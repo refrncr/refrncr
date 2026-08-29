@@ -8,13 +8,14 @@ version = "0.1.0"
 description = "Reference data without the enterprise baggage."
 readme = "README.md"
 requires-python = ">=3.12"
-authors = [
-    { name = "refrncr" }
-]
+authors = [{ name = "refrncr" }]
 dependencies = []
 
+[project.optional-dependencies]
+dev = ["pytest>=8.3,<9", "ruff>=0.16,<0.17"]
+
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
