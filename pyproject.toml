@@ -12,7 +12,7 @@ authors = [{ name = "refrncr" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3,<9", "ruff>=0.16,<0.17"]
+dev = ["pre-commit>=4.0,<5", "pytest>=8.3,<9", "ruff>=0.16,<0.17"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
