@@ -7,6 +7,7 @@ from flask import Flask, abort, make_response, redirect, render_template_string,
 
 from refrncr.services import (
     AuthorizationError,
+    MembershipService,
     SessionService,
     TeamService,
     UserManagementError,
@@ -17,7 +18,12 @@ ANONYMOUS_CSRF_COOKIE = "__Host-refrncr_csrf"
 SESSION_COOKIE = "refrncr_session"
 
 
-def create_flask_app(users: UserService, sessions: SessionService, teams: TeamService) -> Flask:
+def create_flask_app(
+    users: UserService,
+    sessions: SessionService,
+    teams: TeamService,
+    memberships: MembershipService,
+) -> Flask:
     app = Flask(__name__)
 
     def authenticated():
@@ -191,7 +197,7 @@ def create_flask_app(users: UserService, sessions: SessionService, teams: TeamSe
         managed_teams = teams.list_teams(actor.id)
         return render_template_string(
             "<h1>Teams</h1><ul>{% for team in teams %}<li>"
-            "{{ team.name }}"
+            "{{ team.name }} <a href='/teams/{{ team.id }}/members'>Manage members</a>"
             "<form method='post' action='/teams/{{ team.id }}/rename'>"
             "<input name='name'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Rename team</button></form>"
@@ -225,6 +231,45 @@ def create_flask_app(users: UserService, sessions: SessionService, teams: TeamSe
         require_csrf(login_session.csrf_token)
         teams.delete_team(actor.id, team_id)
         return redirect(url_for("team_list"))
+
+    @app.get("/teams/<team_id>/members")
+    def team_members(team_id: str):
+        actor, login_session = require_admin()
+        managed_members = memberships.list_team_members(actor.id, team_id)
+        eligible_users = memberships.list_eligible_users(actor.id, team_id)
+        return render_template_string(
+            "<h1>Team members</h1>"
+            "{% if members %}<ul>{% for membership, user in members %}<li>"
+            "{{ user.display_name }} — {{ user.email }}"
+            "<form method='post' action='/teams/{{ team_id }}/members/"
+            "{{ membership.id }}/delete'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Remove member</button></form></li>{% endfor %}</ul>"
+            "{% else %}<p>This team has no members.</p>{% endif %}"
+            "<form method='post' action='/teams/{{ team_id }}/members'>"
+            "<select name='user_id'>{% for user in eligible_users %}"
+            "<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>"
+            "{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Add member</button></form>",
+            members=managed_members,
+            eligible_users=eligible_users,
+            team_id=team_id,
+            csrf=login_session.csrf_token,
+        )
+
+    @app.post("/teams/<team_id>/members")
+    def create_membership(team_id: str):
+        actor, login_session = require_admin()
+        require_csrf(login_session.csrf_token)
+        memberships.create_membership(actor.id, request.form["user_id"], team_id)
+        return redirect(url_for("team_members", team_id=team_id))
+
+    @app.post("/teams/<team_id>/members/<membership_id>/delete")
+    def delete_membership(team_id: str, membership_id: str):
+        actor, login_session = require_admin()
+        require_csrf(login_session.csrf_token)
+        memberships.delete_membership(actor.id, team_id, membership_id)
+        return redirect(url_for("team_members", team_id=team_id))
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):

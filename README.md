@@ -17,4 +17,7 @@ concurrent multi-user operation.
 
 Administrators can create, rename, list, and delete multiple teams within the single Community
 installation. Team names preserve their NFC-normalized display form and are unique using Unicode
-case-insensitive comparison. Team membership and permissions are handled by later product stories.
+case-insensitive comparison. Administrators can add active users to teams and remove memberships;
+users may belong to multiple teams, and teams may exist without members. Disabling or soft-deleting
+a user retains their memberships, while deleting a team removes its memberships. Team permissions
+are handled by later product stories.
