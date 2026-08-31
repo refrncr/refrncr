@@ -1,11 +1,11 @@
 from a2wsgi import WSGIMiddleware
 from fastapi import FastAPI
 
-from refrncr.services import SessionService, UserService
+from refrncr.services import SessionService, TeamService, UserService
 from refrncr.web import create_flask_app
 
 
-def create_application(users: UserService, sessions: SessionService) -> FastAPI:
+def create_application(users: UserService, sessions: SessionService, teams: TeamService) -> FastAPI:
     users.bootstrap_organisation()
     app = FastAPI(title="refrncr")
 
@@ -13,6 +13,6 @@ def create_application(users: UserService, sessions: SessionService) -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    flask_app = create_flask_app(users, sessions)
+    flask_app = create_flask_app(users, sessions, teams)
     app.mount("/", WSGIMiddleware(flask_app))
     return app

@@ -12,3 +12,9 @@ uses database-backed server-side sessions.
 
 SQLite supports the zero-infrastructure local experience. PostgreSQL is recommended for serious
 concurrent multi-user operation.
+
+## Community teams
+
+Administrators can create, rename, list, and delete multiple teams within the single Community
+installation. Team names preserve their NFC-normalized display form and are unique using Unicode
+case-insensitive comparison. Team membership and permissions are handled by later product stories.

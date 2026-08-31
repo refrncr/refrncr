@@ -5,13 +5,19 @@ import secrets
 
 from flask import Flask, abort, make_response, redirect, render_template_string, request, url_for
 
-from refrncr.services import AuthorizationError, SessionService, UserManagementError, UserService
+from refrncr.services import (
+    AuthorizationError,
+    SessionService,
+    TeamService,
+    UserManagementError,
+    UserService,
+)
 
 ANONYMOUS_CSRF_COOKIE = "__Host-refrncr_csrf"
 SESSION_COOKIE = "refrncr_session"
 
 
-def create_flask_app(users: UserService, sessions: SessionService) -> Flask:
+def create_flask_app(users: UserService, sessions: SessionService, teams: TeamService) -> Flask:
     app = Flask(__name__)
 
     def authenticated():
@@ -178,6 +184,47 @@ def create_flask_app(users: UserService, sessions: SessionService) -> Flask:
         require_csrf(login_session.csrf_token)
         users.change_email(actor.id, target_id, request.form["email"])
         return redirect(url_for("user_list"))
+
+    @app.get("/teams")
+    def team_list():
+        actor, login_session = require_admin()
+        managed_teams = teams.list_teams(actor.id)
+        return render_template_string(
+            "<h1>Teams</h1><ul>{% for team in teams %}<li>"
+            "{{ team.name }}"
+            "<form method='post' action='/teams/{{ team.id }}/rename'>"
+            "<input name='name'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Rename team</button></form>"
+            "<form method='post' action='/teams/{{ team.id }}/delete'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Delete team</button></form></li>{% endfor %}</ul>"
+            "<form method='post' action='/teams'><input name='name'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Create team</button></form>",
+            teams=managed_teams,
+            csrf=login_session.csrf_token,
+        )
+
+    @app.post("/teams")
+    def create_team():
+        actor, login_session = require_admin()
+        require_csrf(login_session.csrf_token)
+        teams.create_team(actor.id, request.form["name"])
+        return redirect(url_for("team_list"))
+
+    @app.post("/teams/<team_id>/rename")
+    def rename_team(team_id: str):
+        actor, login_session = require_admin()
+        require_csrf(login_session.csrf_token)
+        teams.rename_team(actor.id, team_id, request.form["name"])
+        return redirect(url_for("team_list"))
+
+    @app.post("/teams/<team_id>/delete")
+    def delete_team(team_id: str):
+        actor, login_session = require_admin()
+        require_csrf(login_session.csrf_token)
+        teams.delete_team(actor.id, team_id)
+        return redirect(url_for("team_list"))
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):

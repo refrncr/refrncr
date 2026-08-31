@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, event
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column
 
 from refrncr.db.base import Base
@@ -68,3 +69,33 @@ class AuditEvent(Base):
     object_type: Mapped[str] = mapped_column(String(100))
     object_id: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100))
+
+
+class Team(Base):
+    __tablename__ = "teams"
+    __table_args__ = (
+        CheckConstraint("length(name) BETWEEN 1 AND 100", name="ck_teams_name_length"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(100))
+    _name_key: Mapped[str] = mapped_column("name_key", String(300), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    @hybrid_property
+    def name_key(self) -> str:
+        return self._name_key
+
+    @name_key.inplace.expression
+    @classmethod
+    def _name_key_expression(cls):
+        return cls._name_key
+
+
+@event.listens_for(Team, "before_insert")
+@event.listens_for(Team, "before_update")
+def _derive_team_name_key(_mapper, _connection, team: Team) -> None:
+    team._name_key = team.name.casefold()

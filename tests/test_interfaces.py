@@ -8,8 +8,8 @@ from sqlalchemy.pool import StaticPool
 from refrncr.app import create_application
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import User
-from refrncr.services import SessionService, UserService
+from refrncr.models import Team, User
+from refrncr.services import SessionService, TeamService, UserService
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
@@ -26,15 +26,16 @@ def configured_services():
     factory = create_session_factory(engine)
     users = UserService(factory)
     sessions = SessionService(factory)
+    teams = TeamService(factory)
     users.bootstrap_organisation()
-    return factory, users, sessions
+    return factory, users, sessions, teams
 
 
 @pytest.fixture
 def interface():
-    factory, users, sessions = configured_services()
-    client = create_flask_app(users, sessions).test_client()
-    return factory, users, sessions, client
+    factory, users, sessions, teams = configured_services()
+    client = create_flask_app(users, sessions, teams).test_client()
+    return factory, users, sessions, teams, client
 
 
 def request(client, method, path, **kwargs):
@@ -86,8 +87,8 @@ def authenticated_csrf(client):
 
 
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
-    _, users, sessions = configured_services()
-    client = TestClient(create_application(users, sessions), base_url="https://testserver")
+    _, users, sessions, teams = configured_services()
+    client = TestClient(create_application(users, sessions, teams), base_url="https://testserver")
 
     assert client.get("/api/health").json() == {"status": "ok"}
     assert "refrncr" in client.get("/").text
@@ -121,10 +122,11 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
         == 302
     )
     assert client.get("/users").status_code == 200
+    assert client.get("/teams").status_code == 200
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
-    factory, _, _, client = interface
+    factory, _, _, _, client = interface
     form = request(client, "get", "/setup")
     token = csrf_token(form)
     csrf_cookie = client.get_cookie(ANONYMOUS_CSRF_COOKIE)
@@ -161,7 +163,7 @@ def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
 
 
 def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details(interface):
-    _, _, _, client = interface
+    _, _, _, _, client = interface
     setup_admin(client)
     csrf_token(request(client, "get", "/login"))
 
@@ -194,7 +196,7 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
 
 
 def test_successful_login_rotates_and_revokes_existing_session(interface):
-    _, _, sessions, client = interface
+    _, _, sessions, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     old_token = client.get_cookie(SESSION_COOKIE).value
@@ -208,7 +210,7 @@ def test_successful_login_rotates_and_revokes_existing_session(interface):
 
 
 def test_unauthenticated_and_non_admin_users_are_rejected(interface):
-    _, users, _, client = interface
+    _, users, _, _, client = interface
     setup_admin(client)
     assert request(client, "get", "/users").status_code == 403
 
@@ -231,7 +233,7 @@ def test_unauthenticated_and_non_admin_users_are_rejected(interface):
     ],
 )
 def test_every_user_management_post_rejects_missing_csrf(interface, path, data):
-    _, users, _, client = interface
+    _, users, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -242,7 +244,7 @@ def test_every_user_management_post_rejects_missing_csrf(interface, path, data):
 
 
 def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
-    _, _, sessions, client = interface
+    _, _, sessions, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     token = client.get_cookie(SESSION_COOKIE).value
@@ -260,7 +262,7 @@ def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
 
 
 def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
-    _, users, sessions, client = interface
+    _, users, sessions, _, client = interface
     setup_admin(client)
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "member password")
@@ -282,7 +284,7 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
 
 
 def test_user_list_escapes_user_controlled_values(interface):
-    _, users, _, client = interface
+    _, users, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -301,7 +303,7 @@ def test_user_list_escapes_user_controlled_values(interface):
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
-    _, _, _, client = interface
+    _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -334,7 +336,7 @@ def test_expected_user_error_does_not_expose_sensitive_values(interface):
     ],
 )
 def test_create_user_validation_errors_are_controlled(interface, overrides):
-    factory, _, _, client = interface
+    factory, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -357,7 +359,7 @@ def test_create_user_validation_errors_are_controlled(interface, overrides):
 
 
 def test_change_email_validation_error_is_controlled(interface):
-    _, users, _, client = interface
+    _, users, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -374,3 +376,111 @@ def test_change_email_validation_error_is_controlled(interface):
     assert response.status_code == 400
     assert "malformed email" not in response_text(response)
     assert users.authenticate("managed@example.com", "password").id == managed.id
+
+
+def test_admin_creates_renames_lists_and_deletes_team(interface):
+    factory, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    csrf = authenticated_csrf(client)
+
+    response = request(
+        client,
+        "post",
+        "/teams",
+        data={"name": " Platform ", "csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    with factory() as session:
+        team = session.scalar(select(Team))
+        assert team.name == "Platform"
+
+    body = response_text(request(client, "get", "/teams"))
+    assert "Platform" in body
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/rename",
+        data={"name": "Delivery", "csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    assert "Delivery" in response_text(request(client, "get", "/teams"))
+
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/delete",
+        data={"csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    with factory() as session:
+        assert session.get(Team, team.id) is None
+
+
+def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
+    _, users, _, teams, client = interface
+    setup_admin(client)
+    assert request(client, "get", "/teams").status_code == 403
+    assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
+
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    users.create_user(admin.id, "member@example.com", "Member", "member password")
+    assert login(client, "member@example.com", "member password").status_code == 302
+    assert request(client, "get", "/teams").status_code == 403
+    assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
+    assert teams.list_teams(admin.id) == []
+
+
+@pytest.mark.parametrize("token", [None, "invalid", "é"])
+@pytest.mark.parametrize("operation", ["create", "rename", "delete"])
+def test_every_team_state_change_requires_csrf(interface, operation, token):
+    _, users, _, teams, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    team = teams.create_team(admin.id, "Existing")
+    routes = {
+        "create": ("/teams", {"name": "New"}),
+        "rename": (f"/teams/{team.id}/rename", {"name": "Renamed"}),
+        "delete": (f"/teams/{team.id}/delete", {}),
+    }
+    path, data = routes[operation]
+    if token is not None:
+        data["csrf_token"] = token
+
+    response = request(client, "post", path, data=data)
+
+    assert response.status_code == 403
+    assert [stored.name for stored in teams.list_teams(admin.id)] == ["Existing"]
+
+
+def test_team_interface_escapes_names_and_controls_validation_errors(interface):
+    _, users, _, teams, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    teams.create_team(admin.id, "<script>alert(1)</script>")
+    csrf = authenticated_csrf(client)
+
+    body = response_text(request(client, "get", "/teams"))
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body
+
+    response = request(
+        client,
+        "post",
+        "/teams",
+        data={"name": " ", "csrf_token": csrf},
+    )
+    assert response.status_code == 400
+    assert "<script>" not in response_text(response)
+
+    response = request(
+        client,
+        "post",
+        "/teams",
+        data={"name": "<SCRIPT>ALERT(1)</SCRIPT>", "csrf_token": csrf},
+    )
+    assert response.status_code == 400
+    assert "<SCRIPT>" not in response_text(response)

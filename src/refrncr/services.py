@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import unicodedata
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
@@ -13,7 +14,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from refrncr.models import AuditEvent, LoginSession, Organisation, User, utc_now
+from refrncr.models import AuditEvent, LoginSession, Organisation, Team, User, utc_now
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -63,6 +64,20 @@ def normalize_email(email: str) -> str:
     if not local_part or not domain:
         raise ValidationError("A valid email address is required")
     return normalized
+
+
+def normalize_team_name(name: str) -> str:
+    normalized_name = unicodedata.normalize("NFC", name.strip())
+    if not 1 <= len(normalized_name) <= 100:
+        raise ValidationError("Team name must contain between 1 and 100 characters")
+    return normalized_name
+
+
+def require_admin(session: Session, actor_id: str) -> User:
+    actor = session.get(User, actor_id)
+    if actor is None or actor.role != "admin" or not actor.is_active or actor.is_deleted:
+        raise AuthorizationError("Administrator access required")
+    return actor
 
 
 @contextmanager
@@ -129,7 +144,7 @@ class UserService:
         role: str = "user",
     ) -> User:
         with self.sessions.begin() as session:
-            actor = self._require_admin(session, actor_id)
+            actor = require_admin(session, actor_id)
             user = self._new_user(email, display_name, password, role)
             session.add(user)
             try:
@@ -141,7 +156,7 @@ class UserService:
 
     def change_email(self, actor_id: str, target_id: str, email: str) -> User:
         with self.sessions.begin() as session:
-            actor = self._require_admin(session, actor_id)
+            actor = require_admin(session, actor_id)
             target = self._target(session, target_id)
             target.email = normalize_email(email)
             try:
@@ -162,7 +177,7 @@ class UserService:
 
     def list_users(self, actor_id: str) -> list[User]:
         with self.sessions() as session:
-            self._require_admin(session, actor_id)
+            require_admin(session, actor_id)
             return list(session.scalars(select(User).order_by(User.email)))
 
     def authenticate(self, email: str, password: str) -> User | None:
@@ -183,7 +198,7 @@ class UserService:
     def _set_state(self, actor_id: str, target_id: str, action: str) -> User:
         with _write_transaction(self.sessions, immediate_sqlite=True) as session:
             self._lock_organisation(session)
-            actor = self._require_admin(session, actor_id)
+            actor = require_admin(session, actor_id)
             target = self._target(session, target_id)
             if action == "enabled":
                 if target.is_deleted:
@@ -229,13 +244,6 @@ class UserService:
         )
 
     @staticmethod
-    def _require_admin(session: Session, actor_id: str) -> User:
-        actor = session.get(User, actor_id)
-        if actor is None or actor.role != "admin" or not actor.is_active or actor.is_deleted:
-            raise AuthorizationError("Administrator access required")
-        return actor
-
-    @staticmethod
     def _target(session: Session, target_id: str) -> User:
         target = session.get(User, target_id)
         if target is None:
@@ -258,6 +266,66 @@ class UserService:
             actor_user_id=actor_id,
             object_type="user",
             object_id=target.id,
+            action=action,
+        )
+
+
+class TeamService:
+    """Team operations within the one Community installation context."""
+
+    def __init__(self, sessions: sessionmaker[Session]):
+        self.sessions = sessions
+
+    def create_team(self, actor_id: str, name: str) -> Team:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            team = Team(name=normalize_team_name(name))
+            session.add(team)
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise ConflictError("Team name already exists in this installation") from exc
+            session.add(self._audit(actor.id, team.id, "created"))
+            return team
+
+    def rename_team(self, actor_id: str, team_id: str, name: str) -> Team:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            team = self._target(session, team_id)
+            team.name = normalize_team_name(name)
+            team.updated_at = utc_now()
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise ConflictError("Team name already exists in this installation") from exc
+            session.add(self._audit(actor.id, team.id, "renamed"))
+            return team
+
+    def delete_team(self, actor_id: str, team_id: str) -> None:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            team = self._target(session, team_id)
+            session.add(self._audit(actor.id, team.id, "deleted"))
+            session.delete(team)
+
+    def list_teams(self, actor_id: str) -> list[Team]:
+        with self.sessions() as session:
+            require_admin(session, actor_id)
+            return list(session.scalars(select(Team).order_by(Team.name_key)))
+
+    @staticmethod
+    def _target(session: Session, team_id: str) -> Team:
+        team = session.get(Team, team_id)
+        if team is None:
+            raise NotFoundError("Team not found")
+        return team
+
+    @staticmethod
+    def _audit(actor_id: str, team_id: str, action: str) -> AuditEvent:
+        return AuditEvent(
+            actor_user_id=actor_id,
+            object_type="team",
+            object_id=team_id,
             action=action,
         )
 
