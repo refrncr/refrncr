@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      REFRNCR_TEST_POSTGRES_URL: postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test
 
     services:
       postgres:
