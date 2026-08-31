@@ -43,7 +43,7 @@ def test_admin_creates_memberless_team_with_normalized_name_and_timestamps(team_
     assert team.name_key == "café  platform"
     assert team.created_at is not None
     assert team.updated_at is not None
-    assert "memberships" not in inspect(engine).get_table_names()
+    assert "memberships" in inspect(engine).get_table_names()
 
 
 def test_model_derives_name_key_and_rejects_independent_public_assignment(team_services):

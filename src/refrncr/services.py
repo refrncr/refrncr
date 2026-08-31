@@ -14,7 +14,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from refrncr.models import AuditEvent, LoginSession, Organisation, Team, User, utc_now
+from refrncr.models import AuditEvent, LoginSession, Membership, Organisation, Team, User, utc_now
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -304,7 +304,7 @@ class TeamService:
     def delete_team(self, actor_id: str, team_id: str) -> None:
         with _write_transaction(self.sessions, immediate_sqlite=True) as session:
             actor = require_admin(session, actor_id)
-            team = self._target(session, team_id)
+            team = self._target(session, team_id, for_update=True)
             session.add(self._audit(actor.id, team.id, "deleted"))
             session.delete(team)
 
@@ -314,8 +314,11 @@ class TeamService:
             return list(session.scalars(select(Team).order_by(Team.name_key)))
 
     @staticmethod
-    def _target(session: Session, team_id: str) -> Team:
-        team = session.get(Team, team_id)
+    def _target(session: Session, team_id: str, *, for_update: bool = False) -> Team:
+        statement = select(Team).where(Team.id == team_id)
+        if for_update and session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        team = session.scalar(statement)
         if team is None:
             raise NotFoundError("Team not found")
         return team
@@ -326,6 +329,111 @@ class TeamService:
             actor_user_id=actor_id,
             object_type="team",
             object_id=team_id,
+            action=action,
+        )
+
+
+class MembershipService:
+    """Team membership operations within the one Community installation context."""
+
+    def __init__(self, sessions: sessionmaker[Session]):
+        self.sessions = sessions
+
+    def create_membership(self, actor_id: str, user_id: str, team_id: str) -> Membership:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            self._lock_team(session, team_id)
+            target = self._lock_user(session, user_id)
+            if not target.is_active or target.is_deleted:
+                raise InvalidLifecycleError("Only active users can be added to teams")
+            membership = Membership(user_id=target.id, team_id=team_id)
+            session.add(membership)
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise ConflictError("User is already a member of this team") from exc
+            session.add(self._audit(actor.id, membership.id, "created"))
+            return membership
+
+    def delete_membership(self, actor_id: str, team_id: str, membership_id: str) -> None:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            membership = session.get(Membership, membership_id)
+            if membership is None or membership.team_id != team_id:
+                raise NotFoundError("Membership not found")
+            self._lock_team(session, team_id)
+            statement = select(Membership).where(
+                Membership.id == membership_id, Membership.team_id == team_id
+            )
+            if session.get_bind().dialect.name != "sqlite":
+                statement = statement.with_for_update()
+            membership = session.scalar(statement)
+            if membership is None:
+                raise NotFoundError("Membership not found")
+            session.add(self._audit(actor.id, membership.id, "deleted"))
+            session.delete(membership)
+
+    def list_team_members(self, actor_id: str, team_id: str) -> list[tuple[Membership, User]]:
+        with self.sessions() as session:
+            require_admin(session, actor_id)
+            self._team(session, team_id)
+            statement = (
+                select(Membership, User)
+                .join(User, User.id == Membership.user_id)
+                .where(Membership.team_id == team_id)
+                .order_by(User.email)
+            )
+            return list(session.execute(statement).tuples())
+
+    def list_eligible_users(self, actor_id: str, team_id: str) -> list[User]:
+        with self.sessions() as session:
+            require_admin(session, actor_id)
+            self._team(session, team_id)
+            existing = select(Membership.user_id).where(Membership.team_id == team_id)
+            statement = (
+                select(User)
+                .where(
+                    User.is_active.is_(True),
+                    User.is_deleted.is_(False),
+                    User.id.not_in(existing),
+                )
+                .order_by(User.email)
+            )
+            return list(session.scalars(statement))
+
+    @staticmethod
+    def _team(session: Session, team_id: str) -> Team:
+        team = session.get(Team, team_id)
+        if team is None:
+            raise NotFoundError("Team not found")
+        return team
+
+    @staticmethod
+    def _lock_team(session: Session, team_id: str) -> Team:
+        statement = select(Team).where(Team.id == team_id)
+        if session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        team = session.scalar(statement)
+        if team is None:
+            raise NotFoundError("Team not found")
+        return team
+
+    @staticmethod
+    def _lock_user(session: Session, user_id: str) -> User:
+        statement = select(User).where(User.id == user_id)
+        if session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        user = session.scalar(statement)
+        if user is None:
+            raise NotFoundError("User not found")
+        return user
+
+    @staticmethod
+    def _audit(actor_id: str, membership_id: str, action: str) -> AuditEvent:
+        return AuditEvent(
+            actor_user_id=actor_id,
+            object_type="membership",
+            object_id=membership_id,
             action=action,
         )
 

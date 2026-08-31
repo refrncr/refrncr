@@ -1,4 +1,5 @@
 import re
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,8 +9,14 @@ from sqlalchemy.pool import StaticPool
 from refrncr.app import create_application
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import Team, User
-from refrncr.services import SessionService, TeamService, UserService
+from refrncr.models import Membership, Team, User
+from refrncr.services import (
+    AuthorizationError,
+    MembershipService,
+    SessionService,
+    TeamService,
+    UserService,
+)
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
@@ -27,15 +34,16 @@ def configured_services():
     users = UserService(factory)
     sessions = SessionService(factory)
     teams = TeamService(factory)
+    memberships = MembershipService(factory)
     users.bootstrap_organisation()
-    return factory, users, sessions, teams
+    return factory, users, sessions, teams, memberships
 
 
 @pytest.fixture
 def interface():
-    factory, users, sessions, teams = configured_services()
-    client = create_flask_app(users, sessions, teams).test_client()
-    return factory, users, sessions, teams, client
+    factory, users, sessions, teams, memberships = configured_services()
+    client = create_flask_app(users, sessions, teams, memberships).test_client()
+    return factory, users, sessions, teams, memberships, client
 
 
 def request(client, method, path, **kwargs):
@@ -87,12 +95,15 @@ def authenticated_csrf(client):
 
 
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
-    _, users, sessions, teams = configured_services()
-    client = TestClient(create_application(users, sessions, teams), base_url="https://testserver")
+    _, users, sessions, teams, memberships = configured_services()
+    client = TestClient(
+        create_application(users, sessions, teams, memberships), base_url="https://testserver"
+    )
 
     assert client.get("/api/health").json() == {"status": "ok"}
     assert "refrncr" in client.get("/").text
     assert client.get("/users").status_code == 403
+    assert client.get(f"/teams/{uuid.uuid4()}/members").status_code == 403
 
     setup_token = csrf_token(client.get("/setup"))
     assert (
@@ -126,7 +137,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
-    factory, _, _, _, client = interface
+    factory, _, _, _, _, client = interface
     form = request(client, "get", "/setup")
     token = csrf_token(form)
     csrf_cookie = client.get_cookie(ANONYMOUS_CSRF_COOKIE)
@@ -163,7 +174,7 @@ def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
 
 
 def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details(interface):
-    _, _, _, _, client = interface
+    _, _, _, _, _, client = interface
     setup_admin(client)
     csrf_token(request(client, "get", "/login"))
 
@@ -196,7 +207,7 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
 
 
 def test_successful_login_rotates_and_revokes_existing_session(interface):
-    _, _, sessions, _, client = interface
+    _, _, sessions, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     old_token = client.get_cookie(SESSION_COOKIE).value
@@ -210,7 +221,7 @@ def test_successful_login_rotates_and_revokes_existing_session(interface):
 
 
 def test_unauthenticated_and_non_admin_users_are_rejected(interface):
-    _, users, _, _, client = interface
+    _, users, _, _, _, client = interface
     setup_admin(client)
     assert request(client, "get", "/users").status_code == 403
 
@@ -233,7 +244,7 @@ def test_unauthenticated_and_non_admin_users_are_rejected(interface):
     ],
 )
 def test_every_user_management_post_rejects_missing_csrf(interface, path, data):
-    _, users, _, _, client = interface
+    _, users, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -244,7 +255,7 @@ def test_every_user_management_post_rejects_missing_csrf(interface, path, data):
 
 
 def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
-    _, _, sessions, _, client = interface
+    _, _, sessions, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     token = client.get_cookie(SESSION_COOKIE).value
@@ -262,7 +273,7 @@ def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
 
 
 def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
-    _, users, sessions, _, client = interface
+    _, users, sessions, _, _, client = interface
     setup_admin(client)
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "member password")
@@ -284,7 +295,7 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
 
 
 def test_user_list_escapes_user_controlled_values(interface):
-    _, users, _, _, client = interface
+    _, users, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -303,7 +314,7 @@ def test_user_list_escapes_user_controlled_values(interface):
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
-    _, _, _, _, client = interface
+    _, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -336,7 +347,7 @@ def test_expected_user_error_does_not_expose_sensitive_values(interface):
     ],
 )
 def test_create_user_validation_errors_are_controlled(interface, overrides):
-    factory, _, _, _, client = interface
+    factory, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -359,7 +370,7 @@ def test_create_user_validation_errors_are_controlled(interface, overrides):
 
 
 def test_change_email_validation_error_is_controlled(interface):
-    _, users, _, _, client = interface
+    _, users, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -379,7 +390,7 @@ def test_change_email_validation_error_is_controlled(interface):
 
 
 def test_admin_creates_renames_lists_and_deletes_team(interface):
-    factory, _, _, _, client = interface
+    factory, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -418,7 +429,7 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
 
 
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
-    _, users, _, teams, client = interface
+    _, users, _, teams, _, client = interface
     setup_admin(client)
     assert request(client, "get", "/teams").status_code == 403
     assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
@@ -435,7 +446,7 @@ def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
 @pytest.mark.parametrize("token", [None, "invalid", "é"])
 @pytest.mark.parametrize("operation", ["create", "rename", "delete"])
 def test_every_team_state_change_requires_csrf(interface, operation, token):
-    _, users, _, teams, client = interface
+    _, users, _, teams, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -456,7 +467,7 @@ def test_every_team_state_change_requires_csrf(interface, operation, token):
 
 
 def test_team_interface_escapes_names_and_controls_validation_errors(interface):
-    _, users, _, teams, client = interface
+    _, users, _, teams, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -484,3 +495,165 @@ def test_team_interface_escapes_names_and_controls_validation_errors(interface):
     )
     assert response.status_code == 400
     assert "<SCRIPT>" not in response_text(response)
+
+
+def test_admin_views_empty_team_and_adds_and_removes_member(interface):
+    factory, users, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    team = teams.create_team(admin.id, "Platform")
+    csrf = authenticated_csrf(client)
+
+    response = request(client, "get", f"/teams/{team.id}/members")
+    assert response.status_code == 200
+    assert "This team has no members." in response_text(response)
+
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/members",
+        data={"user_id": managed.id, "csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    with factory() as session:
+        membership = session.scalar(select(Membership))
+    body = response_text(request(client, "get", f"/teams/{team.id}/members"))
+    assert "Member" in body and "member@example.com" in body
+
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/members/{membership.id}/delete",
+        data={"csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    assert memberships.list_team_members(admin.id, team.id) == []
+
+
+@pytest.mark.parametrize("token", [None, "invalid", "é"])
+@pytest.mark.parametrize("operation", ["create", "delete"])
+def test_every_membership_state_change_requires_csrf(interface, operation, token):
+    _, users, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    team = teams.create_team(admin.id, "Platform")
+    membership = memberships.create_membership(admin.id, managed.id, team.id)
+    if operation == "create":
+        second = users.create_user(admin.id, "second@example.com", "Second", "password")
+        path = f"/teams/{team.id}/members"
+        data = {"user_id": second.id}
+    else:
+        path = f"/teams/{team.id}/members/{membership.id}/delete"
+        data = {}
+    if token is not None:
+        data["csrf_token"] = token
+
+    response = request(client, "post", path, data=data)
+
+    assert response.status_code == 403
+    assert len(memberships.list_team_members(admin.id, team.id)) == 1
+
+
+def test_membership_interface_authorization_uses_service_for_all_actor_states(interface):
+    _, users, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    team = teams.create_team(admin.id, "Platform")
+
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 200
+    request(client, "post", "/logout", data={"csrf_token": authenticated_csrf(client)})
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+
+    actors = [
+        users.create_user(admin.id, "regular@example.com", "Regular", "password"),
+        users.create_user(admin.id, "disabled@example.com", "Disabled", "password", role="admin"),
+        users.create_user(admin.id, "deleted@example.com", "Deleted", "password", role="admin"),
+    ]
+    assert login(client, "regular@example.com", "password").status_code == 302
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    assert login(client, "disabled@example.com", "password").status_code == 302
+    users.disable_user(admin.id, actors[1].id)
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    assert login(client, "deleted@example.com", "password").status_code == 302
+    users.delete_user(admin.id, actors[2].id)
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    for actor in actors:
+        with pytest.raises(AuthorizationError):
+            memberships.create_membership(actor.id, managed.id, team.id)
+        with pytest.raises(AuthorizationError):
+            memberships.delete_membership(actor.id, team.id, str(uuid.uuid4()))
+
+
+def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(interface):
+    _, users, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "password")
+    deleted = users.create_user(admin.id, "deleted@example.com", "Deleted", "password")
+    team = teams.create_team(admin.id, "Platform")
+    membership = memberships.create_membership(admin.id, managed.id, team.id)
+    disabled_membership = memberships.create_membership(admin.id, disabled.id, team.id)
+    deleted_membership = memberships.create_membership(admin.id, deleted.id, team.id)
+    users.disable_user(admin.id, disabled.id)
+    users.delete_user(admin.id, deleted.id)
+    csrf = authenticated_csrf(client)
+
+    for path, data in [
+        (f"/teams/{team.id}/members", {"user_id": managed.id, "csrf_token": csrf}),
+        (
+            f"/teams/{team.id}/members",
+            {"user_id": str(uuid.uuid4()), "csrf_token": csrf},
+        ),
+        (f"/teams/{team.id}/members", {"user_id": disabled.id, "csrf_token": csrf}),
+        (f"/teams/{team.id}/members", {"user_id": deleted.id, "csrf_token": csrf}),
+        (
+            f"/teams/{uuid.uuid4()}/members",
+            {"user_id": managed.id, "csrf_token": csrf},
+        ),
+        (
+            f"/teams/{team.id}/members/{uuid.uuid4()}/delete",
+            {"csrf_token": csrf},
+        ),
+    ]:
+        response = request(client, "post", path, data=data)
+        assert response.status_code == 400
+        assert "password_hash" not in response_text(response)
+        assert SESSION_COOKIE not in response_text(response)
+
+    for existing in [disabled_membership, deleted_membership, membership]:
+        response = request(
+            client,
+            "post",
+            f"/teams/{team.id}/members/{existing.id}/delete",
+            data={"csrf_token": csrf},
+        )
+        assert response.status_code == 302
+
+
+def test_membership_interface_escapes_user_values(interface):
+    _, users, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(
+        admin.id,
+        "<script>alert(1)</script>@example.com",
+        "<img src=x onerror=alert(1)>",
+        "password",
+    )
+    team = teams.create_team(admin.id, "Platform")
+    memberships.create_membership(admin.id, managed.id, team.id)
+
+    body = response_text(request(client, "get", f"/teams/{team.id}/members"))
+    assert "<script>alert(1)</script>" not in body
+    assert "<img src=x onerror=alert(1)>" not in body
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;@example.com" in body
+    assert "&lt;img src=x onerror=alert(1)&gt;" in body
