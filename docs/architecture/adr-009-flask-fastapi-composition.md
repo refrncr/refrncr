@@ -1,0 +1,37 @@
+# ADR-009: Compose Flask web UI inside a FastAPI ASGI application
+
+Status: Accepted
+
+## Context
+
+REF-33 establishes Flask for the initial server-rendered interface and FastAPI for HTTP APIs.
+Business and authorization rules must be shared and framework-independent.
+
+## Decision
+
+FastAPI is the process-level ASGI application. API routes are registered on it, and the Flask
+WSGI application is mounted at `/` after those routes. Both boundaries receive the same
+application services and session factory through explicit construction.
+
+The composition root bootstraps exactly one Community `Organisation`. Application services run
+inside that installation context and therefore do not accept organisation or tenant identifiers.
+Users, sessions, and audit events contain no generic tenant-scoping columns. Cloud provisioning
+and tenant isolation are separate concerns of `refrncr-cloud`, not extension requirements imposed
+on the Community database model.
+
+The domain and application layers import neither framework. REF-33 does not introduce a public
+user-management REST contract; future FastAPI endpoints will call the same services as Flask.
+
+## Consequences
+
+The product has one deployable application and one composition root. Flask can deliver the first
+web experience without duplicating business logic, while FastAPI remains available for explicit
+API stories. The WSGI/ASGI bridge adds a boundary that must be retained or deliberately replaced.
+The Community service interfaces remain small and installation-scoped; a Cloud integration must
+adapt or compose them externally rather than turning the core schema into a multi-tenant schema.
+
+## Alternatives considered
+
+- Run independent Flask and FastAPI processes, which would duplicate deployment configuration.
+- Implement user-management rules in Flask views, which would prevent safe reuse by FastAPI.
+- Add a user-management API now, which would invent a contract not required by REF-33.

@@ -10,13 +10,18 @@ readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "refrncr" }]
 dependencies = [
+    "a2wsgi>=1.10,<2",
     "sqlalchemy>=2.0,<3",
     "alembic>=1.13,<2",
+    "argon2-cffi>=23.1,<26",
+    "fastapi>=0.116,<1",
+    "flask>=3.1,<4",
     "psycopg[binary]>=3.2,<4",
+    "uvicorn>=0.35,<1",
 ]
 
 [project.optional-dependencies]
-dev = ["pre-commit>=4.0,<5", "pytest>=8.3,<9", "ruff>=0.16,<0.17"]
+dev = ["httpx>=0.28,<1", "pre-commit>=4.0,<5", "pytest>=8.3,<9", "ruff>=0.16,<0.17"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
