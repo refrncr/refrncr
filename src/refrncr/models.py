@@ -117,3 +117,29 @@ class Membership(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class Grant(Base):
+    __tablename__ = "grants"
+    __table_args__ = (
+        CheckConstraint("subject_type IN ('user', 'team')", name="ck_grants_subject_type"),
+        CheckConstraint("permission IN ('viewer', 'editor', 'admin')", name="ck_grants_permission"),
+        UniqueConstraint(
+            "subject_type",
+            "subject_id",
+            "resource_type",
+            "resource_id",
+            name="uq_grants_subject_resource",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    subject_type: Mapped[str] = mapped_column(String(16), index=True)
+    subject_id: Mapped[str] = mapped_column(String(36), index=True)
+    resource_type: Mapped[str] = mapped_column(String(100), index=True)
+    resource_id: Mapped[str] = mapped_column(String(100), index=True)
+    permission: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )

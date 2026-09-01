@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import timedelta
 
@@ -14,7 +14,19 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from refrncr.models import AuditEvent, LoginSession, Membership, Organisation, Team, User, utc_now
+from refrncr.models import (
+    AuditEvent,
+    Grant,
+    LoginSession,
+    Membership,
+    Organisation,
+    Team,
+    User,
+    utc_now,
+)
+
+PERMISSION_LEVELS = {"viewer": 1, "editor": 2, "admin": 3}
+SUBJECT_TYPES = {"user", "team"}
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -50,6 +62,31 @@ class NotFoundError(UserManagementError):
 
 class ValidationError(UserManagementError, ValueError):
     pass
+
+
+class ResourceTypeRegistry:
+    """Maps canonical resource types to framework-independent existence resolvers."""
+
+    def __init__(self) -> None:
+        self._resolvers: dict[str, Callable[[str], bool]] = {}
+
+    def register(self, resource_type: str, resolver: Callable[[str], bool]) -> None:
+        if (
+            not resource_type
+            or resource_type != resource_type.strip().casefold()
+            or len(resource_type) > 100
+        ):
+            raise ValidationError("Resource type must be a canonical lower-case value")
+        if resource_type in self._resolvers:
+            raise ConflictError("Resource type is already registered")
+        self._resolvers[resource_type] = resolver
+
+    def require_existing(self, resource_type: str, resource_id: str) -> None:
+        resolver = self._resolvers.get(resource_type)
+        if resolver is None:
+            raise ValidationError("Resource type is not registered")
+        if not resource_id or len(resource_id) > 100 or not resolver(resource_id):
+            raise NotFoundError("Grantable resource not found")
 
 
 def normalize_email(email: str) -> str:
@@ -305,6 +342,16 @@ class TeamService:
         with _write_transaction(self.sessions, immediate_sqlite=True) as session:
             actor = require_admin(session, actor_id)
             team = self._target(session, team_id, for_update=True)
+            statement = (
+                select(Grant)
+                .where(Grant.subject_type == "team", Grant.subject_id == team.id)
+                .order_by(Grant.id)
+            )
+            if session.get_bind().dialect.name != "sqlite":
+                statement = statement.with_for_update()
+            for grant in session.scalars(statement):
+                session.add(self._grant_audit(actor.id, grant.id))
+                session.delete(grant)
             session.add(self._audit(actor.id, team.id, "deleted"))
             session.delete(team)
 
@@ -331,6 +378,156 @@ class TeamService:
             object_id=team_id,
             action=action,
         )
+
+    @staticmethod
+    def _grant_audit(actor_id: str, grant_id: str) -> AuditEvent:
+        return AuditEvent(
+            actor_user_id=actor_id,
+            object_type="grant",
+            object_id=grant_id,
+            action="deleted",
+        )
+
+
+class GrantService:
+    """Administrator-controlled lifecycle for resource Grants."""
+
+    def __init__(self, sessions: sessionmaker[Session], resources: ResourceTypeRegistry) -> None:
+        self.sessions = sessions
+        self.resources = resources
+
+    def create_grant(
+        self,
+        actor_id: str,
+        subject_type: str,
+        subject_id: str,
+        resource_type: str,
+        resource_id: str,
+        permission: str,
+    ) -> Grant:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            self._validate_permission(permission)
+            if subject_type not in SUBJECT_TYPES:
+                raise ValidationError("Subject type must be user or team")
+            self.resources.require_existing(resource_type, resource_id)
+            self._require_subject(session, subject_type, subject_id)
+            grant = Grant(
+                subject_type=subject_type,
+                subject_id=subject_id,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                permission=permission,
+            )
+            session.add(grant)
+            try:
+                session.flush()
+            except IntegrityError as exc:
+                raise ConflictError("Subject already has a Grant for this resource") from exc
+            session.add(self._audit(actor.id, grant.id, "created"))
+            return grant
+
+    def change_permission(self, actor_id: str, grant_id: str, permission: str) -> Grant:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            self._validate_permission(permission)
+            grant = self._target(session, grant_id, for_update=True)
+            grant.permission = permission
+            grant.updated_at = utc_now()
+            session.add(self._audit(actor.id, grant.id, "permission_changed"))
+            return grant
+
+    def delete_grant(self, actor_id: str, grant_id: str) -> None:
+        with _write_transaction(self.sessions, immediate_sqlite=True) as session:
+            actor = require_admin(session, actor_id)
+            grant = self._target(session, grant_id, for_update=True)
+            session.add(self._audit(actor.id, grant.id, "deleted"))
+            session.delete(grant)
+
+    @staticmethod
+    def _validate_permission(permission: str) -> None:
+        if permission not in PERMISSION_LEVELS:
+            raise ValidationError("Permission must be viewer, editor or admin")
+
+    @staticmethod
+    def _require_subject(session: Session, subject_type: str, subject_id: str) -> None:
+        if subject_type == "user":
+            statement = select(User).where(User.id == subject_id)
+            if session.get_bind().dialect.name != "sqlite":
+                statement = statement.with_for_update()
+            subject = session.scalar(statement)
+            if subject is None:
+                raise NotFoundError("User not found")
+            if not subject.is_active or subject.is_deleted:
+                raise InvalidLifecycleError("Only active users can receive direct Grants")
+            return
+        statement = select(Team).where(Team.id == subject_id)
+        if session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        if session.scalar(statement) is None:
+            raise NotFoundError("Team not found")
+
+    @staticmethod
+    def _target(session: Session, grant_id: str, *, for_update: bool = False) -> Grant:
+        statement = select(Grant).where(Grant.id == grant_id)
+        if for_update and session.get_bind().dialect.name != "sqlite":
+            statement = statement.with_for_update()
+        grant = session.scalar(statement)
+        if grant is None:
+            raise NotFoundError("Grant not found")
+        return grant
+
+    @staticmethod
+    def _audit(actor_id: str, grant_id: str, action: str) -> AuditEvent:
+        return AuditEvent(
+            actor_user_id=actor_id,
+            object_type="grant",
+            object_id=grant_id,
+            action=action,
+        )
+
+
+class AuthorizationService:
+    """Single resource-permission engine plus the separate Community admin rule."""
+
+    def __init__(self, sessions: sessionmaker[Session], resources: ResourceTypeRegistry) -> None:
+        self.sessions = sessions
+        self.resources = resources
+
+    def effective_permission(
+        self, user_id: str, resource_type: str, resource_id: str
+    ) -> str | None:
+        with self.sessions() as session:
+            user = session.get(User, user_id)
+            if user is None or not user.is_active or user.is_deleted:
+                return None
+            self.resources.require_existing(resource_type, resource_id)
+            team_ids = select(Membership.team_id).where(Membership.user_id == user.id)
+            permissions = session.scalars(
+                select(Grant.permission).where(
+                    Grant.resource_type == resource_type,
+                    Grant.resource_id == resource_id,
+                    (
+                        ((Grant.subject_type == "user") & (Grant.subject_id == user.id))
+                        | ((Grant.subject_type == "team") & Grant.subject_id.in_(team_ids))
+                    ),
+                )
+            )
+            return max(permissions, key=PERMISSION_LEVELS.__getitem__, default=None)
+
+    def check_access(
+        self, user_id: str, resource_type: str, resource_id: str, required: str
+    ) -> bool:
+        GrantService._validate_permission(required)
+        with self.sessions() as session:
+            user = session.get(User, user_id)
+            if user is None or not user.is_active or user.is_deleted:
+                return False
+            self.resources.require_existing(resource_type, resource_id)
+            if user.role == "admin":
+                return True
+        effective = self.effective_permission(user_id, resource_type, resource_id)
+        return effective is not None and PERMISSION_LEVELS[effective] >= PERMISSION_LEVELS[required]
 
 
 class MembershipService:
