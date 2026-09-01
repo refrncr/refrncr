@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import LoginSession, User
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.services import SessionService, UserService
 
 
@@ -34,7 +35,7 @@ def test_sqlite_enforces_session_cascade_and_audit_restriction():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
+    users = UserService(SqlAlchemyUnitOfWorkFactory(factory))
     sessions = SessionService(factory)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")

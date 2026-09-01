@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, LoginSession, Organisation, User
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationError,
     ConflictError,
@@ -29,7 +30,7 @@ def services():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    return factory, UserService(factory), SessionService(factory)
+    return factory, UserService(SqlAlchemyUnitOfWorkFactory(factory)), SessionService(factory)
 
 
 def initial_admin(users):
@@ -69,7 +70,7 @@ def test_database_rejects_a_second_organisation(services):
 
 
 def assert_concurrent_bootstrap_and_initial_admin(factory):
-    users = UserService(factory)
+    users = UserService(SqlAlchemyUnitOfWorkFactory(factory))
 
     bootstrap_barrier = Barrier(2)
 

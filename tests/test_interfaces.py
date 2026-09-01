@@ -6,17 +6,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
 
-from refrncr.app import create_application
+from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import Membership, Team, User
-from refrncr.services import (
-    AuthorizationError,
-    MembershipService,
-    SessionService,
-    TeamService,
-    UserService,
-)
+from refrncr.services import AuthorizationError, ResourceTypeRegistry
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
@@ -31,10 +25,11 @@ def configured_services():
     )
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
-    sessions = SessionService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    configured = create_community_services(factory, ResourceTypeRegistry())
+    users = configured.users
+    sessions = configured.sessions
+    teams = configured.teams
+    memberships = configured.memberships
     users.bootstrap_organisation()
     return factory, users, sessions, teams, memberships
 

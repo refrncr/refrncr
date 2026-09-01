@@ -9,6 +9,7 @@ from sqlalchemy.engine import make_url
 
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import Grant, Membership
+from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationService,
     ConflictError,
@@ -104,14 +105,15 @@ def test_empty_sqlite_database_upgrades(tmp_path):
     assert_community_schema(engine)
 
     factory = create_session_factory(engine)
-    users = UserService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
     sessions = SessionService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     resources = ResourceTypeRegistry()
     resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
-    grants = GrantService(factory, resources)
-    authorization = AuthorizationService(factory, resources)
+    grants = GrantService(uow, resources)
+    authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "password")
@@ -161,13 +163,14 @@ def test_empty_postgresql_database_upgrades():
         application_engine = create_database_engine(schema_url)
         assert_community_schema(application_engine)
         factory = create_session_factory(application_engine)
-        users = UserService(factory)
-        teams = TeamService(factory)
-        memberships = MembershipService(factory)
+        uow = SqlAlchemyUnitOfWorkFactory(factory)
+        users = UserService(uow)
+        teams = TeamService(uow)
+        memberships = MembershipService(uow)
         resources = ResourceTypeRegistry()
         resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
-        grants = GrantService(factory, resources)
-        authorization = AuthorizationService(factory, resources)
+        grants = GrantService(uow, resources)
+        authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "password")
         managed = users.create_user(admin.id, "managed@example.com", "Managed", "password")

@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Team
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationError,
     ConflictError,
@@ -26,8 +27,9 @@ def team_services():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
-    teams = TeamService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     return engine, factory, users, teams, admin
@@ -241,8 +243,9 @@ def test_sqlite_enforces_team_name_constraints(team_services):
 
 
 def assert_concurrent_equivalent_names(factory):
-    users = UserService(factory)
-    teams = TeamService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     creation_barrier = Barrier(2)
