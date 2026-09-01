@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
+    AuthenticationService,
     AuthorizationService,
     GrantService,
     MembershipService,
@@ -20,6 +21,7 @@ from refrncr.web import create_flask_app
 @dataclass(frozen=True)
 class CommunityServices:
     users: UserService
+    authentication: AuthenticationService
     sessions: SessionService
     teams: TeamService
     memberships: MembershipService
@@ -35,6 +37,7 @@ def create_community_services(
     permission_data = SqlAlchemyPermissionDataSource(sessions)
     return CommunityServices(
         users=UserService(uow),
+        authentication=AuthenticationService(uow),
         sessions=SessionService(sessions),
         teams=TeamService(uow),
         memberships=MembershipService(uow),
@@ -45,6 +48,7 @@ def create_community_services(
 
 def create_application(
     users: UserService,
+    authentication: AuthenticationService,
     sessions: SessionService,
     teams: TeamService,
     memberships: MembershipService,
@@ -56,6 +60,6 @@ def create_application(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    flask_app = create_flask_app(users, sessions, teams, memberships)
+    flask_app = create_flask_app(users, authentication, sessions, teams, memberships)
     app.mount("/", WSGIMiddleware(flask_app))
     return app

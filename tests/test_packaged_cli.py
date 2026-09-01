@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from sqlalchemy import URL, create_engine, inspect
+from sqlalchemy import URL, create_engine, inspect, text
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,12 @@ def test_wheel_contains_migration_runtime(installed_artifact):
 
 
 def test_installed_console_help_and_http_startup(installed_artifact):
-    for arguments in (["--help"], ["start", "--help"]):
+    for arguments in (
+        ["--help"],
+        ["start", "--help"],
+        ["user", "--help"],
+        ["user", "create-admin", "--help"],
+    ):
         result = subprocess.run(
             [str(installed_artifact.executable), *arguments],
             cwd=installed_artifact.working_directory,
@@ -133,7 +138,10 @@ def test_installed_console_help_and_http_startup(installed_artifact):
             text=True,
         )
         assert result.returncode == 0
-        assert "start" in result.stdout
+        if arguments[0] == "user":
+            assert "create-admin" in result.stdout or "first administrator" in result.stdout
+        else:
+            assert "start" in result.stdout
 
     database = installed_artifact.working_directory / "installed ? smoke.db"
     port = free_loopback_port()
@@ -185,6 +193,59 @@ def test_installed_console_help_and_http_startup(installed_artifact):
     engine = create_engine(URL.create("sqlite", database=str(database)))
     try:
         assert "alembic_version" in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+
+
+def test_installed_artifact_bootstraps_admin_with_injected_password_reader(
+    installed_artifact,
+):
+    database = installed_artifact.working_directory / "installed bootstrap.db"
+    password = "installed artifact secure password"
+    driver = installed_artifact.working_directory / "bootstrap_driver.py"
+    driver.write_text(
+        "from refrncr import cli\n"
+        f"answers = iter([{password!r}, {password!r}])\n"
+        "raise SystemExit(cli.main([\n"
+        "    'user', 'create-admin',\n"
+        "    '--email', ' Installed@Example.COM ',\n"
+        "    '--display-name', ' Installed Administrator ',\n"
+        f"    '--database-path', {str(database)!r},\n"
+        "], password_reader=lambda _prompt: next(answers)))\n"
+    )
+
+    result = subprocess.run(
+        [str(installed_artifact.python), str(driver)],
+        cwd=installed_artifact.working_directory,
+        env=clean_environment(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "First Community administrator created" in result.stdout
+    assert password not in result.stdout
+    assert password not in result.stderr
+    engine = create_engine(URL.create("sqlite", database=str(database)))
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT email, display_name, role, is_active, is_deleted, password_hash "
+                    "FROM users"
+                )
+            ).one()
+        assert row[:5] == (
+            "installed@example.com",
+            "Installed Administrator",
+            "admin",
+            True,
+            False,
+        )
+        assert row.password_hash.startswith("$argon2id$")
+        assert row.password_hash not in result.stdout
+        assert row.password_hash not in result.stderr
     finally:
         engine.dispose()
 

@@ -36,8 +36,10 @@ class PermissionScenario:
             SqlAlchemyPermissionDataSource(factory), self.resources
         )
         self.users.bootstrap_organisation()
-        self.admin = self.users.create_initial_admin("admin@example.com", "Admin", "password")
-        self.user = self.users.create_user(self.admin.id, "user@example.com", "User", "password")
+        self.admin = self.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+        self.user = self.users.create_user(
+            self.admin.id, "user@example.com", "User", "valid password"
+        )
 
     def create_team_source(self, name: str, permission: str, *, user_id: str | None = None):
         team = self.teams.create_team(self.admin.id, name)
@@ -246,10 +248,10 @@ def test_team_grant_requires_current_persisted_membership(scenario):
 
 def test_inactive_and_deleted_users_cannot_inherit_team_permission(scenario):
     disabled = scenario.users.create_user(
-        scenario.admin.id, "disabled@example.com", "Disabled", "password"
+        scenario.admin.id, "disabled@example.com", "Disabled", "valid password"
     )
     deleted = scenario.users.create_user(
-        scenario.admin.id, "deleted@example.com", "Deleted", "password"
+        scenario.admin.id, "deleted@example.com", "Deleted", "valid password"
     )
     team = scenario.teams.create_team(scenario.admin.id, "Privileged")
     for user in [disabled, deleted]:

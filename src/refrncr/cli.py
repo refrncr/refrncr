@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import os
 import sys
-from collections.abc import Sequence
+import warnings
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.services import ResourceTypeRegistry
+from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
@@ -25,6 +27,37 @@ class StartConfiguration:
     database_url: str | URL
     host: str
     port: int
+
+
+@dataclass(frozen=True)
+class CreateAdminConfiguration:
+    database_url: str | URL
+    email: str
+    display_name: str
+
+
+class CliError(Exception):
+    """A controlled, secret-free command-line failure."""
+
+
+PasswordReader = Callable[[str], str]
+
+
+class SecretSafeArgumentParser(argparse.ArgumentParser):
+    def error(self, _message: str) -> None:
+        self.print_usage(sys.stderr)
+        self.exit(2, f"{self.prog}: error: invalid command-line arguments\n")
+
+
+class RefrncrArgumentParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        parsed, unrecognized = self.parse_known_args(args, namespace)
+        if unrecognized:
+            if parsed.command == "user" and parsed.user_command == "create-admin":
+                self.print_usage(sys.stderr)
+                self.exit(2, f"{self.prog}: error: invalid command-line arguments\n")
+            self.error(f"unrecognized arguments: {' '.join(unrecognized)}")
+        return parsed
 
 
 def default_data_directory() -> Path:
@@ -46,7 +79,7 @@ def sqlite_url(path: Path) -> URL:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="refrncr", description="Run refrncr Community.")
+    parser = RefrncrArgumentParser(prog="refrncr", description="Run refrncr Community.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     start = subparsers.add_parser("start", help="Start the local Community web application.")
     database = start.add_mutually_exclusive_group()
@@ -65,16 +98,41 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Bind port (default: REFRNCR_PORT or 8000).",
     )
+
+    user = subparsers.add_parser("user", help="Manage Community user bootstrap.")
+    user_commands = user.add_subparsers(
+        dest="user_command", required=True, parser_class=SecretSafeArgumentParser
+    )
+    create_admin = user_commands.add_parser(
+        "create-admin",
+        help="Bootstrap the first Community administrator.",
+        description="Bootstrap the first administrator for a new refrncr Community installation.",
+    )
+    create_admin.add_argument("--email", required=True, help="Administrator email address.")
+    create_admin.add_argument("--display-name", required=True, help="Administrator display name.")
+    admin_database = create_admin.add_mutually_exclusive_group()
+    admin_database.add_argument(
+        "--database-url",
+        help="SQLAlchemy database URL (overrides REFRNCR_DATABASE_URL).",
+    )
+    admin_database.add_argument(
+        "--database-path",
+        type=Path,
+        help="SQLite database path (overrides REFRNCR_DATABASE_URL).",
+    )
     return parser
 
 
-def resolve_start_configuration(args: argparse.Namespace) -> StartConfiguration:
+def resolve_database_url(args: argparse.Namespace) -> str | URL:
     if args.database_path is not None:
-        database_url = sqlite_url(args.database_path)
-    elif args.database_url is not None:
-        database_url = args.database_url
-    else:
-        database_url = os.environ.get("REFRNCR_DATABASE_URL") or sqlite_url(default_database_path())
+        return sqlite_url(args.database_path)
+    if args.database_url is not None:
+        return args.database_url
+    return os.environ.get("REFRNCR_DATABASE_URL") or sqlite_url(default_database_path())
+
+
+def resolve_start_configuration(args: argparse.Namespace) -> StartConfiguration:
+    database_url = resolve_database_url(args)
     host = args.host or os.environ.get("REFRNCR_HOST") or DEFAULT_HOST
     raw_port = args.port if args.port is not None else os.environ.get("REFRNCR_PORT", DEFAULT_PORT)
     try:
@@ -84,6 +142,14 @@ def resolve_start_configuration(args: argparse.Namespace) -> StartConfiguration:
     if not 1 <= port <= 65535:
         raise ValueError("port must be between 1 and 65535")
     return StartConfiguration(database_url=database_url, host=host, port=port)
+
+
+def resolve_create_admin_configuration(args: argparse.Namespace) -> CreateAdminConfiguration:
+    return CreateAdminConfiguration(
+        database_url=resolve_database_url(args),
+        email=args.email,
+        display_name=args.display_name,
+    )
 
 
 def prepare_database(database_url: str | URL) -> None:
@@ -110,6 +176,7 @@ def build_application(database_url: str | URL):
     )
     return create_application(
         services.users,
+        services.authentication,
         services.sessions,
         services.teams,
         services.memberships,
@@ -127,16 +194,96 @@ def start(configuration: StartConfiguration) -> None:
     uvicorn.run(application, host=configuration.host, port=configuration.port)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def read_password_from_tty(prompt: str) -> str:
+    if not sys.stdin.isatty():
+        raise CliError("an interactive terminal is required to enter the administrator password")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", getpass.GetPassWarning)
+        try:
+            return getpass.getpass(prompt)
+        except getpass.GetPassWarning:
+            raise CliError("administrator password could not be read safely") from None
+
+
+def read_confirmed_password(password_reader: PasswordReader) -> str:
+    try:
+        password = password_reader("Administrator password: ")
+        confirmation = password_reader("Confirm administrator password: ")
+    except (CliError, KeyboardInterrupt):
+        raise
+    except Exception as exc:
+        raise CliError("administrator password could not be read safely") from exc
+    if password != confirmation:
+        raise CliError("administrator password confirmation does not match")
+    return password
+
+
+def create_initial_admin(
+    configuration: CreateAdminConfiguration,
+    password_reader: PasswordReader = read_password_from_tty,
+) -> None:
+    try:
+        prepare_database(configuration.database_url)
+        engine = create_database_engine(configuration.database_url)
+    except Exception as exc:
+        raise CliError("database migration or bootstrap failed") from exc
+
+    try:
+        try:
+            services = create_community_services(
+                create_session_factory(engine),
+                ResourceTypeRegistry(),
+            )
+            services.users.bootstrap_organisation()
+        except Exception as exc:
+            raise CliError("database migration or bootstrap failed") from exc
+        if services.users.has_users():
+            raise CliError("Community installation is already initialized")
+
+        password = read_confirmed_password(password_reader)
+        try:
+            services.users.create_initial_admin(
+                configuration.email,
+                configuration.display_name,
+                password,
+            )
+        except ConflictError as exc:
+            raise CliError("Community installation is already initialized") from exc
+        except ValidationError as exc:
+            raise CliError(str(exc)) from None
+        except Exception as exc:
+            raise CliError("administrator could not be created safely") from exc
+    finally:
+        engine.dispose()
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    password_reader: PasswordReader = read_password_from_tty,
+) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        configuration = resolve_start_configuration(args)
-        start(configuration)
+        if args.command == "start":
+            start(resolve_start_configuration(args))
+        else:
+            create_initial_admin(
+                resolve_create_admin_configuration(args),
+                password_reader,
+            )
+            print("First Community administrator created.")
     except KeyboardInterrupt:
-        return 0
+        if args.command == "start":
+            return 0
+        print("refrncr failed: administrator creation interrupted", file=sys.stderr)
+        return 1
+    except CliError as exc:
+        print(f"refrncr failed: {exc}", file=sys.stderr)
+        return 1
     except Exception as exc:
-        print(f"refrncr failed to start: {exc}", file=sys.stderr)
+        action = "start" if args.command == "start" else "create administrator"
+        print(f"refrncr failed to {action}: {exc}", file=sys.stderr)
         return 1
     return 0
 

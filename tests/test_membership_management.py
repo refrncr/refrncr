@@ -33,8 +33,8 @@ def membership_services():
     teams = TeamService(uow)
     memberships = MembershipService(uow)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     team = teams.create_team(admin.id, "Platform")
     return engine, factory, users, teams, memberships, admin, user, team
 
@@ -44,7 +44,7 @@ def test_admin_creates_memberships_with_stable_ids_and_optional_many_to_many(
 ):
     _, factory, users, teams, memberships, admin, user, team = membership_services
     second_team = teams.create_team(admin.id, "Delivery")
-    second_user = users.create_user(admin.id, "second@example.com", "Second", "password")
+    second_user = users.create_user(admin.id, "second@example.com", "Second", "valid password")
 
     assert memberships.list_team_members(admin.id, team.id) == []
     first = memberships.create_membership(admin.id, user.id, team.id)
@@ -112,8 +112,8 @@ def test_membership_delete_is_physical_and_audited(membership_services):
 
 def test_create_requires_existing_active_user_and_team(membership_services):
     _, factory, users, _, memberships, admin, user, team = membership_services
-    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "password")
-    deleted = users.create_user(admin.id, "deleted@example.com", "Deleted", "password")
+    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "valid password")
+    deleted = users.create_user(admin.id, "deleted@example.com", "Deleted", "valid password")
     users.disable_user(admin.id, disabled.id)
     users.delete_user(admin.id, deleted.id)
 
@@ -139,7 +139,7 @@ def test_create_requires_existing_active_user_and_team(membership_services):
 def test_disabled_and_deleted_user_memberships_are_retained_and_removable(membership_services):
     _, factory, users, teams, memberships, admin, user, team = membership_services
     disabled_membership = memberships.create_membership(admin.id, user.id, team.id)
-    deleted_user = users.create_user(admin.id, "deleted@example.com", "Deleted", "password")
+    deleted_user = users.create_user(admin.id, "deleted@example.com", "Deleted", "valid password")
     second_team = teams.create_team(admin.id, "Second")
     deleted_membership = memberships.create_membership(admin.id, deleted_user.id, second_team.id)
 
@@ -157,12 +157,12 @@ def test_disabled_and_deleted_user_memberships_are_retained_and_removable(member
 
 def test_membership_administration_requires_active_admin(membership_services):
     _, _, users, teams, memberships, admin, user, team = membership_services
-    regular = users.create_user(admin.id, "regular@example.com", "Regular", "password")
+    regular = users.create_user(admin.id, "regular@example.com", "Regular", "valid password")
     disabled_admin = users.create_user(
-        admin.id, "disabled-admin@example.com", "Disabled Admin", "password", role="admin"
+        admin.id, "disabled-admin@example.com", "Disabled Admin", "valid password", role="admin"
     )
     deleted_admin = users.create_user(
-        admin.id, "deleted-admin@example.com", "Deleted Admin", "password", role="admin"
+        admin.id, "deleted-admin@example.com", "Deleted Admin", "valid password", role="admin"
     )
     users.disable_user(admin.id, disabled_admin.id)
     users.delete_user(admin.id, deleted_admin.id)
@@ -226,8 +226,8 @@ def assert_membership_constraints_and_cascade(factory):
     teams = TeamService(uow)
     memberships = MembershipService(uow)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     team = teams.create_team(admin.id, "Platform")
     membership = memberships.create_membership(admin.id, user.id, team.id)
 
@@ -264,8 +264,8 @@ def assert_membership_concurrency(factory):
     teams = TeamService(uow)
     memberships = MembershipService(uow)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     team = teams.create_team(admin.id, "Platform")
     create_barrier = Barrier(2)
 
@@ -318,9 +318,9 @@ def assert_team_membership_races(factory):
     with factory() as session:
         admin = session.scalar(select(User).where(User.email == "admin@example.com"))
     if admin is None:
-        admin = users.create_initial_admin("admin@example.com", "Admin", "password")
+        admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = users.create_user(
-        admin.id, f"race-{uuid.uuid4().hex}@example.com", "Race User", "password"
+        admin.id, f"race-{uuid.uuid4().hex}@example.com", "Race User", "valid password"
     )
     create_team = teams.create_team(admin.id, f"Create race {uuid.uuid4().hex}")
     create_barrier = Barrier(2)

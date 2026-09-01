@@ -31,7 +31,7 @@ def team_services():
     users = UserService(uow)
     teams = TeamService(uow)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     return engine, factory, users, teams, admin
 
 
@@ -165,12 +165,12 @@ def test_delete_physically_removes_team_and_audits(team_services):
 def test_team_administration_requires_active_administrator(team_services):
     _, _, users, teams, admin = team_services
     existing = teams.create_team(admin.id, "Existing")
-    regular = users.create_user(admin.id, "user@example.com", "User", "password")
+    regular = users.create_user(admin.id, "user@example.com", "User", "valid password")
     disabled_admin = users.create_user(
-        admin.id, "disabled@example.com", "Disabled", "password", role="admin"
+        admin.id, "disabled@example.com", "Disabled", "valid password", role="admin"
     )
     deleted_admin = users.create_user(
-        admin.id, "deleted@example.com", "Deleted", "password", role="admin"
+        admin.id, "deleted@example.com", "Deleted", "valid password", role="admin"
     )
     users.disable_user(admin.id, disabled_admin.id)
     users.delete_user(admin.id, deleted_admin.id)
@@ -247,7 +247,7 @@ def assert_concurrent_equivalent_names(factory):
     users = UserService(uow)
     teams = TeamService(uow)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     creation_barrier = Barrier(2)
 
     def create(name):

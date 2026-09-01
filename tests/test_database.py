@@ -38,8 +38,8 @@ def test_sqlite_enforces_session_cascade_and_audit_restriction():
     users = UserService(SqlAlchemyUnitOfWorkFactory(factory))
     sessions = SessionService(factory)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    managed = users.create_user(admin.id, "managed@example.com", "Managed", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
     _, login = sessions.create(managed)
 
     with factory.begin() as session:

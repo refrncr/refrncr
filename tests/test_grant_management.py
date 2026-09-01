@@ -40,8 +40,8 @@ def grant_services():
     grants = GrantService(uow, resources)
     authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     team = teams.create_team(admin.id, "Platform")
     return {
         "engine": engine,
@@ -170,10 +170,10 @@ def test_invalid_subject_and_resource_references_are_rejected(grant_services):
 def test_inactive_and_deleted_users_cannot_receive_direct_grants(grant_services):
     values = grant_services
     disabled = values["users"].create_user(
-        values["admin"].id, "disabled@example.com", "Disabled", "password"
+        values["admin"].id, "disabled@example.com", "Disabled", "valid password"
     )
     deleted = values["users"].create_user(
-        values["admin"].id, "deleted@example.com", "Deleted", "password"
+        values["admin"].id, "deleted@example.com", "Deleted", "valid password"
     )
     values["users"].disable_user(values["admin"].id, disabled.id)
     values["users"].delete_user(values["admin"].id, deleted.id)
@@ -359,14 +359,14 @@ def test_grant_administration_requires_active_community_admin(grant_services):
         values["admin"].id,
         "disabled-admin@example.com",
         "Disabled Admin",
-        "password",
+        "valid password",
         role="admin",
     )
     deleted_admin = values["users"].create_user(
         values["admin"].id,
         "deleted-admin@example.com",
         "Deleted Admin",
-        "password",
+        "valid password",
         role="admin",
     )
     values["users"].disable_user(values["admin"].id, disabled_admin.id)
@@ -503,8 +503,8 @@ def test_sqlite_grant_constraints_and_concurrent_uniqueness(tmp_path):
     resources.register("test-resource", lambda _resource_id: True)
     grants = GrantService(uow, resources)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     barrier = Barrier(2)
 
     def create():

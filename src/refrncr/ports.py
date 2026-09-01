@@ -10,6 +10,10 @@ class PersistenceConflictError(Exception):
     """A persistence constraint rejected the pending unit-of-work changes."""
 
 
+class PasswordHashReplacementError(Exception):
+    """A password-hash replacement could not be persisted safely."""
+
+
 @dataclass(frozen=True)
 class AuditEntry:
     actor_user_id: str
@@ -77,6 +81,10 @@ class UserOperations(Protocol):
         is_active: bool,
         is_deleted: bool,
     ) -> UserRecord: ...
+
+    def replace_password_hash(
+        self, user_id: str, expected_hash: str, replacement_hash: str
+    ) -> bool: ...
 
     def revoke_active_sessions(self, user_id: str, revoked_at: datetime) -> None: ...
 

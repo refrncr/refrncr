@@ -4,10 +4,11 @@ import hashlib
 import secrets
 import unicodedata
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from argon2.low_level import Type
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
@@ -19,6 +20,7 @@ from refrncr.ports import (
     GrantRecord,
     MembershipRecord,
     OrganisationRecord,
+    PasswordHashReplacementError,
     PermissionDataSource,
     PersistenceConflictError,
     TeamRecord,
@@ -38,6 +40,14 @@ PASSWORD_HASHER = PasswordHasher(
     hash_len=32,
     salt_len=16,
     type=Type.ID,
+)
+
+# A valid current-profile hash used only to equalize work for attempts that cannot
+# safely verify a stored credential. Its plaintext is intentionally not a credential.
+_DUMMY_PASSWORD_HASH = (
+    "$argon2id$v=19$m=65536,t=3,p=4$"
+    "U29tZVN0YXRpY1NhbHQxNg$"
+    "JvPgxylqfMveFSbsSWHHBEKbGOlnkLIjFBG0s33wtgE"
 )
 
 
@@ -63,6 +73,26 @@ class NotFoundError(UserManagementError):
 
 class ValidationError(UserManagementError, ValueError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedPrincipal:
+    id: str
+
+
+def validate_password(password: str) -> str:
+    """Validate without trimming, normalizing, or otherwise rewriting a password."""
+    if not isinstance(password, str):
+        raise ValidationError("Password must be text")
+    if len(password) < 12:
+        raise ValidationError("Password must contain at least 12 characters")
+    try:
+        encoded_size = len(password.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValidationError("Password must be valid Unicode text") from exc
+    if encoded_size > 1024:
+        raise ValidationError("Password must not exceed 1024 UTF-8 bytes")
+    return password
 
 
 class ResourceTypeRegistry:
@@ -156,6 +186,10 @@ class UserService:
             self._add_audit(uow, self._audit(user.id, user, "created"))
             return user
 
+    def has_users(self) -> bool:
+        with self.uow() as uow:
+            return uow.users.count() != 0
+
     def create_user(
         self,
         actor_id: str,
@@ -200,21 +234,6 @@ class UserService:
             require_admin(uow, actor_id)
             return uow.users.list_by_email()
 
-    def authenticate(self, email: str, password: str) -> User | None:
-        try:
-            normalized_email = normalize_email(email)
-        except ValidationError:
-            return None
-        with self.uow() as uow:
-            user = uow.users.find_by_email(normalized_email)
-            if user is None or not user.is_active or user.is_deleted:
-                return None
-            try:
-                self.hasher.verify(user.password_hash, password)
-            except VerifyMismatchError:
-                return None
-            return user
-
     def _set_state(self, actor_id: str, target_id: str, action: str) -> UserRecord:
         with self.uow(write=True, serialized=True) as uow:
             self._lock_organisation(uow)
@@ -254,7 +273,7 @@ class UserService:
         return uow.users.create(
             email=normalize_email(email),
             display_name=display_name.strip(),
-            password_hash=self.hasher.hash(password),
+            password_hash=self.hasher.hash(validate_password(password)),
             role=role,
             is_active=True,
             is_deleted=False,
@@ -291,6 +310,55 @@ class UserService:
             object_id=audit.object_id,
             action=audit.action,
         )
+
+
+class AuthenticationService:
+    """Persistence-neutral credential verification and account eligibility boundary."""
+
+    def __init__(self, uow: UnitOfWorkFactory, hasher: PasswordHasher | None = None):
+        self.uow = uow
+        self.hasher = hasher or PASSWORD_HASHER
+
+    def authenticate(self, email: str, password: str) -> AuthenticatedPrincipal | None:
+        try:
+            normalized_email = normalize_email(email)
+        except (TypeError, ValidationError):
+            self._dummy_verify(password)
+            return None
+
+        with self.uow() as uow:
+            user = uow.users.find_by_email(normalized_email)
+            if user is None or not user.is_active or user.is_deleted:
+                self._dummy_verify(password)
+                return None
+            user_id = user.id
+            stored_hash = user.password_hash
+            try:
+                self.hasher.verify(stored_hash, password)
+            except VerifyMismatchError:
+                return None
+            except (InvalidHashError, VerificationError):
+                self._dummy_verify(password)
+                return None
+
+            try:
+                needs_rehash = self.hasher.check_needs_rehash(stored_hash)
+            except InvalidHashError:
+                return None
+        if needs_rehash:
+            replacement_hash = self.hasher.hash(password)
+            try:
+                with self.uow(write=True) as uow:
+                    uow.users.replace_password_hash(user_id, stored_hash, replacement_hash)
+            except PasswordHashReplacementError:
+                return None
+        return AuthenticatedPrincipal(id=user_id)
+
+    def _dummy_verify(self, password: str) -> None:
+        try:
+            self.hasher.verify(_DUMMY_PASSWORD_HASH, password)
+        except (InvalidHashError, VerificationError, TypeError):
+            pass
 
 
 class TeamService:
@@ -570,7 +638,7 @@ class SessionService:
         self.sessions = sessions
         self.lifetime = lifetime
 
-    def create(self, user: User) -> tuple[str, LoginSession]:
+    def create(self, user: User | AuthenticatedPrincipal) -> tuple[str, LoginSession]:
         token = secrets.token_urlsafe(48)
         login = LoginSession(
             user_id=user.id,
