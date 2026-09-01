@@ -527,6 +527,7 @@ def test_create_admin_postgresql_compatibility():
     with administration_engine.begin() as connection:
         connection.execute(text(f'CREATE SCHEMA "{schema}"'))
     schema_url = make_url(database_url).update_query_dict({"options": f"-csearch_path={schema}"})
+    rendered_schema_url = schema_url.render_as_string(hide_password=False)
     answers = iter(["correct horse battery staple"] * 2)
     try:
         assert (
@@ -539,7 +540,7 @@ def test_create_admin_postgresql_compatibility():
                     "--display-name",
                     "Administrator",
                     "--database-url",
-                    str(schema_url),
+                    rendered_schema_url,
                 ],
                 password_reader=lambda _prompt: next(answers),
             )
