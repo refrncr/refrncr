@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Membership, Team, User
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationError,
     ConflictError,
@@ -27,9 +28,10 @@ def membership_services():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     user = users.create_user(admin.id, "user@example.com", "User", "password")
@@ -219,9 +221,10 @@ def test_audit_failure_rolls_back_membership_create_and_delete(membership_servic
 
 
 def assert_membership_constraints_and_cascade(factory):
-    users = UserService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     user = users.create_user(admin.id, "user@example.com", "User", "password")
@@ -256,9 +259,10 @@ def test_sqlite_membership_constraints_and_team_cascade(tmp_path):
 
 
 def assert_membership_concurrency(factory):
-    users = UserService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     user = users.create_user(admin.id, "user@example.com", "User", "password")
@@ -306,9 +310,10 @@ def assert_membership_concurrency(factory):
 
 
 def assert_team_membership_races(factory):
-    users = UserService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     users.bootstrap_organisation()
     with factory() as session:
         admin = session.scalar(select(User).where(User.email == "admin@example.com"))

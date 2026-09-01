@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Grant, Membership
+from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationError,
     AuthorizationService,
@@ -29,14 +30,15 @@ def grant_services():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
-    teams = TeamService(factory)
-    memberships = MembershipService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    memberships = MembershipService(uow)
     resources = ResourceTypeRegistry()
     existing_resources = {"resource-1", "resource-2"}
     resources.register("test-resource", existing_resources.__contains__)
-    grants = GrantService(factory, resources)
-    authorization = AuthorizationService(factory, resources)
+    grants = GrantService(uow, resources)
+    authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     user = users.create_user(admin.id, "user@example.com", "User", "password")
@@ -495,10 +497,11 @@ def test_sqlite_grant_constraints_and_concurrent_uniqueness(tmp_path):
     engine = create_database_engine(f"sqlite:///{tmp_path / 'grants.db'}")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    users = UserService(factory)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
     resources = ResourceTypeRegistry()
     resources.register("test-resource", lambda _resource_id: True)
-    grants = GrantService(factory, resources)
+    grants = GrantService(uow, resources)
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "password")
     user = users.create_user(admin.id, "user@example.com", "User", "password")

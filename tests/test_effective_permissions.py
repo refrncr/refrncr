@@ -7,6 +7,7 @@ from sqlalchemy.engine import make_url
 
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
+from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthorizationError,
     AuthorizationService,
@@ -23,14 +24,17 @@ from refrncr.services import (
 class PermissionScenario:
     def __init__(self, factory):
         self.factory = factory
-        self.users = UserService(factory)
-        self.teams = TeamService(factory)
-        self.memberships = MembershipService(factory)
+        uow = SqlAlchemyUnitOfWorkFactory(factory)
+        self.users = UserService(uow)
+        self.teams = TeamService(uow)
+        self.memberships = MembershipService(uow)
         self.resources = ResourceTypeRegistry()
         self.resources.register("test-resource", {"resource-1", "resource-2"}.__contains__)
         self.resources.register("other-resource", {"resource-1"}.__contains__)
-        self.grants = GrantService(factory, self.resources)
-        self.authorization = AuthorizationService(factory, self.resources)
+        self.grants = GrantService(uow, self.resources)
+        self.authorization = AuthorizationService(
+            SqlAlchemyPermissionDataSource(factory), self.resources
+        )
         self.users.bootstrap_organisation()
         self.admin = self.users.create_initial_admin("admin@example.com", "Admin", "password")
         self.user = self.users.create_user(self.admin.id, "user@example.com", "User", "password")
