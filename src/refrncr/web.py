@@ -6,6 +6,7 @@ import secrets
 from flask import Flask, abort, make_response, redirect, render_template_string, request, url_for
 
 from refrncr.services import (
+    AuthenticationService,
     AuthorizationError,
     MembershipService,
     SessionService,
@@ -20,6 +21,7 @@ SESSION_COOKIE = "refrncr_session"
 
 def create_flask_app(
     users: UserService,
+    authentication: AuthenticationService,
     sessions: SessionService,
     teams: TeamService,
     memberships: MembershipService,
@@ -92,12 +94,12 @@ def create_flask_app(
     def login():
         if request.method == "POST":
             require_csrf(request.cookies.get(ANONYMOUS_CSRF_COOKIE))
-            user = users.authenticate(request.form["email"], request.form["password"])
-            if user is not None:
+            principal = authentication.authenticate(request.form["email"], request.form["password"])
+            if principal is not None:
                 existing_token = request.cookies.get(SESSION_COOKIE)
                 if existing_token:
                     sessions.revoke(existing_token)
-                token, _ = sessions.create(user)
+                token, _ = sessions.create(principal)
                 response = redirect(url_for("index"))
                 response.set_cookie(
                     SESSION_COOKIE,

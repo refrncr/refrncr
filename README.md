@@ -46,6 +46,9 @@ uses database-backed server-side sessions.
 SQLite supports the zero-infrastructure local experience. PostgreSQL is recommended for serious
 concurrent multi-user operation.
 
+The selected Argon2id parameters, per-operation resource implications, and opt-in benchmark are
+documented in [Argon2id resource profile](docs/development/argon2-resource-profile.md).
+
 ## Community teams
 
 Administrators can create, rename, list, and delete multiple teams within the single Community

@@ -27,18 +27,19 @@ def configured_services():
     factory = create_session_factory(engine)
     configured = create_community_services(factory, ResourceTypeRegistry())
     users = configured.users
+    authentication = configured.authentication
     sessions = configured.sessions
     teams = configured.teams
     memberships = configured.memberships
     users.bootstrap_organisation()
-    return factory, users, sessions, teams, memberships
+    return factory, users, authentication, sessions, teams, memberships
 
 
 @pytest.fixture
 def interface():
-    factory, users, sessions, teams, memberships = configured_services()
-    client = create_flask_app(users, sessions, teams, memberships).test_client()
-    return factory, users, sessions, teams, memberships, client
+    factory, users, authentication, sessions, teams, memberships = configured_services()
+    client = create_flask_app(users, authentication, sessions, teams, memberships).test_client()
+    return factory, users, authentication, sessions, teams, memberships, client
 
 
 def request(client, method, path, **kwargs):
@@ -90,9 +91,10 @@ def authenticated_csrf(client):
 
 
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
-    _, users, sessions, teams, memberships = configured_services()
+    _, users, authentication, sessions, teams, memberships = configured_services()
     client = TestClient(
-        create_application(users, sessions, teams, memberships), base_url="https://testserver"
+        create_application(users, authentication, sessions, teams, memberships),
+        base_url="https://testserver",
     )
 
     assert client.get("/api/health").json() == {"status": "ok"}
@@ -132,7 +134,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
-    factory, _, _, _, _, client = interface
+    factory, _, _, _, _, _, client = interface
     form = request(client, "get", "/setup")
     token = csrf_token(form)
     csrf_cookie = client.get_cookie(ANONYMOUS_CSRF_COOKIE)
@@ -169,7 +171,7 @@ def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
 
 
 def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details(interface):
-    _, _, _, _, _, client = interface
+    _, _, _, _, _, _, client = interface
     setup_admin(client)
     csrf_token(request(client, "get", "/login"))
 
@@ -202,7 +204,7 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
 
 
 def test_successful_login_rotates_and_revokes_existing_session(interface):
-    _, _, sessions, _, _, client = interface
+    _, _, _, sessions, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     old_token = client.get_cookie(SESSION_COOKIE).value
@@ -216,12 +218,12 @@ def test_successful_login_rotates_and_revokes_existing_session(interface):
 
 
 def test_unauthenticated_and_non_admin_users_are_rejected(interface):
-    _, users, _, _, _, client = interface
+    _, users, authentication, _, _, _, client = interface
     setup_admin(client)
     assert request(client, "get", "/users").status_code == 403
 
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     users.create_user(admin.id, "member@example.com", "Member", "member password")
     assert login(client, "member@example.com", "member password").status_code == 302
     assert request(client, "get", "/users").status_code == 403
@@ -231,7 +233,10 @@ def test_unauthenticated_and_non_admin_users_are_rejected(interface):
 @pytest.mark.parametrize(
     ("path", "data"),
     [
-        ("/users", {"email": "new@example.com", "display_name": "New", "password": "password"}),
+        (
+            "/users",
+            {"email": "new@example.com", "display_name": "New", "password": "valid password"},
+        ),
         ("/users/{target_id}/email", {"email": "changed@example.com"}),
         ("/users/{target_id}/disable", {}),
         ("/users/{target_id}/enable", {}),
@@ -239,18 +244,18 @@ def test_unauthenticated_and_non_admin_users_are_rejected(interface):
     ],
 )
 def test_every_user_management_post_rejects_missing_csrf(interface, path, data):
-    _, users, _, _, _, client = interface
+    _, users, authentication, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "managed@example.com", "Managed", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
 
     response = request(client, "post", path.format(target_id=managed.id), data=data)
     assert response.status_code == 403
 
 
 def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
-    _, _, sessions, _, _, client = interface
+    _, _, _, sessions, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     token = client.get_cookie(SESSION_COOKIE).value
@@ -268,9 +273,9 @@ def test_logout_requires_csrf_revokes_session_and_deletes_cookie(interface):
 
 
 def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
-    _, users, sessions, _, _, client = interface
+    _, users, authentication, sessions, _, _, client = interface
     setup_admin(client)
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "member password")
 
     assert login(client, managed.email, "member password").status_code == 302
@@ -290,15 +295,15 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
 
 
 def test_user_list_escapes_user_controlled_values(interface):
-    _, users, _, _, _, client = interface
+    _, users, authentication, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     users.create_user(
         admin.id,
         "<script>alert(1)</script>@example.com",
         "<img src=x onerror=alert(1)>",
-        "password",
+        "valid password",
     )
 
     body = response_text(request(client, "get", "/users"))
@@ -309,7 +314,7 @@ def test_user_list_escapes_user_controlled_values(interface):
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
-    _, _, _, _, _, client = interface
+    _, _, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -342,7 +347,7 @@ def test_expected_user_error_does_not_expose_sensitive_values(interface):
     ],
 )
 def test_create_user_validation_errors_are_controlled(interface, overrides):
-    factory, _, _, _, _, client = interface
+    factory, _, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -365,11 +370,11 @@ def test_create_user_validation_errors_are_controlled(interface, overrides):
 
 
 def test_change_email_validation_error_is_controlled(interface):
-    _, users, _, _, _, client = interface
+    _, users, authentication, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "managed@example.com", "Managed", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
     csrf = authenticated_csrf(client)
 
     response = request(
@@ -381,11 +386,11 @@ def test_change_email_validation_error_is_controlled(interface):
 
     assert response.status_code == 400
     assert "malformed email" not in response_text(response)
-    assert users.authenticate("managed@example.com", "password").id == managed.id
+    assert authentication.authenticate("managed@example.com", "valid password").id == managed.id
 
 
 def test_admin_creates_renames_lists_and_deletes_team(interface):
-    factory, _, _, _, _, client = interface
+    factory, _, _, _, _, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
     csrf = authenticated_csrf(client)
@@ -424,13 +429,13 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
 
 
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
-    _, users, _, teams, _, client = interface
+    _, users, authentication, _, teams, _, client = interface
     setup_admin(client)
     assert request(client, "get", "/teams").status_code == 403
     assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
 
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     users.create_user(admin.id, "member@example.com", "Member", "member password")
     assert login(client, "member@example.com", "member password").status_code == 302
     assert request(client, "get", "/teams").status_code == 403
@@ -441,10 +446,10 @@ def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
 @pytest.mark.parametrize("token", [None, "invalid", "é"])
 @pytest.mark.parametrize("operation", ["create", "rename", "delete"])
 def test_every_team_state_change_requires_csrf(interface, operation, token):
-    _, users, _, teams, _, client = interface
+    _, users, authentication, _, teams, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     team = teams.create_team(admin.id, "Existing")
     routes = {
         "create": ("/teams", {"name": "New"}),
@@ -462,10 +467,10 @@ def test_every_team_state_change_requires_csrf(interface, operation, token):
 
 
 def test_team_interface_escapes_names_and_controls_validation_errors(interface):
-    _, users, _, teams, _, client = interface
+    _, users, authentication, _, teams, _, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     teams.create_team(admin.id, "<script>alert(1)</script>")
     csrf = authenticated_csrf(client)
 
@@ -493,11 +498,11 @@ def test_team_interface_escapes_names_and_controls_validation_errors(interface):
 
 
 def test_admin_views_empty_team_and_adds_and_removes_member(interface):
-    factory, users, _, teams, memberships, client = interface
+    factory, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "valid password")
     team = teams.create_team(admin.id, "Platform")
     csrf = authenticated_csrf(client)
 
@@ -530,15 +535,15 @@ def test_admin_views_empty_team_and_adds_and_removes_member(interface):
 @pytest.mark.parametrize("token", [None, "invalid", "é"])
 @pytest.mark.parametrize("operation", ["create", "delete"])
 def test_every_membership_state_change_requires_csrf(interface, operation, token):
-    _, users, _, teams, memberships, client = interface
+    _, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "valid password")
     team = teams.create_team(admin.id, "Platform")
     membership = memberships.create_membership(admin.id, managed.id, team.id)
     if operation == "create":
-        second = users.create_user(admin.id, "second@example.com", "Second", "password")
+        second = users.create_user(admin.id, "second@example.com", "Second", "valid password")
         path = f"/teams/{team.id}/members"
         data = {"user_id": second.id}
     else:
@@ -554,11 +559,11 @@ def test_every_membership_state_change_requires_csrf(interface, operation, token
 
 
 def test_membership_interface_authorization_uses_service_for_all_actor_states(interface):
-    _, users, _, teams, memberships, client = interface
+    _, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "valid password")
     team = teams.create_team(admin.id, "Platform")
 
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 200
@@ -566,16 +571,20 @@ def test_membership_interface_authorization_uses_service_for_all_actor_states(in
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
 
     actors = [
-        users.create_user(admin.id, "regular@example.com", "Regular", "password"),
-        users.create_user(admin.id, "disabled@example.com", "Disabled", "password", role="admin"),
-        users.create_user(admin.id, "deleted@example.com", "Deleted", "password", role="admin"),
+        users.create_user(admin.id, "regular@example.com", "Regular", "valid password"),
+        users.create_user(
+            admin.id, "disabled@example.com", "Disabled", "valid password", role="admin"
+        ),
+        users.create_user(
+            admin.id, "deleted@example.com", "Deleted", "valid password", role="admin"
+        ),
     ]
-    assert login(client, "regular@example.com", "password").status_code == 302
+    assert login(client, "regular@example.com", "valid password").status_code == 302
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
-    assert login(client, "disabled@example.com", "password").status_code == 302
+    assert login(client, "disabled@example.com", "valid password").status_code == 302
     users.disable_user(admin.id, actors[1].id)
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
-    assert login(client, "deleted@example.com", "password").status_code == 302
+    assert login(client, "deleted@example.com", "valid password").status_code == 302
     users.delete_user(admin.id, actors[2].id)
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
     for actor in actors:
@@ -586,13 +595,13 @@ def test_membership_interface_authorization_uses_service_for_all_actor_states(in
 
 
 def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(interface):
-    _, users, _, teams, memberships, client = interface
+    _, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
-    managed = users.create_user(admin.id, "member@example.com", "Member", "password")
-    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "password")
-    deleted = users.create_user(admin.id, "deleted@example.com", "Deleted", "password")
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(admin.id, "member@example.com", "Member", "valid password")
+    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "valid password")
+    deleted = users.create_user(admin.id, "deleted@example.com", "Deleted", "valid password")
     team = teams.create_team(admin.id, "Platform")
     membership = memberships.create_membership(admin.id, managed.id, team.id)
     disabled_membership = memberships.create_membership(admin.id, disabled.id, team.id)
@@ -634,15 +643,15 @@ def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(
 
 
 def test_membership_interface_escapes_user_values(interface):
-    _, users, _, teams, memberships, client = interface
+    _, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)
     assert login(client).status_code == 302
-    admin = users.authenticate("admin@example.com", ADMIN_PASSWORD)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     managed = users.create_user(
         admin.id,
         "<script>alert(1)</script>@example.com",
         "<img src=x onerror=alert(1)>",
-        "password",
+        "valid password",
     )
     team = teams.create_team(admin.id, "Platform")
     memberships.create_membership(admin.id, managed.id, team.id)

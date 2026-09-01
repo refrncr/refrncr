@@ -3,14 +3,24 @@ from __future__ import annotations
 from types import TracebackType
 
 from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-from refrncr.models import AuditEvent, Grant, LoginSession, Membership, Organisation, Team, User
+from refrncr.models import (
+    AuditEvent,
+    Grant,
+    LoginSession,
+    Membership,
+    Organisation,
+    Team,
+    User,
+    utc_now,
+)
 from refrncr.ports import (
     AuthorizationSubject,
     GrantRecord,
     MembershipRecord,
+    PasswordHashReplacementError,
     PermissionContext,
     PersistenceConflictError,
     TeamRecord,
@@ -56,6 +66,21 @@ class SqlAlchemyUserOperations:
         user = User(**values)
         self.session.add(user)
         return user
+
+    def replace_password_hash(
+        self, user_id: str, expected_hash: str, replacement_hash: str
+    ) -> bool:
+        self.session.info["password_hash_replacement_attempted"] = True
+        try:
+            result = self.session.execute(
+                update(User)
+                .where(User.id == user_id, User.password_hash == expected_hash)
+                .values(password_hash=replacement_hash, updated_at=utc_now())
+            )
+            self.session.flush()
+        except SQLAlchemyError:
+            raise PasswordHashReplacementError("Password hash replacement failed") from None
+        return result.rowcount == 1
 
     def revoke_active_sessions(self, user_id: str, revoked_at) -> None:
         self.session.execute(
@@ -197,6 +222,13 @@ class SqlAlchemyUnitOfWork:
             if exc_type is None and self.write:
                 try:
                     self.session.commit()
+                except SQLAlchemyError:
+                    self.session.rollback()
+                    if self.session.info.get("password_hash_replacement_attempted"):
+                        raise PasswordHashReplacementError(
+                            "Password hash replacement failed"
+                        ) from None
+                    raise
                 except Exception:
                     self.session.rollback()
                     raise

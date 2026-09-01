@@ -14,6 +14,7 @@ from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, LoginSession, Organisation, User
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
+    AuthenticationService,
     AuthorizationError,
     ConflictError,
     InvalidLifecycleError,
@@ -90,7 +91,7 @@ def assert_concurrent_bootstrap_and_initial_admin(factory):
         admin_barrier.wait()
         try:
             return users.create_initial_admin(
-                f"admin{index}@example.com", f"Admin {index}", "password"
+                f"admin{index}@example.com", f"Admin {index}", "valid password"
             )
         except ConflictError as exc:
             return exc
@@ -111,7 +112,7 @@ def assert_concurrent_bootstrap_and_initial_admin(factory):
         first_admin.id,
         "second-admin@example.com",
         "Second Admin",
-        "password",
+        "valid password",
         role="admin",
     )
     removal_barrier = Barrier(2)
@@ -207,12 +208,12 @@ def test_admin_lifecycle_is_audited_and_sessions_are_revoked(services):
 def test_installation_authorization_uniqueness_and_last_admin(services):
     _, users, _ = services
     _, admin = initial_admin(users)
-    regular = users.create_user(admin.id, "user@example.com", "User", "password")
+    regular = users.create_user(admin.id, "user@example.com", "User", "valid password")
 
     with pytest.raises(AuthorizationError):
-        users.create_user(regular.id, "other@example.com", "Other", "password")
+        users.create_user(regular.id, "other@example.com", "Other", "valid password")
     with pytest.raises(ConflictError):
-        users.create_user(admin.id, " USER@example.com ", "Duplicate", "password")
+        users.create_user(admin.id, " USER@example.com ", "Duplicate", "valid password")
     with pytest.raises(InvalidLifecycleError):
         users.disable_user(admin.id, admin.id)
     with pytest.raises(NotFoundError):
@@ -251,7 +252,7 @@ def test_business_operation_rolls_back_when_audit_insert_fails(services, monkeyp
 
     monkeypatch.setattr(users, "_audit", invalid_audit)
     with pytest.raises(IntegrityError):
-        users.create_user(admin.id, "rolled-back@example.com", "Rolled Back", "password")
+        users.create_user(admin.id, "rolled-back@example.com", "Rolled Back", "valid password")
 
     with factory() as session:
         assert session.scalar(select(User).where(User.email == "rolled-back@example.com")) is None
@@ -261,8 +262,9 @@ def test_business_operation_rolls_back_when_audit_insert_fails(services, monkeyp
 def test_authentication_and_server_side_session(services):
     _, users, sessions = services
     _, admin = initial_admin(users)
-    assert users.authenticate(admin.email, "wrong") is None
-    authenticated = users.authenticate(admin.email, "correct horse battery staple")
+    authentication = AuthenticationService(users.uow)
+    assert authentication.authenticate(admin.email, "wrong") is None
+    authenticated = authentication.authenticate(admin.email, "correct horse battery staple")
     token, login = sessions.create(authenticated)
     assert inspect(login).detached
     assert login.id is not None

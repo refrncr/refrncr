@@ -30,8 +30,8 @@ def persistence_setup():
     resources.register("document", lambda resource_id: resource_id in {"one", "two"})
     grants = GrantService(uow, resources)
     users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "password")
-    user = users.create_user(admin.id, "user@example.com", "User", "password")
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = users.create_user(admin.id, "user@example.com", "User", "valid password")
     return sessions, uow, users, teams, memberships, grants, admin, user
 
 
