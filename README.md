@@ -2,6 +2,39 @@
 
 Reference data without the enterprise baggage.
 
+## Quick start
+
+Install and start the Community application with two commands:
+
+```shell
+pipx install refrncr
+refrncr start
+```
+
+Open <http://127.0.0.1:8000>. The server binds only to the local loopback interface by
+default. It uses a persistent embedded SQLite database, creates its parent directory, and applies
+all Community database migrations before accepting requests. Docker and PostgreSQL are not
+required for this quick start.
+
+The default database is stored in the operating system's user application-data directory:
+
+- Linux: `$XDG_DATA_HOME/refrncr/refrncr.db`, or `~/.local/share/refrncr/refrncr.db` when
+  `XDG_DATA_HOME` is unset;
+- macOS: `~/Library/Application Support/refrncr/refrncr.db`;
+- Windows: `%LOCALAPPDATA%\refrncr\refrncr.db`.
+
+Configuration precedence is command-line option, then environment variable, then default:
+
+```shell
+refrncr start --database-path ./refrncr.db --host 127.0.0.1 --port 8000
+refrncr start --database-url postgresql+psycopg://user:password@localhost/refrncr
+```
+
+The corresponding environment variables are `REFRNCR_DATABASE_URL`, `REFRNCR_HOST`, and
+`REFRNCR_PORT`. `--database-path` is a convenient SQLite-only override; `--database-url` supports
+any configured SQLAlchemy database URL. PostgreSQL remains an alternative persistence profile
+handled by related stories rather than a quick-start requirement.
+
 ## Community user foundation
 
 The Community application owns exactly one Organisation and supports multiple local users. On
