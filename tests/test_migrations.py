@@ -7,6 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import make_url
 
+from refrncr.cli import prepare_database
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import Grant, Membership
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
@@ -156,12 +157,16 @@ def test_empty_postgresql_database_upgrades():
     schema_url = make_url(database_url).update_query_dict({"options": f"-csearch_path={schema}"})
     application_engine = None
     try:
-        config = Config("alembic.ini")
         rendered_url = schema_url.render_as_string(hide_password=False)
+        prepare_database(schema_url)
+        config = Config("alembic.ini")
         config.set_main_option("sqlalchemy.url", rendered_url.replace("%", "%%"))
-        command.upgrade(config, "head")
         application_engine = create_database_engine(schema_url)
         assert_community_schema(application_engine)
+        with application_engine.connect() as connection:
+            assert (
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004_ref_36"
+            )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
         users = UserService(uow)

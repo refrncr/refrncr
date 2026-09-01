@@ -20,14 +20,26 @@ dependencies = [
     "uvicorn>=0.35,<1",
 ]
 
+[project.scripts]
+refrncr = "refrncr.cli:entrypoint"
+
 [project.optional-dependencies]
-dev = ["httpx>=0.28,<1", "pre-commit>=4.0,<5", "pytest>=8.3,<9", "ruff>=0.16,<0.17"]
+dev = [
+    "httpx>=0.28,<1",
+    "pre-commit>=4.0,<5",
+    "pytest>=8.3,<9",
+    "ruff>=0.16,<0.17",
+    "setuptools>=75",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+refrncr = ["migrations/*.py", "migrations/*.mako", "migrations/versions/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
