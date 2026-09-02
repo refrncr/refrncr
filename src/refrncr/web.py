@@ -3,8 +3,21 @@ from __future__ import annotations
 import hmac
 import secrets
 
-from flask import Flask, abort, make_response, redirect, render_template_string, request, url_for
+from flask import Flask, abort, g, make_response, redirect, render_template_string, request, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 
+from refrncr.browser_security import (
+    HTTPS_ANONYMOUS_CSRF_COOKIE,
+    HTTPS_SESSION_COOKIE,
+    BrowserCookiePolicy,
+)
+from refrncr.login_security import (
+    MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
+    BrowserAuthenticationAdmissionGuard,
+    LoginAttemptLimiter,
+    SourceIdentityResolver,
+    canonical_account_key,
+)
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -15,8 +28,10 @@ from refrncr.services import (
     UserService,
 )
 
-ANONYMOUS_CSRF_COOKIE = "__Host-refrncr_csrf"
-SESSION_COOKIE = "refrncr_session"
+ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
+SESSION_COOKIE = HTTPS_SESSION_COOKIE
+GENERIC_LOGIN_FAILURE = "Invalid credentials"
+MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
 
 
 def create_flask_app(
@@ -25,12 +40,59 @@ def create_flask_app(
     sessions: SessionService,
     teams: TeamService,
     memberships: MembershipService,
+    *,
+    allow_loopback_http: bool = False,
+    login_limiter: LoginAttemptLimiter | None = None,
+    source_resolver: SourceIdentityResolver | None = None,
+    authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
+    login_limiter = login_limiter or LoginAttemptLimiter()
+    source_resolver = source_resolver or SourceIdentityResolver()
+    authentication_admission = authentication_admission or BrowserAuthenticationAdmissionGuard()
+    cookie_policy = BrowserCookiePolicy(
+        session_max_age=int(sessions.lifetime.total_seconds()),
+        allow_loopback_http=allow_loopback_http,
+    )
+
+    def cookie_settings():
+        return cookie_policy.for_request(
+            scheme=request.scheme,
+            host=request.host,
+            remote_address=request.remote_addr,
+        )
+
+    def require_cookie_settings():
+        settings = cookie_settings()
+        if settings is None:
+            abort(403, description="Authenticated browser access requires HTTPS")
+        return settings
+
+    @app.after_request
+    def clear_stale_session_cookie(response):
+        settings = getattr(g, "stale_cookie_settings", None)
+        if settings is not None:
+            response.delete_cookie(settings.session_name, **settings.common_options)
+        return response
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_oversized_request(_error):
+        if request.path == "/login":
+            return GENERIC_LOGIN_FAILURE, 401
+        return "Request is too large", 413
 
     def authenticated():
-        token = request.cookies.get(SESSION_COOKIE)
-        return sessions.resolve_with_session(token) if token else None
+        settings = cookie_settings()
+        if settings is None:
+            return None
+        token = request.cookies.get(settings.session_name)
+        if not token:
+            return None
+        resolved = sessions.resolve_with_session(token)
+        if resolved is None:
+            g.stale_cookie_settings = settings
+        return resolved
 
     def require_admin():
         resolved = authenticated()
@@ -52,14 +114,13 @@ def create_flask_app(
             abort(403)
 
     def form_with_anonymous_csrf(template: str):
+        settings = require_cookie_settings()
         token = secrets.token_urlsafe(32)
         response = make_response(render_template_string(template, csrf_token=token))
         response.set_cookie(
-            ANONYMOUS_CSRF_COOKIE,
+            settings.anonymous_csrf_name,
             token,
-            secure=True,
-            httponly=True,
-            samesite="Lax",
+            **settings.common_options,
         )
         return response
 
@@ -69,8 +130,11 @@ def create_flask_app(
 
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
+        settings = require_cookie_settings()
+        if users.has_users():
+            return redirect(url_for("login"))
         if request.method == "POST":
-            require_csrf(request.cookies.get(ANONYMOUS_CSRF_COOKIE))
+            require_csrf(request.cookies.get(settings.anonymous_csrf_name))
             users.create_initial_admin(
                 request.form["email"],
                 request.form["display_name"],
@@ -78,10 +142,8 @@ def create_flask_app(
             )
             response = redirect(url_for("login"))
             response.delete_cookie(
-                ANONYMOUS_CSRF_COOKIE,
-                secure=True,
-                httponly=True,
-                samesite="Lax",
+                settings.anonymous_csrf_name,
+                **settings.common_options,
             )
             return response
         return form_with_anonymous_csrf(
@@ -92,27 +154,51 @@ def create_flask_app(
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
+        settings = require_cookie_settings()
         if request.method == "POST":
-            require_csrf(request.cookies.get(ANONYMOUS_CSRF_COOKIE))
-            principal = authentication.authenticate(request.form["email"], request.form["password"])
+            require_csrf(request.cookies.get(settings.anonymous_csrf_name))
+            submitted_email = request.form["email"]
+            oversized_identifier = len(submitted_email) > MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS
+            account_key = canonical_account_key(submitted_email)
+            source_key = source_resolver.resolve(
+                request.remote_addr,
+                request.headers.get("X-Forwarded-For"),
+            )
+            attempt = login_limiter.reserve(source_key, account_key)
+            if attempt is None:
+                return GENERIC_LOGIN_FAILURE, 401
+            if oversized_identifier:
+                attempt.failed()
+                return GENERIC_LOGIN_FAILURE, 401
+            permit = authentication_admission.try_acquire()
+            if permit is None:
+                attempt.cancel()
+                return GENERIC_LOGIN_FAILURE, 401
+            try:
+                with permit:
+                    principal = authentication.authenticate(
+                        submitted_email, request.form["password"]
+                    )
+            except Exception:
+                attempt.failed()
+                raise
             if principal is not None:
-                existing_token = request.cookies.get(SESSION_COOKIE)
+                attempt.succeeded()
+                existing_token = request.cookies.get(settings.session_name)
                 if existing_token:
                     sessions.revoke(existing_token)
                 token, _ = sessions.create(principal)
                 response = redirect(url_for("index"))
                 response.set_cookie(
-                    SESSION_COOKIE,
+                    settings.session_name,
                     token,
-                    secure=True,
-                    httponly=True,
-                    samesite="Lax",
+                    max_age=settings.session_max_age,
+                    **settings.common_options,
                 )
-                response.delete_cookie(
-                    ANONYMOUS_CSRF_COOKIE, secure=True, httponly=True, samesite="Lax"
-                )
+                response.delete_cookie(settings.anonymous_csrf_name, **settings.common_options)
                 return response
-            return "Invalid credentials", 401
+            attempt.failed()
+            return GENERIC_LOGIN_FAILURE, 401
         return form_with_anonymous_csrf(
             "<form method='post'><input name='email'><input name='password' type='password'>"
             "<input type='hidden' name='csrf_token' value='{{ csrf_token }}'>"
@@ -121,14 +207,17 @@ def create_flask_app(
 
     @app.post("/logout")
     def logout():
-        token = request.cookies.get(SESSION_COOKIE)
-        if token:
-            resolved = sessions.resolve_with_session(token)
-            if resolved is not None:
-                require_csrf(resolved[1].csrf_token)
-            sessions.revoke(token)
+        settings = cookie_settings()
+        token = request.cookies.get(settings.session_name) if settings else None
+        if not token:
+            return redirect(url_for("index"))
+        resolved = sessions.resolve_with_session(token)
+        if resolved is None:
+            return redirect(url_for("index"))
+        require_csrf(resolved[1].csrf_token)
+        sessions.revoke(token)
         response = redirect(url_for("index"))
-        response.delete_cookie(SESSION_COOKIE, secure=True, httponly=True, samesite="Lax")
+        response.delete_cookie(settings.session_name, **settings.common_options)
         return response
 
     @app.get("/users")

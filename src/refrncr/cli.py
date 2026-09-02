@@ -15,7 +15,9 @@ from alembic.config import Config
 from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
+from refrncr.browser_security import is_loopback_host
 from refrncr.db.session import create_database_engine, create_session_factory
+from refrncr.login_security import SourceIdentityResolver
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
 
 DEFAULT_HOST = "127.0.0.1"
@@ -27,6 +29,7 @@ class StartConfiguration:
     database_url: str | URL
     host: str
     port: int
+    trusted_proxies: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -98,6 +101,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Bind port (default: REFRNCR_PORT or 8000).",
     )
+    start.add_argument(
+        "--trusted-proxy",
+        action="append",
+        default=None,
+        help=(
+            "Trusted reverse-proxy IP or CIDR for X-Forwarded-For source identity "
+            "(repeatable; default: REFRNCR_TRUSTED_PROXIES or none)."
+        ),
+    )
 
     user = subparsers.add_parser("user", help="Manage Community user bootstrap.")
     user_commands = user.add_subparsers(
@@ -141,7 +153,20 @@ def resolve_start_configuration(args: argparse.Namespace) -> StartConfiguration:
         raise ValueError("port must be an integer") from exc
     if not 1 <= port <= 65535:
         raise ValueError("port must be between 1 and 65535")
-    return StartConfiguration(database_url=database_url, host=host, port=port)
+    trusted_proxies = args.trusted_proxy
+    if trusted_proxies is None:
+        configured = os.environ.get("REFRNCR_TRUSTED_PROXIES", "")
+        trusted_proxies = [value.strip() for value in configured.split(",") if value.strip()]
+    try:
+        SourceIdentityResolver.from_config(trusted_proxies)
+    except ValueError:
+        raise ValueError("trusted proxies must be IP addresses or CIDR networks") from None
+    return StartConfiguration(
+        database_url=database_url,
+        host=host,
+        port=port,
+        trusted_proxies=tuple(trusted_proxies),
+    )
 
 
 def resolve_create_admin_configuration(args: argparse.Namespace) -> CreateAdminConfiguration:
@@ -168,7 +193,12 @@ def prepare_database(database_url: str | URL) -> None:
         engine.dispose()
 
 
-def build_application(database_url: str | URL):
+def build_application(
+    database_url: str | URL,
+    *,
+    allow_loopback_http: bool = False,
+    trusted_proxies: tuple[str, ...] = (),
+):
     engine = create_database_engine(database_url)
     services = create_community_services(
         create_session_factory(engine),
@@ -180,18 +210,31 @@ def build_application(database_url: str | URL):
         services.sessions,
         services.teams,
         services.memberships,
+        allow_loopback_http=allow_loopback_http,
+        trusted_proxies=trusted_proxies,
     )
 
 
 def start(configuration: StartConfiguration) -> None:
     try:
         prepare_database(configuration.database_url)
-        application = build_application(configuration.database_url)
+        application = build_application(
+            configuration.database_url,
+            allow_loopback_http=(
+                is_loopback_host(configuration.host) and not configuration.trusted_proxies
+            ),
+            trusted_proxies=configuration.trusted_proxies,
+        )
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
     local_url = f"http://{configuration.host}:{configuration.port}"
     print(f"refrncr is starting at {local_url}", flush=True)
-    uvicorn.run(application, host=configuration.host, port=configuration.port)
+    uvicorn.run(
+        application,
+        host=configuration.host,
+        port=configuration.port,
+        proxy_headers=False,
+    )
 
 
 def read_password_from_tty(prompt: str) -> str:

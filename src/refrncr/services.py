@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import threading
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from argon2.low_level import Type
-from sqlalchemy import select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.authorization import highest_permission, permits, validate_permission
@@ -634,17 +635,31 @@ class MembershipService:
 
 
 class SessionService:
-    def __init__(self, sessions: sessionmaker[Session], lifetime: timedelta = timedelta(hours=12)):
+    def __init__(
+        self,
+        sessions: sessionmaker[Session],
+        lifetime: timedelta = timedelta(hours=12),
+        *,
+        clock: Callable[[], datetime] = utc_now,
+        retention: timedelta = timedelta(days=7),
+        cleanup_batch_size: int = 100,
+    ):
         self.sessions = sessions
         self.lifetime = lifetime
+        self.clock = clock
+        self.retention = retention
+        self.cleanup_batch_size = cleanup_batch_size
+        self._cleanup_cursor: str | None = None
+        self._cleanup_lock = threading.Lock()
 
     def create(self, user: User | AuthenticatedPrincipal) -> tuple[str, LoginSession]:
+        self.cleanup()
         token = secrets.token_urlsafe(48)
         login = LoginSession(
             user_id=user.id,
             token_hash=self._digest(token),
             csrf_token=secrets.token_urlsafe(32),
-            expires_at=utc_now() + self.lifetime,
+            expires_at=self.clock() + self.lifetime,
         )
         with self.sessions.begin() as session:
             session.add(login)
@@ -665,8 +680,8 @@ class SessionService:
                 return None
             expires_at = login.expires_at
             if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=utc_now().tzinfo)
-            if expires_at <= utc_now():
+                expires_at = expires_at.replace(tzinfo=UTC)
+            if expires_at <= self.clock():
                 return None
             user = session.get(User, login.user_id)
             if user is None or not user.is_active or user.is_deleted:
@@ -678,8 +693,36 @@ class SessionService:
             session.execute(
                 update(LoginSession)
                 .where(LoginSession.token_hash == self._digest(token))
-                .values(revoked_at=utc_now())
+                .values(revoked_at=self.clock())
             )
+        self.cleanup()
+
+    def cleanup(self) -> int:
+        """Inspect and delete at most one primary-key page of retained sessions."""
+        with self._cleanup_lock:
+            now = self.clock()
+            cutoff = now - self.retention
+            with self.sessions.begin() as session:
+                statement = (
+                    select(LoginSession.id).order_by(LoginSession.id).limit(self.cleanup_batch_size)
+                )
+                if self._cleanup_cursor is not None:
+                    statement = statement.where(LoginSession.id > self._cleanup_cursor)
+                ids = list(session.scalars(statement))
+                if not ids:
+                    self._cleanup_cursor = None
+                    return 0
+                self._cleanup_cursor = ids[-1] if len(ids) == self.cleanup_batch_size else None
+                result = session.execute(
+                    delete(LoginSession).where(
+                        LoginSession.id.in_(ids),
+                        or_(
+                            LoginSession.expires_at <= cutoff,
+                            LoginSession.revoked_at <= cutoff,
+                        ),
+                    )
+                )
+                return result.rowcount or 0
 
     @staticmethod
     def _digest(token: str) -> str:
