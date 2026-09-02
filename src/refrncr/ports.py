@@ -150,7 +150,13 @@ class GrantOperations(Protocol):
 
 
 class DatasetOperations(Protocol):
-    def get(self, dataset_id: str) -> DatasetRecord | None: ...
+    def get(self, dataset_id: str, *, for_update: bool = False) -> DatasetRecord | None: ...
+
+    def find_by_key(self, key: str, *, for_update: bool = False) -> DatasetRecord | None: ...
+
+    def list_all(self) -> list[DatasetRecord]: ...
+
+    def list_by_ids(self, dataset_ids: tuple[str, ...]) -> list[DatasetRecord]: ...
 
     def exists(self, dataset_id: str) -> bool: ...
 
@@ -203,7 +209,17 @@ class PermissionContext:
     permissions: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ResourcePermissionsContext:
+    subject: AuthorizationSubject
+    permissions: tuple[tuple[str, str], ...]
+
+
 class PermissionDataSource(Protocol):
     def load_context(
         self, user_id: str, resource_type: str, resource_id: str
     ) -> PermissionContext: ...
+
+    def load_resource_permissions(
+        self, user_id: str, resource_type: str
+    ) -> ResourcePermissionsContext: ...

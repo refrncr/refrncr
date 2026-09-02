@@ -22,10 +22,8 @@ from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
     AuthorizationError,
     ConflictError,
-    DatasetService,
     NotFoundError,
     ResourceTypeRegistry,
-    UserService,
     ValidationError,
 )
 
@@ -297,9 +295,9 @@ def test_sqlite_concurrent_duplicate_creation_creates_exactly_one(tmp_path):
     engine = create_database_engine(f"sqlite:///{tmp_path / 'datasets.db'}")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    uow = SqlAlchemyUnitOfWorkFactory(factory)
-    users = UserService(uow)
-    datasets = DatasetService(uow)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    users = services.users
+    datasets = services.datasets
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     barrier = Barrier(2)
@@ -338,9 +336,9 @@ def test_postgresql_dataset_creation_uniqueness_and_rollback(monkeypatch):
     try:
         Base.metadata.create_all(application_engine)
         factory = create_session_factory(application_engine)
-        uow = SqlAlchemyUnitOfWorkFactory(factory)
-        users = UserService(uow)
-        datasets = DatasetService(uow)
+        services = create_community_services(factory, ResourceTypeRegistry())
+        users = services.users
+        datasets = services.datasets
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
         barrier = Barrier(2)
@@ -405,8 +403,9 @@ def test_postgresql_actor_deactivation_serializes_with_dataset_creation():
         Base.metadata.create_all(application_engine)
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
-        users = UserService(uow)
-        datasets = DatasetService(uow)
+        services = create_community_services(factory, ResourceTypeRegistry())
+        users = services.users
+        datasets = services.datasets
         users.bootstrap_organisation()
         actor = users.create_initial_admin("actor@example.com", "Actor", "valid password")
 

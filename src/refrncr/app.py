@@ -40,6 +40,7 @@ def create_community_services(
     uow = SqlAlchemyUnitOfWorkFactory(sessions)
     permission_data = SqlAlchemyPermissionDataSource(sessions)
     resources.register("dataset", DatasetResourceResolver(uow))
+    authorization = AuthorizationService(permission_data, resources)
     return CommunityServices(
         users=UserService(uow),
         authentication=AuthenticationService(uow),
@@ -47,8 +48,8 @@ def create_community_services(
         teams=TeamService(uow),
         memberships=MembershipService(uow),
         grants=GrantService(uow, resources),
-        authorization=AuthorizationService(permission_data, resources),
-        datasets=DatasetService(uow),
+        authorization=authorization,
+        datasets=DatasetService(uow, authorization),
     )
 
 
