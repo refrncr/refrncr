@@ -60,6 +60,8 @@ def create_application(
     teams: TeamService,
     memberships: MembershipService,
     *,
+    authorization: AuthorizationService,
+    datasets: DatasetService,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
@@ -76,6 +78,8 @@ def create_application(
         sessions,
         teams,
         memberships,
+        authorization=authorization,
+        datasets=datasets,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
     )

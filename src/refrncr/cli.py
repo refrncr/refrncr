@@ -210,6 +210,8 @@ def build_application(
         services.sessions,
         services.teams,
         services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
         allow_loopback_http=allow_loopback_http,
         trusted_proxies=trusted_proxies,
     )
