@@ -19,6 +19,7 @@ from refrncr.authorization import highest_permission, permits, validate_permissi
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
+    DatasetFieldRecord,
     DatasetRecord,
     GrantRecord,
     MembershipRecord,
@@ -33,6 +34,7 @@ from refrncr.ports import (
 )
 
 SUBJECT_TYPES = {"user", "team"}
+DATASET_FIELD_TYPES = {"string", "number", "boolean", "date"}
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -184,6 +186,35 @@ def validate_dataset_description(description: str) -> str:
     if len(description) > 10_000:
         raise ValidationError("Dataset description must not exceed 10000 characters")
     return description
+
+
+def validate_dataset_field_key(key: str) -> str:
+    if not isinstance(key, str) or re.fullmatch(r"[a-z0-9][a-z0-9_]{0,99}", key) is None:
+        raise ValidationError(
+            "Field key must contain 1-100 lowercase ASCII letters, numbers, or underscores"
+        )
+    return key
+
+
+def normalize_dataset_field_name(name: str) -> str:
+    if not isinstance(name, str):
+        raise ValidationError("Field name must be text")
+    normalized_name = unicodedata.normalize("NFC", name.strip())
+    if not 1 <= len(normalized_name) <= 200:
+        raise ValidationError("Field name must contain between 1 and 200 characters")
+    return normalized_name
+
+
+def validate_dataset_field_type(data_type: str) -> str:
+    if not isinstance(data_type, str) or data_type not in DATASET_FIELD_TYPES:
+        raise ValidationError("Field type must be string, number, boolean or date")
+    return data_type
+
+
+def validate_dataset_field_flag(value: bool, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValidationError(f"{label} must be a boolean")
+    return value
 
 
 def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -> UserRecord:
@@ -605,6 +636,140 @@ class DatasetService:
         )
 
     _add_audit = staticmethod(UserService._add_audit)
+
+
+class DatasetFieldService:
+    """Authorized schema operations scoped through a parent Dataset."""
+
+    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+        self.uow = uow
+        self.authorization = authorization
+
+    def create_field(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        key: str,
+        name: str,
+        data_type: str,
+        is_required: bool = False,
+        is_unique: bool = False,
+    ) -> DatasetFieldRecord:
+        validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            field = uow.dataset_fields.create(
+                dataset_id=dataset.id,
+                key=validate_dataset_field_key(key),
+                name=normalize_dataset_field_name(name),
+                data_type=validate_dataset_field_type(data_type),
+                is_required=validate_dataset_field_flag(is_required, "is_required"),
+                is_unique=validate_dataset_field_flag(is_unique, "is_unique"),
+            )
+            try:
+                uow.flush()
+            except PersistenceConflictError as exc:
+                if exc.constraint == "uq_dataset_fields_dataset_key":
+                    raise ConflictError("Field key already exists in this Dataset") from exc
+                raise
+            self._add_audit(uow, actor_id, field.id, "created")
+            return field
+
+    def list_fields(self, actor_id: str, dataset_key: str) -> list[DatasetFieldRecord]:
+        dataset = self._get_dataset_with_access(actor_id, dataset_key, "viewer")
+        with self.uow() as uow:
+            return uow.dataset_fields.list_for_dataset(dataset.id)
+
+    def get_field(self, actor_id: str, dataset_key: str, field_key: str) -> DatasetFieldRecord:
+        dataset = self._get_dataset_with_access(actor_id, dataset_key, "viewer")
+        validated_field_key = self._validated_field_lookup_key(field_key)
+        with self.uow() as uow:
+            field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key)
+            if field is None:
+                raise NotFoundError("Dataset field not found")
+            return field
+
+    def update_field(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        field_key: str,
+        name: str,
+        data_type: str,
+        is_required: bool,
+        is_unique: bool,
+    ) -> DatasetFieldRecord:
+        validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            validated_field_key = self._validated_field_lookup_key(field_key)
+            field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
+            if field is None:
+                raise NotFoundError("Dataset field not found")
+
+            normalized_name = normalize_dataset_field_name(name)
+            validated_type = validate_dataset_field_type(data_type)
+            validated_required = validate_dataset_field_flag(is_required, "is_required")
+            validated_unique = validate_dataset_field_flag(is_unique, "is_unique")
+            replacement = (
+                normalized_name,
+                validated_type,
+                validated_required,
+                validated_unique,
+            )
+            current = (field.name, field.data_type, field.is_required, field.is_unique)
+            if replacement == current:
+                return field
+
+            field.name = normalized_name
+            field.data_type = validated_type
+            field.is_required = validated_required
+            field.is_unique = validated_unique
+            field.updated_at = _now()
+            self._add_audit(uow, actor_id, field.id, "definition_updated")
+            return field
+
+    def _get_dataset_with_access(
+        self, actor_id: str, dataset_key: str, required_permission: str
+    ) -> DatasetRecord:
+        validated_key = self._validated_dataset_lookup_key(dataset_key)
+        with self.uow() as uow:
+            dataset = uow.datasets.find_by_key(validated_key)
+        self._require_dataset_access(actor_id, dataset, required_permission)
+        return dataset
+
+    def _require_dataset_access(
+        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str
+    ) -> None:
+        if dataset is None or not self.authorization.check_access(
+            actor_id, "dataset", dataset.id, required_permission
+        ):
+            raise NotFoundError("Dataset not found")
+
+    @staticmethod
+    def _validated_dataset_lookup_key(key: str) -> str:
+        try:
+            return validate_dataset_key(key)
+        except ValidationError as exc:
+            raise NotFoundError("Dataset not found") from exc
+
+    @staticmethod
+    def _validated_field_lookup_key(key: str) -> str:
+        try:
+            return validate_dataset_field_key(key)
+        except ValidationError as exc:
+            raise NotFoundError("Dataset field not found") from exc
+
+    @staticmethod
+    def _add_audit(uow: UnitOfWork, actor_id: str, field_id: str, action: str) -> None:
+        uow.add_audit(
+            actor_user_id=actor_id,
+            object_type="dataset_field",
+            object_id=field_id,
+            action=action,
+        )
 
 
 class GrantService:

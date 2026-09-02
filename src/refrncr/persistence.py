@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from refrncr.models import (
     AuditEvent,
     Dataset,
+    DatasetField,
     Grant,
     LoginSession,
     Membership,
@@ -40,8 +41,14 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
     diagnostic = getattr(error.orig, "diag", None)
     if getattr(diagnostic, "constraint_name", None) == "uq_datasets_key":
         return "uq_datasets_key"
+    if getattr(diagnostic, "constraint_name", None) == "uq_dataset_fields_dataset_key":
+        return "uq_dataset_fields_dataset_key"
     if str(error.orig) == "UNIQUE constraint failed: datasets.key":
         return "uq_datasets_key"
+    if str(error.orig) == (
+        "UNIQUE constraint failed: dataset_fields.dataset_id, dataset_fields.key"
+    ):
+        return "uq_dataset_fields_dataset_key"
     return None
 
 
@@ -238,6 +245,38 @@ class SqlAlchemyDatasetOperations:
         return dataset
 
 
+class SqlAlchemyDatasetFieldOperations:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def find_by_key(
+        self, dataset_id: str, key: str, *, for_update: bool = False
+    ) -> DatasetField | None:
+        statement = _locked(
+            select(DatasetField).where(
+                DatasetField.dataset_id == dataset_id,
+                DatasetField._key == key,
+            ),
+            self.session,
+            for_update,
+        )
+        return self.session.scalar(statement)
+
+    def list_for_dataset(self, dataset_id: str) -> list[DatasetField]:
+        return list(
+            self.session.scalars(
+                select(DatasetField)
+                .where(DatasetField.dataset_id == dataset_id)
+                .order_by(DatasetField._key)
+            )
+        )
+
+    def create(self, **values) -> DatasetField:
+        field = DatasetField(_key=values.pop("key"), **values)
+        self.session.add(field)
+        return field
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(
         self, sessions: sessionmaker[Session], *, write: bool = False, serialized: bool = False
@@ -258,6 +297,7 @@ class SqlAlchemyUnitOfWork:
         self.memberships = SqlAlchemyMembershipOperations(self.session)
         self.grants = SqlAlchemyGrantOperations(self.session)
         self.datasets = SqlAlchemyDatasetOperations(self.session)
+        self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         return self
 
     def __exit__(

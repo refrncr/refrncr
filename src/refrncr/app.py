@@ -9,6 +9,7 @@ from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOf
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
+    DatasetFieldService,
     DatasetResourceResolver,
     DatasetService,
     GrantService,
@@ -31,6 +32,7 @@ class CommunityServices:
     grants: GrantService
     authorization: AuthorizationService
     datasets: DatasetService
+    dataset_fields: DatasetFieldService
 
 
 def create_community_services(
@@ -50,6 +52,7 @@ def create_community_services(
         grants=GrantService(uow, resources),
         authorization=authorization,
         datasets=DatasetService(uow, authorization),
+        dataset_fields=DatasetFieldService(uow, authorization),
     )
 
 
