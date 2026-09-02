@@ -83,6 +83,12 @@ class AuthenticatedPrincipal:
     id: str
 
 
+@dataclass(frozen=True, slots=True)
+class AuthorizedResourceSet:
+    all_resources: bool
+    resource_ids: tuple[str, ...]
+
+
 def validate_password(password: str) -> str:
     """Validate without trimming, normalizing, or otherwise rewriting a password."""
     if not isinstance(password, str):
@@ -475,10 +481,11 @@ class DatasetResourceResolver:
 
 
 class DatasetService:
-    """Dataset creation within the one Community installation context."""
+    """Authorized Dataset operations within the one Community installation context."""
 
-    def __init__(self, uow: UnitOfWorkFactory) -> None:
+    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
         self.uow = uow
+        self.authorization = authorization
 
     def create_dataset(self, actor_id: str, key: str, name: str, description: str) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
@@ -507,6 +514,53 @@ class DatasetService:
             self._add_audit(uow, self._audit(actor.id, "dataset", dataset.id, "created"))
             self._add_audit(uow, self._audit(actor.id, "grant", grant.id, "created"))
             return dataset
+
+    def list_datasets(self, actor_id: str) -> list[DatasetRecord]:
+        access = self.authorization.authorized_resources(actor_id, "dataset", "viewer")
+        with self.uow() as uow:
+            if access.all_resources:
+                return uow.datasets.list_all()
+            return uow.datasets.list_by_ids(access.resource_ids)
+
+    def get_dataset(self, actor_id: str, key: str) -> DatasetRecord:
+        dataset = self._find_by_key(key)
+        if not self.authorization.check_access(actor_id, "dataset", dataset.id, "viewer"):
+            raise NotFoundError("Dataset not found")
+        return dataset
+
+    def update_dataset(self, actor_id: str, key: str, name: str, description: str) -> DatasetRecord:
+        validated_key = self._validated_lookup_key(key)
+        normalized_name = normalize_dataset_name(name)
+        validated_description = validate_dataset_description(description)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            if dataset is None or not self.authorization.check_access(
+                actor_id, "dataset", dataset.id, "editor"
+            ):
+                raise NotFoundError("Dataset not found")
+            dataset.name = normalized_name
+            dataset.description = validated_description
+            dataset.updated_at = _now()
+            self._add_audit(
+                uow,
+                self._audit(actor_id, "dataset", dataset.id, "metadata_updated"),
+            )
+            return dataset
+
+    def _find_by_key(self, key: str) -> DatasetRecord:
+        validated_key = self._validated_lookup_key(key)
+        with self.uow() as uow:
+            dataset = uow.datasets.find_by_key(validated_key)
+            if dataset is None:
+                raise NotFoundError("Dataset not found")
+            return dataset
+
+    @staticmethod
+    def _validated_lookup_key(key: str) -> str:
+        try:
+            return validate_dataset_key(key)
+        except ValidationError as exc:
+            raise NotFoundError("Dataset not found") from exc
 
     @staticmethod
     def _audit(actor_id: str, object_type: str, object_id: str, action: str) -> AuditEntry:
@@ -636,6 +690,29 @@ class AuthorizationService:
         if context.subject.exists and context.subject.active and not context.subject.deleted:
             self.resources.require_existing(resource_type, resource_id)
         return permits(context.subject, context.permissions, required)
+
+    def authorized_resources(
+        self, user_id: str, resource_type: str, required: str
+    ) -> AuthorizedResourceSet:
+        GrantService._validate_permission(required)
+        context = self.data.load_resource_permissions(user_id, resource_type)
+        subject = context.subject
+        if not subject.exists or not subject.active or subject.deleted:
+            raise AuthorizationError("Active user access required")
+        if subject.community_admin:
+            return AuthorizedResourceSet(all_resources=True, resource_ids=())
+
+        permissions_by_resource: dict[str, list[str]] = {}
+        for resource_id, permission in context.permissions:
+            permissions_by_resource.setdefault(resource_id, []).append(permission)
+        resource_ids = tuple(
+            sorted(
+                resource_id
+                for resource_id, permissions in permissions_by_resource.items()
+                if permits(subject, permissions, required)
+            )
+        )
+        return AuthorizedResourceSet(all_resources=False, resource_ids=resource_ids)
 
 
 class MembershipService:

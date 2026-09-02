@@ -24,6 +24,7 @@ from refrncr.ports import (
     PasswordHashReplacementError,
     PermissionContext,
     PersistenceConflictError,
+    ResourcePermissionsContext,
     TeamRecord,
 )
 
@@ -206,8 +207,27 @@ class SqlAlchemyDatasetOperations:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def get(self, dataset_id: str) -> Dataset | None:
-        return self.session.get(Dataset, dataset_id)
+    def get(self, dataset_id: str, *, for_update: bool = False) -> Dataset | None:
+        statement = _locked(
+            select(Dataset).where(Dataset.id == dataset_id), self.session, for_update
+        )
+        return self.session.scalar(statement)
+
+    def find_by_key(self, key: str, *, for_update: bool = False) -> Dataset | None:
+        statement = _locked(select(Dataset).where(Dataset._key == key), self.session, for_update)
+        return self.session.scalar(statement)
+
+    def list_all(self) -> list[Dataset]:
+        return list(self.session.scalars(select(Dataset).order_by(Dataset._key)))
+
+    def list_by_ids(self, dataset_ids: tuple[str, ...]) -> list[Dataset]:
+        if not dataset_ids:
+            return []
+        return list(
+            self.session.scalars(
+                select(Dataset).where(Dataset.id.in_(dataset_ids)).order_by(Dataset._key)
+            )
+        )
 
     def exists(self, dataset_id: str) -> bool:
         return self.session.scalar(select(Dataset.id).where(Dataset.id == dataset_id)) is not None
@@ -313,3 +333,32 @@ class SqlAlchemyPermissionDataSource:
                 )
             )
             return PermissionContext(subject, tuple(permissions))
+
+    def load_resource_permissions(
+        self, user_id: str, resource_type: str
+    ) -> ResourcePermissionsContext:
+        with self.sessions() as session:
+            user = session.get(User, user_id)
+            if user is None:
+                return ResourcePermissionsContext(
+                    AuthorizationSubject(False, False, False, False), ()
+                )
+            subject = AuthorizationSubject(
+                exists=True,
+                active=user.is_active,
+                deleted=user.is_deleted,
+                community_admin=user.role == "admin",
+            )
+            if not user.is_active or user.is_deleted:
+                return ResourcePermissionsContext(subject, ())
+            team_ids = select(Membership.team_id).where(Membership.user_id == user.id)
+            permissions = session.execute(
+                select(Grant.resource_id, Grant.permission).where(
+                    Grant.resource_type == resource_type,
+                    (
+                        ((Grant.subject_type == "user") & (Grant.subject_id == user.id))
+                        | ((Grant.subject_type == "team") & Grant.subject_id.in_(team_ids))
+                    ),
+                )
+            )
+            return ResourcePermissionsContext(subject, tuple(permissions.tuples()))

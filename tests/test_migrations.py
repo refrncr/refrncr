@@ -7,6 +7,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
 
+from refrncr.app import create_community_services
 from refrncr.cli import prepare_database
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, Grant, Membership, Team, User
@@ -15,6 +16,7 @@ from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
     ConflictError,
+    DatasetResourceResolver,
     DatasetService,
     GrantService,
     MembershipService,
@@ -222,9 +224,9 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
     command.upgrade(config, "head")
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
-    uow = SqlAlchemyUnitOfWorkFactory(factory)
-    users = UserService(uow)
-    datasets = DatasetService(uow)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    users = services.users
+    datasets = services.datasets
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     dataset = datasets.create_dataset(admin.id, "downgrade", "Downgrade", "")
@@ -310,9 +312,10 @@ def test_empty_postgresql_database_upgrades():
         memberships = MembershipService(uow)
         resources = ResourceTypeRegistry()
         resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
+        resources.register("dataset", DatasetResourceResolver(uow))
         grants = GrantService(uow, resources)
         authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
-        datasets = DatasetService(uow)
+        datasets = DatasetService(uow, authorization)
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
         dataset = datasets.create_dataset(
