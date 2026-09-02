@@ -89,6 +89,16 @@ class AuthorizedResourceSet:
     resource_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class DatasetDetails:
+    id: str
+    key: str
+    name: str
+    description: str
+    owner_user_id: str
+    owner_display_name: str
+
+
 def validate_password(password: str) -> str:
     """Validate without trimming, normalizing, or otherwise rewriting a password."""
     if not isinstance(password, str):
@@ -523,8 +533,31 @@ class DatasetService:
             return uow.datasets.list_by_ids(access.resource_ids)
 
     def get_dataset(self, actor_id: str, key: str) -> DatasetRecord:
+        return self._get_dataset_with_access(actor_id, key, "viewer")
+
+    def get_dataset_details(self, actor_id: str, key: str) -> DatasetDetails:
+        dataset = self.get_dataset(actor_id, key)
+        with self.uow() as uow:
+            owner = uow.users.get(dataset.owner_user_id)
+        return DatasetDetails(
+            id=dataset.id,
+            key=dataset.key,
+            name=dataset.name,
+            description=dataset.description,
+            owner_user_id=dataset.owner_user_id,
+            owner_display_name=(owner.display_name if owner is not None else dataset.owner_user_id),
+        )
+
+    def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
+        return self._get_dataset_with_access(actor_id, key, "editor")
+
+    def _get_dataset_with_access(
+        self, actor_id: str, key: str, required_permission: str
+    ) -> DatasetRecord:
         dataset = self._find_by_key(key)
-        if not self.authorization.check_access(actor_id, "dataset", dataset.id, "viewer"):
+        if not self.authorization.check_access(
+            actor_id, "dataset", dataset.id, required_permission
+        ):
             raise NotFoundError("Dataset not found")
         return dataset
 

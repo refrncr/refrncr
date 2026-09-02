@@ -17,7 +17,7 @@ HTTPS = "https://localhost"
 ADMIN_PASSWORD = "correct horse battery staple"
 
 
-def configured_services():
+def configured_services(*, include_dataset_dependencies=False):
     engine = create_database_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -32,7 +32,10 @@ def configured_services():
     teams = configured.teams
     memberships = configured.memberships
     users.bootstrap_organisation()
-    return factory, users, authentication, sessions, teams, memberships
+    configured_services = factory, users, authentication, sessions, teams, memberships
+    if include_dataset_dependencies:
+        return *configured_services, configured.authorization, configured.datasets
+    return configured_services
 
 
 @pytest.fixture
@@ -91,9 +94,26 @@ def authenticated_csrf(client):
 
 
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
-    _, users, authentication, sessions, teams, memberships = configured_services()
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+    ) = configured_services(include_dataset_dependencies=True)
     client = TestClient(
-        create_application(users, authentication, sessions, teams, memberships),
+        create_application(
+            users,
+            authentication,
+            sessions,
+            teams,
+            memberships,
+            authorization=authorization,
+            datasets=datasets,
+        ),
         base_url="https://testserver",
     )
 
@@ -131,6 +151,18 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
     )
     assert client.get("/users").status_code == 200
     assert client.get("/teams").status_code == 200
+    assert "Datasets" in client.get("/").text
+    assert client.get("/datasets").status_code == 200
+
+
+def test_low_level_app_without_dataset_dependencies_has_no_dataset_ui(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    assert "Datasets" not in response_text(request(client, "get", "/"))
+    assert request(client, "get", "/datasets").status_code == 404
+    assert request(client, "get", "/datasets/new").status_code == 404
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
