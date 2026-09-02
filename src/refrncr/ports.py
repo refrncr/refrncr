@@ -9,6 +9,10 @@ from typing import Protocol
 class PersistenceConflictError(Exception):
     """A persistence constraint rejected the pending unit-of-work changes."""
 
+    def __init__(self, constraint: str | None = None) -> None:
+        super().__init__("A persistence constraint rejected the operation")
+        self.constraint = constraint
+
 
 class PasswordHashReplacementError(Exception):
     """A password-hash replacement could not be persisted safely."""
@@ -57,6 +61,16 @@ class GrantRecord(Protocol):
     resource_type: str
     resource_id: str
     permission: str
+    updated_at: datetime
+
+
+class DatasetRecord(Protocol):
+    id: str
+    key: str
+    name: str
+    description: str
+    owner_user_id: str
+    created_at: datetime
     updated_at: datetime
 
 
@@ -135,11 +149,27 @@ class GrantOperations(Protocol):
     def list_for_team(self, team_id: str, *, for_update: bool = False) -> list[GrantRecord]: ...
 
 
+class DatasetOperations(Protocol):
+    def get(self, dataset_id: str) -> DatasetRecord | None: ...
+
+    def exists(self, dataset_id: str) -> bool: ...
+
+    def create(
+        self,
+        *,
+        key: str,
+        name: str,
+        description: str,
+        owner_user_id: str,
+    ) -> DatasetRecord: ...
+
+
 class UnitOfWork(Protocol):
     users: UserOperations
     teams: TeamOperations
     memberships: MembershipOperations
     grants: GrantOperations
+    datasets: DatasetOperations
 
     def flush(self) -> None: ...
 

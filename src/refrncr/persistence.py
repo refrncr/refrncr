@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.models import (
     AuditEvent,
+    Dataset,
     Grant,
     LoginSession,
     Membership,
@@ -31,6 +32,16 @@ def _locked(statement, session: Session, for_update: bool):
     if for_update and session.get_bind().dialect.name != "sqlite":
         return statement.with_for_update()
     return statement
+
+
+def _safe_constraint_name(error: IntegrityError) -> str | None:
+    """Return only known canonical constraint identifiers, never driver detail."""
+    diagnostic = getattr(error.orig, "diag", None)
+    if getattr(diagnostic, "constraint_name", None) == "uq_datasets_key":
+        return "uq_datasets_key"
+    if str(error.orig) == "UNIQUE constraint failed: datasets.key":
+        return "uq_datasets_key"
+    return None
 
 
 class SqlAlchemyUserOperations:
@@ -191,6 +202,22 @@ class SqlAlchemyGrantOperations:
         return list(self.session.scalars(statement))
 
 
+class SqlAlchemyDatasetOperations:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get(self, dataset_id: str) -> Dataset | None:
+        return self.session.get(Dataset, dataset_id)
+
+    def exists(self, dataset_id: str) -> bool:
+        return self.session.scalar(select(Dataset.id).where(Dataset.id == dataset_id)) is not None
+
+    def create(self, **values) -> Dataset:
+        dataset = Dataset(_key=values.pop("key"), **values)
+        self.session.add(dataset)
+        return dataset
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(
         self, sessions: sessionmaker[Session], *, write: bool = False, serialized: bool = False
@@ -210,6 +237,7 @@ class SqlAlchemyUnitOfWork:
         self.teams = SqlAlchemyTeamOperations(self.session)
         self.memberships = SqlAlchemyMembershipOperations(self.session)
         self.grants = SqlAlchemyGrantOperations(self.session)
+        self.datasets = SqlAlchemyDatasetOperations(self.session)
         return self
 
     def __exit__(
@@ -242,7 +270,7 @@ class SqlAlchemyUnitOfWork:
         try:
             self.session.flush()
         except IntegrityError as exc:
-            raise PersistenceConflictError from exc
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
 
     def add_audit(self, **values) -> None:
         self.session.add(AuditEvent(**values))

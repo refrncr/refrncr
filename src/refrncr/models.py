@@ -9,8 +9,10 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
     event,
+    inspect,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column
@@ -143,3 +145,42 @@ class Grant(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
+
+
+class ImmutableDatasetKeyError(ValueError):
+    """A persisted Dataset key was changed."""
+
+
+class Dataset(Base):
+    __tablename__ = "datasets"
+    __table_args__ = (
+        CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_datasets_key_length"),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_datasets_name_length"),
+        CheckConstraint("length(description) <= 10000", name="ck_datasets_description_length"),
+        UniqueConstraint("key", name="uq_datasets_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    _key: Mapped[str] = mapped_column("key", String(100))
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    @hybrid_property
+    def key(self) -> str:
+        return self._key
+
+    @key.inplace.expression
+    @classmethod
+    def _key_expression(cls):
+        return cls._key
+
+
+@event.listens_for(Dataset, "before_update")
+def _prevent_dataset_key_update(_mapper, _connection, dataset: Dataset) -> None:
+    if inspect(dataset).attrs["_key"].history.has_changes():
+        raise ImmutableDatasetKeyError("Dataset key is immutable")

@@ -4,17 +4,18 @@ import uuid
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
 
 from refrncr.cli import prepare_database
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import Grant, Membership
+from refrncr.models import AuditEvent, Dataset, Grant, Membership, Team, User
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
     ConflictError,
+    DatasetService,
     GrantService,
     MembershipService,
     ResourceTypeRegistry,
@@ -35,6 +36,7 @@ def assert_community_schema(engine):
         "teams",
         "memberships",
         "grants",
+        "datasets",
     } <= tables
     assert "organisation_id" not in {column["name"] for column in inspector.get_columns("users")}
     assert "organisation_id" not in {
@@ -95,6 +97,38 @@ def assert_community_schema(engine):
     assert inspector.get_foreign_keys("grants") == []
     grant_checks = {constraint["name"] for constraint in inspector.get_check_constraints("grants")}
     assert {"ck_grants_subject_type", "ck_grants_permission"} <= grant_checks
+    dataset_columns = {column["name"] for column in inspector.get_columns("datasets")}
+    assert dataset_columns == {
+        "id",
+        "key",
+        "name",
+        "description",
+        "owner_user_id",
+        "created_at",
+        "updated_at",
+    }
+    assert "organisation_id" not in dataset_columns
+    assert "tenant_id" not in dataset_columns
+    dataset_unique_columns = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("datasets")
+    }
+    assert ("key",) in dataset_unique_columns
+    dataset_checks = {
+        constraint["name"] for constraint in inspector.get_check_constraints("datasets")
+    }
+    assert {
+        "ck_datasets_key_length",
+        "ck_datasets_name_length",
+        "ck_datasets_description_length",
+    } <= dataset_checks
+    dataset_foreign_keys = {
+        tuple(foreign_key["constrained_columns"]): foreign_key
+        for foreign_key in inspector.get_foreign_keys("datasets")
+    }
+    owner_foreign_key = dataset_foreign_keys[("owner_user_id",)]
+    assert owner_foreign_key["referred_table"] == "users"
+    assert owner_foreign_key["options"].get("ondelete") in {None, "RESTRICT"}
 
 
 def test_empty_sqlite_database_upgrades(tmp_path):
@@ -148,6 +182,106 @@ def test_empty_sqlite_database_upgrades(tmp_path):
     assert "teams" in inspect(downgraded_engine).get_table_names()
 
 
+def test_populated_ref_36_sqlite_database_upgrades_to_ref_72(tmp_path):
+    database = tmp_path / "populated-ref-36.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0004_ref_36")
+
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    teams = TeamService(uow)
+    resources = ResourceTypeRegistry()
+    resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
+    grants = GrantService(uow, resources)
+    users.bootstrap_organisation()
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    team = teams.create_team(admin.id, "Existing team")
+    grant = grants.create_grant(admin.id, "team", team.id, "test-resource", "resource-1", "viewer")
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    upgraded_engine = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert_community_schema(upgraded_engine)
+        with create_session_factory(upgraded_engine)() as session:
+            assert session.get(User, admin.id) is not None
+            assert session.get(Team, team.id) is not None
+            assert session.get(Grant, grant.id) is not None
+            assert session.scalar(select(func.count(Dataset.id))) == 0
+    finally:
+        upgraded_engine.dispose()
+
+
+def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
+    database = tmp_path / "ref-72-downgrade.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "head")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    uow = SqlAlchemyUnitOfWorkFactory(factory)
+    users = UserService(uow)
+    datasets = DatasetService(uow)
+    users.bootstrap_organisation()
+    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    dataset = datasets.create_dataset(admin.id, "downgrade", "Downgrade", "")
+    engine.dispose()
+
+    with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
+        command.downgrade(config, "0004_ref_36")
+    engine = create_database_engine(f"sqlite:///{database}")
+    assert "datasets" in inspect(engine).get_table_names()
+    with create_session_factory(engine)() as session:
+        assert session.get(Dataset, dataset.id) is not None
+        assert (
+            session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
+            == 1
+        )
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
+            )
+            == 1
+        )
+    with create_session_factory(engine).begin() as session:
+        session.delete(session.get(Dataset, dataset.id))
+    engine.dispose()
+
+    with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
+        command.downgrade(config, "0004_ref_36")
+    engine = create_database_engine(f"sqlite:///{database}")
+    assert "datasets" in inspect(engine).get_table_names()
+    with create_session_factory(engine).begin() as session:
+        assert session.scalar(select(func.count(Dataset.id))) == 0
+        assert (
+            session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
+            == 1
+        )
+        session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
+    engine.dispose()
+
+    command.downgrade(config, "0004_ref_36")
+    downgraded_engine = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert "datasets" not in inspect(downgraded_engine).get_table_names()
+        with create_session_factory(downgraded_engine)() as session:
+            assert (
+                session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
+                == 0
+            )
+            assert (
+                session.scalar(
+                    select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
+                )
+                == 1
+            )
+    finally:
+        downgraded_engine.dispose()
+
+
 def test_empty_postgresql_database_upgrades():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     if not database_url:
@@ -167,7 +301,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0004_ref_36"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0005_ref_72"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
@@ -178,8 +312,12 @@ def test_empty_postgresql_database_upgrades():
         resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
         grants = GrantService(uow, resources)
         authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
+        datasets = DatasetService(uow)
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
+        dataset = datasets.create_dataset(
+            admin.id, "alembic-postgresql", "Alembic PostgreSQL", "Migrated schema"
+        )
         managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
         team = teams.create_team(admin.id, "Straße")
         with pytest.raises(ConflictError):
@@ -197,6 +335,68 @@ def test_empty_postgresql_database_upgrades():
         with factory() as session:
             assert session.get(Membership, membership.id) is None
             assert session.get(Grant, grant.id) is None
+            dataset_grant = session.scalar(
+                select(Grant).where(
+                    Grant.resource_type == "dataset", Grant.resource_id == dataset.id
+                )
+            )
+            assert session.get(Dataset, dataset.id) is not None
+            assert dataset_grant.permission == "admin"
+            assert {
+                (event.object_type, event.object_id, event.action)
+                for event in session.scalars(
+                    select(AuditEvent).where(
+                        (AuditEvent.object_type == "dataset")
+                        | (
+                            (AuditEvent.object_type == "grant")
+                            & (AuditEvent.object_id == dataset_grant.id)
+                        )
+                    )
+                )
+            } == {
+                ("dataset", dataset.id, "created"),
+                ("grant", dataset_grant.id, "created"),
+            }
+        application_engine.dispose()
+        application_engine = None
+
+        with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
+            command.downgrade(config, "0004_ref_36")
+        application_engine = create_database_engine(schema_url)
+        with create_session_factory(application_engine).begin() as session:
+            assert session.get(Dataset, dataset.id) is not None
+            assert (
+                session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
+                == 1
+            )
+            session.delete(session.get(Dataset, dataset.id))
+        application_engine.dispose()
+        application_engine = None
+
+        with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
+            command.downgrade(config, "0004_ref_36")
+        application_engine = create_database_engine(schema_url)
+        assert "datasets" in inspect(application_engine).get_table_names()
+        with create_session_factory(application_engine).begin() as session:
+            assert session.scalar(select(func.count(Dataset.id))) == 0
+            assert (
+                session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
+                == 1
+            )
+            session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
+        application_engine.dispose()
+        application_engine = None
+
+        command.downgrade(config, "0004_ref_36")
+        application_engine = create_database_engine(schema_url)
+        assert "datasets" not in inspect(application_engine).get_table_names()
+        with create_session_factory(application_engine)() as session:
+            assert (
+                session.scalar(
+                    select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
+                )
+                == 1
+            )
         application_engine.dispose()
         application_engine = None
         command.downgrade(config, "0002_ref_34")
