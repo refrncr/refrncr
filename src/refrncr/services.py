@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 import threading
 import unicodedata
@@ -18,6 +19,7 @@ from refrncr.authorization import highest_permission, permits, validate_permissi
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
+    DatasetRecord,
     GrantRecord,
     MembershipRecord,
     OrganisationRecord,
@@ -142,8 +144,34 @@ def normalize_team_name(name: str) -> str:
     return normalized_name
 
 
-def require_admin(uow: UnitOfWork, actor_id: str) -> UserRecord:
-    actor = uow.users.get(actor_id)
+def validate_dataset_key(key: str) -> str:
+    if not isinstance(key, str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,99}", key) is None:
+        raise ValidationError(
+            "Dataset key must contain 1-100 lowercase ASCII letters, numbers, "
+            "underscores, or hyphens"
+        )
+    return key
+
+
+def normalize_dataset_name(name: str) -> str:
+    if not isinstance(name, str):
+        raise ValidationError("Dataset name must be text")
+    normalized_name = unicodedata.normalize("NFC", name.strip())
+    if not 1 <= len(normalized_name) <= 200:
+        raise ValidationError("Dataset name must contain between 1 and 200 characters")
+    return normalized_name
+
+
+def validate_dataset_description(description: str) -> str:
+    if not isinstance(description, str):
+        raise ValidationError("Dataset description must be text")
+    if len(description) > 10_000:
+        raise ValidationError("Dataset description must not exceed 10000 characters")
+    return description
+
+
+def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -> UserRecord:
+    actor = uow.users.get(actor_id, for_update=for_update)
     if actor is None or actor.role != "admin" or not actor.is_active or actor.is_deleted:
         raise AuthorizationError("Administrator access required")
     return actor
@@ -430,6 +458,63 @@ class TeamService:
             object_type="grant",
             object_id=grant_id,
             action="deleted",
+        )
+
+    _add_audit = staticmethod(UserService._add_audit)
+
+
+class DatasetResourceResolver:
+    """Persistence-neutral Dataset existence resolver for resource Grants."""
+
+    def __init__(self, uow: UnitOfWorkFactory) -> None:
+        self.uow = uow
+
+    def __call__(self, dataset_id: str) -> bool:
+        with self.uow() as uow:
+            return uow.datasets.exists(dataset_id)
+
+
+class DatasetService:
+    """Dataset creation within the one Community installation context."""
+
+    def __init__(self, uow: UnitOfWorkFactory) -> None:
+        self.uow = uow
+
+    def create_dataset(self, actor_id: str, key: str, name: str, description: str) -> DatasetRecord:
+        with self.uow(write=True, serialized=True) as uow:
+            actor = require_admin(uow, actor_id, for_update=True)
+            dataset = uow.datasets.create(
+                key=validate_dataset_key(key),
+                name=normalize_dataset_name(name),
+                description=validate_dataset_description(description),
+                owner_user_id=actor.id,
+            )
+            try:
+                uow.flush()
+            except PersistenceConflictError as exc:
+                if exc.constraint == "uq_datasets_key":
+                    raise ConflictError("Dataset key already exists in this installation") from exc
+                raise
+
+            grant = uow.grants.create(
+                subject_type="user",
+                subject_id=actor.id,
+                resource_type="dataset",
+                resource_id=dataset.id,
+                permission="admin",
+            )
+            uow.flush()
+            self._add_audit(uow, self._audit(actor.id, "dataset", dataset.id, "created"))
+            self._add_audit(uow, self._audit(actor.id, "grant", grant.id, "created"))
+            return dataset
+
+    @staticmethod
+    def _audit(actor_id: str, object_type: str, object_id: str, action: str) -> AuditEntry:
+        return AuditEntry(
+            actor_user_id=actor_id,
+            object_type=object_type,
+            object_id=object_id,
+            action=action,
         )
 
     _add_audit = staticmethod(UserService._add_audit)
