@@ -56,11 +56,13 @@ def test_start_defaults_to_loopback_and_persistent_platform_data(monkeypatch, tm
     monkeypatch.delenv("REFRNCR_DATABASE_URL", raising=False)
     monkeypatch.delenv("REFRNCR_HOST", raising=False)
     monkeypatch.delenv("REFRNCR_PORT", raising=False)
+    monkeypatch.delenv("REFRNCR_TRUSTED_PROXIES", raising=False)
 
     configuration = cli.resolve_start_configuration(parse_start())
 
     assert configuration.host == "127.0.0.1"
     assert configuration.port == 8000
+    assert configuration.trusted_proxies == ()
     assert isinstance(configuration.database_url, URL)
     assert configuration.database_url.database.endswith("/refrncr/refrncr.db")
     assert configuration.database_url.database != ":memory:"
@@ -580,12 +582,28 @@ def test_environment_configuration_is_used(monkeypatch):
     monkeypatch.setenv("REFRNCR_DATABASE_URL", "sqlite:///environment.db")
     monkeypatch.setenv("REFRNCR_HOST", "127.0.0.2")
     monkeypatch.setenv("REFRNCR_PORT", "8766")
+    monkeypatch.setenv("REFRNCR_TRUSTED_PROXIES", "10.0.0.1, 192.0.2.0/24")
 
     configuration = cli.resolve_start_configuration(parse_start())
 
     assert configuration.database_url == "sqlite:///environment.db"
     assert configuration.host == "127.0.0.2"
     assert configuration.port == 8766
+    assert configuration.trusted_proxies == ("10.0.0.1", "192.0.2.0/24")
+
+
+def test_trusted_proxy_cli_options_override_environment(monkeypatch):
+    monkeypatch.setenv("REFRNCR_TRUSTED_PROXIES", "10.0.0.1")
+    configuration = cli.resolve_start_configuration(
+        parse_start("--trusted-proxy", "192.0.2.1", "--trusted-proxy", "2001:db8::/32")
+    )
+    assert configuration.trusted_proxies == ("192.0.2.1", "2001:db8::/32")
+
+
+def test_invalid_trusted_proxy_configuration_fails_safely(monkeypatch, capsys):
+    monkeypatch.setenv("REFRNCR_TRUSTED_PROXIES", "not-an-address")
+    assert cli.main(["start"]) == 1
+    assert "trusted proxies must be IP addresses or CIDR networks" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("name", ["question?.db", "a space.db", "hash#.db", "percent%.db", "é.db"])
@@ -700,10 +718,20 @@ def test_migration_failure_prevents_server_start(monkeypatch, capsys):
 def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     received = {}
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
-    monkeypatch.setattr(cli, "build_application", lambda _url: object())
 
-    def run(application, *, host, port):
-        received.update(application=application, host=host, port=port)
+    def build_application(_url, **kwargs):
+        received.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(cli, "build_application", build_application)
+
+    def run(application, *, host, port, proxy_headers):
+        received.update(
+            application=application,
+            host=host,
+            port=port,
+            proxy_headers=proxy_headers,
+        )
 
     monkeypatch.setattr(cli.uvicorn, "run", run)
 
@@ -714,12 +742,31 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     assert exit_code == 0
     assert received["host"] == "127.0.0.2"
     assert received["port"] == 8123
+    assert received["allow_loopback_http"] is True
+    assert received["trusted_proxies"] == ()
+    assert received["proxy_headers"] is False
     assert "http://127.0.0.2:8123" in capsys.readouterr().out
+
+
+def test_start_with_trusted_proxy_disables_loopback_http_cookie_mode(monkeypatch):
+    received = {}
+    monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
+
+    def build_application(_url, **kwargs):
+        received.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(cli, "build_application", build_application)
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *_args, **_kwargs: None)
+
+    assert cli.main(["start", "--trusted-proxy", "127.0.0.1"]) == 0
+    assert received["allow_loopback_http"] is False
+    assert received["trusted_proxies"] == ("127.0.0.1",)
 
 
 def test_server_bind_failure_propagates_nonzero_exit(monkeypatch):
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
-    monkeypatch.setattr(cli, "build_application", lambda _url: object())
+    monkeypatch.setattr(cli, "build_application", lambda _url, **_kwargs: object())
 
     def fail_to_bind(*_args, **_kwargs):
         raise SystemExit(1)

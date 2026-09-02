@@ -158,16 +158,10 @@ def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
         request(client, "post", "/setup", data={**setup_data, "csrf_token": token}).status_code
         == 302
     )
-    second_token = csrf_token(request(client, "get", "/setup"))
-    response = request(
-        client,
-        "post",
-        "/setup",
-        data={**setup_data, "csrf_token": second_token},
-    )
-    assert response.status_code == 400
-    assert "already been completed" in response_text(response)
-    assert ADMIN_PASSWORD not in response_text(response)
+    initialized = request(client, "get", "/setup")
+    assert initialized.status_code == 302
+    assert initialized.headers["Location"].endswith("/login")
+    assert "Create administrator" not in response_text(initialized)
 
 
 def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details(interface):
@@ -190,6 +184,7 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
     assert response.status_code == 302
     cookie = response.headers["Set-Cookie"]
     assert "Secure" in cookie and "HttpOnly" in cookie and "SameSite=Lax" in cookie
+    assert "Max-Age=43200" in cookie and "Path=/" in cookie
 
     for email, password in [
         ("admin@example.com", "wrong password"),
@@ -282,7 +277,9 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
     disabled_token = client.get_cookie(SESSION_COOKIE).value
     users.disable_user(admin.id, managed.id)
     assert sessions.resolve(disabled_token) is None
-    assert request(client, "get", "/users").status_code == 403
+    disabled_response = request(client, "get", "/users")
+    assert disabled_response.status_code == 403
+    assert "Max-Age=0" in disabled_response.headers["Set-Cookie"]
     assert login(client, managed.email, "member password").status_code == 401
 
     users.enable_user(admin.id, managed.id)
@@ -290,7 +287,9 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
     deleted_token = client.get_cookie(SESSION_COOKIE).value
     users.delete_user(admin.id, managed.id)
     assert sessions.resolve(deleted_token) is None
-    assert request(client, "get", "/users").status_code == 403
+    deleted_response = request(client, "get", "/users")
+    assert deleted_response.status_code == 403
+    assert "Max-Age=0" in deleted_response.headers["Set-Cookie"]
     assert login(client, managed.email, "member password").status_code == 401
 
 

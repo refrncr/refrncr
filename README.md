@@ -33,7 +33,11 @@ refrncr start --database-url postgresql+psycopg://user:password@localhost/refrnc
 The corresponding environment variables are `REFRNCR_DATABASE_URL`, `REFRNCR_HOST`, and
 `REFRNCR_PORT`. `--database-path` is a convenient SQLite-only override; `--database-url` supports
 any configured SQLAlchemy database URL. PostgreSQL remains an alternative persistence profile
-handled by related stories rather than a quick-start requirement.
+handled by related stories rather than a quick-start requirement. Explicit trusted reverse proxies
+can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options or the comma-separated
+`REFRNCR_TRUSTED_PROXIES` environment variable; direct Community use requires no proxy setting.
+Configuring a trusted proxy disables plain-HTTP loopback cookies, so proxy deployments require
+HTTPS.
 
 ## Community user foundation
 
@@ -42,6 +46,9 @@ application construction the Organisation is created when absent; `/setup` creat
 as its administrator. Administrators can then create, enable, disable, soft-delete, and change the
 email address of users through the Flask web boundary. Passwords use Argon2id and authentication
 uses database-backed server-side sessions.
+
+The loopback and HTTPS cookie/session policy is documented in
+[Browser session security](docs/development/browser-session-security.md).
 
 SQLite supports the zero-infrastructure local experience. PostgreSQL is recommended for serious
 concurrent multi-user operation.

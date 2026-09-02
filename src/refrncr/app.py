@@ -4,6 +4,7 @@ from a2wsgi import WSGIMiddleware
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.login_security import SourceIdentityResolver
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthenticationService,
@@ -52,6 +53,9 @@ def create_application(
     sessions: SessionService,
     teams: TeamService,
     memberships: MembershipService,
+    *,
+    allow_loopback_http: bool = False,
+    trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
     users.bootstrap_organisation()
     app = FastAPI(title="refrncr")
@@ -60,6 +64,14 @@ def create_application(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    flask_app = create_flask_app(users, authentication, sessions, teams, memberships)
+    flask_app = create_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        allow_loopback_http=allow_loopback_http and not trusted_proxies,
+        source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
+    )
     app.mount("/", WSGIMiddleware(flask_app))
     return app
