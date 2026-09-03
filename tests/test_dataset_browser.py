@@ -7,8 +7,8 @@ from sqlalchemy.pool import StaticPool
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Dataset, Grant
-from refrncr.services import ResourceTypeRegistry
+from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
+from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
@@ -35,6 +35,7 @@ def dataset_browser():
         services.memberships,
         authorization=services.authorization,
         datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
     ).test_client()
     return factory, services, admin, client
 
@@ -85,6 +86,27 @@ def create_dataset(services, admin, key, name=None, description=""):
     )
 
 
+def create_field(
+    services,
+    actor,
+    dataset,
+    key="field",
+    name="Field",
+    data_type="string",
+    is_required=False,
+    is_unique=False,
+):
+    return services.dataset_fields.create_field(
+        actor.id,
+        dataset.key,
+        key,
+        name,
+        data_type,
+        is_required,
+        is_unique,
+    )
+
+
 @pytest.mark.parametrize(
     ("method", "path", "data"),
     [
@@ -94,6 +116,10 @@ def create_dataset(services, admin, key, name=None, description=""):
         ("get", "/datasets/example", None),
         ("get", "/datasets/example/edit", None),
         ("post", "/datasets/example", {"name": "Changed", "description": ""}),
+        ("get", "/datasets/example/fields/new", None),
+        ("post", "/datasets/example/fields", {"key": "field", "name": "Field"}),
+        ("get", "/datasets/example/fields/field/edit", None),
+        ("post", "/datasets/example/fields/field", {"name": "Changed"}),
     ],
 )
 def test_all_dataset_routes_require_authentication(dataset_browser, method, path, data):
@@ -502,3 +528,566 @@ def test_invalid_edit_redisplays_escaped_values_without_mutation(dataset_browser
         persisted = session.get(Dataset, dataset.id)
         assert persisted.name == "Original"
         assert persisted.description == "Original"
+
+
+def test_dataset_detail_field_empty_state_order_values_and_admin_controls(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "schema")
+    login(client)
+
+    empty_page = body(request(client, "get", "/datasets/schema"))
+    assert "<h2>Fields</h2>" in empty_page
+    assert "No fields are defined." in empty_page
+    assert "Add field" in empty_page
+
+    create_field(services, admin, dataset, "zeta", "Zeta", "date", True, False)
+    create_field(services, admin, dataset, "alpha", "<script>alert(1)</script>", "string")
+    page = body(request(client, "get", "/datasets/schema"))
+
+    assert page.index("alpha") < page.index("zeta")
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert "string" in page and "date" in page
+    assert "Required" in page and "Unique" in page
+    assert page.count("Edit field") == 2
+
+
+def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "revoked-during-read")
+    login(client)
+    monkeypatch.setattr(
+        services.dataset_fields,
+        "list_fields",
+        lambda _actor_id, _dataset_key: (_ for _ in ()).throw(NotFoundError()),
+    )
+
+    response = request(client, "get", "/datasets/revoked-during-read")
+
+    assert response.status_code == 404
+    assert body(response) == body(request(client, "get", "/does-not-exist"))
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor"])
+def test_viewer_and_editor_see_fields_without_schema_controls(dataset_browser, permission):
+    _, services, admin, client = dataset_browser
+    user = services.users.create_user(
+        admin.id, f"{permission}@example.com", permission.title(), "user password"
+    )
+    dataset = create_dataset(services, admin, "visible-schema")
+    create_field(services, admin, dataset, "field", "Visible field", "boolean", True, True)
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, f"{permission}@example.com", "user password")
+
+    page = body(request(client, "get", "/datasets/visible-schema"))
+
+    assert "Visible field" in page
+    assert "Add field" not in page
+    assert "Edit field" not in page
+
+
+def test_community_admin_override_shows_schema_controls_without_grant(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "override")
+    field = create_field(services, admin, dataset)
+    with factory.begin() as session:
+        session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
+    login(client)
+
+    page = body(request(client, "get", "/datasets/override"))
+
+    assert "Add field" in page
+    assert "Edit field" in page
+    assert request(client, "get", f"/datasets/override/fields/{field.key}/edit").status_code == 200
+
+
+def test_owner_without_permission_cannot_view_schema_or_controls(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    owner = services.users.create_user(admin.id, "owner@example.com", "Owner", "owner password")
+    dataset = create_dataset(services, admin, "owned-schema")
+    create_field(services, admin, dataset)
+    with factory.begin() as session:
+        session.execute(
+            update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
+        )
+    login(client, "owner@example.com", "owner password")
+
+    response = request(client, "get", "/datasets/owned-schema")
+
+    assert response.status_code == 404
+    assert "Add field" not in body(response)
+    assert "Edit field" not in body(response)
+
+
+def test_admin_create_field_form_lists_exact_types(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "form")
+    login(client)
+
+    response = request(client, "get", "/datasets/form/fields/new")
+    page = body(response)
+
+    assert response.status_code == 200
+    assert [
+        choice for choice in ("string", "number", "boolean", "date") if f"value='{choice}'" in page
+    ] == ["string", "number", "boolean", "date"]
+    assert "name='key'" in page
+    assert "name='is_required'" in page
+    assert "name='is_unique'" in page
+
+
+@pytest.mark.parametrize("data_type", ["string", "number", "boolean", "date"])
+def test_admin_create_field_browser_flow_accepts_supported_types(dataset_browser, data_type):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "create-field")
+    login(client)
+    form = request(client, "get", "/datasets/create-field/fields/new")
+
+    response = request(
+        client,
+        "post",
+        "/datasets/create-field/fields",
+        data={
+            "key": data_type,
+            "name": data_type.title(),
+            "data_type": data_type,
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/datasets/create-field")
+    field = services.dataset_fields.get_field(admin.id, dataset.key, data_type)
+    assert field.data_type == data_type
+    assert field.is_required is False
+    assert field.is_unique is False
+
+
+def test_create_field_checkboxes_and_mass_assignment_are_explicit(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "allowlist")
+    login(client)
+    form = request(client, "get", "/datasets/allowlist/fields/new")
+
+    response = request(
+        client,
+        "post",
+        "/datasets/allowlist/fields",
+        data={
+            "key": "protected",
+            "name": "Protected",
+            "data_type": "string",
+            "is_required": "attacker-value",
+            "is_unique": "attacker-value",
+            "csrf_token": form_csrf(form),
+            "id": "attacker-id",
+            "dataset_id": "attacker-dataset",
+            "created_at": "1900-01-01",
+            "updated_at": "1900-01-01",
+            "actor_user_id": "attacker-user",
+            "object_type": "attacker-type",
+            "owner_user_id": "attacker-owner",
+            "permission": "viewer",
+            "tenant_id": "attacker-tenant",
+        },
+    )
+
+    assert response.status_code == 302
+    with factory() as session:
+        field = session.scalar(
+            select(DatasetField).where(
+                DatasetField.dataset_id == dataset.id,
+                DatasetField._key == "protected",
+            )
+        )
+        persisted_dataset = session.get(Dataset, dataset.id)
+        dataset_grant = session.scalar(
+            select(Grant).where(
+                Grant.resource_type == "dataset",
+                Grant.resource_id == dataset.id,
+                Grant.subject_type == "user",
+                Grant.subject_id == admin.id,
+            )
+        )
+    assert field.id != "attacker-id"
+    assert field.dataset_id == dataset.id
+    assert field.created_at.year != 1900 and field.updated_at.year != 1900
+    assert field.is_required is True and field.is_unique is True
+    assert persisted_dataset.owner_user_id == admin.id
+    assert dataset_grant.permission == "admin"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"key": "INVALID"},
+        {"name": "   "},
+        {"data_type": "datetime"},
+    ],
+)
+def test_create_field_validation_is_safe_and_preserves_values(dataset_browser, overrides):
+    factory, services, admin, client = dataset_browser
+    create_dataset(services, admin, "invalid-field")
+    login(client)
+    form = request(client, "get", "/datasets/invalid-field/fields/new")
+    markup = "<script>alert(1)</script>"
+    data = {
+        "key": "valid_key",
+        "name": markup,
+        "data_type": "string",
+        "csrf_token": form_csrf(form),
+        **overrides,
+    }
+
+    response = request(client, "post", "/datasets/invalid-field/fields", data=data)
+
+    assert response.status_code == 400
+    assert markup not in body(response)
+    if overrides.get("name") != "   ":
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetField.id))) == 0
+
+
+def test_duplicate_field_key_is_safe_conflict(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "duplicate-field")
+    create_field(services, admin, dataset, "duplicate")
+    login(client)
+    form = request(client, "get", "/datasets/duplicate-field/fields/new")
+
+    response = request(
+        client,
+        "post",
+        "/datasets/duplicate-field/fields",
+        data={
+            "key": "duplicate",
+            "name": "Duplicate",
+            "data_type": "string",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 409
+    assert "Field key already exists in this Dataset" in body(response)
+    assert "constraint" not in body(response).casefold()
+    assert "sql" not in body(response).casefold()
+
+
+@pytest.mark.parametrize("token", [None, "invalid", "é"])
+def test_create_field_requires_valid_csrf(dataset_browser, token):
+    factory, services, admin, client = dataset_browser
+    create_dataset(services, admin, "csrf-field")
+    login(client)
+    data = {"key": "blocked", "name": "Blocked", "data_type": "string"}
+    if token is not None:
+        data["csrf_token"] = token
+
+    response = request(client, "post", "/datasets/csrf-field/fields", data=data)
+
+    assert response.status_code == 403
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetField.id))) == 0
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor"])
+def test_viewer_and_editor_field_mutation_routes_are_denied(dataset_browser, permission):
+    factory, services, admin, client = dataset_browser
+    user = services.users.create_user(
+        admin.id, f"blocked-{permission}@example.com", permission.title(), "user password"
+    )
+    dataset = create_dataset(services, admin, "blocked-schema")
+    field = create_field(services, admin, dataset)
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, f"blocked-{permission}@example.com", "user password")
+    csrf = session_csrf(client, services)
+
+    responses = [
+        request(client, "get", "/datasets/blocked-schema/fields/new"),
+        request(
+            client,
+            "post",
+            "/datasets/blocked-schema/fields",
+            data={
+                "key": "blocked",
+                "name": "Blocked",
+                "data_type": "string",
+                "csrf_token": csrf,
+            },
+        ),
+        request(client, "get", f"/datasets/blocked-schema/fields/{field.key}/edit"),
+        request(
+            client,
+            "post",
+            f"/datasets/blocked-schema/fields/{field.key}",
+            data={
+                "name": "Blocked",
+                "data_type": "string",
+                "csrf_token": csrf,
+            },
+        ),
+    ]
+
+    assert [response.status_code for response in responses] == [404] * 4
+    assert len({body(response) for response in responses}) == 1
+    with factory() as session:
+        persisted = session.get(DatasetField, field.id)
+        assert persisted.name == "Field"
+        assert session.scalar(select(func.count(DatasetField.id))) == 1
+
+
+def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "edit-field")
+    field = create_field(services, admin, dataset, "stable_key", "Original")
+    original_id = field.id
+    login(client)
+    form = request(client, "get", "/datasets/edit-field/fields/stable_key/edit")
+
+    assert form.status_code == 200
+    assert "stable_key" in body(form)
+    assert "name='key'" not in body(form)
+    response = request(
+        client,
+        "post",
+        "/datasets/edit-field/fields/stable_key",
+        data={
+            "name": "  Changed  ",
+            "data_type": "date",
+            "is_required": "on",
+            "is_unique": "on",
+            "csrf_token": form_csrf(form),
+            "key": "attacker_key",
+            "id": "attacker-id",
+            "dataset_id": "attacker-dataset",
+            "created_at": "1900-01-01",
+            "updated_at": "1900-01-01",
+            "permission": "viewer",
+            "owner_user_id": "attacker-owner",
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/datasets/edit-field")
+    with factory() as session:
+        persisted = session.get(DatasetField, original_id)
+        assert persisted.key == "stable_key"
+        assert persisted.name == "Changed"
+        assert persisted.data_type == "date"
+        assert persisted.is_required is True and persisted.is_unique is True
+        assert persisted.dataset_id == dataset.id
+        assert persisted.created_at.year != 1900 and persisted.updated_at.year != 1900
+        assert (
+            session.scalar(
+                select(func.count(DatasetField.id)).where(DatasetField._key == "attacker_key")
+            )
+            == 0
+        )
+
+
+def test_edit_field_absent_checkboxes_clear_flags(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "checkbox-edit")
+    field = create_field(services, admin, dataset, is_required=True, is_unique=True)
+    login(client)
+    form = request(client, "get", "/datasets/checkbox-edit/fields/field/edit")
+
+    response = request(
+        client,
+        "post",
+        "/datasets/checkbox-edit/fields/field",
+        data={
+            "name": "Field",
+            "data_type": "string",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 302
+    persisted = services.dataset_fields.get_field(admin.id, dataset.key, field.key)
+    assert persisted.is_required is False and persisted.is_unique is False
+
+
+def test_browser_noop_field_update_preserves_timestamp_and_audit(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "noop-field")
+    field = create_field(services, admin, dataset, name="Ñame")
+    with factory() as session:
+        original_updated_at = session.get(DatasetField, field.id).updated_at
+    login(client)
+    form = request(client, "get", "/datasets/noop-field/fields/field/edit")
+
+    response = request(
+        client,
+        "post",
+        "/datasets/noop-field/fields/field",
+        data={
+            "name": " N\N{COMBINING TILDE}ame ",
+            "data_type": "string",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 302
+    with factory() as session:
+        persisted = session.get(DatasetField, field.id)
+        assert persisted.updated_at == original_updated_at
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_id == field.id,
+                    AuditEvent.action == "definition_updated",
+                )
+            )
+            == 0
+        )
+
+
+@pytest.mark.parametrize("token", [None, "invalid", "é"])
+def test_edit_field_requires_valid_csrf(dataset_browser, token):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "csrf-field-edit")
+    field = create_field(services, admin, dataset, name="Original")
+    login(client)
+    data = {"name": "Changed", "data_type": "string"}
+    if token is not None:
+        data["csrf_token"] = token
+
+    response = request(client, "post", "/datasets/csrf-field-edit/fields/field", data=data)
+
+    assert response.status_code == 403
+    with factory() as session:
+        assert session.get(DatasetField, field.id).name == "Original"
+
+
+def test_invalid_field_edit_redisplays_escaped_value_without_mutation(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "invalid-field-edit")
+    field = create_field(services, admin, dataset, name="Original")
+    login(client)
+    form = request(client, "get", "/datasets/invalid-field-edit/fields/field/edit")
+    markup = "<script>alert(1)</script>"
+
+    response = request(
+        client,
+        "post",
+        "/datasets/invalid-field-edit/fields/field",
+        data={
+            "name": markup,
+            "data_type": "datetime",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 400
+    assert markup not in body(response)
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+    with factory() as session:
+        persisted = session.get(DatasetField, field.id)
+        assert persisted.name == "Original"
+        assert persisted.data_type == "string"
+
+
+def test_field_routes_are_non_disclosing_for_missing_malformed_cross_dataset_and_inaccessible(
+    dataset_browser,
+):
+    _, services, admin, client = dataset_browser
+    private = create_dataset(services, admin, "private-schema")
+    other = create_dataset(services, admin, "other-schema")
+    create_field(services, admin, private, "private_field")
+    user = services.users.create_user(admin.id, "outsider@example.com", "Outsider", "user password")
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", other.id, "viewer")
+    login(client, "outsider@example.com", "user password")
+
+    responses = [
+        request(client, "get", "/datasets/private-schema/fields/private_field/edit"),
+        request(client, "get", "/datasets/missing/fields/private_field/edit"),
+        request(client, "get", "/datasets/INVALID/fields/private_field/edit"),
+        request(client, "get", "/datasets/other-schema/fields/missing/edit"),
+        request(client, "get", "/datasets/other-schema/fields/_malformed/edit"),
+        request(client, "get", "/datasets/other-schema/fields/private_field/edit"),
+    ]
+
+    assert [response.status_code for response in responses] == [404] * 6
+    assert len({body(response) for response in responses}) == 1
+
+    login(client)
+    authorized_parent_responses = [
+        request(client, "get", "/datasets/other-schema/fields/missing/edit"),
+        request(client, "get", "/datasets/other-schema/fields/_malformed/edit"),
+        request(client, "get", "/datasets/other-schema/fields/private_field/edit"),
+    ]
+    assert [response.status_code for response in authorized_parent_responses] == [404] * 3
+    assert len({body(response) for response in authorized_parent_responses}) == 1
+
+
+def test_create_field_post_is_non_disclosing_and_does_not_mutate(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    private = create_dataset(services, admin, "private-create")
+    services.users.create_user(admin.id, "create-outsider@example.com", "Outsider", "user password")
+    login(client, "create-outsider@example.com", "user password")
+    csrf = session_csrf(client, services)
+    data = {
+        "key": "attempted",
+        "name": "Attempted",
+        "data_type": "string",
+        "csrf_token": csrf,
+    }
+
+    responses = [
+        request(client, "post", "/datasets/missing/fields", data=data),
+        request(client, "post", "/datasets/INVALID/fields", data=data),
+        request(client, "post", f"/datasets/{private.key}/fields", data=data),
+    ]
+
+    assert [response.status_code for response in responses] == [404] * 3
+    assert len({body(response) for response in responses}) == 1
+    assert all("Traceback" not in body(response) for response in responses)
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetField.id))) == 0
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset_field")
+            )
+            == 0
+        )
+
+
+def test_update_field_post_is_non_disclosing_and_does_not_mutate(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    private = create_dataset(services, admin, "private-update")
+    visible = create_dataset(services, admin, "visible-update")
+    private_field = create_field(services, admin, private, "private_field", "Original")
+    outsider = services.users.create_user(
+        admin.id, "update-outsider@example.com", "Outsider", "user password"
+    )
+    services.grants.create_grant(admin.id, "user", outsider.id, "dataset", visible.id, "admin")
+    login(client, "update-outsider@example.com", "user password")
+    csrf = session_csrf(client, services)
+    data = {"name": "Changed", "data_type": "date", "csrf_token": csrf}
+
+    responses = [
+        request(client, "post", "/datasets/missing/fields/private_field", data=data),
+        request(client, "post", "/datasets/INVALID/fields/private_field", data=data),
+        request(client, "post", "/datasets/private-update/fields/private_field", data=data),
+        request(client, "post", "/datasets/visible-update/fields/missing", data=data),
+        request(client, "post", "/datasets/visible-update/fields/_malformed", data=data),
+        request(client, "post", "/datasets/visible-update/fields/private_field", data=data),
+    ]
+
+    assert [response.status_code for response in responses] == [404] * 6
+    assert len({body(response) for response in responses}) == 1
+    assert all("Traceback" not in body(response) for response in responses)
+    with factory() as session:
+        persisted = session.get(DatasetField, private_field.id)
+        assert persisted.name == "Original"
+        assert persisted.data_type == "string"
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_type == "dataset_field",
+                    AuditEvent.action == "definition_updated",
+                )
+            )
+            == 0
+        )

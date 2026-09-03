@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     event,
+    false,
     inspect,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -184,3 +185,47 @@ class Dataset(Base):
 def _prevent_dataset_key_update(_mapper, _connection, dataset: Dataset) -> None:
     if inspect(dataset).attrs["_key"].history.has_changes():
         raise ImmutableDatasetKeyError("Dataset key is immutable")
+
+
+class ImmutableDatasetFieldKeyError(ValueError):
+    """A persisted Dataset field key was changed."""
+
+
+class DatasetField(Base):
+    __tablename__ = "dataset_fields"
+    __table_args__ = (
+        CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_dataset_fields_key_length"),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_dataset_fields_name_length"),
+        CheckConstraint(
+            "data_type IN ('string', 'number', 'boolean', 'date')",
+            name="ck_dataset_fields_data_type",
+        ),
+        UniqueConstraint("dataset_id", "key", name="uq_dataset_fields_dataset_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    _key: Mapped[str] = mapped_column("key", String(100))
+    name: Mapped[str] = mapped_column(String(200))
+    data_type: Mapped[str] = mapped_column(String(20))
+    is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    is_unique: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    @hybrid_property
+    def key(self) -> str:
+        return self._key
+
+    @key.inplace.expression
+    @classmethod
+    def _key_expression(cls):
+        return cls._key
+
+
+@event.listens_for(DatasetField, "before_update")
+def _prevent_dataset_field_key_update(_mapper, _connection, field: DatasetField) -> None:
+    if inspect(field).attrs["_key"].history.has_changes():
+        raise ImmutableDatasetFieldKeyError("Dataset field key is immutable")

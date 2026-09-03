@@ -74,6 +74,18 @@ class DatasetRecord(Protocol):
     updated_at: datetime
 
 
+class DatasetFieldRecord(Protocol):
+    id: str
+    dataset_id: str
+    key: str
+    name: str
+    data_type: str
+    is_required: bool
+    is_unique: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class UserOperations(Protocol):
     def get(self, user_id: str, *, for_update: bool = False) -> UserRecord | None: ...
 
@@ -170,12 +182,32 @@ class DatasetOperations(Protocol):
     ) -> DatasetRecord: ...
 
 
+class DatasetFieldOperations(Protocol):
+    def find_by_key(
+        self, dataset_id: str, key: str, *, for_update: bool = False
+    ) -> DatasetFieldRecord | None: ...
+
+    def list_for_dataset(self, dataset_id: str) -> list[DatasetFieldRecord]: ...
+
+    def create(
+        self,
+        *,
+        dataset_id: str,
+        key: str,
+        name: str,
+        data_type: str,
+        is_required: bool,
+        is_unique: bool,
+    ) -> DatasetFieldRecord: ...
+
+
 class UnitOfWork(Protocol):
     users: UserOperations
     teams: TeamOperations
     memberships: MembershipOperations
     grants: GrantOperations
     datasets: DatasetOperations
+    dataset_fields: DatasetFieldOperations
 
     def flush(self) -> None: ...
 

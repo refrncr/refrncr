@@ -9,6 +9,7 @@ from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOf
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
+    DatasetFieldService,
     DatasetResourceResolver,
     DatasetService,
     GrantService,
@@ -31,6 +32,7 @@ class CommunityServices:
     grants: GrantService
     authorization: AuthorizationService
     datasets: DatasetService
+    dataset_fields: DatasetFieldService
 
 
 def create_community_services(
@@ -50,6 +52,7 @@ def create_community_services(
         grants=GrantService(uow, resources),
         authorization=authorization,
         datasets=DatasetService(uow, authorization),
+        dataset_fields=DatasetFieldService(uow, authorization),
     )
 
 
@@ -62,6 +65,7 @@ def create_application(
     *,
     authorization: AuthorizationService,
     datasets: DatasetService,
+    dataset_fields: DatasetFieldService,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
@@ -80,6 +84,7 @@ def create_application(
         memberships,
         authorization=authorization,
         datasets=datasets,
+        dataset_fields=dataset_fields,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
     )

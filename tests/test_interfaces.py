@@ -34,7 +34,12 @@ def configured_services(*, include_dataset_dependencies=False):
     users.bootstrap_organisation()
     configured_services = factory, users, authentication, sessions, teams, memberships
     if include_dataset_dependencies:
-        return *configured_services, configured.authorization, configured.datasets
+        return (
+            *configured_services,
+            configured.authorization,
+            configured.datasets,
+            configured.dataset_fields,
+        )
     return configured_services
 
 
@@ -103,6 +108,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
         memberships,
         authorization,
         datasets,
+        dataset_fields,
     ) = configured_services(include_dataset_dependencies=True)
     client = TestClient(
         create_application(
@@ -113,6 +119,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
             memberships,
             authorization=authorization,
             datasets=datasets,
+            dataset_fields=dataset_fields,
         ),
         base_url="https://testserver",
     )
@@ -163,6 +170,48 @@ def test_low_level_app_without_dataset_dependencies_has_no_dataset_ui(interface)
     assert "Datasets" not in response_text(request(client, "get", "/"))
     assert request(client, "get", "/datasets").status_code == 404
     assert request(client, "get", "/datasets/new").status_code == 404
+    assert request(client, "get", "/datasets/example/fields/new").status_code == 404
+    assert request(client, "get", "/datasets/example/fields/field/edit").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "included",
+    [
+        ("authorization",),
+        ("datasets",),
+        ("dataset_fields",),
+        ("authorization", "datasets"),
+        ("authorization", "dataset_fields"),
+        ("datasets", "dataset_fields"),
+    ],
+)
+def test_low_level_app_rejects_partial_dataset_composition(included):
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+        dataset_fields,
+    ) = configured_services(include_dataset_dependencies=True)
+    available = {
+        "authorization": authorization,
+        "datasets": datasets,
+        "dataset_fields": dataset_fields,
+    }
+
+    with pytest.raises(ValueError, match="Dataset browser dependencies"):
+        create_flask_app(
+            users,
+            authentication,
+            sessions,
+            teams,
+            memberships,
+            **{name: available[name] for name in included},
+        )
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
