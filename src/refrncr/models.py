@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    LargeBinary,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -202,6 +206,7 @@ class DatasetField(Base):
             name="ck_dataset_fields_data_type",
         ),
         UniqueConstraint("dataset_id", "key", name="uq_dataset_fields_dataset_key"),
+        UniqueConstraint("id", "dataset_id", name="uq_dataset_fields_id_dataset"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -244,3 +249,61 @@ class DatasetBusinessKeyField(Base):
 
     dataset_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     field_key: Mapped[str] = mapped_column(String(100), primary_key=True)
+
+
+class DatasetRecord(Base):
+    __tablename__ = "dataset_records"
+    __table_args__ = (
+        UniqueConstraint("id", "dataset_id", name="uq_dataset_records_id_dataset"),
+        UniqueConstraint(
+            "dataset_id", "identifier_key", name="uq_dataset_records_dataset_identifier"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class DatasetRecordValue(Base):
+    __tablename__ = "dataset_record_values"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["record_id", "dataset_id"],
+            ["dataset_records.id", "dataset_records.dataset_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["field_id", "dataset_id"],
+            ["dataset_fields.id", "dataset_fields.dataset_id"],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "(CASE WHEN string_value IS NULL THEN 0 ELSE 1 END + "
+            "CASE WHEN number_value IS NULL THEN 0 ELSE 1 END + "
+            "CASE WHEN boolean_value IS NULL THEN 0 ELSE 1 END + "
+            "CASE WHEN date_value IS NULL THEN 0 ELSE 1 END) = 1",
+            name="ck_dataset_record_values_exactly_one_typed_value",
+        ),
+        UniqueConstraint("record_id", "field_id", name="uq_dataset_record_values_record_field"),
+        UniqueConstraint(
+            "dataset_id",
+            "field_id",
+            "unique_value_key",
+            name="uq_dataset_record_values_unique_value",
+        ),
+    )
+
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    field_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(String(36))
+    string_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    number_value: Mapped[Decimal | None] = mapped_column(Numeric(38, 18), nullable=True)
+    boolean_value: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    date_value: Mapped[date | None] = mapped_column(Date, nullable=True)
+    canonical_value_key: Mapped[bytes] = mapped_column(LargeBinary(1010))
+    unique_value_key: Mapped[bytes | None] = mapped_column(LargeBinary(1010), nullable=True)

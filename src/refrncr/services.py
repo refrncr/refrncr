@@ -7,7 +7,8 @@ import threading
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -28,6 +29,8 @@ from refrncr.ports import (
     PasswordHashReplacementError,
     PermissionDataSource,
     PersistenceConflictError,
+    RecordValue,
+    StoredRecord,
     TeamRecord,
     UnitOfWork,
     UnitOfWorkFactory,
@@ -81,6 +84,18 @@ class ValidationError(UserManagementError, ValueError):
     pass
 
 
+class RecordValidationError(ValidationError):
+    def __init__(self, errors: dict[str, str]) -> None:
+        super().__init__("Record contains invalid values")
+        self.errors = errors
+
+
+class RecordConflictError(ConflictError):
+    def __init__(self, message: str, field_key: str | None = None) -> None:
+        super().__init__(message)
+        self.field_key = field_key
+
+
 @dataclass(frozen=True, slots=True)
 class AuthenticatedPrincipal:
     id: str
@@ -100,6 +115,14 @@ class DatasetDetails:
     description: str
     owner_user_id: str
     owner_display_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class RecordPage:
+    records: tuple[StoredRecord, ...]
+    page: int
+    page_size: int
+    total: int
 
 
 def validate_password(password: str) -> str:
@@ -216,6 +239,64 @@ def validate_dataset_field_flag(value: bool, label: str) -> bool:
     if not isinstance(value, bool):
         raise ValidationError(f"{label} must be a boolean")
     return value
+
+
+_DECIMAL_PATTERN = re.compile(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?")
+
+
+def canonicalize_record_value(data_type: str, raw: str) -> tuple[object, bytes] | None:
+    if not isinstance(raw, str):
+        raise ValidationError("Value must be text")
+    if data_type == "string":
+        value = unicodedata.normalize("NFC", raw.strip())
+        if not value:
+            return None
+        if any(unicodedata.category(character) == "Cc" for character in value):
+            raise ValidationError("Control characters are not allowed")
+        encoded = value.encode("utf-8")
+        if len(encoded) > 1000:
+            raise ValidationError("Value must not exceed 1000 UTF-8 bytes")
+        return value, b"s" + encoded
+    if data_type == "number":
+        if raw == "":
+            return None
+        if _DECIMAL_PATTERN.fullmatch(raw) is None:
+            raise ValidationError("Enter a decimal number without exponent or separators")
+        integer, _, fraction = raw.lstrip("-").partition(".")
+        significant_integer = integer.lstrip("0")
+        precision = len(significant_integer) + len(fraction)
+        if precision > 38 or len(fraction) > 18 or len(integer) > 20:
+            raise ValidationError("Number must have at most 20 integer and 18 fractional digits")
+        try:
+            value = Decimal(raw)
+        except InvalidOperation as exc:
+            raise ValidationError("Enter a valid decimal number") from exc
+        if value == 0:
+            canonical = "0"
+            value = Decimal(0)
+        else:
+            canonical = format(value, "f")
+            if "." in canonical:
+                canonical = canonical.rstrip("0").rstrip(".")
+        return value, b"n" + canonical.encode("ascii")
+    if data_type == "boolean":
+        if raw == "":
+            return None
+        if raw not in {"true", "false"}:
+            raise ValidationError("Choose true or false")
+        value = raw == "true"
+        return value, b"b1" if value else b"b0"
+    if data_type == "date":
+        if raw == "":
+            return None
+        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", raw) is None:
+            raise ValidationError("Enter a date as YYYY-MM-DD")
+        try:
+            value = date.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValidationError("Enter a valid Gregorian date") from exc
+        return value, b"d" + raw.encode("ascii")
+    raise ValidationError("Unknown field type")
 
 
 def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -> UserRecord:
@@ -667,6 +748,10 @@ class DatasetFieldService:
             )
             if validated_component and not validated_required:
                 raise ValidationError("A Record identifier field must be required")
+            if uow.dataset_records.count(dataset.id) and (
+                validated_required or validated_component
+            ):
+                raise ValidationError("Required fields cannot be added after records exist")
             field = uow.dataset_fields.create(
                 dataset_id=dataset.id,
                 key=validate_dataset_field_key(key),
@@ -751,6 +836,12 @@ class DatasetFieldService:
             if replacement == current:
                 return field
 
+            self._validate_record_aware_definition_change(
+                uow, dataset.id, field, validated_type, validated_required, validated_unique
+            )
+            if validated_unique != field.is_unique:
+                uow.dataset_records.set_field_unique_keys(dataset.id, field.id, validated_unique)
+
             field.name = normalized_name
             field.data_type = validated_type
             field.is_required = validated_required
@@ -803,6 +894,17 @@ class DatasetFieldService:
             if not membership_changed and not definition_changed:
                 return field
 
+            if membership_changed and uow.dataset_records.count(dataset.id):
+                raise ValidationError("Record identifier cannot change after records exist")
+            if definition_changed:
+                self._validate_record_aware_definition_change(
+                    uow, dataset.id, field, validated_type, validated_required, validated_unique
+                )
+                if validated_unique != field.is_unique:
+                    uow.dataset_records.set_field_unique_keys(
+                        dataset.id, field.id, validated_unique
+                    )
+
             if membership_changed:
                 replacement_keys = set(current_key.field_keys)
                 if validated_component:
@@ -843,6 +945,8 @@ class DatasetFieldService:
                 raise ValidationError(
                     "Remove this field from the Record identifier before deleting it"
                 )
+            if uow.dataset_records.field_has_values(dataset.id, field.id):
+                raise ValidationError("A field with stored values cannot be deleted")
             field_id = field.id
             uow.dataset_fields.delete(field)
             self._add_audit(uow, actor_id, field_id, "deleted")
@@ -886,6 +990,31 @@ class DatasetFieldService:
             object_id=field_id,
             action=action,
         )
+
+    @staticmethod
+    def _validate_record_aware_definition_change(
+        uow: UnitOfWork,
+        dataset_id: str,
+        field: DatasetFieldRecord,
+        data_type: str,
+        is_required: bool,
+        is_unique: bool,
+    ) -> None:
+        has_records = bool(uow.dataset_records.count(dataset_id))
+        if has_records and data_type != field.data_type:
+            raise ValidationError("Field type cannot change after records exist")
+        if (
+            not field.is_required
+            and is_required
+            and uow.dataset_records.field_has_missing_values(dataset_id, field.id)
+        ):
+            raise ValidationError("Required cannot be enabled while records have no value")
+        if (
+            not field.is_unique
+            and is_unique
+            and uow.dataset_records.field_has_duplicate_values(dataset_id, field.id)
+        ):
+            raise ValidationError("Unique cannot be enabled while duplicate values exist")
 
 
 class DatasetBusinessKeyService:
@@ -934,6 +1063,9 @@ class DatasetBusinessKeyService:
             if current.field_keys == canonical:
                 return current
 
+            if uow.dataset_records.count(dataset.id):
+                raise ValidationError("Record identifier cannot change after records exist")
+
             uow.dataset_business_keys.replace(dataset.id, canonical)
             uow.add_audit(
                 actor_user_id=actor_id,
@@ -950,6 +1082,129 @@ class DatasetBusinessKeyService:
     ) -> None:
         if dataset is None or not self.authorization.check_access(
             actor_id, "dataset", dataset.id, required_permission
+        ):
+            raise NotFoundError("Dataset not found")
+
+
+class DatasetRecordService:
+    """Authorized current-record operations scoped through a parent Dataset."""
+
+    PAGE_SIZE = 50
+
+    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+        self.uow = uow
+        self.authorization = authorization
+
+    def create_record(
+        self, actor_id: str, dataset_key: str, submitted: dict[str, str]
+    ) -> StoredRecord:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self._require_access(actor_id, dataset, "editor")
+            fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            field_by_key = {field.key: field for field in fields}
+            unknown = sorted(set(submitted) - set(field_by_key))
+            if unknown:
+                raise RecordValidationError({key: "Unknown Dataset field" for key in unknown})
+            identifier = uow.dataset_business_keys.get(dataset.id)
+            if not identifier.field_keys:
+                raise ValidationError("Configure a Record identifier before adding records")
+
+            errors: dict[str, str] = {}
+            values: list[RecordValue] = []
+            for field in fields:
+                raw = submitted.get(field.key, "")
+                try:
+                    canonical = canonicalize_record_value(field.data_type, raw)
+                except ValidationError as error:
+                    errors[field.key] = str(error)
+                    continue
+                if canonical is None:
+                    if field.is_required or field.key in identifier.field_keys:
+                        errors[field.key] = "A value is required"
+                    continue
+                value, key = canonical
+                values.append(
+                    RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
+                )
+            if errors:
+                raise RecordValidationError(errors)
+            value_by_key = {value.field_key: value for value in values}
+            components = [value_by_key[key].canonical_key for key in identifier.field_keys]
+            encoded_identifier = b"".join(
+                len(component).to_bytes(4, "big") + component for component in components
+            )
+            if len(encoded_identifier) > 2000:
+                raise ValidationError("Encoded Record identifier must not exceed 2000 UTF-8 bytes")
+            record = uow.dataset_records.create(
+                dataset_id=dataset.id, identifier_key=encoded_identifier
+            )
+            try:
+                uow.flush()
+                uow.dataset_records.add_values(record, tuple(values))
+                uow.flush()
+            except PersistenceConflictError as error:
+                if error.constraint == "uq_dataset_records_dataset_identifier":
+                    raise RecordConflictError("Record identifier already exists") from error
+                if error.constraint == "uq_dataset_record_values_unique_value":
+                    raise RecordConflictError("A unique field value already exists") from error
+                raise
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset_record",
+                object_id=record.id,
+                action="created",
+            )
+            return StoredRecord(record.id, dataset.id, tuple(values))
+
+    def list_records(self, actor_id: str, dataset_key: str, page: int = 1) -> RecordPage:
+        if not isinstance(page, int) or isinstance(page, bool) or page < 1:
+            raise ValidationError("Page must be a positive integer")
+        dataset = self._find_dataset(actor_id, dataset_key, "viewer")
+        identifier = self._business_key(dataset.id)
+        with self.uow() as uow:
+            records = uow.dataset_records.list_all(dataset.id)
+        identifier_keys = identifier.field_keys
+
+        def sort_key(record: StoredRecord):
+            by_key = {value.field_key: value for value in record.values}
+            result = []
+            for key in identifier_keys:
+                value = by_key[key]
+                result.append(
+                    value.value.encode("utf-8") if value.data_type == "string" else value.value
+                )
+            return tuple(result)
+
+        records.sort(key=sort_key)
+        start = (page - 1) * self.PAGE_SIZE
+        return RecordPage(
+            tuple(records[start : start + self.PAGE_SIZE]),
+            page,
+            self.PAGE_SIZE,
+            len(records),
+        )
+
+    def get_dataset_for_add(self, actor_id: str, dataset_key: str) -> DatasetRecord:
+        return self._find_dataset(actor_id, dataset_key, "editor")
+
+    def _find_dataset(self, actor_id: str, key: str, permission: str) -> DatasetRecord:
+        validated = DatasetFieldService._validated_dataset_lookup_key(key)
+        with self.uow() as uow:
+            dataset = uow.datasets.find_by_key(validated)
+        self._require_access(actor_id, dataset, permission)
+        return dataset
+
+    def _business_key(self, dataset_id: str) -> DatasetBusinessKey:
+        with self.uow() as uow:
+            return uow.dataset_business_keys.get(dataset_id)
+
+    def _require_access(
+        self, actor_id: str, dataset: DatasetRecord | None, permission: str
+    ) -> None:
+        if dataset is None or not self.authorization.check_access(
+            actor_id, "dataset", dataset.id, permission
         ):
             raise NotFoundError("Dataset not found")
 
