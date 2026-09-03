@@ -8,6 +8,7 @@ from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
+from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
@@ -36,6 +37,7 @@ def dataset_browser():
         authorization=services.authorization,
         datasets=services.datasets,
         dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
     ).test_client()
     return factory, services, admin, client
 
@@ -120,6 +122,7 @@ def create_field(
         ("post", "/datasets/example/fields", {"key": "field", "name": "Field"}),
         ("get", "/datasets/example/fields/field/edit", None),
         ("post", "/datasets/example/fields/field", {"name": "Changed"}),
+        ("post", "/datasets/example/fields/field/delete", None),
     ],
 )
 def test_all_dataset_routes_require_authentication(dataset_browser, method, path, data):
@@ -1087,6 +1090,444 @@ def test_update_field_post_is_non_disclosing_and_does_not_mutate(dataset_browser
                 select(func.count(AuditEvent.id)).where(
                     AuditEvent.object_type == "dataset_field",
                     AuditEvent.action == "definition_updated",
+                )
+            )
+            == 0
+        )
+
+
+def test_record_identifier_detail_is_compact_canonical_and_marks_each_component(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "business-key")
+    create_field(services, admin, dataset, "zeta", "Zeta", is_required=True)
+    create_field(services, admin, dataset, "alpha", "Alpha", is_required=True)
+    login(client)
+
+    unconfigured = body(request(client, "get", "/datasets/business-key"))
+    assert "Record identifier: Not configured" in unconfigured
+    assert "Business key" not in unconfigured
+
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("zeta", "alpha"))
+    configured = body(request(client, "get", "/datasets/business-key"))
+    assert "Record identifier: <code>alpha</code> + <code>zeta</code>" in configured
+    assert "🔑 Alpha" in configured
+    assert "🔑 Zeta" in configured
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor"])
+def test_viewer_and_editor_see_record_identifier_without_management_controls(
+    dataset_browser, permission
+):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, f"{permission}-visible")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    user = services.users.create_user(
+        admin.id, f"{permission}@example.com", permission.title(), "user password"
+    )
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, user.email, "user password")
+
+    detail = body(request(client, "get", f"/datasets/{dataset.key}"))
+    assert "Record identifier: <code>code</code>" in detail
+    assert "🔑 Code" in detail
+    assert "Edit field" not in detail
+    field = services.dataset_fields.get_field(admin.id, dataset.key, "code")
+    with pytest.raises(NotFoundError):
+        services.dataset_fields.delete_field(user.id, dataset.key, field.key)
+
+
+def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_with_prg(
+    dataset_browser,
+):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "managed-key")
+    required = create_field(services, admin, dataset, "required", "Required", is_required=True)
+    optional = create_field(services, admin, dataset, "optional", "Optional")
+    manager = services.users.create_user(
+        admin.id, "manager@example.com", "Manager", "user password"
+    )
+    services.grants.create_grant(admin.id, "user", manager.id, "dataset", dataset.id, "admin")
+    login(client, manager.email, "user password")
+
+    form = request(client, "get", f"/datasets/{dataset.key}/fields/{required.key}/edit")
+    page = body(form)
+    assert "Part of Record identifier" in page
+    assert "Delete field" in page
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{required.key}",
+        data={
+            "name": required.name,
+            "data_type": required.data_type,
+            "is_required": "on",
+            "is_business_key_component": "on",
+            "csrf_token": form_csrf(form),
+            "dataset_id": "attacker-controlled",
+            "owner_user_id": manager.id,
+            "permission": "viewer",
+            "business_key": optional.key,
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}")
+    assert services.dataset_business_keys.get_business_key(manager.id, dataset.key).field_keys == (
+        required.key,
+    )
+
+    change_form = request(client, "get", f"/datasets/{dataset.key}/fields/{required.key}/edit")
+    assert "name='is_business_key_component' checked" in body(change_form)
+    changed = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{required.key}",
+        data={
+            "name": required.name,
+            "data_type": required.data_type,
+            "is_required": "on",
+            "csrf_token": form_csrf(change_form),
+        },
+    )
+    assert changed.status_code == 302
+    assert services.dataset_business_keys.get_business_key(manager.id, dataset.key).field_keys == ()
+    with factory() as session:
+        persisted_dataset = session.get(Dataset, dataset.id)
+        persisted_optional = session.get(DatasetField, optional.id)
+        assert persisted_dataset.owner_user_id == admin.id
+        assert persisted_optional.is_required is False
+
+
+def test_admin_can_add_field_directly_to_record_identifier(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "create-identifier-field")
+    login(client)
+    form = request(client, "get", f"/datasets/{dataset.key}/fields/new")
+    assert "Part of Record identifier" in body(form)
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields",
+        data={
+            "key": "code",
+            "name": "Code",
+            "data_type": "string",
+            "is_required": "on",
+            "is_business_key_component": "on",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 302
+    field = services.dataset_fields.get_field(admin.id, dataset.key, "code")
+    assert field.is_required is True
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == (
+        "code",
+    )
+
+
+def test_add_field_rejects_identifier_membership_without_required(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "invalid-create-identifier")
+    login(client)
+    form = request(client, "get", f"/datasets/{dataset.key}/fields/new")
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields",
+        data={
+            "key": "code",
+            "name": "Code",
+            "data_type": "string",
+            "is_business_key_component": "on",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Record identifier field must be required" in body(response)
+    assert "name='is_business_key_component' checked" in body(response)
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetField.id))) == 0
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()
+
+
+def test_community_admin_builds_composite_identifier_without_dataset_grant(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "community-key")
+    create_field(services, admin, dataset, "first", "First", is_required=True)
+    create_field(services, admin, dataset, "second", "Second", is_required=True)
+    with factory.begin() as session:
+        session.query(Grant).filter_by(resource_type="dataset", resource_id=dataset.id).delete()
+    login(client)
+
+    for field_key in ("second", "first"):
+        form = request(client, "get", f"/datasets/{dataset.key}/fields/{field_key}/edit")
+        assert form.status_code == 200
+        changed = request(
+            client,
+            "post",
+            f"/datasets/{dataset.key}/fields/{field_key}",
+            data={
+                "name": field_key.title(),
+                "data_type": "string",
+                "is_required": "on",
+                "is_business_key_component": "on",
+                "csrf_token": form_csrf(form),
+            },
+        )
+        assert changed.status_code == 302
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == (
+        "first",
+        "second",
+    )
+
+
+@pytest.mark.parametrize("token", [None, "invalid", "é"])
+def test_delete_field_requires_valid_csrf(dataset_browser, token):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "csrf-key")
+    field = create_field(services, admin, dataset, "field", "Field", is_required=True)
+    login(client)
+    data = {}
+    if token is not None:
+        data["csrf_token"] = token
+
+    response = request(
+        client, "post", f"/datasets/{dataset.key}/fields/{field.key}/delete", data=data
+    )
+
+    assert response.status_code == 403
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is not None
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_id == field.id,
+                    AuditEvent.action == "deleted",
+                )
+            )
+            == 0
+        )
+
+
+def test_identifier_membership_requires_field_to_remain_required(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "eligibility")
+    optional = create_field(services, admin, dataset, "optional", "Optional")
+    login(client)
+    form = request(client, "get", f"/datasets/{dataset.key}/fields/{optional.key}/edit")
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{optional.key}",
+        data={
+            "name": optional.name,
+            "data_type": optional.data_type,
+            "is_business_key_component": "on",
+            "csrf_token": form_csrf(form),
+        },
+    )
+    assert response.status_code == 400
+    assert "Record identifier field must be required" in body(response)
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()
+
+
+def test_delete_field_is_non_disclosing_for_missing_inaccessible_and_owner_only_datasets(
+    dataset_browser,
+):
+    factory, services, admin, client = dataset_browser
+    user = services.users.create_user(admin.id, "outsider@example.com", "Outsider", "user password")
+    private = create_dataset(services, admin, "private-key")
+    private_field = create_field(services, admin, private, "private_field", "Private")
+    with factory.begin() as session:
+        session.execute(
+            update(Dataset).where(Dataset.id == private.id).values(owner_user_id=user.id)
+        )
+    login(client, user.email, "user password")
+    csrf = session_csrf(client, services)
+
+    responses = [
+        request(
+            client,
+            "post",
+            "/datasets/missing/fields/private_field/delete",
+            data={"csrf_token": csrf},
+        ),
+        request(
+            client,
+            "post",
+            "/datasets/INVALID/fields/private_field/delete",
+            data={"csrf_token": csrf},
+        ),
+        request(
+            client,
+            "post",
+            f"/datasets/{private.key}/fields/{private_field.key}/delete",
+            data={"csrf_token": csrf},
+        ),
+    ]
+    assert [response.status_code for response in responses] == [404] * 3
+    assert len({body(response) for response in responses}) == 1
+    with factory() as session:
+        assert session.get(DatasetField, private_field.id) is not None
+
+
+def test_identifier_field_content_is_escaped_on_detail_and_edit_form(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "escaped-key")
+    unsafe = "<img src=x onerror=alert(1)>"
+    create_field(services, admin, dataset, "unsafe", unsafe, is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("unsafe",))
+    login(client)
+
+    for response in (
+        request(client, "get", f"/datasets/{dataset.key}"),
+        request(client, "get", f"/datasets/{dataset.key}/fields/unsafe/edit"),
+    ):
+        assert response.status_code == 200
+        assert unsafe not in body(response)
+        assert "&lt;img src=x onerror=alert(1)&gt;" in body(response)
+
+
+def test_dataset_admin_deletes_normal_field_with_prg_and_audit(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "delete-field")
+    field = create_field(services, admin, dataset, "obsolete", "Obsolete")
+    login(client)
+    edit_form = request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit")
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{field.key}/delete",
+        data={"csrf_token": form_csrf(edit_form), "dataset_id": "attacker-controlled"},
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}")
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is None
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_type == "dataset_field",
+                    AuditEvent.object_id == field.id,
+                    AuditEvent.action == "deleted",
+                )
+            )
+            == 1
+        )
+
+
+def test_community_admin_deletes_normal_field_without_dataset_grant(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    community_admin = services.users.create_user(
+        admin.id, "second-admin@example.com", "Second Admin", "user password", role="admin"
+    )
+    dataset = create_dataset(services, admin, "community-delete")
+    field = create_field(services, admin, dataset, "obsolete", "Obsolete")
+    with factory.begin() as session:
+        session.query(Grant).filter_by(resource_type="dataset", resource_id=dataset.id).delete()
+    login(client, community_admin.email, "user password")
+
+    edit_form = request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit")
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{field.key}/delete",
+        data={"csrf_token": form_csrf(edit_form)},
+    )
+
+    assert response.status_code == 302
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is None
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor"])
+def test_viewer_and_editor_cannot_delete_field(dataset_browser, permission):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, f"{permission}-delete")
+    field = create_field(services, admin, dataset, "protected", "Protected")
+    user = services.users.create_user(
+        admin.id, f"{permission}-delete@example.com", permission.title(), "user password"
+    )
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, user.email, "user password")
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{field.key}/delete",
+        data={"csrf_token": session_csrf(client, services)},
+    )
+
+    assert response.status_code == 404
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is not None
+
+
+def test_identifier_field_cannot_be_deleted_and_state_remains_intact(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "identifier-delete")
+    field = create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    login(client)
+    edit_form = request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit")
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{field.key}/delete",
+        data={"csrf_token": form_csrf(edit_form)},
+    )
+
+    assert response.status_code == 400
+    assert "Remove this field from the Record identifier before deleting it" in body(response)
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is not None
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_id == field.id,
+                    AuditEvent.action == "deleted",
+                )
+            )
+            == 0
+        )
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == (
+        field.key,
+    )
+
+
+def test_delete_audit_failure_rolls_back_field(dataset_browser, monkeypatch):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "delete-rollback")
+    field = create_field(services, admin, dataset, "field", "Field")
+    login(client)
+    edit_form = request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit")
+
+    def fail_audit(_self, **_values):
+        raise RuntimeError("injected audit failure")
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_audit)
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/fields/{field.key}/delete",
+        data={"csrf_token": form_csrf(edit_form)},
+    )
+    assert response.status_code == 500
+
+    with factory() as session:
+        assert session.get(DatasetField, field.id) is not None
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_id == field.id,
+                    AuditEvent.action == "deleted",
                 )
             )
             == 0

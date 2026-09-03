@@ -1,5 +1,6 @@
 import re
 import uuid
+from itertools import chain, combinations
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +40,7 @@ def configured_services(*, include_dataset_dependencies=False):
             configured.authorization,
             configured.datasets,
             configured.dataset_fields,
+            configured.dataset_business_keys,
         )
     return configured_services
 
@@ -109,6 +111,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
         authorization,
         datasets,
         dataset_fields,
+        dataset_business_keys,
     ) = configured_services(include_dataset_dependencies=True)
     client = TestClient(
         create_application(
@@ -120,6 +123,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
             authorization=authorization,
             datasets=datasets,
             dataset_fields=dataset_fields,
+            dataset_business_keys=dataset_business_keys,
         ),
         base_url="https://testserver",
     )
@@ -172,18 +176,19 @@ def test_low_level_app_without_dataset_dependencies_has_no_dataset_ui(interface)
     assert request(client, "get", "/datasets/new").status_code == 404
     assert request(client, "get", "/datasets/example/fields/new").status_code == 404
     assert request(client, "get", "/datasets/example/fields/field/edit").status_code == 404
+    assert request(client, "post", "/datasets/example/fields/field/delete").status_code == 404
 
 
 @pytest.mark.parametrize(
     "included",
-    [
-        ("authorization",),
-        ("datasets",),
-        ("dataset_fields",),
-        ("authorization", "datasets"),
-        ("authorization", "dataset_fields"),
-        ("datasets", "dataset_fields"),
-    ],
+    list(
+        chain.from_iterable(
+            combinations(
+                ("authorization", "datasets", "dataset_fields", "dataset_business_keys"), size
+            )
+            for size in range(1, 4)
+        )
+    ),
 )
 def test_low_level_app_rejects_partial_dataset_composition(included):
     (
@@ -196,11 +201,13 @@ def test_low_level_app_rejects_partial_dataset_composition(included):
         authorization,
         datasets,
         dataset_fields,
+        dataset_business_keys,
     ) = configured_services(include_dataset_dependencies=True)
     available = {
         "authorization": authorization,
         "datasets": datasets,
         "dataset_fields": dataset_fields,
+        "dataset_business_keys": dataset_business_keys,
     }
 
     with pytest.raises(ValueError, match="Dataset browser dependencies"):

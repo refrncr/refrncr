@@ -24,6 +24,7 @@ from refrncr.services import (
     AuthorizationError,
     AuthorizationService,
     ConflictError,
+    DatasetBusinessKeyService,
     DatasetFieldService,
     DatasetService,
     MembershipService,
@@ -51,6 +52,7 @@ def create_flask_app(
     authorization: AuthorizationService | None = None,
     datasets: DatasetService | None = None,
     dataset_fields: DatasetFieldService | None = None,
+    dataset_business_keys: DatasetBusinessKeyService | None = None,
     allow_loopback_http: bool = False,
     login_limiter: LoginAttemptLimiter | None = None,
     source_resolver: SourceIdentityResolver | None = None,
@@ -61,7 +63,7 @@ def create_flask_app(
     login_limiter = login_limiter or LoginAttemptLimiter()
     source_resolver = source_resolver or SourceIdentityResolver()
     authentication_admission = authentication_admission or BrowserAuthenticationAdmissionGuard()
-    dataset_dependencies = (authorization, datasets, dataset_fields)
+    dataset_dependencies = (authorization, datasets, dataset_fields, dataset_business_keys)
     if any(dependency is not None for dependency in dataset_dependencies) and not all(
         dependency is not None for dependency in dataset_dependencies
     ):
@@ -123,9 +125,14 @@ def create_flask_app(
         return resolved
 
     def require_dataset_dependencies():
-        if authorization is None or datasets is None or dataset_fields is None:
+        if (
+            authorization is None
+            or datasets is None
+            or dataset_fields is None
+            or dataset_business_keys is None
+        ):
             abort(404)
-        return authorization, datasets, dataset_fields
+        return authorization, datasets, dataset_fields, dataset_business_keys
 
     def dataset_route(rule: str, **options):
         if dataset_ui_enabled:
@@ -172,7 +179,9 @@ def create_flask_app(
     @dataset_route("/datasets", methods=["GET"])
     def dataset_list():
         actor, _login_session = require_authenticated()
-        _authorization, dataset_service, _field_service = require_dataset_dependencies()
+        _authorization, dataset_service, _field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         visible_datasets = dataset_service.list_datasets(actor.id)
         return render_template_string(
             "<nav><a href='{{ url_for(\"index\") }}'>Home</a></nav>"
@@ -216,7 +225,9 @@ def create_flask_app(
     @dataset_route("/datasets", methods=["POST"])
     def create_dataset():
         actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service = require_dataset_dependencies()
+        _authorization, dataset_service, _field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         require_csrf(login_session.csrf_token)
         key = request.form.get("key", "")
         name = request.form.get("name", "")
@@ -236,7 +247,9 @@ def create_flask_app(
     @dataset_route("/datasets/<key>", methods=["GET"])
     def dataset_detail(key: str):
         actor, _login_session = require_authenticated()
-        authorization_service, dataset_service, field_service = require_dataset_dependencies()
+        authorization_service, dataset_service, field_service, business_key_service = (
+            require_dataset_dependencies()
+        )
         try:
             dataset = dataset_service.get_dataset_details(actor.id, key)
             editable = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
@@ -244,6 +257,7 @@ def create_flask_app(
                 actor.id, "dataset", dataset.id, "admin"
             )
             fields = field_service.list_fields(actor.id, dataset.key)
+            business_key = business_key_service.get_business_key(actor.id, dataset.key)
         except NotFoundError:
             abort(404)
         return render_template_string(
@@ -255,12 +269,16 @@ def create_flask_app(
             "{% if editable %}<a href='{{ url_for(\"edit_dataset\", key=dataset.key) }}'>"
             "Edit dataset</a>{% endif %}"
             "<section><h2>Fields</h2>"
+            "<p>Record identifier: {% if business_key.field_keys %}"
+            "{% for field_key in business_key.field_keys %}{% if not loop.first %} + {% endif %}"
+            "<code>{{ field_key }}</code>{% endfor %}{% else %}Not configured{% endif %}</p>"
             '{% if schema_admin %}<a href=\'{{ url_for("new_dataset_field", '
             "key=dataset.key) }}'>Add field</a>{% endif %}"
             "{% if fields %}<table><thead><tr><th>Key</th><th>Name</th><th>Type</th>"
             "<th>Required</th><th>Unique</th>{% if schema_admin %}<th>Actions</th>"
             "{% endif %}</tr></thead><tbody>{% for field in fields %}<tr>"
-            "<td><code>{{ field.key }}</code></td><td>{{ field.name }}</td>"
+            "<td><code>{{ field.key }}</code></td><td>"
+            "{% if field.key in business_key.field_keys %}🔑 {% endif %}{{ field.name }}</td>"
             "<td>{{ field.data_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td>"
             "<td>{{ 'Yes' if field.is_unique else 'No' }}</td>"
             '{% if schema_admin %}<td><a href=\'{{ url_for("edit_dataset_field", '
@@ -271,6 +289,7 @@ def create_flask_app(
             editable=editable,
             schema_admin=schema_admin,
             fields=fields,
+            business_key=business_key,
         )
 
     def render_dataset_edit_form(dataset, *, name: str, description: str, csrf: str, error=None):
@@ -294,7 +313,9 @@ def create_flask_app(
     @dataset_route("/datasets/<key>/edit", methods=["GET"])
     def edit_dataset(key: str):
         actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service = require_dataset_dependencies()
+        _authorization, dataset_service, _field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         try:
             dataset = dataset_service.get_dataset_for_edit(actor.id, key)
         except NotFoundError:
@@ -309,7 +330,9 @@ def create_flask_app(
     @dataset_route("/datasets/<key>", methods=["POST"])
     def update_dataset(key: str):
         actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service = require_dataset_dependencies()
+        _authorization, dataset_service, _field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         require_csrf(login_session.csrf_token)
         name = request.form.get("name", "")
         description = request.form.get("description", "")
@@ -335,7 +358,9 @@ def create_flask_app(
         return redirect(url_for("dataset_detail", key=dataset.key))
 
     def require_dataset_schema_admin(actor_id: str, key: str):
-        authorization_service, dataset_service, _field_service = require_dataset_dependencies()
+        authorization_service, dataset_service, _field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         try:
             dataset = dataset_service.get_dataset(actor_id, key)
         except NotFoundError:
@@ -353,6 +378,7 @@ def create_flask_app(
         data_type: str = "string",
         is_required: bool = False,
         is_unique: bool = False,
+        is_business_key_component: bool = False,
         error=None,
     ):
         return render_template_string(
@@ -371,6 +397,9 @@ def create_flask_app(
             "{% if is_required %} checked{% endif %}> Required</label>"
             "<label><input type='checkbox' name='is_unique'"
             "{% if is_unique %} checked{% endif %}> Unique</label>"
+            "<label><input type='checkbox' name='is_business_key_component'"
+            "{% if is_business_key_component %} checked{% endif %}> "
+            "Part of Record identifier</label>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Add field</button></form>",
             dataset=dataset,
@@ -379,6 +408,7 @@ def create_flask_app(
             data_type=data_type,
             is_required=is_required,
             is_unique=is_unique,
+            is_business_key_component=is_business_key_component,
             error=error,
             csrf=csrf,
             type_choices=DATASET_FIELD_TYPES,
@@ -393,13 +423,16 @@ def create_flask_app(
     @dataset_route("/datasets/<key>/fields", methods=["POST"])
     def create_dataset_field(key: str):
         actor, login_session = require_authenticated()
-        _authorization, _dataset_service, field_service = require_dataset_dependencies()
+        _authorization, _dataset_service, field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         require_csrf(login_session.csrf_token)
         field_key = request.form.get("key", "")
         name = request.form.get("name", "")
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
+        is_business_key_component = "is_business_key_component" in request.form
         try:
             field_service.create_field(
                 actor.id,
@@ -409,6 +442,7 @@ def create_flask_app(
                 data_type,
                 is_required,
                 is_unique,
+                is_business_key_component,
             )
         except NotFoundError:
             abort(404)
@@ -422,6 +456,7 @@ def create_flask_app(
                 data_type=data_type,
                 is_required=is_required,
                 is_unique=is_unique,
+                is_business_key_component=is_business_key_component,
                 error=str(error),
             )
             return response, 409 if isinstance(error, ConflictError) else 400
@@ -436,6 +471,7 @@ def create_flask_app(
         data_type: str,
         is_required: bool,
         is_unique: bool,
+        is_business_key_component: bool,
         error=None,
     ):
         return render_template_string(
@@ -454,14 +490,22 @@ def create_flask_app(
             "{% if is_required %} checked{% endif %}> Required</label>"
             "<label><input type='checkbox' name='is_unique'"
             "{% if is_unique %} checked{% endif %}> Unique</label>"
+            "<label><input type='checkbox' name='is_business_key_component'"
+            "{% if is_business_key_component %} checked{% endif %}> "
+            "Part of Record identifier</label>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Save field</button></form>",
+            "<button>Save field</button></form>"
+            "<form method='post' action='{{ url_for(\"delete_dataset_field\", "
+            "key=dataset.key, field_key=field.key) }}'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<button>Delete field</button></form>",
             dataset=dataset,
             field=field,
             name=name,
             data_type=data_type,
             is_required=is_required,
             is_unique=is_unique,
+            is_business_key_component=is_business_key_component,
             error=error,
             csrf=csrf,
             type_choices=DATASET_FIELD_TYPES,
@@ -471,9 +515,12 @@ def create_flask_app(
     def edit_dataset_field(key: str, field_key: str):
         actor, login_session = require_authenticated()
         dataset = require_dataset_schema_admin(actor.id, key)
-        _authorization, _dataset_service, field_service = require_dataset_dependencies()
+        _authorization, _dataset_service, field_service, business_key_service = (
+            require_dataset_dependencies()
+        )
         try:
             field = field_service.get_field(actor.id, key, field_key)
+            business_key = business_key_service.get_business_key(actor.id, key)
         except NotFoundError:
             abort(404)
         return render_dataset_field_edit_form(
@@ -484,19 +531,23 @@ def create_flask_app(
             data_type=field.data_type,
             is_required=field.is_required,
             is_unique=field.is_unique,
+            is_business_key_component=field.key in business_key.field_keys,
         )
 
     @dataset_route("/datasets/<key>/fields/<field_key>", methods=["POST"])
     def update_dataset_field(key: str, field_key: str):
         actor, login_session = require_authenticated()
-        _authorization, _dataset_service, field_service = require_dataset_dependencies()
+        _authorization, _dataset_service, field_service, _business_key_service = (
+            require_dataset_dependencies()
+        )
         require_csrf(login_session.csrf_token)
         name = request.form.get("name", "")
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
+        is_business_key_component = "is_business_key_component" in request.form
         try:
-            field_service.update_field(
+            field_service.update_field_and_business_key_membership(
                 actor.id,
                 key,
                 field_key,
@@ -504,6 +555,7 @@ def create_flask_app(
                 data_type,
                 is_required,
                 is_unique,
+                is_business_key_component,
             )
         except NotFoundError:
             abort(404)
@@ -522,6 +574,41 @@ def create_flask_app(
                     data_type=data_type,
                     is_required=is_required,
                     is_unique=is_unique,
+                    is_business_key_component=is_business_key_component,
+                    error=str(error),
+                ),
+                400,
+            )
+        return redirect(url_for("dataset_detail", key=key))
+
+    @dataset_route("/datasets/<key>/fields/<field_key>/delete", methods=["POST"])
+    def delete_dataset_field(key: str, field_key: str):
+        actor, login_session = require_authenticated()
+        _authorization, _dataset_service, field_service, business_key_service = (
+            require_dataset_dependencies()
+        )
+        require_csrf(login_session.csrf_token)
+        try:
+            field_service.delete_field(actor.id, key, field_key)
+        except NotFoundError:
+            abort(404)
+        except ValidationError as error:
+            dataset = require_dataset_schema_admin(actor.id, key)
+            try:
+                field = field_service.get_field(actor.id, key, field_key)
+                business_key = business_key_service.get_business_key(actor.id, key)
+            except NotFoundError:
+                abort(404)
+            return (
+                render_dataset_field_edit_form(
+                    dataset,
+                    field,
+                    csrf=login_session.csrf_token,
+                    name=field.name,
+                    data_type=field.data_type,
+                    is_required=field.is_required,
+                    is_unique=field.is_unique,
+                    is_business_key_component=field.key in business_key.field_keys,
                     error=str(error),
                 ),
                 400,

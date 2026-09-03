@@ -22,6 +22,7 @@ from refrncr.models import (
 from refrncr.ports import (
     AuthorizationSubject,
     DatasetBusinessKey,
+    DatasetFieldRecord,
     GrantRecord,
     MembershipRecord,
     PasswordHashReplacementError,
@@ -277,6 +278,9 @@ class SqlAlchemyDatasetFieldOperations:
         field = DatasetField(_key=values.pop("key"), **values)
         self.session.add(field)
         return field
+
+    def delete(self, field: DatasetFieldRecord) -> None:
+        self.session.delete(field)
 
 
 class SqlAlchemyDatasetBusinessKeyOperations:

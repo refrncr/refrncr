@@ -69,6 +69,7 @@ def create_application(
     authorization: AuthorizationService,
     datasets: DatasetService,
     dataset_fields: DatasetFieldService,
+    dataset_business_keys: DatasetBusinessKeyService,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
@@ -88,6 +89,7 @@ def create_application(
         authorization=authorization,
         datasets=datasets,
         dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
     )

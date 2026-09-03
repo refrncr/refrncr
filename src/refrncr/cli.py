@@ -213,6 +213,7 @@ def build_application(
         authorization=services.authorization,
         datasets=services.datasets,
         dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
         allow_loopback_http=allow_loopback_http,
         trusted_proxies=trusted_proxies,
     )

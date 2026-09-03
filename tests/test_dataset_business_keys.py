@@ -363,6 +363,64 @@ def test_commit_time_audit_failure_restores_complete_previous_key(
     )
 
 
+def test_combined_field_and_identifier_update_rolls_back_together(
+    business_key_services, monkeypatch
+):
+    _, factory, services, admin = business_key_services
+    dataset = create_dataset(services, admin)
+    field = create_required_field(services, admin, dataset, "field")
+
+    def fail_audit(_self, **_values):
+        raise RuntimeError("injected audit failure")
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_audit)
+    with pytest.raises(RuntimeError, match="injected audit failure"):
+        services.dataset_fields.update_field_and_business_key_membership(
+            admin.id,
+            dataset.key,
+            field.key,
+            "Changed",
+            "number",
+            True,
+            True,
+            True,
+        )
+    with factory() as session:
+        persisted = session.get(DatasetField, field.id)
+        assert (
+            persisted.name,
+            persisted.data_type,
+            persisted.is_required,
+            persisted.is_unique,
+        ) == (
+            field.name,
+            field.data_type,
+            True,
+            False,
+        )
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()
+
+    monkeypatch.undo()
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_audit)
+    with pytest.raises(RuntimeError, match="injected audit failure"):
+        services.dataset_fields.update_field_and_business_key_membership(
+            admin.id,
+            dataset.key,
+            field.key,
+            field.name,
+            field.data_type,
+            False,
+            field.is_unique,
+            False,
+        )
+    with factory() as session:
+        assert session.get(DatasetField, field.id).is_required is True
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == (
+        field.key,
+    )
+
+
 def test_postgresql_fk_and_commit_failure_rollback(postgresql_business_key_services, monkeypatch):
     _, factory, services, admin, _config = postgresql_business_key_services
     first = create_dataset(services, admin, "first")
