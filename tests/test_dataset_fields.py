@@ -379,6 +379,40 @@ def test_create_audit_failure_rolls_back_field(field_services, monkeypatch):
         )
 
 
+def test_create_identifier_field_audit_failure_rolls_back_field_and_membership(
+    field_services, monkeypatch
+):
+    _, factory, services, admin = field_services
+    dataset = create_dataset(services, admin)
+    original = SqlAlchemyUnitOfWork.add_audit
+
+    def fail_identifier_audit(self, **values):
+        if values["object_type"] == "dataset":
+            raise RuntimeError("injected identifier audit failure")
+        original(self, **values)
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_identifier_audit)
+    with pytest.raises(RuntimeError, match="injected identifier audit failure"):
+        services.dataset_fields.create_field(
+            admin.id,
+            dataset.key,
+            "field",
+            "Name",
+            "string",
+            is_required=True,
+            is_business_key_component=True,
+        )
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetField.id))) == 0
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset_field")
+            )
+            == 0
+        )
+    assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()
+
+
 def test_update_audit_failure_rolls_back_definition(field_services, monkeypatch):
     _, factory, services, admin = field_services
     dataset = create_dataset(services, admin)

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from types import TracebackType
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.models import (
     AuditEvent,
     Dataset,
+    DatasetBusinessKeyField,
     DatasetField,
     Grant,
     LoginSession,
@@ -20,6 +21,8 @@ from refrncr.models import (
 )
 from refrncr.ports import (
     AuthorizationSubject,
+    DatasetBusinessKey,
+    DatasetFieldRecord,
     GrantRecord,
     MembershipRecord,
     PasswordHashReplacementError,
@@ -276,6 +279,42 @@ class SqlAlchemyDatasetFieldOperations:
         self.session.add(field)
         return field
 
+    def delete(self, field: DatasetFieldRecord) -> None:
+        self.session.delete(field)
+
+
+class SqlAlchemyDatasetBusinessKeyOperations:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get(self, dataset_id: str) -> DatasetBusinessKey:
+        keys = self.session.scalars(
+            select(DatasetBusinessKeyField.field_key)
+            .where(DatasetBusinessKeyField.dataset_id == dataset_id)
+            .order_by(DatasetBusinessKeyField.field_key)
+        )
+        return DatasetBusinessKey(dataset_id=dataset_id, field_keys=tuple(keys))
+
+    def contains(self, dataset_id: str, field_key: str) -> bool:
+        return (
+            self.session.scalar(
+                select(DatasetBusinessKeyField.field_key).where(
+                    DatasetBusinessKeyField.dataset_id == dataset_id,
+                    DatasetBusinessKeyField.field_key == field_key,
+                )
+            )
+            is not None
+        )
+
+    def replace(self, dataset_id: str, field_keys: tuple[str, ...]) -> None:
+        self.session.execute(
+            delete(DatasetBusinessKeyField).where(DatasetBusinessKeyField.dataset_id == dataset_id)
+        )
+        self.session.add_all(
+            DatasetBusinessKeyField(dataset_id=dataset_id, field_key=field_key)
+            for field_key in field_keys
+        )
+
 
 class SqlAlchemyUnitOfWork:
     def __init__(
@@ -298,6 +337,7 @@ class SqlAlchemyUnitOfWork:
         self.grants = SqlAlchemyGrantOperations(self.session)
         self.datasets = SqlAlchemyDatasetOperations(self.session)
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
+        self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
         return self
 
     def __exit__(

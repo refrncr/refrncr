@@ -6,11 +6,21 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import IntegrityError
 
 from refrncr.app import create_community_services
 from refrncr.cli import prepare_database
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Dataset, DatasetField, Grant, Membership, Team, User
+from refrncr.models import (
+    AuditEvent,
+    Dataset,
+    DatasetBusinessKeyField,
+    DatasetField,
+    Grant,
+    Membership,
+    Team,
+    User,
+)
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.services import (
     AuthenticationService,
@@ -172,6 +182,21 @@ def assert_community_schema(engine):
     dataset_foreign_key = field_foreign_keys[("dataset_id",)]
     assert dataset_foreign_key["referred_table"] == "datasets"
     assert dataset_foreign_key["options"].get("ondelete") == "CASCADE"
+    business_key_columns = {
+        column["name"] for column in inspector.get_columns("dataset_business_key_fields")
+    }
+    assert business_key_columns == {"dataset_id", "field_key"}
+    business_key_pk = inspector.get_pk_constraint("dataset_business_key_fields")
+    assert business_key_pk["constrained_columns"] == ["dataset_id", "field_key"]
+    assert inspector.get_indexes("dataset_business_key_fields") == []
+    assert inspector.get_unique_constraints("dataset_business_key_fields") == []
+    business_key_foreign_keys = inspector.get_foreign_keys("dataset_business_key_fields")
+    assert len(business_key_foreign_keys) == 1
+    business_key_foreign_key = business_key_foreign_keys[0]
+    assert business_key_foreign_key["constrained_columns"] == ["dataset_id", "field_key"]
+    assert business_key_foreign_key["referred_table"] == "dataset_fields"
+    assert business_key_foreign_key["referred_columns"] == ["dataset_id", "key"]
+    assert business_key_foreign_key["options"].get("ondelete") == "CASCADE"
 
 
 def test_empty_sqlite_database_upgrades(tmp_path):
@@ -286,6 +311,118 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
             assert session.scalar(select(func.count(DatasetField.id))) == 0
     finally:
         upgraded_engine.dispose()
+
+
+def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
+    database = tmp_path / "populated-ref-74.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0006_ref_74")
+
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    dataset = services.datasets.create_dataset(admin.id, "existing", "Existing", "Preserved")
+    field = services.dataset_fields.create_field(
+        admin.id, dataset.key, "code", "Code", "string", is_required=True
+    )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    upgraded_engine = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert_community_schema(upgraded_engine)
+        with create_session_factory(upgraded_engine)() as session:
+            persisted_dataset = session.get(Dataset, dataset.id)
+            persisted_field = session.get(DatasetField, field.id)
+            assert (persisted_dataset.key, persisted_dataset.description) == (
+                "existing",
+                "Preserved",
+            )
+            assert (persisted_field.key, persisted_field.is_required) == ("code", True)
+            assert session.scalar(select(func.count(DatasetBusinessKeyField.dataset_id))) == 0
+    finally:
+        upgraded_engine.dispose()
+
+
+def test_ref_75_sqlite_composite_fk_duplicate_and_cascade_behavior(tmp_path):
+    database = tmp_path / "ref-75-constraints.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "head")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    first = services.datasets.create_dataset(admin.id, "first", "First", "")
+    second = services.datasets.create_dataset(admin.id, "second", "Second", "")
+    field = services.dataset_fields.create_field(
+        admin.id, first.key, "code", "Code", "string", is_required=True
+    )
+
+    with pytest.raises(IntegrityError), factory.begin() as session:
+        session.add(DatasetBusinessKeyField(dataset_id=second.id, field_key=field.key))
+    with pytest.raises(IntegrityError), factory.begin() as session:
+        session.add_all(
+            [
+                DatasetBusinessKeyField(dataset_id=first.id, field_key=field.key),
+                DatasetBusinessKeyField(dataset_id=first.id, field_key=field.key),
+            ]
+        )
+
+    with factory.begin() as session:
+        session.add(DatasetBusinessKeyField(dataset_id=first.id, field_key=field.key))
+    with factory.begin() as session:
+        session.delete(session.get(DatasetField, field.id))
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetBusinessKeyField.dataset_id))) == 0
+
+    cascading_field = services.dataset_fields.create_field(
+        admin.id, first.key, "cascade", "Cascade", "string", is_required=True
+    )
+    services.dataset_business_keys.set_business_key(admin.id, first.key, (cascading_field.key,))
+    with factory.begin() as session:
+        session.delete(session.get(Dataset, first.id))
+    with factory() as session:
+        assert session.get(DatasetField, cascading_field.id) is None
+        assert session.scalar(select(func.count(DatasetBusinessKeyField.dataset_id))) == 0
+
+
+def test_ref_75_sqlite_downgrade_fails_closed_for_business_key_state(tmp_path):
+    database = tmp_path / "ref-75-downgrade.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "head")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    dataset = services.datasets.create_dataset(admin.id, "dataset", "Dataset", "")
+    services.dataset_fields.create_field(
+        admin.id, dataset.key, "code", "Code", "string", is_required=True
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    engine.dispose()
+
+    with pytest.raises(RuntimeError, match="Dataset business-key rows exist"):
+        command.downgrade(config, "0006_ref_74")
+
+    engine = create_database_engine(f"sqlite:///{database}")
+    with create_session_factory(engine).begin() as session:
+        session.query(DatasetBusinessKeyField).delete()
+    engine.dispose()
+    command.downgrade(config, "0006_ref_74")
+    downgraded_engine = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert "dataset_business_key_fields" not in inspect(downgraded_engine).get_table_names()
+        with create_session_factory(downgraded_engine)() as session:
+            assert session.get(Dataset, dataset.id) is not None
+    finally:
+        downgraded_engine.dispose()
 
 
 def test_ref_74_sqlite_downgrade_fails_closed_for_field_state(tmp_path):
@@ -406,7 +543,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006_ref_74"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007_ref_75"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

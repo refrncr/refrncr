@@ -19,6 +19,7 @@ from refrncr.authorization import highest_permission, permits, validate_permissi
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
+    DatasetBusinessKey,
     DatasetFieldRecord,
     DatasetRecord,
     GrantRecord,
@@ -654,17 +655,24 @@ class DatasetFieldService:
         data_type: str,
         is_required: bool = False,
         is_unique: bool = False,
+        is_business_key_component: bool = False,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "admin")
+            validated_required = validate_dataset_field_flag(is_required, "is_required")
+            validated_component = validate_dataset_field_flag(
+                is_business_key_component, "is_business_key_component"
+            )
+            if validated_component and not validated_required:
+                raise ValidationError("A Record identifier field must be required")
             field = uow.dataset_fields.create(
                 dataset_id=dataset.id,
                 key=validate_dataset_field_key(key),
                 name=normalize_dataset_field_name(name),
                 data_type=validate_dataset_field_type(data_type),
-                is_required=validate_dataset_field_flag(is_required, "is_required"),
+                is_required=validated_required,
                 is_unique=validate_dataset_field_flag(is_unique, "is_unique"),
             )
             try:
@@ -674,6 +682,20 @@ class DatasetFieldService:
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
             self._add_audit(uow, actor_id, field.id, "created")
+            if validated_component:
+                current_key = uow.dataset_business_keys.get(dataset.id)
+                replacement_keys = tuple(sorted((*current_key.field_keys, field.key)))
+                uow.dataset_business_keys.replace(dataset.id, replacement_keys)
+                uow.add_audit(
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset.id,
+                    action=(
+                        "business_key_defined"
+                        if not current_key.field_keys
+                        else "business_key_updated"
+                    ),
+                )
             return field
 
     def list_fields(self, actor_id: str, dataset_key: str) -> list[DatasetFieldRecord]:
@@ -713,6 +735,12 @@ class DatasetFieldService:
             validated_type = validate_dataset_field_type(data_type)
             validated_required = validate_dataset_field_flag(is_required, "is_required")
             validated_unique = validate_dataset_field_flag(is_unique, "is_unique")
+            if (
+                field.is_required
+                and not validated_required
+                and uow.dataset_business_keys.contains(dataset.id, field.key)
+            ):
+                raise ValidationError("A business-key field must remain required")
             replacement = (
                 normalized_name,
                 validated_type,
@@ -730,6 +758,94 @@ class DatasetFieldService:
             field.updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
+
+    def update_field_and_business_key_membership(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        field_key: str,
+        name: str,
+        data_type: str,
+        is_required: bool,
+        is_unique: bool,
+        is_business_key_component: bool,
+    ) -> DatasetFieldRecord:
+        validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            validated_field_key = self._validated_field_lookup_key(field_key)
+            field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
+            if field is None:
+                raise NotFoundError("Dataset field not found")
+
+            normalized_name = normalize_dataset_field_name(name)
+            validated_type = validate_dataset_field_type(data_type)
+            validated_required = validate_dataset_field_flag(is_required, "is_required")
+            validated_unique = validate_dataset_field_flag(is_unique, "is_unique")
+            validated_component = validate_dataset_field_flag(
+                is_business_key_component, "is_business_key_component"
+            )
+            if validated_component and not validated_required:
+                raise ValidationError("A Record identifier field must be required")
+
+            current_key = uow.dataset_business_keys.get(dataset.id)
+            currently_component = field.key in current_key.field_keys
+            membership_changed = currently_component != validated_component
+            replacement = (
+                normalized_name,
+                validated_type,
+                validated_required,
+                validated_unique,
+            )
+            current_definition = (field.name, field.data_type, field.is_required, field.is_unique)
+            definition_changed = replacement != current_definition
+            if not membership_changed and not definition_changed:
+                return field
+
+            if membership_changed:
+                replacement_keys = set(current_key.field_keys)
+                if validated_component:
+                    replacement_keys.add(field.key)
+                else:
+                    replacement_keys.discard(field.key)
+                uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
+                uow.add_audit(
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset.id,
+                    action=(
+                        "business_key_defined"
+                        if not current_key.field_keys
+                        else "business_key_updated"
+                    ),
+                )
+
+            if definition_changed:
+                field.name = normalized_name
+                field.data_type = validated_type
+                field.is_required = validated_required
+                field.is_unique = validated_unique
+                field.updated_at = _now()
+                self._add_audit(uow, actor_id, field.id, "definition_updated")
+            return field
+
+    def delete_field(self, actor_id: str, dataset_key: str, field_key: str) -> None:
+        validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            validated_field_key = self._validated_field_lookup_key(field_key)
+            field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
+            if field is None:
+                raise NotFoundError("Dataset field not found")
+            if uow.dataset_business_keys.contains(dataset.id, field.key):
+                raise ValidationError(
+                    "Remove this field from the Record identifier before deleting it"
+                )
+            field_id = field.id
+            uow.dataset_fields.delete(field)
+            self._add_audit(uow, actor_id, field_id, "deleted")
 
     def _get_dataset_with_access(
         self, actor_id: str, dataset_key: str, required_permission: str
@@ -770,6 +886,72 @@ class DatasetFieldService:
             object_id=field_id,
             action=action,
         )
+
+
+class DatasetBusinessKeyService:
+    """Authorized business-key metadata operations scoped through a parent Dataset."""
+
+    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+        self.uow = uow
+        self.authorization = authorization
+
+    def get_business_key(self, actor_id: str, dataset_key: str) -> DatasetBusinessKey:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow() as uow:
+            dataset = uow.datasets.find_by_key(validated_key)
+            self._require_dataset_access(actor_id, dataset, "viewer")
+            return uow.dataset_business_keys.get(dataset.id)
+
+    def set_business_key(
+        self, actor_id: str, dataset_key: str, field_keys: tuple[str, ...]
+    ) -> DatasetBusinessKey:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            if not isinstance(field_keys, tuple) or not field_keys:
+                raise ValidationError("At least one business-key field is required")
+            if any(not isinstance(field_key, str) for field_key in field_keys):
+                raise ValidationError("Business-key field keys must be text")
+            if len(set(field_keys)) != len(field_keys):
+                raise ValidationError("Business-key fields must not contain duplicates")
+
+            components: list[str] = []
+            for submitted_key in field_keys:
+                try:
+                    field_key = validate_dataset_field_key(submitted_key)
+                except ValidationError as exc:
+                    raise ValidationError("Selected Dataset field does not exist") from exc
+                field = uow.dataset_fields.find_by_key(dataset.id, field_key)
+                if field is None:
+                    raise ValidationError("Selected Dataset field does not exist")
+                if not field.is_required:
+                    raise ValidationError("Every business-key field must be required")
+                components.append(field.key)
+
+            canonical = tuple(sorted(components))
+            current = uow.dataset_business_keys.get(dataset.id)
+            if current.field_keys == canonical:
+                return current
+
+            uow.dataset_business_keys.replace(dataset.id, canonical)
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset",
+                object_id=dataset.id,
+                action=(
+                    "business_key_defined" if not current.field_keys else "business_key_updated"
+                ),
+            )
+            return DatasetBusinessKey(dataset_id=dataset.id, field_keys=canonical)
+
+    def _require_dataset_access(
+        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str
+    ) -> None:
+        if dataset is None or not self.authorization.check_access(
+            actor_id, "dataset", dataset.id, required_permission
+        ):
+            raise NotFoundError("Dataset not found")
 
 
 class GrantService:
