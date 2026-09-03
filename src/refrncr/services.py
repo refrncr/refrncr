@@ -34,7 +34,7 @@ from refrncr.ports import (
 )
 
 SUBJECT_TYPES = {"user", "team"}
-DATASET_FIELD_TYPES = {"string", "number", "boolean", "date"}
+DATASET_FIELD_TYPES = ("string", "number", "boolean", "date")
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
