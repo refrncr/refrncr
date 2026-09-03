@@ -91,6 +91,7 @@ class DatasetRecordRow(Protocol):
     id: str
     dataset_id: str
     identifier_key: bytes
+    revision: int
     created_at: datetime
 
 
@@ -109,6 +110,7 @@ class StoredRecord:
     id: str
     dataset_id: str
     values: tuple[RecordValue, ...]
+    revision: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,6 +246,24 @@ class DatasetBusinessKeyOperations(Protocol):
 
 class DatasetRecordOperations(Protocol):
     def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecordRow: ...
+
+    def get(self, dataset_id: str, record_id: str) -> StoredRecord | None: ...
+
+    def update_if_revision(
+        self,
+        dataset_id: str,
+        record_id: str,
+        expected_revision: int,
+        identifier_key: bytes,
+    ) -> bool: ...
+
+    def replace_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
+
+    def delete_if_revision(
+        self, dataset_id: str, record_id: str, expected_revision: int
+    ) -> bool: ...
+
+    def current_revision(self, dataset_id: str, record_id: str) -> int | None: ...
 
     def add_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
 

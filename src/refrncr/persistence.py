@@ -343,9 +343,72 @@ class SqlAlchemyDatasetRecordOperations:
         return inspect(self.session.get_bind()).has_table("dataset_records")
 
     def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecord:
-        record = DatasetRecord(dataset_id=dataset_id, identifier_key=identifier_key)
+        record = DatasetRecord(dataset_id=dataset_id, identifier_key=identifier_key, revision=1)
         self.session.add(record)
         return record
+
+    def get(self, dataset_id: str, record_id: str) -> StoredRecord | None:
+        record = self.session.scalar(
+            select(DatasetRecord).where(
+                DatasetRecord.dataset_id == dataset_id, DatasetRecord.id == record_id
+            )
+        )
+        if record is None:
+            return None
+        return StoredRecord(
+            record.id, record.dataset_id, self._values(dataset_id, record_id), record.revision
+        )
+
+    def update_if_revision(
+        self,
+        dataset_id: str,
+        record_id: str,
+        expected_revision: int,
+        identifier_key: bytes,
+    ) -> bool:
+        try:
+            result = self.session.execute(
+                update(DatasetRecord)
+                .where(
+                    DatasetRecord.dataset_id == dataset_id,
+                    DatasetRecord.id == record_id,
+                    DatasetRecord.revision == expected_revision,
+                )
+                .values(
+                    identifier_key=identifier_key,
+                    revision=DatasetRecord.revision + 1,
+                    updated_at=utc_now(),
+                )
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+        return result.rowcount == 1
+
+    def replace_values(self, record: DatasetRecord, values: tuple[RecordValue, ...]) -> None:
+        self.session.execute(
+            delete(DatasetRecordValue).where(
+                DatasetRecordValue.dataset_id == record.dataset_id,
+                DatasetRecordValue.record_id == record.id,
+            )
+        )
+        self.add_values(record, values)
+
+    def delete_if_revision(self, dataset_id: str, record_id: str, expected_revision: int) -> bool:
+        result = self.session.execute(
+            delete(DatasetRecord).where(
+                DatasetRecord.dataset_id == dataset_id,
+                DatasetRecord.id == record_id,
+                DatasetRecord.revision == expected_revision,
+            )
+        )
+        return result.rowcount == 1
+
+    def current_revision(self, dataset_id: str, record_id: str) -> int | None:
+        return self.session.scalar(
+            select(DatasetRecord.revision).where(
+                DatasetRecord.dataset_id == dataset_id, DatasetRecord.id == record_id
+            )
+        )
 
     def add_values(self, record: DatasetRecord, values: tuple[RecordValue, ...]) -> None:
         rows = []
@@ -411,9 +474,48 @@ class SqlAlchemyDatasetRecordOperations:
                 )
             )
         return [
-            StoredRecord(record.id, record.dataset_id, tuple(grouped[record.id]))
+            StoredRecord(record.id, record.dataset_id, tuple(grouped[record.id]), record.revision)
             for record in records
         ]
+
+    def _values(self, dataset_id: str, record_id: str) -> tuple[RecordValue, ...]:
+        rows = self.session.execute(
+            select(DatasetRecordValue, DatasetField)
+            .join(
+                DatasetField,
+                (DatasetField.id == DatasetRecordValue.field_id)
+                & (DatasetField.dataset_id == DatasetRecordValue.dataset_id),
+            )
+            .where(
+                DatasetRecordValue.dataset_id == dataset_id,
+                DatasetRecordValue.record_id == record_id,
+            )
+        )
+        result = []
+        for row, field in rows:
+            value = next(
+                candidate
+                for candidate in (
+                    row.string_value,
+                    row.number_value,
+                    row.boolean_value,
+                    row.date_value,
+                )
+                if candidate is not None
+            )
+            if field.data_type == "number":
+                value = Decimal(row.canonical_value_key[1:].decode("ascii"))
+            result.append(
+                RecordValue(
+                    field.id,
+                    field.key,
+                    field.data_type,
+                    value,
+                    row.canonical_value_key,
+                    field.is_unique,
+                )
+            )
+        return tuple(result)
 
     def count(self, dataset_id: str) -> int:
         if not self._available():
