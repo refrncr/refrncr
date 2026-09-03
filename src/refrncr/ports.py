@@ -86,6 +86,12 @@ class DatasetFieldRecord(Protocol):
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class DatasetBusinessKey:
+    dataset_id: str
+    field_keys: tuple[str, ...]
+
+
 class UserOperations(Protocol):
     def get(self, user_id: str, *, for_update: bool = False) -> UserRecord | None: ...
 
@@ -201,6 +207,14 @@ class DatasetFieldOperations(Protocol):
     ) -> DatasetFieldRecord: ...
 
 
+class DatasetBusinessKeyOperations(Protocol):
+    def get(self, dataset_id: str) -> DatasetBusinessKey: ...
+
+    def contains(self, dataset_id: str, field_key: str) -> bool: ...
+
+    def replace(self, dataset_id: str, field_keys: tuple[str, ...]) -> None: ...
+
+
 class UnitOfWork(Protocol):
     users: UserOperations
     teams: TeamOperations
@@ -208,6 +222,7 @@ class UnitOfWork(Protocol):
     grants: GrantOperations
     datasets: DatasetOperations
     dataset_fields: DatasetFieldOperations
+    dataset_business_keys: DatasetBusinessKeyOperations
 
     def flush(self) -> None: ...
 

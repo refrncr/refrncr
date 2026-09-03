@@ -19,6 +19,7 @@ from refrncr.authorization import highest_permission, permits, validate_permissi
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
+    DatasetBusinessKey,
     DatasetFieldRecord,
     DatasetRecord,
     GrantRecord,
@@ -713,6 +714,12 @@ class DatasetFieldService:
             validated_type = validate_dataset_field_type(data_type)
             validated_required = validate_dataset_field_flag(is_required, "is_required")
             validated_unique = validate_dataset_field_flag(is_unique, "is_unique")
+            if (
+                field.is_required
+                and not validated_required
+                and uow.dataset_business_keys.contains(dataset.id, field.key)
+            ):
+                raise ValidationError("A business-key field must remain required")
             replacement = (
                 normalized_name,
                 validated_type,
@@ -770,6 +777,72 @@ class DatasetFieldService:
             object_id=field_id,
             action=action,
         )
+
+
+class DatasetBusinessKeyService:
+    """Authorized business-key metadata operations scoped through a parent Dataset."""
+
+    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+        self.uow = uow
+        self.authorization = authorization
+
+    def get_business_key(self, actor_id: str, dataset_key: str) -> DatasetBusinessKey:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow() as uow:
+            dataset = uow.datasets.find_by_key(validated_key)
+            self._require_dataset_access(actor_id, dataset, "viewer")
+            return uow.dataset_business_keys.get(dataset.id)
+
+    def set_business_key(
+        self, actor_id: str, dataset_key: str, field_keys: tuple[str, ...]
+    ) -> DatasetBusinessKey:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            if not isinstance(field_keys, tuple) or not field_keys:
+                raise ValidationError("At least one business-key field is required")
+            if any(not isinstance(field_key, str) for field_key in field_keys):
+                raise ValidationError("Business-key field keys must be text")
+            if len(set(field_keys)) != len(field_keys):
+                raise ValidationError("Business-key fields must not contain duplicates")
+
+            components: list[str] = []
+            for submitted_key in field_keys:
+                try:
+                    field_key = validate_dataset_field_key(submitted_key)
+                except ValidationError as exc:
+                    raise ValidationError("Selected Dataset field does not exist") from exc
+                field = uow.dataset_fields.find_by_key(dataset.id, field_key)
+                if field is None:
+                    raise ValidationError("Selected Dataset field does not exist")
+                if not field.is_required:
+                    raise ValidationError("Every business-key field must be required")
+                components.append(field.key)
+
+            canonical = tuple(sorted(components))
+            current = uow.dataset_business_keys.get(dataset.id)
+            if current.field_keys == canonical:
+                return current
+
+            uow.dataset_business_keys.replace(dataset.id, canonical)
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset",
+                object_id=dataset.id,
+                action=(
+                    "business_key_defined" if not current.field_keys else "business_key_updated"
+                ),
+            )
+            return DatasetBusinessKey(dataset_id=dataset.id, field_keys=canonical)
+
+    def _require_dataset_access(
+        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str
+    ) -> None:
+        if dataset is None or not self.authorization.check_access(
+            actor_id, "dataset", dataset.id, required_permission
+        ):
+            raise NotFoundError("Dataset not found")
 
 
 class GrantService:

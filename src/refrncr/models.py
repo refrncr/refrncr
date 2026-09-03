@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -229,3 +230,17 @@ class DatasetField(Base):
 def _prevent_dataset_field_key_update(_mapper, _connection, field: DatasetField) -> None:
     if inspect(field).attrs["_key"].history.has_changes():
         raise ImmutableDatasetFieldKeyError("Dataset field key is immutable")
+
+
+class DatasetBusinessKeyField(Base):
+    __tablename__ = "dataset_business_key_fields"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["dataset_id", "field_key"],
+            ["dataset_fields.dataset_id", "dataset_fields.key"],
+            ondelete="CASCADE",
+        ),
+    )
+
+    dataset_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    field_key: Mapped[str] = mapped_column(String(100), primary_key=True)
