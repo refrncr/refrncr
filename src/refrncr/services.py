@@ -96,6 +96,23 @@ class RecordConflictError(ConflictError):
         self.field_key = field_key
 
 
+class StaleRecordError(ConflictError):
+    """The submitted Record revision no longer matches persisted state."""
+
+
+_EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
+MAX_RECORD_REVISION = 2_147_483_647
+
+
+def parse_expected_revision(raw: str) -> int:
+    if not isinstance(raw, str) or _EXPECTED_REVISION_PATTERN.fullmatch(raw) is None:
+        raise ValidationError("Expected revision must be a canonical positive integer")
+    revision = int(raw)
+    if revision > MAX_RECORD_REVISION:
+        raise ValidationError("Expected revision is out of range")
+    return revision
+
+
 @dataclass(frozen=True, slots=True)
 class AuthenticatedPrincipal:
     id: str
@@ -1103,40 +1120,8 @@ class DatasetRecordService:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             self._require_access(actor_id, dataset, "editor")
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
-            field_by_key = {field.key: field for field in fields}
-            unknown = sorted(set(submitted) - set(field_by_key))
-            if unknown:
-                raise RecordValidationError({key: "Unknown Dataset field" for key in unknown})
             identifier = uow.dataset_business_keys.get(dataset.id)
-            if not identifier.field_keys:
-                raise ValidationError("Configure a Record identifier before adding records")
-
-            errors: dict[str, str] = {}
-            values: list[RecordValue] = []
-            for field in fields:
-                raw = submitted.get(field.key, "")
-                try:
-                    canonical = canonicalize_record_value(field.data_type, raw)
-                except ValidationError as error:
-                    errors[field.key] = str(error)
-                    continue
-                if canonical is None:
-                    if field.is_required or field.key in identifier.field_keys:
-                        errors[field.key] = "A value is required"
-                    continue
-                value, key = canonical
-                values.append(
-                    RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
-                )
-            if errors:
-                raise RecordValidationError(errors)
-            value_by_key = {value.field_key: value for value in values}
-            components = [value_by_key[key].canonical_key for key in identifier.field_keys]
-            encoded_identifier = b"".join(
-                len(component).to_bytes(4, "big") + component for component in components
-            )
-            if len(encoded_identifier) > 2000:
-                raise ValidationError("Encoded Record identifier must not exceed 2000 UTF-8 bytes")
+            values, encoded_identifier = self._validated_values(fields, identifier, submitted)
             record = uow.dataset_records.create(
                 dataset_id=dataset.id, identifier_key=encoded_identifier
             )
@@ -1156,7 +1141,125 @@ class DatasetRecordService:
                 object_id=record.id,
                 action="created",
             )
-            return StoredRecord(record.id, dataset.id, tuple(values))
+            return StoredRecord(record.id, dataset.id, tuple(values), 1)
+
+    def get_record_for_edit(self, actor_id: str, dataset_key: str, record_id: str) -> StoredRecord:
+        dataset = self._find_dataset(actor_id, dataset_key, "editor")
+        with self.uow() as uow:
+            record = uow.dataset_records.get(dataset.id, record_id)
+        if record is None:
+            raise NotFoundError("Record not found")
+        return record
+
+    def update_record(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        record_id: str,
+        expected_revision: int,
+        submitted: dict[str, str],
+    ) -> StoredRecord:
+        if not isinstance(expected_revision, int) or isinstance(expected_revision, bool):
+            raise ValidationError("Expected revision must be a positive integer")
+        if not 1 <= expected_revision <= MAX_RECORD_REVISION:
+            raise ValidationError("Expected revision is out of range")
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self._require_access(actor_id, dataset, "editor")
+            existing = uow.dataset_records.get(dataset.id, record_id)
+            if existing is None:
+                raise NotFoundError("Record not found")
+            fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            identifier = uow.dataset_business_keys.get(dataset.id)
+            values, encoded_identifier = self._validated_values(fields, identifier, submitted)
+            try:
+                updated = uow.dataset_records.update_if_revision(
+                    dataset.id, record_id, expected_revision, encoded_identifier
+                )
+                if not updated:
+                    self._raise_missing_or_stale(uow, dataset.id, record_id)
+                uow.dataset_records.replace_values(existing, values)
+                uow.flush()
+            except PersistenceConflictError as error:
+                self._raise_record_conflict(error)
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset_record",
+                object_id=record_id,
+                action="updated",
+            )
+            return StoredRecord(record_id, dataset.id, values, expected_revision + 1)
+
+    def delete_record(
+        self, actor_id: str, dataset_key: str, record_id: str, expected_revision: int
+    ) -> None:
+        if not isinstance(expected_revision, int) or isinstance(expected_revision, bool):
+            raise ValidationError("Expected revision must be a positive integer")
+        if not 1 <= expected_revision <= MAX_RECORD_REVISION:
+            raise ValidationError("Expected revision is out of range")
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self._require_access(actor_id, dataset, "editor")
+            if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
+                self._raise_missing_or_stale(uow, dataset.id, record_id)
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset_record",
+                object_id=record_id,
+                action="deleted",
+            )
+
+    @staticmethod
+    def _raise_missing_or_stale(uow: UnitOfWork, dataset_id: str, record_id: str) -> None:
+        if uow.dataset_records.current_revision(dataset_id, record_id) is None:
+            raise NotFoundError("Record not found")
+        raise StaleRecordError("Record changed since this form was opened")
+
+    @staticmethod
+    def _raise_record_conflict(error: PersistenceConflictError) -> None:
+        if error.constraint == "uq_dataset_records_dataset_identifier":
+            raise RecordConflictError("Record identifier already exists") from error
+        if error.constraint == "uq_dataset_record_values_unique_value":
+            raise RecordConflictError("A unique field value already exists") from error
+        raise error
+
+    @staticmethod
+    def _validated_values(fields, identifier, submitted):
+        field_by_key = {field.key: field for field in fields}
+        unknown = sorted(set(submitted) - set(field_by_key))
+        if unknown:
+            raise RecordValidationError({key: "Unknown Dataset field" for key in unknown})
+        if not identifier.field_keys:
+            raise ValidationError("Configure a Record identifier before adding records")
+        errors: dict[str, str] = {}
+        values: list[RecordValue] = []
+        for field in fields:
+            raw = submitted.get(field.key, "")
+            try:
+                canonical = canonicalize_record_value(field.data_type, raw)
+            except ValidationError as error:
+                errors[field.key] = str(error)
+                continue
+            if canonical is None:
+                if field.is_required or field.key in identifier.field_keys:
+                    errors[field.key] = "A value is required"
+                continue
+            value, key = canonical
+            values.append(
+                RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
+            )
+        if errors:
+            raise RecordValidationError(errors)
+        value_by_key = {value.field_key: value for value in values}
+        components = [value_by_key[key].canonical_key for key in identifier.field_keys]
+        encoded_identifier = b"".join(
+            len(component).to_bytes(4, "big") + component for component in components
+        )
+        if len(encoded_identifier) > 2000:
+            raise ValidationError("Encoded Record identifier must not exceed 2000 UTF-8 bytes")
+        return tuple(values), encoded_identifier
 
     def list_records(self, actor_id: str, dataset_key: str, page: int = 1) -> RecordPage:
         if not isinstance(page, int) or isinstance(page, bool) or page < 1:
@@ -1169,13 +1272,20 @@ class DatasetRecordService:
 
         def sort_key(record: StoredRecord):
             by_key = {value.field_key: value for value in record.values}
+            incomplete = any(key not in by_key for key in identifier_keys)
             result = []
             for key in identifier_keys:
-                value = by_key[key]
+                value = by_key.get(key)
+                if value is None:
+                    result.append((1, None))
+                    continue
                 result.append(
-                    value.value.encode("utf-8") if value.data_type == "string" else value.value
+                    (
+                        0,
+                        value.value.encode("utf-8") if value.data_type == "string" else value.value,
+                    )
                 )
-            return tuple(result)
+            return incomplete, tuple(result), record.id
 
         records.sort(key=sort_key)
         start = (page - 1) * self.PAGE_SIZE

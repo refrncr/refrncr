@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Integer,
     LargeBinary,
     Numeric,
     String,
@@ -258,11 +259,13 @@ class DatasetRecord(Base):
         UniqueConstraint(
             "dataset_id", "identifier_key", name="uq_dataset_records_dataset_identifier"
         ),
+        CheckConstraint("revision >= 1", name="ck_dataset_records_revision_positive"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+    revision: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now

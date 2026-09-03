@@ -34,10 +34,12 @@ from refrncr.services import (
     RecordConflictError,
     RecordValidationError,
     SessionService,
+    StaleRecordError,
     TeamService,
     UserManagementError,
     UserService,
     ValidationError,
+    parse_expected_revision,
 )
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
@@ -335,22 +337,34 @@ def create_flask_app(
             fields = field_service.list_fields(actor.id, key)
             identifier = business_key_service.get_business_key(actor.id, key)
             page = record_service.list_records(actor.id, key, parse_page_parameter())
-            may_add = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
+            may_edit = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
         except NotFoundError:
             abort(404)
         rows = [
-            (record, {value.field_key: value.value for value in record.values})
+            (
+                record,
+                {value.field_key: value.value for value in record.values},
+                any(
+                    key not in {value.field_key for value in record.values}
+                    for key in identifier.field_keys
+                ),
+            )
             for record in page.records
         ]
         return render_template_string(
             "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>Dataset</a></nav>"
             "<h1>Records — {{ dataset.name }}</h1>"
-            "{% if may_add %}<a href='{{ url_for(\"new_dataset_record\", key=dataset.key) }}'>"
+            "{% if may_edit %}<a href='{{ url_for(\"new_dataset_record\", key=dataset.key) }}'>"
             "Add record</a>{% endif %}"
             "{% if rows %}<table><thead><tr>{% for field in fields %}<th>"
             "{% if field.key in identifier.field_keys %}🔑 {% endif %}{{ field.name }}</th>"
-            "{% endfor %}</tr></thead><tbody>{% for record, values in rows %}<tr>"
+            "{% endfor %}<th>Status</th></tr></thead><tbody>"
+            "{% for record, values, incomplete in rows %}<tr>"
             "{% for field in fields %}<td>{{ values.get(field.key, '') }}</td>{% endfor %}"
+            "<td>{% if incomplete %}Incomplete record{% endif %}</td>"
+            '{% if may_edit %}<td><a href=\'{{ url_for("edit_dataset_record", key=dataset.key, '
+            "record_id=record.id) }}'>Edit</a> <a href='{{ url_for(\"delete_dataset_record\", "
+            "key=dataset.key, record_id=record.id) }}'>Delete</a></td>{% endif %}"
             "</tr>{% endfor %}</tbody></table>{% else %}<p>No records are available.</p>{% endif %}"
             '<nav>{% if page.page > 1 %}<a href=\'{{ url_for("dataset_records_view", '
             "key=dataset.key, page=page.page-1) }}'>Previous</a>{% endif %} "
@@ -362,17 +376,28 @@ def create_flask_app(
             identifier=identifier,
             rows=rows,
             page=page,
-            may_add=may_add,
+            may_edit=may_edit,
         )
 
-    def render_record_form(dataset, fields, *, csrf, submitted=None, errors=None, status=200):
+    def render_record_form(
+        dataset,
+        fields,
+        *,
+        csrf,
+        submitted=None,
+        errors=None,
+        status=200,
+        record=None,
+    ):
         submitted = submitted or {}
         errors = errors or {}
         response = render_template_string(
             "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Add record</h1>{% if errors.get('_record') %}"
+            "</nav><h1>{{ 'Edit record' if record else 'Add record' }}</h1>"
+            "{% if errors.get('_record') %}"
             "<p role='alert'>{{ errors['_record'] }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"create_dataset_record\", "
+            "<form method='post' action='{{ url_for(\"edit_dataset_record\", key=dataset.key, "
+            'record_id=record.id) if record else url_for("create_dataset_record", '
             "key=dataset.key) }}'>"
             "{% for field in fields %}<div><label>{{ field.name }}{% if field.is_required %} *"
             "{% endif %}{% if field.data_type == 'boolean' %}<select name='{{ field.key }}'>"
@@ -384,12 +409,15 @@ def create_flask_app(
             "{% if errors.get(field.key) %}<span role='alert'>{{ errors[field.key] }}</span>"
             "{% endif %}</div>{% endfor %}<input type='hidden' name='csrf_token' "
             "value='{{ csrf }}'>"
-            "<button>Add record</button></form>",
+            "{% if record %}<input type='hidden' name='expected_revision' "
+            "value='{{ record.revision }}'>{% endif %}"
+            "<button>{{ 'Save record' if record else 'Add record' }}</button></form>",
             dataset=dataset,
             fields=fields,
             csrf=csrf,
             submitted=submitted,
             errors=errors,
+            record=record,
         )
         return (response, status) if status != 200 else response
 
@@ -426,6 +454,7 @@ def create_flask_app(
                 continue
             if form_key not in expected:
                 errors[form_key] = "Unknown Dataset field"
+                errors["_record"] = "Record contains unknown Dataset fields"
             elif len(form_values) != 1:
                 errors[form_key] = "Submit exactly one value"
             else:
@@ -471,6 +500,164 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         return redirect(url_for("dataset_records_view", key=key))
+
+    def record_form_values(record):
+        values = {}
+        for value in record.values:
+            if value.data_type == "boolean":
+                values[value.field_key] = "true" if value.value else "false"
+            else:
+                values[value.field_key] = str(value.value)
+        return values
+
+    def parsed_record_form(fields, infrastructure):
+        expected = {field.key for field in fields}
+        submitted: dict[str, str] = {}
+        errors: dict[str, str] = {}
+        for form_key, form_values in request.form.lists():
+            if form_key in infrastructure:
+                continue
+            if form_key not in expected:
+                errors[form_key] = "Unknown Dataset field"
+                errors["_record"] = "Record contains unknown Dataset fields"
+            elif len(form_values) != 1:
+                errors[form_key] = "Submit exactly one value"
+            else:
+                submitted[form_key] = form_values[0]
+        return submitted, errors
+
+    def exact_expected_revision():
+        values = request.form.getlist("expected_revision")
+        if len(values) != 1:
+            raise ValidationError("Submit exactly one expected revision")
+        return parse_expected_revision(values[0])
+
+    @dataset_route("/datasets/<key>/records/<record_id>/edit", methods=["GET", "POST"])
+    def edit_dataset_record(key: str, record_id: str):
+        actor, login_session = require_authenticated()
+        _authorization, _datasets, field_service, _business_keys, record_service = (
+            require_dataset_dependencies()
+        )
+        try:
+            dataset = record_service.get_dataset_for_add(actor.id, key)
+            fields = field_service.list_fields(actor.id, key)
+            record = record_service.get_record_for_edit(actor.id, key, record_id)
+        except NotFoundError:
+            abort(404)
+        if request.method == "GET":
+            return render_record_form(
+                dataset,
+                fields,
+                csrf=login_session.csrf_token,
+                submitted=record_form_values(record),
+                record=record,
+            )
+        require_csrf(login_session.csrf_token)
+        submitted, errors = parsed_record_form(fields, {"csrf_token", "expected_revision"})
+        try:
+            expected_revision = exact_expected_revision()
+        except ValidationError as error:
+            errors["_record"] = str(error)
+        if errors:
+            return render_record_form(
+                dataset,
+                fields,
+                csrf=login_session.csrf_token,
+                submitted=submitted,
+                errors=errors,
+                status=400,
+                record=record,
+            )
+        try:
+            record_service.update_record(actor.id, key, record_id, expected_revision, submitted)
+        except RecordValidationError as error:
+            return render_record_form(
+                dataset,
+                fields,
+                csrf=login_session.csrf_token,
+                submitted=submitted,
+                errors=error.errors,
+                status=400,
+                record=record,
+            )
+        except ValidationError as error:
+            return render_record_form(
+                dataset,
+                fields,
+                csrf=login_session.csrf_token,
+                submitted=submitted,
+                errors={"_record": str(error)},
+                status=400,
+                record=record,
+            )
+        except (RecordConflictError, StaleRecordError) as error:
+            return render_record_form(
+                dataset,
+                fields,
+                csrf=login_session.csrf_token,
+                submitted=submitted,
+                errors={"_record": str(error)},
+                status=409,
+                record=record,
+            )
+        except NotFoundError:
+            abort(404)
+        return redirect(url_for("dataset_records_view", key=key))
+
+    @dataset_route("/datasets/<key>/records/<record_id>/delete", methods=["GET", "POST"])
+    def delete_dataset_record(key: str, record_id: str):
+        actor, login_session = require_authenticated()
+        _authorization, _datasets, _fields, business_keys, record_service = (
+            require_dataset_dependencies()
+        )
+        try:
+            dataset = record_service.get_dataset_for_add(actor.id, key)
+            record = record_service.get_record_for_edit(actor.id, key, record_id)
+            identifier_keys = business_keys.get_business_key(actor.id, key).field_keys
+        except NotFoundError:
+            abort(404)
+        values = {value.field_key: value.value for value in record.values}
+        incomplete = any(field_key not in values for field_key in identifier_keys)
+        identifier = (
+            "Incomplete record"
+            if incomplete
+            else " / ".join(str(values[field_key]) for field_key in identifier_keys)
+        )
+        error = None
+        status = 200
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            try:
+                if request.form.getlist("confirm") != ["yes"]:
+                    raise ValidationError("Explicit confirmation is required")
+                expected_revision = exact_expected_revision()
+                extras = set(request.form) - {"csrf_token", "confirm", "expected_revision"}
+                if extras:
+                    raise ValidationError("Unknown form field")
+                record_service.delete_record(actor.id, key, record_id, expected_revision)
+            except ValidationError as exc:
+                error, status = str(exc), 400
+            except StaleRecordError as exc:
+                error, status = str(exc), 409
+            except NotFoundError:
+                abort(404)
+            else:
+                return redirect(url_for("dataset_records_view", key=key))
+        response = render_template_string(
+            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
+            "</nav><h1>Delete record</h1>{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
+            "<p>Record identifier: {{ identifier }}</p><p>This deletion is permanent.</p>"
+            "<form method='post'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<input type='hidden' name='expected_revision' value='{{ record.revision }}'>"
+            "<label><input type='checkbox' name='confirm' value='yes'> Confirm permanent "
+            "deletion</label><button>Delete record</button></form>",
+            dataset=dataset,
+            record=record,
+            identifier=identifier,
+            csrf=login_session.csrf_token,
+            error=error,
+        )
+        return (response, status) if status != 200 else response
 
     def render_dataset_edit_form(dataset, *, name: str, description: str, csrf: str, error=None):
         return render_template_string(

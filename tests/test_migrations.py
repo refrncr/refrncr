@@ -202,7 +202,25 @@ def assert_community_schema(engine):
     assert business_key_foreign_key["referred_columns"] == ["dataset_id", "key"]
     assert business_key_foreign_key["options"].get("ondelete") == "CASCADE"
     record_columns = {column["name"] for column in inspector.get_columns("dataset_records")}
-    assert record_columns == {"id", "dataset_id", "identifier_key", "created_at", "updated_at"}
+    assert record_columns == {
+        "id",
+        "dataset_id",
+        "identifier_key",
+        "revision",
+        "created_at",
+        "updated_at",
+    }
+    revision_column = next(
+        column
+        for column in inspector.get_columns("dataset_records")
+        if column["name"] == "revision"
+    )
+    assert revision_column["nullable"] is False
+    assert revision_column["default"] is None
+    record_checks = {
+        constraint["name"] for constraint in inspector.get_check_constraints("dataset_records")
+    }
+    assert "ck_dataset_records_revision_positive" in record_checks
     record_uniques = {
         tuple(constraint["column_names"])
         for constraint in inspector.get_unique_constraints("dataset_records")
@@ -229,6 +247,106 @@ def assert_community_schema(engine):
         "RESTRICT",
     }
     assert value_foreign_keys[("record_id", "dataset_id")]["options"].get("ondelete") == "CASCADE"
+
+
+def test_ref_80_sqlite_migration_backfills_and_downgrades_without_data_loss(tmp_path):
+    database = tmp_path / "ref-80.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0008_ref_79")
+    engine = create_database_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users "
+                "(id, email, display_name, password_hash, role, is_active, is_deleted, "
+                "created_at, updated_at) VALUES "
+                "('user-1', 'admin@example.com', 'Admin', 'hash', 'admin', 1, 0, "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO datasets "
+                "(id, key, name, description, owner_user_id, created_at, updated_at) VALUES "
+                "('dataset-1', 'records', 'Records', '', 'user-1', "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO dataset_records "
+                "(id, dataset_id, identifier_key, created_at, updated_at) VALUES "
+                "('record-1', 'dataset-1', X'7331', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO dataset_fields "
+                "(id, dataset_id, key, name, data_type, is_required, is_unique, "
+                "created_at, updated_at) VALUES "
+                "('field-1', 'dataset-1', 'code', 'Code', 'string', 1, 1, "
+                "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO dataset_business_key_fields (dataset_id, field_key) "
+                "VALUES ('dataset-1', 'code')"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO dataset_record_values "
+                "(record_id, field_id, dataset_id, string_value, canonical_value_key, "
+                "unique_value_key) VALUES "
+                "('record-1', 'field-1', 'dataset-1', 'one', X'736F6E65', X'736F6E65')"
+            )
+        )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    upgraded = create_database_engine(f"sqlite:///{database}")
+    with upgraded.connect() as connection:
+        assert (
+            connection.scalar(text("SELECT revision FROM dataset_records WHERE id = 'record-1'"))
+            == 1
+        )
+        assert connection.execute(
+            text(
+                "SELECT string_value, canonical_value_key, unique_value_key "
+                "FROM dataset_record_values WHERE record_id = 'record-1'"
+            )
+        ).one() == ("one", b"sone", b"sone")
+    assert (
+        next(
+            column
+            for column in inspect(upgraded).get_columns("dataset_records")
+            if column["name"] == "revision"
+        )["default"]
+        is None
+    )
+    upgraded.dispose()
+
+    command.downgrade(config, "0008_ref_79")
+    downgraded = create_database_engine(f"sqlite:///{database}")
+    assert "revision" not in {
+        column["name"] for column in inspect(downgraded).get_columns("dataset_records")
+    }
+    with downgraded.connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT identifier_key FROM dataset_records WHERE id = 'record-1'")
+            )
+            == b"s1"
+        )
+        assert (
+            connection.scalar(
+                text("SELECT string_value FROM dataset_record_values WHERE record_id = 'record-1'")
+            )
+            == "one"
+        )
+    downgraded.dispose()
 
 
 def test_empty_sqlite_database_upgrades(tmp_path):
@@ -575,7 +693,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008_ref_79"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009_ref_80"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
