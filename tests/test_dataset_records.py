@@ -1,0 +1,378 @@
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
+from threading import Barrier
+
+import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, func, select, text
+from sqlalchemy.engine import make_url
+
+from refrncr.app import create_community_services
+from refrncr.db.base import Base
+from refrncr.db.session import create_database_engine, create_session_factory
+from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue
+from refrncr.services import (
+    NotFoundError,
+    RecordConflictError,
+    RecordValidationError,
+    ResourceTypeRegistry,
+    ValidationError,
+    canonicalize_record_value,
+)
+from refrncr.web import create_flask_app
+
+PASSWORD = "correct horse battery staple"
+
+
+@pytest.fixture
+def record_services():
+    engine = create_database_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
+    return engine, factory, services, admin
+
+
+@pytest.fixture
+def postgresql_record_services():
+    database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
+    administration_engine = create_engine(database_url)
+    schema = f"dataset_records_{uuid.uuid4().hex}"
+    with administration_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    schema_url = make_url(database_url).update_query_dict({"options": f"-csearch_path={schema}"})
+    engine = create_database_engine(schema_url)
+    try:
+        Base.metadata.create_all(engine)
+        factory = create_session_factory(engine)
+        services = create_community_services(factory, ResourceTypeRegistry())
+        services.users.bootstrap_organisation()
+        admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
+        yield engine, factory, services, admin
+    finally:
+        engine.dispose()
+        with administration_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+        administration_engine.dispose()
+
+
+def configured_dataset(services, admin, key="records"):
+    dataset = services.datasets.create_dataset(admin.id, key, "Records", "")
+    fields = {}
+    for field_key, data_type, required, unique in (
+        ("code", "string", True, False),
+        ("amount", "number", True, False),
+        ("active", "boolean", False, False),
+        ("day", "date", False, True),
+    ):
+        fields[field_key] = services.dataset_fields.create_field(
+            admin.id,
+            key,
+            field_key,
+            field_key.title(),
+            data_type,
+            is_required=required,
+            is_unique=unique,
+        )
+    services.dataset_business_keys.set_business_key(admin.id, key, ("code", "amount"))
+    return dataset, fields
+
+
+def test_canonical_value_contracts():
+    assert canonicalize_record_value("string", "  Cafe\N{COMBINING ACUTE ACCENT}  ") == (
+        "Café",
+        b"sCaf\xc3\xa9",
+    )
+    assert canonicalize_record_value("number", "1.00") == (Decimal("1.00"), b"n1")
+    assert canonicalize_record_value("number", "-0.000") == (Decimal(0), b"n0")
+    assert canonicalize_record_value("boolean", "false") == (False, b"b0")
+    assert canonicalize_record_value("date", "0001-01-01")[1] == b"d0001-01-01"
+    assert canonicalize_record_value("date", "9999-12-31")[1] == b"d9999-12-31"
+    assert canonicalize_record_value("string", "  ") is None
+
+
+@pytest.mark.parametrize(
+    ("data_type", "raw"),
+    [
+        ("string", "bad\nvalue"),
+        ("string", "é" * 501),
+        ("number", "+1"),
+        ("number", "01"),
+        ("number", "1e2"),
+        ("number", "123456789012345678901"),
+        ("number", "0.1234567890123456789"),
+        ("boolean", "on"),
+        ("date", "2024-02-30"),
+        ("date", "2024-1-01"),
+    ],
+)
+def test_invalid_canonical_values_are_rejected(data_type, raw):
+    with pytest.raises(ValidationError):
+        canonicalize_record_value(data_type, raw)
+
+
+def test_create_normalized_record_values_identifier_and_audit(record_services):
+    _, factory, services, admin = record_services
+    dataset, fields = configured_dataset(services, admin)
+
+    record = services.dataset_records.create_record(
+        admin.id,
+        dataset.key,
+        {"code": " Café ", "amount": "1.00", "active": "false", "day": "2024-02-29"},
+    )
+
+    assert record.dataset_id == dataset.id
+    with factory() as session:
+        persisted = session.get(DatasetRecord, record.id)
+        values = list(
+            session.scalars(
+                select(DatasetRecordValue).where(DatasetRecordValue.record_id == record.id)
+            )
+        )
+        assert persisted.identifier_key.startswith(len(b"n1").to_bytes(4, "big") + b"n1")
+        assert len(values) == 4
+        assert {value.field_id for value in values} == set(fields[field].id for field in fields)
+        events = list(
+            session.scalars(
+                select(AuditEvent).where(
+                    AuditEvent.object_type == "dataset_record",
+                    AuditEvent.object_id == record.id,
+                )
+            )
+        )
+        assert [event.action for event in events] == ["created"]
+
+
+def test_required_unknown_duplicate_identifier_and_unique_value(record_services):
+    _, _, services, admin = record_services
+    dataset, _ = configured_dataset(services, admin)
+    with pytest.raises(RecordValidationError) as missing:
+        services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
+    assert missing.value.errors == {"amount": "A value is required"}
+    with pytest.raises(RecordValidationError) as unknown:
+        services.dataset_records.create_record(
+            admin.id, dataset.key, {"code": "one", "amount": "1", "foreign": "x"}
+        )
+    assert unknown.value.errors == {"foreign": "Unknown Dataset field"}
+
+    services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "one", "amount": "1.0", "day": "2024-01-01"}
+    )
+    with pytest.raises(RecordConflictError, match="identifier"):
+        services.dataset_records.create_record(
+            admin.id, dataset.key, {"code": "one", "amount": "1.00"}
+        )
+    with pytest.raises(RecordConflictError, match="unique"):
+        services.dataset_records.create_record(
+            admin.id, dataset.key, {"code": "two", "amount": "2", "day": "2024-01-01"}
+        )
+
+
+def test_optional_absence_ordering_and_pagination(record_services):
+    _, factory, services, admin = record_services
+    dataset, fields = configured_dataset(services, admin)
+    for index in range(52, 0, -1):
+        services.dataset_records.create_record(
+            admin.id,
+            dataset.key,
+            {"code": f"item-{index:02}", "amount": str(index)},
+        )
+
+    first = services.dataset_records.list_records(admin.id, dataset.key)
+    second = services.dataset_records.list_records(admin.id, dataset.key, 2)
+    beyond = services.dataset_records.list_records(admin.id, dataset.key, 999)
+    assert (len(first.records), len(second.records), len(beyond.records)) == (50, 2, 0)
+    first_amounts = [
+        dict((value.field_key, value.value) for value in record.values)["amount"]
+        for record in first.records[:3]
+    ]
+    assert first_amounts == [
+        Decimal(1),
+        Decimal(2),
+        Decimal(3),
+    ]
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(DatasetRecordValue.record_id)).where(
+                    DatasetRecordValue.field_id == fields["active"].id
+                )
+            )
+            == 0
+        )
+
+
+def test_record_aware_schema_guards_and_safe_changes(record_services):
+    _, _, services, admin = record_services
+    dataset, fields = configured_dataset(services, admin)
+    empty = services.dataset_fields.create_field(admin.id, dataset.key, "empty", "Empty", "string")
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "one", "amount": "1"})
+
+    with pytest.raises(ValidationError, match="type cannot change"):
+        services.dataset_fields.update_field(
+            admin.id, dataset.key, fields["active"].key, "Active", "date", False, False
+        )
+    with pytest.raises(ValidationError, match="Required cannot"):
+        services.dataset_fields.update_field(
+            admin.id, dataset.key, fields["active"].key, "Active", "boolean", True, False
+        )
+    with pytest.raises(ValidationError, match="identifier cannot change"):
+        services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    changed = services.dataset_fields.update_field(
+        admin.id, dataset.key, fields["code"].key, "Renamed", "string", True, False
+    )
+    assert changed.name == "Renamed"
+    services.dataset_fields.delete_field(admin.id, dataset.key, empty.key)
+
+
+def test_sqlite_concurrent_duplicate_identifier_creates_one(tmp_path):
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'records.db'}")
+    Base.metadata.create_all(engine)
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
+    dataset, _ = configured_dataset(services, admin)
+    barrier = Barrier(2)
+
+    def create():
+        barrier.wait()
+        try:
+            return services.dataset_records.create_record(
+                admin.id, dataset.key, {"code": "same", "amount": "1"}
+            )
+        except RecordConflictError as error:
+            return error
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: create(), range(2)))
+    assert sum(isinstance(result, RecordConflictError) for result in results) == 1
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetRecord.id))) == 1
+
+
+def test_browser_add_list_validation_security_and_escaping(record_services):
+    _, _, services, admin = record_services
+    dataset, _ = configured_dataset(services, admin)
+    client = create_flask_app(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+        dataset_records=services.dataset_records,
+    ).test_client()
+    login_form = client.get("/login", base_url="https://localhost")
+    csrf = login_form.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
+    response = client.post(
+        "/login",
+        base_url="https://localhost",
+        data={"email": admin.email, "password": PASSWORD, "csrf_token": csrf},
+    )
+    assert response.status_code == 302
+    form = client.get(f"/datasets/{dataset.key}/records/new", base_url="https://localhost")
+    body = form.get_data(as_text=True)
+    form_csrf = body.split("name='csrf_token' value='")[1].split("'", 1)[0]
+    assert "Add record" in body
+
+    invalid = client.post(
+        f"/datasets/{dataset.key}/records",
+        base_url="https://localhost",
+        data={"code": "<script>x</script>", "amount": "bad", "csrf_token": form_csrf},
+    )
+    assert invalid.status_code == 400
+    assert "&lt;script&gt;x&lt;/script&gt;" in invalid.get_data(as_text=True)
+    assert "Enter a decimal number" in invalid.get_data(as_text=True)
+
+    created = client.post(
+        f"/datasets/{dataset.key}/records",
+        base_url="https://localhost",
+        data={"code": "<b>safe</b>", "amount": "2", "csrf_token": form_csrf},
+    )
+    assert created.status_code == 302
+    listing = client.get(f"/datasets/{dataset.key}/records", base_url="https://localhost")
+    assert "&lt;b&gt;safe&lt;/b&gt;" in listing.get_data(as_text=True)
+    assert "🔑" in listing.get_data(as_text=True)
+    assert (
+        client.get(
+            f"/datasets/{dataset.key}/records?page=1&page=2", base_url="https://localhost"
+        ).status_code
+        == 400
+    )
+
+
+def test_viewer_lists_but_cannot_add(record_services):
+    _, _, services, admin = record_services
+    dataset, _ = configured_dataset(services, admin)
+    viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", PASSWORD)
+    services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    assert services.dataset_records.list_records(viewer.id, dataset.key).records == ()
+    with pytest.raises(NotFoundError, match="Dataset not found"):
+        services.dataset_records.create_record(
+            viewer.id, dataset.key, {"code": "one", "amount": "1"}
+        )
+
+
+def test_postgresql_constraints_order_and_atomicity(postgresql_record_services):
+    _, factory, services, admin = postgresql_record_services
+    dataset, _ = configured_dataset(services, admin)
+    for code, amount in (("z", "10"), ("é", "2"), ("e", "1")):
+        services.dataset_records.create_record(
+            admin.id, dataset.key, {"code": code, "amount": amount}
+        )
+    page = services.dataset_records.list_records(admin.id, dataset.key)
+    ordered = [{value.field_key: value.value for value in record.values} for record in page.records]
+    assert [row["amount"] for row in ordered] == [Decimal(1), Decimal(2), Decimal(10)]
+    with pytest.raises(RecordConflictError):
+        services.dataset_records.create_record(
+            admin.id, dataset.key, {"code": "e", "amount": "1.00"}
+        )
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetRecord.id))) == 3
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset_record")
+            )
+            == 3
+        )
+
+
+def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_path):
+    database = tmp_path / "populated-ref-75.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0007_ref_75")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
+    dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
+    field = services.dataset_fields.create_field(
+        admin.id, dataset.key, "code", "Code", "string", is_required=True
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    upgraded = create_database_engine(f"sqlite:///{database}")
+    upgraded_factory = create_session_factory(upgraded)
+    upgraded_services = create_community_services(upgraded_factory, ResourceTypeRegistry())
+    assert upgraded_services.dataset_business_keys.get_business_key(
+        admin.id, dataset.key
+    ).field_keys == (field.key,)
+    record = upgraded_services.dataset_records.create_record(
+        admin.id, dataset.key, {field.key: "one"}
+    )
+    assert record.dataset_id == dataset.id

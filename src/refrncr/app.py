@@ -11,6 +11,7 @@ from refrncr.services import (
     AuthorizationService,
     DatasetBusinessKeyService,
     DatasetFieldService,
+    DatasetRecordService,
     DatasetResourceResolver,
     DatasetService,
     GrantService,
@@ -35,6 +36,7 @@ class CommunityServices:
     datasets: DatasetService
     dataset_fields: DatasetFieldService
     dataset_business_keys: DatasetBusinessKeyService
+    dataset_records: DatasetRecordService
 
 
 def create_community_services(
@@ -56,6 +58,7 @@ def create_community_services(
         datasets=DatasetService(uow, authorization),
         dataset_fields=DatasetFieldService(uow, authorization),
         dataset_business_keys=DatasetBusinessKeyService(uow, authorization),
+        dataset_records=DatasetRecordService(uow, authorization),
     )
 
 
@@ -70,6 +73,7 @@ def create_application(
     datasets: DatasetService,
     dataset_fields: DatasetFieldService,
     dataset_business_keys: DatasetBusinessKeyService,
+    dataset_records: DatasetRecordService | None = None,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
@@ -90,6 +94,7 @@ def create_application(
         datasets=datasets,
         dataset_fields=dataset_fields,
         dataset_business_keys=dataset_business_keys,
+        dataset_records=dataset_records,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
     )

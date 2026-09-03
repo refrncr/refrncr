@@ -49,6 +49,10 @@ def assert_community_schema(engine):
         "memberships",
         "grants",
         "datasets",
+        "dataset_fields",
+        "dataset_business_key_fields",
+        "dataset_records",
+        "dataset_record_values",
     } <= tables
     assert "organisation_id" not in {column["name"] for column in inspector.get_columns("users")}
     assert "organisation_id" not in {
@@ -197,6 +201,34 @@ def assert_community_schema(engine):
     assert business_key_foreign_key["referred_table"] == "dataset_fields"
     assert business_key_foreign_key["referred_columns"] == ["dataset_id", "key"]
     assert business_key_foreign_key["options"].get("ondelete") == "CASCADE"
+    record_columns = {column["name"] for column in inspector.get_columns("dataset_records")}
+    assert record_columns == {"id", "dataset_id", "identifier_key", "created_at", "updated_at"}
+    record_uniques = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("dataset_records")
+    }
+    assert {("id", "dataset_id"), ("dataset_id", "identifier_key")} <= record_uniques
+    value_columns = {column["name"] for column in inspector.get_columns("dataset_record_values")}
+    assert value_columns == {
+        "record_id",
+        "field_id",
+        "dataset_id",
+        "string_value",
+        "number_value",
+        "boolean_value",
+        "date_value",
+        "canonical_value_key",
+        "unique_value_key",
+    }
+    value_foreign_keys = {
+        tuple(foreign_key["constrained_columns"]): foreign_key
+        for foreign_key in inspector.get_foreign_keys("dataset_record_values")
+    }
+    assert value_foreign_keys[("field_id", "dataset_id")]["options"].get("ondelete") in {
+        None,
+        "RESTRICT",
+    }
+    assert value_foreign_keys[("record_id", "dataset_id")]["options"].get("ondelete") == "CASCADE"
 
 
 def test_empty_sqlite_database_upgrades(tmp_path):
@@ -543,7 +575,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0007_ref_75"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0008_ref_79"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from types import TracebackType
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, inspect, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -11,6 +12,8 @@ from refrncr.models import (
     Dataset,
     DatasetBusinessKeyField,
     DatasetField,
+    DatasetRecord,
+    DatasetRecordValue,
     Grant,
     LoginSession,
     Membership,
@@ -28,7 +31,9 @@ from refrncr.ports import (
     PasswordHashReplacementError,
     PermissionContext,
     PersistenceConflictError,
+    RecordValue,
     ResourcePermissionsContext,
+    StoredRecord,
     TeamRecord,
 )
 
@@ -46,12 +51,26 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
         return "uq_datasets_key"
     if getattr(diagnostic, "constraint_name", None) == "uq_dataset_fields_dataset_key":
         return "uq_dataset_fields_dataset_key"
+    if getattr(diagnostic, "constraint_name", None) in {
+        "uq_dataset_records_dataset_identifier",
+        "uq_dataset_record_values_unique_value",
+    }:
+        return diagnostic.constraint_name
     if str(error.orig) == "UNIQUE constraint failed: datasets.key":
         return "uq_datasets_key"
     if str(error.orig) == (
         "UNIQUE constraint failed: dataset_fields.dataset_id, dataset_fields.key"
     ):
         return "uq_dataset_fields_dataset_key"
+    if str(error.orig) == (
+        "UNIQUE constraint failed: dataset_records.dataset_id, dataset_records.identifier_key"
+    ):
+        return "uq_dataset_records_dataset_identifier"
+    if str(error.orig) == (
+        "UNIQUE constraint failed: dataset_record_values.dataset_id, "
+        "dataset_record_values.field_id, dataset_record_values.unique_value_key"
+    ):
+        return "uq_dataset_record_values_unique_value"
     return None
 
 
@@ -316,6 +335,160 @@ class SqlAlchemyDatasetBusinessKeyOperations:
         )
 
 
+class SqlAlchemyDatasetRecordOperations:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def _available(self) -> bool:
+        return inspect(self.session.get_bind()).has_table("dataset_records")
+
+    def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecord:
+        record = DatasetRecord(dataset_id=dataset_id, identifier_key=identifier_key)
+        self.session.add(record)
+        return record
+
+    def add_values(self, record: DatasetRecord, values: tuple[RecordValue, ...]) -> None:
+        rows = []
+        for value in values:
+            typed = {
+                "string_value": None,
+                "number_value": None,
+                "boolean_value": None,
+                "date_value": None,
+            }
+            typed[f"{value.data_type}_value"] = value.value
+            rows.append(
+                DatasetRecordValue(
+                    record_id=record.id,
+                    dataset_id=record.dataset_id,
+                    field_id=value.field_id,
+                    canonical_value_key=value.canonical_key,
+                    unique_value_key=value.canonical_key if value.is_unique else None,
+                    **typed,
+                )
+            )
+        self.session.add_all(rows)
+
+    def list_all(self, dataset_id: str) -> list[StoredRecord]:
+        records = list(
+            self.session.scalars(
+                select(DatasetRecord)
+                .where(DatasetRecord.dataset_id == dataset_id)
+                .order_by(DatasetRecord.id)
+            )
+        )
+        values = self.session.execute(
+            select(DatasetRecordValue, DatasetField)
+            .join(
+                DatasetField,
+                (DatasetField.id == DatasetRecordValue.field_id)
+                & (DatasetField.dataset_id == DatasetRecordValue.dataset_id),
+            )
+            .where(DatasetRecordValue.dataset_id == dataset_id)
+        )
+        grouped: dict[str, list[RecordValue]] = {record.id: [] for record in records}
+        for row, field in values:
+            value = next(
+                candidate
+                for candidate in (
+                    row.string_value,
+                    row.number_value,
+                    row.boolean_value,
+                    row.date_value,
+                )
+                if candidate is not None
+            )
+            if field.data_type == "number":
+                value = Decimal(row.canonical_value_key[1:].decode("ascii"))
+            grouped[row.record_id].append(
+                RecordValue(
+                    field_id=field.id,
+                    field_key=field.key,
+                    data_type=field.data_type,
+                    value=value,
+                    canonical_key=row.canonical_value_key,
+                    is_unique=field.is_unique,
+                )
+            )
+        return [
+            StoredRecord(record.id, record.dataset_id, tuple(grouped[record.id]))
+            for record in records
+        ]
+
+    def count(self, dataset_id: str) -> int:
+        if not self._available():
+            return 0
+        return (
+            self.session.scalar(
+                select(func.count(DatasetRecord.id)).where(DatasetRecord.dataset_id == dataset_id)
+            )
+            or 0
+        )
+
+    def field_has_values(self, dataset_id: str, field_id: str) -> bool:
+        if not self._available():
+            return False
+        return (
+            self.session.scalar(
+                select(DatasetRecordValue.record_id)
+                .where(
+                    DatasetRecordValue.dataset_id == dataset_id,
+                    DatasetRecordValue.field_id == field_id,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
+    def field_has_missing_values(self, dataset_id: str, field_id: str) -> bool:
+        if not self._available():
+            return False
+        value_records = select(DatasetRecordValue.record_id).where(
+            DatasetRecordValue.dataset_id == dataset_id,
+            DatasetRecordValue.field_id == field_id,
+        )
+        return (
+            self.session.scalar(
+                select(DatasetRecord.id)
+                .where(
+                    DatasetRecord.dataset_id == dataset_id,
+                    DatasetRecord.id.not_in(value_records),
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
+    def field_has_duplicate_values(self, dataset_id: str, field_id: str) -> bool:
+        if not self._available():
+            return False
+        return (
+            self.session.scalar(
+                select(DatasetRecordValue.canonical_value_key)
+                .where(
+                    DatasetRecordValue.dataset_id == dataset_id,
+                    DatasetRecordValue.field_id == field_id,
+                )
+                .group_by(DatasetRecordValue.canonical_value_key)
+                .having(func.count() > 1)
+                .limit(1)
+            )
+            is not None
+        )
+
+    def set_field_unique_keys(self, dataset_id: str, field_id: str, enabled: bool) -> None:
+        if not self._available():
+            return
+        self.session.execute(
+            update(DatasetRecordValue)
+            .where(
+                DatasetRecordValue.dataset_id == dataset_id,
+                DatasetRecordValue.field_id == field_id,
+            )
+            .values(unique_value_key=(DatasetRecordValue.canonical_value_key if enabled else None))
+        )
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(
         self, sessions: sessionmaker[Session], *, write: bool = False, serialized: bool = False
@@ -338,6 +511,7 @@ class SqlAlchemyUnitOfWork:
         self.datasets = SqlAlchemyDatasetOperations(self.session)
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
+        self.dataset_records = SqlAlchemyDatasetRecordOperations(self.session)
         return self
 
     def __exit__(

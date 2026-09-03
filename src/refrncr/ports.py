@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Protocol
 
 
@@ -84,6 +85,30 @@ class DatasetFieldRecord(Protocol):
     is_unique: bool
     created_at: datetime
     updated_at: datetime
+
+
+class DatasetRecordRow(Protocol):
+    id: str
+    dataset_id: str
+    identifier_key: bytes
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class RecordValue:
+    field_id: str
+    field_key: str
+    data_type: str
+    value: str | Decimal | bool | date
+    canonical_key: bytes
+    is_unique: bool
+
+
+@dataclass(frozen=True, slots=True)
+class StoredRecord:
+    id: str
+    dataset_id: str
+    values: tuple[RecordValue, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +242,24 @@ class DatasetBusinessKeyOperations(Protocol):
     def replace(self, dataset_id: str, field_keys: tuple[str, ...]) -> None: ...
 
 
+class DatasetRecordOperations(Protocol):
+    def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecordRow: ...
+
+    def add_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
+
+    def list_all(self, dataset_id: str) -> list[StoredRecord]: ...
+
+    def count(self, dataset_id: str) -> int: ...
+
+    def field_has_values(self, dataset_id: str, field_id: str) -> bool: ...
+
+    def field_has_missing_values(self, dataset_id: str, field_id: str) -> bool: ...
+
+    def field_has_duplicate_values(self, dataset_id: str, field_id: str) -> bool: ...
+
+    def set_field_unique_keys(self, dataset_id: str, field_id: str, enabled: bool) -> None: ...
+
+
 class UnitOfWork(Protocol):
     users: UserOperations
     teams: TeamOperations
@@ -225,6 +268,7 @@ class UnitOfWork(Protocol):
     datasets: DatasetOperations
     dataset_fields: DatasetFieldOperations
     dataset_business_keys: DatasetBusinessKeyOperations
+    dataset_records: DatasetRecordOperations
 
     def flush(self) -> None: ...
 
