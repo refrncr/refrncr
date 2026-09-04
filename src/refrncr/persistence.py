@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 
-from sqlalchemy import and_, delete, func, inspect, or_, select, update
+from sqlalchemy import and_, delete, func, inspect, or_, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -20,6 +20,7 @@ from refrncr.models import (
     Organisation,
     Team,
     User,
+    new_id,
     utc_now,
 )
 from refrncr.ports import (
@@ -51,6 +52,8 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
         return "uq_datasets_key"
     if getattr(diagnostic, "constraint_name", None) == "uq_dataset_fields_dataset_key":
         return "uq_dataset_fields_dataset_key"
+    if getattr(diagnostic, "constraint_name", None) == "uq_dataset_fields_dataset_position":
+        return "uq_dataset_fields_dataset_position"
     if getattr(diagnostic, "constraint_name", None) in {
         "uq_dataset_records_dataset_identifier",
         "uq_dataset_record_values_unique_value",
@@ -62,6 +65,10 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
         "UNIQUE constraint failed: dataset_fields.dataset_id, dataset_fields.key"
     ):
         return "uq_dataset_fields_dataset_key"
+    if str(error.orig) == (
+        "UNIQUE constraint failed: dataset_fields.dataset_id, dataset_fields.display_position"
+    ):
+        return "uq_dataset_fields_dataset_position"
     if str(error.orig) == (
         "UNIQUE constraint failed: dataset_records.dataset_id, dataset_records.identifier_key"
     ):
@@ -274,6 +281,25 @@ class SqlAlchemyDatasetFieldOperations:
     def find_by_key(
         self, dataset_id: str, key: str, *, for_update: bool = False
     ) -> DatasetField | None:
+        if not self._has_display_position():
+            row = self.session.execute(
+                select(
+                    DatasetField.id,
+                    DatasetField.dataset_id,
+                    DatasetField._key,
+                    DatasetField.name,
+                    DatasetField.data_type,
+                    DatasetField.is_required,
+                    DatasetField.is_unique,
+                    DatasetField.created_at,
+                    DatasetField.updated_at,
+                ).where(DatasetField.dataset_id == dataset_id, DatasetField._key == key)
+            ).one_or_none()
+            if row is None:
+                return None
+            values = dict(row._mapping)
+            values["key"] = values.pop("_key")
+            return SimpleNamespace(**values)
         statement = _locked(
             select(DatasetField).where(
                 DatasetField.dataset_id == dataset_id,
@@ -285,21 +311,81 @@ class SqlAlchemyDatasetFieldOperations:
         return self.session.scalar(statement)
 
     def list_for_dataset(self, dataset_id: str) -> list[DatasetField]:
+        if not self._has_display_position():
+            rows = self.session.execute(
+                select(
+                    DatasetField.id,
+                    DatasetField.dataset_id,
+                    DatasetField._key,
+                    DatasetField.name,
+                    DatasetField.data_type,
+                    DatasetField.is_required,
+                    DatasetField.is_unique,
+                    DatasetField.created_at,
+                    DatasetField.updated_at,
+                )
+                .where(DatasetField.dataset_id == dataset_id)
+                .order_by(DatasetField._key)
+            )
+            result = []
+            for row in rows:
+                values = dict(row._mapping)
+                values["key"] = values.pop("_key")
+                result.append(SimpleNamespace(**values))
+            return result
         return list(
             self.session.scalars(
                 select(DatasetField)
                 .where(DatasetField.dataset_id == dataset_id)
-                .order_by(DatasetField._key)
+                .order_by(DatasetField.display_position, DatasetField._key, DatasetField.id)
             )
         )
 
     def create(self, **values) -> DatasetField:
+        if not self._has_display_position():
+            values.pop("display_position", None)
+            values["id"] = new_id()
+            values["created_at"] = values["updated_at"] = utc_now()
+            key = values.pop("key")
+            self.session.execute(
+                text(
+                    "INSERT INTO dataset_fields (id, dataset_id, key, name, data_type, "
+                    "is_required, is_unique, created_at, updated_at) VALUES (:id, :dataset_id, "
+                    ":key, :name, :data_type, :is_required, :is_unique, :created_at, :updated_at)"
+                ),
+                {**values, "key": key},
+            )
+            return SimpleNamespace(_key=key, key=key, **values)
         field = DatasetField(_key=values.pop("key"), **values)
         self.session.add(field)
         return field
 
     def delete(self, field: DatasetFieldRecord) -> None:
-        self.session.delete(field)
+        self.session.execute(
+            delete(DatasetField)
+            .where(DatasetField.id == field.id)
+            .execution_options(synchronize_session=False)
+        )
+        self.session.expire_all()
+
+    def replace_order(self, dataset_id: str, field_ids: tuple[str, ...]) -> None:
+        fields = self.list_for_dataset(dataset_id)
+        by_id = {field.id: field for field in fields}
+        if set(by_id) != set(field_ids) or len(field_ids) != len(by_id):
+            raise PersistenceConflictError()
+        offset = max((field.display_position for field in fields), default=0) + len(fields) + 1
+        for index, field_id in enumerate(field_ids, 1):
+            by_id[field_id].display_position = offset + index
+        self.session.flush()
+        for index, field_id in enumerate(field_ids, 1):
+            by_id[field_id].display_position = index
+        self.session.flush()
+
+    def _has_display_position(self) -> bool:
+        return "display_position" in {
+            column["name"]
+            for column in inspect(self.session.connection()).get_columns("dataset_fields")
+        }
 
 
 class SqlAlchemyDatasetBusinessKeyOperations:

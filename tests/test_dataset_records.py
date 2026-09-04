@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue
+from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import (
     NotFoundError,
@@ -829,10 +829,24 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
-    field = services.dataset_fields.create_field(
-        admin.id, dataset.key, "code", "Code", "string", is_required=True
-    )
-    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    field_id = str(uuid.uuid4())
+    now = utc_now()
+    with factory.begin() as session:
+        session.execute(
+            text(
+                "INSERT INTO dataset_fields (id, dataset_id, key, name, data_type, is_required, "
+                "is_unique, created_at, updated_at) VALUES (:id, :dataset_id, 'code', 'Code', "
+                "'string', 1, 0, :now, :now)"
+            ),
+            {"id": field_id, "dataset_id": dataset.id, "now": now},
+        )
+        session.execute(
+            text(
+                "INSERT INTO dataset_business_key_fields (dataset_id, field_key) "
+                "VALUES (:dataset_id, 'code')"
+            ),
+            {"dataset_id": dataset.id},
+        )
     engine.dispose()
 
     command.upgrade(config, "head")
@@ -841,8 +855,6 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     upgraded_services = create_community_services(upgraded_factory, ResourceTypeRegistry())
     assert upgraded_services.dataset_business_keys.get_business_key(
         admin.id, dataset.key
-    ).field_keys == (field.key,)
-    record = upgraded_services.dataset_records.create_record(
-        admin.id, dataset.key, {field.key: "one"}
-    )
+    ).field_keys == ("code",)
+    record = upgraded_services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
     assert record.dataset_id == dataset.id

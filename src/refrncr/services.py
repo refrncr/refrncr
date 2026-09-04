@@ -100,6 +100,10 @@ class StaleRecordError(ConflictError):
     """The submitted Record revision no longer matches persisted state."""
 
 
+class StaleFieldOrderError(ConflictError):
+    """The submitted field order no longer matches persisted state."""
+
+
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
 MAX_RECORD_REVISION = 2_147_483_647
 
@@ -776,6 +780,7 @@ class DatasetFieldService:
                 data_type=validate_dataset_field_type(data_type),
                 is_required=validated_required,
                 is_unique=validate_dataset_field_flag(is_unique, "is_unique"),
+                display_position=len(uow.dataset_fields.list_for_dataset(dataset.id)) + 1,
             )
             try:
                 uow.flush()
@@ -966,7 +971,71 @@ class DatasetFieldService:
                 raise ValidationError("A field with stored values cannot be deleted")
             field_id = field.id
             uow.dataset_fields.delete(field)
+            uow.flush()
+            remaining = uow.dataset_fields.list_for_dataset(dataset.id)
+            uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
             self._add_audit(uow, actor_id, field_id, "deleted")
+
+    def replace_order(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        expected_order: tuple[str, ...],
+        proposed_order: tuple[str, ...],
+    ) -> tuple[DatasetFieldRecord, ...]:
+        validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
+        if not isinstance(expected_order, tuple) or not isinstance(proposed_order, tuple):
+            raise ValidationError("Field order must be a complete sequence")
+        if any(
+            not isinstance(value, str) or not value for value in (*expected_order, *proposed_order)
+        ):
+            raise ValidationError("Field order contains a malformed field identity")
+        if len(set(expected_order)) != len(expected_order) or len(set(proposed_order)) != len(
+            proposed_order
+        ):
+            raise ValidationError("Field order contains duplicate fields")
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
+            self._require_dataset_access(actor_id, dataset, "admin")
+            fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            current = tuple(field.id for field in fields)
+            if expected_order != current:
+                raise StaleFieldOrderError("Field order changed since this page was opened")
+            if len(proposed_order) != len(current) or set(proposed_order) != set(current):
+                raise ValidationError("Field order must contain every current field exactly once")
+            if proposed_order == current:
+                return tuple(fields)
+            uow.dataset_fields.replace_order(dataset.id, proposed_order)
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset",
+                object_id=dataset.id,
+                action="field_order_updated",
+            )
+            by_id = {field.id: field for field in fields}
+            return tuple(by_id[field_id] for field_id in proposed_order)
+
+    def move_field(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        field_id: str,
+        direction: str,
+        expected_order: tuple[str, ...],
+    ) -> tuple[DatasetFieldRecord, ...]:
+        if direction not in {"up", "down"}:
+            raise ValidationError("Field direction is invalid")
+        if not isinstance(field_id, str) or not field_id:
+            raise NotFoundError("Dataset field not found")
+        if field_id not in expected_order:
+            raise NotFoundError("Dataset field not found")
+        proposed = list(expected_order)
+        index = proposed.index(field_id)
+        target = index - 1 if direction == "up" else index + 1
+        if target < 0 or target >= len(proposed):
+            return self.replace_order(actor_id, dataset_key, expected_order, expected_order)
+        proposed[index], proposed[target] = proposed[target], proposed[index]
+        return self.replace_order(actor_id, dataset_key, expected_order, tuple(proposed))
 
     def _get_dataset_with_access(
         self, actor_id: str, dataset_key: str, required_permission: str

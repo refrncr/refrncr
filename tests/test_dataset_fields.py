@@ -19,7 +19,13 @@ from refrncr.models import (
     utc_now,
 )
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
+from refrncr.services import (
+    ConflictError,
+    NotFoundError,
+    ResourceTypeRegistry,
+    StaleFieldOrderError,
+    ValidationError,
+)
 
 PASSWORD = "correct horse battery staple"
 
@@ -64,8 +70,8 @@ def test_sqlite_database_defaults_round_trip_as_false(field_services):
         session.execute(
             text(
                 "INSERT INTO dataset_fields "
-                "(id, dataset_id, key, name, data_type, created_at, updated_at) "
-                "VALUES (:id, :dataset_id, :key, :name, :data_type, :created_at, :updated_at)"
+                "(id, dataset_id, key, name, data_type, display_position, created_at, updated_at) "
+                "VALUES (:id, :dataset_id, :key, :name, :data_type, 1, :created_at, :updated_at)"
             ),
             {
                 "id": field_id,
@@ -84,7 +90,7 @@ def test_sqlite_database_defaults_round_trip_as_false(field_services):
         assert field.is_unique is False
 
 
-def test_list_fields_is_empty_then_sorted_by_key(field_services):
+def test_list_fields_is_empty_then_preserves_creation_display_order(field_services):
     _, _, services, admin = field_services
     dataset = create_dataset(services, admin)
     assert services.dataset_fields.list_fields(admin.id, dataset.key) == []
@@ -93,10 +99,102 @@ def test_list_fields_is_empty_then_sorted_by_key(field_services):
         services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
 
     assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        "zeta",
         "alpha",
         "middle",
-        "zeta",
     ]
+
+
+def test_reorder_exact_permutation_and_stale_detection(field_services):
+    _, _, services, admin = field_services
+    dataset = create_dataset(services, admin)
+    fields = [
+        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+        for key in ("first", "second", "third")
+    ]
+    expected = tuple(field.id for field in fields)
+    services.dataset_fields.replace_order(
+        admin.id, dataset.key, expected, tuple(reversed(expected))
+    )
+    assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        "third",
+        "second",
+        "first",
+    ]
+    with pytest.raises(StaleFieldOrderError, match="changed since"):
+        services.dataset_fields.replace_order(admin.id, dataset.key, expected, expected)
+
+
+@pytest.mark.parametrize(
+    "proposed",
+    [
+        lambda ids: (ids[0], ids[0], ids[2]),
+        lambda ids: ids[:-1],
+        lambda ids: (*ids, str(uuid.uuid4())),
+    ],
+)
+def test_reorder_rejects_non_exact_permutations_without_audit(field_services, proposed):
+    _, factory, services, admin = field_services
+    dataset = create_dataset(services, admin)
+    fields = [
+        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+        for key in ("first", "second", "third")
+    ]
+    expected = tuple(field.id for field in fields)
+    with pytest.raises(ValidationError):
+        services.dataset_fields.replace_order(admin.id, dataset.key, expected, proposed(expected))
+    assert tuple(
+        field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)
+    ) == (expected)
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 0
+        )
+
+
+def test_reorder_audit_failure_rolls_back_complete_order(field_services, monkeypatch):
+    _, factory, services, admin = field_services
+    dataset = create_dataset(services, admin)
+    fields = [
+        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+        for key in ("first", "second")
+    ]
+    expected = tuple(field.id for field in fields)
+    original_add_audit = SqlAlchemyUnitOfWork.add_audit
+
+    def fail_order_audit(self, **values):
+        if values["action"] == "field_order_updated":
+            raise RuntimeError("injected order audit failure")
+        return original_add_audit(self, **values)
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_order_audit)
+    with pytest.raises(RuntimeError, match="injected order audit failure"):
+        services.dataset_fields.replace_order(
+            admin.id, dataset.key, expected, tuple(reversed(expected))
+        )
+    assert tuple(
+        field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)
+    ) == (expected)
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 0
+        )
+
+
+def test_delete_compacts_field_positions(field_services):
+    _, _, services, admin = field_services
+    dataset = create_dataset(services, admin)
+    for key in ("first", "second", "third"):
+        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+    services.dataset_fields.delete_field(admin.id, dataset.key, "second")
+    fields = services.dataset_fields.list_fields(admin.id, dataset.key)
+    assert [(field.key, field.display_position) for field in fields] == [("first", 1), ("third", 2)]
 
 
 @pytest.mark.parametrize("key", ["a", "a" * 100, "a0_b"])
@@ -505,9 +603,10 @@ def test_postgresql_field_creation_duplicate_rollback_and_race(monkeypatch):
             session.execute(
                 text(
                     "INSERT INTO dataset_fields "
-                    "(id, dataset_id, key, name, data_type, created_at, updated_at) "
+                    "(id, dataset_id, key, name, data_type, display_position, "
+                    "created_at, updated_at) "
                     "VALUES "
-                    "(:id, :dataset_id, :key, :name, :data_type, :created_at, :updated_at)"
+                    "(:id, :dataset_id, :key, :name, :data_type, 2, :created_at, :updated_at)"
                 ),
                 {
                     "id": default_field_id,

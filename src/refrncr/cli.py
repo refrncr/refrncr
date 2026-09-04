@@ -12,6 +12,7 @@ from pathlib import Path
 import uvicorn
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
@@ -189,8 +190,41 @@ def prepare_database(database_url: str | URL) -> None:
             config.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
             config.attributes["connection"] = connection
             command.upgrade(config, "head")
+            _validate_ref_121_schema(connection)
     finally:
         engine.dispose()
+
+
+def _validate_ref_121_schema(connection) -> None:
+    revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
+    if revision != "0010_ref_121":
+        return
+    inspector = inspect(connection)
+    columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}
+    position = columns.get("display_position")
+    unique_constraints = {
+        constraint["name"] for constraint in inspector.get_unique_constraints("dataset_fields")
+    }
+    check_constraints = {
+        constraint["name"] for constraint in inspector.get_check_constraints("dataset_fields")
+    }
+    if (
+        position is None
+        or position["nullable"]
+        or "uq_dataset_fields_dataset_position" not in unique_constraints
+        or "ck_dataset_fields_display_position_positive" not in check_constraints
+    ):
+        raise RuntimeError("REF-121 schema is incomplete; restore or repair the database")
+    invalid = connection.scalar(
+        text(
+            "SELECT count(*) FROM dataset_fields AS field WHERE display_position < 1 OR "
+            "display_position IS NULL OR display_position <> (SELECT count(*) FROM "
+            "dataset_fields AS preceding WHERE preceding.dataset_id = field.dataset_id AND "
+            "preceding.display_position <= field.display_position)"
+        )
+    )
+    if invalid:
+        raise RuntimeError("REF-121 field positions are not a dense positive order")
 
 
 def build_application(
