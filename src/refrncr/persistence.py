@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from decimal import Decimal
 from types import SimpleNamespace, TracebackType
 
@@ -564,6 +565,58 @@ class SqlAlchemyDatasetRecordOperations:
             for record in records
         ]
 
+    def iterate_all(self, dataset_id: str) -> Iterator[StoredRecord]:
+        statement = (
+            select(DatasetRecord, DatasetRecordValue, DatasetField)
+            .outerjoin(
+                DatasetRecordValue,
+                (DatasetRecordValue.record_id == DatasetRecord.id)
+                & (DatasetRecordValue.dataset_id == DatasetRecord.dataset_id),
+            )
+            .outerjoin(
+                DatasetField,
+                (DatasetField.id == DatasetRecordValue.field_id)
+                & (DatasetField.dataset_id == DatasetRecordValue.dataset_id),
+            )
+            .where(DatasetRecord.dataset_id == dataset_id)
+            .order_by(DatasetRecord.id, DatasetRecordValue.field_id)
+            .execution_options(yield_per=1000)
+        )
+        current = None
+        values: list[RecordValue] = []
+        for record, row, field in self.session.execute(statement):
+            if current is not None and record.id != current.id:
+                yield StoredRecord(current.id, current.dataset_id, tuple(values), current.revision)
+                values = []
+            current = record
+            if row is not None and field is not None:
+                values.append(self._record_value(row, field))
+        if current is not None:
+            yield StoredRecord(current.id, current.dataset_id, tuple(values), current.revision)
+
+    @staticmethod
+    def _record_value(row: DatasetRecordValue, field: DatasetField) -> RecordValue:
+        value = next(
+            candidate
+            for candidate in (
+                row.string_value,
+                row.number_value,
+                row.boolean_value,
+                row.date_value,
+            )
+            if candidate is not None
+        )
+        if field.data_type == "number":
+            value = Decimal(row.canonical_value_key[1:].decode("ascii"))
+        return RecordValue(
+            field.id,
+            field.key,
+            field.data_type,
+            value,
+            row.canonical_value_key,
+            field.is_unique,
+        )
+
     def existing_identifier_keys(
         self, dataset_id: str, identifier_keys: tuple[bytes, ...]
     ) -> set[bytes]:
@@ -777,6 +830,14 @@ class SqlAlchemyUnitOfWork:
             self.session.flush()
         except IntegrityError as exc:
             raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+
+    def begin_export_snapshot(self) -> None:
+        """Start the engine-appropriate read snapshot before any export query."""
+        bind = self.session.get_bind()
+        if bind.dialect.name == "postgresql":
+            self.session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+        else:
+            self.session.connection()
 
     def add_audit(self, **values) -> None:
         self.session.add(AuditEvent(**values))

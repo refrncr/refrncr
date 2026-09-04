@@ -6,7 +6,17 @@ import hmac
 import re
 import secrets
 
-from flask import Flask, abort, g, make_response, redirect, render_template_string, request, url_for
+from flask import (
+    Flask,
+    abort,
+    g,
+    make_response,
+    redirect,
+    render_template_string,
+    request,
+    send_file,
+    url_for,
+)
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from refrncr.browser_security import (
@@ -14,6 +24,7 @@ from refrncr.browser_security import (
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
+from refrncr.dataset_export import ExportGenerationError, verify_artifact_readable
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -403,6 +414,10 @@ def create_flask_app(
         return render_template_string(
             "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>Dataset</a></nav>"
             "<h1>Records — {{ dataset.name }}</h1>"
+            '<p>Export: <a href=\'{{ url_for("export_dataset_records", key=dataset.key, '
+            'format="csv") }}\'>CSV</a> <a href=\'{{ url_for("export_dataset_records", '
+            "key=dataset.key, format=\"xlsx\") }}'>Excel</a> <a href='{{ "
+            'url_for("export_dataset_records", key=dataset.key, format="json") }}\'>JSON</a></p>'
             "{% if may_edit %}<a href='{{ url_for(\"new_dataset_record\", key=dataset.key) }}'>"
             "Add record</a> <a href='{{ url_for(\"import_dataset_records\", key=dataset.key) }}'>"
             "Import records</a>{% endif %}"
@@ -428,6 +443,36 @@ def create_flask_app(
             page=page,
             may_edit=may_edit,
         )
+
+    @dataset_route("/datasets/<key>/records/export", methods=["GET"])
+    def export_dataset_records(key: str):
+        actor, _login_session = require_authenticated()
+        _authorization, _datasets, _fields, _business_keys, record_service = (
+            require_dataset_dependencies()
+        )
+        formats = request.args.getlist("format")
+        if len(formats) != 1 or formats[0] not in {"csv", "xlsx", "json"}:
+            return "Choose exactly one supported export format", 400
+        try:
+            artifact = record_service.export_dataset(actor.id, key, formats[0])
+        except NotFoundError:
+            abort(404)
+        except (ExportGenerationError, ValidationError) as error:
+            return str(error), 422
+        verify_artifact_readable(artifact)
+        try:
+            response = send_file(
+                artifact.content,
+                mimetype=artifact.media_type,
+                as_attachment=True,
+                download_name=f"{key}.{artifact.extension}",
+                max_age=0,
+            )
+        except Exception:
+            artifact.content.close()
+            raise
+        response.call_on_close(artifact.content.close)
+        return response
 
     def render_import_upload(dataset, csrf, error=None, status=200):
         response = render_template_string(

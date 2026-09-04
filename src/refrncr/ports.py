@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -273,6 +274,8 @@ class DatasetRecordOperations(Protocol):
 
     def list_all(self, dataset_id: str) -> list[StoredRecord]: ...
 
+    def iterate_all(self, dataset_id: str) -> Iterator[StoredRecord]: ...
+
     def existing_identifier_keys(
         self, dataset_id: str, identifier_keys: tuple[bytes, ...]
     ) -> set[bytes]: ...
@@ -301,6 +304,8 @@ class UnitOfWork(Protocol):
     dataset_fields: DatasetFieldOperations
     dataset_business_keys: DatasetBusinessKeyOperations
     dataset_records: DatasetRecordOperations
+
+    def begin_export_snapshot(self) -> None: ...
 
     def flush(self) -> None: ...
 
