@@ -1,0 +1,943 @@
+from __future__ import annotations
+
+import csv
+import io
+import os
+import re
+import secrets
+import threading
+import time
+import unicodedata
+import zipfile
+from dataclasses import dataclass, replace
+from datetime import date, datetime
+from pathlib import PurePath
+from xml.etree.ElementTree import ParseError
+
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
+
+from refrncr.ports import PersistenceConflictError
+from refrncr.services import (
+    DatasetFieldService,
+    DatasetRecordService,
+    NotFoundError,
+    RecordValidationError,
+    ValidationError,
+    canonicalize_record_value,
+)
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_DATA_ROWS = 10_000
+MAX_COLUMNS = 250
+MAX_ZIP_ENTRIES = 1_000
+MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 100
+MAX_REPORTED_ROWS = 100
+PREVIEW_ROWS = 20
+IMPORT_TTL_SECONDS = 15 * 60
+MAX_STAGED_BYTES = 50 * 1024 * 1024
+MAX_WORKSHEET_SOURCE_ROWS = 100_001
+PROFILE_SCAN_ROWS = 100
+PROFILE_SAMPLE_VALUES = 25
+DISPLAY_SAMPLE_VALUES = 3
+DISPLAY_SAMPLE_CHARS = 80
+
+UNREADABLE_XLSX_MESSAGE = (
+    "We couldn't read this modern Excel workbook. Open it in Excel or LibreOffice, save a new "
+    ".xlsx copy, and upload that copy. Password-protected, damaged, or unsupported workbooks "
+    "cannot be imported."
+)
+
+
+class ImportValidationError(ValidationError):
+    """A safe, user-facing import validation failure."""
+
+
+@dataclass(frozen=True, slots=True)
+class SourceRow:
+    number: int
+    values: tuple[str, ...]
+    formulas: frozenset[int] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedSource:
+    kind: str
+    headers: tuple[str, ...]
+    rows: tuple[SourceRow, ...]
+    ignored_empty_rows: int
+    delimiter: str | None = None
+    worksheet: str | None = None
+    worksheets: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ColumnTypeProfile:
+    values: tuple[str, ...]
+    display_values: tuple[str, ...]
+    compatible_types: frozenset[str]
+
+    def compatibility(self, data_type: str) -> str:
+        if not self.values:
+            return "unknown"
+        return "compatible" if data_type in self.compatible_types else "incompatible"
+
+
+@dataclass(frozen=True, slots=True)
+class MappingCandidate:
+    field_key: str
+    field_name: str
+    confidence: str
+    reason: str
+    score: int
+
+
+@dataclass(frozen=True, slots=True)
+class ColumnMappingAdvice:
+    header: str
+    samples: tuple[str, ...]
+    candidates: tuple[MappingCandidate, ...]
+    selected: str | None
+    warning: str | None = None
+
+    @property
+    def candidate_keys(self) -> tuple[str, ...]:
+        return tuple(candidate.field_key for candidate in self.candidates)
+
+
+@dataclass(frozen=True, slots=True)
+class MappingCompleteness:
+    required_mapped: int
+    required_total: int
+    missing_required: tuple[str, ...]
+    missing_identifier: tuple[str, ...]
+    unmapped_columns: int
+    ignored_columns: int
+
+
+@dataclass(frozen=True, slots=True)
+class MappingAssistance:
+    columns: tuple[ColumnMappingAdvice, ...]
+    completeness: MappingCompleteness
+
+    @property
+    def mapping(self) -> tuple[str | None, ...]:
+        return tuple(column.selected for column in self.columns)
+
+
+@dataclass(frozen=True, slots=True)
+class ImportError:
+    row: int | None
+    header: str | None
+    field: str | None
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class ImportPreview:
+    filename: str
+    source: ParsedSource
+    mapping: tuple[str | None, ...]
+    valid_rows: int
+    invalid_rows: int
+    errors: tuple[ImportError, ...]
+    total_errors: int
+    row_report_truncated: bool
+    sample: tuple[tuple[str, ...], ...]
+    schema_fingerprint: tuple
+
+    @property
+    def valid(self) -> bool:
+        return self.invalid_rows == 0 and self.total_errors == 0
+
+    @property
+    def non_row_errors(self) -> tuple[ImportError, ...]:
+        return tuple(error for error in self.errors if error.row is None)
+
+    @property
+    def row_error_groups(self) -> tuple[tuple[int, tuple[ImportError, ...]], ...]:
+        rows = sorted({error.row for error in self.errors if error.row is not None})
+        return tuple(
+            (row, tuple(error for error in self.errors if error.row == row)) for row in rows
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StagedImport:
+    token: str
+    actor_id: str
+    session_id: str
+    dataset_id: str
+    filename: str
+    content: bytes
+    kind: str
+    worksheet: str | None
+    mapping: tuple[str | None, ...] | None
+    schema_fingerprint: tuple | None
+    expires_at: float
+
+
+class TransientImportStore:
+    """Bounded, process-local state for Community's single-process browser profile."""
+
+    def __init__(
+        self,
+        *,
+        clock=time.monotonic,
+        ttl: int = IMPORT_TTL_SECONDS,
+        capacity: int = 100,
+        max_bytes: int = MAX_STAGED_BYTES,
+    ):
+        self.clock = clock
+        self.ttl = ttl
+        self.capacity = capacity
+        self.max_bytes = max_bytes
+        self._states: dict[str, StagedImport] = {}
+        self._lock = threading.Lock()
+
+    def create(self, actor_id, session_id, dataset_id, filename, content, kind) -> StagedImport:
+        with self._lock:
+            self._cleanup()
+            used_bytes = sum(len(item.content) for item in self._states.values())
+            if len(self._states) >= self.capacity or used_bytes + len(content) > self.max_bytes:
+                raise ImportValidationError(
+                    "Temporary import capacity is unavailable; try again later"
+                )
+            token = secrets.token_urlsafe(32)
+            while token in self._states:
+                token = secrets.token_urlsafe(32)
+            state = StagedImport(
+                token,
+                actor_id,
+                session_id,
+                dataset_id,
+                filename,
+                content,
+                kind,
+                None,
+                None,
+                None,
+                self.clock() + self.ttl,
+            )
+            self._states[token] = state
+            return state
+
+    def get(self, token, actor_id, session_id, dataset_id) -> StagedImport:
+        with self._lock:
+            self._cleanup()
+            state = self._states.get(token)
+            if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
+                actor_id,
+                session_id,
+                dataset_id,
+            ):
+                raise NotFoundError("Import not found")
+            return state
+
+    def update(self, state: StagedImport, **changes) -> StagedImport:
+        with self._lock:
+            if self._states.get(state.token) != state:
+                raise NotFoundError("Import not found")
+            updated = replace(state, **changes)
+            self._states[state.token] = updated
+            return updated
+
+    def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
+        with self._lock:
+            self._cleanup()
+            state = self._states.get(token)
+            if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
+                actor_id,
+                session_id,
+                dataset_id,
+            ):
+                raise NotFoundError("Import not found")
+            self._states.pop(token)
+            return state
+
+    def cancel(self, token, actor_id, session_id, dataset_id) -> None:
+        self.consume(token, actor_id, session_id, dataset_id)
+
+    def revoke_session(self, session_id: str) -> None:
+        with self._lock:
+            for token in [
+                key for key, value in self._states.items() if value.session_id == session_id
+            ]:
+                self._states.pop(token, None)
+
+    def _cleanup(self):
+        now = self.clock()
+        for token in [key for key, value in self._states.items() if value.expires_at <= now]:
+            self._states.pop(token, None)
+
+
+def _safe_filename(filename: str) -> str:
+    name = PurePath(filename.replace("\\", "/")).name.strip()
+    return name[:255] or "import"
+
+
+def normalize_mapping_name(value: str) -> str:
+    """Return a deterministic comparison form while preserving no display state."""
+    normalized = unicodedata.normalize("NFC", value.strip())
+    normalized = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", normalized)
+    normalized = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", normalized)
+    normalized = re.sub(r"[_\-\s]+", " ", normalized)
+    decomposed = unicodedata.normalize("NFKD", normalized.casefold())
+    without_marks = "".join(
+        character for character in decomposed if not unicodedata.combining(character)
+    )
+    return " ".join(re.sub(r"[^\w]+", " ", without_marks).split())
+
+
+def _safe_sample(value: str) -> str:
+    if len(value) <= DISPLAY_SAMPLE_CHARS:
+        return value
+    return value[: DISPLAY_SAMPLE_CHARS - 1] + "…"
+
+
+def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...]:
+    """Profile at most 100 rows and 25 non-empty, non-formula values per column."""
+    sampled: list[list[str]] = [[] for _header in source.headers]
+    for row in source.rows[:PROFILE_SCAN_ROWS]:
+        for index, value in enumerate(row.values):
+            if index in row.formulas or not value.strip():
+                continue
+            if len(sampled[index]) < PROFILE_SAMPLE_VALUES:
+                sampled[index].append(value)
+    profiles = []
+    for values in sampled:
+        compatible = set()
+        for data_type in ("string", "number", "boolean", "date"):
+            if values and all(_profile_value_matches(data_type, value) for value in values):
+                compatible.add(data_type)
+        profiles.append(
+            ColumnTypeProfile(
+                tuple(values),
+                tuple(_safe_sample(value) for value in values[:DISPLAY_SAMPLE_VALUES]),
+                frozenset(compatible),
+            )
+        )
+    return tuple(profiles)
+
+
+def _profile_value_matches(data_type: str, value: str) -> bool:
+    try:
+        return canonicalize_record_value(data_type, value) is not None
+    except ValidationError:
+        return False
+
+
+def _name_match(header: str, field) -> tuple[int, str, str] | None:
+    normalized_header = normalize_mapping_name(header)
+    normalized_key = normalize_mapping_name(field.key)
+    normalized_name = normalize_mapping_name(field.name)
+    if header == field.key:
+        return 600, "strong", "Exact field key match"
+    if normalized_header == normalized_key:
+        return 500, "strong", "Field key matches after separator normalization"
+    if normalized_header == normalized_name:
+        return 400, "strong", "Field name matches after separator normalization"
+    header_tokens = frozenset(normalized_header.split())
+    field_tokens = frozenset(normalized_name.split()) | frozenset(normalized_key.split())
+    overlap = header_tokens & field_tokens
+    if not overlap:
+        return None
+    difference = len(header_tokens ^ field_tokens)
+    return 120 + 20 * len(overlap) - 10 * difference, "limited", "Header words overlap"
+
+
+def rank_mapping_candidates(header: str, profile: ColumnTypeProfile, fields) -> tuple:
+    candidates = []
+    for field in fields:
+        name_match = _name_match(header, field)
+        if name_match is None:
+            continue
+        name_score, strength, reason = name_match
+        compatibility = profile.compatibility(field.data_type)
+        score = name_score
+        if compatibility == "compatible":
+            if field.data_type != "string":
+                score += 20
+                reason += f"; values match the {field.data_type.title()} field type"
+        elif compatibility == "incompatible":
+            score -= 80
+            reason += f"; values do not match the {field.data_type.title()} field type"
+        confidence = (
+            "Low"
+            if compatibility == "incompatible"
+            else "High"
+            if strength == "strong"
+            else "Medium"
+        )
+        candidates.append(MappingCandidate(field.key, field.name, confidence, reason, score))
+    candidates.sort(key=lambda candidate: (-candidate.score, candidate.field_key))
+    return tuple(candidates[:3])
+
+
+def build_mapping_assistance(
+    source: ParsedSource, fields, identifier, selected_mapping=None
+) -> MappingAssistance:
+    profiles = profile_source_columns(source)
+    candidate_sets = [
+        rank_mapping_candidates(header, profiles[index], fields)
+        for index, header in enumerate(source.headers)
+    ]
+    warnings: list[str | None] = [None] * len(source.headers)
+    for index, candidates in enumerate(candidate_sets):
+        if len(candidates) > 1 and candidates[0].score - candidates[1].score < 20:
+            warnings[index] = "Multiple possible fields — choose one"
+            candidate_sets[index] = tuple(
+                replace(
+                    candidate,
+                    confidence="Medium" if candidate.confidence == "High" else candidate.confidence,
+                    reason="Multiple possible fields — choose one",
+                )
+                for candidate in candidates
+            )
+    if selected_mapping is None:
+        selections: list[str | None] = [""] * len(source.headers)
+        eligible: dict[str, list[tuple[int, int]]] = {}
+        for index, candidates in enumerate(candidate_sets):
+            if not candidates or candidates[0].confidence != "High":
+                continue
+            if len(candidates) > 1 and candidates[0].score - candidates[1].score < 20:
+                warnings[index] = "Multiple possible fields — choose one"
+                continue
+            eligible.setdefault(candidates[0].field_key, []).append((candidates[0].score, index))
+        for field_key, matches in eligible.items():
+            matches.sort(key=lambda item: (-item[0], item[1]))
+            if len(matches) == 1 or matches[0][0] > matches[1][0]:
+                selections[matches[0][1]] = field_key
+                losers = matches[1:]
+            else:
+                losers = matches
+            for _score, index in losers:
+                warnings[index] = "Another source column also matches this field — choose one"
+    else:
+        selections = list(selected_mapping[: len(source.headers)])
+        selections.extend("" for _index in range(len(source.headers) - len(selections)))
+    columns = tuple(
+        ColumnMappingAdvice(
+            header,
+            profiles[index].display_values,
+            candidate_sets[index],
+            selections[index],
+            warnings[index],
+        )
+        for index, header in enumerate(source.headers)
+    )
+    mapped = {selection for selection in selections if selection}
+    required = [field for field in fields if field.is_required]
+    field_by_key = {field.key: field for field in fields}
+    missing_required = tuple(field.name for field in required if field.key not in mapped)
+    missing_identifier = tuple(
+        field_by_key[key].name for key in identifier.field_keys if key not in mapped
+    )
+    completeness = MappingCompleteness(
+        len(required) - len(missing_required),
+        len(required),
+        missing_required,
+        missing_identifier,
+        sum(selection == "" for selection in selections),
+        sum(selection is None for selection in selections),
+    )
+    return MappingAssistance(columns, completeness)
+
+
+def _validated_headers(values) -> tuple[str, ...]:
+    headers = tuple("" if value is None else str(value).strip() for value in values)
+    if not headers or any(not header for header in headers):
+        raise ImportValidationError("Every source column must have a header")
+    if len(headers) > MAX_COLUMNS:
+        raise ImportValidationError("The file has more than 250 columns")
+    normalized = [normalize_mapping_name(header) for header in headers]
+    if any(not header for header in normalized):
+        raise ImportValidationError("Every source column must have a meaningful header")
+    if len(set(normalized)) != len(normalized):
+        raise ImportValidationError("Source headers must be unique")
+    return headers
+
+
+def parse_csv(content: bytes) -> ParsedSource:
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ImportValidationError("Upload a valid UTF-8 CSV file") from exc
+    if "\x00" in text:
+        raise ImportValidationError("Upload a valid UTF-8 CSV file")
+    sample = text[:65536]
+    try:
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+        except csv.Error:
+            first_line = sample.splitlines()[0] if sample.splitlines() else ""
+            candidates = [delimiter for delimiter in ",;\t" if delimiter in first_line]
+            if len(candidates) != 1:
+                raise
+            dialect = csv.excel()
+            dialect.delimiter = candidates[0]
+        reader = csv.reader(io.StringIO(text, newline=""), dialect, strict=True)
+        raw_header = next(reader)
+        headers = _validated_headers(raw_header)
+        rows, empty = [], 0
+        for number, values in enumerate(reader, 2):
+            if len(values) != len(headers):
+                raise ImportValidationError(f"Row {number} has an inconsistent column count")
+            if all(value.strip() == "" for value in values):
+                empty += 1
+                continue
+            rows.append(SourceRow(number, tuple(values)))
+            if len(rows) > MAX_DATA_ROWS:
+                raise ImportValidationError("The file has more than 10,000 data rows")
+    except (csv.Error, StopIteration) as exc:
+        raise ImportValidationError(
+            "We couldn't read this CSV file. Save it as UTF-8 CSV with comma, semicolon, or tab "
+            "separators and upload it again."
+        ) from exc
+    if not rows:
+        raise ImportValidationError("The file must contain at least one data row")
+    delimiter = {",": "comma", ";": "semicolon", "\t": "tab"}[dialect.delimiter]
+    return ParsedSource("csv", headers, tuple(rows), empty, delimiter=delimiter)
+
+
+def _xlsx_preflight(content: bytes) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_ZIP_ENTRIES:
+                raise ImportValidationError("The workbook contains too many internal files")
+            total = 0
+            for entry in entries:
+                parts = PurePath(entry.filename.replace("\\", "/")).parts
+                if entry.filename.startswith(("/", "\\")) or ".." in parts:
+                    raise ImportValidationError("The workbook contains unsafe internal paths")
+                total += entry.file_size
+                if total > MAX_UNCOMPRESSED_BYTES:
+                    raise ImportValidationError("The workbook is too large when expanded")
+                if entry.file_size and (
+                    entry.compress_size == 0
+                    or entry.file_size > entry.compress_size * MAX_COMPRESSION_RATIO
+                ):
+                    raise ImportValidationError("The workbook has an unsafe compression ratio")
+                normalized = entry.filename.casefold()
+                if (
+                    "externallinks/" in normalized
+                    or normalized.endswith("vbaproject.bin")
+                    or normalized.endswith("connections.xml")
+                ):
+                    raise ImportValidationError(
+                        "The workbook contains macros, external links, or external data "
+                        "connections. Remove that active content, save a new .xlsx copy, and "
+                        "upload it again."
+                    )
+    except (zipfile.BadZipFile, OSError) as exc:
+        raise ImportValidationError(UNREADABLE_XLSX_MESSAGE) from exc
+
+
+def _inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
+    _xlsx_preflight(content)
+    try:
+        workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=False)
+    except (InvalidFileException, OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+        raise ImportValidationError(UNREADABLE_XLSX_MESSAGE) from exc
+    try:
+        visible = tuple(
+            sheet.title for sheet in workbook.worksheets if sheet.sheet_state == "visible"
+        )
+        if not visible:
+            raise ImportValidationError(
+                "The workbook has no visible worksheets. Make exactly the worksheet you want to "
+                "import visible, save the workbook, and upload it again."
+            )
+        if worksheet is None:
+            return ParsedSource("xlsx", (), (), 0, worksheets=visible)
+        if worksheet not in visible:
+            raise ImportValidationError("Select exactly one visible worksheet")
+        sheet = workbook[worksheet]
+        if sheet.max_column is not None and sheet.max_column > MAX_COLUMNS:
+            raise ImportValidationError("The worksheet has more than 250 columns")
+        if sheet.max_row is not None and sheet.max_row > MAX_WORKSHEET_SOURCE_ROWS:
+            raise ImportValidationError("The worksheet contains too many physical rows")
+        iterator = sheet.iter_rows()
+        try:
+            header_cells = next(iterator)
+        except StopIteration as exc:
+            raise ImportValidationError("The worksheet is empty") from exc
+        headers = _validated_headers(cell.value for cell in header_cells)
+        rows, empty = [], 0
+        for number, cells in enumerate(iterator, 2):
+            if number > MAX_WORKSHEET_SOURCE_ROWS:
+                raise ImportValidationError("The worksheet contains too many physical rows")
+            if len(cells) > MAX_COLUMNS:
+                raise ImportValidationError("The worksheet has more than 250 columns")
+            if len(cells) > len(headers):
+                raise ImportValidationError(f"Row {number} has an inconsistent column count")
+            cells = cells[: len(headers)]
+            if len(cells) < len(headers):
+                cells += (None,) * (len(headers) - len(cells))
+            values, formulas = [], set()
+            for index, cell in enumerate(cells):
+                if cell.data_type == "f":
+                    formulas.add(index)
+                    values.append("")
+                elif cell.value is None:
+                    values.append("")
+                elif isinstance(cell.value, bool):
+                    values.append("true" if cell.value else "false")
+                elif isinstance(cell.value, (datetime, date)):
+                    values.append(
+                        cell.value.date().isoformat()
+                        if isinstance(cell.value, datetime)
+                        else cell.value.isoformat()
+                    )
+                else:
+                    values.append(str(cell.value))
+            if all(value.strip() == "" for value in values) and not formulas:
+                empty += 1
+                continue
+            rows.append(SourceRow(number, tuple(values), frozenset(formulas)))
+            if len(rows) > MAX_DATA_ROWS:
+                raise ImportValidationError("The worksheet has more than 10,000 data rows")
+        if not rows:
+            raise ImportValidationError("The worksheet must contain at least one data row")
+        return ParsedSource(
+            "xlsx", headers, tuple(rows), empty, worksheet=worksheet, worksheets=visible
+        )
+    finally:
+        workbook.close()
+
+
+def inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
+    try:
+        return _inspect_xlsx(content, worksheet)
+    except ImportValidationError:
+        raise
+    except (EOFError, InvalidFileException, KeyError, OSError, ParseError, ValueError) as exc:
+        raise ImportValidationError(UNREADABLE_XLSX_MESSAGE) from exc
+
+
+def parse_source(filename: str, content: bytes, worksheet: str | None = None) -> ParsedSource:
+    if not content:
+        raise ImportValidationError("Choose a non-empty CSV or Excel file")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise ImportValidationError("The import file must not exceed 10 MiB")
+    suffix = os.path.splitext(filename)[1].casefold()
+    if suffix == ".csv" and not content.startswith(b"PK\x03\x04"):
+        return parse_csv(content)
+    if suffix == ".xlsx" and content.startswith(b"PK\x03\x04"):
+        return inspect_xlsx(content, worksheet)
+    raise ImportValidationError(
+        "The file contents do not match a supported CSV or .xlsx file. Choose the original CSV, "
+        "or open the workbook in Excel or LibreOffice and save a new .xlsx copy."
+    )
+
+
+class DatasetRecordImportService:
+    def __init__(self, records: DatasetRecordService, store: TransientImportStore | None = None):
+        self.records = records
+        self.uow = records.uow
+        self.authorization = records.authorization
+        self.store = store or TransientImportStore()
+
+    def begin(self, actor_id, session_id, dataset_key, filename, content):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        safe_name = _safe_filename(filename)
+        source = parse_source(safe_name, content)
+        state = self.store.create(actor_id, session_id, dataset.id, safe_name, content, source.kind)
+        if source.kind == "xlsx" and len(source.worksheets) == 1:
+            state = self.store.update(state, worksheet=source.worksheets[0])
+            source = parse_source(safe_name, content, state.worksheet)
+        return (
+            state,
+            source,
+            self._assistance(dataset.id, source) if source.headers else None,
+        )
+
+    def select_worksheet(self, actor_id, session_id, dataset_key, token, worksheet):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        state = self.store.get(token, actor_id, session_id, dataset.id)
+        source = parse_source(state.filename, state.content, worksheet)
+        state = self.store.update(state, worksheet=worksheet, mapping=None)
+        return state, source, self._assistance(dataset.id, source)
+
+    def mapping_assistance(self, actor_id, session_id, dataset_key, token):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        state = self.store.get(token, actor_id, session_id, dataset.id)
+        source = parse_source(state.filename, state.content, state.worksheet)
+        return state, source, self._assistance(dataset.id, source, state.mapping)
+
+    def preview(self, actor_id, session_id, dataset_key, token, mapping):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        state = self.store.get(token, actor_id, session_id, dataset.id)
+        source = parse_source(state.filename, state.content, state.worksheet)
+        preview = self._validate(dataset.id, state.filename, source, mapping)
+        self.store.update(
+            state, mapping=preview.mapping, schema_fingerprint=preview.schema_fingerprint
+        )
+        return preview
+
+    def saved_preview(self, actor_id, session_id, dataset_key, token):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        state = self.store.get(token, actor_id, session_id, dataset.id)
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        source = parse_source(state.filename, state.content, state.worksheet)
+        return self._validate(dataset.id, state.filename, source, state.mapping)
+
+    def confirm(self, actor_id, session_id, dataset_key, token) -> int:
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow() as read_uow:
+            target = read_uow.datasets.find_by_key(validated_key)
+        if target is None:
+            raise NotFoundError("Dataset not found")
+        self.records._require_access(actor_id, target, "editor")
+        state = self.store.consume(token, actor_id, session_id, target.id)
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            self.records._require_access(actor_id, dataset, "editor")
+            source = parse_source(state.filename, state.content, state.worksheet)
+            preview, validated = self._validate_in_uow(
+                uow, dataset.id, state.filename, source, state.mapping
+            )
+            if preview.schema_fingerprint != state.schema_fingerprint:
+                raise ImportValidationError("The Dataset schema changed; upload the import again")
+            if not preview.valid:
+                raise ImportValidationError("The import is no longer valid; upload it again")
+            try:
+                for values, identifier in validated:
+                    record = uow.dataset_records.create(
+                        dataset_id=dataset.id, identifier_key=identifier
+                    )
+                    uow.flush()
+                    uow.dataset_records.add_values(record, values)
+                    uow.flush()
+                    uow.add_audit(
+                        actor_user_id=actor_id,
+                        object_type="dataset_record",
+                        object_id=record.id,
+                        action="created",
+                    )
+            except PersistenceConflictError as error:
+                DatasetRecordService._raise_record_conflict(error)
+        return len(validated)
+
+    def cancel(self, actor_id, session_id, dataset_key, token):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        self.store.cancel(token, actor_id, session_id, dataset.id)
+
+    def revoke_session(self, session_id: str) -> None:
+        self.store.revoke_session(session_id)
+
+    def _assistance(self, dataset_id, source, selected_mapping=None):
+        with self.uow() as uow:
+            fields = uow.dataset_fields.list_for_dataset(dataset_id)
+            identifier = uow.dataset_business_keys.get(dataset_id)
+        return build_mapping_assistance(source, fields, identifier, selected_mapping)
+
+    def _validate(self, dataset_id, filename, source, mapping):
+        with self.uow() as uow:
+            preview, _ = self._validate_in_uow(uow, dataset_id, filename, source, mapping)
+            return preview
+
+    def _validate_in_uow(self, uow, dataset_id, filename, source, mapping):
+        fields = uow.dataset_fields.list_for_dataset(dataset_id)
+        identifier = uow.dataset_business_keys.get(dataset_id)
+        field_by_key = {field.key: field for field in fields}
+        mapping = tuple(mapping)
+        mapping_errors = []
+        if len(mapping) != len(source.headers):
+            mapping_errors.append(
+                ImportError(None, None, None, "Submit exactly one mapping for every source column")
+            )
+        unmapped = [value for value in mapping if value == ""]
+        unknown = [
+            value for value in mapping if value not in {None, ""} and value not in field_by_key
+        ]
+        duplicate = [
+            value for value in set(mapping) if value not in {None, ""} and mapping.count(value) > 1
+        ]
+        if unknown:
+            mapping_errors.append(
+                ImportError(None, None, None, "A mapping refers to an unknown Dataset field")
+            )
+        if unmapped:
+            mapping_errors.append(
+                ImportError(
+                    None,
+                    None,
+                    None,
+                    "Map or explicitly mark every source column as Ignored",
+                )
+            )
+        if duplicate:
+            mapping_errors.append(
+                ImportError(None, None, None, "A Dataset field may be mapped only once")
+            )
+        required = {field.key for field in fields if field.is_required} | set(identifier.field_keys)
+        missing = sorted(required - {value for value in mapping if value})
+        if missing:
+            mapping_errors.append(
+                ImportError(None, None, None, "Map every required and identifier field")
+            )
+        fingerprint = (
+            tuple(
+                (
+                    field.id,
+                    field.key,
+                    field.name,
+                    field.data_type,
+                    field.is_required,
+                    field.is_unique,
+                )
+                for field in fields
+            ),
+            identifier.field_keys,
+        )
+        if mapping_errors:
+            return ImportPreview(
+                filename,
+                source,
+                mapping,
+                0,
+                0,
+                tuple(mapping_errors),
+                len(mapping_errors),
+                False,
+                (),
+                fingerprint,
+            ), []
+        seen_ids, seen_unique, validated, errors, invalid_rows = set(), set(), [], [], set()
+        for row in source.rows:
+            submitted = {
+                target: row.values[index]
+                for index, target in enumerate(mapping)
+                if target is not None
+            }
+            row_errors = []
+            for index in row.formulas:
+                if mapping[index] is not None:
+                    row_errors.append(
+                        ImportError(
+                            row.number,
+                            source.headers[index],
+                            field_by_key[mapping[index]].name,
+                            "Formula cells cannot be imported. Replace the formula with its value "
+                            "or mark this source column as Ignored.",
+                        )
+                    )
+            try:
+                values, encoded = DatasetRecordService._validated_values(
+                    fields, identifier, submitted
+                )
+            except RecordValidationError as error:
+                values, encoded = (), b""
+                for key, message in error.errors.items():
+                    index = mapping.index(key)
+                    row_errors.append(
+                        ImportError(
+                            row.number, source.headers[index], field_by_key[key].name, message
+                        )
+                    )
+            except ValidationError as error:
+                values, encoded = (), b""
+                row_errors.append(ImportError(row.number, None, None, str(error)))
+            if not row_errors:
+                if encoded in seen_ids:
+                    row_errors.append(
+                        ImportError(
+                            row.number, None, None, "Record identifier is duplicated in this file"
+                        )
+                    )
+                for value in values:
+                    marker = (value.field_id, value.canonical_key)
+                    if value.is_unique and marker in seen_unique:
+                        row_errors.append(
+                            ImportError(
+                                row.number,
+                                source.headers[mapping.index(value.field_key)],
+                                field_by_key[value.field_key].name,
+                                "Unique value is duplicated in this file",
+                            )
+                        )
+                if not row_errors:
+                    seen_ids.add(encoded)
+                    seen_unique.update(
+                        (value.field_id, value.canonical_key) for value in values if value.is_unique
+                    )
+                    validated.append((row, values, encoded))
+            if row_errors:
+                invalid_rows.add(row.number)
+                errors.extend(row_errors)
+        existing_identifiers = uow.dataset_records.existing_identifier_keys(
+            dataset_id, tuple(encoded for _row, _values, encoded in validated)
+        )
+        unique_candidates = tuple(
+            (value.field_id, value.canonical_key)
+            for _row, values, _encoded in validated
+            for value in values
+            if value.is_unique
+        )
+        existing_unique = uow.dataset_records.existing_unique_value_keys(
+            dataset_id, unique_candidates
+        )
+        accepted = []
+        for row, values, encoded in validated:
+            database_errors = []
+            if encoded in existing_identifiers:
+                database_errors.append(
+                    ImportError(
+                        row.number,
+                        None,
+                        None,
+                        "Record identifier already exists in this Dataset",
+                    )
+                )
+            for value in values:
+                marker = (value.field_id, value.canonical_key)
+                if value.is_unique and marker in existing_unique:
+                    database_errors.append(
+                        ImportError(
+                            row.number,
+                            source.headers[mapping.index(value.field_key)],
+                            field_by_key[value.field_key].name,
+                            "Unique value already exists in this Dataset",
+                        )
+                    )
+            if database_errors:
+                invalid_rows.add(row.number)
+                errors.extend(database_errors)
+            else:
+                accepted.append((values, encoded))
+        errors.sort(
+            key=lambda item: (
+                item.row is not None,
+                item.row or 0,
+                item.header or "",
+                item.field or "",
+                item.message,
+            )
+        )
+        reported_rows = set(sorted(invalid_rows)[:MAX_REPORTED_ROWS])
+        reported_errors = tuple(
+            error for error in errors if error.row is None or error.row in reported_rows
+        )
+        sample = tuple(
+            tuple(row.values[index] for index, target in enumerate(mapping) if target is not None)
+            for row in source.rows[:PREVIEW_ROWS]
+        )
+        preview = ImportPreview(
+            filename,
+            source,
+            mapping,
+            len(source.rows) - len(invalid_rows),
+            len(invalid_rows),
+            reported_errors,
+            len(errors),
+            len(invalid_rows) > MAX_REPORTED_ROWS,
+            sample,
+            fingerprint,
+        )
+        return preview, accepted

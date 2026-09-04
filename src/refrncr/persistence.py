@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from types import TracebackType
 
-from sqlalchemy import delete, func, inspect, select, update
+from sqlalchemy import and_, delete, func, inspect, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -477,6 +477,50 @@ class SqlAlchemyDatasetRecordOperations:
             StoredRecord(record.id, record.dataset_id, tuple(grouped[record.id]), record.revision)
             for record in records
         ]
+
+    def existing_identifier_keys(
+        self, dataset_id: str, identifier_keys: tuple[bytes, ...]
+    ) -> set[bytes]:
+        found: set[bytes] = set()
+        for start in range(0, len(identifier_keys), 500):
+            chunk = identifier_keys[start : start + 500]
+            found.update(
+                self.session.scalars(
+                    select(DatasetRecord.identifier_key).where(
+                        DatasetRecord.dataset_id == dataset_id,
+                        DatasetRecord.identifier_key.in_(chunk),
+                    )
+                )
+            )
+        return found
+
+    def existing_unique_value_keys(
+        self, dataset_id: str, values: tuple[tuple[str, bytes], ...]
+    ) -> set[tuple[str, bytes]]:
+        found: set[tuple[str, bytes]] = set()
+        for start in range(0, len(values), 250):
+            chunk = values[start : start + 250]
+            if not chunk:
+                continue
+            rows = self.session.execute(
+                select(
+                    DatasetRecordValue.field_id,
+                    DatasetRecordValue.unique_value_key,
+                ).where(
+                    DatasetRecordValue.dataset_id == dataset_id,
+                    or_(
+                        *(
+                            and_(
+                                DatasetRecordValue.field_id == field_id,
+                                DatasetRecordValue.unique_value_key == key,
+                            )
+                            for field_id, key in chunk
+                        )
+                    ),
+                )
+            )
+            found.update((field_id, key) for field_id, key in rows if key is not None)
+        return found
 
     def _values(self, dataset_id: str, record_id: str) -> tuple[RecordValue, ...]:
         rows = self.session.execute(

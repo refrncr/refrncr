@@ -16,6 +16,7 @@ dependencies = [
     "argon2-cffi>=23.1,<26",
     "fastapi>=0.116,<1",
     "flask>=3.1,<4",
+    "openpyxl>=3.1,<4",
     "psycopg[binary]>=3.2,<4",
     "uvicorn>=0.35,<1",
 ]
