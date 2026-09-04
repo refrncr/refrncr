@@ -1337,26 +1337,7 @@ class DatasetRecordService:
         identifier = self._business_key(dataset.id)
         with self.uow() as uow:
             records = uow.dataset_records.list_all(dataset.id)
-        identifier_keys = identifier.field_keys
-
-        def sort_key(record: StoredRecord):
-            by_key = {value.field_key: value for value in record.values}
-            incomplete = any(key not in by_key for key in identifier_keys)
-            result = []
-            for key in identifier_keys:
-                value = by_key.get(key)
-                if value is None:
-                    result.append((1, None))
-                    continue
-                result.append(
-                    (
-                        0,
-                        value.value.encode("utf-8") if value.data_type == "string" else value.value,
-                    )
-                )
-            return incomplete, tuple(result), record.id
-
-        records.sort(key=sort_key)
+        records.sort(key=lambda record: self._record_sort_key(record, identifier.field_keys))
         start = (page - 1) * self.PAGE_SIZE
         return RecordPage(
             tuple(records[start : start + self.PAGE_SIZE]),
@@ -1364,6 +1345,46 @@ class DatasetRecordService:
             self.PAGE_SIZE,
             len(records),
         )
+
+    def export_dataset(self, actor_id: str, dataset_key: str, format_name: str):
+        from refrncr.dataset_export import (
+            ExportGenerationError,
+            externally_ordered_records,
+            generate_export,
+        )
+
+        if not isinstance(format_name, str) or format_name not in {"csv", "xlsx", "json"}:
+            raise ExportGenerationError("Choose exactly one supported export format")
+        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(validated_key)
+            self._require_access(actor_id, dataset, "viewer")
+            fields = tuple(uow.dataset_fields.list_for_dataset(dataset.id))
+            identifier = uow.dataset_business_keys.get(dataset.id)
+            records = externally_ordered_records(
+                uow.dataset_records.iterate_all(dataset.id),
+                lambda record: self._record_sort_key(record, identifier.field_keys),
+            )
+            return generate_export(format_name, fields, records, dataset.key)
+
+    @staticmethod
+    def _record_sort_key(record: StoredRecord, identifier_keys: tuple[str, ...]):
+        by_key = {value.field_key: value for value in record.values}
+        incomplete = any(key not in by_key for key in identifier_keys)
+        result = []
+        for key in identifier_keys:
+            value = by_key.get(key)
+            if value is None:
+                result.append((1, None))
+                continue
+            result.append(
+                (
+                    0,
+                    value.value.encode("utf-8") if value.data_type == "string" else value.value,
+                )
+            )
+        return incomplete, tuple(result), record.id
 
     def get_dataset_for_add(self, actor_id: str, dataset_key: str) -> DatasetRecord:
         return self._find_dataset(actor_id, dataset_key, "editor")
