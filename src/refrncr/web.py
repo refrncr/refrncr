@@ -41,6 +41,7 @@ from refrncr.services import (
     RecordConflictError,
     RecordValidationError,
     SessionService,
+    StaleFieldOrderError,
     StaleRecordError,
     TeamService,
     UserManagementError,
@@ -278,7 +279,7 @@ def create_flask_app(
 
     @dataset_route("/datasets/<key>", methods=["GET"])
     def dataset_detail(key: str):
-        actor, _login_session = require_authenticated()
+        actor, login_session = require_authenticated()
         (
             authorization_service,
             dataset_service,
@@ -319,7 +320,15 @@ def create_flask_app(
             "<td>{{ field.data_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td>"
             "<td>{{ 'Yes' if field.is_unique else 'No' }}</td>"
             '{% if schema_admin %}<td><a href=\'{{ url_for("edit_dataset_field", '
-            "key=dataset.key, field_key=field.key) }}'>Edit field</a></td>{% endif %}"
+            "key=dataset.key, field_key=field.key) }}'>Edit field</a>"
+            "<form method='post' action='{{ url_for(\"move_dataset_field\", key=dataset.key) }}'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "{% for ordered_field in fields %}<input type='hidden' name='expected_field_id' "
+            "value='{{ ordered_field.id }}'>{% endfor %}"
+            "<input type='hidden' name='field_id' value='{{ field.id }}'>"
+            "<button name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>"
+            "<button name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>"
+            "</form></td>{% endif %}"
             "</tr>{% endfor %}</tbody></table>{% else %}<p>No fields are defined.</p>{% endif %}"
             "</section>",
             dataset=dataset,
@@ -327,7 +336,32 @@ def create_flask_app(
             schema_admin=schema_admin,
             fields=fields,
             business_key=business_key,
+            csrf=login_session.csrf_token,
         )
+
+    @dataset_route("/datasets/<key>/fields/order", methods=["POST"])
+    def move_dataset_field(key: str):
+        actor, login_session = require_authenticated()
+        _authorization, _datasets, field_service, _business_keys, _records = (
+            require_dataset_dependencies()
+        )
+        require_csrf(login_session.csrf_token)
+        if set(request.form) != {"csrf_token", "expected_field_id", "field_id", "direction"}:
+            abort(400, description="Invalid field order request")
+        field_ids = request.form.getlist("field_id")
+        directions = request.form.getlist("direction")
+        expected = tuple(request.form.getlist("expected_field_id"))
+        if len(field_ids) != 1 or len(directions) != 1 or not expected:
+            abort(400, description="Invalid field order request")
+        try:
+            field_service.move_field(actor.id, key, field_ids[0], directions[0], expected)
+        except NotFoundError:
+            abort(404)
+        except ValidationError as error:
+            abort(400, description=str(error))
+        except StaleFieldOrderError as error:
+            abort(409, description=str(error))
+        return redirect(url_for("dataset_detail", key=key))
 
     def parse_page_parameter() -> int:
         values = request.args.getlist("page")

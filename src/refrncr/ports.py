@@ -83,6 +83,7 @@ class DatasetFieldRecord(Protocol):
     data_type: str
     is_required: bool
     is_unique: bool
+    display_position: int
     created_at: datetime
     updated_at: datetime
 
@@ -222,6 +223,8 @@ class DatasetFieldOperations(Protocol):
 
     def list_for_dataset(self, dataset_id: str) -> list[DatasetFieldRecord]: ...
 
+    def replace_order(self, dataset_id: str, field_ids: tuple[str, ...]) -> None: ...
+
     def create(
         self,
         *,
@@ -231,6 +234,7 @@ class DatasetFieldOperations(Protocol):
         data_type: str,
         is_required: bool,
         is_unique: bool,
+        display_position: int,
     ) -> DatasetFieldRecord: ...
 
     def delete(self, field: DatasetFieldRecord) -> None: ...

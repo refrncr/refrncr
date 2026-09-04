@@ -208,6 +208,12 @@ class DatasetField(Base):
         ),
         UniqueConstraint("dataset_id", "key", name="uq_dataset_fields_dataset_key"),
         UniqueConstraint("id", "dataset_id", name="uq_dataset_fields_id_dataset"),
+        UniqueConstraint(
+            "dataset_id", "display_position", name="uq_dataset_fields_dataset_position"
+        ),
+        CheckConstraint(
+            "display_position >= 1", name="ck_dataset_fields_display_position_positive"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -217,6 +223,7 @@ class DatasetField(Base):
     data_type: Mapped[str] = mapped_column(String(20))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     is_unique: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    display_position: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now

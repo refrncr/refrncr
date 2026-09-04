@@ -154,6 +154,7 @@ def assert_community_schema(engine):
         "data_type",
         "is_required",
         "is_unique",
+        "display_position",
         "created_at",
         "updated_at",
     }
@@ -168,6 +169,7 @@ def assert_community_schema(engine):
         for constraint in inspector.get_unique_constraints("dataset_fields")
     }
     assert ("dataset_id", "key") in field_unique_columns
+    assert ("dataset_id", "display_position") in field_unique_columns
     assert "ix_dataset_fields_dataset_id" not in {
         index["name"] for index in inspector.get_indexes("dataset_fields")
     }
@@ -178,6 +180,7 @@ def assert_community_schema(engine):
         "ck_dataset_fields_key_length",
         "ck_dataset_fields_name_length",
         "ck_dataset_fields_data_type",
+        "ck_dataset_fields_display_position_positive",
     } <= field_checks
     field_foreign_keys = {
         tuple(foreign_key["constrained_columns"]): foreign_key
@@ -357,7 +360,6 @@ def test_empty_sqlite_database_upgrades(tmp_path):
 
     engine = create_database_engine(f"sqlite:///{database}")
     assert_community_schema(engine)
-
     factory = create_session_factory(engine)
     uow = SqlAlchemyUnitOfWorkFactory(factory)
     users = UserService(uow)
@@ -398,6 +400,190 @@ def test_empty_sqlite_database_upgrades(tmp_path):
     assert "memberships" not in inspect(downgraded_engine).get_table_names()
     assert "grants" not in inspect(downgraded_engine).get_table_names()
     assert "teams" in inspect(downgraded_engine).get_table_names()
+
+
+def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path):
+    database = tmp_path / "partial-ref-121.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0009_ref_80")
+    engine = create_database_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE dataset_fields ADD COLUMN display_position INTEGER")
+    engine.dispose()
+
+    command.upgrade(config, "head")
+
+    upgraded = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert_community_schema(upgraded)
+        with upgraded.connect() as connection:
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                "0010_ref_121"
+            )
+    finally:
+        upgraded.dispose()
+
+
+@pytest.mark.parametrize(
+    "positions",
+    [
+        (None, None, None),
+        (1, None, 9),
+        (1, 1, 1),
+        (0, 2, 3),
+        (-1, 4, 8),
+        (1, 2, 3),
+    ],
+)
+def test_ref_121_partial_values_are_canonically_rebuilt(tmp_path, positions):
+    database = tmp_path / "partial-values.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0009_ref_80")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    dataset = services.datasets.create_dataset(admin.id, "partial", "Partial", "")
+    for key in ("zeta", "alpha", "middle"):
+        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+    with engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE dataset_fields ADD COLUMN display_position INTEGER")
+        for key, position in zip(("zeta", "alpha", "middle"), positions, strict=True):
+            connection.execute(
+                text("UPDATE dataset_fields SET display_position=:position WHERE key=:key"),
+                {"position": position, "key": key},
+            )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+
+    upgraded = create_database_engine(f"sqlite:///{database}")
+    try:
+        with upgraded.connect() as connection:
+            assert connection.execute(
+                text("SELECT key, display_position FROM dataset_fields ORDER BY display_position")
+            ).all() == [("alpha", 1), ("middle", 2), ("zeta", 3)]
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+    finally:
+        upgraded.dispose()
+
+
+def test_prepare_database_rejects_ref_121_revision_with_incomplete_schema(tmp_path):
+    database = tmp_path / "false-head.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0009_ref_80")
+    engine = create_database_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE alembic_version SET version_num='0010_ref_121'"))
+    engine.dispose()
+
+    with pytest.raises(RuntimeError, match="schema is incomplete"):
+        prepare_database(f"sqlite:///{database}")
+
+
+def test_sqlite_migration_rejects_external_transaction_without_changing_fk_state(tmp_path):
+    database = tmp_path / "external-transaction.db"
+    config = Config("alembic.ini")
+    engine = create_database_engine(f"sqlite:///{database}")
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        config.attributes["connection"] = connection
+        with pytest.raises(RuntimeError, match="ownership of the connection transaction"):
+            command.upgrade(config, "head")
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
+        transaction.rollback()
+    engine.dispose()
+
+
+def test_sqlite_migration_failure_restores_foreign_keys_on_supplied_connection(tmp_path):
+    database = tmp_path / "leftover-table.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0009_ref_80")
+    engine = create_database_engine(f"sqlite:///{database}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE _alembic_tmp_dataset_fields (id VARCHAR(36) PRIMARY KEY)"
+        )
+    with engine.connect() as connection:
+        config.attributes["connection"] = connection
+        with pytest.raises(RuntimeError, match="unfinished migration tables"):
+            command.upgrade(config, "head")
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one() == 1
+        assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+    engine.dispose()
+
+
+def test_ref_121_sqlite_upgrade_and_downgrade_preserve_relational_snapshot(tmp_path):
+    database = tmp_path / "populated-ref-121.db"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
+    command.upgrade(config, "0009_ref_80")
+    engine = create_database_engine(f"sqlite:///{database}")
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    services.users.bootstrap_organisation()
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    member = services.users.create_user(admin.id, "member@example.com", "Member", "valid password")
+    team = services.teams.create_team(admin.id, "Reviewers")
+    services.memberships.create_membership(admin.id, member.id, team.id)
+    dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
+    services.grants.create_grant(admin.id, "team", team.id, "dataset", dataset.id, "editor")
+    code = services.dataset_fields.create_field(
+        admin.id, dataset.key, "code", "Code", "string", is_required=True
+    )
+    amount = services.dataset_fields.create_field(
+        admin.id, dataset.key, "amount", "Amount", "number"
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (code.key,))
+    record = services.dataset_records.create_record(
+        admin.id, dataset.key, {code.key: "EUR", amount.key: "12.50"}
+    )
+
+    tables = {
+        "datasets": "id, key, name, description, owner_user_id",
+        "dataset_fields": "id, dataset_id, key, name, data_type, is_required, is_unique",
+        "dataset_business_key_fields": "dataset_id, field_key",
+        "dataset_records": "id, dataset_id, identifier_key, revision",
+        "dataset_record_values": (
+            "record_id, field_id, dataset_id, string_value, number_value, boolean_value, "
+            "date_value, canonical_value_key, unique_value_key"
+        ),
+        "memberships": "id, user_id, team_id",
+        "grants": "id, subject_type, subject_id, resource_type, resource_id, permission",
+        "audit_events": "id, actor_user_id, object_type, object_id, action",
+    }
+
+    def snapshot(database_engine):
+        with database_engine.connect() as connection:
+            return {
+                table: connection.exec_driver_sql(
+                    f"SELECT {columns} FROM {table} ORDER BY 1, 2"
+                ).all()
+                for table, columns in tables.items()
+            }
+
+    before = snapshot(engine)
+    assert before["dataset_records"][0][0] == record.id
+    engine.dispose()
+    command.upgrade(config, "head")
+    upgraded = create_database_engine(f"sqlite:///{database}")
+    assert snapshot(upgraded) == before
+    with upgraded.connect() as connection:
+        assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+    upgraded.dispose()
+    command.downgrade(config, "0009_ref_80")
+    downgraded = create_database_engine(f"sqlite:///{database}")
+    try:
+        assert snapshot(downgraded) == before
+        with downgraded.connect() as connection:
+            assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
+    finally:
+        downgraded.dispose()
 
 
 def test_populated_ref_36_sqlite_database_upgrades_to_ref_72(tmp_path):
@@ -526,7 +712,7 @@ def test_ref_75_sqlite_composite_fk_duplicate_and_cascade_behavior(tmp_path):
     with factory.begin() as session:
         session.add(DatasetBusinessKeyField(dataset_id=first.id, field_key=field.key))
     with factory.begin() as session:
-        session.delete(session.get(DatasetField, field.id))
+        session.execute(text("DELETE FROM dataset_fields WHERE id=:id"), {"id": field.id})
     with factory() as session:
         assert session.scalar(select(func.count(DatasetBusinessKeyField.dataset_id))) == 0
 
@@ -593,8 +779,13 @@ def test_ref_74_sqlite_downgrade_fails_closed_for_field_state(tmp_path):
         command.downgrade(config, "0005_ref_72")
     engine = create_database_engine(f"sqlite:///{database}")
     with create_session_factory(engine).begin() as session:
-        assert session.get(DatasetField, field.id) is not None
-        session.delete(session.get(DatasetField, field.id))
+        assert (
+            session.scalar(
+                text("SELECT count(*) FROM dataset_fields WHERE id=:id"), {"id": field.id}
+            )
+            == 1
+        )
+        session.execute(text("DELETE FROM dataset_fields WHERE id=:id"), {"id": field.id})
     engine.dispose()
 
     command.downgrade(config, "0005_ref_72")
@@ -693,7 +884,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0009_ref_80"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0010_ref_121"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

@@ -547,12 +547,14 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     create_field(services, admin, dataset, "alpha", "<script>alert(1)</script>", "string")
     page = body(request(client, "get", "/datasets/schema"))
 
-    assert page.index("alpha") < page.index("zeta")
+    assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert "string" in page and "date" in page
     assert "Required" in page and "Unique" in page
     assert page.count("Edit field") == 2
+    assert page.count("Move up") == 2
+    assert page.count("Move down") == 2
 
 
 def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):
@@ -587,6 +589,7 @@ def test_viewer_and_editor_see_fields_without_schema_controls(dataset_browser, p
     assert "Visible field" in page
     assert "Add field" not in page
     assert "Edit field" not in page
+    assert "Move up" not in page
 
 
 def test_community_admin_override_shows_schema_controls_without_grant(dataset_browser):
@@ -602,6 +605,42 @@ def test_community_admin_override_shows_schema_controls_without_grant(dataset_br
     assert "Add field" in page
     assert "Edit field" in page
     assert request(client, "get", f"/datasets/override/fields/{field.key}/edit").status_code == 200
+
+
+def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "ordered")
+    fields = [
+        create_field(services, admin, dataset, key, key.title())
+        for key in ("first", "second", "third")
+    ]
+    login(client)
+    expected = [field.id for field in fields]
+    csrf = session_csrf(client, services)
+    data = {
+        "csrf_token": csrf,
+        "expected_field_id": expected,
+        "field_id": fields[1].id,
+        "direction": "up",
+    }
+
+    moved = request(client, "post", "/datasets/ordered/fields/order", data=data)
+    stale = request(client, "post", "/datasets/ordered/fields/order", data=data)
+
+    assert moved.status_code == 302
+    assert stale.status_code == 409
+    assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        "second",
+        "first",
+        "third",
+    ]
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 1
+        )
 
 
 def test_owner_without_permission_cannot_view_schema_or_controls(dataset_browser):
