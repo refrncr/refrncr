@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
@@ -37,6 +38,7 @@ class CommunityServices:
     dataset_fields: DatasetFieldService
     dataset_business_keys: DatasetBusinessKeyService
     dataset_records: DatasetRecordService
+    record_imports: DatasetRecordImportService
 
 
 def create_community_services(
@@ -47,6 +49,7 @@ def create_community_services(
     permission_data = SqlAlchemyPermissionDataSource(sessions)
     resources.register("dataset", DatasetResourceResolver(uow))
     authorization = AuthorizationService(permission_data, resources)
+    dataset_records = DatasetRecordService(uow, authorization)
     return CommunityServices(
         users=UserService(uow),
         authentication=AuthenticationService(uow),
@@ -58,7 +61,8 @@ def create_community_services(
         datasets=DatasetService(uow, authorization),
         dataset_fields=DatasetFieldService(uow, authorization),
         dataset_business_keys=DatasetBusinessKeyService(uow, authorization),
-        dataset_records=DatasetRecordService(uow, authorization),
+        dataset_records=dataset_records,
+        record_imports=DatasetRecordImportService(dataset_records),
     )
 
 
@@ -74,6 +78,7 @@ def create_application(
     dataset_fields: DatasetFieldService,
     dataset_business_keys: DatasetBusinessKeyService,
     dataset_records: DatasetRecordService | None = None,
+    record_imports: DatasetRecordImportService | None = None,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
 ) -> FastAPI:
@@ -95,6 +100,7 @@ def create_application(
         dataset_fields=dataset_fields,
         dataset_business_keys=dataset_business_keys,
         dataset_records=dataset_records,
+        record_imports=record_imports,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
     )
