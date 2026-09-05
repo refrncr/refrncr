@@ -127,6 +127,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/templates/pages/datasets/detail.html",
         "refrncr/templates/pages/datasets/edit.html",
         "refrncr/templates/pages/datasets/list.html",
+        "refrncr/templates/pages/datasets/_record_table.html",
     } <= files
     assert not any(name.endswith((".db", ".pyc")) or "__pycache__" in name for name in files)
 

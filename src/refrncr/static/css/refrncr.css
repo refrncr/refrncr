@@ -162,7 +162,7 @@ tbody tr:hover { background: var(--ref-gray-50); }
 .record-row.is-selected, .record-row.is-selected:hover { background: var(--ref-green-50); box-shadow: inset 3px 0 0 var(--color-primary); }
 .record-table tbody tr { height: 3rem; }
 .record-table { table-layout: fixed; }
-.record-table td { min-width: 0; padding-block: .5rem; color: var(--ref-gray-900); font-family: var(--font-mono); font-size: .75rem; vertical-align: middle; }
+.record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text); font-family: var(--font-mono); font-size: .75rem; font-style: normal; font-weight: 400; vertical-align: middle; }
 .cell-content { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); margin-top: var(--space-md); }
 .empty-state { padding: var(--space-xxl) var(--space-lg); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); text-align: center; }

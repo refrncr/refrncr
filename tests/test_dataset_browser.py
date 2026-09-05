@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 import pytest
 from flask import template_rendered
@@ -317,9 +318,8 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "for='new-record-code'" in page
     assert "id='new-record-code' name='code' type='text' required autofocus" in page
     assert "id='new-record-active' name='active'" in page
-    assert "<caption>" not in page
-    assert "placeholder='Search by code or name…' disabled" in page
-    assert ">Filter</button>" in page and ">Sort</button>" in page
+    assert "Search records" not in page
+    assert ">Filter</button>" not in page and ">Sort</button>" not in page
     assert "Showing 0–0 of 0" in page
 
 
@@ -334,7 +334,15 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
 
     assert f"data-dialog-open='record-panel-{record.id}'" in page
+    assert "<caption class='visually-hidden'>Records</caption>" in page
     assert "data-record-row" in page
+    assert "<tr class='record-row' data-record-row" in page
+    assert "<tr class='record-row' tabindex=" not in page
+    assert "<tr class='record-row' role=" not in page
+    assert (
+        f"type='button' data-dialog-open='record-panel-{record.id}' "
+        f"aria-label='View record EUR ({record.id})'>View</button>" in page
+    )
     assert f"id='record-panel-{record.id}'" in page
     assert ">EUR</h2><p data-record-subtitle>View record</p>" in page
     assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
@@ -352,17 +360,35 @@ def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
     create_field(services, admin, dataset, "code", "Code", is_required=True)
     create_field(services, admin, dataset, "amount", "Amount", data_type="number")
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
-    services.dataset_records.create_record(admin.id, dataset.key, {"code": "one", "amount": "1.2"})
-    services.dataset_records.create_record(
+    one = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "one", "amount": "1.2"}
+    )
+    three = services.dataset_records.create_record(
         admin.id, dataset.key, {"code": "two", "amount": "3.456"}
+    )
+    zero = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "zero", "amount": "0.00"}
+    )
+    negative = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "negative", "amount": "-2.5"}
     )
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
 
-    assert "<th scope='col' class='numeric-column'>Amount" in page
-    assert "<td class='numeric-column'>1.200</td>" in page
-    assert "<td class='numeric-column'>3.456</td>" in page
+    assert re.search(r"<th scope='col' class='numeric-column'>\s*Amount", page)
+    for value in ("1.200", "3.456", "0.000", "-2.500"):
+        assert re.search(rf"<td class='numeric-column'>\s*{re.escape(value)}\s*</td>", page)
+    persisted = {
+        record.id: dict((value.field_key, value.value) for value in record.values)["amount"]
+        for record in services.dataset_records.list_records(admin.id, dataset.key).records
+    }
+    assert persisted == {
+        one.id: Decimal("1.2"),
+        three.id: Decimal("3.456"),
+        zero.id: Decimal("0.00"),
+        negative.id: Decimal("-2.5"),
+    }
 
 
 def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):
@@ -376,7 +402,7 @@ def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
 
-    assert "<td><span class='cell-content'>-</span></td>" in page
+    assert "<span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>" in page
 
 
 def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
@@ -394,8 +420,8 @@ def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
     assert ".record-table tbody tr { height: 3rem; }" in stylesheet
     assert ".record-table td" in stylesheet
     assert (
-        "color: var(--ref-gray-900); font-family: var(--font-mono); font-size: .75rem; "
-        "vertical-align: middle" in stylesheet
+        "color: var(--color-text); font-family: var(--font-mono); font-size: .75rem; "
+        "font-style: normal; font-weight: 400; vertical-align: middle" in stylesheet
     )
 
 
@@ -418,6 +444,77 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     assert ".record-table { table-layout: fixed; }" in stylesheet
     assert "text-overflow: ellipsis" in stylesheet
     assert ".side-panel-header h2 { font-family: var(--font-display); }" in stylesheet
+
+
+def test_record_table_include_and_view_button_pointer_guard(dataset_browser, monkeypatch):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "include")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "VALUE"})
+    login(client)
+    loaded = []
+    loader = client.application.jinja_env.loader
+    original_get_source = loader.get_source
+
+    def record_source(environment, template):
+        loaded.append(template)
+        return original_get_source(environment, template)
+
+    monkeypatch.setattr(loader, "get_source", record_source)
+
+    response = request(client, "get", f"/datasets/{dataset.key}/records")
+    script = body(request(client, "get", "/static/js/refrncr.js"))
+
+    assert response.status_code == 200
+    assert "pages/datasets/_record_table.html" in loaded
+    assert 'event.target.closest("a, button, input")' in script
+    assert "if (event.target !== row) return;" in script
+
+
+def test_record_table_pagination_keeps_range_and_links(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "pages")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    for index in range(51):
+        services.dataset_records.create_record(admin.id, dataset.key, {"code": f"VALUE-{index:02}"})
+    login(client)
+
+    first = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    second = body(request(client, "get", f"/datasets/{dataset.key}/records?page=2"))
+
+    assert "Showing 1–50 of 51" in first
+    assert "href='/datasets/pages/records?page=2'>Next</a>" in first
+    assert ">Previous</a>" not in first
+    assert "Showing 51–51 of 51" in second
+    assert "href='/datasets/pages/records?page=1'>Previous</a>" in second
+    assert ">Next</a>" not in second
+
+
+def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "viewer-records")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    visible_record = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "VISIBLE"}
+    )
+    viewer = services.users.create_user(
+        admin.id, "record-viewer@example.com", "Record viewer", "viewer password"
+    )
+    services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    login(client, viewer.email, "viewer password")
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert f"aria-label='View record VISIBLE ({visible_record.id})'>View</button>" in page
+    assert "Export</summary>" in page
+    assert "Configure</a>" not in page
+    assert "Import</a>" not in page
+    assert "Add record</button>" not in page
+    assert "data-record-mode='edit'" not in page
+    assert "data-record-mode='delete'" not in page
 
 
 def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser):

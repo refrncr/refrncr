@@ -1,0 +1,49 @@
+<div class='record-toolbar' aria-label='Record results'>
+  <span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>
+</div>
+{% if rows %}
+  <div class='table-scroll'>
+    <table class='record-table'>
+      <caption class='visually-hidden'>Records</caption>
+      <thead>
+        <tr>
+          {% for field in fields %}
+            <th scope='col'{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>
+              {{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'>{% endif %}
+            </th>
+          {% endfor %}
+          <th scope='col'>Status</th>
+          <th scope='col'><span class='visually-hidden'>Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record, values, incomplete in rows %}
+          <tr class='record-row' data-record-row data-dialog-open='record-panel-{{ record.id }}'>
+            {% for field in fields %}
+              {% set cell_value = values.get(field.key) %}
+              <td{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>
+                {% if cell_value is none %}
+                  <span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>
+                {% elif field.data_type == 'number' %}
+                  {{ display_record_value(field, cell_value) }}
+                {% else %}
+                  <span class='cell-content' title='{{ cell_value }}'>{{ cell_value }}</span>
+                {% endif %}
+              </td>
+            {% endfor %}
+            <td>{% if incomplete %}<span class='badge badge-warning'>Incomplete record</span>{% else %}<span class='badge badge-success'>Complete</span>{% endif %}</td>
+            <td>
+              <button class='button button-secondary' type='button' data-dialog-open='record-panel-{{ record.id }}' aria-label='View record {{ values.get(identifier.field_keys[0], record.id) }} ({{ record.id }})'>View</button>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class='empty-state'><h2>No records yet</h2><p>No records are available.</p></div>
+{% endif %}
+<nav>
+  {% if page.page > 1 %}<a href='{{ url_for("dataset_records_view", key=dataset.key, page=page.page-1) }}'>Previous</a>{% endif %}
+  {% if page.page * page.page_size < page.total %}<a href='{{ url_for("dataset_records_view", key=dataset.key, page=page.page+1) }}'>Next</a>{% endif %}
+</nav>

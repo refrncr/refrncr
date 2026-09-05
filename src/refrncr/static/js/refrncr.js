@@ -28,7 +28,8 @@
   };
 
   document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
-    trigger.addEventListener("click", () => {
+    trigger.addEventListener("click", (event) => {
+      if (trigger.hasAttribute("data-record-row") && event.target.closest("a, button, input")) return;
       const dialog = document.getElementById(trigger.dataset.dialogOpen);
       if (!dialog) return;
       if (dialog.hasAttribute("data-side-panel")) {
@@ -54,6 +55,7 @@
 
   document.querySelectorAll("[data-record-row]").forEach((row) => {
     row.addEventListener("keydown", (event) => {
+      if (event.target !== row) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         row.click();

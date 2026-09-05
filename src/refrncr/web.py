@@ -516,27 +516,7 @@ def create_flask_app(
             "</div>{% endfor %}</div><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<footer class='side-panel-footer'><button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
             "<button class='button button-primary' type='submit'>Create record</button></footer></form></div></dialog>{% endif %}"
-            "<div class='record-toolbar' aria-label='Record controls'>"
-            "<input type='search' aria-label='Search records' placeholder='Search by code or name…' disabled>"
-            "<button class='button button-secondary' type='button' disabled>Filter</button>"
-            "<button class='button button-secondary' type='button' disabled>Sort</button>"
-            "<span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span></div>"
-            "{% if rows %}<div class='table-scroll'><table class='record-table'><thead><tr>{% for field in fields %}"
-            "<th scope='col'{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>"
-            "{{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' "
-            "src='{{ url_for(\"static\", filename=\"images/lucide-key-round.svg\") }}' alt='' "
-            "aria-hidden='true'>{% endif %}</th>"
-            "{% endfor %}<th scope='col'>Status</th></tr></thead><tbody>"
-            "{% for record, values, incomplete in rows %}<tr class='record-row' tabindex='0' role='button' "
-            "aria-haspopup='dialog' data-record-row data-dialog-open='record-panel-{{ record.id }}'>"
-            "{% for field in fields %}{% set cell_value = values.get(field.key) %}"
-            "<td{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>"
-            "{% if field.data_type == 'number' %}{{ display_record_value(field, cell_value if cell_value is not none else '-') }}"
-            "{% else %}<span class='cell-content'{% if cell_value is not none %} title='{{ cell_value }}'{% endif %}>"
-            "{{ cell_value if cell_value is not none else '-' }}</span>{% endif %}</td>{% endfor %}"
-            "<td>{% if incomplete %}<span class='badge badge-warning'>Incomplete record</span>{% else %}<span class='badge badge-success'>Complete</span>{% endif %}</td>"
-            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No records yet</h2>"
-            "<p>No records are available.</p></div>{% endif %}"
+            "{% include 'pages/datasets/_record_table.html' %}"
             "{% for record, values, incomplete in rows %}<dialog class='side-panel' id='record-panel-{{ record.id }}' "
             "data-side-panel data-record-panel data-panel-entity='record' data-default-subtitle='View record' "
             "aria-labelledby='record-panel-title-{{ record.id }}'><div class='side-panel-layout'>"
@@ -573,12 +553,7 @@ def create_flask_app(
             "value='{{ record.revision }}'></div><footer class='side-panel-footer'>"
             "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
             "<button class='button button-danger' type='submit'>Delete record</button></footer></form>{% endif %}"
-            "</div></dialog>{% endfor %}"
-            '<nav>{% if page.page > 1 %}<a href=\'{{ url_for("dataset_records_view", '
-            "key=dataset.key, page=page.page-1) }}'>Previous</a>{% endif %} "
-            "{% if page.page * page.page_size < page.total %}<a href='{{ "
-            'url_for("dataset_records_view", key=dataset.key, page=page.page+1) }}\'>Next</a>'
-            "{% endif %}</nav>",
+            "</div></dialog>{% endfor %}",
             dataset=dataset,
             fields=fields,
             identifier=identifier,
