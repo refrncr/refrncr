@@ -395,49 +395,17 @@ def create_flask_app(
             business_key = business_key_service.get_business_key(actor.id, dataset.key)
         except NotFoundError:
             abort(404)
-        return render_template_string(
-            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
-            "<h1>{{ dataset.name }}</h1><p><code>{{ dataset.key }}</code></p>"
-            "<p>{{ dataset.description }}</p>"
-            "<p>Initial owner: {{ dataset.owner_display_name }} "
-            "(<code>{{ dataset.owner_user_id }}</code>)</p>"
-            "<p><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>View records</a></p>"
-            "{% if editable %}<a href='{{ url_for(\"edit_dataset\", key=dataset.key) }}'>"
-            "Edit dataset</a>{% endif %}"
-            "<section><h2>Fields</h2>"
-            "<p>Record identifier: {% if business_key.field_keys %}"
-            "{% for field_key in business_key.field_keys %}{% if not loop.first %} + {% endif %}"
-            "<code>{{ field_key }}</code>{% endfor %}{% else %}Not configured{% endif %}</p>"
-            '{% if schema_admin %}<a href=\'{{ url_for("new_dataset_field", '
-            "key=dataset.key) }}'>Add field</a>{% endif %}"
-            "{% if fields %}<div class='table-scroll'><table><caption>Dataset fields</caption><thead><tr><th scope='col'>Key</th><th scope='col'>Name</th><th scope='col'>Type</th>"
-            "<th scope='col'>Required</th><th scope='col'>Unique</th>{% if schema_admin %}<th scope='col'>Actions</th>"
-            "{% endif %}</tr></thead><tbody>{% for field in fields %}<tr>"
-            "<td><code>{{ field.key }}</code></td><td>"
-            "{{ field.name }}{% if field.key in business_key.field_keys %} <img class='key-icon' "
-            "src='{{ url_for(\"static\", filename=\"images/lucide-key-round.svg\") }}' alt='' "
-            "aria-hidden='true'>{% endif %}</td>"
-            "<td>{{ field.data_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td>"
-            "<td>{{ 'Yes' if field.is_unique else 'No' }}</td>"
-            '{% if schema_admin %}<td><a href=\'{{ url_for("edit_dataset_field", '
-            "key=dataset.key, field_key=field.key) }}'>Edit field</a>"
-            "<form method='post' action='{{ url_for(\"move_dataset_field\", key=dataset.key) }}'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "{% for ordered_field in fields %}<input type='hidden' name='expected_field_id' "
-            "value='{{ ordered_field.id }}'>{% endfor %}"
-            "<input type='hidden' name='field_id' value='{{ field.id }}'>"
-            "<button name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>"
-            "<button name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>"
-            "</form></td>{% endif %}"
-            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h3>No fields yet</h3>"
-            "<p>No fields are defined for this dataset.</p></div>{% endif %}"
-            "</section>",
+        return render_template(
+            "pages/datasets/detail.html",
             dataset=dataset,
             editable=editable,
             schema_admin=schema_admin,
             fields=fields,
             business_key=business_key,
-            csrf=login_session.csrf_token,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @dataset_route("/datasets/<key>/fields/order", methods=["POST"])

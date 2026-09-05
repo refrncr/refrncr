@@ -1,6 +1,7 @@
 import re
 
 import pytest
+from flask import template_rendered
 from sqlalchemy import func, select, update
 from sqlalchemy.pool import StaticPool
 
@@ -828,8 +829,22 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
 
     create_field(services, admin, dataset, "zeta", "Zeta", "date", True, False)
     create_field(services, admin, dataset, "alpha", "<script>alert(1)</script>", "string")
-    page = body(request(client, "get", "/datasets/schema"))
+    rendered_templates = []
 
+    def record_template(_sender, template, **_extra):
+        rendered_templates.append(template.name)
+
+    template_rendered.connect(record_template, client.application)
+    try:
+        response = request(client, "get", "/datasets/schema")
+    finally:
+        template_rendered.disconnect(record_template, client.application)
+    page = body(response)
+
+    assert response.status_code == 200
+    assert rendered_templates == ["pages/datasets/detail.html"]
+    assert "<nav aria-label='Breadcrumb'><a href='/datasets'>Datasets</a></nav>" in page
+    assert "<caption>Dataset fields</caption>" in page
     assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
@@ -838,6 +853,26 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert page.count("Edit field") == 2
     assert page.count("Move up") == 2
     assert page.count("Move down") == 2
+    order_forms = re.findall(
+        r"<form method='post' action='/datasets/schema/fields/order'>(.*?)</form>",
+        page,
+        re.DOTALL,
+    )
+    assert len(order_forms) == 2
+    expected_ids = [
+        field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)
+    ]
+    csrf = session_csrf(client, services)
+    for form, field_id in zip(order_forms, expected_ids, strict=True):
+        assert form.count(f"name='csrf_token' value='{csrf}'") == 1
+        assert re.findall(r"name='expected_field_id' value='([^']+)'", form) == expected_ids
+        assert f"name='field_id' value='{field_id}'" in form
+        assert "name='direction' value='up'" in form
+        assert "name='direction' value='down'" in form
+    assert "name='direction' value='up' disabled" in order_forms[0]
+    assert "name='direction' value='down' disabled" not in order_forms[0]
+    assert "name='direction' value='up' disabled" not in order_forms[1]
+    assert "name='direction' value='down' disabled" in order_forms[1]
 
 
 def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):

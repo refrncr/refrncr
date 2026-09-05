@@ -81,6 +81,9 @@ The Dataset-edit page reuses those primitives directly. It presents the immutabl
 text rather than a submitted control, and connects validation feedback only to the affected field.
 Create and edit remain separate page compositions because their key and action contracts differ.
 
+The Dataset-detail page uses a file template under the shared shell. Its existing metadata,
+permission-dependent schema controls, field table, and field-order forms remain unchanged.
+
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.
 
