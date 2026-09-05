@@ -144,7 +144,59 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
     assert response.status_code == 200
     assert "No datasets are available." in body(response)
     assert "New dataset" in body(response)
-    assert "My Datasets" in body(response)
+    assert "<h1>Datasets</h1>" in body(response)
+
+
+def test_dataset_list_uses_file_template_search_and_accessible_rows(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(
+        services,
+        admin,
+        "searchable",
+        "Name <unsafe>",
+        "Description 'unsafe' <markup>",
+    )
+    login(client)
+    rendered_templates = []
+
+    def record_template(_sender, template, **_extra):
+        rendered_templates.append(template.name)
+
+    template_rendered.connect(record_template, client.application)
+    try:
+        response = request(client, "get", "/datasets")
+    finally:
+        template_rendered.disconnect(record_template, client.application)
+    page = body(response)
+
+    assert response.status_code == 200
+    assert rendered_templates == ["pages/datasets/list.html"]
+    assert "<title>Datasets · REFRNCR</title>" in page
+    assert "<h1>Datasets</h1>" in page
+    assert "My Datasets" not in page
+    assert "for='dataset-search'>Search datasets</label>" in page
+    assert "placeholder='Search datasets…' data-list-search" in page
+    assert "dataset-tabs" not in page
+    assert "button-tab" not in page
+    assert "<table aria-label='Datasets'>" in page
+    assert "<th scope='col'>Name</th>" in page
+    assert "<th scope='col'>Key</th>" in page
+    assert "<th scope='col'>Description</th>" in page
+    row = re.search(r"<tr class='dataset-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
+    assert row is not None
+    assert "tabindex" not in row.group(1)
+    assert "role=" not in row.group(1)
+    assert "data-row-href='/datasets/searchable/records'" in row.group(1)
+    assert "data-list-row" in row.group(1)
+    assert (
+        "data-search-text='Name &lt;unsafe&gt; searchable Description &#39;unsafe&#39; "
+        "&lt;markup&gt;'" in row.group(1)
+    )
+    assert "<a href='/datasets/searchable/records'>Name &lt;unsafe&gt;</a>" in row.group(2)
+    assert "Description &#39;unsafe&#39; &lt;markup&gt;" in row.group(2)
+    assert "Name <unsafe>" not in page
+    assert "<markup>" not in page
+    assert "+ New dataset" in page
 
 
 def test_shared_shell_marks_active_navigation_and_exposes_account_context(dataset_browser):
@@ -180,6 +232,27 @@ def test_shared_shell_navigation_follows_effective_role(dataset_browser):
     assert 'href="/users"' not in page
     assert 'href="/teams"' not in page
     assert "New dataset" not in page
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+def test_resource_permissions_show_dataset_without_community_admin_create_action(
+    dataset_browser, permission
+):
+    _, services, admin, client = dataset_browser
+    user = services.users.create_user(
+        admin.id,
+        f"resource-{permission}@example.com",
+        f"Resource {permission.title()}",
+        "user password",
+    )
+    dataset = create_dataset(services, admin, f"{permission}-visible")
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, user.email, "user password")
+
+    page = body(request(client, "get", "/datasets"))
+
+    assert f"href='/datasets/{dataset.key}/records'" in page
+    assert "+ New dataset" not in page
 
 
 def test_ui_assets_are_local_and_critical_login_controls_are_labelled(dataset_browser):

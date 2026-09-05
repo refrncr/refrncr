@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Datasets · REFRNCR{% endblock %}
+
+{% block content %}
+  <div class='page-header dataset-list-header'><div><h1>Datasets</h1></div>
+    <div class='page-actions'><label class='visually-hidden' for='dataset-search'>Search datasets</label>
+      <input id='dataset-search' type='search' placeholder='Search datasets…' data-list-search>
+      {% if actor.role == 'admin' %}<a class='button button-primary' href='{{ url_for("new_dataset") }}'>+ New dataset</a>{% endif %}
+    </div>
+  </div>
+  {% if datasets %}<div class='table-scroll dataset-table'><table aria-label='Datasets'><thead><tr>
+    <th scope='col'>Name</th><th scope='col'>Key</th><th scope='col'>Description</th></tr></thead><tbody>
+    {% for dataset in datasets %}<tr class='dataset-row' data-row-href='{{ url_for("dataset_records_view", key=dataset.key) }}' data-list-row data-search-text='{{ dataset.name }} {{ dataset.key }} {{ dataset.description }}'>
+      <td><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>{{ dataset.name }}</a></td>
+      <td><code>{{ dataset.key }}</code></td><td>{{ dataset.description or '—' }}</td>
+    </tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>
+    <p>No datasets are available.</p></div>{% endif %}
+{% endblock %}

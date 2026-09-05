@@ -84,6 +84,10 @@ Create and edit remain separate page compositions because their key and action c
 The Dataset-detail page uses a file template under the shared shell. Its existing metadata,
 permission-dependent schema controls, field table, and field-order forms remain unchanged.
 
+The Dataset list uses a file template with client-side searching across the authorized name, key,
+and description values. Dataset names remain keyboard-accessible links, while non-functional
+status filters were removed and pointer row navigation remains an enhancement.
+
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.
 

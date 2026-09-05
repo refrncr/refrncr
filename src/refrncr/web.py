@@ -292,28 +292,14 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         visible_datasets = dataset_service.list_datasets(actor.id)
-        return render_template_string(
-            "<div class='page-header dataset-list-header'><div><h1>My Datasets</h1></div>"
-            "<div class='page-actions'><label class='visually-hidden' for='dataset-search'>Search datasets</label>"
-            "<input id='dataset-search' type='search' placeholder='Search by name…' data-list-search>"
-            "{% if actor.role == 'admin' %}<a class='button button-primary' href='{{ url_for(\"new_dataset\") }}'>"
-            "+ New dataset</a>{% endif %}</div></div>"
-            "<div class='dataset-tabs' aria-label='Dataset filters'>"
-            "<button class='button button-tab is-active' type='button'>All</button>"
-            "<button class='button button-tab' type='button' disabled>Active</button>"
-            "<button class='button button-tab' type='button' disabled>Archived</button>"
-            "<button class='button button-tab' type='button' disabled>Errors</button></div>"
-            "{% if datasets %}<div class='table-scroll dataset-table'><table><thead><tr>"
-            "<th scope='col'>Name</th><th scope='col'>Key</th><th scope='col'>Description</th></tr></thead><tbody>"
-            "{% for dataset in datasets %}<tr class='dataset-row' tabindex='0' "
-            "data-row-href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}' "
-            "data-list-row data-search-text='{{ dataset.name }} {{ dataset.key }} {{ dataset.description }}'>"
-            "<td><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>{{ dataset.name }}</a></td>"
-            "<td><code>{{ dataset.key }}</code></td><td>{{ dataset.description or '—' }}</td>"
-            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>"
-            "<p>No datasets are available.</p></div>{% endif %}",
+        return render_template(
+            "pages/datasets/list.html",
             actor=actor,
             datasets=visible_datasets,
+            current_actor=actor,
+            current_csrf=_login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     def render_dataset_create_form(
