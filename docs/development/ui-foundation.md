@@ -10,12 +10,17 @@ The canonical logo is the rounded 2×2 grid with the filled top-left square. Use
 `logo-horizontal.svg` in application chrome and `logo-mark.svg` where only a compact mark
 fits. Do not recolour, distort, rotate, or add effects to either asset.
 
-The font stacks are intentionally offline-safe:
+The typography contract is:
 
 - Montserrat 500 for the wordmark and page-level headings;
 - Inter 400–700 for interface text;
 - JetBrains Mono 400 for technical identifiers and code-like values;
-- system fonts are the fallback when those fonts are not installed locally.
+- system fonts remain the fallback.
+
+The required upstream WOFF2 files and their OFL notices still need to be packaged in the
+dedicated asset step. Until that work is complete, the named fonts are only preferred font
+families and the application may use the system fallbacks. The completed foundation must not
+request fonts from a CDN at runtime.
 
 The application never requests fonts or icons from a CDN. Inline SVG is appropriate for a
 small functional icon; icon-only controls always require an accessible name.
@@ -36,7 +41,39 @@ their corresponding literal values.
 
 `templates/base.html` owns the document structure, skip link, logo, permission-aware primary
 navigation, current-page state, account context, CSRF-protected sign-out action, flash region,
-and main landmark. Authenticated pages are rendered inside this shell.
+main landmark, and page script extension point. File-based page templates extend this shell.
+
+Page-level layout macros live under `templates/layouts/`. Reusable controls live under
+`templates/components.html` until the component set is large enough to split by component.
+The overview page demonstrates the current composition pattern:
+
+```jinja
+{% extends "base.html" %}
+{% from "components.html" import button %}
+{% from "layouts/page.html" import page_header %}
+
+{% block content %}
+  {{ page_header("Overview", "Manage your reference data in one place.") }}
+  {{ button("View datasets", url_for("dataset_list")) }}
+{% endblock %}
+```
+
+The current reusable Jinja primitives are:
+
+- `page_header`, for a page title and optional description;
+- `button`, for link actions and real buttons using the same variants;
+- `form_field`, for a labelled input with optional autocomplete, required, value, help, error,
+  disabled, `aria-describedby`, and `aria-invalid` behaviour;
+- `feedback`, for escaped status or error feedback with the appropriate live-region role.
+
+The overview uses `page_header` and both link-button variants. The login and setup pages use the
+shared auth layout, `form_field`, `feedback`, and a real submit-button variant. Credential
+failures are shown once as generic form feedback and referenced by both login fields. Neither
+submitted login field is rendered back into the response. Setup may safely redisplay the email
+and display name after validation, but never the submitted password.
+
+Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
+without changing their route behaviour.
 
 Reusable classes include:
 
@@ -46,9 +83,9 @@ Reusable classes include:
 - `card`, `badge-*`, `table-scroll`, `pagination`, and `empty-state`;
 - `dialog` and its open/close data attributes for confirmations.
 
-Shared Jinja patterns for alerts, empty states and confirmation dialogs live in
-`templates/components.html`. Component names use lowercase kebab-case. State classes use the
-`is-` prefix, and JavaScript hooks use `data-*` attributes rather than presentation classes.
+Component names use lowercase kebab-case. State classes use the `is-` prefix, and JavaScript
+hooks use `data-*` attributes rather than presentation classes. Documentation must only list a
+Jinja component after a page actually consumes it.
 
 All applicable controls define hover, visible keyboard focus, active, disabled and error
 states. Destructive actions use the danger treatment but still include explicit text; colour

@@ -252,6 +252,44 @@ Prefer extending existing patterns over introducing new architecture.
 If the Jira issue conflicts with the current codebase, architecture documentation or another authoritative requirement, surface the conflict instead of silently choosing an interpretation.
 
 
+## Iterative UI design
+
+The product owner may refine the interface iteratively through visual feedback. Treat these requests as valid design exploration while preserving a coherent design system.
+
+Before implementing each UI instruction, classify it as one of:
+
+1. **Design token** — a reusable visual value such as colour, spacing, typography, radius, shadow, breakpoint or component dimension.
+2. **Global component** — behaviour or presentation shared by all instances of a button, field, table, panel, alert or other component.
+3. **Component variant** — a deliberate variation for a category such as data tables, destructive buttons or compact forms.
+4. **Page-specific rule** — presentation unique to one page or workflow.
+5. **Product functionality** — new behaviour, data, permissions, workflow or business rules.
+
+Apply the change at the highest reusable level that accurately represents the request.
+
+Rules:
+
+- Do not add page-specific CSS when a token, global component or component variant is the correct abstraction.
+- Do not generalise a genuinely page-specific decision merely to avoid local CSS.
+- Reuse existing tokens, component markup, Jinja macros, includes and JavaScript controllers.
+- Do not duplicate composite markup in Python strings or page templates.
+- Keep routes focused on request handling and presentation data; do not move business logic into Jinja, CSS or JavaScript.
+- Preserve server-side authorization, CSRF protection, IDOR protection, escaping, audit behaviour and transaction boundaries.
+- Hiding an action is never a substitute for server-side authorization.
+- Maintain semantic HTML, keyboard support, visible focus and WCAG 2.2 AA contrast.
+- Make full content available to keyboard and assistive-technology users when visual truncation is used.
+- Do not introduce a new framework, build process or dependency for a visual adjustment without approval.
+- If a request changes functionality, architecture, security, persisted data or story scope, stop and ask for approval before implementing it.
+- Before implementation, briefly state the selected classification and which shared token, component, variant or page rule will change.
+- After approximately five related UI adjustments, perform a short consistency review for duplicated values, selectors, markup, states and accessibility behaviour.
+- At the end of an iterative UI session, report:
+  - changed tokens;
+  - changed global components;
+  - changed component variants;
+  - deliberate page-specific rules;
+  - functional changes;
+  - remaining inconsistencies or follow-up work.
+
+
 ### Scope control
 
 Implement the Jira issue that was requested.

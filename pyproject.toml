@@ -48,6 +48,7 @@ refrncr = [
     "static/js/*.js",
     "static/images/*.svg",
     "templates/*.html",
+    "templates/**/*.html",
 ]
 
 [tool.pytest.ini_options]

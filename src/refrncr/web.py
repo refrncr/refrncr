@@ -1,4 +1,4 @@
-# HTML templates are intentionally kept next to their small browser handlers.
+# Legacy inline templates remain temporarily while pages move to file-based Jinja templates.
 # ruff: noqa: E501
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from flask import (
     g,
     make_response,
     redirect,
+    render_template,
     request,
     send_file,
     url_for,
@@ -245,10 +246,24 @@ def create_flask_app(
         if not matches:
             abort(403)
 
-    def form_with_anonymous_csrf(template: str):
+    def render_anonymous_template(template_name: str, **context):
+        context.setdefault("current_actor", None)
+        context.setdefault("current_csrf", None)
+        context.setdefault("active_navigation", "")
+        context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
+        return render_template(template_name, **context)
+
+    def anonymous_csrf_form_response(template_name: str, **context):
         settings = require_cookie_settings()
         token = secrets.token_urlsafe(32)
-        response = make_response(render_template_string(template, csrf_token=token))
+        context.setdefault("error", None)
+        response = make_response(
+            render_anonymous_template(
+                template_name,
+                csrf_token=token,
+                **context,
+            )
+        )
         response.set_cookie(
             settings.anonymous_csrf_name,
             token,
@@ -259,14 +274,14 @@ def create_flask_app(
     @app.get("/")
     def index():
         resolved = authenticated()
-        return render_template_string(
-            "<div class='page-header'><div><h1>Overview</h1>"
-            "<p>Manage your reference data in one place.</p></div></div>"
-            "{% if resolved %}{% if dataset_ui_enabled %}<nav>"
-            "<a class='button button-primary' href='{{ url_for(\"dataset_list\") }}'>View datasets</a>"
-            "</nav>{% endif %}{% else %}<a href='{{ url_for(\"login\") }}'>"
-            "Sign in</a>{% endif %}",
+        actor = resolved[0] if resolved else None
+        csrf = resolved[1].csrf_token if resolved else None
+        return render_template(
+            "pages/index.html",
             resolved=resolved,
+            current_actor=actor,
+            current_csrf=csrf,
+            active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
         )
 
@@ -1514,29 +1529,60 @@ def create_flask_app(
             return redirect(url_for("login"))
         if request.method == "POST":
             require_csrf(request.cookies.get(settings.anonymous_csrf_name))
-            users.create_initial_admin(
-                request.form["email"],
-                request.form["display_name"],
-                request.form["password"],
-            )
+            try:
+                users.create_initial_admin(
+                    request.form["email"],
+                    request.form["display_name"],
+                    request.form["password"],
+                )
+            except UserManagementError as error:
+                message = str(error)
+                if message.startswith("Display name"):
+                    error_field = "display_name"
+                elif message.startswith("A valid email"):
+                    error_field = "email"
+                elif message.startswith("Password"):
+                    error_field = "password"
+                else:
+                    error_field = None
+                return (
+                    render_anonymous_template(
+                        "pages/auth/setup.html",
+                        csrf_token=request.cookies.get(settings.anonymous_csrf_name),
+                        error=message,
+                        error_field=error_field,
+                        email=request.form["email"],
+                        display_name=request.form["display_name"],
+                    ),
+                    400,
+                )
             response = redirect(url_for("login"))
             response.delete_cookie(
                 settings.anonymous_csrf_name,
                 **settings.common_options,
             )
             return response
-        return form_with_anonymous_csrf(
-            "<div class='card'><h1>Set up administrator</h1><form method='post'>"
-            "<label for='setup-email'>Email address</label><input id='setup-email' name='email' type='email' autocomplete='email' required>"
-            "<label for='setup-name'>Name</label><input id='setup-name' name='display_name' autocomplete='name' required>"
-            "<label for='setup-password'>Password</label><input id='setup-password' name='password' type='password' autocomplete='new-password' required>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf_token }}'>"
-            "<button>Create administrator</button></form></div>"
+        return anonymous_csrf_form_response(
+            "pages/auth/setup.html",
+            error_field=None,
+            email=None,
+            display_name=None,
         )
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
         settings = require_cookie_settings()
+
+        def invalid_credentials_response():
+            return (
+                render_anonymous_template(
+                    "pages/auth/login.html",
+                    csrf_token=request.cookies.get(settings.anonymous_csrf_name),
+                    error=GENERIC_LOGIN_FAILURE,
+                ),
+                401,
+            )
+
         if request.method == "POST":
             require_csrf(request.cookies.get(settings.anonymous_csrf_name))
             submitted_email = request.form["email"]
@@ -1548,14 +1594,14 @@ def create_flask_app(
             )
             attempt = login_limiter.reserve(source_key, account_key)
             if attempt is None:
-                return GENERIC_LOGIN_FAILURE, 401
+                return invalid_credentials_response()
             if oversized_identifier:
                 attempt.failed()
-                return GENERIC_LOGIN_FAILURE, 401
+                return invalid_credentials_response()
             permit = authentication_admission.try_acquire()
             if permit is None:
                 attempt.cancel()
-                return GENERIC_LOGIN_FAILURE, 401
+                return invalid_credentials_response()
             try:
                 with permit:
                     principal = authentication.authenticate(
@@ -1580,16 +1626,8 @@ def create_flask_app(
                 response.delete_cookie(settings.anonymous_csrf_name, **settings.common_options)
                 return response
             attempt.failed()
-            return GENERIC_LOGIN_FAILURE, 401
-        return form_with_anonymous_csrf(
-            "<div class='card'><h1>Sign in</h1><p>Sign in to manage your reference data.</p>"
-            "<form class='login-form' method='post'><label for='login-email'>Email address</label>"
-            "<input id='login-email' name='email' type='email' autocomplete='username' required>"
-            "<label for='login-password'>Password</label>"
-            "<input id='login-password' name='password' type='password' autocomplete='current-password' required>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf_token }}'>"
-            "<button type='submit'>Sign in</button></form></div>"
-        )
+            return invalid_credentials_response()
+        return anonymous_csrf_form_response("pages/auth/login.html")
 
     @app.post("/logout")
     def logout():

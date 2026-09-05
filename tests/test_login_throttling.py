@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -37,6 +38,12 @@ class MutableClock:
 def csrf(response) -> str:
     marker = "name='csrf_token' value='"
     return response.get_data(as_text=True).split(marker, 1)[1].split("'", 1)[0]
+
+
+def generic_login_failure_body(response) -> str:
+    body = response.get_data(as_text=True)
+    assert body.count(GENERIC_LOGIN_FAILURE) == 1
+    return re.sub(r"name='csrf_token' value='[^']+'", "name='csrf_token' value='TOKEN'", body)
 
 
 def configured_web(limiter: LoginAttemptLimiter, admission=None):
@@ -227,7 +234,7 @@ def test_browser_ignores_arbitrary_forwarding_headers_by_default(header):
     )
 
     assert first.status_code == second.status_code == 401
-    assert first.get_data(as_text=True) == second.get_data(as_text=True) == GENERIC_LOGIN_FAILURE
+    assert generic_login_failure_body(first) == generic_login_failure_body(second)
     assert services.authentication.authenticate.call_count == 1
 
 
@@ -243,9 +250,9 @@ def test_throttled_browser_request_skips_authentication_and_remains_generic():
     unknown = post_login(client, "unknown@example.com", "wrong password")
 
     assert wrong.status_code == throttled.status_code == unknown.status_code == 401
-    assert {response.get_data(as_text=True) for response in (wrong, throttled, unknown)} == {
-        GENERIC_LOGIN_FAILURE
-    }
+    assert (
+        len({generic_login_failure_body(response) for response in (wrong, throttled, unknown)}) == 1
+    )
     assert wrapped.call_count == 2
     assert admission.try_acquire.call_count == 2
 
@@ -273,7 +280,7 @@ def test_oversized_browser_identifiers_are_generic_bounded_and_skip_authenticati
             "wrong password",
         )
         assert response.status_code == 401
-        assert response.get_data(as_text=True) == GENERIC_LOGIN_FAILURE
+        generic_login_failure_body(response)
 
     assert services.authentication.authenticate.call_count == 0
     assert limiter.entry_count == 2
@@ -296,6 +303,6 @@ def test_multi_megabyte_login_body_is_rejected_before_form_buffering_or_authenti
     )
 
     assert response.status_code == 401
-    assert response.get_data(as_text=True) == GENERIC_LOGIN_FAILURE
+    generic_login_failure_body(response)
     assert services.authentication.authenticate.call_count == 0
     assert limiter.entry_count == 0

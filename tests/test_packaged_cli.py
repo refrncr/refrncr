@@ -119,6 +119,11 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/migrations/versions/0003_ref_35_team_memberships.py",
         "refrncr/migrations/versions/0004_ref_36_access_grants.py",
     } <= files
+    assert {
+        "refrncr/templates/layouts/auth/base.html",
+        "refrncr/templates/pages/auth/login.html",
+        "refrncr/templates/pages/auth/setup.html",
+    } <= files
     assert not any(name.endswith((".db", ".pyc")) or "__pycache__" in name for name in files)
 
 
