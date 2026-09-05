@@ -662,6 +662,37 @@ def test_granted_editor_or_admin_can_edit_with_prg_and_audit(dataset_browser, pe
     assert audits == 1
 
 
+def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(
+        services,
+        admin,
+        "edit-form",
+        "Stored <name>",
+        "Stored <description>",
+    )
+    login(client)
+
+    response = request(client, "get", "/datasets/edit-form/edit")
+    page = body(response)
+
+    assert response.status_code == 200
+    assert "<title>Edit dataset · REFRNCR</title>" in page
+    assert '<header class="page-header">' in page
+    assert "<p>Key: <code>edit-form</code></p>" in page
+    assert "name='key'" not in page
+    assert "<form method='post' action='/datasets/edit-form'>" in page
+    assert "<label for='dataset-name'>Name</label>" in page
+    assert "value='Stored &lt;name&gt;'" in page
+    assert "<label for='dataset-description'>Description</label>" in page
+    assert ">Stored &lt;description&gt;</textarea>" in page
+    assert '<a class="button button-secondary" href="/datasets/edit-form">Cancel</a>' in page
+    assert '<button class="button button-primary" type="submit">Save dataset</button>' in page
+    assert "aria-invalid='true'" not in page
+    assert "Stored <name>" not in page
+    assert "Stored <description>" not in page
+
+
 def test_community_admin_can_edit_without_dataset_grant(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "admin-edit")
@@ -772,8 +803,13 @@ def test_invalid_edit_redisplays_escaped_values_without_mutation(dataset_browser
     )
 
     assert response.status_code == 400
-    assert markup not in body(response)
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+    page = body(response)
+    assert markup not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert "Dataset description must not exceed 10000 characters" in page
+    assert "id='dataset-edit-error'" in page
+    assert "aria-describedby='dataset-edit-error' aria-invalid='true'" in page
+    assert page.count("aria-invalid='true'") == 1
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
         assert persisted.name == "Original"

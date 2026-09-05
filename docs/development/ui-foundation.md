@@ -77,6 +77,10 @@ The Dataset-create page combines `page_header`, `form_field`, `feedback`, and li
 variants. Its Description field selects the generic textarea control while retaining the same
 label, value, error, disabled, and accessible-description contract as text inputs.
 
+The Dataset-edit page reuses those primitives directly. It presents the immutable Dataset key as
+text rather than a submitted control, and connects validation feedback only to the affected field.
+Create and edit remain separate page compositions because their key and action contracts differ.
+
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.
 

@@ -1206,22 +1206,27 @@ def create_flask_app(
         )
         return (response, status) if status != 200 else response
 
-    def render_dataset_edit_form(dataset, *, name: str, description: str, csrf: str, error=None):
-        return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
-            "Dataset</a></nav><h1>Edit dataset</h1>"
-            "<p>Key: <code>{{ dataset.key }}</code></p>"
-            "{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"update_dataset\", key=dataset.key) }}'>"
-            "<label>Name <input name='name' value='{{ name }}'></label>"
-            "<label>Description <textarea name='description'>{{ description }}</textarea></label>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Save dataset</button></form>",
+    def render_dataset_edit_form(
+        dataset,
+        *,
+        actor,
+        name: str,
+        description: str,
+        csrf: str,
+        error=None,
+        error_field=None,
+    ):
+        return render_template(
+            "pages/datasets/edit.html",
             dataset=dataset,
             name=name,
             description=description,
-            csrf=csrf,
             error=error,
+            error_field=error_field,
+            current_actor=actor,
+            current_csrf=csrf,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @dataset_route("/datasets/<key>/edit", methods=["GET"])
@@ -1236,6 +1241,7 @@ def create_flask_app(
             abort(404)
         return render_dataset_edit_form(
             dataset,
+            actor=actor,
             name=dataset.name,
             description=dataset.description,
             csrf=login_session.csrf_token,
@@ -1259,13 +1265,22 @@ def create_flask_app(
                 dataset = dataset_service.get_dataset_for_edit(actor.id, key)
             except NotFoundError:
                 abort(404)
+            message = str(error)
+            if message.startswith("Dataset name"):
+                error_field = "name"
+            elif message.startswith("Dataset description"):
+                error_field = "description"
+            else:
+                error_field = None
             return (
                 render_dataset_edit_form(
                     dataset,
+                    actor=actor,
                     name=name,
                     description=description,
                     csrf=login_session.csrf_token,
-                    error=str(error),
+                    error=message,
+                    error_field=error_field,
                 ),
                 400,
             )
