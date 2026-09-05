@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import re
 import secrets
+from decimal import Decimal
 
 from flask import (
     Flask,
@@ -12,11 +13,11 @@ from flask import (
     g,
     make_response,
     redirect,
-    render_template_string,
     request,
     send_file,
     url_for,
 )
+from flask import render_template_string as flask_render_template_string
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from refrncr.browser_security import (
@@ -143,17 +144,65 @@ def create_flask_app(
             return GENERIC_LOGIN_FAILURE, 401
         return "Request is too large", 413
 
+    authentication_cache_missing = object()
+
     def authenticated():
+        cached = getattr(g, "authenticated_resolution", authentication_cache_missing)
+        if cached is not authentication_cache_missing:
+            return cached
         settings = cookie_settings()
         if settings is None:
+            g.authenticated_resolution = None
             return None
         token = request.cookies.get(settings.session_name)
         if not token:
+            g.authenticated_resolution = None
             return None
         resolved = sessions.resolve_with_session(token)
         if resolved is None:
             g.stale_cookie_settings = settings
+        g.authenticated_resolution = resolved
         return resolved
+
+    def active_navigation() -> str:
+        endpoint = request.endpoint or ""
+        if endpoint == "index":
+            return "home"
+        if endpoint.startswith("dataset_") or endpoint in {
+            "new_dataset",
+            "create_dataset",
+            "edit_dataset",
+            "update_dataset",
+            "new_dataset_field",
+            "create_dataset_field",
+            "edit_dataset_field",
+            "update_dataset_field",
+            "delete_dataset_field",
+            "import_dataset_records",
+            "select_import_worksheet",
+            "review_import_mapping",
+            "preview_record_import",
+            "confirm_record_import",
+            "cancel_record_import",
+            "export_dataset_records",
+        }:
+            return "datasets"
+        if endpoint.startswith("user_"):
+            return "users"
+        if endpoint.startswith("team_"):
+            return "teams"
+        return ""
+
+    def render_template_string(template: str, **context):
+        resolved = authenticated()
+        actor = resolved[0] if resolved else None
+        csrf = resolved[1].csrf_token if resolved else None
+        page = "{% extends 'base.html' %}{% block content %}" + template + "{% endblock %}"
+        context.setdefault("current_actor", actor)
+        context.setdefault("current_csrf", csrf)
+        context.setdefault("active_navigation", active_navigation())
+        context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
+        return flask_render_template_string(page, **context)
 
     def require_admin():
         resolved = authenticated()
@@ -211,11 +260,12 @@ def create_flask_app(
     def index():
         resolved = authenticated()
         return render_template_string(
-            "<h1>refrncr</h1>"
+            "<div class='page-header'><div><h1>Overview</h1>"
+            "<p>Manage your reference data in one place.</p></div></div>"
             "{% if resolved %}{% if dataset_ui_enabled %}<nav>"
-            "<a href='{{ url_for(\"dataset_list\") }}'>Datasets</a>"
+            "<a class='button button-primary' href='{{ url_for(\"dataset_list\") }}'>View datasets</a>"
             "</nav>{% endif %}{% else %}<a href='{{ url_for(\"login\") }}'>"
-            "Log in</a>{% endif %}",
+            "Sign in</a>{% endif %}",
             resolved=resolved,
             dataset_ui_enabled=dataset_ui_enabled,
         )
@@ -228,15 +278,25 @@ def create_flask_app(
         )
         visible_datasets = dataset_service.list_datasets(actor.id)
         return render_template_string(
-            "<nav><a href='{{ url_for(\"index\") }}'>Home</a></nav>"
-            "<h1>Datasets</h1>"
-            "{% if actor.role == 'admin' %}<a href='{{ url_for(\"new_dataset\") }}'>"
-            "Create dataset</a>{% endif %}"
-            "{% if datasets %}<ul>{% for dataset in datasets %}<li>"
-            "<a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
-            "{{ dataset.name }}</a> <code>{{ dataset.key }}</code>"
-            "{% if dataset.description %}<p>{{ dataset.description }}</p>{% endif %}"
-            "</li>{% endfor %}</ul>{% else %}<p>No datasets are available.</p>{% endif %}",
+            "<div class='page-header dataset-list-header'><div><h1>My Datasets</h1></div>"
+            "<div class='page-actions'><label class='visually-hidden' for='dataset-search'>Search datasets</label>"
+            "<input id='dataset-search' type='search' placeholder='Search by name…' data-list-search>"
+            "{% if actor.role == 'admin' %}<a class='button button-primary' href='{{ url_for(\"new_dataset\") }}'>"
+            "+ New dataset</a>{% endif %}</div></div>"
+            "<div class='dataset-tabs' aria-label='Dataset filters'>"
+            "<button class='button button-tab is-active' type='button'>All</button>"
+            "<button class='button button-tab' type='button' disabled>Active</button>"
+            "<button class='button button-tab' type='button' disabled>Archived</button>"
+            "<button class='button button-tab' type='button' disabled>Errors</button></div>"
+            "{% if datasets %}<div class='table-scroll dataset-table'><table><thead><tr>"
+            "<th scope='col'>Name</th><th scope='col'>Key</th><th scope='col'>Description</th></tr></thead><tbody>"
+            "{% for dataset in datasets %}<tr class='dataset-row' tabindex='0' "
+            "data-row-href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}' "
+            "data-list-row data-search-text='{{ dataset.name }} {{ dataset.key }} {{ dataset.description }}'>"
+            "<td><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>{{ dataset.name }}</a></td>"
+            "<td><code>{{ dataset.key }}</code></td><td>{{ dataset.description or '—' }}</td>"
+            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>"
+            "<p>No datasets are available.</p></div>{% endif %}",
             actor=actor,
             datasets=visible_datasets,
         )
@@ -246,11 +306,12 @@ def create_flask_app(
     ):
         _actor, login_session = require_admin()
         return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
-            "<h1>Create dataset</h1>{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
+            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
+            "<h1>New dataset</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
             "<form method='post' action='{{ url_for(\"create_dataset\") }}'>"
-            "<label>Key <input name='key' value='{{ key }}'></label>"
-            "<label>Name <input name='name' value='{{ name }}'></label>"
+            "<label>Key <input name='key' value='{{ key }}' required aria-describedby='key-help'></label>"
+            "<p class='help-text' id='key-help'>A permanent technical identifier.</p>"
+            "<label>Name <input name='name' value='{{ name }}' required></label>"
             "<label>Description <textarea name='description'>{{ description }}</textarea></label>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Create dataset</button></form>",
@@ -309,12 +370,12 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
+            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
             "<h1>{{ dataset.name }}</h1><p><code>{{ dataset.key }}</code></p>"
             "<p>{{ dataset.description }}</p>"
             "<p>Initial owner: {{ dataset.owner_display_name }} "
             "(<code>{{ dataset.owner_user_id }}</code>)</p>"
-            "<p><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a></p>"
+            "<p><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>View records</a></p>"
             "{% if editable %}<a href='{{ url_for(\"edit_dataset\", key=dataset.key) }}'>"
             "Edit dataset</a>{% endif %}"
             "<section><h2>Fields</h2>"
@@ -323,11 +384,13 @@ def create_flask_app(
             "<code>{{ field_key }}</code>{% endfor %}{% else %}Not configured{% endif %}</p>"
             '{% if schema_admin %}<a href=\'{{ url_for("new_dataset_field", '
             "key=dataset.key) }}'>Add field</a>{% endif %}"
-            "{% if fields %}<table><thead><tr><th>Key</th><th>Name</th><th>Type</th>"
-            "<th>Required</th><th>Unique</th>{% if schema_admin %}<th>Actions</th>"
+            "{% if fields %}<div class='table-scroll'><table><caption>Dataset fields</caption><thead><tr><th scope='col'>Key</th><th scope='col'>Name</th><th scope='col'>Type</th>"
+            "<th scope='col'>Required</th><th scope='col'>Unique</th>{% if schema_admin %}<th scope='col'>Actions</th>"
             "{% endif %}</tr></thead><tbody>{% for field in fields %}<tr>"
             "<td><code>{{ field.key }}</code></td><td>"
-            "{% if field.key in business_key.field_keys %}🔑 {% endif %}{{ field.name }}</td>"
+            "{{ field.name }}{% if field.key in business_key.field_keys %} <img class='key-icon' "
+            "src='{{ url_for(\"static\", filename=\"images/lucide-key-round.svg\") }}' alt='' "
+            "aria-hidden='true'>{% endif %}</td>"
             "<td>{{ field.data_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td>"
             "<td>{{ 'Yes' if field.is_unique else 'No' }}</td>"
             '{% if schema_admin %}<td><a href=\'{{ url_for("edit_dataset_field", '
@@ -340,7 +403,8 @@ def create_flask_app(
             "<button name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>"
             "<button name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>"
             "</form></td>{% endif %}"
-            "</tr>{% endfor %}</tbody></table>{% else %}<p>No fields are defined.</p>{% endif %}"
+            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h3>No fields yet</h3>"
+            "<p>No fields are defined for this dataset.</p></div>{% endif %}"
             "</section>",
             dataset=dataset,
             editable=editable,
@@ -384,7 +448,7 @@ def create_flask_app(
 
     @dataset_route("/datasets/<key>/records", methods=["GET"])
     def dataset_records_view(key: str):
-        actor, _login_session = require_authenticated()
+        actor, login_session = require_authenticated()
         (
             authorization_service,
             dataset_service,
@@ -398,6 +462,9 @@ def create_flask_app(
             identifier = business_key_service.get_business_key(actor.id, key)
             page = record_service.list_records(actor.id, key, parse_page_parameter())
             may_edit = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
+            may_configure = authorization_service.check_access(
+                actor.id, "dataset", dataset.id, "admin"
+            )
         except NotFoundError:
             abort(404)
         rows = [
@@ -411,26 +478,122 @@ def create_flask_app(
             )
             for record in page.records
         ]
+        numeric_scales = {
+            field.key: max(
+                (
+                    max(0, -value.as_tuple().exponent)
+                    for _record, values, _incomplete in rows
+                    if isinstance((value := values.get(field.key)), Decimal)
+                ),
+                default=0,
+            )
+            for field in fields
+            if field.data_type == "number"
+        }
+
+        def display_record_value(field, value):
+            if field.data_type == "number" and isinstance(value, Decimal):
+                return f"{value:.{numeric_scales[field.key]}f}"
+            return value
+
+        record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
+        range_start = (page.page - 1) * page.page_size + 1 if page.total else 0
+        range_end = min(page.page * page.page_size, page.total)
         return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>Dataset</a></nav>"
-            "<h1>Records — {{ dataset.name }}</h1>"
-            '<p>Export: <a href=\'{{ url_for("export_dataset_records", key=dataset.key, '
-            'format="csv") }}\'>CSV</a> <a href=\'{{ url_for("export_dataset_records", '
-            "key=dataset.key, format=\"xlsx\") }}'>Excel</a> <a href='{{ "
-            'url_for("export_dataset_records", key=dataset.key, format="json") }}\'>JSON</a></p>'
-            "{% if may_edit %}<a href='{{ url_for(\"new_dataset_record\", key=dataset.key) }}'>"
-            "Add record</a> <a href='{{ url_for(\"import_dataset_records\", key=dataset.key) }}'>"
-            "Import records</a>{% endif %}"
-            "{% if rows %}<table><thead><tr>{% for field in fields %}<th>"
-            "{% if field.key in identifier.field_keys %}🔑 {% endif %}{{ field.name }}</th>"
-            "{% endfor %}<th>Status</th></tr></thead><tbody>"
-            "{% for record, values, incomplete in rows %}<tr>"
-            "{% for field in fields %}<td>{{ values.get(field.key, '') }}</td>{% endfor %}"
-            "<td>{% if incomplete %}Incomplete record{% endif %}</td>"
-            '{% if may_edit %}<td><a href=\'{{ url_for("edit_dataset_record", key=dataset.key, '
-            "record_id=record.id) }}'>Edit</a> <a href='{{ url_for(\"delete_dataset_record\", "
-            "key=dataset.key, record_id=record.id) }}'>Delete</a></td>{% endif %}"
-            "</tr>{% endfor %}</tbody></table>{% else %}<p>No records are available.</p>{% endif %}"
+            "<div class='page-header'><div>"
+            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>Dataset</a></nav>"
+            "<h1>{{ dataset.name }} records</h1></div>"
+            "<div class='page-actions record-page-actions'>"
+            "<details class='export-menu'><summary class='button button-secondary'>"
+            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-download.svg\") }}' "
+            "alt='' aria-hidden='true'>Export</summary>"
+            "<div class='export-menu-options' aria-label='Export format'>"
+            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="csv") }}\'>CSV</a>'
+            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="xlsx") }}\'>Excel</a>'
+            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="json") }}\'>JSON</a>'
+            "</div></details>"
+            "{% if may_configure %}<a class='button button-secondary' href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
+            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-settings-2.svg\") }}' "
+            "alt='' aria-hidden='true'>Configure</a>{% endif %}"
+            "{% if may_edit %}<a class='button button-secondary' href='{{ url_for(\"import_dataset_records\", key=dataset.key) }}'>"
+            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-upload.svg\") }}' "
+            "alt='' aria-hidden='true'>Import</a><button class='button button-primary' type='button' data-dialog-open='add-record-panel'>"
+            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-plus.svg\") }}' "
+            "alt='' aria-hidden='true'>Add record</button>{% endif %}</div></div>"
+            "{% if may_edit %}<dialog class='side-panel' id='add-record-panel' data-side-panel aria-labelledby='add-record-title'>"
+            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
+            "<h2 id='add-record-title'>New {{ record_type }} record</h2><p>Add record</p></div>"
+            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
+            "</header><form class='side-panel-form' method='post' action='{{ url_for(\"create_dataset_record\", key=dataset.key) }}'>"
+            "<div class='side-panel-body'>{% for field in fields %}<div class='form-field'>"
+            "<label for='new-record-{{ field.key }}'>{{ field.name }}{% if field.is_required %} *{% endif %}</label>"
+            "{% if field.data_type == 'boolean' %}<select id='new-record-{{ field.key }}' name='{{ field.key }}'"
+            "{% if field.is_required %} required{% endif %}{% if loop.first %} autofocus{% endif %}>"
+            "<option value=''>Choose a value</option><option value='true'>Yes</option><option value='false'>No</option></select>"
+            "{% else %}<input id='new-record-{{ field.key }}' name='{{ field.key }}' "
+            "type='{{ 'date' if field.data_type == 'date' else 'text' }}'"
+            "{% if field.is_required %} required{% endif %}{% if loop.first %} autofocus{% endif %}>{% endif %}"
+            "</div>{% endfor %}</div><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
+            "<footer class='side-panel-footer'><button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Create record</button></footer></form></div></dialog>{% endif %}"
+            "<div class='record-toolbar' aria-label='Record controls'>"
+            "<input type='search' aria-label='Search records' placeholder='Search by code or name…' disabled>"
+            "<button class='button button-secondary' type='button' disabled>Filter</button>"
+            "<button class='button button-secondary' type='button' disabled>Sort</button>"
+            "<span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span></div>"
+            "{% if rows %}<div class='table-scroll'><table class='record-table'><thead><tr>{% for field in fields %}"
+            "<th scope='col'{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>"
+            "{{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' "
+            "src='{{ url_for(\"static\", filename=\"images/lucide-key-round.svg\") }}' alt='' "
+            "aria-hidden='true'>{% endif %}</th>"
+            "{% endfor %}<th scope='col'>Status</th></tr></thead><tbody>"
+            "{% for record, values, incomplete in rows %}<tr class='record-row' tabindex='0' role='button' "
+            "aria-haspopup='dialog' data-record-row data-dialog-open='record-panel-{{ record.id }}'>"
+            "{% for field in fields %}{% set cell_value = values.get(field.key) %}"
+            "<td{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>"
+            "{% if field.data_type == 'number' %}{{ display_record_value(field, cell_value if cell_value is not none else '-') }}"
+            "{% else %}<span class='cell-content'{% if cell_value is not none %} title='{{ cell_value }}'{% endif %}>"
+            "{{ cell_value if cell_value is not none else '-' }}</span>{% endif %}</td>{% endfor %}"
+            "<td>{% if incomplete %}<span class='badge badge-warning'>Incomplete record</span>{% else %}<span class='badge badge-success'>Complete</span>{% endif %}</td>"
+            "</tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No records yet</h2>"
+            "<p>No records are available.</p></div>{% endif %}"
+            "{% for record, values, incomplete in rows %}<dialog class='side-panel' id='record-panel-{{ record.id }}' "
+            "data-side-panel data-record-panel data-panel-entity='record' data-default-subtitle='View record' "
+            "aria-labelledby='record-panel-title-{{ record.id }}'><div class='side-panel-layout'>"
+            "<header class='side-panel-header'><div><h2 id='record-panel-title-{{ record.id }}'>"
+            "{{ values.get(identifier.field_keys[0], record.id) }}</h2><p data-record-subtitle>View record</p></div>"
+            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button></header>"
+            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
+            "<dl class='record-details'>{% for field in fields %}<div><dt>{{ field.name }}</dt>"
+            "<dd>{{ values.get(field.key, '—') }}</dd></div>{% endfor %}</dl></div>"
+            "{% if may_edit %}<footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit</button>"
+            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete</button>"
+            "</footer>{% endif %}</section>"
+            "{% if may_edit %}<form class='side-panel-view side-panel-form' data-record-view='edit' hidden method='post' "
+            "action='{{ url_for(\"edit_dataset_record\", key=dataset.key, record_id=record.id) }}'>"
+            "<div class='side-panel-body'>{% for field in fields %}<div class='form-field'>"
+            "<label for='edit-{{ record.id }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} *{% endif %}</label>"
+            "{% if field.data_type == 'boolean' %}<select id='edit-{{ record.id }}-{{ field.key }}' name='{{ field.key }}'"
+            "{% if field.is_required %} required{% endif %}><option value=''>Choose a value</option>"
+            "<option value='true'{% if values.get(field.key) == true %} selected{% endif %}>Yes</option>"
+            "<option value='false'{% if values.get(field.key) == false %} selected{% endif %}>No</option></select>"
+            "{% else %}<input id='edit-{{ record.id }}-{{ field.key }}' name='{{ field.key }}' "
+            "type='{{ 'date' if field.data_type == 'date' else 'text' }}' value='{{ values.get(field.key, '') }}'"
+            "{% if field.is_required %} required{% endif %}>{% endif %}</div>{% endfor %}</div>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><input type='hidden' name='expected_revision' "
+            "value='{{ record.revision }}'><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Save record</button></footer></form>"
+            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
+            "action='{{ url_for(\"delete_dataset_record\", key=dataset.key, record_id=record.id) }}'>"
+            "<div class='side-panel-body'><h3>Delete record?</h3><p class='delete-confirmation'>"
+            "This deletion cannot be undone.</p><input type='hidden' name='confirm' value='yes'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><input type='hidden' name='expected_revision' "
+            "value='{{ record.revision }}'></div><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-danger' type='submit'>Delete record</button></footer></form>{% endif %}"
+            "</div></dialog>{% endfor %}"
             '<nav>{% if page.page > 1 %}<a href=\'{{ url_for("dataset_records_view", '
             "key=dataset.key, page=page.page-1) }}'>Previous</a>{% endif %} "
             "{% if page.page * page.page_size < page.total %}<a href='{{ "
@@ -442,6 +605,12 @@ def create_flask_app(
             rows=rows,
             page=page,
             may_edit=may_edit,
+            may_configure=may_configure,
+            csrf=login_session.csrf_token,
+            record_type=record_type,
+            range_start=range_start,
+            range_end=range_end,
+            display_record_value=display_record_value,
         )
 
     @dataset_route("/datasets/<key>/records/export", methods=["GET"])
@@ -476,12 +645,12 @@ def create_flask_app(
 
     def render_import_upload(dataset, csrf, error=None, status=200):
         response = render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Import records</h1>{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
+            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
+            "</nav><h1>Import records</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
             "<form method='post' enctype='multipart/form-data'>"
             "<label>CSV or Excel file <input type='file' name='file' accept='.csv,.xlsx' required>"
             "</label><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Upload</button></form>",
+            "<button>Upload file</button></form>",
             dataset=dataset,
             csrf=csrf,
             error=error,
@@ -505,7 +674,7 @@ def create_flask_app(
     def render_mapping(dataset, fields, state, parsed, assistance, csrf, error=None, status=200):
         response = render_template_string(
             "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Map import columns</h1>{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
+            "</nav><h1>Map import columns</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
             "<p>File: {{ state.filename }}</p>{% if parsed.worksheet %}<p>Worksheet: {{ parsed.worksheet }}"
             "</p>{% endif %}{% if parsed.delimiter %}<p>Detected delimiter: {{ parsed.delimiter }}</p>{% endif %}"
             "<section aria-label='Mapping completeness'><p>{{ assistance.completeness.required_mapped }} of "
@@ -523,7 +692,7 @@ def create_flask_app(
             "{% else %}<p>No non-empty example values in the profiling sample.</p>{% endif %}"
             "{% if advice.candidates %}<p>Suggested: {{ advice.candidates[0].field_name }} — "
             "{{ advice.candidates[0].confidence }} confidence. {{ advice.candidates[0].reason }}.</p>{% endif %}"
-            "{% if not advice.candidates %}<p>No name-based suggestion — choose a field or Ignored.</p>{% endif %}"
+            "{% if not advice.candidates %}<p>No name-based suggestion — choose a field or Ignore.</p>{% endif %}"
             "{% if advice.warning %}<p role='alert'>{{ advice.warning }}</p>{% endif %}"
             "<label>Mapping <select name='mapping_{{ loop.index0 }}'>"
             "<option value=''{% if advice.selected == '' %} selected{% endif %}>Choose a field</option>"
@@ -533,7 +702,7 @@ def create_flask_app(
             "<optgroup label='All fields'>{% for field in fields %}{% if field.key not in advice.candidate_keys %}"
             "<option value='{{ field.key }}'{% if advice.selected == field.key %} selected{% endif %}>"
             "{{ field.name }} ({{ field.key }})</option>{% endif %}{% endfor %}</optgroup>"
-            "<option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Ignored</option>"
+            "<option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Ignore</option>"
             "</select></label></fieldset>{% endfor %}"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Validate and preview</button></form>",
             dataset=dataset,
@@ -599,7 +768,7 @@ def create_flask_app(
             )
             fields = field_service.list_fields(actor.id, key)
         except NotFoundError:
-            return "Import expired or unavailable; upload it again", 404
+            return "The import has expired or is unavailable. Upload the file again.", 404
         except ImportValidationError as error:
             return str(error), 400
         return render_mapping(dataset, fields, state, source, assistance, login_session.csrf_token)
@@ -617,7 +786,7 @@ def create_flask_app(
                 actor.id, login_session.id, key, token
             )
         except NotFoundError:
-            return "Import expired or unavailable; upload it again", 404
+            return "The import has expired or is unavailable. Upload the file again.", 404
         return render_mapping(dataset, fields, state, source, assistance, login_session.csrf_token)
 
     @dataset_route("/datasets/<key>/records/import/<token>/preview", methods=["GET", "POST"])
@@ -668,7 +837,7 @@ def create_flask_app(
                         status=400,
                     )
         except NotFoundError:
-            return "Import expired or unavailable; upload it again", 404
+            return "The import has expired or is unavailable. Upload the file again.", 404
         except ImportValidationError as error:
             return str(error), 400
         mapped_headers = [
@@ -681,7 +850,7 @@ def create_flask_app(
             "{% if preview.source.worksheet %}<p>Worksheet: {{ preview.source.worksheet }}</p>{% endif %}"
             "{% if preview.source.delimiter %}<p>Detected delimiter: {{ preview.source.delimiter }}</p>{% endif %}"
             "<dl><dt>Data rows</dt><dd>{{ preview.source.rows|length }}</dd><dt>Valid rows</dt><dd>{{ preview.valid_rows }}</dd>"
-            "<dt>Total failing rows</dt><dd>{{ preview.invalid_rows }}</dd><dt>Ignored empty rows</dt><dd>{{ preview.source.ignored_empty_rows }}</dd></dl>"
+            "<dt>Failing rows</dt><dd>{{ preview.invalid_rows }}</dd><dt>Ignored empty rows</dt><dd>{{ preview.source.ignored_empty_rows }}</dd></dl>"
             "<h2>Mappings</h2><ul>{% for header, target in mapped_headers %}<li>{{ header }} → {{ target or 'Ignored' }}</li>{% endfor %}</ul>"
             "{% if preview.errors %}<h2>Errors</h2>"
             "{% if preview.non_row_errors %}<h3>File and mapping errors</h3><ul>{% for error in preview.non_row_errors %}<li>"
@@ -691,10 +860,10 @@ def create_flask_app(
             "{% for error in errors %}<li>{% if error.header %}{{ error.header }}: {% endif %}"
             "{% if error.field %}{{ error.field }}: {% endif %}{{ error.message }}</li>{% endfor %}"
             "</ul></section>{% endfor %}{% if preview.row_report_truncated %}"
-            "<p>Showing 100 of {{ preview.invalid_rows }} failing data rows. Row numbers above are "
-            "the original source-file row numbers; row 1 is the header. Later failing rows are not "
+            "<p>Showing 100 of {{ preview.invalid_rows }} failing data rows. Row numbers above refer "
+            "to the source file; row 1 is the header. Later failing rows are not "
             "shown.</p>{% endif %}{% endif %}"
-            "<h2>Sample</h2><table>{% for row in preview.sample %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</table>"
+            "<h2>Sample</h2><div class='table-scroll'><table aria-label='Import sample'>{% for row in preview.sample %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</table></div>"
             "{% if preview.valid %}<form method='post' action='{{ url_for(\"confirm_record_import\", key=dataset.key, token=token) }}'>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Import {{ preview.valid_rows }} records</button></form>{% endif %}"
             "<form method='post' action='{{ url_for(\"cancel_record_import\", key=dataset.key, token=token) }}'>"
@@ -716,7 +885,7 @@ def create_flask_app(
         try:
             record_imports.confirm(actor.id, login_session.id, key, token)
         except NotFoundError:
-            return "Import expired or unavailable; upload it again", 404
+            return "The import has expired or is unavailable. Upload the file again.", 404
         except (ImportValidationError, RecordConflictError) as error:
             return str(error), 409
         return redirect(url_for("dataset_records_view", key=key))
@@ -728,7 +897,7 @@ def create_flask_app(
         try:
             record_imports.cancel(actor.id, login_session.id, key, token)
         except NotFoundError:
-            return "Import expired or unavailable; upload it again", 404
+            return "The import has expired or is unavailable. Upload the file again.", 404
         return redirect(url_for("dataset_records_view", key=key))
 
     def render_record_form(
@@ -997,12 +1166,12 @@ def create_flask_app(
                 return redirect(url_for("dataset_records_view", key=key))
         response = render_template_string(
             "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Delete record</h1>{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
-            "<p>Record identifier: {{ identifier }}</p><p>This deletion is permanent.</p>"
+            "</nav><h1>Delete record</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
+            "<p>Record identifier: {{ identifier }}</p><p>This deletion cannot be undone.</p>"
             "<form method='post'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<input type='hidden' name='expected_revision' value='{{ record.revision }}'>"
-            "<label><input type='checkbox' name='confirm' value='yes'> Confirm permanent "
-            "deletion</label><button>Delete record</button></form>",
+            "<label><input type='checkbox' name='confirm' value='yes'> I confirm permanent "
+            "deletion</label><button class='button-danger'>Delete record</button></form>",
             dataset=dataset,
             record=record,
             identifier=identifier,
@@ -1122,7 +1291,7 @@ def create_flask_app(
             "{% if is_unique %} checked{% endif %}> Unique</label>"
             "<label><input type='checkbox' name='is_business_key_component'"
             "{% if is_business_key_component %} checked{% endif %}> "
-            "Part of Record identifier</label>"
+            "Part of record identifier</label>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Add field</button></form>",
             dataset=dataset,
@@ -1215,13 +1384,13 @@ def create_flask_app(
             "{% if is_unique %} checked{% endif %}> Unique</label>"
             "<label><input type='checkbox' name='is_business_key_component'"
             "{% if is_business_key_component %} checked{% endif %}> "
-            "Part of Record identifier</label>"
+            "Part of record identifier</label>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Save field</button></form>"
             "<form method='post' action='{{ url_for(\"delete_dataset_field\", "
             "key=dataset.key, field_key=field.key) }}'>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Delete field</button></form>",
+            "<button class='button-danger'>Delete field</button></form>",
             dataset=dataset,
             field=field,
             name=name,
@@ -1357,9 +1526,12 @@ def create_flask_app(
             )
             return response
         return form_with_anonymous_csrf(
-            "<form method='post'><input name='email'><input name='display_name'>"
-            "<input name='password' type='password'><input type='hidden' name='csrf_token' "
-            "value='{{ csrf_token }}'><button>Create administrator</button></form>"
+            "<div class='card'><h1>Set up administrator</h1><form method='post'>"
+            "<label for='setup-email'>Email address</label><input id='setup-email' name='email' type='email' autocomplete='email' required>"
+            "<label for='setup-name'>Name</label><input id='setup-name' name='display_name' autocomplete='name' required>"
+            "<label for='setup-password'>Password</label><input id='setup-password' name='password' type='password' autocomplete='new-password' required>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf_token }}'>"
+            "<button>Create administrator</button></form></div>"
         )
 
     @app.route("/login", methods=["GET", "POST"])
@@ -1410,9 +1582,13 @@ def create_flask_app(
             attempt.failed()
             return GENERIC_LOGIN_FAILURE, 401
         return form_with_anonymous_csrf(
-            "<form method='post'><input name='email'><input name='password' type='password'>"
+            "<div class='card'><h1>Sign in</h1><p>Sign in to manage your reference data.</p>"
+            "<form class='login-form' method='post'><label for='login-email'>Email address</label>"
+            "<input id='login-email' name='email' type='email' autocomplete='username' required>"
+            "<label for='login-password'>Password</label>"
+            "<input id='login-password' name='password' type='password' autocomplete='current-password' required>"
             "<input type='hidden' name='csrf_token' value='{{ csrf_token }}'>"
-            "<button>Log in</button></form>"
+            "<button type='submit'>Sign in</button></form></div>"
         )
 
     @app.post("/logout")
@@ -1437,24 +1613,81 @@ def create_flask_app(
         actor, login_session = require_admin()
         managed_users = users.list_users(actor.id)
         return render_template_string(
-            "<h1>Users</h1><ul>{% for user in users %}<li>"
-            "{{ user.display_name }} — {{ user.email }} ({{ user.role }}) "
-            "active={{ user.is_active }} deleted={{ user.is_deleted }}"
-            "<form method='post' action='/users/{{ user.id }}/email'>"
-            "<input name='email'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Change email</button></form>"
-            "<form method='post' action='/users/{{ user.id }}/disable'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Disable</button></form>"
-            "<form method='post' action='/users/{{ user.id }}/enable'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Enable</button></form>"
-            "<form method='post' action='/users/{{ user.id }}/delete'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Delete</button></form></li>{% endfor %}</ul>"
-            "<form method='post' action='/users'><input name='email'><input name='display_name'>"
-            "<input name='password' type='password'><input type='hidden' name='csrf_token' "
-            "value='{{ csrf }}'><button>Create user</button></form>",
+            "<div class='page-header dataset-list-header'><div><h1>My Users</h1></div>"
+            "<div class='page-actions'><label class='visually-hidden' for='user-search'>Search users</label>"
+            "<input id='user-search' type='search' placeholder='Search by name or email…' data-list-search>"
+            "<button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button>"
+            "</div></div><div class='dataset-tabs' aria-label='User filters'>"
+            "<button class='button button-tab is-active' type='button'>All</button>"
+            "<button class='button button-tab' type='button' disabled>Active</button>"
+            "<button class='button button-tab' type='button' disabled>Inactive</button>"
+            "<button class='button button-tab' type='button' disabled>Deleted</button></div>"
+            "<div class='table-scroll dataset-table'><table><thead><tr><th scope='col'>Name</th>"
+            "<th scope='col'>Email address</th><th scope='col'>Role</th><th scope='col'>Status</th>"
+            "</tr></thead><tbody>{% for user in users %}"
+            "<tr class='record-row' tabindex='0' role='button' aria-haspopup='dialog' data-record-row "
+            "data-dialog-open='user-panel-{{ user.id }}' data-list-row "
+            "data-search-text='{{ user.display_name }} {{ user.email }} {{ user.role }}'>"
+            "<td><strong>{{ user.display_name }}</strong></td><td>{{ user.email }}</td>"
+            "<td>{{ 'Administrator' if user.role == 'admin' else 'User' }}</td><td>"
+            "{% if user.is_deleted %}<span class='badge badge-error'>Deleted</span>"
+            "{% elif user.is_active %}<span class='badge badge-success'>Active</span>"
+            "{% else %}<span class='badge badge-warning'>Inactive</span>{% endif %}</td></tr>{% endfor %}"
+            "</tbody></table></div>"
+            "{% for user in users %}<dialog class='side-panel' id='user-panel-{{ user.id }}' data-side-panel "
+            "data-record-panel data-panel-entity='user' data-default-subtitle='View user' "
+            "aria-labelledby='user-panel-title-{{ user.id }}'><div class='side-panel-layout'>"
+            "<header class='side-panel-header'><div><h2 id='user-panel-title-{{ user.id }}'>"
+            "{{ user.display_name }}</h2><p data-record-subtitle>View user</p></div>"
+            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button></header>"
+            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
+            "<dl class='record-details'><div><dt>Name</dt><dd>{{ user.display_name }}</dd></div>"
+            "<div><dt>Email address</dt><dd>{{ user.email }}</dd></div><div><dt>Role</dt>"
+            "<dd>{{ 'Administrator' if user.role == 'admin' else 'User' }}</dd></div><div><dt>Status</dt><dd>"
+            "{{ 'Deleted' if user.is_deleted else ('Active' if user.is_active else 'Inactive') }}</dd></div></dl>"
+            "{% if not user.is_deleted %}<form class='user-state-action' method='post' "
+            "action='/users/{{ user.id }}/{{ 'disable' if user.is_active else 'enable' }}'>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-secondary'>"
+            "{{ 'Disable user' if user.is_active else 'Enable user' }}</button></form>{% endif %}</div>"
+            "{% if not user.is_deleted %}<footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit user</button>"
+            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete user</button>"
+            "</footer>{% endif %}</section>"
+            "{% if not user.is_deleted %}<form class='side-panel-view side-panel-form' data-record-view='edit' "
+            "hidden method='post' action='/users/{{ user.id }}/email'><div class='side-panel-body'>"
+            "<div class='form-field'><label for='edit-user-name-{{ user.id }}'>Name</label>"
+            "<input id='edit-user-name-{{ user.id }}' value='{{ user.display_name }}' disabled></div>"
+            "<div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label>"
+            "<input id='edit-user-email-{{ user.id }}' name='email' type='email' value='{{ user.email }}' required></div>"
+            "<div class='form-field'><label for='edit-user-role-{{ user.id }}'>Role</label>"
+            "<input id='edit-user-role-{{ user.id }}' value='{{ 'Administrator' if user.role == 'admin' else 'User' }}' disabled></div>"
+            "</div><input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Save user</button></footer></form>"
+            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
+            "action='/users/{{ user.id }}/delete'><div class='side-panel-body'><h3>Delete user?</h3>"
+            "<p class='delete-confirmation'>This deletion cannot be undone.</p>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'></div><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-danger' type='submit'>Delete user</button></footer></form>{% endif %}"
+            "</div></dialog>{% endfor %}"
+            "<dialog class='side-panel' id='add-user-panel' data-side-panel aria-labelledby='add-user-title'>"
+            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
+            "<h2 id='add-user-title'>New user</h2><p>Add user</p></div>"
+            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
+            "</header><form class='side-panel-form' method='post' action='/users'>"
+            "<div class='side-panel-body'><div class='form-field'><label for='new-user-email'>Email address</label>"
+            "<input id='new-user-email' name='email' type='email' required autofocus></div>"
+            "<div class='form-field'><label for='new-user-name'>Name</label>"
+            "<input id='new-user-name' name='display_name' required></div>"
+            "<div class='form-field'><label for='new-user-password'>Password</label>"
+            "<input id='new-user-password' name='password' type='password' required></div>"
+            "<div class='form-field'><label for='new-user-role'>Role</label><select id='new-user-role' name='role'>"
+            "<option value='user'>User</option><option value='admin'>Administrator</option></select></div></div>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Create user</button>"
+            "</footer></form></div></dialog>",
             users=managed_users,
             csrf=login_session.csrf_token,
         )
@@ -1498,19 +1731,88 @@ def create_flask_app(
     def team_list():
         actor, login_session = require_admin()
         managed_teams = teams.list_teams(actor.id)
+        team_members = {
+            team.id: memberships.list_team_members(actor.id, team.id) for team in managed_teams
+        }
+        eligible_team_users = {
+            team.id: memberships.list_eligible_users(actor.id, team.id) for team in managed_teams
+        }
+        open_team = request.args.get("open_team")
         return render_template_string(
-            "<h1>Teams</h1><ul>{% for team in teams %}<li>"
-            "{{ team.name }} <a href='/teams/{{ team.id }}/members'>Manage members</a>"
-            "<form method='post' action='/teams/{{ team.id }}/rename'>"
-            "<input name='name'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Rename team</button></form>"
-            "<form method='post' action='/teams/{{ team.id }}/delete'>"
+            "<div class='page-header dataset-list-header'><div><h1>My Teams</h1></div>"
+            "<div class='page-actions'><label class='visually-hidden' for='team-search'>Search teams</label>"
+            "<input id='team-search' type='search' placeholder='Search by name…' data-list-search>"
+            "<button class='button button-primary' type='button' data-dialog-open='add-team-panel'>+ New team</button>"
+            "</div></div><div class='dataset-tabs' aria-label='Team filters'>"
+            "<button class='button button-tab is-active' type='button'>All</button>"
+            "<button class='button button-tab' type='button' disabled>Active</button>"
+            "<button class='button button-tab' type='button' disabled>Archived</button></div>"
+            "{% if teams %}<div class='table-scroll dataset-table'><table><thead><tr>"
+            "<th scope='col'>Name</th><th scope='col'>Last updated</th></tr></thead><tbody>"
+            "{% for team in teams %}<tr class='record-row' tabindex='0' role='button' aria-haspopup='dialog' "
+            "data-record-row data-dialog-open='team-panel-{{ team.id }}' data-list-row "
+            "data-search-text='{{ team.name }}'><td><strong>{{ team.name }}</strong></td>"
+            "<td>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}"
+            "</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2>"
+            "<p>No teams are available.</p></div>{% endif %}"
+            "{% for team in teams %}<dialog class='side-panel' id='team-panel-{{ team.id }}' data-side-panel "
+            "data-record-panel data-panel-entity='team' data-default-subtitle='View team' "
+            "{% if open_team == team.id %}data-auto-open='view' {% endif %}"
+            "aria-labelledby='team-panel-title-{{ team.id }}'><div class='side-panel-layout'>"
+            "<header class='side-panel-header'><div><h2 id='team-panel-title-{{ team.id }}'>{{ team.name }}</h2>"
+            "<p data-record-subtitle>View team</p></div><button class='side-panel-close' type='button' "
+            "data-dialog-close aria-label='Close panel'>×</button></header>"
+            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
+            "<dl class='record-details'><div><dt>Name</dt><dd>{{ team.name }}</dd></div>"
+            "<div><dt>Last updated</dt><dd>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd></div></dl>"
+            "<h3>Team members</h3>{% set members = team_members[team.id] %}"
+            "{% if members %}<ul class='member-list'>{% for membership, user in members %}<li>"
+            "<div><strong>{{ user.display_name }}</strong><span>{{ user.email }}</span></div>"
+            "<form method='post' action='/teams/{{ team.id }}/members/{{ membership.id }}/delete'>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Delete team</button></form></li>{% endfor %}</ul>"
-            "<form method='post' action='/teams'><input name='name'>"
+            "<button class='button button-secondary' type='submit'>Remove</button></form></li>{% endfor %}</ul>"
+            "{% else %}<p>This team has no members.</p>{% endif %}"
+            "{% set eligible_users = eligible_team_users[team.id] %}{% if eligible_users %}"
+            "<form class='add-member-form' method='post' action='/teams/{{ team.id }}/members'>"
+            "<label for='team-user-{{ team.id }}'>Add user</label>"
+            "<select id='team-user-{{ team.id }}' name='user_id'>{% for user in eligible_users %}"
+            "<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select>"
             "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Create team</button></form>",
+            "<button class='button button-primary' type='submit'>Add member</button></form>"
+            "{% else %}<p class='help-text'>All eligible users are already members.</p>{% endif %}"
+            "</div><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit team</button>"
+            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete team</button>"
+            "</footer></section>"
+            "<form class='side-panel-view side-panel-form' data-record-view='edit' hidden method='post' "
+            "action='/teams/{{ team.id }}/rename'><div class='side-panel-body'><div class='form-field'>"
+            "<label for='edit-team-name-{{ team.id }}'>Name</label>"
+            "<input id='edit-team-name-{{ team.id }}' name='name' value='{{ team.name }}' required></div></div>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Save team</button></footer></form>"
+            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
+            "action='/teams/{{ team.id }}/delete'><div class='side-panel-body'><h3>Delete team?</h3>"
+            "<p class='delete-confirmation'>This deletion cannot be undone.</p>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'></div><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
+            "<button class='button button-danger' type='submit'>Delete team</button></footer></form>"
+            "</div></dialog>{% endfor %}"
+            "<dialog class='side-panel' id='add-team-panel' data-side-panel aria-labelledby='add-team-title'>"
+            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
+            "<h2 id='add-team-title'>New team</h2><p>Add team</p></div>"
+            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
+            "</header><form class='side-panel-form' method='post' action='/teams'>"
+            "<div class='side-panel-body'><div class='form-field'><label for='new-team-name'>Name</label>"
+            "<input id='new-team-name' name='name' required autofocus></div></div>"
+            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
+            "<button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
+            "<button class='button button-primary' type='submit'>Create team</button></footer>"
+            "</form></div></dialog>",
             teams=managed_teams,
+            team_members=team_members,
+            eligible_team_users=eligible_team_users,
+            open_team=open_team,
             csrf=login_session.csrf_token,
         )
 
@@ -1550,7 +1852,7 @@ def create_flask_app(
             "<button>Remove member</button></form></li>{% endfor %}</ul>"
             "{% else %}<p>This team has no members.</p>{% endif %}"
             "<form method='post' action='/teams/{{ team_id }}/members'>"
-            "<select name='user_id'>{% for user in eligible_users %}"
+            "<label for='team-user'>User</label><select id='team-user' name='user_id'>{% for user in eligible_users %}"
             "<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>"
             "{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
             "<button>Add member</button></form>",
@@ -1565,14 +1867,14 @@ def create_flask_app(
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
         memberships.create_membership(actor.id, request.form["user_id"], team_id)
-        return redirect(url_for("team_members", team_id=team_id))
+        return redirect(url_for("team_list", open_team=team_id))
 
     @app.post("/teams/<team_id>/members/<membership_id>/delete")
     def delete_membership(team_id: str, membership_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
         memberships.delete_membership(actor.id, team_id, membership_id)
-        return redirect(url_for("team_members", team_id=team_id))
+        return redirect(url_for("team_list", open_team=team_id))
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):

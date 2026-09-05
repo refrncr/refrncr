@@ -400,6 +400,28 @@ def test_user_list_escapes_user_controlled_values(interface):
     assert "&lt;img src=x onerror=alert(1)&gt;" in body
 
 
+def test_user_list_uses_management_layout_and_add_user_panel(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    body = response_text(request(client, "get", "/users"))
+
+    assert "My Users" in body
+    assert "data-list-search" in body
+    assert "<th scope='col'>Email address</th>" in body
+    assert "data-dialog-open='add-user-panel'" in body
+    assert "id='add-user-panel' data-side-panel" in body
+    assert "data-dialog-open='user-panel-" in body
+    assert "data-panel-entity='user'" in body
+    assert "data-record-mode='edit'>Edit user" in body
+    assert "data-record-mode='delete'>Delete user" in body
+    assert "data-record-view='edit' hidden method='post' action='/users/" in body
+    assert "This deletion cannot be undone." in body
+    assert "action='/users'" in body
+    assert "name='role'" in body
+
+
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
     _, _, _, _, _, _, client = interface
     setup_admin(client)
@@ -495,6 +517,17 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
 
     body = response_text(request(client, "get", "/teams"))
     assert "Platform" in body
+    assert "My Teams" in body
+    assert "data-list-search" in body
+    assert "data-dialog-open='add-team-panel'" in body
+    assert f"data-dialog-open='team-panel-{team.id}'" in body
+    assert "data-panel-entity='team'" in body
+    assert "data-record-mode='edit'>Edit team" in body
+    assert "data-record-mode='delete'>Delete team" in body
+    assert f"action='/teams/{team.id}/rename'" in body
+    assert f"action='/teams/{team.id}/delete'" in body
+    assert "<h3>Team members</h3>" in body
+    assert f"action='/teams/{team.id}/members'" in body
     response = request(
         client,
         "post",
@@ -604,6 +637,7 @@ def test_admin_views_empty_team_and_adds_and_removes_member(interface):
         data={"user_id": managed.id, "csrf_token": csrf},
     )
     assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/teams?open_team={team.id}")
     with factory() as session:
         membership = session.scalar(select(Membership))
     body = response_text(request(client, "get", f"/teams/{team.id}/members"))

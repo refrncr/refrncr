@@ -1,0 +1,21 @@
+{% macro alert(message, kind='error') -%}
+  {% if message %}<div class="alert alert-{{ kind }}" role="alert">{{ message }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro empty_state(title, description='') -%}
+  <div class="empty-state">
+    <h2>{{ title }}</h2>
+    {% if description %}<p>{{ description }}</p>{% endif %}
+    {{ caller() if caller else '' }}
+  </div>
+{%- endmacro %}
+
+{% macro confirmation_dialog(id, title, description) -%}
+  <dialog class="dialog" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-description">
+    <div class="dialog-content">
+      <h2 id="{{ id }}-title">{{ title }}</h2>
+      <p id="{{ id }}-description">{{ description }}</p>
+      {{ caller() }}
+    </div>
+  </dialog>
+{%- endmacro %}

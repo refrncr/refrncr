@@ -40,7 +40,15 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-refrncr = ["migrations/*.py", "migrations/*.mako", "migrations/versions/*.py"]
+refrncr = [
+    "migrations/*.py",
+    "migrations/*.mako",
+    "migrations/versions/*.py",
+    "static/css/*.css",
+    "static/js/*.js",
+    "static/images/*.svg",
+    "templates/*.html",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

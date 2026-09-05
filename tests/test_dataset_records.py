@@ -557,7 +557,7 @@ def test_browser_add_list_validation_security_and_escaping(record_services):
     assert created.status_code == 302
     listing = client.get(f"/datasets/{dataset.key}/records", base_url="https://localhost")
     assert "&lt;b&gt;safe&lt;/b&gt;" in listing.get_data(as_text=True)
-    assert "🔑" in listing.get_data(as_text=True)
+    assert "images/lucide-key-round.svg" in listing.get_data(as_text=True)
     assert (
         client.get(
             f"/datasets/{dataset.key}/records?page=1&page=2", base_url="https://localhost"
@@ -709,7 +709,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
     delete_url = f"/datasets/{dataset.key}/records/{record.id}/delete"
     confirmation = client.get(delete_url, base_url="https://localhost")
     assert "2 / changed" in confirmation.get_data(as_text=True)
-    assert "permanent" in confirmation.get_data(as_text=True)
+    assert "cannot be undone" in confirmation.get_data(as_text=True)
     assert (
         client.post(
             delete_url,
