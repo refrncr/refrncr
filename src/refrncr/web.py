@@ -317,24 +317,25 @@ def create_flask_app(
         )
 
     def render_dataset_create_form(
-        *, key: str = "", name: str = "", description: str = "", error=None
+        *,
+        key: str = "",
+        name: str = "",
+        description: str = "",
+        error=None,
+        error_field=None,
     ):
-        _actor, login_session = require_admin()
-        return render_template_string(
-            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_list\") }}'>Datasets</a></nav>"
-            "<h1>New dataset</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"create_dataset\") }}'>"
-            "<label>Key <input name='key' value='{{ key }}' required aria-describedby='key-help'></label>"
-            "<p class='help-text' id='key-help'>A permanent technical identifier.</p>"
-            "<label>Name <input name='name' value='{{ name }}' required></label>"
-            "<label>Description <textarea name='description'>{{ description }}</textarea></label>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Create dataset</button></form>",
+        actor, login_session = require_admin()
+        return render_template(
+            "pages/datasets/create.html",
             key=key,
             name=name,
             description=description,
             error=error,
-            csrf=login_session.csrf_token,
+            error_field=error_field,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @dataset_route("/datasets/new", methods=["GET"])
@@ -355,11 +356,21 @@ def create_flask_app(
         try:
             dataset = dataset_service.create_dataset(actor.id, key, name, description)
         except (ValidationError, ConflictError) as error:
+            message = str(error)
+            if message.startswith("Dataset key"):
+                error_field = "key"
+            elif message.startswith("Dataset name"):
+                error_field = "name"
+            elif message.startswith("Dataset description"):
+                error_field = "description"
+            else:
+                error_field = None
             response = render_dataset_create_form(
                 key=key,
                 name=name,
                 description=description,
-                error=str(error),
+                error=message,
+                error_field=error_field,
             )
             return response, 409 if isinstance(error, ConflictError) else 400
         return redirect(url_for("dataset_detail", key=dataset.key))

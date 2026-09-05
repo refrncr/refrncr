@@ -422,15 +422,51 @@ def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_brows
     assert events == {("dataset", "created"), ("grant", "created")}
 
 
+def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
+    _, _, _, client = dataset_browser
+    login(client)
+
+    response = request(client, "get", "/datasets/new")
+    page = body(response)
+
+    assert response.status_code == 200
+    assert "<title>New dataset · REFRNCR</title>" in page
+    assert '<header class="page-header">' in page
+    assert "<form method='post' action='/datasets'>" in page
+    assert "<label for='dataset-key'>Key</label>" in page
+    assert "id='dataset-key' name='key' type='text' value='' required" in page
+    assert "aria-describedby='dataset-key-help'" in page
+    assert "id='dataset-key-help'>A permanent technical identifier.</p>" in page
+    assert "<label for='dataset-name'>Name</label>" in page
+    assert "id='dataset-name' name='name' type='text' value='' required" in page
+    assert "<label for='dataset-description'>Description</label>" in page
+    assert "<textarea id='dataset-description' name='description'></textarea>" in page
+    assert '<a class="button button-secondary" href="/datasets">Cancel</a>' in page
+    assert '<button class="button button-primary" type="submit">Create dataset</button>' in page
+    assert "aria-invalid='true'" not in page
+
+
 @pytest.mark.parametrize(
-    ("overrides", "status"),
+    ("overrides", "status", "error_field", "message"),
     [
-        ({"key": "INVALID"}, 400),
-        ({"name": "   "}, 400),
-        ({"description": "x" * 10_001}, 400),
+        (
+            {"key": "INVALID"},
+            400,
+            "dataset-key",
+            "Dataset key must contain 1-100 lowercase ASCII letters",
+        ),
+        ({"name": "   "}, 400, "dataset-name", "Dataset name must contain"),
+        (
+            {"description": "x" * 10_001},
+            400,
+            "dataset-description",
+            "Dataset description must not exceed 10000 characters",
+        ),
     ],
 )
-def test_create_validation_safely_redisplays_values(dataset_browser, overrides, status):
+def test_create_validation_safely_redisplays_values(
+    dataset_browser, overrides, status, error_field, message
+):
     factory, _, _, client = dataset_browser
     login(client)
     form = request(client, "get", "/datasets/new")
@@ -446,9 +482,13 @@ def test_create_validation_safely_redisplays_values(dataset_browser, overrides, 
     response = request(client, "post", "/datasets", data=data)
 
     assert response.status_code == status
-    assert submitted_markup not in body(response)
+    page = body(response)
+    assert submitted_markup not in page
+    assert message in page
+    assert page.count("aria-invalid='true'") == 1
+    assert f"id='{error_field}-error'" in page
     if overrides.get("name") != "   ":
-        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
@@ -474,6 +514,8 @@ def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
     assert response.status_code == 409
     assert "Dataset key already exists in this installation" in body(response)
     assert "Preserved" in body(response)
+    assert "id='dataset-key-error'" in body(response)
+    assert body(response).count("aria-invalid='true'") == 1
     assert "sql" not in body(response).casefold()
 
 

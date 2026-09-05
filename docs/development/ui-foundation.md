@@ -63,7 +63,8 @@ The current reusable Jinja primitives are:
 - `page_header`, for a page title and optional description;
 - `button`, for link actions and real buttons using the same variants;
 - `form_field`, for a labelled input with optional autocomplete, required, value, help, error,
-  disabled, `aria-describedby`, and `aria-invalid` behaviour;
+  disabled, `aria-describedby`, and `aria-invalid` behaviour; the same contract renders an
+  input or textarea when a migrated page needs that control;
 - `feedback`, for escaped status or error feedback with the appropriate live-region role.
 
 The overview uses `page_header` and both link-button variants. The login and setup pages use the
@@ -71,6 +72,10 @@ shared auth layout, `form_field`, `feedback`, and a real submit-button variant. 
 failures are shown once as generic form feedback and referenced by both login fields. Neither
 submitted login field is rendered back into the response. Setup may safely redisplay the email
 and display name after validation, but never the submitted password.
+
+The Dataset-create page combines `page_header`, `form_field`, `feedback`, and link/submit button
+variants. Its Description field selects the generic textarea control while retaining the same
+label, value, error, disabled, and accessible-description contract as text inputs.
 
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.

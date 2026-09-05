@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "components.html" import button, feedback, form_field %}
+{% from "layouts/page.html" import page_header %}
+
+{% block title %}New dataset · REFRNCR{% endblock %}
+
+{% block content %}
+  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_list") }}'>Datasets</a></nav>
+  {{ page_header("New dataset") }}
+  {{ feedback(error if not error_field else none, id="dataset-create-error") }}
+  <form method='post' action='{{ url_for("create_dataset") }}'>
+    {{ form_field(
+      "Key",
+      "key",
+      "dataset-key",
+      required=true,
+      value=key,
+      help_text="A permanent technical identifier.",
+      error=error if error_field == "key" else none
+    ) }}
+    {{ form_field(
+      "Name",
+      "name",
+      "dataset-name",
+      required=true,
+      value=name,
+      error=error if error_field == "name" else none
+    ) }}
+    {{ form_field(
+      "Description",
+      "description",
+      "dataset-description",
+      value=description,
+      error=error if error_field == "description" else none,
+      control="textarea"
+    ) }}
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <div class='form-actions'>
+      {{ button("Cancel", url_for("dataset_list"), variant="secondary") }}
+      {{ button("Create dataset", button_type="submit") }}
+    </div>
+  </form>
+{% endblock %}
