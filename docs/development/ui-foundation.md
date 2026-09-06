@@ -96,8 +96,9 @@ Community user, team, and membership management use file templates and the same 
 structure. Team membership data is loaded only for the team selected through `open_team`, avoiding
 per-team membership queries on the list page while preserving the existing management workflows.
 
-Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
-without changing their route behaviour.
+Dataset field, standalone record mutation, and record-import workflows also use file templates.
+The legacy inline-template adapter has been removed; non-HTML downloads, redirects, and plain-text
+security responses retain their existing response contracts.
 
 Reusable classes include:
 

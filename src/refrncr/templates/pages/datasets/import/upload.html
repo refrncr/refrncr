@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Records</a></nav><h1>Import records</h1>
+  {% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}
+  <form method='post' enctype='multipart/form-data'><label>CSV or Excel file <input type='file' name='file' accept='.csv,.xlsx' required></label><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button>Upload file</button></form>
+{% endblock %}

@@ -18,7 +18,6 @@ from flask import (
     send_file,
     url_for,
 )
-from flask import render_template_string as flask_render_template_string
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from refrncr.browser_security import (
@@ -194,16 +193,15 @@ def create_flask_app(
             return "teams"
         return ""
 
-    def render_template_string(template: str, **context):
+    def render_authenticated_template(template_name: str, **context):
         resolved = authenticated()
         actor = resolved[0] if resolved else None
         csrf = resolved[1].csrf_token if resolved else None
-        page = "{% extends 'base.html' %}{% block content %}" + template + "{% endblock %}"
         context.setdefault("current_actor", actor)
         context.setdefault("current_csrf", csrf)
         context.setdefault("active_navigation", active_navigation())
         context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
-        return flask_render_template_string(page, **context)
+        return render_template(template_name, **context)
 
     def require_admin():
         resolved = authenticated()
@@ -529,73 +527,32 @@ def create_flask_app(
         return response
 
     def render_import_upload(dataset, csrf, error=None, status=200):
-        response = render_template_string(
-            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Import records</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
-            "<form method='post' enctype='multipart/form-data'>"
-            "<label>CSV or Excel file <input type='file' name='file' accept='.csv,.xlsx' required>"
-            "</label><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Upload file</button></form>",
+        response = render_authenticated_template(
+            "pages/datasets/import/upload.html",
             dataset=dataset,
-            csrf=csrf,
+            current_csrf=csrf,
             error=error,
         )
         return (response, status) if status != 200 else response
 
     def render_worksheet(dataset, state, parsed, csrf):
-        return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Select worksheet</h1><p>File: {{ state.filename }}</p>"
-            "<form method='post' action='{{ url_for(\"select_import_worksheet\", key=dataset.key, token=state.token) }}'>"
-            "<label>Visible worksheet <select name='worksheet'>{% for sheet in parsed.worksheets %}"
-            "<option value='{{ sheet }}'>{{ sheet }}</option>{% endfor %}</select></label>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Continue</button></form>",
+        return render_authenticated_template(
+            "pages/datasets/import/worksheet.html",
             dataset=dataset,
             state=state,
             parsed=parsed,
-            csrf=csrf,
+            current_csrf=csrf,
         )
 
     def render_mapping(dataset, fields, state, parsed, assistance, csrf, error=None, status=200):
-        response = render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Map import columns</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
-            "<p>File: {{ state.filename }}</p>{% if parsed.worksheet %}<p>Worksheet: {{ parsed.worksheet }}"
-            "</p>{% endif %}{% if parsed.delimiter %}<p>Detected delimiter: {{ parsed.delimiter }}</p>{% endif %}"
-            "<section aria-label='Mapping completeness'><p>{{ assistance.completeness.required_mapped }} of "
-            "{{ assistance.completeness.required_total }} required fields mapped.</p>"
-            "{% if assistance.completeness.missing_required %}<p role='alert'>Missing required fields: "
-            "{{ assistance.completeness.missing_required|join(', ') }}</p>{% endif %}"
-            "{% if assistance.completeness.missing_identifier %}<p role='alert'>Missing identifier fields: "
-            "{{ assistance.completeness.missing_identifier|join(', ') }}</p>{% endif %}"
-            "<p>{{ assistance.completeness.unmapped_columns }} source columns unmapped; "
-            "{{ assistance.completeness.ignored_columns }} source columns explicitly ignored.</p>"
-            "</section>"
-            "<form method='post' action='{{ url_for(\"preview_record_import\", key=dataset.key, token=state.token) }}'>"
-            "{% for advice in assistance.columns %}<fieldset><legend>{{ advice.header }}</legend>"
-            "{% if advice.samples %}<p>Examples: {% for sample in advice.samples %}<code>{{ sample }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>"
-            "{% else %}<p>No non-empty example values in the profiling sample.</p>{% endif %}"
-            "{% if advice.candidates %}<p>Suggested: {{ advice.candidates[0].field_name }} — "
-            "{{ advice.candidates[0].confidence }} confidence. {{ advice.candidates[0].reason }}.</p>{% endif %}"
-            "{% if not advice.candidates %}<p>No name-based suggestion — choose a field or Ignore.</p>{% endif %}"
-            "{% if advice.warning %}<p role='alert'>{{ advice.warning }}</p>{% endif %}"
-            "<label>Mapping <select name='mapping_{{ loop.index0 }}'>"
-            "<option value=''{% if advice.selected == '' %} selected{% endif %}>Choose a field</option>"
-            "{% if advice.candidates %}<optgroup label='Suggested fields'>{% for candidate in advice.candidates %}"
-            "<option value='{{ candidate.field_key }}'{% if advice.selected == candidate.field_key %} selected{% endif %}>"
-            "[{{ candidate.confidence }}] {{ candidate.field_name }} — {{ candidate.reason }}</option>{% endfor %}</optgroup>{% endif %}"
-            "<optgroup label='All fields'>{% for field in fields %}{% if field.key not in advice.candidate_keys %}"
-            "<option value='{{ field.key }}'{% if advice.selected == field.key %} selected{% endif %}>"
-            "{{ field.name }} ({{ field.key }})</option>{% endif %}{% endfor %}</optgroup>"
-            "<option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Ignore</option>"
-            "</select></label></fieldset>{% endfor %}"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Validate and preview</button></form>",
+        response = render_authenticated_template(
+            "pages/datasets/import/mapping.html",
             dataset=dataset,
             fields=fields,
             state=state,
             parsed=parsed,
             assistance=assistance,
-            csrf=csrf,
+            current_csrf=csrf,
             error=error,
         )
         return (response, status) if status != 200 else response
@@ -728,37 +685,14 @@ def create_flask_app(
         mapped_headers = [
             (preview.source.headers[index], value) for index, value in enumerate(preview.mapping)
         ]
-        return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a></nav>"
-            "<h1>Import preview</h1><p>File: {{ preview.filename }}</p>"
-            "<p><a href='{{ url_for(\"review_import_mapping\", key=dataset.key, token=token) }}'>Review mappings</a></p>"
-            "{% if preview.source.worksheet %}<p>Worksheet: {{ preview.source.worksheet }}</p>{% endif %}"
-            "{% if preview.source.delimiter %}<p>Detected delimiter: {{ preview.source.delimiter }}</p>{% endif %}"
-            "<dl><dt>Data rows</dt><dd>{{ preview.source.rows|length }}</dd><dt>Valid rows</dt><dd>{{ preview.valid_rows }}</dd>"
-            "<dt>Failing rows</dt><dd>{{ preview.invalid_rows }}</dd><dt>Ignored empty rows</dt><dd>{{ preview.source.ignored_empty_rows }}</dd></dl>"
-            "<h2>Mappings</h2><ul>{% for header, target in mapped_headers %}<li>{{ header }} → {{ target or 'Ignored' }}</li>{% endfor %}</ul>"
-            "{% if preview.errors %}<h2>Errors</h2>"
-            "{% if preview.non_row_errors %}<h3>File and mapping errors</h3><ul>{% for error in preview.non_row_errors %}<li>"
-            "{{ error.message }}</li>{% endfor %}</ul>{% endif %}"
-            "{% for row, errors in preview.row_error_groups %}<section><h3>Failing data row "
-            "{{ loop.index }} — source file row {{ row }}</h3><ul>"
-            "{% for error in errors %}<li>{% if error.header %}{{ error.header }}: {% endif %}"
-            "{% if error.field %}{{ error.field }}: {% endif %}{{ error.message }}</li>{% endfor %}"
-            "</ul></section>{% endfor %}{% if preview.row_report_truncated %}"
-            "<p>Showing 100 of {{ preview.invalid_rows }} failing data rows. Row numbers above refer "
-            "to the source file; row 1 is the header. Later failing rows are not "
-            "shown.</p>{% endif %}{% endif %}"
-            "<h2>Sample</h2><div class='table-scroll'><table aria-label='Import sample'>{% for row in preview.sample %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</table></div>"
-            "{% if preview.valid %}<form method='post' action='{{ url_for(\"confirm_record_import\", key=dataset.key, token=token) }}'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Import {{ preview.valid_rows }} records</button></form>{% endif %}"
-            "<form method='post' action='{{ url_for(\"cancel_record_import\", key=dataset.key, token=token) }}'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button>Cancel import</button></form>",
+        return render_authenticated_template(
+            "pages/datasets/import/preview.html",
             dataset=dataset,
             fields=fields,
             preview=preview,
             mapped_headers=mapped_headers,
             token=token,
-            csrf=login_session.csrf_token,
+            current_csrf=login_session.csrf_token,
         )
 
     @dataset_route("/datasets/<key>/records/import/<token>/confirm", methods=["POST"])
@@ -797,30 +731,11 @@ def create_flask_app(
     ):
         submitted = submitted or {}
         errors = errors or {}
-        response = render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>{{ 'Edit record' if record else 'Add record' }}</h1>"
-            "{% if errors.get('_record') %}"
-            "<p role='alert'>{{ errors['_record'] }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"edit_dataset_record\", key=dataset.key, "
-            'record_id=record.id) if record else url_for("create_dataset_record", '
-            "key=dataset.key) }}'>"
-            "{% for field in fields %}<div><label>{{ field.name }}{% if field.is_required %} *"
-            "{% endif %}{% if field.data_type == 'boolean' %}<select name='{{ field.key }}'>"
-            "<option value=''>—</option><option value='true'{% if submitted.get(field.key) == "
-            "'true' %} selected{% endif %}>true</option><option value='false'{% if "
-            "submitted.get(field.key) == 'false' %} selected{% endif %}>false</option></select>"
-            "{% else %}<input name='{{ field.key }}' type='{{ 'date' if field.data_type == 'date' "
-            "else 'text' }}' value='{{ submitted.get(field.key, '') }}'>{% endif %}</label>"
-            "{% if errors.get(field.key) %}<span role='alert'>{{ errors[field.key] }}</span>"
-            "{% endif %}</div>{% endfor %}<input type='hidden' name='csrf_token' "
-            "value='{{ csrf }}'>"
-            "{% if record %}<input type='hidden' name='expected_revision' "
-            "value='{{ record.revision }}'>{% endif %}"
-            "<button>{{ 'Save record' if record else 'Add record' }}</button></form>",
+        response = render_authenticated_template(
+            "pages/datasets/records/form.html",
             dataset=dataset,
             fields=fields,
-            csrf=csrf,
+            current_csrf=csrf,
             submitted=submitted,
             errors=errors,
             record=record,
@@ -1049,18 +964,12 @@ def create_flask_app(
                 abort(404)
             else:
                 return redirect(url_for("dataset_records_view", key=key))
-        response = render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_records_view\", key=dataset.key) }}'>Records</a>"
-            "</nav><h1>Delete record</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}"
-            "<p>Record identifier: {{ identifier }}</p><p>This deletion cannot be undone.</p>"
-            "<form method='post'><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<input type='hidden' name='expected_revision' value='{{ record.revision }}'>"
-            "<label><input type='checkbox' name='confirm' value='yes'> I confirm permanent "
-            "deletion</label><button class='button-danger'>Delete record</button></form>",
+        response = render_authenticated_template(
+            "pages/datasets/records/delete.html",
             dataset=dataset,
             record=record,
             identifier=identifier,
-            csrf=login_session.csrf_token,
+            current_csrf=login_session.csrf_token,
             error=error,
         )
         return (response, status) if status != 200 else response
@@ -1173,27 +1082,8 @@ def create_flask_app(
         is_business_key_component: bool = False,
         error=None,
     ):
-        return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
-            "Dataset</a></nav><h1>Add field</h1>"
-            "{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"create_dataset_field\", "
-            "key=dataset.key) }}'>"
-            "<label>Key <input name='key' value='{{ key }}'></label>"
-            "<label>Name <input name='name' value='{{ name }}'></label>"
-            "<label>Type <select name='data_type'>"
-            "{% for choice in type_choices %}<option value='{{ choice }}'"
-            "{% if choice == data_type %} selected{% endif %}>{{ choice }}</option>{% endfor %}"
-            "</select></label>"
-            "<label><input type='checkbox' name='is_required'"
-            "{% if is_required %} checked{% endif %}> Required</label>"
-            "<label><input type='checkbox' name='is_unique'"
-            "{% if is_unique %} checked{% endif %}> Unique</label>"
-            "<label><input type='checkbox' name='is_business_key_component'"
-            "{% if is_business_key_component %} checked{% endif %}> "
-            "Part of record identifier</label>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Add field</button></form>",
+        return render_authenticated_template(
+            "pages/datasets/fields/create.html",
             dataset=dataset,
             key=key,
             name=name,
@@ -1202,7 +1092,7 @@ def create_flask_app(
             is_unique=is_unique,
             is_business_key_component=is_business_key_component,
             error=error,
-            csrf=csrf,
+            current_csrf=csrf,
             type_choices=DATASET_FIELD_TYPES,
         )
 
@@ -1266,31 +1156,8 @@ def create_flask_app(
         is_business_key_component: bool,
         error=None,
     ):
-        return render_template_string(
-            "<nav><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
-            "Dataset</a></nav><h1>Edit field</h1>"
-            "<p>Key: <code>{{ field.key }}</code></p>"
-            "{% if error %}<p role='alert'>{{ error }}</p>{% endif %}"
-            "<form method='post' action='{{ url_for(\"update_dataset_field\", "
-            "key=dataset.key, field_key=field.key) }}'>"
-            "<label>Name <input name='name' value='{{ name }}'></label>"
-            "<label>Type <select name='data_type'>"
-            "{% for choice in type_choices %}<option value='{{ choice }}'"
-            "{% if choice == data_type %} selected{% endif %}>{{ choice }}</option>{% endfor %}"
-            "</select></label>"
-            "<label><input type='checkbox' name='is_required'"
-            "{% if is_required %} checked{% endif %}> Required</label>"
-            "<label><input type='checkbox' name='is_unique'"
-            "{% if is_unique %} checked{% endif %}> Unique</label>"
-            "<label><input type='checkbox' name='is_business_key_component'"
-            "{% if is_business_key_component %} checked{% endif %}> "
-            "Part of record identifier</label>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Save field</button></form>"
-            "<form method='post' action='{{ url_for(\"delete_dataset_field\", "
-            "key=dataset.key, field_key=field.key) }}'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button class='button-danger'>Delete field</button></form>",
+        return render_authenticated_template(
+            "pages/datasets/fields/edit.html",
             dataset=dataset,
             field=field,
             name=name,
@@ -1299,7 +1166,7 @@ def create_flask_app(
             is_unique=is_unique,
             is_business_key_component=is_business_key_component,
             error=error,
-            csrf=csrf,
+            current_csrf=csrf,
             type_choices=DATASET_FIELD_TYPES,
         )
 

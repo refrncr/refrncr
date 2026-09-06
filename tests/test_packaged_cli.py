@@ -140,6 +140,15 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/templates/pages/teams/_membership_controls.html",
         "refrncr/templates/pages/teams/_team_form_fields.html",
         "refrncr/templates/pages/teams/_team_panels.html",
+        "refrncr/templates/pages/datasets/import/upload.html",
+        "refrncr/templates/pages/datasets/import/worksheet.html",
+        "refrncr/templates/pages/datasets/import/mapping.html",
+        "refrncr/templates/pages/datasets/import/preview.html",
+        "refrncr/templates/pages/datasets/records/form.html",
+        "refrncr/templates/pages/datasets/records/delete.html",
+        "refrncr/templates/pages/datasets/fields/_form_fields.html",
+        "refrncr/templates/pages/datasets/fields/create.html",
+        "refrncr/templates/pages/datasets/fields/edit.html",
     } <= files
     assert not any(name.endswith((".db", ".pyc")) or "__pycache__" in name for name in files)
 

@@ -520,6 +520,15 @@ def test_record_page_has_no_inline_markup_and_side_panel_component_is_generic():
     assert "|safe" not in side_panel
 
 
+def test_web_module_has_no_legacy_string_templates():
+    web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
+
+    assert "render_template_string" not in web_source
+    assert "flask_render_template_string" not in web_source
+    assert '"<form' not in web_source and '"<dialog' not in web_source
+    assert '"{% ' not in web_source and '"{{ ' not in web_source
+
+
 def test_record_table_pagination_keeps_range_and_links(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "pages")
