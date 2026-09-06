@@ -131,9 +131,11 @@ New templates must:
 9. return focus to a dialog trigger through the native `<dialog>` behaviour;
 10. render all user-controlled values through Jinja auto-escaping.
 
-At widths below 768 px the sidebar becomes an explicitly controlled menu. Pages must remain
-free of horizontal overflow at 320 px; dense tables may scroll inside their own container.
-Desktop remains the primary target for dataset workflows.
+The supported application workspace starts at 768 px and targets tablet and desktop use. Below
+768 px access is best effort: navigation, forms, and side panels remain operable, while no
+mobile-specific redesign is implied. Pages remain free of horizontal overflow; wide data tables
+retain readable minimum dimensions and scroll horizontally inside their `table-scroll` container.
+Collapsible navigation below 1024 px belongs to REF-128 and is not part of this foundation.
 
 Navigation visibility improves clarity but is never authorization. Every route and mutation
 must continue to enforce server-side permissions and CSRF independently.

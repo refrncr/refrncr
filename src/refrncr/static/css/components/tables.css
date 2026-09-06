@@ -15,7 +15,7 @@ th { background: var(--color-table-heading); color: var(--color-text-secondary);
 .record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .record-toolbar input { width: min(100%, 22rem); margin-top: 0; }
 .record-toolbar span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
-.record-table { table-layout: fixed; }
+.record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }
 .record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
 .record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text-data); font-family: var(--font-data); font-size: var(--font-size-xs); font-style: normal; font-weight: var(--font-weight-regular); vertical-align: middle; }
 .cell-content { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

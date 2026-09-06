@@ -447,6 +447,34 @@ def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
     )
 
 
+def test_record_table_retains_readable_width_inside_scroll_container(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "wide-records")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "description", "Description")
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(
+        admin.id,
+        dataset.key,
+        {"code": "EUR", "description": "Euro"},
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+
+    assert re.search(r"<div class='table-scroll'>\s*<table class='record-table'>", page)
+    assert "--data-table-min-width: 48rem" in tokens
+    assert (
+        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }"
+        in tables
+    )
+    assert ".table-scroll { width: 100%; overflow-x: auto;" in tables
+    assert not re.search(r"\.record-table\s+th[^}]*white-space:\s*nowrap", tables)
+    assert "currencies" not in tables.lower()
+
+
 def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "long-text")
@@ -464,7 +492,7 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     dialog = body(request(client, "get", "/static/css/components/dialog.css"))
 
     assert f"<span class='cell-content' title='{long_text}'>{long_text}</span>" in page
-    assert ".record-table { table-layout: fixed; }" in tables
+    assert "table-layout: fixed" in tables
     assert "text-overflow: ellipsis" in tables
     assert ".side-panel-header h2" in dialog
     assert "font-family: var(--font-display)" in dialog
