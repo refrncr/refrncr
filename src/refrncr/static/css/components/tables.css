@@ -1,0 +1,28 @@
+.table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+table { width: 100%; border-collapse: collapse; font-size: var(--font-size-body-sm); }
+caption { padding: var(--space-md); font-weight: var(--font-weight-bold); text-align: left; }
+th, td { padding: .75rem var(--space-md); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
+th { background: var(--color-table-heading); color: var(--color-text-secondary); font-size: var(--font-size-xs); letter-spacing: .04em; text-transform: uppercase; }
+.table-scroll tbody tr:hover { background: var(--color-row-hover); }
+.management-table { box-shadow: var(--shadow-sm); }
+.management-table th, .management-table td { padding-block: 1rem; }
+.dataset-row, .record-row { cursor: pointer; }
+.dataset-row td:first-child a { color: var(--color-text); font-weight: var(--font-weight-bold); text-decoration: none; }
+.dataset-row:hover { background: var(--color-row-selected); }
+.record-row.is-selected, .record-row.is-selected:hover { background: var(--color-row-selected); box-shadow: inset 3px 0 0 var(--color-action-primary); }
+.numeric-column { text-align: right; font-variant-numeric: tabular-nums; }
+.key-icon { display: inline-block; width: 1rem; height: 1rem; vertical-align: -.2em; }
+.record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.record-toolbar input { width: min(100%, 22rem); margin-top: 0; }
+.record-toolbar span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
+.record-table { table-layout: fixed; }
+.record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
+.record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text-data); font-family: var(--font-data); font-size: var(--font-size-xs); font-style: normal; font-weight: var(--font-weight-regular); vertical-align: middle; }
+.cell-content { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); margin-top: var(--space-md); }
+@media (max-width: 767px) {
+  .record-toolbar { flex-wrap: wrap; }
+  .record-toolbar input { width: 100%; }
+  .record-toolbar span { width: 100%; margin-left: 0; }
+  th, td { padding-inline: var(--space-sm); }
+}

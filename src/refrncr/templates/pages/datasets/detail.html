@@ -18,8 +18,8 @@
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
           <input type='hidden' name='field_id' value='{{ field.id }}'>
-          <button name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>
-          <button name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>
+          <button class='button button-secondary' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>
+          <button class='button button-secondary' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>
         </form></td>{% endif %}
     </tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset.</p></div>{% endif %}
   </section>

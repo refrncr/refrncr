@@ -1,5 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
   <nav><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Records</a></nav><h1>Select worksheet</h1><p>File: {{ state.filename }}</p>
-  <form method='post' action='{{ url_for("select_import_worksheet", key=dataset.key, token=state.token) }}'><label>Visible worksheet <select name='worksheet'>{% for sheet in parsed.worksheets %}<option value='{{ sheet }}'>{{ sheet }}</option>{% endfor %}</select></label><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button>Continue</button></form>
+  <form class='form' method='post' action='{{ url_for("select_import_worksheet", key=dataset.key, token=state.token) }}'><label>Visible worksheet <select name='worksheet'>{% for sheet in parsed.worksheets %}<option value='{{ sheet }}'>{{ sheet }}</option>{% endfor %}</select></label><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>Continue</button></form>
 {% endblock %}

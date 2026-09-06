@@ -45,8 +45,11 @@ refrncr = [
     "migrations/*.mako",
     "migrations/versions/*.py",
     "static/css/*.css",
+    "static/css/**/*.css",
+    "static/fonts/**/*.woff2",
     "static/js/*.js",
     "static/images/*.svg",
+    "static/licenses/*",
     "templates/*.html",
     "templates/**/*.html",
 ]

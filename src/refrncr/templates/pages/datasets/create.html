@@ -8,7 +8,7 @@
   <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_list") }}'>Datasets</a></nav>
   {{ page_header("New dataset") }}
   {{ feedback(error if not error_field else none, id="dataset-create-error") }}
-  <form method='post' action='{{ url_for("create_dataset") }}'>
+  <form class='form' method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Key",
       "key",

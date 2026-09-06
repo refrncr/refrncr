@@ -9,7 +9,7 @@
   {{ page_header("Edit dataset") }}
   <p>Key: <code>{{ dataset.key }}</code></p>
   {{ feedback(error, id="dataset-edit-error") }}
-  <form method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <form class='form' method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
     {{ form_field(
       "Name",
       "name",

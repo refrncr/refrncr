@@ -1,0 +1,3 @@
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip-link { position: fixed; z-index: var(--layer-skip-link); top: var(--space-sm); left: var(--space-sm); padding: var(--space-sm) var(--space-md); background: var(--color-surface); transform: translateY(-200%); }
+.skip-link:focus { transform: none; }

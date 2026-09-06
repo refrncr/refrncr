@@ -275,17 +275,34 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
     _, _, _, client = dataset_browser
 
     response = request(client, "get", "/static/css/refrncr.css")
-    stylesheet = body(response)
+    entrypoint = body(response)
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    app_shell = body(request(client, "get", "/static/css/layouts/app-shell.css"))
+    auth = body(request(client, "get", "/static/css/layouts/auth.css"))
 
     assert response.status_code == 200
-    assert "--color-primary:" in stylesheet
-    assert "--space-md:" in stylesheet
-    assert "--radius-lg:" in stylesheet
-    assert "--shadow-md:" in stylesheet
-    assert "--breakpoint-tablet: 768px" in stylesheet
-    assert "@media (max-width: 767px)" in stylesheet
-    assert '.login-form button[type="submit"]' in stylesheet
-    assert "https://" not in stylesheet
+    assert entrypoint.splitlines() == [
+        '@import url("tokens.css");',
+        '@import url("base.css");',
+        '@import url("utilities.css");',
+        '@import url("layouts/app-shell.css");',
+        '@import url("layouts/page.css");',
+        '@import url("layouts/auth.css");',
+        '@import url("components/buttons.css");',
+        '@import url("components/forms.css");',
+        '@import url("components/feedback.css");',
+        '@import url("components/cards-badges.css");',
+        '@import url("components/tables.css");',
+        '@import url("components/dialog.css");',
+    ]
+    assert "--color-action-primary:" in tokens
+    assert "--space-md:" in tokens
+    assert "--radius-lg:" in tokens
+    assert "--shadow-md:" in tokens
+    assert "--breakpoint-tablet: 768px" in tokens
+    assert "@media (max-width: 767px)" in app_shell
+    assert '.login-form button[type="submit"]' in auth
+    assert "https://" not in entrypoint + tokens + app_shell + auth
 
     script = body(request(client, "get", "/static/js/refrncr.js"))
     assert 'document.querySelectorAll(".export-menu")' in script
@@ -418,14 +435,15 @@ def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
-    stylesheet = body(request(client, "get", "/static/css/refrncr.css"))
+    stylesheet = body(request(client, "get", "/static/css/components/tables.css"))
 
     assert "<table class='record-table'>" in page
-    assert ".record-table tbody tr { height: 3rem; }" in stylesheet
+    assert "min-height: var(--record-row-min-height)" in stylesheet
+    assert "height: var(--record-row-min-height)" in stylesheet
     assert ".record-table td" in stylesheet
     assert (
-        "color: var(--color-text); font-family: var(--font-mono); font-size: .75rem; "
-        "font-style: normal; font-weight: 400; vertical-align: middle" in stylesheet
+        "color: var(--color-text-data); font-family: var(--font-data); "
+        "font-size: var(--font-size-xs)" in stylesheet
     )
 
 
@@ -442,12 +460,84 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
-    stylesheet = body(request(client, "get", "/static/css/refrncr.css"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+    dialog = body(request(client, "get", "/static/css/components/dialog.css"))
 
     assert f"<span class='cell-content' title='{long_text}'>{long_text}</span>" in page
-    assert ".record-table { table-layout: fixed; }" in stylesheet
-    assert "text-overflow: ellipsis" in stylesheet
-    assert ".side-panel-header h2 { font-family: var(--font-display); }" in stylesheet
+    assert ".record-table { table-layout: fixed; }" in tables
+    assert "text-overflow: ellipsis" in tables
+    assert ".side-panel-header h2" in dialog
+    assert "font-family: var(--font-display)" in dialog
+
+
+def test_all_design_system_assets_are_local_and_served(dataset_browser):
+    _, _, _, client = dataset_browser
+    css_files = (
+        "base.css",
+        "utilities.css",
+        "layouts/app-shell.css",
+        "layouts/page.css",
+        "layouts/auth.css",
+        "components/buttons.css",
+        "components/forms.css",
+        "components/feedback.css",
+        "components/cards-badges.css",
+        "components/tables.css",
+        "components/dialog.css",
+    )
+    fonts = (
+        "montserrat/Montserrat-Medium.woff2",
+        "inter/Inter-Regular.woff2",
+        "inter/Inter-SemiBold.woff2",
+        "inter/Inter-Bold.woff2",
+        "jetbrains-mono/JetBrainsMono-Regular.woff2",
+    )
+    for filename in css_files:
+        assert request(client, "get", f"/static/css/{filename}").status_code == 200
+    for filename in fonts:
+        response = request(client, "get", f"/static/fonts/{filename}")
+        assert response.status_code == 200
+        assert response.mimetype == "font/woff2"
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    assert tokens.count("@font-face") == 5
+    assert "Montserrat-Medium.woff2" in tokens and "font-weight: 500" in tokens
+    assert "Inter-Regular.woff2" in tokens and "Inter-SemiBold.woff2" in tokens
+    assert "Inter-Bold.woff2" in tokens and "JetBrainsMono-Regular.woff2" in tokens
+    assert "http://" not in tokens and "https://" not in tokens
+
+
+def test_component_css_uses_explicit_contract_selectors(dataset_browser):
+    _, _, _, client = dataset_browser
+    buttons = body(request(client, "get", "/static/css/components/buttons.css"))
+    forms = body(request(client, "get", "/static/css/components/forms.css"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+    assert "button:not([class])" not in buttons
+    assert ".button {" in buttons
+    assert "\nform {" not in forms
+    assert ".form {" in forms
+    assert "\ntbody tr:hover" not in tables
+    assert ".table-scroll tbody tr:hover" in tables
+
+
+def test_local_lucide_set_has_only_template_consumers_and_packaged_notices(dataset_browser):
+    _, _, _, client = dataset_browser
+    repository = Path(__file__).resolve().parents[1]
+    image_directory = repository / "src/refrncr/static/images"
+    template_directory = repository / "src/refrncr/templates"
+    lucide_files = {path.name for path in image_directory.glob("lucide-*.svg")}
+    template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
+
+    assert lucide_files == {
+        "lucide-download.svg",
+        "lucide-key-round.svg",
+        "lucide-plus.svg",
+        "lucide-settings-2.svg",
+        "lucide-upload.svg",
+    }
+    for filename in lucide_files:
+        assert filename in template_source
+    for filename in ("LICENSE-Lucide.txt", "ASSET-SOURCES.md"):
+        assert request(client, "get", f"/static/licenses/{filename}").status_code == 200
 
 
 def test_record_table_include_and_view_button_pointer_guard(dataset_browser, monkeypatch):
@@ -477,7 +567,7 @@ def test_record_table_include_and_view_button_pointer_guard(dataset_browser, mon
     assert "pages/datasets/_record_form_fields.html" in loaded
     assert "components/side_panel.html" in loaded
     assert 'event.target.closest("a, button, input")' in script
-    assert "if (event.target !== row) return;" in script
+    assert 'document.querySelectorAll("[data-record-row]").forEach' not in script
 
 
 def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser):
@@ -660,7 +750,7 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert response.status_code == 200
     assert "<title>New dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
-    assert "<form method='post' action='/datasets'>" in page
+    assert "<form class='form' method='post' action='/datasets'>" in page
     assert "<label for='dataset-key'>Key</label>" in page
     assert "id='dataset-key' name='key' type='text' value='' required" in page
     assert "aria-describedby='dataset-key-help'" in page
@@ -909,7 +999,7 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert '<header class="page-header">' in page
     assert "<p>Key: <code>edit-form</code></p>" in page
     assert "name='key'" not in page
-    assert "<form method='post' action='/datasets/edit-form'>" in page
+    assert "<form class='form' method='post' action='/datasets/edit-form'>" in page
     assert "<label for='dataset-name'>Name</label>" in page
     assert "value='Stored &lt;name&gt;'" in page
     assert "<label for='dataset-description'>Description</label>" in page

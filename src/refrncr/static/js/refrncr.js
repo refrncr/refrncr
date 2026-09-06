@@ -18,7 +18,7 @@
       dialog.querySelectorAll("[data-panel-view]").forEach((view) => {
         view.hidden = view.dataset.panelView !== "view";
       });
-      const subtitle = dialog.querySelector("[data-panel-subtitle], [data-record-subtitle]");
+      const subtitle = dialog.querySelector("[data-panel-subtitle]");
       if (subtitle) {
         subtitle.textContent =
           subtitle.dataset.defaultText || dialog.dataset.defaultSubtitle || "View record";
@@ -28,9 +28,6 @@
       row.classList.remove("is-selected");
       row.removeAttribute("aria-selected");
     });
-    if (!document.querySelector("dialog[data-side-panel][open]")) {
-      dialog.closest(".app-main")?.classList.remove("has-open-side-panel");
-    }
   };
 
   const restoreSidePanelFocus = (dialog) => {
@@ -85,16 +82,6 @@
     });
   });
 
-  document.querySelectorAll("[data-record-row]").forEach((row) => {
-    row.addEventListener("keydown", (event) => {
-      if (event.target !== row) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        row.click();
-      }
-    });
-  });
-
   document.querySelectorAll("[data-panel-mode]").forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const dialog = trigger.closest("dialog[data-panel-modes]");
@@ -103,7 +90,7 @@
       dialog.querySelectorAll("[data-panel-view]").forEach((view) => {
         view.hidden = view.dataset.panelView !== mode;
       });
-      const subtitle = dialog.querySelector("[data-panel-subtitle], [data-record-subtitle]");
+      const subtitle = dialog.querySelector("[data-panel-subtitle]");
       const entity = dialog.dataset.panelEntity || "record";
       if (subtitle) {
         subtitle.textContent =
@@ -158,10 +145,6 @@
     autoOpenPanel.querySelectorAll("[data-panel-view]").forEach((view) => {
       view.hidden = view.dataset.panelView !== autoOpenPanel.dataset.autoOpen;
     });
-    const subtitle = autoOpenPanel.querySelector("[data-record-subtitle], [data-panel-subtitle]");
-    if (subtitle && autoOpenPanel.dataset.autoOpen === "members") {
-      subtitle.textContent = "Manage members";
-    }
     autoOpenPanel.querySelector("[data-dialog-close]")?.focus();
   }
 })();

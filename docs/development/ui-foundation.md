@@ -17,20 +17,20 @@ The typography contract is:
 - JetBrains Mono 400 for technical identifiers and code-like values;
 - system fonts remain the fallback.
 
-The required upstream WOFF2 files and their OFL notices still need to be packaged in the
-dedicated asset step. Until that work is complete, the named fonts are only preferred font
-families and the application may use the system fallbacks. The completed foundation must not
-request fonts from a CDN at runtime.
+The required upstream WOFF2 files and their OFL notices are packaged below `static/fonts/` and
+`static/licenses/`. `static/licenses/ASSET-SOURCES.md` records their pinned upstream versions,
+filenames and licenses. The browser loads them through relative local URLs; no font or icon CDN
+is used at runtime.
 
 The application never requests fonts or icons from a CDN. Inline SVG is appropriate for a
 small functional icon; icon-only controls always require an accessible name.
 
 ## Tokens
 
-All canonical tokens live in `static/css/refrncr.css` under `:root`. They cover the green,
+All canonical tokens live in `static/css/tokens.css` under `:root`. They cover the green,
 neutral, success, warning, error and information colours; semantic aliases; the three font
 stacks; the 4/8/16/24/32/48 px spacing scale; radii; shadows; and the 320/768/1024/1440 px
-breakpoints. New pages must use semantic variables such as `--color-primary` and
+breakpoints. New pages must use semantic variables such as `--color-action-primary` and
 `--color-border`. Do not copy token sets into page-specific CSS.
 
 CSS custom properties cannot be used directly in media-query conditions. The documented
@@ -137,3 +137,22 @@ Desktop remains the primary target for dataset workflows.
 
 Navigation visibility improves clarity but is never authorization. Every route and mutation
 must continue to enforce server-side permissions and CSRF independently.
+
+## CSS loading order
+
+`static/css/refrncr.css` is the only public stylesheet entrypoint. It imports, in order:
+
+1. primitive and semantic tokens;
+2. element defaults and accessibility utilities;
+3. the app-shell, page and authentication layouts;
+4. buttons, forms, feedback, cards/badges/empty states, tables/pagination and dialogs.
+
+Imports are relative to the entrypoint and all nested files are package data, so the same URLs
+work from a source checkout and an installed wheel. Breakpoint literals in media conditions must
+stay aligned with the reference values documented in `tokens.css`; custom properties cannot be
+used as media-query boundaries.
+
+Broad implicit component selectors are intentionally avoided. Forms that need the shared width
+contract use `.form`; buttons use `.button` plus a variant; hover behaviour for table rows is
+scoped to `.table-scroll`. Plain semantic elements remain available when no component treatment
+is intended.

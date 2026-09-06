@@ -1,0 +1,12 @@
+.form { max-width: 48rem; }
+label, legend { font-weight: var(--font-weight-bold); }
+label { display: block; margin-top: var(--space-md); }
+input:not([type="hidden"]), select, textarea { display: block; width: 100%; min-height: var(--control-height); margin-top: var(--space-xs); padding: .625rem .75rem; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; }
+input[type="checkbox"], input[type="radio"] { display: inline-block; width: 1.25rem; min-height: 1.25rem; margin: 0 var(--space-sm) 0 0; accent-color: var(--color-action-primary); vertical-align: middle; }
+input[type="file"] { padding: var(--space-sm); }
+input:hover, select:hover, textarea:hover { border-color: var(--color-text-secondary); }
+input:focus, select:focus, textarea:focus { border-color: var(--color-action-primary-hover); box-shadow: 0 0 0 3px var(--color-focus-shadow); outline: 0; }
+input:disabled, select:disabled, textarea:disabled { background: var(--color-action-secondary); cursor: not-allowed; }
+[aria-invalid="true"], .field-error { border-color: var(--color-error); }
+.form-field + .form-field { margin-top: var(--space-lg); }
+fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
