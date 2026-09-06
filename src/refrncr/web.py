@@ -479,81 +479,8 @@ def create_flask_app(
         record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
         range_start = (page.page - 1) * page.page_size + 1 if page.total else 0
         range_end = min(page.page * page.page_size, page.total)
-        return render_template_string(
-            "<div class='page-header'><div>"
-            "<nav aria-label='Breadcrumb'><a href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>Dataset</a></nav>"
-            "<h1>{{ dataset.name }} records</h1></div>"
-            "<div class='page-actions record-page-actions'>"
-            "<details class='export-menu'><summary class='button button-secondary'>"
-            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-download.svg\") }}' "
-            "alt='' aria-hidden='true'>Export</summary>"
-            "<div class='export-menu-options' aria-label='Export format'>"
-            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="csv") }}\'>CSV</a>'
-            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="xlsx") }}\'>Excel</a>'
-            '<a href=\'{{ url_for("export_dataset_records", key=dataset.key, format="json") }}\'>JSON</a>'
-            "</div></details>"
-            "{% if may_configure %}<a class='button button-secondary' href='{{ url_for(\"dataset_detail\", key=dataset.key) }}'>"
-            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-settings-2.svg\") }}' "
-            "alt='' aria-hidden='true'>Configure</a>{% endif %}"
-            "{% if may_edit %}<a class='button button-secondary' href='{{ url_for(\"import_dataset_records\", key=dataset.key) }}'>"
-            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-upload.svg\") }}' "
-            "alt='' aria-hidden='true'>Import</a><button class='button button-primary' type='button' data-dialog-open='add-record-panel'>"
-            "<img class='button-icon' src='{{ url_for(\"static\", filename=\"images/lucide-plus.svg\") }}' "
-            "alt='' aria-hidden='true'>Add record</button>{% endif %}</div></div>"
-            "{% if may_edit %}<dialog class='side-panel' id='add-record-panel' data-side-panel aria-labelledby='add-record-title'>"
-            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
-            "<h2 id='add-record-title'>New {{ record_type }} record</h2><p>Add record</p></div>"
-            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
-            "</header><form class='side-panel-form' method='post' action='{{ url_for(\"create_dataset_record\", key=dataset.key) }}'>"
-            "<div class='side-panel-body'>{% for field in fields %}<div class='form-field'>"
-            "<label for='new-record-{{ field.key }}'>{{ field.name }}{% if field.is_required %} *{% endif %}</label>"
-            "{% if field.data_type == 'boolean' %}<select id='new-record-{{ field.key }}' name='{{ field.key }}'"
-            "{% if field.is_required %} required{% endif %}{% if loop.first %} autofocus{% endif %}>"
-            "<option value=''>Choose a value</option><option value='true'>Yes</option><option value='false'>No</option></select>"
-            "{% else %}<input id='new-record-{{ field.key }}' name='{{ field.key }}' "
-            "type='{{ 'date' if field.data_type == 'date' else 'text' }}'"
-            "{% if field.is_required %} required{% endif %}{% if loop.first %} autofocus{% endif %}>{% endif %}"
-            "</div>{% endfor %}</div><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<footer class='side-panel-footer'><button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Create record</button></footer></form></div></dialog>{% endif %}"
-            "{% include 'pages/datasets/_record_table.html' %}"
-            "{% for record, values, incomplete in rows %}<dialog class='side-panel' id='record-panel-{{ record.id }}' "
-            "data-side-panel data-record-panel data-panel-entity='record' data-default-subtitle='View record' "
-            "aria-labelledby='record-panel-title-{{ record.id }}'><div class='side-panel-layout'>"
-            "<header class='side-panel-header'><div><h2 id='record-panel-title-{{ record.id }}'>"
-            "{{ values.get(identifier.field_keys[0], record.id) }}</h2><p data-record-subtitle>View record</p></div>"
-            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button></header>"
-            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
-            "<dl class='record-details'>{% for field in fields %}<div><dt>{{ field.name }}</dt>"
-            "<dd>{{ values.get(field.key, '—') }}</dd></div>{% endfor %}</dl></div>"
-            "{% if may_edit %}<footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit</button>"
-            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete</button>"
-            "</footer>{% endif %}</section>"
-            "{% if may_edit %}<form class='side-panel-view side-panel-form' data-record-view='edit' hidden method='post' "
-            "action='{{ url_for(\"edit_dataset_record\", key=dataset.key, record_id=record.id) }}'>"
-            "<div class='side-panel-body'>{% for field in fields %}<div class='form-field'>"
-            "<label for='edit-{{ record.id }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} *{% endif %}</label>"
-            "{% if field.data_type == 'boolean' %}<select id='edit-{{ record.id }}-{{ field.key }}' name='{{ field.key }}'"
-            "{% if field.is_required %} required{% endif %}><option value=''>Choose a value</option>"
-            "<option value='true'{% if values.get(field.key) == true %} selected{% endif %}>Yes</option>"
-            "<option value='false'{% if values.get(field.key) == false %} selected{% endif %}>No</option></select>"
-            "{% else %}<input id='edit-{{ record.id }}-{{ field.key }}' name='{{ field.key }}' "
-            "type='{{ 'date' if field.data_type == 'date' else 'text' }}' value='{{ values.get(field.key, '') }}'"
-            "{% if field.is_required %} required{% endif %}>{% endif %}</div>{% endfor %}</div>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><input type='hidden' name='expected_revision' "
-            "value='{{ record.revision }}'><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Save record</button></footer></form>"
-            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
-            "action='{{ url_for(\"delete_dataset_record\", key=dataset.key, record_id=record.id) }}'>"
-            "<div class='side-panel-body'><h3>Delete record?</h3><p class='delete-confirmation'>"
-            "This deletion cannot be undone.</p><input type='hidden' name='confirm' value='yes'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><input type='hidden' name='expected_revision' "
-            "value='{{ record.revision }}'></div><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-danger' type='submit'>Delete record</button></footer></form>{% endif %}"
-            "</div></dialog>{% endfor %}",
+        return render_template(
+            "pages/datasets/records.html",
             dataset=dataset,
             fields=fields,
             identifier=identifier,
@@ -561,7 +488,10 @@ def create_flask_app(
             page=page,
             may_edit=may_edit,
             may_configure=may_configure,
-            csrf=login_session.csrf_token,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
             record_type=record_type,
             range_start=range_start,
             range_end=range_end,

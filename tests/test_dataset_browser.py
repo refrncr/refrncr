@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from flask import template_rendered
@@ -344,7 +345,10 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
         f"aria-label='View record EUR ({record.id})'>View</button>" in page
     )
     assert f"id='record-panel-{record.id}'" in page
-    assert ">EUR</h2><p data-record-subtitle>View record</p>" in page
+    assert ">EUR</h2>" in page
+    assert f"aria-labelledby='record-panel-title-{record.id}'" in page
+    assert f"aria-describedby='record-panel-description-{record.id}'" in page
+    assert "data-panel-subtitle data-default-text='View record'>View record</p>" in page
     assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
     assert "data-record-mode='edit'" in page
@@ -467,9 +471,53 @@ def test_record_table_include_and_view_button_pointer_guard(dataset_browser, mon
     script = body(request(client, "get", "/static/js/refrncr.js"))
 
     assert response.status_code == 200
+    assert "pages/datasets/records.html" in loaded
     assert "pages/datasets/_record_table.html" in loaded
+    assert "pages/datasets/_record_panels.html" in loaded
+    assert "pages/datasets/_record_form_fields.html" in loaded
+    assert "components/side_panel.html" in loaded
     assert 'event.target.closest("a, button, input")' in script
     assert "if (event.target !== row) return;" in script
+
+
+def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "modal-contract")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "FOCUS"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    script = body(request(client, "get", "/static/js/refrncr.js"))
+
+    assert "data-side-panel data-modal-side-panel" in page
+    assert "autofocus data-initial-focus" in page
+    assert "dialog.showModal();" in script
+    assert "sidePanelOpeners.set(dialog, trigger);" in script
+    assert "const opener = sidePanelOpeners.get(dialog);" in script
+    assert "opener?.isConnected" in script
+    assert 'document.getElementById("content")?.focus();' in script
+    assert 'dialog.addEventListener("close"' in script
+    assert 'dialog.addEventListener("keydown"' not in script
+    assert "innerHTML" not in script
+
+
+def test_record_page_has_no_inline_markup_and_side_panel_component_is_generic():
+    repository = Path(__file__).parents[1]
+    web_source = (repository / "src/refrncr/web.py").read_text()
+    record_route = web_source.split("def dataset_records_view", 1)[1].split(
+        "def export_dataset_records", 1
+    )[0]
+    side_panel = (repository / "src/refrncr/templates/components/side_panel.html").read_text()
+
+    assert "return render_template(" in record_route
+    assert '"pages/datasets/records.html"' in record_route
+    assert "render_template_string" not in record_route
+    assert "<dialog" not in record_route and "<form" not in record_route
+    assert "record" not in side_panel
+    assert "permission" not in side_panel and "csrf" not in side_panel
+    assert "|safe" not in side_panel
 
 
 def test_record_table_pagination_keeps_range_and_links(dataset_browser):

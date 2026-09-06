@@ -88,9 +88,9 @@ The Dataset list uses a file template with client-side searching across the auth
 and description values. Dataset names remain keyboard-accessible links, while non-functional
 status filters were removed and pointer row navigation remains an enhancement.
 
-The records route temporarily includes a page-private record table and pagination composition.
-It is not a general design-system component; record sidepanels remain unchanged pending their
-separate accessible component migration.
+The records route uses a file template with page-private table, field, and record-panel
+compositions. Its create and per-record workflows use the shared modal side-panel structure;
+one rendered panel per displayed record remains a deliberate temporary performance trade-off.
 
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.
