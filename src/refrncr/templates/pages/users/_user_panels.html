@@ -1,0 +1,43 @@
+{% from "components/side_panel.html" import side_panel %}
+{% from "pages/users/_user_form_fields.html" import create_user_fields, edit_user_fields %}
+
+{% for user in users %}
+  {% call side_panel("user-panel-" ~ user.id, user.display_name, "user-panel-title-" ~ user.id, "View user", "user-panel-description-" ~ user.id, true, "user") %}
+    <section class='side-panel-view' data-panel-view='view'>
+      <div class='side-panel-body'>
+        <dl class='record-details'>
+          <div><dt>Name</dt><dd>{{ user.display_name }}</dd></div>
+          <div><dt>Email address</dt><dd>{{ user.email }}</dd></div>
+          <div><dt>Role</dt><dd>{{ 'Administrator' if user.role == 'admin' else 'User' }}</dd></div>
+          <div><dt>Status</dt><dd>{{ 'Deleted' if user.is_deleted else ('Active' if user.is_active else 'Inactive') }}</dd></div>
+        </dl>
+        {% if not user.is_deleted %}
+          <form class='user-state-action' method='post' action='{{ url_for("change_user_state", target_id=user.id, action="disable" if user.is_active else "enable") }}'>
+            <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+            <button class='button button-secondary' type='submit'>{{ 'Disable user' if user.is_active else 'Enable user' }}</button>
+          </form>
+        {% endif %}
+      </div>
+      {% if not user.is_deleted %}<footer class='side-panel-footer'><button class='button button-secondary' type='button' data-panel-mode='edit'>Edit user</button><button class='button button-danger' type='button' data-panel-mode='delete'>Delete user</button></footer>{% endif %}
+    </section>
+    {% if not user.is_deleted %}
+      <form class='side-panel-view side-panel-form' data-panel-view='edit' hidden method='post' action='{{ url_for("change_user_email", target_id=user.id) }}'>
+        <div class='side-panel-body'>{{ edit_user_fields(user) }}</div>
+        <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+        <footer class='side-panel-footer'><button class='button button-secondary' type='button' data-panel-mode='view'>Cancel</button><button class='button button-primary' type='submit'>Save user</button></footer>
+      </form>
+      <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden method='post' action='{{ url_for("change_user_state", target_id=user.id, action="delete") }}'>
+        <div class='side-panel-body'><h3>Delete user?</h3><p class='delete-confirmation'>This deletion cannot be undone.</p><input type='hidden' name='csrf_token' value='{{ current_csrf }}'></div>
+        <footer class='side-panel-footer'><button class='button button-secondary' type='button' data-panel-mode='view'>Cancel</button><button class='button button-danger' type='submit'>Delete user</button></footer>
+      </form>
+    {% endif %}
+  {% endcall %}
+{% endfor %}
+
+{% call side_panel("add-user-panel", "New user", "add-user-title", "Add user", "add-user-description") %}
+  <form class='side-panel-form' method='post' action='{{ url_for("create_user") }}'>
+    <div class='side-panel-body'>{{ create_user_fields() }}</div>
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <footer class='side-panel-footer'><button class='button button-secondary' type='button' data-dialog-close>Cancel</button><button class='button button-primary' type='submit'>Create user</button></footer>
+  </form>
+{% endcall %}

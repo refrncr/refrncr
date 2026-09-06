@@ -14,9 +14,9 @@
     "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
 
   const resetSidePanel = (dialog) => {
-    if (dialog.dataset.panelModeController === "record" || dialog.hasAttribute("data-record-panel")) {
-      dialog.querySelectorAll("[data-record-view]").forEach((view) => {
-        view.hidden = view.dataset.recordView !== "view";
+    if (dialog.hasAttribute("data-panel-modes")) {
+      dialog.querySelectorAll("[data-panel-view]").forEach((view) => {
+        view.hidden = view.dataset.panelView !== "view";
       });
       const subtitle = dialog.querySelector("[data-panel-subtitle], [data-record-subtitle]");
       if (subtitle) {
@@ -41,11 +41,6 @@
     } else {
       document.getElementById("content")?.focus();
     }
-  };
-
-  const closeLegacySidePanel = (dialog) => {
-    dialog.close();
-    resetSidePanel(dialog);
   };
 
   document.querySelectorAll("dialog[data-modal-side-panel]").forEach((dialog) => {
@@ -78,14 +73,6 @@
           selectedRow.classList.add("is-selected");
           selectedRow.setAttribute("aria-selected", "true");
         }
-      } else if (dialog.hasAttribute("data-side-panel")) {
-        document.querySelectorAll("dialog[data-side-panel][open]").forEach(closeLegacySidePanel);
-        dialog.show();
-        dialog.closest(".app-main")?.classList.add("has-open-side-panel");
-        if (trigger.hasAttribute("data-record-row")) {
-          trigger.classList.add("is-selected");
-          trigger.setAttribute("aria-selected", "true");
-        }
       } else {
         dialog.showModal();
       }
@@ -94,9 +81,7 @@
   document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const dialog = trigger.closest("dialog");
-      if (dialog?.hasAttribute("data-modal-side-panel")) dialog.close();
-      else if (dialog?.hasAttribute("data-side-panel")) closeLegacySidePanel(dialog);
-      else dialog?.close();
+      dialog?.close();
     });
   });
 
@@ -110,15 +95,13 @@
     });
   });
 
-  document.querySelectorAll("[data-record-mode]").forEach((trigger) => {
+  document.querySelectorAll("[data-panel-mode]").forEach((trigger) => {
     trigger.addEventListener("click", () => {
-      const dialog = trigger.closest(
-        "dialog[data-panel-mode-controller='record'], dialog[data-record-panel]",
-      );
+      const dialog = trigger.closest("dialog[data-panel-modes]");
       if (!dialog) return;
-      const mode = trigger.dataset.recordMode;
-      dialog.querySelectorAll("[data-record-view]").forEach((view) => {
-        view.hidden = view.dataset.recordView !== mode;
+      const mode = trigger.dataset.panelMode;
+      dialog.querySelectorAll("[data-panel-view]").forEach((view) => {
+        view.hidden = view.dataset.panelView !== mode;
       });
       const subtitle = dialog.querySelector("[data-panel-subtitle], [data-record-subtitle]");
       const entity = dialog.dataset.panelEntity || "record";
@@ -126,7 +109,7 @@
         subtitle.textContent =
           trigger.dataset.modeLabel || `${mode[0].toUpperCase()}${mode.slice(1)} ${entity}`;
       }
-      if (mode === "edit") dialog.querySelector("[data-record-view='edit'] input, [data-record-view='edit'] select")?.focus();
+      if (mode === "edit") dialog.querySelector("[data-panel-view='edit'] input, [data-panel-view='edit'] select")?.focus();
     });
   });
 
@@ -170,20 +153,15 @@
 
   const autoOpenPanel = document.querySelector("dialog[data-auto-open]");
   if (autoOpenPanel) {
-    autoOpenPanel.show();
-    autoOpenPanel.closest(".app-main")?.classList.add("has-open-side-panel");
-    autoOpenPanel.querySelectorAll("[data-record-view]").forEach((view) => {
-      view.hidden = view.dataset.recordView !== autoOpenPanel.dataset.autoOpen;
+    sidePanelOpeners.set(autoOpenPanel, null);
+    autoOpenPanel.showModal();
+    autoOpenPanel.querySelectorAll("[data-panel-view]").forEach((view) => {
+      view.hidden = view.dataset.panelView !== autoOpenPanel.dataset.autoOpen;
     });
     const subtitle = autoOpenPanel.querySelector("[data-record-subtitle], [data-panel-subtitle]");
     if (subtitle && autoOpenPanel.dataset.autoOpen === "members") {
       subtitle.textContent = "Manage members";
     }
-    document.querySelectorAll("[data-record-row]").forEach((row) => {
-      if (row.dataset.dialogOpen === autoOpenPanel.id) {
-        row.classList.add("is-selected");
-        row.setAttribute("aria-selected", "true");
-      }
-    });
+    autoOpenPanel.querySelector("[data-dialog-close]")?.focus();
   }
 })();

@@ -351,8 +351,8 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     assert "data-panel-subtitle data-default-text='View record'>View record</p>" in page
     assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
-    assert "data-record-mode='edit'" in page
-    assert "data-record-view='edit' hidden" in page
+    assert "data-panel-mode='edit'" in page
+    assert "data-panel-view='edit' hidden" in page
     assert "value='1'" in page
     assert "This deletion cannot be undone." in page
     assert "name='confirm' value='yes'" in page
@@ -561,8 +561,8 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
     assert "Configure</a>" not in page
     assert "Import</a>" not in page
     assert "Add record</button>" not in page
-    assert "data-record-mode='edit'" not in page
-    assert "data-record-mode='delete'" not in page
+    assert "data-panel-mode='edit'" not in page
+    assert "data-panel-mode='delete'" not in page
 
 
 def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser):

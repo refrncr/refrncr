@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% from "pages/teams/_membership_controls.html" import membership_controls %}
+
+{% block content %}
+  <h1>Team members</h1>
+  {{ membership_controls(team_id, members, eligible_users, current_csrf, true) }}
+{% endblock %}

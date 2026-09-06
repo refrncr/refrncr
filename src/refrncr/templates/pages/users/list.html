@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class='page-header management-list-header'><div><h1>My Users</h1></div><div class='page-actions'><label class='visually-hidden' for='user-search'>Search users</label><input id='user-search' type='search' placeholder='Search by name or email…' data-list-search><button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button></div></div>
+  <div class='table-scroll management-table'><table><caption class='visually-hidden'>Users</caption><thead><tr><th scope='col'>Name</th><th scope='col'>Email address</th><th scope='col'>Role</th><th scope='col'>Status</th><th scope='col'><span class='visually-hidden'>Actions</span></th></tr></thead><tbody>
+    {% for user in users %}<tr class='record-row' data-record-row data-dialog-open='user-panel-{{ user.id }}' data-list-row data-search-text='{{ user.display_name }} {{ user.email }} {{ user.role }}'><td><strong>{{ user.display_name }}</strong></td><td>{{ user.email }}</td><td>{{ 'Administrator' if user.role == 'admin' else 'User' }}</td><td>{% if user.is_deleted %}<span class='badge badge-error'>Deleted</span>{% elif user.is_active %}<span class='badge badge-success'>Active</span>{% else %}<span class='badge badge-warning'>Inactive</span>{% endif %}</td><td><button class='button button-secondary' type='button' data-dialog-open='user-panel-{{ user.id }}' aria-label='View user {{ user.display_name }} ({{ user.id }})'>View</button></td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "pages/users/_user_panels.html" %}
+{% endblock %}

@@ -1,6 +1,7 @@
 import re
 import uuid
 from itertools import chain, combinations
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -668,17 +669,22 @@ def test_user_list_uses_management_layout_and_add_user_panel(interface):
 
     assert "My Users" in body
     assert "data-list-search" in body
+    assert "<caption class='visually-hidden'>Users</caption>" in body
     assert "<th scope='col'>Email address</th>" in body
+    assert "<tr class='record-row' tabindex=" not in body
+    assert "<tr class='record-row' role=" not in body
+    assert "aria-label='User filters'" not in body
     assert "data-dialog-open='add-user-panel'" in body
     assert "id='add-user-panel' data-side-panel" in body
     assert "data-dialog-open='user-panel-" in body
     assert "data-panel-entity='user'" in body
-    assert "data-record-mode='edit'>Edit user" in body
-    assert "data-record-mode='delete'>Delete user" in body
-    assert "data-record-view='edit' hidden method='post' action='/users/" in body
+    assert "data-panel-mode='edit'>Edit user" in body
+    assert "data-panel-mode='delete'>Delete user" in body
+    assert "data-panel-view='edit' hidden method='post' action='/users/" in body
     assert "This deletion cannot be undone." in body
     assert "action='/users'" in body
     assert "name='role'" in body
+    assert "data-modal-side-panel" in body
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
@@ -778,11 +784,18 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert "Platform" in body
     assert "My Teams" in body
     assert "data-list-search" in body
+    assert "<caption class='visually-hidden'>Teams</caption>" in body
+    assert "<tr class='record-row' tabindex=" not in body
+    assert "<tr class='record-row' role=" not in body
+    assert "aria-label='Team filters'" not in body
     assert "data-dialog-open='add-team-panel'" in body
-    assert f"data-dialog-open='team-panel-{team.id}'" in body
+    assert f"href='/teams?open_team={team.id}'" in body
+    body = response_text(request(client, "get", f"/teams?open_team={team.id}"))
+    assert f"id='team-panel-{team.id}'" in body
+    assert "data-modal-side-panel" in body
     assert "data-panel-entity='team'" in body
-    assert "data-record-mode='edit'>Edit team" in body
-    assert "data-record-mode='delete'>Delete team" in body
+    assert "data-panel-mode='edit'>Edit team" in body
+    assert "data-panel-mode='delete'>Delete team" in body
     assert f"action='/teams/{team.id}/rename'" in body
     assert f"action='/teams/{team.id}/delete'" in body
     assert "<h3>Team members</h3>" in body
@@ -805,6 +818,53 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert response.status_code == 302
     with factory() as session:
         assert session.get(Team, team.id) is None
+
+
+def test_team_list_only_loads_memberships_for_the_open_team(interface, monkeypatch):
+    _, _, authentication, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    first = teams.create_team(admin.id, "First")
+    teams.create_team(admin.id, "Second")
+    member_calls = []
+    eligible_calls = []
+    original_members = memberships.list_team_members
+    original_eligible = memberships.list_eligible_users
+
+    def list_members(actor_id, team_id):
+        member_calls.append(team_id)
+        return original_members(actor_id, team_id)
+
+    def list_eligible(actor_id, team_id):
+        eligible_calls.append(team_id)
+        return original_eligible(actor_id, team_id)
+
+    monkeypatch.setattr(memberships, "list_team_members", list_members)
+    monkeypatch.setattr(memberships, "list_eligible_users", list_eligible)
+
+    assert request(client, "get", "/teams").status_code == 200
+    assert member_calls == [] and eligible_calls == []
+    assert request(client, "get", f"/teams?open_team={first.id}").status_code == 200
+    assert member_calls == [first.id]
+    assert eligible_calls == [first.id]
+
+
+def test_management_routes_use_file_templates_without_inline_markup():
+    web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
+    management_source = web_source.split('    @app.get("/users")', 1)[1].split(
+        "    @app.errorhandler(UserManagementError)", 1
+    )[0]
+
+    for template in (
+        '"pages/users/list.html"',
+        '"pages/teams/list.html"',
+        '"pages/teams/members.html"',
+    ):
+        assert template in management_source
+    assert "render_template_string" not in management_source
+    assert '"<dialog' not in management_source
+    assert '"<form' not in management_source
 
 
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):

@@ -92,6 +92,10 @@ The records route uses a file template with page-private table, field, and recor
 compositions. Its create and per-record workflows use the shared modal side-panel structure;
 one rendered panel per displayed record remains a deliberate temporary performance trade-off.
 
+Community user, team, and membership management use file templates and the same modal side-panel
+structure. Team membership data is loaded only for the team selected through `open_team`, avoiding
+per-team membership queries on the list page while preserving the existing management workflows.
+
 Remaining pages still use the legacy inline-template adapter and will be migrated incrementally
 without changing their route behaviour.
 

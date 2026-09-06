@@ -18,8 +18,8 @@
   {% set panel_id = "record-panel-" ~ record.id %}
   {% set title_id = "record-panel-title-" ~ record.id %}
   {% set description_id = "record-panel-description-" ~ record.id %}
-  {% call side_panel(panel_id, values.get(identifier.field_keys[0], record.id), title_id, "View record", description_id, "record", "record") %}
-    <section class='side-panel-view' data-record-view='view'>
+  {% call side_panel(panel_id, values.get(identifier.field_keys[0], record.id), title_id, "View record", description_id, true, "record") %}
+    <section class='side-panel-view' data-panel-view='view'>
       <div class='side-panel-body'>
         <dl class='record-details'>
           {% for field in fields %}<div><dt>{{ field.name }}</dt><dd>{{ values.get(field.key, '—') }}</dd></div>{% endfor %}
@@ -27,22 +27,22 @@
       </div>
       {% if may_edit %}
         <footer class='side-panel-footer'>
-          <button class='button button-secondary' type='button' data-record-mode='edit'>Edit</button>
-          <button class='button button-danger' type='button' data-record-mode='delete'>Delete</button>
+          <button class='button button-secondary' type='button' data-panel-mode='edit'>Edit</button>
+          <button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>
         </footer>
       {% endif %}
     </section>
     {% if may_edit %}
-      <form class='side-panel-view side-panel-form' data-record-view='edit' hidden method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='edit' hidden method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
         <footer class='side-panel-footer'>
-          <button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>
+          <button class='button button-secondary' type='button' data-panel-mode='view'>Cancel</button>
           <button class='button button-primary' type='submit'>Save record</button>
         </footer>
       </form>
-      <form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>
           <h3>Delete record?</h3>
           <p class='delete-confirmation'>This deletion cannot be undone.</p>
@@ -51,7 +51,7 @@
           <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
         </div>
         <footer class='side-panel-footer'>
-          <button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>
+          <button class='button button-secondary' type='button' data-panel-mode='view'>Cancel</button>
           <button class='button button-danger' type='submit'>Delete record</button>
         </footer>
       </form>

@@ -1535,84 +1535,13 @@ def create_flask_app(
     def user_list():
         actor, login_session = require_admin()
         managed_users = users.list_users(actor.id)
-        return render_template_string(
-            "<div class='page-header dataset-list-header'><div><h1>My Users</h1></div>"
-            "<div class='page-actions'><label class='visually-hidden' for='user-search'>Search users</label>"
-            "<input id='user-search' type='search' placeholder='Search by name or email…' data-list-search>"
-            "<button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button>"
-            "</div></div><div class='dataset-tabs' aria-label='User filters'>"
-            "<button class='button button-tab is-active' type='button'>All</button>"
-            "<button class='button button-tab' type='button' disabled>Active</button>"
-            "<button class='button button-tab' type='button' disabled>Inactive</button>"
-            "<button class='button button-tab' type='button' disabled>Deleted</button></div>"
-            "<div class='table-scroll dataset-table'><table><thead><tr><th scope='col'>Name</th>"
-            "<th scope='col'>Email address</th><th scope='col'>Role</th><th scope='col'>Status</th>"
-            "</tr></thead><tbody>{% for user in users %}"
-            "<tr class='record-row' tabindex='0' role='button' aria-haspopup='dialog' data-record-row "
-            "data-dialog-open='user-panel-{{ user.id }}' data-list-row "
-            "data-search-text='{{ user.display_name }} {{ user.email }} {{ user.role }}'>"
-            "<td><strong>{{ user.display_name }}</strong></td><td>{{ user.email }}</td>"
-            "<td>{{ 'Administrator' if user.role == 'admin' else 'User' }}</td><td>"
-            "{% if user.is_deleted %}<span class='badge badge-error'>Deleted</span>"
-            "{% elif user.is_active %}<span class='badge badge-success'>Active</span>"
-            "{% else %}<span class='badge badge-warning'>Inactive</span>{% endif %}</td></tr>{% endfor %}"
-            "</tbody></table></div>"
-            "{% for user in users %}<dialog class='side-panel' id='user-panel-{{ user.id }}' data-side-panel "
-            "data-record-panel data-panel-entity='user' data-default-subtitle='View user' "
-            "aria-labelledby='user-panel-title-{{ user.id }}'><div class='side-panel-layout'>"
-            "<header class='side-panel-header'><div><h2 id='user-panel-title-{{ user.id }}'>"
-            "{{ user.display_name }}</h2><p data-record-subtitle>View user</p></div>"
-            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button></header>"
-            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
-            "<dl class='record-details'><div><dt>Name</dt><dd>{{ user.display_name }}</dd></div>"
-            "<div><dt>Email address</dt><dd>{{ user.email }}</dd></div><div><dt>Role</dt>"
-            "<dd>{{ 'Administrator' if user.role == 'admin' else 'User' }}</dd></div><div><dt>Status</dt><dd>"
-            "{{ 'Deleted' if user.is_deleted else ('Active' if user.is_active else 'Inactive') }}</dd></div></dl>"
-            "{% if not user.is_deleted %}<form class='user-state-action' method='post' "
-            "action='/users/{{ user.id }}/{{ 'disable' if user.is_active else 'enable' }}'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-secondary'>"
-            "{{ 'Disable user' if user.is_active else 'Enable user' }}</button></form>{% endif %}</div>"
-            "{% if not user.is_deleted %}<footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit user</button>"
-            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete user</button>"
-            "</footer>{% endif %}</section>"
-            "{% if not user.is_deleted %}<form class='side-panel-view side-panel-form' data-record-view='edit' "
-            "hidden method='post' action='/users/{{ user.id }}/email'><div class='side-panel-body'>"
-            "<div class='form-field'><label for='edit-user-name-{{ user.id }}'>Name</label>"
-            "<input id='edit-user-name-{{ user.id }}' value='{{ user.display_name }}' disabled></div>"
-            "<div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label>"
-            "<input id='edit-user-email-{{ user.id }}' name='email' type='email' value='{{ user.email }}' required></div>"
-            "<div class='form-field'><label for='edit-user-role-{{ user.id }}'>Role</label>"
-            "<input id='edit-user-role-{{ user.id }}' value='{{ 'Administrator' if user.role == 'admin' else 'User' }}' disabled></div>"
-            "</div><input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Save user</button></footer></form>"
-            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
-            "action='/users/{{ user.id }}/delete'><div class='side-panel-body'><h3>Delete user?</h3>"
-            "<p class='delete-confirmation'>This deletion cannot be undone.</p>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'></div><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-danger' type='submit'>Delete user</button></footer></form>{% endif %}"
-            "</div></dialog>{% endfor %}"
-            "<dialog class='side-panel' id='add-user-panel' data-side-panel aria-labelledby='add-user-title'>"
-            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
-            "<h2 id='add-user-title'>New user</h2><p>Add user</p></div>"
-            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
-            "</header><form class='side-panel-form' method='post' action='/users'>"
-            "<div class='side-panel-body'><div class='form-field'><label for='new-user-email'>Email address</label>"
-            "<input id='new-user-email' name='email' type='email' required autofocus></div>"
-            "<div class='form-field'><label for='new-user-name'>Name</label>"
-            "<input id='new-user-name' name='display_name' required></div>"
-            "<div class='form-field'><label for='new-user-password'>Password</label>"
-            "<input id='new-user-password' name='password' type='password' required></div>"
-            "<div class='form-field'><label for='new-user-role'>Role</label><select id='new-user-role' name='role'>"
-            "<option value='user'>User</option><option value='admin'>Administrator</option></select></div></div>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Create user</button>"
-            "</footer></form></div></dialog>",
+        return render_template(
+            "pages/users/list.html",
             users=managed_users,
-            csrf=login_session.csrf_token,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @app.post("/users")
@@ -1654,89 +1583,24 @@ def create_flask_app(
     def team_list():
         actor, login_session = require_admin()
         managed_teams = teams.list_teams(actor.id)
-        team_members = {
-            team.id: memberships.list_team_members(actor.id, team.id) for team in managed_teams
-        }
-        eligible_team_users = {
-            team.id: memberships.list_eligible_users(actor.id, team.id) for team in managed_teams
-        }
         open_team = request.args.get("open_team")
-        return render_template_string(
-            "<div class='page-header dataset-list-header'><div><h1>My Teams</h1></div>"
-            "<div class='page-actions'><label class='visually-hidden' for='team-search'>Search teams</label>"
-            "<input id='team-search' type='search' placeholder='Search by name…' data-list-search>"
-            "<button class='button button-primary' type='button' data-dialog-open='add-team-panel'>+ New team</button>"
-            "</div></div><div class='dataset-tabs' aria-label='Team filters'>"
-            "<button class='button button-tab is-active' type='button'>All</button>"
-            "<button class='button button-tab' type='button' disabled>Active</button>"
-            "<button class='button button-tab' type='button' disabled>Archived</button></div>"
-            "{% if teams %}<div class='table-scroll dataset-table'><table><thead><tr>"
-            "<th scope='col'>Name</th><th scope='col'>Last updated</th></tr></thead><tbody>"
-            "{% for team in teams %}<tr class='record-row' tabindex='0' role='button' aria-haspopup='dialog' "
-            "data-record-row data-dialog-open='team-panel-{{ team.id }}' data-list-row "
-            "data-search-text='{{ team.name }}'><td><strong>{{ team.name }}</strong></td>"
-            "<td>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>{% endfor %}"
-            "</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2>"
-            "<p>No teams are available.</p></div>{% endif %}"
-            "{% for team in teams %}<dialog class='side-panel' id='team-panel-{{ team.id }}' data-side-panel "
-            "data-record-panel data-panel-entity='team' data-default-subtitle='View team' "
-            "{% if open_team == team.id %}data-auto-open='view' {% endif %}"
-            "aria-labelledby='team-panel-title-{{ team.id }}'><div class='side-panel-layout'>"
-            "<header class='side-panel-header'><div><h2 id='team-panel-title-{{ team.id }}'>{{ team.name }}</h2>"
-            "<p data-record-subtitle>View team</p></div><button class='side-panel-close' type='button' "
-            "data-dialog-close aria-label='Close panel'>×</button></header>"
-            "<section class='side-panel-view' data-record-view='view'><div class='side-panel-body'>"
-            "<dl class='record-details'><div><dt>Name</dt><dd>{{ team.name }}</dd></div>"
-            "<div><dt>Last updated</dt><dd>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd></div></dl>"
-            "<h3>Team members</h3>{% set members = team_members[team.id] %}"
-            "{% if members %}<ul class='member-list'>{% for membership, user in members %}<li>"
-            "<div><strong>{{ user.display_name }}</strong><span>{{ user.email }}</span></div>"
-            "<form method='post' action='/teams/{{ team.id }}/members/{{ membership.id }}/delete'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button class='button button-secondary' type='submit'>Remove</button></form></li>{% endfor %}</ul>"
-            "{% else %}<p>This team has no members.</p>{% endif %}"
-            "{% set eligible_users = eligible_team_users[team.id] %}{% if eligible_users %}"
-            "<form class='add-member-form' method='post' action='/teams/{{ team.id }}/members'>"
-            "<label for='team-user-{{ team.id }}'>Add user</label>"
-            "<select id='team-user-{{ team.id }}' name='user_id'>{% for user in eligible_users %}"
-            "<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button class='button button-primary' type='submit'>Add member</button></form>"
-            "{% else %}<p class='help-text'>All eligible users are already members.</p>{% endif %}"
-            "</div><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='edit'>Edit team</button>"
-            "<button class='button button-danger' type='button' data-record-mode='delete'>Delete team</button>"
-            "</footer></section>"
-            "<form class='side-panel-view side-panel-form' data-record-view='edit' hidden method='post' "
-            "action='/teams/{{ team.id }}/rename'><div class='side-panel-body'><div class='form-field'>"
-            "<label for='edit-team-name-{{ team.id }}'>Name</label>"
-            "<input id='edit-team-name-{{ team.id }}' name='name' value='{{ team.name }}' required></div></div>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Save team</button></footer></form>"
-            "<form class='side-panel-view side-panel-form' data-record-view='delete' hidden method='post' "
-            "action='/teams/{{ team.id }}/delete'><div class='side-panel-body'><h3>Delete team?</h3>"
-            "<p class='delete-confirmation'>This deletion cannot be undone.</p>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'></div><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-record-mode='view'>Cancel</button>"
-            "<button class='button button-danger' type='submit'>Delete team</button></footer></form>"
-            "</div></dialog>{% endfor %}"
-            "<dialog class='side-panel' id='add-team-panel' data-side-panel aria-labelledby='add-team-title'>"
-            "<div class='side-panel-layout'><header class='side-panel-header'><div>"
-            "<h2 id='add-team-title'>New team</h2><p>Add team</p></div>"
-            "<button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>"
-            "</header><form class='side-panel-form' method='post' action='/teams'>"
-            "<div class='side-panel-body'><div class='form-field'><label for='new-team-name'>Name</label>"
-            "<input id='new-team-name' name='name' required autofocus></div></div>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'><footer class='side-panel-footer'>"
-            "<button class='button button-secondary' type='button' data-dialog-close>Cancel</button>"
-            "<button class='button button-primary' type='submit'>Create team</button></footer>"
-            "</form></div></dialog>",
+        selected_team = next((team for team in managed_teams if team.id == open_team), None)
+        selected_team_members = (
+            memberships.list_team_members(actor.id, selected_team.id) if selected_team else []
+        )
+        selected_eligible_users = (
+            memberships.list_eligible_users(actor.id, selected_team.id) if selected_team else []
+        )
+        return render_template(
+            "pages/teams/list.html",
             teams=managed_teams,
-            team_members=team_members,
-            eligible_team_users=eligible_team_users,
-            open_team=open_team,
-            csrf=login_session.csrf_token,
+            selected_team=selected_team,
+            selected_team_members=selected_team_members,
+            selected_eligible_users=selected_eligible_users,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @app.post("/teams")
@@ -1765,24 +1629,15 @@ def create_flask_app(
         actor, login_session = require_admin()
         managed_members = memberships.list_team_members(actor.id, team_id)
         eligible_users = memberships.list_eligible_users(actor.id, team_id)
-        return render_template_string(
-            "<h1>Team members</h1>"
-            "{% if members %}<ul>{% for membership, user in members %}<li>"
-            "{{ user.display_name }} — {{ user.email }}"
-            "<form method='post' action='/teams/{{ team_id }}/members/"
-            "{{ membership.id }}/delete'>"
-            "<input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Remove member</button></form></li>{% endfor %}</ul>"
-            "{% else %}<p>This team has no members.</p>{% endif %}"
-            "<form method='post' action='/teams/{{ team_id }}/members'>"
-            "<label for='team-user'>User</label><select id='team-user' name='user_id'>{% for user in eligible_users %}"
-            "<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>"
-            "{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'>"
-            "<button>Add member</button></form>",
+        return render_template(
+            "pages/teams/members.html",
             members=managed_members,
             eligible_users=eligible_users,
             team_id=team_id,
-            csrf=login_session.csrf_token,
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
         )
 
     @app.post("/teams/<team_id>/members")
