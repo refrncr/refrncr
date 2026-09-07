@@ -279,7 +279,7 @@ def test_stale_authenticated_cookie_is_cleared_when_presented():
     services.sessions.revoke(token)
 
     response = client.get("/users", base_url=base_url)
-    assert response.status_code == 403
+    assert response.status_code == 302
     deletion = response.headers["Set-Cookie"]
     assert deletion.startswith(f"{HTTPS_SESSION_COOKIE}=")
     assert "Max-Age=0" in deletion and "Secure" in deletion
@@ -302,7 +302,7 @@ def test_expired_authenticated_cookie_is_rejected_and_cleared_with_injected_cloc
 
     clock.value += timedelta(hours=12)
     response = client.get("/users", base_url=base_url)
-    assert response.status_code == 403
+    assert response.status_code == 302
     assert "Max-Age=0" in response.headers["Set-Cookie"]
 
 

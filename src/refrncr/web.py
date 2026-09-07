@@ -6,6 +6,7 @@ import hmac
 import re
 import secrets
 from decimal import Decimal
+from urllib.parse import unquote, urlsplit
 
 from flask import (
     Flask,
@@ -66,6 +67,28 @@ ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
 GENERIC_LOGIN_FAILURE = "Invalid credentials"
 MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
+
+
+def safe_login_target(target: str | None) -> str:
+    """Accept only root-relative paths, never URLs or query/fragment payloads."""
+    if not target:
+        return "/"
+    decoded = unquote(target)
+    if (
+        not decoded.startswith("/")
+        or decoded.startswith("//")
+        or any(
+            character.isspace() or ord(character) < 32 or ord(character) == 127
+            for character in decoded
+        )
+        or any(character in decoded for character in "\\%?#")
+        or any(segment in {".", ".."} for segment in decoded.split("/"))
+    ):
+        return "/"
+    parsed = urlsplit(decoded)
+    if parsed.scheme or parsed.netloc or parsed.path in {"/login", "/logout", "/setup"}:
+        return "/"
+    return target
 
 
 def create_flask_app(
@@ -163,6 +186,16 @@ def create_flask_app(
             g.stale_cookie_settings = settings
         g.authenticated_resolution = resolved
         return resolved
+
+    @app.before_request
+    def redirect_anonymous_browser_request():
+        # Only registered browser endpoints participate; API/health is owned by FastAPI.
+        if request.endpoint and request.endpoint not in {"static", "setup", "login", "logout"}:
+            if authenticated() is None:
+                target = (
+                    safe_login_target(request.path) if request.method in {"GET", "HEAD"} else "/"
+                )
+                return redirect(url_for("login", next=target))
 
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
@@ -1324,6 +1357,9 @@ def create_flask_app(
     @app.route("/login", methods=["GET", "POST"])
     def login():
         settings = require_cookie_settings()
+        return_target = safe_login_target(
+            request.form.get("next") if request.method == "POST" else request.args.get("next")
+        )
 
         def invalid_credentials_response():
             return (
@@ -1331,13 +1367,22 @@ def create_flask_app(
                     "pages/auth/login.html",
                     csrf_token=request.cookies.get(settings.anonymous_csrf_name),
                     error=GENERIC_LOGIN_FAILURE,
+                    next_target=return_target,
+                    field_errors={},
+                    email=request.form.get("email", "")[:MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS],
                 ),
                 401,
             )
 
         if request.method == "POST":
             require_csrf(request.cookies.get(settings.anonymous_csrf_name))
-            submitted_email = request.form["email"]
+            submitted_email = request.form.get("email", "")
+            submitted_password = request.form.get("password", "")
+            field_errors = {}
+            if not submitted_email.strip():
+                field_errors["email"] = "Enter your email address."
+            if not submitted_password:
+                field_errors["password"] = "Enter your password."
             oversized_identifier = len(submitted_email) > MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS
             account_key = canonical_account_key(submitted_email)
             source_key = source_resolver.resolve(
@@ -1350,15 +1395,23 @@ def create_flask_app(
             if oversized_identifier:
                 attempt.failed()
                 return invalid_credentials_response()
+            if field_errors:
+                attempt.failed()
+                return render_anonymous_template(
+                    "pages/auth/login.html",
+                    csrf_token=request.cookies.get(settings.anonymous_csrf_name),
+                    error="Check the required fields below.",
+                    field_errors=field_errors,
+                    email=submitted_email[:MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS],
+                    next_target=return_target,
+                ), 400
             permit = authentication_admission.try_acquire()
             if permit is None:
                 attempt.cancel()
                 return invalid_credentials_response()
             try:
                 with permit:
-                    principal = authentication.authenticate(
-                        submitted_email, request.form["password"]
-                    )
+                    principal = authentication.authenticate(submitted_email, submitted_password)
             except Exception:
                 attempt.failed()
                 raise
@@ -1368,7 +1421,7 @@ def create_flask_app(
                 if existing_token:
                     sessions.revoke(existing_token)
                 token, _ = sessions.create(principal)
-                response = redirect(url_for("index"))
+                response = redirect(return_target)
                 response.set_cookie(
                     settings.session_name,
                     token,
@@ -1379,7 +1432,9 @@ def create_flask_app(
                 return response
             attempt.failed()
             return invalid_credentials_response()
-        return anonymous_csrf_form_response("pages/auth/login.html")
+        return anonymous_csrf_form_response(
+            "pages/auth/login.html", next_target=return_target, field_errors={}, email=None
+        )
 
     @app.post("/logout")
     def logout():

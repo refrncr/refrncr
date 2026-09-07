@@ -10,3 +10,6 @@ input:disabled, select:disabled, textarea:disabled { background: var(--color-act
 [aria-invalid="true"], .field-error { border-color: var(--color-error); }
 .form-field + .form-field { margin-top: var(--space-lg); }
 fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+
+.form-field [data-password-toggle] { margin-top: var(--space-sm); }
+.form-field [data-password-toggle][hidden] { display: none; }

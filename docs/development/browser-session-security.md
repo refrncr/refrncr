@@ -66,3 +66,19 @@ the same generic HTTP 401 response without calling authentication or consuming l
 Permits are released in a `finally`-equivalent context-manager boundary after success, credential
 failure, or an exception. The guard covers only interactive browser authentication; CLI bootstrap
 and `AuthenticationService` itself are unchanged. It has no waiting queue or distributed state.
+
+Anonymous requests to registered protected browser endpoints redirect to `/login`; authenticated
+permission failures still return 403. Static assets, unknown routes, setup, logout and FastAPI
+health/API routes retain their separate contracts. A safe originally requested GET/HEAD path
+travels through a hidden `next` field and is revalidated on POST. Other methods return to `/`
+after login and never replay a mutation. Return targets must be root-relative paths: URLs,
+protocol-relative paths, backslashes, controls/whitespace, dot segments, nested percent encoding,
+query strings and fragments are rejected. Login, logout and setup targets also fall back to `/`.
+Query parameters are deliberately not copied from protected requests, avoiding propagation of
+credentials or other sensitive parameters. The destination still enforces its own authorization.
+
+Missing login fields receive associated English validation errors (400), independent of any
+account lookup, and still consume failed-attempt limiter history. Credential/account failures
+and throttled attempts continue to share the generic 401 response. Only the escaped submitted
+email (bounded to 320 code points) and request CSRF/return-path values may differ; passwords
+are never supplied to the rendering context.

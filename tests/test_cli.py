@@ -682,9 +682,10 @@ def test_first_run_migrates_sqlite_and_restart_is_idempotent(tmp_path):
     restarted = cli.build_application(database_url)
 
     assert TestClient(application).get("/api/health").json() == {"status": "ok"}
-    response = TestClient(restarted).get("/")
+    response = TestClient(restarted, base_url="https://testserver").get("/")
     assert response.status_code == 200
-    assert "refrncr" in response.text
+    assert "Sign in to your account" in response.text
+    assert "Overview" not in response.text
     engine.dispose()
 
 

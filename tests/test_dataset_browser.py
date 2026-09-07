@@ -133,7 +133,8 @@ def test_all_dataset_routes_require_authentication(dataset_browser, method, path
 
     response = request(client, method, path, data=data)
 
-    assert response.status_code == 403
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/login?")
 
 
 def test_dataset_navigation_and_empty_list_state(dataset_browser):
@@ -268,7 +269,7 @@ def test_ui_assets_are_local_and_critical_login_controls_are_labelled(dataset_br
     assert "for='login-password'" in page
     assert "autocomplete='current-password'" in page
     assert "class='login-form'" in page
-    assert 'aria-live="polite"' in page
+    assert '<main id="content"' in page
 
 
 def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):

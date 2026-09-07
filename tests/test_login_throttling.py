@@ -43,6 +43,7 @@ def csrf(response) -> str:
 def generic_login_failure_body(response) -> str:
     body = response.get_data(as_text=True)
     assert body.count(GENERIC_LOGIN_FAILURE) == 1
+    body = re.sub(r"(name='email' type='email' value=')[^']*", r"\1EMAIL", body)
     return re.sub(r"name='csrf_token' value='[^']+'", "name='csrf_token' value='TOKEN'", body)
 
 
@@ -306,3 +307,32 @@ def test_multi_megabyte_login_body_is_rejected_before_form_buffering_or_authenti
     generic_login_failure_body(response)
     assert services.authentication.authenticate.call_count == 0
     assert limiter.entry_count == 0
+
+
+def test_account_failure_states_have_the_same_browser_response():
+    services, client = configured_web(LoginAttemptLimiter())
+    admin = services.authentication.authenticate("admin@example.com", PASSWORD)
+    inactive = services.users.create_user(admin.id, "inactive@example.com", "Inactive", PASSWORD)
+    deleted = services.users.create_user(admin.id, "deleted@example.com", "Deleted", PASSWORD)
+    services.users.disable_user(admin.id, inactive.id)
+    services.users.delete_user(admin.id, deleted.id)
+    responses = [
+        post_login(client, email, "wrong password")
+        for email in (
+            "admin@example.com",
+            "unknown@example.com",
+            inactive.email,
+            deleted.email,
+        )
+    ]
+    assert {response.status_code for response in responses} == {401}
+    # Only the user's submitted email and random CSRF token may differ.
+    assert len({generic_login_failure_body(response) for response in responses}) == 1
+
+
+def test_required_field_failures_still_consume_limiter_history():
+    services, client = configured_web(LoginAttemptLimiter(source_account_limit=1))
+    services.authentication.authenticate = Mock(return_value=None)
+    assert post_login(client, "admin@example.com", "").status_code == 400
+    assert post_login(client, "admin@example.com", PASSWORD).status_code == 401
+    services.authentication.authenticate.assert_not_called()
