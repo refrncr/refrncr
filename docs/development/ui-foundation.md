@@ -84,6 +84,10 @@ The Dataset-create page combines `page_header`, `form_field`, `feedback`, and li
 variants. Its Description field selects the generic textarea control while retaining the same
 label, value, error, disabled, and accessible-description contract as text inputs.
 
+The `readonly_field` macro renders non-editable form values with the shared `.form-label`
+typography. Dataset and field edit forms use it for immutable keys; only the value uses
+monospace, while the label matches editable field labels in full pages and side panels.
+
 The Dataset-edit page reuses those primitives directly. It presents the immutable Dataset key as
 text rather than a submitted control, and connects validation feedback only to the affected field.
 Create and edit remain separate page compositions because their key and action contracts differ.
@@ -206,3 +210,77 @@ Manual checks still required when browser automation is unavailable:
    server validation still work and the visibility button is hidden.
 5. Sign in from a protected page and confirm return to its path. Sign out and confirm protected
    content is unavailable. Verify text, button and focus-state contrast with the shared tokens.
+
+## Configuration side panels (REF-131)
+
+All side panels use `components/side_panel.html` and the shared external controller.
+Do not build separate page-dependent dialog markup, CSS variants or controllers. The
+`side_panel` macro accepts a unique panel ID, title and title ID, optional description and
+optional description ID, and caller content. It generates `aria-labelledby` and, when a
+description is present, `aria-describedby` (with a generated description ID if omitted).
+Use `.side-panel-body` for scrolling content and `.side-panel-footer` for separate actions.
+The header stays fixed; shared form actions remain available while scrolling. Existing width,
+spacing, focus and responsive tokens apply, including full-width panels below 768 px.
+
+Dataset creation uses a single `form_side_panel()` on the dataset list. Dataset settings,
+field creation and field editing share one instance on dataset detail. Each trigger retains
+its existing authorized route as its `href`:
+
+```jinja
+{% from "components/side_panel.html" import form_side_panel %}
+<a data-panel-url data-dialog-open="configuration-panel"
+   href="{{ url_for('new_dataset') }}">New dataset</a>
+{{ form_side_panel() }}
+```
+
+Render triggers and the host within the existing permission conditions. Multiple hosts need
+unique IDs passed to `form_side_panel(panel_id)` and matching `data-dialog-open` values.
+
+The existing full page is the form source: wrap its reusable form content in
+`data-side-panel-content` with an English `data-panel-title`. The controller fetches that
+same GET route and imports only this content, leaving the document shell and scripts behind.
+There are no extra endpoints, duplicate forms, or client-side validation rules. Keep business
+logic, authorization, normalization, CSRF, audit and transactions in the existing server
+layers. Form actions and hidden CSRF fields remain the originals. Use `novalidate` so server
+validation consistently supplies English messages. A `data-panel-cancel` link retains its
+fallback destination and closes the panel when enhanced.
+
+POSTs use the same form data and routes. Server validation responses (400/409) replace the
+form in the panel, preserving escaped submitted values; successful redirects navigate to the
+server's destination. Authentication redirects and failed GETs fall back to full-page
+navigation. Other POST errors retain the form and announce an error; network failures do not
+automatically retry mutations. Stale GET/validation responses cannot overwrite a newly opened
+form. Only one mutation per panel may be pending at a time.
+
+Opening calls native `showModal()`: the browser supplies background inertness, Tab focus
+containment and Escape closing. Focus moves to a visible error summary, an invalid control,
+or the first relevant visible form control; the close button is the fallback. Error summaries
+use `data-error-focus` and `tabindex="-1"`; invalid controls retain their accessible error
+references. Closing through Cancel, the close button or native Escape restores the exact
+trigger, including when several triggers share a host. If that trigger has disappeared,
+focus returns to the main content. Controller registration is idempotent. Without JavaScript
+(or native dialog support), links and full-page forms continue to work.
+
+`test_dataset_browser.py` covers rendering, shared composition, permission-aware triggers,
+full-page forms, server mutations, validation, CSRF and escaping. `test_side_panel_javascript.py`
+uses the existing Node test approach for control events, focus selection/restoration,
+multiple triggers/panels, loading, submissions and errors. DOM doubles verify that native
+modality is requested; they cannot prove browser Tab containment, Escape handling or layout.
+Before merge, verify in a real browser:
+
+1. Open each of the four flows with the keyboard and confirm the first form control receives
+   visible focus. Cycle Tab and Shift+Tab, including from the last control, and confirm focus
+   stays inside the dialog and the background cannot be activated.
+2. Close with Escape, Close panel and Cancel; confirm focus returns to the particular opener.
+   Repeat across different field triggers and existing record/user/team panels.
+3. Submit invalid values, correct them and save; check error announcements, focus, retained
+   values, successful redirects and existing field deletion behavior.
+4. Test desktop, tablet and 320 px widths, short viewports, long labels/keys, zoom and increased
+   text size. Check header/close visibility, scrolling, actions and absence of page overflow.
+5. Disable JavaScript and repeat all four workflows using the full pages.
+
+Dataset and field edit panels use `panel_form_actions` for the same fixed footer as record
+panels. Dataset Save fills the single-column footer; field Save and Delete share the two-column
+footer. These edit panels have no Cancel action; the header close button and Escape close them.
+Footer submit buttons use native `form` attributes to preserve their original form and CSRF
+association, including on full-page fallbacks. Creation panels retain their Cancel action.

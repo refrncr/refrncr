@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from flask import template_rendered
+from jinja2 import BaseLoader
 from sqlalchemy import func, select, update
 from sqlalchemy.pool import StaticPool
 
@@ -776,7 +777,7 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert response.status_code == 200
     assert "<title>New dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
-    assert "<form class='form' method='post' action='/datasets'>" in page
+    assert "<form class='form' novalidate method='post' action='/datasets'>" in page
     assert "<label for='dataset-key'>Key</label>" in page
     assert "id='dataset-key' name='key' type='text' value='' required" in page
     assert "aria-describedby='dataset-key-help'" in page
@@ -785,7 +786,9 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert "id='dataset-name' name='name' type='text' value='' required" in page
     assert "<label for='dataset-description'>Description</label>" in page
     assert "<textarea id='dataset-description' name='description'></textarea>" in page
-    assert '<a class="button button-secondary" href="/datasets">Cancel</a>' in page
+    assert (
+        "<a class='button button-secondary' data-panel-cancel href='/datasets'>Cancel</a>" in page
+    )
     assert '<button class="button button-primary" type="submit">Create dataset</button>' in page
     assert "aria-invalid='true'" not in page
 
@@ -1023,15 +1026,19 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert response.status_code == 200
     assert "<title>Edit dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
-    assert "<p>Key: <code>edit-form</code></p>" in page
+    assert "<p><span class='form-label'>Key:</span> <code>edit-form</code></p>" in page
     assert "name='key'" not in page
-    assert "<form class='form' method='post' action='/datasets/edit-form'>" in page
+    assert (
+        "<form id='dataset-edit-form' class='form' novalidate "
+        "method='post' action='/datasets/edit-form'>" in page
+    )
     assert "<label for='dataset-name'>Name</label>" in page
     assert "value='Stored &lt;name&gt;'" in page
     assert "<label for='dataset-description'>Description</label>" in page
     assert ">Stored &lt;description&gt;</textarea>" in page
-    assert '<a class="button button-secondary" href="/datasets/edit-form">Cancel</a>' in page
-    assert '<button class="button button-primary" type="submit">Save dataset</button>' in page
+    assert "data-panel-cancel" not in page
+    assert "side-panel-footer-single" in page
+    assert "type='submit' form='dataset-edit-form'>Save dataset</button>" in page
     assert "aria-invalid='true'" not in page
     assert "Stored <name>" not in page
     assert "Stored <description>" not in page
@@ -2235,3 +2242,108 @@ def test_delete_audit_failure_rolls_back_field(dataset_browser, monkeypatch):
             )
             == 0
         )
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+def test_configuration_panel_triggers_follow_existing_permissions(dataset_browser, permission):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "panel-permissions")
+    create_field(services, admin, dataset)
+    user = services.users.create_user(admin.id, "panels@example.com", "Panels", PASSWORD)
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, user.email)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}"))
+    expected = {"viewer": 0, "editor": 1, "admin": 3}[permission]
+    assert page.count("data-panel-url") == expected
+    assert page.count("id='configuration-panel'") == (1 if expected else 0)
+    assert "data-panel-url" not in body(request(client, "get", "/datasets"))
+
+
+def test_configuration_flows_load_one_shared_panel_and_keep_full_page_fallback(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "panel-forms", "Name <unsafe>")
+    create_field(services, admin, dataset)
+    login(client)
+    loaded = []
+    original_loader = client.application.jinja_env.loader
+
+    class TrackingLoader(BaseLoader):
+        def get_source(self, environment, template):
+            loaded.append(template)
+            return original_loader.get_source(environment, template)
+
+    client.application.jinja_env.loader = TrackingLoader()
+    for page_path in ["/datasets", "/datasets/panel-forms"]:
+        page = body(request(client, "get", page_path))
+        assert page.count("id='configuration-panel'") == 1
+        assert "aria-labelledby='configuration-panel-title'" in page
+        assert "id='configuration-panel-title' tabindex='-1'" in page
+        assert "data-panel-host" in page
+    assert "components/side_panel.html" in loaded
+    for path, title in [
+        ("/datasets/new", "New dataset"),
+        ("/datasets/panel-forms/edit", "Edit dataset"),
+        ("/datasets/panel-forms/fields/new", "Add field"),
+        ("/datasets/panel-forms/fields/field/edit", "Edit field"),
+    ]:
+        response = request(client, "get", path)
+        page = body(response)
+        assert response.status_code == 200
+        assert "<!doctype html>" in page
+        assert f"data-side-panel-content data-panel-title='{title}'" in page
+        if title in {"New dataset", "Add field"}:
+            assert "data-panel-cancel href=" in page
+        else:
+            assert "data-panel-cancel" not in page
+            assert "side-panel-footer" in page
+        assert "method='post'" in page
+        assert form_csrf(response)
+        assert "Name <unsafe>" not in page
+
+
+def test_side_panel_description_gets_an_accessible_id_without_explicit_id(dataset_browser):
+    _, _, _, client = dataset_browser
+    with client.application.test_request_context():
+        template = client.application.jinja_env.from_string(
+            '{% from "components/side_panel.html" import side_panel %}'
+            '{% call side_panel("first", "First", "first-title", description="Help <text>") %}'
+            "<p>Content</p>{% endcall %}"
+            '{% call side_panel("second", "Second", "second-title") %}Body{% endcall %}'
+        )
+        page = template.render()
+    assert "aria-describedby='first-description'" in page
+    assert "id='first-description'" in page
+    assert "Help &lt;text&gt;" in page
+    assert page.count("aria-describedby=") == 1
+
+
+@pytest.mark.parametrize(
+    "path, data",
+    [
+        ("/datasets", {"key": "invalid key", "name": "<script>alert(1)</script>"}),
+        ("/datasets/panel-errors", {"name": "", "description": "<script>alert(1)</script>"}),
+        ("/datasets/panel-errors/fields", {"key": "bad key", "name": "<script>alert(1)</script>"}),
+        (
+            "/datasets/panel-errors/fields/field",
+            {"name": "<script>alert(1)</script>", "data_type": "invalid"},
+        ),
+    ],
+)
+def test_panel_validation_keeps_server_errors_values_and_csrf(dataset_browser, path, data):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "panel-errors")
+    create_field(services, admin, dataset)
+    login(client)
+    csrf = session_csrf(client, services)
+    rejected = request(client, "post", path, data=data)
+    assert rejected.status_code == 403
+    assert "data-side-panel-content" not in body(rejected)
+    response = request(client, "post", path, data={**data, "csrf_token": csrf})
+    page = body(response)
+    assert response.status_code == 400
+    assert "data-side-panel-content" in page
+    assert "aria-invalid='true'" in page or "data-error-focus" in page
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert form_csrf(response) == csrf

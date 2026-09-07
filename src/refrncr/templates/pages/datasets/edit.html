@@ -1,15 +1,18 @@
 {% extends "base.html" %}
-{% from "components.html" import button, feedback, form_field %}
+{% from "components.html" import button, feedback, form_field, readonly_field %}
 {% from "layouts/page.html" import page_header %}
+{% from "components/side_panel.html" import panel_form_actions %}
 
 {% block title %}Edit dataset · REFRNCR{% endblock %}
 
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}
   {{ page_header("Edit dataset") }}
-  <p>Key: <code>{{ dataset.key }}</code></p>
-  {{ feedback(error, id="dataset-edit-error") }}
-  <form class='form' method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Edit dataset'>
+  <div class='side-panel-body'>
+  {{ readonly_field("Key", dataset.key, technical=true) }}
+  {{ feedback(error, id="dataset-edit-error", focus=true) }}
+  <form id='dataset-edit-form' class='form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
     {{ form_field(
       "Name",
       "name",
@@ -26,9 +29,10 @@
       control="textarea"
     ) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-    <div class='form-actions'>
-      {{ button("Cancel", url_for("dataset_detail", key=dataset.key), variant="secondary") }}
-      {{ button("Save dataset", button_type="submit") }}
-    </div>
   </form>
+  </div>
+  {% call panel_form_actions(single=true) %}
+    <button class='button button-primary' type='submit' form='dataset-edit-form'>Save dataset</button>
+  {% endcall %}
+  </div>
 {% endblock %}

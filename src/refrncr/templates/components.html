@@ -41,3 +41,7 @@
     <span class="metadata-item"><span aria-hidden="true">•</span><span>Updated <time datetime="{{ updated.isoformat() }}">{{ updated|absolute_utc }}</time></span></span>
   </p>
 {%- endmacro %}
+
+{% macro readonly_field(label, value, technical=false) -%}
+  <p><span class='form-label'>{{ label }}:</span> {% if technical %}<code>{{ value }}</code>{% else %}{{ value }}{% endif %}</p>
+{%- endmacro %}
