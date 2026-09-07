@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import re
 import secrets
+from datetime import UTC
 from decimal import Decimal
 from urllib.parse import unquote, urlsplit
 
@@ -110,6 +111,26 @@ def create_flask_app(
     authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
 ) -> Flask:
     app = Flask(__name__)
+
+    @app.template_filter("absolute_utc")
+    def absolute_utc(value):
+        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        months = (
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        )
+        return f"{value.day} {months[value.month - 1]} {value.year}, {value:%H:%M} UTC"
+
     app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
 
     @app.before_request
@@ -322,7 +343,7 @@ def create_flask_app(
         _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
             require_dataset_dependencies()
         )
-        visible_datasets = dataset_service.list_datasets(actor.id)
+        visible_datasets = dataset_service.list_dataset_overview(actor.id)
         return render_template(
             "pages/datasets/list.html",
             actor=actor,
@@ -468,7 +489,8 @@ def create_flask_app(
             record_service,
         ) = require_dataset_dependencies()
         try:
-            dataset = dataset_service.get_dataset(actor.id, key)
+            context = dataset_service.get_dataset_context(actor.id, key)
+            dataset = context.dataset
             fields = field_service.list_fields(actor.id, key)
             identifier = business_key_service.get_business_key(actor.id, key)
             page = record_service.list_records(actor.id, key, parse_page_parameter())
@@ -513,6 +535,7 @@ def create_flask_app(
         return render_template(
             "pages/datasets/records.html",
             dataset=dataset,
+            context=context,
             fields=fields,
             identifier=identifier,
             rows=rows,

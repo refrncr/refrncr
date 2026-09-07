@@ -1,8 +1,12 @@
 {% extends "base.html" %}
+{% from "components.html" import content_metadata %}
+{% from "layouts/page.html" import page_context %}
 
 {% block content %}
-  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_list") }}'>Datasets</a></nav>
-  <h1>{{ dataset.name }}</h1><p><code>{{ dataset.key }}</code></p>
+  {% call page_context(dataset.name, content_metadata(dataset.record_count, dataset.last_updated)) %}
+    {% include "pages/datasets/_breadcrumbs.html" %}
+  {% endcall %}
+  <p><code>{{ dataset.key }}</code></p>
   <p>{{ dataset.description }}</p>
   <p>Initial owner: {{ dataset.owner_display_name }} (<code>{{ dataset.owner_user_id }}</code>)</p>
   <p><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View records</a></p>

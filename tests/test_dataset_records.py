@@ -822,13 +822,14 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     database = tmp_path / "populated-ref-75.db"
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
-    command.upgrade(config, "0007_ref_75")
+    command.upgrade(config, "head")
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
+    command.downgrade(config, "0007_ref_75")
     field_id = str(uuid.uuid4())
     now = utc_now()
     with factory.begin() as session:

@@ -197,7 +197,7 @@ def prepare_database(database_url: str | URL) -> None:
 
 def _validate_ref_121_schema(connection) -> None:
     revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-    if revision != "0010_ref_121":
+    if revision not in {"0010_ref_121", "0011_ref_130"}:
         return
     inspector = inspect(connection)
     columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}

@@ -22,6 +22,7 @@ from refrncr.ports import (
     AuditEntry,
     DatasetBusinessKey,
     DatasetFieldRecord,
+    DatasetOverview,
     DatasetRecord,
     GrantRecord,
     MembershipRecord,
@@ -136,6 +137,8 @@ class DatasetDetails:
     description: str
     owner_user_id: str
     owner_display_name: str
+    record_count: int
+    last_updated: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -666,11 +669,27 @@ class DatasetService:
                 return uow.datasets.list_all()
             return uow.datasets.list_by_ids(access.resource_ids)
 
+    def list_dataset_overview(self, actor_id: str) -> list[DatasetOverview]:
+        access = self.authorization.authorized_resources(actor_id, "dataset", "viewer")
+        with self.uow() as uow:
+            return uow.datasets.current_overview(
+                None if access.all_resources else access.resource_ids
+            )
+
+    def get_dataset_context(self, actor_id: str, key: str) -> DatasetOverview:
+        dataset = self.get_dataset(actor_id, key)
+        with self.uow() as uow:
+            rows = uow.datasets.current_overview((dataset.id,))
+        if not rows:
+            raise NotFoundError("Dataset not found")
+        return rows[0]
+
     def get_dataset(self, actor_id: str, key: str) -> DatasetRecord:
         return self._get_dataset_with_access(actor_id, key, "viewer")
 
     def get_dataset_details(self, actor_id: str, key: str) -> DatasetDetails:
-        dataset = self.get_dataset(actor_id, key)
+        context = self.get_dataset_context(actor_id, key)
+        dataset = context.dataset
         with self.uow() as uow:
             owner = uow.users.get(dataset.owner_user_id)
         return DatasetDetails(
@@ -680,6 +699,8 @@ class DatasetService:
             description=dataset.description,
             owner_user_id=dataset.owner_user_id,
             owner_display_name=(owner.display_name if owner is not None else dataset.owner_user_id),
+            record_count=context.record_count,
+            last_updated=context.last_updated,
         )
 
     def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
@@ -788,6 +809,7 @@ class DatasetFieldService:
                 if exc.constraint == "uq_dataset_fields_dataset_key":
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
+            dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "created")
             if validated_component:
                 current_key = uow.dataset_business_keys.get(dataset.id)
@@ -869,6 +891,7 @@ class DatasetFieldService:
             field.is_required = validated_required
             field.is_unique = validated_unique
             field.updated_at = _now()
+            dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
 
@@ -945,6 +968,7 @@ class DatasetFieldService:
                     ),
                 )
 
+            dataset.content_updated_at = _now()
             if definition_changed:
                 field.name = normalized_name
                 field.data_type = validated_type
@@ -974,6 +998,7 @@ class DatasetFieldService:
             uow.flush()
             remaining = uow.dataset_fields.list_for_dataset(dataset.id)
             uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
+            dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field_id, "deleted")
 
     def replace_order(
@@ -1005,6 +1030,7 @@ class DatasetFieldService:
                 raise ValidationError("Field order must contain every current field exactly once")
             if proposed_order == current:
                 return tuple(fields)
+            dataset.content_updated_at = _now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
             uow.add_audit(
                 actor_user_id=actor_id,
@@ -1152,6 +1178,7 @@ class DatasetBusinessKeyService:
             if uow.dataset_records.count(dataset.id):
                 raise ValidationError("Record identifier cannot change after records exist")
 
+            dataset.content_updated_at = _now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
             uow.add_audit(
                 actor_user_id=actor_id,
@@ -1204,6 +1231,7 @@ class DatasetRecordService:
                 if error.constraint == "uq_dataset_record_values_unique_value":
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
+            dataset.content_updated_at = _now()
             uow.add_audit(
                 actor_user_id=actor_id,
                 object_type="dataset_record",
@@ -1252,6 +1280,7 @@ class DatasetRecordService:
                 uow.flush()
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
+            dataset.content_updated_at = _now()
             uow.add_audit(
                 actor_user_id=actor_id,
                 object_type="dataset_record",
@@ -1273,6 +1302,7 @@ class DatasetRecordService:
             self._require_access(actor_id, dataset, "editor")
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
+            dataset.content_updated_at = _now()
             uow.add_audit(
                 actor_user_id=actor_id,
                 object_type="dataset_record",

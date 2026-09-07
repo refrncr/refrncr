@@ -1,11 +1,12 @@
 {% extends "base.html" %}
+{% from "components.html" import content_metadata %}
+{% from "layouts/page.html" import page_context %}
 
 {% block content %}
   <div class='page-header'>
-    <div>
-      <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_detail", key=dataset.key) }}'>Dataset</a></nav>
-      <h1>{{ dataset.name }} records</h1>
-    </div>
+    {% call page_context(dataset.name ~ " records", content_metadata(context.record_count, context.last_updated)) %}
+      {% include "pages/datasets/_breadcrumbs.html" %}
+    {% endcall %}
     <div class='page-actions record-page-actions'>
       <details class='export-menu'>
         <summary class='button button-secondary'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-download.svg") }}' alt='' aria-hidden='true'>Export</summary>

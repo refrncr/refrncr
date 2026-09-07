@@ -91,9 +91,28 @@ Create and edit remain separate page compositions because their key and action c
 The Dataset-detail page uses a file template under the shared shell. Its existing metadata,
 permission-dependent schema controls, field table, and field-order forms remain unchanged.
 
-The Dataset list uses a file template with client-side searching across the authorized name, key,
-and description values. Dataset names remain keyboard-accessible links, while non-functional
-status filters were removed and pointer row navigation remains an enhancement.
+The Dataset list uses a file template with Dataset, Records and Updated columns. Counts use
+the shared `numeric-column` treatment; there are no search, filter or sort controls. Dataset
+names remain keyboard-accessible links and pointer row navigation remains an enhancement.
+REF-130 adds shared `breadcrumbs` and `content_metadata` macros in `components.html`.
+The dataset breadcrumb include supplies Datasets → No owning team → dataset name, with only
+Datasets linked and the last item marked as current. Creation uses Datasets → New dataset
+because no dataset exists yet. The records and configuration headings consume the same secondary
+metadata component. The shared `page_context` layout follows the supplied dataset-table HTML
+reference: a flat column-flex group with no breadcrumb/title gap, zero child margins, and
+`--space-sm` (8 px) padding before metadata. This reproduces the reference's single collapsed
+8 px heading/paragraph margin without relying on margin collapse inside flex layout.
+The `.page-title` class shares the canonical heading font family and wrapping rule, using
+`--font-size-page-title` (28 px), semibold weight and normal font line-height. Other `h1` styles
+remain unchanged. Breadcrumbs use regular 12 px Inter, normal line-height, uppercase presentation
+and `--letter-spacing-label` (0.5 px). Breadcrumb links use the lighter `--color-breadcrumb-link` (#2c8156), with 4.55:1 contrast
+on the #f9f9f9 background. This closely follows the reference green while retaining AA contrast.
+Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px Inter, normal line-height,
+tabular figures and one inline-flex row with 8 px horizontal gaps. The decorative bullet has
+`aria-hidden="true"` and is grouped with Updated so it cannot wrap alone. Whitespace between the
+count and Updated groups retains a text boundary for assistive technology. The outer header's
+24 px bottom margin and responsive action layout remain unchanged. The typography and breadcrumb-colour tokens are
+shared; no dataset-specific selectors or component variants are introduced.
 
 The records route uses a file template with page-private table, field, and record-panel
 compositions. Its create and per-record workflows use the shared modal side-panel structure;

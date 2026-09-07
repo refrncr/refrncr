@@ -10,7 +10,7 @@ import time
 import unicodedata
 import zipfile
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import PurePath
 from xml.etree.ElementTree import ParseError
 
@@ -722,6 +722,8 @@ class DatasetRecordImportService:
                     )
             except PersistenceConflictError as error:
                 DatasetRecordService._raise_record_conflict(error)
+            if validated:
+                dataset.content_updated_at = datetime.now(UTC)
         return len(validated)
 
     def cancel(self, actor_id, session_id, dataset_key, token):

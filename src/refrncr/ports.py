@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Protocol
 
@@ -74,6 +74,20 @@ class DatasetRecord(Protocol):
     owner_user_id: str
     created_at: datetime
     updated_at: datetime
+    content_updated_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetOverview:
+    dataset: DatasetRecord
+    record_count: int
+    last_updated: datetime
+
+    def __post_init__(self) -> None:
+        value = self.last_updated
+        # SQLite returns naive values for timestamps stored in UTC.
+        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        object.__setattr__(self, "last_updated", value)
 
 
 class DatasetFieldRecord(Protocol):
@@ -197,6 +211,10 @@ class GrantOperations(Protocol):
 
 
 class DatasetOperations(Protocol):
+    def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
+        """Current working set only; None is reserved for authorized all-resource access."""
+        ...
+
     def get(self, dataset_id: str, *, for_update: bool = False) -> DatasetRecord | None: ...
 
     def find_by_key(self, key: str, *, for_update: bool = False) -> DatasetRecord | None: ...

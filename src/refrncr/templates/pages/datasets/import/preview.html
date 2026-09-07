@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <nav><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Records</a></nav><h1>Import preview</h1><p>File: {{ preview.filename }}</p><p><a href='{{ url_for("review_import_mapping", key=dataset.key, token=token) }}'>Review mappings</a></p>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Import preview</h1><p>File: {{ preview.filename }}</p><p><a href='{{ url_for("review_import_mapping", key=dataset.key, token=token) }}'>Review mappings</a></p>
   {% if preview.source.worksheet %}<p>Worksheet: {{ preview.source.worksheet }}</p>{% endif %}{% if preview.source.delimiter %}<p>Detected delimiter: {{ preview.source.delimiter }}</p>{% endif %}
   <dl><dt>Data rows</dt><dd>{{ preview.source.rows|length }}</dd><dt>Valid rows</dt><dd>{{ preview.valid_rows }}</dd><dt>Failing rows</dt><dd>{{ preview.invalid_rows }}</dd><dt>Ignored empty rows</dt><dd>{{ preview.source.ignored_empty_rows }}</dd></dl>
   <h2>Mappings</h2><ul>{% for header, target in mapped_headers %}<li>{{ header }} → {{ target or 'Ignored' }}</li>{% endfor %}</ul>

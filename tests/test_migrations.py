@@ -120,6 +120,7 @@ def assert_community_schema(engine):
         "name",
         "description",
         "owner_user_id",
+        "content_updated_at",
         "created_at",
         "updated_at",
     }
@@ -419,7 +420,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0010_ref_121"
+                "0011_ref_130"
             )
     finally:
         upgraded.dispose()
@@ -440,7 +441,7 @@ def test_ref_121_partial_values_are_canonically_rebuilt(tmp_path, positions):
     database = tmp_path / "partial-values.db"
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
-    command.upgrade(config, "0009_ref_80")
+    command.upgrade(config, "head")
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
@@ -449,6 +450,8 @@ def test_ref_121_partial_values_are_canonically_rebuilt(tmp_path, positions):
     dataset = services.datasets.create_dataset(admin.id, "partial", "Partial", "")
     for key in ("zeta", "alpha", "middle"):
         services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+    engine.dispose()
+    command.downgrade(config, "0009_ref_80")
     with engine.begin() as connection:
         connection.exec_driver_sql("ALTER TABLE dataset_fields ADD COLUMN display_position INTEGER")
         for key, position in zip(("zeta", "alpha", "middle"), positions, strict=True):
@@ -522,7 +525,7 @@ def test_ref_121_sqlite_upgrade_and_downgrade_preserve_relational_snapshot(tmp_p
     database = tmp_path / "populated-ref-121.db"
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
-    command.upgrade(config, "0009_ref_80")
+    command.upgrade(config, "head")
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
@@ -570,6 +573,7 @@ def test_ref_121_sqlite_upgrade_and_downgrade_preserve_relational_snapshot(tmp_p
     before = snapshot(engine)
     assert before["dataset_records"][0][0] == record.id
     engine.dispose()
+    command.downgrade(config, "0009_ref_80")
     command.upgrade(config, "head")
     upgraded = create_database_engine(f"sqlite:///{database}")
     assert snapshot(upgraded) == before
@@ -623,7 +627,7 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     database = tmp_path / "populated-ref-72.db"
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
-    command.upgrade(config, "0005_ref_72")
+    command.upgrade(config, "head")
 
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
@@ -633,6 +637,7 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     dataset = services.datasets.create_dataset(admin.id, "existing", "Existing", "Preserved")
     engine.dispose()
 
+    command.downgrade(config, "0005_ref_72")
     command.upgrade(config, "head")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
@@ -653,7 +658,7 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     database = tmp_path / "populated-ref-74.db"
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database}")
-    command.upgrade(config, "0006_ref_74")
+    command.upgrade(config, "head")
 
     engine = create_database_engine(f"sqlite:///{database}")
     factory = create_session_factory(engine)
@@ -666,6 +671,7 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     )
     engine.dispose()
 
+    command.downgrade(config, "0006_ref_74")
     command.upgrade(config, "head")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
@@ -756,7 +762,7 @@ def test_ref_75_sqlite_downgrade_fails_closed_for_business_key_state(tmp_path):
     try:
         assert "dataset_business_key_fields" not in inspect(downgraded_engine).get_table_names()
         with create_session_factory(downgraded_engine)() as session:
-            assert session.get(Dataset, dataset.id) is not None
+            assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
     finally:
         downgraded_engine.dispose()
 
@@ -793,7 +799,7 @@ def test_ref_74_sqlite_downgrade_fails_closed_for_field_state(tmp_path):
     try:
         assert "dataset_fields" not in inspect(downgraded_engine).get_table_names()
         with create_session_factory(downgraded_engine)() as session:
-            assert session.get(Dataset, dataset.id) is not None
+            assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
     finally:
         downgraded_engine.dispose()
 
@@ -818,7 +824,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
     engine = create_database_engine(f"sqlite:///{database}")
     assert "datasets" in inspect(engine).get_table_names()
     with create_session_factory(engine)() as session:
-        assert session.get(Dataset, dataset.id) is not None
+        assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
         assert (
             session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
             == 1
@@ -830,7 +836,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
             == 1
         )
     with create_session_factory(engine).begin() as session:
-        session.delete(session.get(Dataset, dataset.id))
+        session.execute(Dataset.__table__.delete().where(Dataset.id == dataset.id))
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
@@ -884,7 +890,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0010_ref_121"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0011_ref_130"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
@@ -924,7 +930,7 @@ def test_empty_postgresql_database_upgrades():
                     Grant.resource_type == "dataset", Grant.resource_id == dataset.id
                 )
             )
-            assert session.get(Dataset, dataset.id) is not None
+            assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
             assert dataset_grant.permission == "admin"
             assert {
                 (event.object_type, event.object_id, event.action)
@@ -948,12 +954,12 @@ def test_empty_postgresql_database_upgrades():
             command.downgrade(config, "0004_ref_36")
         application_engine = create_database_engine(schema_url)
         with create_session_factory(application_engine).begin() as session:
-            assert session.get(Dataset, dataset.id) is not None
+            assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
             assert (
                 session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
                 == 1
             )
-            session.delete(session.get(Dataset, dataset.id))
+            session.execute(Dataset.__table__.delete().where(Dataset.id == dataset.id))
         application_engine.dispose()
         application_engine = None
 

@@ -28,6 +28,7 @@ from refrncr.ports import (
     AuthorizationSubject,
     DatasetBusinessKey,
     DatasetFieldRecord,
+    DatasetOverview,
     GrantRecord,
     MembershipRecord,
     PasswordHashReplacementError,
@@ -243,6 +244,29 @@ class SqlAlchemyGrantOperations:
 class SqlAlchemyDatasetOperations:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
+        if dataset_ids == ():
+            return []
+        # DatasetRecord contains only the mutable working set. Future version storage
+        # must preserve this boundary, never union historical/published rows here.
+        current_counts = select(
+            DatasetRecord.dataset_id, func.count(DatasetRecord.id).label("record_count")
+        )
+        if dataset_ids is not None:
+            current_counts = current_counts.where(DatasetRecord.dataset_id.in_(dataset_ids))
+        current_counts = current_counts.group_by(DatasetRecord.dataset_id).subquery()
+        statement = (
+            select(Dataset, func.coalesce(current_counts.c.record_count, 0))
+            .outerjoin(current_counts, current_counts.c.dataset_id == Dataset.id)
+            .order_by(Dataset._key)
+        )
+        if dataset_ids is not None:
+            statement = statement.where(Dataset.id.in_(dataset_ids))
+        return [
+            DatasetOverview(dataset, count, dataset.content_updated_at or dataset.created_at)
+            for dataset, count in self.session.execute(statement)
+        ]
 
     def get(self, dataset_id: str, *, for_update: bool = False) -> Dataset | None:
         statement = _locked(

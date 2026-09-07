@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <nav><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Records</a></nav><h1>Map import columns</h1>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Map import columns</h1>
   {% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}
   <p>File: {{ state.filename }}</p>{% if parsed.worksheet %}<p>Worksheet: {{ parsed.worksheet }}</p>{% endif %}{% if parsed.delimiter %}<p>Detected delimiter: {{ parsed.delimiter }}</p>{% endif %}
   <section aria-label='Mapping completeness'><p>{{ assistance.completeness.required_mapped }} of {{ assistance.completeness.required_total }} required fields mapped.</p>{% if assistance.completeness.missing_required %}<p role='alert'>Missing required fields: {{ assistance.completeness.missing_required|join(', ') }}</p>{% endif %}{% if assistance.completeness.missing_identifier %}<p role='alert'>Missing identifier fields: {{ assistance.completeness.missing_identifier|join(', ') }}</p>{% endif %}<p>{{ assistance.completeness.unmapped_columns }} source columns unmapped; {{ assistance.completeness.ignored_columns }} source columns explicitly ignored.</p></section>

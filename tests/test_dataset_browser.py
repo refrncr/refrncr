@@ -150,7 +150,7 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
     assert "<h1>Datasets</h1>" in body(response)
 
 
-def test_dataset_list_uses_file_template_search_and_accessible_rows(dataset_browser):
+def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_browser):
     _, services, admin, client = dataset_browser
     create_dataset(
         services,
@@ -177,26 +177,23 @@ def test_dataset_list_uses_file_template_search_and_accessible_rows(dataset_brow
     assert "<title>Datasets · REFRNCR</title>" in page
     assert "<h1>Datasets</h1>" in page
     assert "My Datasets" not in page
-    assert "for='dataset-search'>Search datasets</label>" in page
-    assert "placeholder='Search datasets…' data-list-search" in page
+    assert "Search datasets" not in page
+    assert "data-list-search" not in page
     assert "dataset-tabs" not in page
     assert "button-tab" not in page
     assert "<table aria-label='Datasets'>" in page
-    assert "<th scope='col'>Name</th>" in page
-    assert "<th scope='col'>Key</th>" in page
-    assert "<th scope='col'>Description</th>" in page
+    assert "<th scope='col'>Dataset</th>" in page
+    assert "<th scope='col' class='numeric-column'>Records</th>" in page
+    assert "<th scope='col'>Updated</th>" in page
     row = re.search(r"<tr class='dataset-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
     assert row is not None
     assert "tabindex" not in row.group(1)
     assert "role=" not in row.group(1)
     assert "data-row-href='/datasets/searchable/records'" in row.group(1)
-    assert "data-list-row" in row.group(1)
-    assert (
-        "data-search-text='Name &lt;unsafe&gt; searchable Description &#39;unsafe&#39; "
-        "&lt;markup&gt;'" in row.group(1)
-    )
+    assert "data-list-row" not in row.group(1)
+    assert "data-search-text" not in row.group(1)
     assert "<a href='/datasets/searchable/records'>Name &lt;unsafe&gt;</a>" in row.group(2)
-    assert "Description &#39;unsafe&#39; &lt;markup&gt;" in row.group(2)
+    assert "<td class='numeric-column'>0</td>" in row.group(2)
     assert "Name <unsafe>" not in page
     assert "<markup>" not in page
     assert "+ New dataset" in page
@@ -718,9 +715,9 @@ def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser)
     assert "href='/datasets/beta-team/records'" in page
     assert "hidden-owned" not in page
     assert "Create dataset" not in page
-    assert "data-list-search" in page
-    assert "data-list-row" in page
-    assert "<th scope='col'>Name</th>" in page
+    assert "data-list-search" not in page
+    assert "data-list-row" not in page
+    assert "<th scope='col'>Dataset</th>" in page
     assert request(client, "get", "/datasets/beta-team").status_code == 200
     assert "Configure" not in body(request(client, "get", "/datasets/beta-team/records"))
 
@@ -1189,7 +1186,8 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
 
     assert response.status_code == 200
     assert rendered_templates == ["pages/datasets/detail.html"]
-    assert "<nav aria-label='Breadcrumb'><a href='/datasets'>Datasets</a></nav>" in page
+    assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
+    assert '<a href="/datasets">Datasets</a>' in page
     assert "<caption>Dataset fields</caption>" in page
     assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
