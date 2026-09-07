@@ -1,0 +1,7 @@
+{% macro create_team_fields() -%}
+  <div class='form-field'><label for='new-team-name'>Name</label><input id='new-team-name' name='name' required autofocus data-initial-focus></div>
+{%- endmacro %}
+
+{% macro edit_team_fields(team) -%}
+  <div class='form-field'><label for='edit-team-name-{{ team.id }}'>Name</label><input id='edit-team-name-{{ team.id }}' name='name' value='{{ team.name }}' required></div>
+{%- endmacro %}

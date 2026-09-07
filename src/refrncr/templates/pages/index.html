@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "components.html" import button %}
+{% from "layouts/page.html" import page_header %}
+
+{% block title %}Overview · REFRNCR{% endblock %}
+
+{% block content %}
+  {{ page_header("Overview", "Manage your reference data in one place.") }}
+  {% if resolved and dataset_ui_enabled %}
+    <nav aria-label="Dataset actions">
+      {{ button("View datasets", url_for("dataset_list")) }}
+    </nav>
+  {% elif not resolved %}
+    {{ button("Sign in", url_for("login"), variant="secondary") }}
+  {% endif %}
+{% endblock %}

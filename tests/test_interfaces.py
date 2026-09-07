@@ -1,6 +1,7 @@
 import re
 import uuid
 from itertools import chain, combinations
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import Membership, Team, User
+from refrncr.models import AuditEvent, LoginSession, Membership, Team, User
 from refrncr.services import AuthorizationError, ResourceTypeRegistry
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 
@@ -179,6 +180,44 @@ def test_low_level_app_without_dataset_dependencies_has_no_dataset_ui(interface)
     assert request(client, "post", "/datasets/example/fields/field/delete").status_code == 404
 
 
+def test_anonymous_overview_uses_file_template_layout_and_components(interface):
+    _, _, _, _, _, _, client = interface
+
+    response = request(client, "get", "/")
+    page = response_text(response)
+
+    assert response.status_code == 200
+    assert "<title>Overview · REFRNCR</title>" in page
+    assert '<header class="page-header">' in page
+    assert '<a class="button button-secondary" href="/login">Sign in</a>' in page
+    assert 'aria-current="page"' not in page
+    assert 'class="app-sidebar"' not in page
+
+
+def test_authenticated_overview_shell_is_permission_aware_and_escapes_actor(interface):
+    _, users, authentication, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    member = users.create_user(
+        admin.id,
+        "shell-member@example.com",
+        "<em>Shell member</em>",
+        "member password",
+    )
+    assert login(client, member.email, "member password").status_code == 302
+
+    page = response_text(request(client, "get", "/"))
+
+    assert 'href="/" aria-current="page"' in page
+    assert 'href="/users"' not in page
+    assert 'href="/teams"' not in page
+    assert 'action="/logout"' in page
+    assert 'name="csrf_token"' in page
+    assert "<em>Shell member</em>" not in page
+    assert "&lt;em&gt;Shell member&lt;/em&gt;" in page
+
+
 @pytest.mark.parametrize(
     "included",
     list(
@@ -246,10 +285,143 @@ def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):
         request(client, "post", "/setup", data={**setup_data, "csrf_token": token}).status_code
         == 302
     )
+    assert client.get_cookie(ANONYMOUS_CSRF_COOKIE) is None
+    assert client.get_cookie(SESSION_COOKIE) is None
+    with factory() as session:
+        admin = session.scalar(select(User))
+        event = session.scalar(select(AuditEvent))
+        assert admin is not None and admin.role == "admin"
+        assert event is not None
+        assert (event.object_type, event.object_id, event.action, event.actor_user_id) == (
+            "user",
+            admin.id,
+            "created",
+            admin.id,
+        )
+        assert session.scalar(select(func.count(LoginSession.id))) == 0
     initialized = request(client, "get", "/setup")
     assert initialized.status_code == 302
     assert initialized.headers["Location"].endswith("/login")
     assert "Create administrator" not in response_text(initialized)
+
+
+def test_setup_get_uses_auth_layout_and_shared_form_components(interface):
+    _, _, _, _, _, _, client = interface
+
+    response = request(client, "get", "/setup")
+    page = response_text(response)
+
+    assert response.status_code == 200
+    assert "<title>Set up administrator · REFRNCR</title>" in page
+    assert "<section class='card' aria-labelledby='auth-title'>" in page
+    assert "<form class='setup-form' method='post'>" in page
+    assert "<label for='setup-email'>Email address</label>" in page
+    assert "id='setup-email' name='email' type='email'" in page
+    assert "autocomplete='email' required" in page
+    assert "<label for='setup-name'>Name</label>" in page
+    assert "id='setup-name' name='display_name' type='text'" in page
+    assert "autocomplete='name' required" in page
+    assert "<label for='setup-password'>Password</label>" in page
+    assert "id='setup-password' name='password' type='password'" in page
+    assert "autocomplete='new-password' required" in page
+    assert "aria-describedby='setup-password-help'" in page
+    assert "id='setup-password-help'>Use at least 12 characters.</p>" in page
+    assert (
+        '<button class="button button-primary" type="submit">Create administrator</button>' in page
+    )
+    assert "aria-invalid='true'" not in page
+
+
+def test_setup_validation_renders_accessible_error_without_password_or_partial_write(interface):
+    factory, _, _, _, _, _, client = interface
+    token = csrf_token(request(client, "get", "/setup"))
+    submitted_name = "<strong>Administrator</strong>"
+    secret = "too short"
+
+    response = request(
+        client,
+        "post",
+        "/setup",
+        data={
+            "email": "Admin@Example.com",
+            "display_name": submitted_name,
+            "password": secret,
+            "csrf_token": token,
+        },
+    )
+    page = response_text(response)
+
+    assert response.status_code == 400
+    assert "Password must contain at least 12 characters" in page
+    assert "id='setup-password-error'" in page
+    assert "aria-describedby='setup-password-help setup-password-error'" in page
+    assert page.count("aria-invalid='true'") == 1
+    assert "value='Admin@Example.com'" in page
+    assert "value='&lt;strong&gt;Administrator&lt;/strong&gt;'" in page
+    assert submitted_name not in page
+    assert secret not in page
+    assert "name='password'" in page and "value='too short'" not in page
+    with factory() as session:
+        assert session.scalar(select(func.count(User.id))) == 0
+        assert session.scalar(select(func.count(AuditEvent.id))) == 0
+        assert session.scalar(select(func.count(LoginSession.id))) == 0
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error_field", "message"),
+    [
+        ({"display_name": "   "}, "setup-name", "Display name is required"),
+        ({"email": "invalid"}, "setup-email", "A valid email address is required"),
+        (
+            {"password": "short"},
+            "setup-password",
+            "Password must contain at least 12 characters",
+        ),
+    ],
+)
+def test_setup_validation_marks_only_the_failing_field(interface, overrides, error_field, message):
+    _, _, _, _, _, _, client = interface
+    token = csrf_token(request(client, "get", "/setup"))
+    data = {
+        "email": "admin@example.com",
+        "display_name": "Administrator",
+        "password": ADMIN_PASSWORD,
+        "csrf_token": token,
+    }
+
+    response = request(client, "post", "/setup", data={**data, **overrides})
+    page = response_text(response)
+
+    assert response.status_code == 400
+    assert message in page
+    assert page.count("aria-invalid='true'") == 1
+    assert f"id='{error_field}'" in page
+    assert f"{error_field}-error" in page
+    assert "value='short'" not in page
+
+
+def test_superseded_setup_csrf_token_is_rejected_without_admin_creation(interface):
+    factory, _, _, _, _, _, client = interface
+    superseded = csrf_token(request(client, "get", "/setup"))
+    current = csrf_token(request(client, "get", "/setup"))
+    assert superseded != current
+
+    response = request(
+        client,
+        "post",
+        "/setup",
+        data={
+            "email": "admin@example.com",
+            "display_name": "Administrator",
+            "password": ADMIN_PASSWORD,
+            "csrf_token": superseded,
+        },
+    )
+
+    assert response.status_code == 403
+    with factory() as session:
+        assert session.scalar(select(func.count(User.id))) == 0
+        assert session.scalar(select(func.count(AuditEvent.id))) == 0
 
 
 def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details(interface):
@@ -281,9 +453,97 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
     ]:
         response = login(client, email, password)
         assert response.status_code == 401
-        assert response_text(response) == "Invalid credentials"
-        assert email not in response_text(response)
-        assert password not in response_text(response)
+        body = response_text(response)
+        assert "Invalid credentials" in body
+        assert email not in body
+        assert password not in body
+
+
+def test_login_get_uses_auth_layout_and_shared_form_components(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+
+    response = request(client, "get", "/login")
+    page = response_text(response)
+
+    assert response.status_code == 200
+    assert "<title>Sign in · REFRNCR</title>" in page
+    assert "<section class='card' aria-labelledby='auth-title'>" in page
+    assert "<form class='login-form' method='post'>" in page
+    assert "<label for='login-email'>Email address</label>" in page
+    assert "id='login-email' name='email' type='email'" in page
+    assert "autocomplete='username' required" in page
+    assert "<label for='login-password'>Password</label>" in page
+    assert "id='login-password' name='password' type='password'" in page
+    assert "autocomplete='current-password' required" in page
+    assert '<button class="button button-primary" type="submit">Sign in</button>' in page
+    assert "aria-invalid='true'" not in page
+    assert "aria-describedby='login-error'" not in page
+
+
+def test_invalid_login_uses_generic_accessible_feedback_without_reflection(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    token = csrf_token(request(client, "get", "/login"))
+    submitted_email = "<img src=x onerror=alert(1)>@example.com"
+
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": submitted_email,
+            "password": "incorrect password",
+            "csrf_token": token,
+        },
+    )
+    page = response_text(response)
+
+    assert response.status_code == 401
+    assert page.count("Invalid credentials") == 1
+    assert "id='login-error' role='alert'" in page
+    assert page.count("aria-describedby='login-error'") == 2
+    assert page.count("aria-invalid='true'") == 2
+    assert submitted_email not in page
+    assert "&lt;img" not in page
+    assert "incorrect password" not in page
+
+
+def test_superseded_anonymous_csrf_token_is_rejected(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    superseded = csrf_token(request(client, "get", "/login"))
+    current = csrf_token(request(client, "get", "/login"))
+    assert superseded != current
+
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": "admin@example.com",
+            "password": ADMIN_PASSWORD,
+            "csrf_token": superseded,
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_login_template_autoescapes_component_feedback(interface):
+    _, _, _, _, _, _, client = interface
+    with client.application.test_request_context("/login", base_url=HTTPS):
+        page = client.application.jinja_env.get_template("pages/auth/login.html").render(
+            csrf_token="csrf",
+            error="<img src=x onerror=alert(1)>",
+            current_actor=None,
+            current_csrf=None,
+            active_navigation="",
+            dataset_ui_enabled=False,
+        )
+
+    assert "<img src=x onerror=alert(1)>" not in page
+    assert "&lt;img src=x onerror=alert(1)&gt;" in page
 
 
 def test_successful_login_rotates_and_revokes_existing_session(interface):
@@ -400,6 +660,33 @@ def test_user_list_escapes_user_controlled_values(interface):
     assert "&lt;img src=x onerror=alert(1)&gt;" in body
 
 
+def test_user_list_uses_management_layout_and_add_user_panel(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    body = response_text(request(client, "get", "/users"))
+
+    assert "My Users" in body
+    assert "data-list-search" in body
+    assert "<caption class='visually-hidden'>Users</caption>" in body
+    assert "<th scope='col'>Email address</th>" in body
+    assert "<tr class='record-row' tabindex=" not in body
+    assert "<tr class='record-row' role=" not in body
+    assert "aria-label='User filters'" not in body
+    assert "data-dialog-open='add-user-panel'" in body
+    assert "id='add-user-panel' data-side-panel" in body
+    assert "data-dialog-open='user-panel-" in body
+    assert "data-panel-entity='user'" in body
+    assert "data-panel-mode='edit'>Edit user" in body
+    assert "data-panel-mode='delete'>Delete user" in body
+    assert "data-panel-view='edit' hidden method='post' action='/users/" in body
+    assert "This deletion cannot be undone." in body
+    assert "action='/users'" in body
+    assert "name='role'" in body
+    assert "data-modal-side-panel" in body
+
+
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
     _, _, _, _, _, _, client = interface
     setup_admin(client)
@@ -495,6 +782,24 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
 
     body = response_text(request(client, "get", "/teams"))
     assert "Platform" in body
+    assert "My Teams" in body
+    assert "data-list-search" in body
+    assert "<caption class='visually-hidden'>Teams</caption>" in body
+    assert "<tr class='record-row' tabindex=" not in body
+    assert "<tr class='record-row' role=" not in body
+    assert "aria-label='Team filters'" not in body
+    assert "data-dialog-open='add-team-panel'" in body
+    assert f"href='/teams?open_team={team.id}'" in body
+    body = response_text(request(client, "get", f"/teams?open_team={team.id}"))
+    assert f"id='team-panel-{team.id}'" in body
+    assert "data-modal-side-panel" in body
+    assert "data-panel-entity='team'" in body
+    assert "data-panel-mode='edit'>Edit team" in body
+    assert "data-panel-mode='delete'>Delete team" in body
+    assert f"action='/teams/{team.id}/rename'" in body
+    assert f"action='/teams/{team.id}/delete'" in body
+    assert "<h3>Team members</h3>" in body
+    assert f"action='/teams/{team.id}/members'" in body
     response = request(
         client,
         "post",
@@ -513,6 +818,53 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert response.status_code == 302
     with factory() as session:
         assert session.get(Team, team.id) is None
+
+
+def test_team_list_only_loads_memberships_for_the_open_team(interface, monkeypatch):
+    _, _, authentication, _, teams, memberships, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    first = teams.create_team(admin.id, "First")
+    teams.create_team(admin.id, "Second")
+    member_calls = []
+    eligible_calls = []
+    original_members = memberships.list_team_members
+    original_eligible = memberships.list_eligible_users
+
+    def list_members(actor_id, team_id):
+        member_calls.append(team_id)
+        return original_members(actor_id, team_id)
+
+    def list_eligible(actor_id, team_id):
+        eligible_calls.append(team_id)
+        return original_eligible(actor_id, team_id)
+
+    monkeypatch.setattr(memberships, "list_team_members", list_members)
+    monkeypatch.setattr(memberships, "list_eligible_users", list_eligible)
+
+    assert request(client, "get", "/teams").status_code == 200
+    assert member_calls == [] and eligible_calls == []
+    assert request(client, "get", f"/teams?open_team={first.id}").status_code == 200
+    assert member_calls == [first.id]
+    assert eligible_calls == [first.id]
+
+
+def test_management_routes_use_file_templates_without_inline_markup():
+    web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
+    management_source = web_source.split('    @app.get("/users")', 1)[1].split(
+        "    @app.errorhandler(UserManagementError)", 1
+    )[0]
+
+    for template in (
+        '"pages/users/list.html"',
+        '"pages/teams/list.html"',
+        '"pages/teams/members.html"',
+    ):
+        assert template in management_source
+    assert "render_template_string" not in management_source
+    assert '"<dialog' not in management_source
+    assert '"<form' not in management_source
 
 
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
@@ -604,6 +956,7 @@ def test_admin_views_empty_team_and_adds_and_removes_member(interface):
         data={"user_id": managed.id, "csrf_token": csrf},
     )
     assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/teams?open_team={team.id}")
     with factory() as session:
         membership = session.scalar(select(Membership))
     body = response_text(request(client, "get", f"/teams/{team.id}/members"))

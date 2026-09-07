@@ -1,0 +1,32 @@
+{% extends "layouts/auth/base.html" %}
+{% from "components.html" import button, feedback, form_field %}
+
+{% block title %}Sign in · REFRNCR{% endblock %}
+
+{% block auth_content %}
+  <h1 id='auth-title'>Sign in</h1>
+  <p>Sign in to manage your reference data.</p>
+  {{ feedback(error, id="login-error") }}
+  <form class='login-form' method='post'>
+    {{ form_field(
+      "Email address",
+      "email",
+      "login-email",
+      type="email",
+      autocomplete="username",
+      required=true,
+      error_id="login-error" if error else none
+    ) }}
+    {{ form_field(
+      "Password",
+      "password",
+      "login-password",
+      type="password",
+      autocomplete="current-password",
+      required=true,
+      error_id="login-error" if error else none
+    ) }}
+    <input type='hidden' name='csrf_token' value='{{ csrf_token }}'>
+    {{ button("Sign in", button_type="submit") }}
+  </form>
+{% endblock %}

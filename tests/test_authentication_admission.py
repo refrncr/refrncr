@@ -117,7 +117,7 @@ def test_four_requests_enter_authentication_and_fifth_is_rejected_immediately():
 
         rejected = post_login(clients[4], tokens[4])
         assert rejected.status_code == 401
-        assert rejected.get_data(as_text=True) == GENERIC_LOGIN_FAILURE
+        assert rejected.get_data(as_text=True).count(GENERIC_LOGIN_FAILURE) == 1
         assert authentication.calls == 4
         assert sessions.created == 0
 
@@ -178,7 +178,7 @@ def test_admission_rejection_creates_no_session_and_does_not_consume_limiter_att
 
     rejected = post_login(rejected_client, csrf(rejected_client))
     assert rejected.status_code == 401
-    assert rejected.get_data(as_text=True) == GENERIC_LOGIN_FAILURE
+    assert rejected.get_data(as_text=True).count(GENERIC_LOGIN_FAILURE) == 1
     assert authentication.calls == 0
     assert sessions.created == 0
 

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "components.html" import button, feedback, form_field %}
+{% from "layouts/page.html" import page_header %}
+
+{% block title %}Edit dataset · REFRNCR{% endblock %}
+
+{% block content %}
+  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_detail", key=dataset.key) }}'>Dataset</a></nav>
+  {{ page_header("Edit dataset") }}
+  <p>Key: <code>{{ dataset.key }}</code></p>
+  {{ feedback(error, id="dataset-edit-error") }}
+  <form class='form' method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+    {{ form_field(
+      "Name",
+      "name",
+      "dataset-name",
+      value=name,
+      error_id="dataset-edit-error" if error_field == "name" else none
+    ) }}
+    {{ form_field(
+      "Description",
+      "description",
+      "dataset-description",
+      value=description,
+      error_id="dataset-edit-error" if error_field == "description" else none,
+      control="textarea"
+    ) }}
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <div class='form-actions'>
+      {{ button("Cancel", url_for("dataset_detail", key=dataset.key), variant="secondary") }}
+      {{ button("Save dataset", button_type="submit") }}
+    </div>
+  </form>
+{% endblock %}

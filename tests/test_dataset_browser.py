@@ -1,6 +1,9 @@
 import re
+from decimal import Decimal
+from pathlib import Path
 
 import pytest
+from flask import template_rendered
 from sqlalchemy import func, select, update
 from sqlalchemy.pool import StaticPool
 
@@ -142,7 +145,551 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
 
     assert response.status_code == 200
     assert "No datasets are available." in body(response)
-    assert "Create dataset" in body(response)
+    assert "New dataset" in body(response)
+    assert "<h1>Datasets</h1>" in body(response)
+
+
+def test_dataset_list_uses_file_template_search_and_accessible_rows(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(
+        services,
+        admin,
+        "searchable",
+        "Name <unsafe>",
+        "Description 'unsafe' <markup>",
+    )
+    login(client)
+    rendered_templates = []
+
+    def record_template(_sender, template, **_extra):
+        rendered_templates.append(template.name)
+
+    template_rendered.connect(record_template, client.application)
+    try:
+        response = request(client, "get", "/datasets")
+    finally:
+        template_rendered.disconnect(record_template, client.application)
+    page = body(response)
+
+    assert response.status_code == 200
+    assert rendered_templates == ["pages/datasets/list.html"]
+    assert "<title>Datasets · REFRNCR</title>" in page
+    assert "<h1>Datasets</h1>" in page
+    assert "My Datasets" not in page
+    assert "for='dataset-search'>Search datasets</label>" in page
+    assert "placeholder='Search datasets…' data-list-search" in page
+    assert "dataset-tabs" not in page
+    assert "button-tab" not in page
+    assert "<table aria-label='Datasets'>" in page
+    assert "<th scope='col'>Name</th>" in page
+    assert "<th scope='col'>Key</th>" in page
+    assert "<th scope='col'>Description</th>" in page
+    row = re.search(r"<tr class='dataset-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
+    assert row is not None
+    assert "tabindex" not in row.group(1)
+    assert "role=" not in row.group(1)
+    assert "data-row-href='/datasets/searchable/records'" in row.group(1)
+    assert "data-list-row" in row.group(1)
+    assert (
+        "data-search-text='Name &lt;unsafe&gt; searchable Description &#39;unsafe&#39; "
+        "&lt;markup&gt;'" in row.group(1)
+    )
+    assert "<a href='/datasets/searchable/records'>Name &lt;unsafe&gt;</a>" in row.group(2)
+    assert "Description &#39;unsafe&#39; &lt;markup&gt;" in row.group(2)
+    assert "Name <unsafe>" not in page
+    assert "<markup>" not in page
+    assert "+ New dataset" in page
+
+
+def test_shared_shell_marks_active_navigation_and_exposes_account_context(dataset_browser):
+    _, _, _, client = dataset_browser
+    login(client)
+
+    response = request(client, "get", "/datasets")
+    page = body(response)
+
+    assert '<html lang="en">' in page
+    assert '<main id="content"' in page
+    assert 'aria-label="Primary navigation"' in page
+    assert 'href="/datasets" aria-current="page"' in page
+    assert "Administrator" in page
+    assert "Administrator" in page
+    assert 'action="/logout"' in page
+    assert 'name="csrf_token"' in page
+    assert "data-responsive-shell" in page
+
+
+def test_shared_shell_navigation_follows_effective_role(dataset_browser):
+    _, services, admin, client = dataset_browser
+    viewer = services.users.create_user(
+        admin.id, "shell-viewer@example.com", "Shell Viewer", "viewer password"
+    )
+    dataset = create_dataset(services, admin, "shell-visible")
+    services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    login(client, viewer.email, "viewer password")
+
+    page = body(request(client, "get", "/datasets"))
+
+    assert 'href="/datasets"' in page
+    assert 'href="/users"' not in page
+    assert 'href="/teams"' not in page
+    assert "New dataset" not in page
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+def test_resource_permissions_show_dataset_without_community_admin_create_action(
+    dataset_browser, permission
+):
+    _, services, admin, client = dataset_browser
+    user = services.users.create_user(
+        admin.id,
+        f"resource-{permission}@example.com",
+        f"Resource {permission.title()}",
+        "user password",
+    )
+    dataset = create_dataset(services, admin, f"{permission}-visible")
+    services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    login(client, user.email, "user password")
+
+    page = body(request(client, "get", "/datasets"))
+
+    assert f"href='/datasets/{dataset.key}/records'" in page
+    assert "+ New dataset" not in page
+
+
+def test_ui_assets_are_local_and_critical_login_controls_are_labelled(dataset_browser):
+    _, _, _, client = dataset_browser
+
+    page = body(request(client, "get", "/login"))
+
+    assert "fonts.googleapis.com" not in page
+    assert "cdn.jsdelivr.net" not in page
+    assert "for='login-email'" in page
+    assert "for='login-password'" in page
+    assert "autocomplete='current-password'" in page
+    assert "class='login-form'" in page
+    assert 'aria-live="polite"' in page
+
+
+def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
+    _, _, _, client = dataset_browser
+
+    response = request(client, "get", "/static/css/refrncr.css")
+    entrypoint = body(response)
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    app_shell = body(request(client, "get", "/static/css/layouts/app-shell.css"))
+    auth = body(request(client, "get", "/static/css/layouts/auth.css"))
+
+    assert response.status_code == 200
+    assert entrypoint.splitlines() == [
+        '@import url("tokens.css");',
+        '@import url("base.css");',
+        '@import url("utilities.css");',
+        '@import url("layouts/app-shell.css");',
+        '@import url("layouts/page.css");',
+        '@import url("layouts/auth.css");',
+        '@import url("components/buttons.css");',
+        '@import url("components/forms.css");',
+        '@import url("components/feedback.css");',
+        '@import url("components/cards-badges.css");',
+        '@import url("components/tables.css");',
+        '@import url("components/dialog.css");',
+    ]
+    assert "--color-action-primary:" in tokens
+    assert "--space-md:" in tokens
+    assert "--radius-lg:" in tokens
+    assert "--shadow-md:" in tokens
+    assert "--breakpoint-tablet: 768px" in tokens
+    assert "@media (max-width: 767px)" in app_shell
+    assert '.login-form button[type="submit"]' in auth
+    assert "https://" not in entrypoint + tokens + app_shell + auth
+
+    script = body(request(client, "get", "/static/js/refrncr.js"))
+    assert 'document.querySelectorAll(".export-menu")' in script
+    assert 'menu.removeAttribute("open")' in script
+
+
+def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "button-actions")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "active", "Actief", data_type="boolean")
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert "<div class='page-actions record-page-actions'>" in page
+    assert "images/lucide-download.svg" in page
+    assert "images/lucide-settings-2.svg" in page
+    assert "images/lucide-upload.svg" in page
+    assert "images/lucide-plus.svg" in page
+    assert "Export</summary>" in page
+    assert "format=csv" in page and "format=xlsx" in page and "format=json" in page
+    assert "class='button button-secondary'" in page and "Import</a>" in page
+    assert "href='/datasets/button-actions'>" in page and "Configure</a>" in page
+    assert "data-dialog-open='add-record-panel'" in page
+    assert "<dialog class='side-panel' id='add-record-panel' data-side-panel" in page
+    assert "New button-action record" in page
+    assert "class='button button-primary' type='submit'>Create record</button>" in page
+    assert "action='/datasets/button-actions/records'" in page
+    assert "name='csrf_token'" in page
+    assert "for='new-record-code'" in page
+    assert "id='new-record-code' name='code' type='text' required autofocus" in page
+    assert "id='new-record-active' name='active'" in page
+    assert "Search records" not in page
+    assert ">Filter</button>" not in page and ">Sort</button>" not in page
+    assert "Showing 0–0 of 0" in page
+
+
+def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "currencies")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    record = services.dataset_records.create_record(admin.id, dataset.key, {"code": "EUR"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert f"data-dialog-open='record-panel-{record.id}'" in page
+    assert "<caption class='visually-hidden'>Records</caption>" in page
+    assert "data-record-row" in page
+    assert "<tr class='record-row' data-record-row" in page
+    assert "<tr class='record-row' tabindex=" not in page
+    assert "<tr class='record-row' role=" not in page
+    assert (
+        f"type='button' data-dialog-open='record-panel-{record.id}' "
+        f"aria-label='View record EUR ({record.id})'>View</button>" in page
+    )
+    assert f"id='record-panel-{record.id}'" in page
+    assert ">EUR</h2>" in page
+    assert f"aria-labelledby='record-panel-title-{record.id}'" in page
+    assert f"aria-describedby='record-panel-description-{record.id}'" in page
+    assert "data-panel-subtitle data-default-text='View record'>View record</p>" in page
+    assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
+    assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
+    assert "data-panel-mode='edit'" in page
+    assert "data-panel-view='edit' hidden" in page
+    assert "value='1'" in page
+    assert "This deletion cannot be undone." in page
+    assert "name='confirm' value='yes'" in page
+
+
+def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "measurements")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "amount", "Amount", data_type="number")
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    one = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "one", "amount": "1.2"}
+    )
+    three = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "two", "amount": "3.456"}
+    )
+    zero = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "zero", "amount": "0.00"}
+    )
+    negative = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "negative", "amount": "-2.5"}
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert re.search(r"<th scope='col' class='numeric-column'>\s*Amount", page)
+    for value in ("1.200", "3.456", "0.000", "-2.500"):
+        assert re.search(rf"<td class='numeric-column'>\s*{re.escape(value)}\s*</td>", page)
+    persisted = {
+        record.id: dict((value.field_key, value.value) for value in record.values)["amount"]
+        for record in services.dataset_records.list_records(admin.id, dataset.key).records
+    }
+    assert persisted == {
+        one.id: Decimal("1.2"),
+        three.id: Decimal("3.456"),
+        zero.id: Decimal("0.00"),
+        negative.id: Decimal("-2.5"),
+    }
+
+
+def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "optional-values")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "note", "Note")
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert "<span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>" in page
+
+
+def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "table-style")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "ABC"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    stylesheet = body(request(client, "get", "/static/css/components/tables.css"))
+
+    assert "<table class='record-table'>" in page
+    assert "min-height: var(--record-row-min-height)" in stylesheet
+    assert "height: var(--record-row-min-height)" in stylesheet
+    assert ".record-table td" in stylesheet
+    assert (
+        "color: var(--color-text-data); font-family: var(--font-data); "
+        "font-size: var(--font-size-xs)" in stylesheet
+    )
+
+
+def test_record_table_retains_readable_width_inside_scroll_container(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "wide-records")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "description", "Description")
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(
+        admin.id,
+        dataset.key,
+        {"code": "EUR", "description": "Euro"},
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+
+    assert re.search(r"<div class='table-scroll'>\s*<table class='record-table'>", page)
+    assert "--data-table-min-width: 48rem" in tokens
+    assert (
+        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }"
+        in tables
+    )
+    assert ".table-scroll { width: 100%; overflow-x: auto;" in tables
+    assert not re.search(r"\.record-table\s+th[^}]*white-space:\s*nowrap", tables)
+    assert "currencies" not in tables.lower()
+
+
+def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "long-text")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "note", "Note")
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    long_text = "A long description that should be truncated in the record table"
+    services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "LONG", "note": long_text}
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+    dialog = body(request(client, "get", "/static/css/components/dialog.css"))
+
+    assert f"<span class='cell-content' title='{long_text}'>{long_text}</span>" in page
+    assert "table-layout: fixed" in tables
+    assert "text-overflow: ellipsis" in tables
+    assert ".side-panel-header h2" in dialog
+    assert "font-family: var(--font-display)" in dialog
+
+
+def test_all_design_system_assets_are_local_and_served(dataset_browser):
+    _, _, _, client = dataset_browser
+    css_files = (
+        "base.css",
+        "utilities.css",
+        "layouts/app-shell.css",
+        "layouts/page.css",
+        "layouts/auth.css",
+        "components/buttons.css",
+        "components/forms.css",
+        "components/feedback.css",
+        "components/cards-badges.css",
+        "components/tables.css",
+        "components/dialog.css",
+    )
+    fonts = (
+        "montserrat/Montserrat-Medium.woff2",
+        "inter/Inter-Regular.woff2",
+        "inter/Inter-SemiBold.woff2",
+        "inter/Inter-Bold.woff2",
+        "jetbrains-mono/JetBrainsMono-Regular.woff2",
+    )
+    for filename in css_files:
+        assert request(client, "get", f"/static/css/{filename}").status_code == 200
+    for filename in fonts:
+        response = request(client, "get", f"/static/fonts/{filename}")
+        assert response.status_code == 200
+        assert response.mimetype == "font/woff2"
+    tokens = body(request(client, "get", "/static/css/tokens.css"))
+    assert tokens.count("@font-face") == 5
+    assert "Montserrat-Medium.woff2" in tokens and "font-weight: 500" in tokens
+    assert "Inter-Regular.woff2" in tokens and "Inter-SemiBold.woff2" in tokens
+    assert "Inter-Bold.woff2" in tokens and "JetBrainsMono-Regular.woff2" in tokens
+    assert "http://" not in tokens and "https://" not in tokens
+
+
+def test_component_css_uses_explicit_contract_selectors(dataset_browser):
+    _, _, _, client = dataset_browser
+    buttons = body(request(client, "get", "/static/css/components/buttons.css"))
+    forms = body(request(client, "get", "/static/css/components/forms.css"))
+    tables = body(request(client, "get", "/static/css/components/tables.css"))
+    assert "button:not([class])" not in buttons
+    assert ".button {" in buttons
+    assert "\nform {" not in forms
+    assert ".form {" in forms
+    assert "\ntbody tr:hover" not in tables
+    assert ".table-scroll tbody tr:hover" in tables
+
+
+def test_local_lucide_set_has_only_template_consumers_and_packaged_notices(dataset_browser):
+    _, _, _, client = dataset_browser
+    repository = Path(__file__).resolve().parents[1]
+    image_directory = repository / "src/refrncr/static/images"
+    template_directory = repository / "src/refrncr/templates"
+    lucide_files = {path.name for path in image_directory.glob("lucide-*.svg")}
+    template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
+
+    assert lucide_files == {
+        "lucide-download.svg",
+        "lucide-key-round.svg",
+        "lucide-plus.svg",
+        "lucide-settings-2.svg",
+        "lucide-upload.svg",
+    }
+    for filename in lucide_files:
+        assert filename in template_source
+    for filename in ("LICENSE-Lucide.txt", "ASSET-SOURCES.md"):
+        assert request(client, "get", f"/static/licenses/{filename}").status_code == 200
+
+
+def test_record_table_include_and_view_button_pointer_guard(dataset_browser, monkeypatch):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "include")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "VALUE"})
+    login(client)
+    loaded = []
+    loader = client.application.jinja_env.loader
+    original_get_source = loader.get_source
+
+    def record_source(environment, template):
+        loaded.append(template)
+        return original_get_source(environment, template)
+
+    monkeypatch.setattr(loader, "get_source", record_source)
+
+    response = request(client, "get", f"/datasets/{dataset.key}/records")
+    script = body(request(client, "get", "/static/js/refrncr.js"))
+
+    assert response.status_code == 200
+    assert "pages/datasets/records.html" in loaded
+    assert "pages/datasets/_record_table.html" in loaded
+    assert "pages/datasets/_record_panels.html" in loaded
+    assert "pages/datasets/_record_form_fields.html" in loaded
+    assert "components/side_panel.html" in loaded
+    assert 'event.target.closest("a, button, input")' in script
+    assert 'document.querySelectorAll("[data-record-row]").forEach' not in script
+
+
+def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "modal-contract")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "FOCUS"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    script = body(request(client, "get", "/static/js/refrncr.js"))
+
+    assert "data-side-panel data-modal-side-panel" in page
+    assert "autofocus data-initial-focus" in page
+    assert "dialog.showModal();" in script
+    assert "sidePanelOpeners.set(dialog, trigger);" in script
+    assert "const opener = sidePanelOpeners.get(dialog);" in script
+    assert "opener?.isConnected" in script
+    assert 'document.getElementById("content")?.focus();' in script
+    assert 'dialog.addEventListener("close"' in script
+    assert 'dialog.addEventListener("keydown"' not in script
+    assert "innerHTML" not in script
+
+
+def test_record_page_has_no_inline_markup_and_side_panel_component_is_generic():
+    repository = Path(__file__).parents[1]
+    web_source = (repository / "src/refrncr/web.py").read_text()
+    record_route = web_source.split("def dataset_records_view", 1)[1].split(
+        "def export_dataset_records", 1
+    )[0]
+    side_panel = (repository / "src/refrncr/templates/components/side_panel.html").read_text()
+
+    assert "return render_template(" in record_route
+    assert '"pages/datasets/records.html"' in record_route
+    assert "render_template_string" not in record_route
+    assert "<dialog" not in record_route and "<form" not in record_route
+    assert "record" not in side_panel
+    assert "permission" not in side_panel and "csrf" not in side_panel
+    assert "|safe" not in side_panel
+
+
+def test_web_module_has_no_legacy_string_templates():
+    web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
+
+    assert "render_template_string" not in web_source
+    assert "flask_render_template_string" not in web_source
+    assert '"<form' not in web_source and '"<dialog' not in web_source
+    assert '"{% ' not in web_source and '"{{ ' not in web_source
+
+
+def test_record_table_pagination_keeps_range_and_links(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "pages")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    for index in range(51):
+        services.dataset_records.create_record(admin.id, dataset.key, {"code": f"VALUE-{index:02}"})
+    login(client)
+
+    first = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    second = body(request(client, "get", f"/datasets/{dataset.key}/records?page=2"))
+
+    assert "Showing 1–50 of 51" in first
+    assert "href='/datasets/pages/records?page=2'>Next</a>" in first
+    assert ">Previous</a>" not in first
+    assert "Showing 51–51 of 51" in second
+    assert "href='/datasets/pages/records?page=1'>Previous</a>" in second
+    assert ">Next</a>" not in second
+
+
+def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "viewer-records")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    visible_record = services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "VISIBLE"}
+    )
+    viewer = services.users.create_user(
+        admin.id, "record-viewer@example.com", "Record viewer", "viewer password"
+    )
+    services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    login(client, viewer.email, "viewer password")
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+
+    assert f"aria-label='View record VISIBLE ({visible_record.id})'>View</button>" in page
+    assert "Export</summary>" in page
+    assert "Configure</a>" not in page
+    assert "Import</a>" not in page
+    assert "Add record</button>" not in page
+    assert "data-panel-mode='edit'" not in page
+    assert "data-panel-mode='delete'" not in page
 
 
 def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser):
@@ -166,11 +713,15 @@ def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser)
 
     assert response.status_code == 200
     assert page.index("alpha-direct") < page.index("beta-team")
-    assert "/datasets/alpha-direct" in page
-    assert "/datasets/beta-team" in page
+    assert "href='/datasets/alpha-direct/records'" in page
+    assert "href='/datasets/beta-team/records'" in page
     assert "hidden-owned" not in page
     assert "Create dataset" not in page
+    assert "data-list-search" in page
+    assert "data-list-row" in page
+    assert "<th scope='col'>Name</th>" in page
     assert request(client, "get", "/datasets/beta-team").status_code == 200
+    assert "Configure" not in body(request(client, "get", "/datasets/beta-team/records"))
 
 
 def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_browser):
@@ -217,15 +768,51 @@ def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_brows
     assert events == {("dataset", "created"), ("grant", "created")}
 
 
+def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
+    _, _, _, client = dataset_browser
+    login(client)
+
+    response = request(client, "get", "/datasets/new")
+    page = body(response)
+
+    assert response.status_code == 200
+    assert "<title>New dataset · REFRNCR</title>" in page
+    assert '<header class="page-header">' in page
+    assert "<form class='form' method='post' action='/datasets'>" in page
+    assert "<label for='dataset-key'>Key</label>" in page
+    assert "id='dataset-key' name='key' type='text' value='' required" in page
+    assert "aria-describedby='dataset-key-help'" in page
+    assert "id='dataset-key-help'>A permanent technical identifier.</p>" in page
+    assert "<label for='dataset-name'>Name</label>" in page
+    assert "id='dataset-name' name='name' type='text' value='' required" in page
+    assert "<label for='dataset-description'>Description</label>" in page
+    assert "<textarea id='dataset-description' name='description'></textarea>" in page
+    assert '<a class="button button-secondary" href="/datasets">Cancel</a>' in page
+    assert '<button class="button button-primary" type="submit">Create dataset</button>' in page
+    assert "aria-invalid='true'" not in page
+
+
 @pytest.mark.parametrize(
-    ("overrides", "status"),
+    ("overrides", "status", "error_field", "message"),
     [
-        ({"key": "INVALID"}, 400),
-        ({"name": "   "}, 400),
-        ({"description": "x" * 10_001}, 400),
+        (
+            {"key": "INVALID"},
+            400,
+            "dataset-key",
+            "Dataset key must contain 1-100 lowercase ASCII letters",
+        ),
+        ({"name": "   "}, 400, "dataset-name", "Dataset name must contain"),
+        (
+            {"description": "x" * 10_001},
+            400,
+            "dataset-description",
+            "Dataset description must not exceed 10000 characters",
+        ),
     ],
 )
-def test_create_validation_safely_redisplays_values(dataset_browser, overrides, status):
+def test_create_validation_safely_redisplays_values(
+    dataset_browser, overrides, status, error_field, message
+):
     factory, _, _, client = dataset_browser
     login(client)
     form = request(client, "get", "/datasets/new")
@@ -241,9 +828,13 @@ def test_create_validation_safely_redisplays_values(dataset_browser, overrides, 
     response = request(client, "post", "/datasets", data=data)
 
     assert response.status_code == status
-    assert submitted_markup not in body(response)
+    page = body(response)
+    assert submitted_markup not in page
+    assert message in page
+    assert page.count("aria-invalid='true'") == 1
+    assert f"id='{error_field}-error'" in page
     if overrides.get("name") != "   ":
-        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
@@ -269,6 +860,8 @@ def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
     assert response.status_code == 409
     assert "Dataset key already exists in this installation" in body(response)
     assert "Preserved" in body(response)
+    assert "id='dataset-key-error'" in body(response)
+    assert body(response).count("aria-invalid='true'") == 1
     assert "sql" not in body(response).casefold()
 
 
@@ -415,6 +1008,37 @@ def test_granted_editor_or_admin_can_edit_with_prg_and_audit(dataset_browser, pe
     assert audits == 1
 
 
+def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(
+        services,
+        admin,
+        "edit-form",
+        "Stored <name>",
+        "Stored <description>",
+    )
+    login(client)
+
+    response = request(client, "get", "/datasets/edit-form/edit")
+    page = body(response)
+
+    assert response.status_code == 200
+    assert "<title>Edit dataset · REFRNCR</title>" in page
+    assert '<header class="page-header">' in page
+    assert "<p>Key: <code>edit-form</code></p>" in page
+    assert "name='key'" not in page
+    assert "<form class='form' method='post' action='/datasets/edit-form'>" in page
+    assert "<label for='dataset-name'>Name</label>" in page
+    assert "value='Stored &lt;name&gt;'" in page
+    assert "<label for='dataset-description'>Description</label>" in page
+    assert ">Stored &lt;description&gt;</textarea>" in page
+    assert '<a class="button button-secondary" href="/datasets/edit-form">Cancel</a>' in page
+    assert '<button class="button button-primary" type="submit">Save dataset</button>' in page
+    assert "aria-invalid='true'" not in page
+    assert "Stored <name>" not in page
+    assert "Stored <description>" not in page
+
+
 def test_community_admin_can_edit_without_dataset_grant(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "admin-edit")
@@ -525,8 +1149,13 @@ def test_invalid_edit_redisplays_escaped_values_without_mutation(dataset_browser
     )
 
     assert response.status_code == 400
-    assert markup not in body(response)
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in body(response)
+    page = body(response)
+    assert markup not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+    assert "Dataset description must not exceed 10000 characters" in page
+    assert "id='dataset-edit-error'" in page
+    assert "aria-describedby='dataset-edit-error' aria-invalid='true'" in page
+    assert page.count("aria-invalid='true'") == 1
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
         assert persisted.name == "Original"
@@ -540,13 +1169,27 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
 
     empty_page = body(request(client, "get", "/datasets/schema"))
     assert "<h2>Fields</h2>" in empty_page
-    assert "No fields are defined." in empty_page
+    assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
 
     create_field(services, admin, dataset, "zeta", "Zeta", "date", True, False)
     create_field(services, admin, dataset, "alpha", "<script>alert(1)</script>", "string")
-    page = body(request(client, "get", "/datasets/schema"))
+    rendered_templates = []
 
+    def record_template(_sender, template, **_extra):
+        rendered_templates.append(template.name)
+
+    template_rendered.connect(record_template, client.application)
+    try:
+        response = request(client, "get", "/datasets/schema")
+    finally:
+        template_rendered.disconnect(record_template, client.application)
+    page = body(response)
+
+    assert response.status_code == 200
+    assert rendered_templates == ["pages/datasets/detail.html"]
+    assert "<nav aria-label='Breadcrumb'><a href='/datasets'>Datasets</a></nav>" in page
+    assert "<caption>Dataset fields</caption>" in page
     assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
@@ -555,6 +1198,26 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert page.count("Edit field") == 2
     assert page.count("Move up") == 2
     assert page.count("Move down") == 2
+    order_forms = re.findall(
+        r"<form method='post' action='/datasets/schema/fields/order'>(.*?)</form>",
+        page,
+        re.DOTALL,
+    )
+    assert len(order_forms) == 2
+    expected_ids = [
+        field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)
+    ]
+    csrf = session_csrf(client, services)
+    for form, field_id in zip(order_forms, expected_ids, strict=True):
+        assert form.count(f"name='csrf_token' value='{csrf}'") == 1
+        assert re.findall(r"name='expected_field_id' value='([^']+)'", form) == expected_ids
+        assert f"name='field_id' value='{field_id}'" in form
+        assert "name='direction' value='up'" in form
+        assert "name='direction' value='down'" in form
+    assert "name='direction' value='up' disabled" in order_forms[0]
+    assert "name='direction' value='down' disabled" not in order_forms[0]
+    assert "name='direction' value='up' disabled" not in order_forms[1]
+    assert "name='direction' value='down' disabled" in order_forms[1]
 
 
 def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):
@@ -1149,8 +1812,9 @@ def test_record_identifier_detail_is_compact_canonical_and_marks_each_component(
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("zeta", "alpha"))
     configured = body(request(client, "get", "/datasets/business-key"))
     assert "Record identifier: <code>alpha</code> + <code>zeta</code>" in configured
-    assert "🔑 Alpha" in configured
-    assert "🔑 Zeta" in configured
+    assert configured.count("images/lucide-key-round.svg") == 2
+    assert "Alpha" in configured
+    assert "Zeta" in configured
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor"])
@@ -1169,7 +1833,8 @@ def test_viewer_and_editor_see_record_identifier_without_management_controls(
 
     detail = body(request(client, "get", f"/datasets/{dataset.key}"))
     assert "Record identifier: <code>code</code>" in detail
-    assert "🔑 Code" in detail
+    assert "images/lucide-key-round.svg" in detail
+    assert "Code" in detail
     assert "Edit field" not in detail
     field = services.dataset_fields.get_field(admin.id, dataset.key, "code")
     with pytest.raises(NotFoundError):
@@ -1191,7 +1856,7 @@ def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_wi
 
     form = request(client, "get", f"/datasets/{dataset.key}/fields/{required.key}/edit")
     page = body(form)
-    assert "Part of Record identifier" in page
+    assert "Part of record identifier" in page
     assert "Delete field" in page
     response = request(
         client,
@@ -1242,7 +1907,7 @@ def test_admin_can_add_field_directly_to_record_identifier(dataset_browser):
     dataset = create_dataset(services, admin, "create-identifier-field")
     login(client)
     form = request(client, "get", f"/datasets/{dataset.key}/fields/new")
-    assert "Part of Record identifier" in body(form)
+    assert "Part of record identifier" in body(form)
 
     response = request(
         client,

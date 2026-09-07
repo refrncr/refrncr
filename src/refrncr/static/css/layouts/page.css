@@ -1,0 +1,31 @@
+.page-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg); }
+.page-actions, .form-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.button-icon { width: 1rem; height: 1rem; margin-right: .4375rem; }
+.button-primary .button-icon { filter: brightness(0) invert(1); }
+.export-menu { position: relative; }
+.export-menu summary { list-style: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu summary::after { margin-left: var(--space-sm); content: "▾"; }
+.export-menu[open] summary::after { content: "▴"; }
+.export-menu-options { position: absolute; z-index: var(--layer-menu); top: calc(100% + var(--space-xs)); right: 0; display: grid; min-width: 10rem; padding: var(--space-xs); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-md); }
+.export-menu-options a { padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); color: var(--color-text); text-decoration: none; }
+.export-menu-options a:hover { background: var(--color-action-secondary); }
+.management-list-header { flex-wrap: nowrap; align-items: center; }
+.management-list-header h1 { margin: 0; white-space: nowrap; }
+.management-list-header .page-actions { flex: 0 1 auto; flex-wrap: nowrap; margin-left: auto; }
+.management-list-header input { flex: 0 1 22rem; width: min(22rem, 35vw); margin-top: 0; }
+.management-list-header .button { flex: 0 0 auto; white-space: nowrap; }
+.user-state-action, .add-member-form { margin-top: var(--space-xl); }
+.member-list { margin: 0; padding: 0; list-style: none; }
+.member-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-md) 0; border-bottom: 1px solid var(--color-border-subtle); }
+.member-list li:first-child { padding-top: 0; }
+.member-list strong, .member-list span { display: block; }
+.member-list span { color: var(--color-text-muted); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+.member-list form { flex: 0 0 auto; }
+@media (max-width: 767px) {
+  .page-actions, .form-actions { width: 100%; }
+  .page-actions > *, .form-actions > * { flex: 1 1 auto; }
+  .management-list-header { flex-wrap: wrap; }
+  .management-list-header .page-actions { width: 100%; flex-wrap: wrap; margin-left: 0; }
+  .management-list-header input { width: 100%; }
+}

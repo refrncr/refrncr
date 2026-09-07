@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import sysconfig
+import tarfile
 import time
 import urllib.request
 import venv
@@ -21,6 +22,7 @@ class InstalledArtifact:
     executable: Path
     python: Path
     wheel: Path
+    sdist: Path
     working_directory: Path
     install_directory: Path
 
@@ -39,6 +41,19 @@ def installed_artifact(tmp_path_factory):
 
     wheel_directory = root / "dist"
     wheel_directory.mkdir()
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import setuptools.build_meta as backend, sys; backend.build_sdist(sys.argv[1])",
+            str(wheel_directory),
+        ],
+        cwd=source,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    sdist = next(wheel_directory.glob("refrncr-*.tar.gz"))
     subprocess.run(
         [
             sys.executable,
@@ -91,7 +106,7 @@ def installed_artifact(tmp_path_factory):
     ).stdout.strip()
     assert Path(imported_from).is_relative_to(environment)
 
-    return InstalledArtifact(executable, python, wheel, working_directory, environment)
+    return InstalledArtifact(executable, python, wheel, sdist, working_directory, environment)
 
 
 def clean_environment():
@@ -119,7 +134,79 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/migrations/versions/0003_ref_35_team_memberships.py",
         "refrncr/migrations/versions/0004_ref_36_access_grants.py",
     } <= files
+    assert {
+        "refrncr/static/css/refrncr.css",
+        "refrncr/static/css/tokens.css",
+        "refrncr/static/css/base.css",
+        "refrncr/static/css/utilities.css",
+        "refrncr/static/css/layouts/app-shell.css",
+        "refrncr/static/css/layouts/page.css",
+        "refrncr/static/css/layouts/auth.css",
+        "refrncr/static/css/components/buttons.css",
+        "refrncr/static/css/components/forms.css",
+        "refrncr/static/css/components/feedback.css",
+        "refrncr/static/css/components/cards-badges.css",
+        "refrncr/static/css/components/tables.css",
+        "refrncr/static/css/components/dialog.css",
+        "refrncr/static/fonts/montserrat/Montserrat-Medium.woff2",
+        "refrncr/static/fonts/inter/Inter-Regular.woff2",
+        "refrncr/static/fonts/inter/Inter-SemiBold.woff2",
+        "refrncr/static/fonts/inter/Inter-Bold.woff2",
+        "refrncr/static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
+        "refrncr/static/licenses/OFL-Montserrat.txt",
+        "refrncr/static/licenses/OFL-Inter.txt",
+        "refrncr/static/licenses/OFL-JetBrains-Mono.txt",
+        "refrncr/static/licenses/LICENSE-Lucide.txt",
+        "refrncr/static/licenses/ASSET-SOURCES.md",
+    } <= files
+    assert {
+        "refrncr/templates/layouts/auth/base.html",
+        "refrncr/templates/pages/auth/login.html",
+        "refrncr/templates/pages/auth/setup.html",
+        "refrncr/templates/pages/datasets/create.html",
+        "refrncr/templates/pages/datasets/detail.html",
+        "refrncr/templates/pages/datasets/edit.html",
+        "refrncr/templates/pages/datasets/list.html",
+        "refrncr/templates/pages/datasets/_record_table.html",
+        "refrncr/templates/pages/datasets/_record_form_fields.html",
+        "refrncr/templates/pages/datasets/_record_panels.html",
+        "refrncr/templates/pages/datasets/records.html",
+        "refrncr/templates/components/side_panel.html",
+        "refrncr/templates/pages/users/list.html",
+        "refrncr/templates/pages/users/_user_form_fields.html",
+        "refrncr/templates/pages/users/_user_panels.html",
+        "refrncr/templates/pages/teams/list.html",
+        "refrncr/templates/pages/teams/members.html",
+        "refrncr/templates/pages/teams/_membership_controls.html",
+        "refrncr/templates/pages/teams/_team_form_fields.html",
+        "refrncr/templates/pages/teams/_team_panels.html",
+        "refrncr/templates/pages/datasets/import/upload.html",
+        "refrncr/templates/pages/datasets/import/worksheet.html",
+        "refrncr/templates/pages/datasets/import/mapping.html",
+        "refrncr/templates/pages/datasets/import/preview.html",
+        "refrncr/templates/pages/datasets/records/form.html",
+        "refrncr/templates/pages/datasets/records/delete.html",
+        "refrncr/templates/pages/datasets/fields/_form_fields.html",
+        "refrncr/templates/pages/datasets/fields/create.html",
+        "refrncr/templates/pages/datasets/fields/edit.html",
+    } <= files
     assert not any(name.endswith((".db", ".pyc")) or "__pycache__" in name for name in files)
+
+
+def test_sdist_contains_ui_runtime_and_licenses(installed_artifact):
+    with tarfile.open(installed_artifact.sdist) as archive:
+        files = {name.split("/", 1)[-1] for name in archive.getnames()}
+
+    assert {
+        "src/refrncr/static/css/components/dialog.css",
+        "src/refrncr/static/css/layouts/app-shell.css",
+        "src/refrncr/static/fonts/inter/Inter-Regular.woff2",
+        "src/refrncr/static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
+        "src/refrncr/static/fonts/montserrat/Montserrat-Medium.woff2",
+        "src/refrncr/static/licenses/ASSET-SOURCES.md",
+        "src/refrncr/static/licenses/LICENSE-Lucide.txt",
+        "src/refrncr/templates/pages/datasets/records.html",
+    } <= files
 
 
 def test_installed_console_help_and_http_startup(installed_artifact):
@@ -176,6 +263,18 @@ def test_installed_console_help_and_http_startup(installed_artifact):
                 time.sleep(0.05)
         assert response.status == 200
         assert "refrncr" in body
+        for asset in (
+            "static/css/components/dialog.css",
+            "static/fonts/montserrat/Montserrat-Medium.woff2",
+            "static/fonts/inter/Inter-Regular.woff2",
+            "static/fonts/inter/Inter-SemiBold.woff2",
+            "static/fonts/inter/Inter-Bold.woff2",
+            "static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
+        ):
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/{asset}", timeout=1
+            ) as asset_response:
+                assert asset_response.status == 200
     finally:
         if process.poll() is None:
             if os.name == "nt":

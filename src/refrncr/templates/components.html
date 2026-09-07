@@ -1,0 +1,26 @@
+{% macro button(label, href=none, variant='primary', button_type='button', disabled=false) -%}
+  {% if href %}
+    <a class="button button-{{ variant }}" href="{{ href }}">{{ label }}</a>
+  {% else %}
+    <button class="button button-{{ variant }}" type="{{ button_type }}"{% if disabled %} disabled{% endif %}>{{ label }}</button>
+  {% endif %}
+{%- endmacro %}
+
+{% macro feedback(message, kind='error', id=none) -%}
+  {% if message %}
+    <div class='alert alert-{{ kind }}'{% if id %} id='{{ id }}'{% endif %} role='{{ 'alert' if kind == 'error' else 'status' }}'>{{ message }}</div>
+  {% endif %}
+{%- endmacro %}
+
+{% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input') -%}
+  <div class='form-field'>
+    <label for='{{ id }}'>{{ label }}</label>
+    {% if control == 'textarea' %}
+      <textarea id='{{ id }}' name='{{ name }}'{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>{{ value if value is not none else '' }}</textarea>
+    {% else %}
+      <input id='{{ id }}' name='{{ name }}' type='{{ type }}'{% if value is not none %} value='{{ value }}'{% endif %}{% if autocomplete %} autocomplete='{{ autocomplete }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>
+    {% endif %}
+    {% if help_text %}<p class='help-text' id='{{ id }}-help'>{{ help_text }}</p>{% endif %}
+    {% if error %}<p class='error-text' id='{{ id }}-error'>{{ error }}</p>{% endif %}
+  </div>
+{%- endmacro %}
