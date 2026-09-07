@@ -39,7 +39,8 @@ their corresponding literal values.
 
 ## Layout and components
 
-`templates/base.html` owns the document structure, skip link, logo, permission-aware primary
+`templates/base.html` owns the document structure, skip link and overridable layout block.
+Its default application layout owns the logo, permission-aware primary
 navigation, current-page state, account context, CSRF-protected sign-out action, flash region,
 main landmark, and page script extension point. File-based page templates extend this shell.
 
@@ -68,9 +69,15 @@ The current reusable Jinja primitives are:
 - `feedback`, for escaped status or error feedback with the appropriate live-region role.
 
 The overview uses `page_header` and both link-button variants. The login and setup pages use the
-shared auth layout, `form_field`, `feedback`, and a real submit-button variant. Credential
-failures are shown once as generic form feedback and referenced by both login fields. Neither
-submitted login field is rendered back into the response. Setup may safely redisplay the email
+shared auth layout, `form_field`, `feedback`, and a real submit-button variant. The auth layout
+overrides the application shell with a centred canonical wordmark and card. Login opts into the
+shared field password-visibility button and focusable feedback summary. The shared external
+controller reveals the button only when JavaScript is available, updates its action name and
+focuses the error summary after a failed submission. Required-field validation runs on the
+server to keep messages in English even without JavaScript. Credential
+failures are shown once as generic form feedback and referenced by both login fields. The
+submitted email is escaped and retained (bounded to the browser identifier limit); the
+password is never rendered back into the response. Setup may safely redisplay the email
 and display name after validation, but never the submitted password.
 
 The Dataset-create page combines `page_header`, `form_field`, `feedback`, and link/submit button
@@ -158,3 +165,25 @@ Broad implicit component selectors are intentionally avoided. Forms that need th
 contract use `.form`; buttons use `.button` plus a variant; hover behaviour for table rows is
 scoped to `.table-scroll`. Plain semantic elements remain available when no component treatment
 is intended.
+
+## Focused login verification (REF-129)
+
+Automated tests cover routing, form semantics, errors, redirects and security regressions.
+`test_login_javascript.py` executes the shared controller when Node is available; this does
+not replace a real browser or assistive-technology check. No browser dependency was added.
+
+Manual checks still required when browser automation is unavailable:
+
+1. Open `/` and a protected page while signed out. Confirm the focused login page has no
+   application navigation or Overview, and shows the canonical wordmark.
+2. At 320 px and desktop widths, check the card, labels, errors and buttons fit without
+   horizontal scrolling; repeat with zoom and increased text size.
+3. Tab through the skip link, brand link, email, password, Show password and Sign in. Confirm
+   visible focus throughout. Activate Show/Hide password with Space and Enter: the value stays
+   unchanged, the form does not submit and a screen reader announces the new action name.
+4. Submit empty fields and incorrect credentials. Confirm focus reaches the error summary and
+   the screen reader associates each invalid field with its error. Email stays populated;
+   password stays empty after server responses. Repeat with JavaScript disabled: login and
+   server validation still work and the visibility button is hidden.
+5. Sign in from a protected page and confirm return to its path. Sign out and confirm protected
+   content is unavailable. Verify text, button and focus-state contrast with the shared tokens.

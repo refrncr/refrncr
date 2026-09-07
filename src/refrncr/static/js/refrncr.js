@@ -1,4 +1,16 @@
 (() => {
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    const input = document.getElementById(button.getAttribute("aria-controls"));
+    if (!input || input.type !== "password") return;
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      button.textContent = show ? "Hide password" : "Show password";
+    });
+  });
+  document.querySelector("[data-error-focus]")?.focus();
+
   const toggle = document.querySelector("[data-nav-toggle]");
   const navigation = document.querySelector("[data-navigation]");
   if (toggle && navigation) {

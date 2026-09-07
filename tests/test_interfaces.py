@@ -131,8 +131,8 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
 
     assert client.get("/api/health").json() == {"status": "ok"}
     assert "refrncr" in client.get("/").text
-    assert client.get("/users").status_code == 403
-    assert client.get(f"/teams/{uuid.uuid4()}/members").status_code == 403
+    assert client.get("/users", follow_redirects=False).status_code == 302
+    assert client.get(f"/teams/{uuid.uuid4()}/members", follow_redirects=False).status_code == 302
 
     setup_token = csrf_token(client.get("/setup"))
     assert (
@@ -180,18 +180,15 @@ def test_low_level_app_without_dataset_dependencies_has_no_dataset_ui(interface)
     assert request(client, "post", "/datasets/example/fields/field/delete").status_code == 404
 
 
-def test_anonymous_overview_uses_file_template_layout_and_components(interface):
-    _, _, _, _, _, _, client = interface
-
+def test_anonymous_root_redirects_to_focused_login(interface):
+    *_, client = interface
     response = request(client, "get", "/")
-    page = response_text(response)
-
-    assert response.status_code == 200
-    assert "<title>Overview · REFRNCR</title>" in page
-    assert '<header class="page-header">' in page
-    assert '<a class="button button-secondary" href="/login">Sign in</a>' in page
-    assert 'aria-current="page"' not in page
-    assert 'class="app-sidebar"' not in page
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/login?")
+    page = response_text(request(client, "get", response.headers["Location"]))
+    assert "Sign in to your account" in page
+    for excluded in ("Overview", "app-shell", "app-sidebar", "<nav", "Sign up", "Forgot password"):
+        assert excluded not in page
 
 
 def test_authenticated_overview_shell_is_permission_aware_and_escapes_actor(interface):
@@ -455,7 +452,7 @@ def test_login_requires_csrf_uses_secure_cookie_and_hides_authentication_details
         assert response.status_code == 401
         body = response_text(response)
         assert "Invalid credentials" in body
-        assert email not in body
+        assert f"value='{email}'" in body
         assert password not in body
 
 
@@ -469,7 +466,7 @@ def test_login_get_uses_auth_layout_and_shared_form_components(interface):
     assert response.status_code == 200
     assert "<title>Sign in · REFRNCR</title>" in page
     assert "<section class='card' aria-labelledby='auth-title'>" in page
-    assert "<form class='login-form' method='post'>" in page
+    assert "<form class='login-form' method='post' action='/login' novalidate>" in page
     assert "<label for='login-email'>Email address</label>" in page
     assert "id='login-email' name='email' type='email'" in page
     assert "autocomplete='username' required" in page
@@ -505,7 +502,7 @@ def test_invalid_login_uses_generic_accessible_feedback_without_reflection(inter
     assert page.count("aria-describedby='login-error'") == 2
     assert page.count("aria-invalid='true'") == 2
     assert submitted_email not in page
-    assert "&lt;img" not in page
+    assert "&lt;img" in page
     assert "incorrect password" not in page
 
 
@@ -563,7 +560,7 @@ def test_successful_login_rotates_and_revokes_existing_session(interface):
 def test_unauthenticated_and_non_admin_users_are_rejected(interface):
     _, users, authentication, _, _, _, client = interface
     setup_admin(client)
-    assert request(client, "get", "/users").status_code == 403
+    assert request(client, "get", "/users").status_code == 302
 
     assert login(client).status_code == 302
     admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -626,7 +623,7 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
     users.disable_user(admin.id, managed.id)
     assert sessions.resolve(disabled_token) is None
     disabled_response = request(client, "get", "/users")
-    assert disabled_response.status_code == 403
+    assert disabled_response.status_code == 302
     assert "Max-Age=0" in disabled_response.headers["Set-Cookie"]
     assert login(client, managed.email, "member password").status_code == 401
 
@@ -636,7 +633,7 @@ def test_disabled_and_deleted_users_cannot_login_or_reuse_sessions(interface):
     users.delete_user(admin.id, managed.id)
     assert sessions.resolve(deleted_token) is None
     deleted_response = request(client, "get", "/users")
-    assert deleted_response.status_code == 403
+    assert deleted_response.status_code == 302
     assert "Max-Age=0" in deleted_response.headers["Set-Cookie"]
     assert login(client, managed.email, "member password").status_code == 401
 
@@ -870,8 +867,8 @@ def test_management_routes_use_file_templates_without_inline_markup():
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
     _, users, authentication, _, teams, _, client = interface
     setup_admin(client)
-    assert request(client, "get", "/teams").status_code == 403
-    assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
+    assert request(client, "get", "/teams").status_code == 302
+    assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 302
 
     assert login(client).status_code == 302
     admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
@@ -1008,7 +1005,7 @@ def test_membership_interface_authorization_uses_service_for_all_actor_states(in
 
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 200
     request(client, "post", "/logout", data={"csrf_token": authenticated_csrf(client)})
-    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 302
 
     actors = [
         users.create_user(admin.id, "regular@example.com", "Regular", "valid password"),
@@ -1023,10 +1020,10 @@ def test_membership_interface_authorization_uses_service_for_all_actor_states(in
     assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
     assert login(client, "disabled@example.com", "valid password").status_code == 302
     users.disable_user(admin.id, actors[1].id)
-    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 302
     assert login(client, "deleted@example.com", "valid password").status_code == 302
     users.delete_user(admin.id, actors[2].id)
-    assert request(client, "get", f"/teams/{team.id}/members").status_code == 403
+    assert request(client, "get", f"/teams/{team.id}/members").status_code == 302
     for actor in actors:
         with pytest.raises(AuthorizationError):
             memberships.create_membership(actor.id, managed.id, team.id)
@@ -1101,3 +1098,148 @@ def test_membership_interface_escapes_user_values(interface):
     assert "<img src=x onerror=alert(1)>" not in body
     assert "&lt;script&gt;alert(1)&lt;/script&gt;@example.com" in body
     assert "&lt;img src=x onerror=alert(1)&gt;" in body
+
+
+@pytest.mark.parametrize("path", ["/", "/users", "/teams", "/teams/missing/members"])
+def test_anonymous_browser_redirect_preserves_only_path(interface, path):
+    from urllib.parse import parse_qs, urlsplit
+
+    *_, client = interface
+    response = request(client, "get", path + "?password=never-forward-this")
+    assert response.status_code == 302
+    location = urlsplit(response.headers["Location"])
+    assert location.path == "/login"
+    assert parse_qs(location.query) == {"next": [path]}
+    page = response_text(request(client, "get", response.headers["Location"]))
+    assert "never-forward-this" not in page
+    assert "Overview" not in page
+    assert "app-shell" not in page
+
+
+@pytest.mark.parametrize(
+    ("fields", "invalid"),
+    [
+        ({}, ["email", "password"]),
+        ({"email": "admin@example.com"}, ["password"]),
+        ({"password": "never-echo-this"}, ["email"]),
+        ({"email": "   ", "password": "never-echo-this"}, ["email"]),
+    ],
+)
+def test_login_required_fields_have_associated_errors(interface, fields, invalid):
+    *_, client = interface
+    token = csrf_token(request(client, "get", "/login"))
+    response = request(client, "post", "/login", data={**fields, "csrf_token": token})
+    page = response_text(response)
+    assert response.status_code == 400
+    for field in invalid:
+        assert f"aria-describedby='login-{field}-error'" in page
+        assert f"id='login-{field}-error'" in page
+    assert page.count("aria-invalid='true'") == len(invalid)
+    assert "tabindex='-1' data-error-focus" in page
+    assert "never-echo-this" not in page
+    if fields.get("email") == "admin@example.com":
+        assert "value='admin@example.com'" in page
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "https://evil.example/users",
+        "https://localhost/users",
+        "//evil.example",
+        "///evil.example",
+        "users",
+        "javascript:alert(1)",
+        "/\\evil.example",
+        "/%2fevil.example",
+        "/%252fevil.example",
+        "/%5cevil.example",
+        "/users%0d%0aLocation:evil",
+        "/./users",
+        "/users/../login",
+        "/users?password=secret",
+        "/users#secret",
+        "/login",
+        "/logout",
+        "/setup",
+        " /users",
+    ],
+)
+def test_login_rejects_unsafe_return_targets_on_get_and_post(interface, target):
+    *_, client = interface
+    setup_admin(client)
+    response = request(client, "get", "/login", query_string={"next": target})
+    assert "name='next' value='/'" in response_text(response)
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": "admin@example.com",
+            "password": ADMIN_PASSWORD,
+            "csrf_token": csrf_token(response),
+            "next": target,
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+    assert ADMIN_PASSWORD not in response.headers["Location"]
+
+
+def test_safe_return_target_survives_failure_and_success(interface):
+    *_, client = interface
+    setup_admin(client)
+    form = request(client, "get", "/login", query_string={"next": "/teams"})
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": "admin@example.com",
+            "password": "wrong password",
+            "csrf_token": csrf_token(form),
+            "next": "/teams",
+        },
+    )
+    assert response.status_code == 401
+    assert "name='next' value='/teams'" in response_text(response)
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": "admin@example.com",
+            "password": ADMIN_PASSWORD,
+            "csrf_token": csrf_token(response),
+            "next": "/teams",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/teams"
+    assert request(client, "get", "/teams").status_code == 200
+
+
+def test_login_password_toggle_is_named_and_cannot_submit(interface):
+    from html.parser import HTMLParser
+
+    class Buttons(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.buttons = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "button":
+                self.buttons.append(dict(attrs))
+
+    *_, client = interface
+    page = response_text(request(client, "get", "/login"))
+    parser = Buttons()
+    parser.feed(page)
+    (toggle,) = [button for button in parser.buttons if "data-password-toggle" in button]
+    assert toggle["type"] == "button"
+    assert toggle["aria-controls"] == "login-password"
+    assert "Show password</button>" in page
+    assert "images/logo-horizontal.svg" in page
+    assert 'alt="REFRNCR"' in page
+    assert "Sign in to your account" in page
+    assert "Sign up" not in page and "Forgot password" not in page

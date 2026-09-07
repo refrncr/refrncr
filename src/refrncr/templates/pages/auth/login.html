@@ -4,18 +4,19 @@
 {% block title %}Sign in · REFRNCR{% endblock %}
 
 {% block auth_content %}
-  <h1 id='auth-title'>Sign in</h1>
-  <p>Sign in to manage your reference data.</p>
-  {{ feedback(error, id="login-error") }}
-  <form class='login-form' method='post'>
+  <h1 id='auth-title'>Sign in to your account</h1>
+  {{ feedback(error, id="login-error", focus=true) }}
+  <form class='login-form' method='post' action='{{ url_for("login") }}' novalidate>
     {{ form_field(
       "Email address",
       "email",
       "login-email",
       type="email",
       autocomplete="username",
+      value=email|default(none),
       required=true,
-      error_id="login-error" if error else none
+      error=field_errors.email if field_errors else none,
+      error_id="login-error" if error and not field_errors else none
     ) }}
     {{ form_field(
       "Password",
@@ -24,8 +25,11 @@
       type="password",
       autocomplete="current-password",
       required=true,
-      error_id="login-error" if error else none
+      password_toggle=true,
+      error=field_errors.password if field_errors else none,
+      error_id="login-error" if error and not field_errors else none
     ) }}
+    <input type='hidden' name='next' value='{{ next_target|default("/") }}'>
     <input type='hidden' name='csrf_token' value='{{ csrf_token }}'>
     {{ button("Sign in", button_type="submit") }}
   </form>

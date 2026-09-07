@@ -6,19 +6,22 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro feedback(message, kind='error', id=none) -%}
+{% macro feedback(message, kind='error', id=none, focus=false) -%}
   {% if message %}
-    <div class='alert alert-{{ kind }}'{% if id %} id='{{ id }}'{% endif %} role='{{ 'alert' if kind == 'error' else 'status' }}'>{{ message }}</div>
+    <div class='alert alert-{{ kind }}'{% if id %} id='{{ id }}'{% endif %} role='{{ 'alert' if kind == 'error' else 'status' }}'{% if focus %} tabindex='-1' data-error-focus{% endif %}>{{ message }}</div>
   {% endif %}
 {%- endmacro %}
 
-{% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input') -%}
+{% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false) -%}
   <div class='form-field'>
     <label for='{{ id }}'>{{ label }}</label>
     {% if control == 'textarea' %}
       <textarea id='{{ id }}' name='{{ name }}'{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>{{ value if value is not none else '' }}</textarea>
     {% else %}
       <input id='{{ id }}' name='{{ name }}' type='{{ type }}'{% if value is not none %} value='{{ value }}'{% endif %}{% if autocomplete %} autocomplete='{{ autocomplete }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>
+    {% endif %}
+    {% if password_toggle and type == 'password' %}
+      <button class="button button-secondary" type="button" aria-controls="{{ id }}" data-password-toggle hidden>Show password</button>
     {% endif %}
     {% if help_text %}<p class='help-text' id='{{ id }}-help'>{{ help_text }}</p>{% endif %}
     {% if error %}<p class='error-text' id='{{ id }}-error'>{{ error }}</p>{% endif %}

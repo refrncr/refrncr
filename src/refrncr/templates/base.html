@@ -10,6 +10,7 @@
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
+    {% block layout %}
     <div class="app-shell" data-responsive-shell>
       <header class="app-header">
         <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
@@ -53,6 +54,7 @@
         {% block content %}{% endblock %}
       </main>
     </div>
+    {% endblock %}
     {% block scripts %}{% endblock %}
   </body>
 </html>
