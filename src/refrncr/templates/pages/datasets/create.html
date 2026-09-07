@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "components.html" import button, feedback, form_field %}
+{% from "components.html" import breadcrumbs, button, feedback, form_field %}
 {% from "layouts/page.html" import page_header %}
 
 {% block title %}New dataset · REFRNCR{% endblock %}
 
 {% block content %}
-  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_list") }}'>Datasets</a></nav>
+  {{ breadcrumbs([("Datasets", url_for("dataset_list")), ("New dataset", none)]) }}
   {{ page_header("New dataset") }}
   {{ feedback(error if not error_field else none, id="dataset-create-error") }}
   <form class='form' method='post' action='{{ url_for("create_dataset") }}'>

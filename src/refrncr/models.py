@@ -177,6 +177,8 @@ class Dataset(Base):
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
+    content_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     @hybrid_property
     def key(self) -> str:
         return self._key

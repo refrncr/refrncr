@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <nav><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Records</a></nav><h1>{{ 'Edit record' if record else 'Add record' }}</h1>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>{{ 'Edit record' if record else 'Add record' }}</h1>
   {% if errors.get('_record') %}<p role='alert'>{{ errors['_record'] }}</p>{% endif %}
   <form class='form' method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) if record else url_for("create_dataset_record", key=dataset.key) }}'>
     {% for field in fields %}<div><label>{{ field.name }}{% if field.is_required %} *{% endif %}{% if field.data_type == 'boolean' %}<select name='{{ field.key }}'><option value=''>—</option><option value='true'{% if submitted.get(field.key) == 'true' %} selected{% endif %}>true</option><option value='false'{% if submitted.get(field.key) == 'false' %} selected{% endif %}>false</option></select>{% else %}<input name='{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}' value='{{ submitted.get(field.key, "") }}'>{% endif %}</label>{% if errors.get(field.key) %}<span role='alert'>{{ errors[field.key] }}</span>{% endif %}</div>{% endfor %}

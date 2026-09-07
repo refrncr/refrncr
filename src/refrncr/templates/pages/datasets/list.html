@@ -4,16 +4,15 @@
 
 {% block content %}
   <div class='page-header management-list-header'><div><h1>Datasets</h1></div>
-    <div class='page-actions'><label class='visually-hidden' for='dataset-search'>Search datasets</label>
-      <input id='dataset-search' type='search' placeholder='Search datasets…' data-list-search>
+    <div class='page-actions'>
       {% if actor.role == 'admin' %}<a class='button button-primary' href='{{ url_for("new_dataset") }}'>+ New dataset</a>{% endif %}
     </div>
   </div>
-  {% if datasets %}<div class='table-scroll management-table'><table aria-label='Datasets'><thead><tr>
-    <th scope='col'>Name</th><th scope='col'>Key</th><th scope='col'>Description</th></tr></thead><tbody>
-    {% for dataset in datasets %}<tr class='dataset-row' data-row-href='{{ url_for("dataset_records_view", key=dataset.key) }}' data-list-row data-search-text='{{ dataset.name }} {{ dataset.key }} {{ dataset.description }}'>
+  {% if datasets %}<div class='table-scroll management-table'><table aria-label='Datasets'><caption class='visually-hidden'>Datasets</caption><thead><tr>
+    <th scope='col'>Dataset</th><th scope='col' class='numeric-column'>Records</th><th scope='col'>Updated</th></tr></thead><tbody>
+    {% for context in datasets %}{% set dataset = context.dataset %}<tr class='dataset-row' data-row-href='{{ url_for("dataset_records_view", key=dataset.key) }}'>
       <td><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>{{ dataset.name }}</a></td>
-      <td><code>{{ dataset.key }}</code></td><td>{{ dataset.description or '—' }}</td>
+      <td class='numeric-column'>{{ context.record_count }}</td><td><time datetime='{{ context.last_updated.isoformat() }}'>{{ context.last_updated|absolute_utc }}</time></td>
     </tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>
     <p>No datasets are available.</p></div>{% endif %}
 {% endblock %}

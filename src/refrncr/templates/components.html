@@ -27,3 +27,17 @@
     {% if error %}<p class='error-text' id='{{ id }}-error'>{{ error }}</p>{% endif %}
   </div>
 {%- endmacro %}
+
+{% macro breadcrumbs(items) -%}
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol>{% for label, href in items %}
+      <li>{% if not loop.first %}<span aria-hidden="true">›</span> {% endif %}{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}<span{% if loop.last %} aria-current="page"{% endif %}>{{ label }}</span>{% endif %}</li>
+    {% endfor %}</ol>
+  </nav>
+{%- endmacro %}
+
+{% macro content_metadata(count, updated) -%}
+  <p class="metadata"><span>{{ count }} {{ 'record' if count == 1 else 'records' }}</span>
+    <span class="metadata-item"><span aria-hidden="true">•</span><span>Updated <time datetime="{{ updated.isoformat() }}">{{ updated|absolute_utc }}</time></span></span>
+  </p>
+{%- endmacro %}

@@ -5,7 +5,7 @@
 {% block title %}Edit dataset · REFRNCR{% endblock %}
 
 {% block content %}
-  <nav aria-label='Breadcrumb'><a href='{{ url_for("dataset_detail", key=dataset.key) }}'>Dataset</a></nav>
+  {% include "pages/datasets/_breadcrumbs.html" %}
   {{ page_header("Edit dataset") }}
   <p>Key: <code>{{ dataset.key }}</code></p>
   {{ feedback(error, id="dataset-edit-error") }}

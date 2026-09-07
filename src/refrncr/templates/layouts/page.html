@@ -6,3 +6,11 @@
     </div>
   </header>
 {%- endmacro %}
+
+{% macro page_context(title, metadata) -%}
+  <div class="page-context">
+    {{ caller() }}
+    <h1 class="page-title">{{ title }}</h1>
+    {{ metadata }}
+  </div>
+{%- endmacro %}
