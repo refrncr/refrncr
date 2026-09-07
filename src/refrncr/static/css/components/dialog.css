@@ -14,7 +14,7 @@
 .side-panel-close { min-width: var(--control-height); padding: 0; border-color: transparent; background: transparent; color: var(--color-text); font-size: 2rem; font-weight: var(--font-weight-regular); }
 .side-panel-close:hover { background: var(--color-action-secondary); }
 .side-panel-body { flex: 1; min-height: 0; padding: var(--space-lg); overflow-y: auto; }
-.side-panel-body label, .record-details dt { font-family: var(--font-display); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); letter-spacing: .04em; text-transform: uppercase; }
+.side-panel-body label, .side-panel-body .form-label, .record-details dt { font-family: var(--font-display); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); letter-spacing: .04em; text-transform: uppercase; }
 .record-details { margin: 0; }
 .record-details div + div { margin-top: var(--space-lg); }
 .record-details dd { margin: var(--space-xs) 0 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
@@ -23,3 +23,12 @@
 .side-panel-footer-single { grid-template-columns: 1fr; }
 @keyframes panel-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @media (max-width: 767px) { .side-panel { width: 100%; border-left: 0; } .side-panel-footer { padding: var(--space-md); } }
+/* Shared form content is also rendered as a standalone page. */
+.side-panel-header, .side-panel-footer { flex-shrink: 0; }
+.side-panel-header > div { min-width: 0; overflow-wrap: anywhere; }
+.side-panel-close { flex-shrink: 0; }
+.side-panel-body .form { width: 100%; max-width: none; }
+.side-panel-body .form-actions { position: sticky; bottom: calc(-1 * var(--space-lg)); padding-block: var(--space-md); background: var(--color-surface); }
+.side-panel-body code { overflow-wrap: anywhere; }
+
+main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[data-side-panel-content] { padding: 0; }

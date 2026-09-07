@@ -1,4 +1,6 @@
 (() => {
+  if (document.refrncrInitialized) return;
+  document.refrncrInitialized = true;
   document.querySelectorAll("[data-password-toggle]").forEach((button) => {
     const input = document.getElementById(button.getAttribute("aria-controls"));
     if (!input || input.type !== "password") return;
@@ -22,8 +24,50 @@
   }
 
   const sidePanelOpeners = new WeakMap();
-  const focusableSelector =
-    "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])";
+  const panelLoads = new WeakMap();
+  const pendingForms = new WeakSet();
+  const visibleControl = (element) =>
+    !element.closest("[hidden]") && element.getClientRects().length > 0;
+  const focusSidePanel = (dialog) => {
+    const candidates = dialog.querySelectorAll(
+      "[data-error-focus], [aria-invalid='true'], [data-initial-focus], input:not([type='hidden']):not([disabled]), select:not([disabled]), textarea:not([disabled])"
+    );
+    // Error summaries take precedence over invalid fields and ordinary inputs.
+    const initialFocus =
+      [...candidates].find((element) => element.hasAttribute("data-error-focus") && visibleControl(element)) ||
+      [...candidates].find((element) => element.getAttribute("aria-invalid") === "true" && visibleControl(element)) ||
+      [...candidates].find(visibleControl) ||
+      dialog.querySelector("[data-dialog-close]");
+    initialFocus?.focus();
+  };
+
+  const renderPanelResponse = async (dialog, response, load) => {
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    if (panelLoads.get(dialog) !== load) return true;
+    const content = page.querySelector("[data-side-panel-content]");
+    if (!content) return false;
+    const title = document.getElementById(dialog.getAttribute("aria-labelledby"));
+    title.textContent = content.dataset.panelTitle;
+    dialog.querySelector("[data-panel-host]").replaceChildren(document.importNode(content, true));
+    if (dialog.open) focusSidePanel(dialog);
+    return true;
+  };
+
+  const loadPanel = async (dialog, trigger) => {
+    const load = {};
+    panelLoads.set(dialog, load);
+    document.getElementById(dialog.getAttribute("aria-labelledby")).textContent = "Loading…";
+    dialog.querySelector("[data-panel-host]").replaceChildren();
+    try {
+      const response = await fetch(trigger.href, {credentials: "same-origin"});
+      if (panelLoads.get(dialog) !== load) return;
+      if (!response.ok || response.redirected || !await renderPanelResponse(dialog, response, load)) {
+        window.location.assign(response.redirected ? response.url : trigger.href);
+      }
+    } catch {
+      if (panelLoads.get(dialog) === load) window.location.assign(trigger.href);
+    }
+  };
 
   const resetSidePanel = (dialog) => {
     if (dialog.hasAttribute("data-panel-modes")) {
@@ -54,8 +98,58 @@
 
   document.querySelectorAll("dialog[data-modal-side-panel]").forEach((dialog) => {
     dialog.addEventListener("close", () => {
+      panelLoads.delete(dialog);
       resetSidePanel(dialog);
       restoreSidePanelFocus(dialog);
+    });
+  });
+
+  document.querySelectorAll("[data-panel-host]").forEach((host) => {
+    const dialog = host.closest("dialog");
+    host.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-panel-cancel]")) return;
+      event.preventDefault();
+      dialog.close();
+    });
+    host.addEventListener("submit", async (event) => {
+      const form = event.target;
+      event.preventDefault();
+      if (pendingForms.has(dialog)) return;
+      pendingForms.add(dialog);
+      const load = panelLoads.get(dialog);
+      const buttons = [...form.elements].filter((control) => control.matches("button[type='submit']"));
+      const data = new FormData(form, event.submitter);
+      buttons.forEach((button) => { button.disabled = true; });
+      form.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch(form.action, {
+          method: "POST", body: data, credentials: "same-origin",
+        });
+        if (response.redirected) {
+          window.location.assign(response.url);
+        } else if (panelLoads.get(dialog) !== load) {
+          return;
+        } else if (![400, 409].includes(response.status) || !await renderPanelResponse(dialog, response, load)) {
+          const error = document.createElement("p");
+          error.setAttribute("role", "alert");
+          error.tabIndex = -1;
+          error.textContent = "The form could not be saved. Reload the page to check your access and try again.";
+          form.prepend(error);
+          if (dialog.open) error.focus();
+        }
+      } catch {
+        if (panelLoads.get(dialog) !== load) return;
+        const error = document.createElement("p");
+        error.setAttribute("role", "alert");
+        error.tabIndex = -1;
+        error.textContent = "The result could not be confirmed. Check the dataset before trying again.";
+        form.prepend(error);
+        if (dialog.open) error.focus();
+      } finally {
+        pendingForms.delete(dialog);
+        buttons.forEach((button) => { button.disabled = false; });
+        form.removeAttribute("aria-busy");
+      }
     });
   });
 
@@ -63,7 +157,11 @@
     trigger.addEventListener("click", (event) => {
       if (trigger.hasAttribute("data-record-row") && event.target.closest("a, button, input")) return;
       const dialog = document.getElementById(trigger.dataset.dialogOpen);
-      if (!dialog) return;
+      if (!dialog || typeof dialog.showModal !== "function") return;
+      if (trigger.hasAttribute("data-panel-url")) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
+        event.preventDefault();
+      }
       if (dialog.hasAttribute("data-modal-side-panel")) {
         if (dialog.open) {
           dialog.focus();
@@ -72,11 +170,8 @@
         if (document.querySelector("dialog[data-modal-side-panel][open]")) return;
         sidePanelOpeners.set(dialog, trigger);
         dialog.showModal();
-        const initialFocus =
-          dialog.querySelector("[data-initial-focus]") ||
-          dialog.querySelector("[data-dialog-close]") ||
-          dialog.querySelector(focusableSelector);
-        initialFocus?.focus();
+        if (trigger.hasAttribute("data-panel-url")) loadPanel(dialog, trigger);
+        focusSidePanel(dialog);
         const selectedRow = trigger.closest("[data-record-row]");
         if (selectedRow) {
           selectedRow.classList.add("is-selected");
@@ -157,6 +252,6 @@
     autoOpenPanel.querySelectorAll("[data-panel-view]").forEach((view) => {
       view.hidden = view.dataset.panelView !== autoOpenPanel.dataset.autoOpen;
     });
-    autoOpenPanel.querySelector("[data-dialog-close]")?.focus();
+    focusSidePanel(autoOpenPanel);
   }
 })();

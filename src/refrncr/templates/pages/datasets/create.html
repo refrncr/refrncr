@@ -7,8 +7,9 @@
 {% block content %}
   {{ breadcrumbs([("Datasets", url_for("dataset_list")), ("New dataset", none)]) }}
   {{ page_header("New dataset") }}
-  {{ feedback(error if not error_field else none, id="dataset-create-error") }}
-  <form class='form' method='post' action='{{ url_for("create_dataset") }}'>
+  <div class='side-panel-body' data-side-panel-content data-panel-title='New dataset'>
+  {{ feedback(error if not error_field else none, id="dataset-create-error", focus=true) }}
+  <form class='form' novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Key",
       "key",
@@ -36,8 +37,9 @@
     ) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
-      {{ button("Cancel", url_for("dataset_list"), variant="secondary") }}
+      <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>
       {{ button("Create dataset", button_type="submit") }}
     </div>
   </form>
+  </div>
 {% endblock %}
