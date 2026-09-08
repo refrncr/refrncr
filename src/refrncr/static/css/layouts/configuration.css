@@ -1,0 +1,33 @@
+.configuration-overview { display: grid; gap: var(--space-xl); min-width: 0; }
+.configuration-overview > section:first-child { padding-top: 10px; }
+.configuration-overview section { min-width: 0; overflow-wrap: anywhere; }
+.configuration-overview h2 { margin: 0 0 var(--space-md); font-size: var(--font-size-heading-sm); }
+.configuration-overview p { margin-block: var(--space-sm); }
+.detail-list { display: grid; gap: var(--space-md); margin: 0; }
+.detail-list > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: var(--space-md); }
+.detail-list dt, .section-description { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.detail-list dd { min-width: 0; margin: 0; white-space: pre-wrap; }
+.detail-list code, .field-key { color: var(--color-text-muted); }
+.detail-list code { padding-inline: 0; }
+.field-name { font-weight: var(--font-weight-semibold); }
+.field-key { padding-inline: 0; }
+.section-header { align-items: center; margin-bottom: var(--space-md); }
+.section-header h2, .section-header p { margin: 0; }
+.configuration-table { position: relative; }
+.configuration-table table { min-width: var(--data-table-min-width); table-layout: fixed; }
+.configuration-table .identifier-column { width: var(--space-xxl); padding-inline: var(--space-sm); text-align: center; }
+.configuration-table th:nth-child(2) { width: 22%; }
+.configuration-table th:nth-child(3) { width: 18%; }
+.configuration-table th:nth-child(4) { width: 12%; }
+.configuration-table th:nth-child(5) { width: 24%; }
+.configuration-table td { vertical-align: middle; }
+.configuration-table th:last-child, .configuration-table td:last-child { text-align: right; }
+.configuration-table .field-actions { justify-content: flex-end; }
+.configuration-table .field-actions .button-icon { margin: 0; }
+.field-edit-action { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-height-compact); min-height: var(--control-height-compact); color: var(--color-text-secondary); text-decoration: none; }
+.field-edit-action:hover { color: var(--color-link-hover); }
+.constraint-list, .field-actions, .field-actions form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.constraint-list .badge { background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+@media (max-width: 767px) {
+  .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+}

@@ -3,6 +3,7 @@
 @import url("utilities.css");
 @import url("layouts/app-shell.css");
 @import url("layouts/page.css");
+@import url("layouts/configuration.css");
 @import url("layouts/settings.css");
 @import url("layouts/auth.css");
 @import url("layouts/import.css");

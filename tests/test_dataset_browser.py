@@ -286,6 +286,7 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
         '@import url("utilities.css");',
         '@import url("layouts/app-shell.css");',
         '@import url("layouts/page.css");',
+        '@import url("layouts/configuration.css");',
         '@import url("layouts/settings.css");',
         '@import url("layouts/auth.css");',
         '@import url("layouts/import.css");',
@@ -1181,7 +1182,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema"))
-    assert "<h2>Fields</h2>" in empty_page
+    assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
 
@@ -1203,12 +1204,12 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert rendered_templates == ["pages/datasets/detail.html"]
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<a href="/datasets">Datasets</a>' in page
-    assert "<caption>Dataset fields</caption>" in page
+    assert "<caption class='visually-hidden'>Dataset fields</caption>" in page
     assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert "string" in page and "date" in page
-    assert "Required" in page and "Unique" in page
+    assert "Required" in page and "None" in page
     assert page.count("Edit field") == 2
     assert page.count("Move up") == 2
     assert page.count("Move down") == 2
@@ -1820,12 +1821,13 @@ def test_record_identifier_detail_is_compact_canonical_and_marks_each_component(
     login(client)
 
     unconfigured = body(request(client, "get", "/datasets/business-key"))
-    assert "Record identifier: Not configured" in unconfigured
+    assert "No record identifier configured" in unconfigured
     assert "Business key" not in unconfigured
 
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("zeta", "alpha"))
     configured = body(request(client, "get", "/datasets/business-key"))
-    assert "Record identifier: <code>alpha</code> + <code>zeta</code>" in configured
+    assert "No record identifier configured" not in configured
+    assert configured.index("Zeta") < configured.index("Alpha")
     assert configured.count("images/lucide-key-round.svg") == 2
     assert "Alpha" in configured
     assert "Zeta" in configured
@@ -1846,8 +1848,8 @@ def test_viewer_and_editor_see_record_identifier_without_management_controls(
     login(client, user.email, "user password")
 
     detail = body(request(client, "get", f"/datasets/{dataset.key}"))
-    assert "Record identifier: <code>code</code>" in detail
-    assert "images/lucide-key-round.svg" in detail
+    assert "<code class='field-key'>code</code>" in detail
+    assert "Code is part of the record identifier" in detail
     assert "Code" in detail
     assert "Edit field" not in detail
     field = services.dataset_fields.get_field(admin.id, dataset.key, "code")
