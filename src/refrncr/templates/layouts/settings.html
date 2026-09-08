@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import back_icon, settings_icon, user_icon, team_icon %}
+
+{% block title %}{{ settings_title }}{% endblock %}
+
+{% block layout %}
+  <div class="app-shell settings-shell" data-responsive-shell>
+    <a class="settings-topbar settings-back" href="{{ url_for('index') }}">{{ back_icon() }}Back to app</a>
+    <header class="settings-topbar settings-header">
+      <p class="settings-title">{{ settings_icon() }}Settings</p>
+      <button class="nav-toggle" type="button" aria-label="Settings menu" aria-expanded="false" aria-controls="settings-navigation" data-nav-toggle>
+        <span aria-hidden="true">☰</span><span>Menu</span>
+      </button>
+    </header>
+    <aside class="settings-sidebar" data-navigation>
+      <nav id="settings-navigation" class="primary-navigation" aria-label="Settings navigation">
+        <p class="nav-label">Access management</p>
+        <a class="nav-item{{ ' is-active' if active_navigation == 'users' else '' }}" href="{{ url_for('user_list') }}"{% if active_navigation == 'users' %} aria-current="page"{% endif %}>{{ user_icon() }}Users</a>
+        <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>{{ team_icon() }}Teams</a>
+      </nav>
+    </aside>
+    <main id="content" class="app-main settings-content" tabindex="-1">
+      {% include "components/flash_messages.html" %}
+      <header class="page-header management-list-header">
+        <h1 class="page-title">{{ settings_title }}</h1>
+        <div class="page-actions">{% block settings_actions %}{% endblock %}</div>
+      </header>
+      {% block settings_content %}{% endblock %}
+    </main>
+  </div>
+{% endblock %}

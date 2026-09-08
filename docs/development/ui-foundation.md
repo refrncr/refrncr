@@ -167,6 +167,13 @@ mobile-specific redesign is implied. Pages remain free of horizontal overflow; w
 retain readable minimum dimensions and scroll horizontally inside their `table-scroll` container.
 Collapsible navigation below 1024 px belongs to REF-128 and is not part of this foundation.
 
+At desktop/tablet widths (768 px and above), the shared app shell is bounded by the viewport
+height. Main content scrolls independently so long dataset tables cannot push the account
+details, Settings and Log out below the screen. Sidebar navigation can scroll separately
+when necessary, while the account area does not shrink. The same viewport layout serves
+the dedicated Settings shell. Smaller screens retain the existing compact menu and page scroll.
+Navigation focus outlines sit inside each item so scrolling containers cannot clip them.
+
 Navigation visibility improves clarity but is never authorization. Every route and mutation
 must continue to enforce server-side permissions and CSRF independently.
 
@@ -176,7 +183,7 @@ must continue to enforce server-side permissions and CSRF independently.
 
 1. primitive and semantic tokens;
 2. element defaults and accessibility utilities;
-3. the app-shell, page and authentication layouts;
+3. the app-shell, page, Settings and authentication layouts;
 4. buttons, forms, feedback, cards/badges/empty states, tables/pagination and dialogs.
 
 Imports are relative to the entrypoint and all nested files are package data, so the same URLs
@@ -284,3 +291,61 @@ panels. Dataset Save fills the single-column footer; field Save and Delete share
 footer. These edit panels have no Cancel action; the header close button and Escape close them.
 Footer submit buttons use native `form` attributes to preserve their original form and CSRF
 association, including on full-page fallbacks. Creation panels retain their Cancel action.
+
+## Community Settings (REF-132)
+
+`layouts/settings.html` overrides the base layout to provide a dedicated Settings workspace
+for Users, Teams and the standalone membership page. It reuses the app-shell grid and sidebar
+width, shared sidebar styling, vertical navigation, management headers and existing page
+content. The normal application sidebar and account controls are not rendered in Settings.
+
+The desktop top row contains Back to app on the left and a Settings icon/title on the right,
+with matching surface and bottom borders. Back to app opens Overview. The sidebar below it
+contains only Access management, Users and Teams. Active navigation uses the existing green
+surface, foreground and `aria-current="page"`. Main content fills the remaining width, with
+one Users or Teams heading and no redundant breadcrumb or horizontal Settings tabs.
+
+Below 768 px, the shared compact menu controller toggles the Settings sidebar through its
+existing `data-nav-toggle` and `data-navigation` hooks. The button is named Settings menu,
+controls `settings-navigation` and exposes `aria-expanded`. Back to app remains available
+above the Settings header. Navigation stays vertical when expanded. No routing or new
+JavaScript controller is introduced.
+
+`components/flash_messages.html` supplies the same live region to both shells.
+`components/icons.html` shares the existing Settings cogwheel between the account link and
+Settings header and provides small decorative line icons for Back to app, Users and Teams.
+The existing Users/Teams tables, actions, membership controls and shared side panels remain
+the page content; routes, form actions, CSRF, sessions, authorization and persistence do not
+change. The Settings account link opens `/users`; `/teams` and membership URLs remain intact.
+Visibility uses the session-resolved actor's existing `role == 'admin'` condition, independently
+of route-level `require_admin()` and service authorization.
+
+The normal app account area retains the refined Settings and Log out links. They share Inter,
+regular weight and `--font-size-sm` with the role label, `1em` icons, a 6 px
+`--account-link-icon-gap`, and no button surface or underline. `--color-account-link` supplies
+the muted blue-grey foreground. Links have no extra vertical padding, with 3 px above Settings
+to distinguish account details from actions. Log out remains a CSRF-protected POST button.
+
+`test_interfaces.py` covers the dedicated shell, absence of normal navigation, navigation
+contents and active state, page titles, compact menu semantics, account-link visibility,
+direct access restrictions and existing management regressions. `test_dataset_browser.py`
+covers the stylesheet import contract. Before merge, verify both pages at desktop and compact
+widths, including the menu, keyboard focus, Back to app and existing side-panel flows.
+
+The shared `.management-table` scroll container establishes a positioning context so its
+absolutely positioned, visually hidden Actions heading stays within that container at narrow
+widths. This containment fix also applies to the dataset overview using the same variant;
+its content and behavior remain unchanged.
+
+The Users table has a `user-management-table` variant below 768 px. Each body row is a
+compact two-column grid: the strong Name sits above Email address in a flexible details
+area, while the named View button occupies an intrinsic-width action column, centered
+across both lines. Role and Status are hidden. Values wrap normally, with `overflow-wrap:
+anywhere` as a fallback for unbroken content that cannot fit. Row borders separate records.
+The desktop header is visually hidden, preserving its column headers, explicit cell/header
+associations and accessible caption. Explicit table roles retain semantics when CSS changes
+the display layout. Desktop and Teams table presentation remain unchanged.
+
+The shared mobile side-panel header reserves a fixed close-button column at the top right
+and lets the title wrap in the remaining space. Compact header padding uses the existing
+spacing token. Full-width fields, scrollable body, footer and focus behavior are unchanged.
