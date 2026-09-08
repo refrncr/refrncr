@@ -1,32 +1,78 @@
 {% extends "base.html" %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components.html" import content_metadata %}
+{% from "components/icons.html" import file_pen_icon %}
+{% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
 {% block content %}
-  {% call page_context(dataset.name, content_metadata(dataset.record_count, dataset.last_updated)) %}
-    {% include "pages/datasets/_breadcrumbs.html" %}
-  {% endcall %}
-  <p><code>{{ dataset.key }}</code></p>
-  <p>{{ dataset.description }}</p>
-  <p>Initial owner: {{ dataset.owner_display_name }} (<code>{{ dataset.owner_user_id }}</code>)</p>
-  <p><a href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View records</a></p>
-  {% if editable %}<a data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset", key=dataset.key) }}'>Edit dataset</a>{% endif %}
-  <section><h2>Fields</h2>
-    <p>Record identifier: {% if business_key.field_keys %}{% for field_key in business_key.field_keys %}{% if not loop.first %} + {% endif %}<code>{{ field_key }}</code>{% endfor %}{% else %}Not configured{% endif %}</p>
-    {% if schema_admin %}<a data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a>{% endif %}
-    {% if fields %}<div class='table-scroll'><table><caption>Dataset fields</caption><thead><tr><th scope='col'>Key</th><th scope='col'>Name</th><th scope='col'>Type</th><th scope='col'>Required</th><th scope='col'>Unique</th>{% if schema_admin %}<th scope='col'>Actions</th>{% endif %}</tr></thead><tbody>{% for field in fields %}<tr>
-      <td><code>{{ field.key }}</code></td><td>{{ field.name }}{% if field.key in business_key.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'>{% endif %}</td>
-      <td>{{ field.data_type }}</td><td>{{ 'Yes' if field.is_required else 'No' }}</td><td>{{ 'Yes' if field.is_unique else 'No' }}</td>
-      {% if schema_admin %}<td><a data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>Edit field</a>
-        <form method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
-          <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-          {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
-          <input type='hidden' name='field_id' value='{{ field.id }}'>
-          <button class='button button-secondary' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}>Move up</button>
-          <button class='button button-secondary' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}>Move down</button>
-        </form></td>{% endif %}
-    </tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset.</p></div>{% endif %}
-  </section>
+  <div class='page-header'>
+    {% call page_context(dataset.name, content_metadata(dataset.record_count, dataset.last_updated)) %}
+      {% include "pages/datasets/_breadcrumbs.html" %}
+    {% endcall %}
+    <div class='page-actions record-page-actions'>
+      <a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View records</a>
+      {% if editable %}<a class='button button-secondary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset", key=dataset.key) }}'>Edit dataset</a>{% endif %}
+    </div>
+  </div>
+  <div class='configuration-overview'>
+    <section aria-labelledby='dataset-details-heading'>
+      <h2 id='dataset-details-heading'>Dataset details</h2>
+      <dl class='detail-list'>
+        <div><dt>Name</dt><dd>{{ dataset.name }}</dd></div>
+        <div><dt>Description</dt><dd>{{ dataset.description or 'No description provided' }}</dd></div>
+        <div><dt>Owning team</dt><dd>No owning team</dd></div>
+        <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
+      </dl>
+    </section>
+    {% if fields and not business_key.field_keys %}
+      {{ feedback("No record identifier configured. Choose one or more fields to uniquely identify each record.", kind="warning") }}
+    {% endif %}
+    <section aria-labelledby='fields-heading'>
+      <div class='page-header section-header'>
+        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p></div>
+        {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}
+      </div>
+      {% if fields %}
+        <div class='table-scroll configuration-table' role='region' aria-label='Dataset fields' tabindex='0'>
+          <table>
+            <caption class='visually-hidden'>Dataset fields</caption>
+            <thead><tr><th scope='col' class='identifier-column'><span class='visually-hidden'>Identifier</span></th><th scope='col'>Field</th><th scope='col'><span class='visually-hidden'>Key</span></th><th scope='col'>Type</th><th scope='col'>Constraints</th><th scope='col'>Actions</th></tr></thead>
+            <tbody>{% for field in fields %}
+              <tr>
+                <td class='identifier-column'>{% if field.key in business_key.field_keys %}<img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}</td>
+                <td><span class='field-name'>{{ field.name }}</span></td>
+                <td><code class='field-key'>{{ field.key }}</code></td>
+                <td>{{ field.data_type }}</td>
+                <td>
+                  <div class='constraint-list'>
+                    {% if field.is_required %}<span class='badge'>Required</span>{% endif %}
+                    {% if field.is_unique %}<span class='badge'>Unique</span>{% endif %}
+                    {% if field.key in business_key.field_keys %}<span class='badge'>Identifier</span>{% endif %}
+                    {% if not field.is_required and not field.is_unique and field.key not in business_key.field_keys %}None{% endif %}
+                  </div>
+                </td>
+                <td>
+                  {% if schema_admin %}
+                    <div class='field-actions'>
+                      <a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>
+                      <form method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
+                        <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+                        {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
+                        <input type='hidden' name='field_id' value='{{ field.id }}'>
+                        <button class='button button-secondary' aria-label='Move up {{ field.name }}' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}><span aria-hidden='true'>↑</span></button>
+                        <button class='button button-secondary' aria-label='Move down {{ field.name }}' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}><span aria-hidden='true'>↓</span></button>
+                      </form>
+                    </div>
+                  {% else %}<span class='section-description'>Read only</span>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}</tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset. Fields describe the values each record can contain.</p></div>
+      {% endif %}
+    </section>
+  </div>
   {% if editable or schema_admin %}{{ form_side_panel() }}{% endif %}
 {% endblock %}

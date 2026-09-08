@@ -17,6 +17,6 @@ their upstream projects.
 ## Icons
 
 The five `lucide-*.svg` files are the Download, Key Round, Plus, Settings 2 and Upload icons
-from the official Lucide release `0.468.0`. They are the only Lucide icons currently consumed
-by templates. The Key Round colour is adapted to the REFRNCR palette. See
+from the official Lucide release `0.468.0`. The File Pen icon from the same release is rendered inline by
+the shared `file_pen_icon` macro in `templates/components/icons.html`. The Key Round colour is adapted to the REFRNCR palette. See
 `LICENSE-Lucide.txt` for the upstream ISC/MIT notices.

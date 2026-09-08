@@ -400,3 +400,55 @@ proposal/dataset order. Used fields remain selectable; duplicate validation stay
 field badges. Server errors retain their select associations. Truncated examples offer a native,
 keyboard-accessible disclosure of the same first three non-empty, non-formula sample values;
 full values are escaped and wrap within the row. No mapping or import rules change.
+
+## Configure dataset overview (REF-142)
+
+The overview composes the shared dataset context, header action layout and configuration
+side-panel host with two labelled sections: Dataset details and Fields. The product owner's
+visual refinements replace the original separate Record identifier section with shared warning
+feedback, shown only when fields exist and no identifier is configured. The warning adds no
+mutation controls. Empty datasets and configured identifiers produce no warning.
+
+Owning team deliberately reads **No owning team**, matching the shared breadcrumb. The current
+model has an initial owning user but no dataset-to-team ownership relation; the product owner
+approved this placeholder. A future ownership story must supply an authorized team display name.
+Do not substitute a user name or expose internal UUIDs. Ordering forms retain UUIDs only in the
+functional hidden inputs required by the existing endpoint.
+
+The table has Identifier, Field, Key, Type, Constraints and Actions columns in canonical field
+display order. Identifier and Key headings are visually hidden but available to assistive
+technology. The compact identifier column shows the existing decorative key SVG beside hidden
+text naming its field. Constraints shows Required, Unique and Identifier badges, or None when
+no constraint applies. Keys are muted monospace values in their own column.
+
+Actions and their heading are right-aligned. Edit field uses the shared `file_pen_icon` macro
+without a button border or background, retaining the existing authorized route, accessible
+field name, keyboard focus and minimum click area. Up/down controls preserve their existing
+forms, permissions and programmatic boundary-disabled states. The Fields header retains one
+Add field trigger in both populated and empty states.
+
+`layouts/configuration.css` supplies the overview and field-table variant. No tokens, service
+contracts, domain rules, persistence operations or dependencies were added. The explicitly
+requested extra 10 px above Dataset details is a deliberate page-specific spacing exception.
+Dataset key padding is removed to align it with other detail values. Other values reuse existing
+semantic tokens. The table uses its own keyboard-focusable horizontal scroll region; metadata
+remains untruncated, wraps within its region and uses ordinary Jinja escaping.
+
+`test_configure_overview.py` covers viewer/editor/admin presentation, zero/single/multiple fields,
+conditional identifier warnings, canonical ordering after reorder, separate key cells, constraints,
+icon-only editing, boundary controls, internal-ID exclusion and malicious input escaping.
+Existing dataset browser and side-panel controller tests retain authorization, CSRF, not-found
+and panel lifecycle regression coverage.
+
+Final local verification used Chrome at 1440, 768 and 320 px with populated, empty and long/malicious
+metadata fixtures. Six semantic columns, hidden Key heading, 48 px identifier column, separate
+name/key cells, right-aligned actions and borderless file-pen presentation were verified. No
+page overflow occurred; wide tables scrolled internally. Keyboard order, visible focus, reachable
+actions and read-only viewer presentation were checked. All three panel entry points opened with
+initial field focus and restored their invoking control after Escape or Close. Successful dataset
+submission returned to the updated overview. The browser test waits for the native close event
+before opening another panel; Chrome may include browser chrome in native modal Tab cycling.
+
+CI's PostgreSQL 16 gate remains pending until the change is pushed after visual review. Local
+integration tests use PostgreSQL 15. No actual dark theme or assistive-technology session was
+verified; the implementation retains semantic tokens and accessible markup.
