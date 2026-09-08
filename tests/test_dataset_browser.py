@@ -286,6 +286,7 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
         '@import url("utilities.css");',
         '@import url("layouts/app-shell.css");',
         '@import url("layouts/page.css");',
+        '@import url("layouts/settings.css");',
         '@import url("layouts/auth.css");',
         '@import url("components/buttons.css");',
         '@import url("components/forms.css");',

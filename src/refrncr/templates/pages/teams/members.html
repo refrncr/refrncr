@@ -1,7 +1,8 @@
-{% extends "base.html" %}
+{% extends "layouts/settings.html" %}
+{% set settings_title = "Teams" %}
 {% from "pages/teams/_membership_controls.html" import membership_controls %}
 
-{% block content %}
-  <h1>Team members</h1>
+{% block settings_content %}
+  <h2>Team members</h2>
   {{ membership_controls(team_id, members, eligible_users, current_csrf, true) }}
 {% endblock %}

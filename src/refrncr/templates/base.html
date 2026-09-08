@@ -1,3 +1,4 @@
+{% from "components/icons.html" import settings_icon -%}
 <!doctype html>
 <html lang="en">
   <head>
@@ -30,27 +31,22 @@
             {% if dataset_ui_enabled %}
               <a class="nav-item{{ ' is-active' if active_navigation == 'datasets' else '' }}" href="{{ url_for('dataset_list') }}"{% if active_navigation == 'datasets' %} aria-current="page"{% endif %}>Datasets</a>
             {% endif %}
-            {% if current_actor.role == 'admin' %}
-              <a class="nav-item{{ ' is-active' if active_navigation == 'users' else '' }}" href="{{ url_for('user_list') }}"{% if active_navigation == 'users' %} aria-current="page"{% endif %}>Users</a>
-              <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>Teams</a>
-            {% endif %}
           </nav>
           <div class="account-context">
             <p class="account-name">{{ current_actor.display_name }}</p>
             <p class="account-role">{{ 'Administrator' if current_actor.role == 'admin' else 'User' }}</p>
+            {% if current_actor.role == 'admin' %}
+              <a class="account-link" href="{{ url_for('user_list') }}"{% if active_navigation in ('users', 'teams') %} aria-current="page"{% endif %}>{{ settings_icon() }}Settings</a>
+            {% endif %}
             <form method="post" action="{{ url_for('logout') }}">
               <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
-              <button class="button button-link" type="submit">Sign out</button>
+              <button class="account-link" type="submit"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>Log out</button>
             </form>
           </div>
         </aside>
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
-        <div class="flash-region" aria-live="polite" aria-atomic="true">
-          {% for category, message in get_flashed_messages(with_categories=true) %}
-            <div class="alert alert-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
-          {% endfor %}
-        </div>
+        {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>
     </div>

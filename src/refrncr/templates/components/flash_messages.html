@@ -1,0 +1,5 @@
+<div class="flash-region" aria-live="polite" aria-atomic="true">
+  {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ category }}" role="{{ 'alert' if category == 'error' else 'status' }}">{{ message }}</div>
+  {% endfor %}
+</div>

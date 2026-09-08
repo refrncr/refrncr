@@ -664,10 +664,10 @@ def test_user_list_uses_management_layout_and_add_user_panel(interface):
 
     body = response_text(request(client, "get", "/users"))
 
-    assert "My Users" in body
+    assert '<h1 class="page-title">Users</h1>' in body
     assert "data-list-search" in body
     assert "<caption class='visually-hidden'>Users</caption>" in body
-    assert "<th scope='col'>Email address</th>" in body
+    assert "class='table-cell-wrap' scope='col'>Email address</th>" in body
     assert "<tr class='record-row' tabindex=" not in body
     assert "<tr class='record-row' role=" not in body
     assert "aria-label='User filters'" not in body
@@ -682,6 +682,175 @@ def test_user_list_uses_management_layout_and_add_user_panel(interface):
     assert "action='/users'" in body
     assert "name='role'" in body
     assert "data-modal-side-panel" in body
+
+
+def test_users_mobile_table_preserves_identity_and_view_action(interface):
+    _, users, authentication, _, _, _, client = interface
+    setup_admin(client)
+    login(client)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    managed = users.create_user(
+        admin.id,
+        "long-unbroken-address-for-mobile-testing@example.com",
+        "LongUnbrokenDisplayNameForMobileTesting",
+        "valid password",
+    )
+    body = response_text(request(client, "get", "/users"))
+    table = re.search(
+        r"<table class='user-management-table' role='table'>(.*?)</table>", body, re.S
+    ).group(1)
+    headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", table, re.S)
+    assert len(headers) == 5
+    expected_classes = [
+        "table-cell-wrap",
+        "table-cell-wrap",
+        "table-column-secondary",
+        "table-column-secondary",
+        "table-column-action",
+    ]
+    assert [re.search(r"class='([^']+)'", attrs).group(1) for attrs, _ in headers] == (
+        expected_classes
+    )
+    assert [text for _, text in headers[:4]] == ["Name", "Email address", "Role", "Status"]
+    header_ids = [re.search(r"id='([^']+)'", attrs).group(1) for attrs, _ in headers]
+    assert all("role='columnheader'" in attrs and "scope='col'" in attrs for attrs, _ in headers)
+    assert "<caption class='visually-hidden'>Users</caption>" in table
+    assert "<thead role='rowgroup'><tr role='row'>" in table
+    rows = re.findall(r"<tbody role='rowgroup'>(.*?)</tbody>", table, re.S)[0]
+    assert rows.count("role='row'") == rows.count("<tr ")
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", rows, re.S):
+        cells = re.findall(r"<td([^>]*)>(.*?)</td>", row, re.S)
+        assert [re.search(r"class='([^']+)'", attrs).group(1) for attrs, _ in cells] == (
+            expected_classes
+        )
+        assert [re.search(r"headers='([^']+)'", attrs).group(1) for attrs, _ in cells] == header_ids
+        assert all("role='cell'" in attrs for attrs, _ in cells)
+        assert f"<strong>{managed.display_name}</strong>" in rows
+        assert managed.email in rows
+        action = cells[-1][1]
+        assert "type='button'" in action
+        assert "data-dialog-open='user-panel-" in action
+        assert "aria-label='View user " in action
+        assert ">View</button>" in action
+        assert "disabled" not in action
+    assert f"aria-label='View user {managed.display_name} ({managed.id})'" in table
+
+    css = response_text(request(client, "get", "/static/css/components/tables.css"))
+    breakpoint = "@media (max-width: 767px)"
+    desktop, mobile = css.split(breakpoint)
+    assert "user-management-table" not in desktop
+    rules = {
+        selector.strip(): declarations
+        for selector, declarations in re.findall(r"([^{}]+)\{([^{}]*)\}", mobile)
+    }
+    hidden = [selector for selector, rule in rules.items() if "display: none" in rule]
+    assert hidden == [".user-management-table .table-column-secondary"]
+    row_rule = rules[".user-management-table tbody tr"]
+    assert "display: grid;" in row_rule
+    assert "grid-template-columns: minmax(0, 1fr) max-content;" in row_rule
+    assert "border-bottom: 1px solid var(--color-border-subtle);" in row_rule
+    assert "grid-column: 1;" in rules[".user-management-table .table-cell-wrap"]
+    header_rule = rules[".user-management-table thead"]
+    assert "position: absolute;" in header_rule
+    assert "clip: rect(0 0 0 0);" in header_rule
+    assert "display: none" not in header_rule
+    action_rule = rules[".user-management-table td.table-column-action"]
+    assert "display: block;" in action_rule
+    assert "grid-column: 2;" in action_rule
+    assert "grid-row: 1 / 3;" in action_rule
+    assert "align-self: center;" in action_rule
+    assert "white-space: nowrap;" in action_rule
+    assert "overflow-wrap: anywhere;" in rules[".user-management-table .table-cell-wrap"]
+
+    panel_css = response_text(request(client, "get", "/static/css/components/dialog.css"))
+    mobile_panel = panel_css.split(breakpoint)[1].split("/* Shared")[0]
+    assert "grid-template-columns: minmax(0, 1fr) var(--control-height);" in mobile_panel
+    assert "width: var(--control-height); justify-self: end; align-self: start;" in mobile_panel
+
+
+@pytest.mark.parametrize(
+    ("path", "title"), [("/users", "Users"), ("/teams", "Teams"), ("members", "Teams")]
+)
+def test_settings_layout_navigation_and_context(interface, path, title):
+    _, _, authentication, _, teams, _, client = interface
+    setup_admin(client)
+    login(client)
+    if path == "members":
+        admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+        team = teams.create_team(admin.id, "Settings team")
+        path = f"/teams/{team.id}/members"
+    response = request(client, "get", path)
+    assert response.status_code == 200
+    body = response_text(response)
+    assert 'class="app-shell settings-shell" data-responsive-shell' in body
+    assert 'class="settings-sidebar" data-navigation' in body
+    assert 'class="settings-topbar settings-header"' in body
+    assert 'class="settings-title"' in body
+    assert 'class="app-sidebar"' not in body
+    assert 'id="primary-navigation"' not in body
+    assert 'class="account-context"' not in body
+    assert ">Overview</a>" not in body
+    assert ">Datasets</a>" not in body
+    secondary = re.search(r'<nav id="settings-navigation".*?</nav>', body, re.S).group()
+    assert 'aria-label="Settings navigation"' in secondary
+    assert 'class="primary-navigation"' in secondary
+    assert "Access management" in secondary
+    assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
+    assert secondary.count("<a ") == 2
+    assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
+    assert secondary.count('aria-current="page"') == 1
+    assert secondary.count('aria-hidden="true"') == 2
+    assert re.search(
+        r'<a class="settings-topbar settings-back" href="/">.*?</svg>Back to app</a>',
+        body,
+        re.S,
+    )
+    assert f"<title>{title}</title>" in body
+    assert f'<h1 class="page-title">{title}</h1>' in body
+    assert body.count("<h1") == 1
+    assert 'class="breadcrumbs"' not in body
+    assert 'aria-expanded="false" aria-controls="settings-navigation" data-nav-toggle' in body
+    assert 'aria-label="Settings menu"' in body
+    assert '<main id="content" class="app-main settings-content" tabindex="-1">' in body
+    assert body.count('class="flash-region"') == 1
+    shell_styles = response_text(request(client, "get", "/static/css/layouts/app-shell.css"))
+    assert re.search(r"\.primary-navigation\s*{[^}]*flex-direction: column;", shell_styles)
+    for label in (
+        "Personal",
+        "Appearance",
+        "Tasks",
+        "Cases",
+        "Theme",
+        "Developer",
+        "Billing",
+        "Notifications",
+        "Language",
+    ):
+        assert label not in secondary
+
+
+def test_settings_visibility_and_direct_access_follow_authenticated_role(interface):
+    _, users, authentication, _, _, _, client = interface
+    setup_admin(client)
+    login(client)
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    regular = users.create_user(admin.id, "regular@example.com", "Regular", "valid password")
+    body = response_text(request(client, "get", "/"))
+    assert ">Settings</a>" in body
+    assert "settings-shell" not in body
+    assert 'id="primary-navigation"' in body
+    account = re.search(r'<div class="account-context">.*?</div>', body, re.S).group()
+    assert account.index('class="account-name"') < account.index('class="account-role"')
+    assert account.index('class="account-role"') < account.index(">Settings</a>")
+    assert account.index(">Settings</a>") < account.index(">Log out</button>")
+    login(client, regular.email, "valid password")
+    body = response_text(request(client, "get", "/"))
+    assert ">Settings</a>" not in body
+    assert ">Users</a>" not in body
+    assert ">Teams</a>" not in body
+    for path in ("/users", "/teams", "/teams/missing/members"):
+        assert request(client, "get", path).status_code == 403
+        assert request(client, "post", path, data={}).status_code == 403
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):
@@ -779,7 +948,7 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
 
     body = response_text(request(client, "get", "/teams"))
     assert "Platform" in body
-    assert "My Teams" in body
+    assert '<h1 class="page-title">Teams</h1>' in body
     assert "data-list-search" in body
     assert "<caption class='visually-hidden'>Teams</caption>" in body
     assert "<tr class='record-row' tabindex=" not in body
