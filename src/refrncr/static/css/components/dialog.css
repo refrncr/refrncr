@@ -37,3 +37,13 @@
 .side-panel-body code { overflow-wrap: anywhere; }
 
 main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[data-side-panel-content] { padding: 0; }
+
+.dialog-large { width: min(calc(100% - 2rem), 72rem); height: min(85dvh, 56rem); max-height: calc(100dvh - 2rem); }
+.dialog-large-layout { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.dialog-large-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-lg); border-bottom: 1px solid var(--color-border); }
+.dialog-large-header h2 { margin: 0; }
+.dialog-large-body { overflow: auto; min-height: 0; padding: var(--space-lg); overflow-wrap: anywhere; }
+.dialog-large-body code { white-space: pre-wrap; }
+@media (max-width: 767px) { .dialog-large { width: calc(100% - 1rem); height: calc(100dvh - 1rem); max-height: none; } .dialog-large-header, .dialog-large-body { padding: var(--space-md); } }
+.dialog-large { max-width: none; }
+.dialog-large-header .button { flex-shrink: 0; white-space: nowrap; }

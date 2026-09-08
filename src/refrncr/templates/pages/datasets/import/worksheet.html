@@ -1,5 +1,4 @@
-{% extends "base.html" %}
-{% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Select worksheet</h1><p>File: {{ state.filename }}</p>
-  <form class='form' method='post' action='{{ url_for("select_import_worksheet", key=dataset.key, token=state.token) }}'><label>Visible worksheet <select name='worksheet'>{% for sheet in parsed.worksheets %}<option value='{{ sheet }}'>{{ sheet }}</option>{% endfor %}</select></label><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>Continue</button></form>
-{% endblock %}
+<p>File: <strong>{{ state.filename }}</strong></p><p>This workbook contains multiple visible worksheets. Select the one to import.</p>
+<form id='import-step-form' class='form' method='post' action='{{ url_for("select_import_worksheet", key=dataset.key, token=state.token) }}' novalidate>
+<label for='import-worksheet'>Worksheet</label><select id='import-worksheet' name='worksheet'{% if error %} aria-invalid='true' aria-describedby='import-error'{% endif %}><option value=''>Choose a worksheet</option>{% for sheet in source.worksheets %}<option value='{{ sheet }}'{% if state.worksheet == sheet %} selected{% endif %}>{{ sheet }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+</form>

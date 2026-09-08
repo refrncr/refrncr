@@ -349,3 +349,54 @@ the display layout. Desktop and Teams table presentation remain unchanged.
 The shared mobile side-panel header reserves a fixed close-button column at the top right
 and lets the title wrap in the remaining space. Compact header padding uses the existing
 spacing token. Full-width fields, scrollable body, footer and focus behavior are unchanged.
+
+## Record import wizard (REF-134)
+
+The import workflow keeps the dataset shell and breadcrumb context. Its shared wizard template
+composes five step includes, an ordered progress indicator, and one navigation footer. Desktop
+content scrolls within the available workspace, keeping the footer at the same height on every
+step. On narrow viewports the page scrolls and the footer remains sticky.
+`layouts/import.css` contains deliberate workflow-specific layout rules; existing color, spacing,
+typography, radius, button, field and table tokens are reused without adding tokens. Completed,
+current and future steps have text labels as well as color. Automatic worksheet completion stays
+visible and noninteractive. The progress list becomes vertical on narrow viewports; tables scroll
+inside their named keyboard-focusable region.
+
+`.dialog-large` is a shared dialog size/layout variant with a fixed heading/Close area and a
+separately scrollable report body, nearly full-screen below 768 px. The report consumes the existing
+open/close controller, native modality and Escape handling, adds explicit Tab/Shift+Tab wrapping,
+and restores the exact opener on close. Validation summaries reuse `feedback` and `data-error-focus`.
+Mapping errors are associated with their relevant select; the completeness summary identifies
+missing required and identifier fields. Client-side completeness and duplicate-submit guards are
+progressive enhancements; the server independently checks all transitions and confirmation.
+No wizard animation is introduced, and existing reduced-motion tokens remain effective.
+
+For visual review, check all five steps, success and invalid-preview/report states at desktop and
+narrow widths. Check long values, mapping examples, preview table scrolling, sticky action placement,
+Tab/Shift+Tab containment, Escape/Close focus restoration, and reduced-motion mode. The native file
+control remains keyboard accessible and supports dropping files onto the control itself.
+
+The mapping instruction, file/worksheet metadata, live completeness summary, missing-field badges
+and continuation hint are inside the accessible `i` disclosure beside the Map columns heading.
+The mapping list follows the heading directly. The information panel uses the existing tooltip
+controller and supports keyboard focus/scrolling within its content; Escape returns focus to the `i`.
+Summary counts and missing fields keep updating while the panel is closed. The mapping page uses a page-specific compact list: source name/examples, a decorative arrow,
+and the target control. Rows use the existing 3rem record-row minimum, 14px text, 12px examples, compact 36px
+controls and reduced padding, and grow with their content. Below 768px source and target stack;
+controls retain 44px touch targets and 16px text. These density rules are scoped to the mapping
+list and do not change global fields, badges or tokens. Desktop target cells reserve an 8rem
+status column so dropdown widths stay equal across all rows and all status badges align at the
+right edge. On mobile the full-width dropdown sits above its right-aligned badge. Existing controls, badges and tokens are reused without global
+component changes. Selected mapping status is independent of automatic suggestion confidence;
+confidence always names its suggested field. Proposal reasons and confidence are behind the existing mapping status badge (Mapped, Needs a
+choice, Do not import, or Mapping error), without an additional badge: native `details` provides a no-JavaScript
+fallback, enhanced to a viewport-contained tooltip on hover, focus or touch/click. Escape, blur
+and outside clicks dismiss it. The tooltip names the suggested target independently of the selected
+mapping. Warnings appear once inside that same tooltip. Ambiguous suggestions use the dropdown
+placeholder `Multiple matches — choose one`, with no separate hint below the dropdown. Dropdown options retain their values and short field names. Fields used by another row appear
+in a muted `Already mapped` group at the bottom, while the current selection stays in its normal
+group. JavaScript updates these groups immediately and restores freed fields in their original
+proposal/dataset order. Used fields remain selectable; duplicate validation stays unchanged. The live completeness summary includes identifier fields and updates missing
+field badges. Server errors retain their select associations. Truncated examples offer a native,
+keyboard-accessible disclosure of the same first three non-empty, non-formula sample values;
+full values are escaped and wrap within the row. No mapping or import rules change.

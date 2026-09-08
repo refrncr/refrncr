@@ -1,0 +1,10 @@
+<dialog data-modal-report class='dialog dialog-large' id='import-error-report' aria-labelledby='import-report-title' aria-describedby='import-report-description'>
+  <div class='dialog-large-layout'>
+    <header class='dialog-large-header'><h2 id='import-report-title'>Import error report</h2><button class='button button-secondary' type='button' data-dialog-close autofocus>Close</button></header>
+    <div class='dialog-large-body' tabindex='0'>
+      <p id='import-report-description'>{{ preview.invalid_rows }} source rows failed validation. No records have been imported.</p>
+      {% for row in report_rows %}<section><h3>Failing data row {{ loop.index }} — source file row {{ row.number }}</h3><p>Identifier: {{ row.identifier or '—' }}</p><ul>{% for item in row.errors %}<li>{% if item.field %}<strong>{{ item.field }}</strong>: {% endif %}{% if item.value is not none %}<code>{{ item.value or '—' }}</code> — {% endif %}{{ item.message }}</li>{% endfor %}</ul></section>{% endfor %}
+      {% if preview.row_report_truncated %}<p>Showing 100 of {{ preview.invalid_rows }} failing data rows. Row numbers above refer to the source file; row 1 is the header. Later failing rows are not shown.</p>{% endif %}
+    </div>
+  </div>
+</dialog>

@@ -288,6 +288,7 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
         '@import url("layouts/page.css");',
         '@import url("layouts/settings.css");',
         '@import url("layouts/auth.css");',
+        '@import url("layouts/import.css");',
         '@import url("components/buttons.css");',
         '@import url("components/forms.css");',
         '@import url("components/feedback.css");',
@@ -617,7 +618,13 @@ def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser
     assert "opener?.isConnected" in script
     assert 'document.getElementById("content")?.focus();' in script
     assert 'dialog.addEventListener("close"' in script
-    assert 'dialog.addEventListener("keydown"' not in script
+    # Explicit Tab wrapping belongs only to the new error-report variant; side panels
+    # retain their native keyboard behavior.
+    report_controller = script.split('document.querySelectorAll("dialog[data-modal-report]")')[
+        1
+    ].split('document.querySelectorAll("[data-dialog-open]")')[0]
+    assert script.count('dialog.addEventListener("keydown"') == 1
+    assert 'dialog.addEventListener("keydown"' in report_controller
     assert "innerHTML" not in script
 
 

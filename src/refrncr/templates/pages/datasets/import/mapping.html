@@ -1,11 +1,41 @@
-{% extends "base.html" %}
-{% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Map import columns</h1>
-  {% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}
-  <p>File: {{ state.filename }}</p>{% if parsed.worksheet %}<p>Worksheet: {{ parsed.worksheet }}</p>{% endif %}{% if parsed.delimiter %}<p>Detected delimiter: {{ parsed.delimiter }}</p>{% endif %}
-  <section aria-label='Mapping completeness'><p>{{ assistance.completeness.required_mapped }} of {{ assistance.completeness.required_total }} required fields mapped.</p>{% if assistance.completeness.missing_required %}<p role='alert'>Missing required fields: {{ assistance.completeness.missing_required|join(', ') }}</p>{% endif %}{% if assistance.completeness.missing_identifier %}<p role='alert'>Missing identifier fields: {{ assistance.completeness.missing_identifier|join(', ') }}</p>{% endif %}<p>{{ assistance.completeness.unmapped_columns }} source columns unmapped; {{ assistance.completeness.ignored_columns }} source columns explicitly ignored.</p></section>
-  <form class='form' method='post' action='{{ url_for("preview_record_import", key=dataset.key, token=state.token) }}'>
-    {% for advice in assistance.columns %}<fieldset><legend>{{ advice.header }}</legend>{% if advice.samples %}<p>Examples: {% for sample in advice.samples %}<code>{{ sample }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% else %}<p>No non-empty example values in the profiling sample.</p>{% endif %}{% if advice.candidates %}<p>Suggested: {{ advice.candidates[0].field_name }} — {{ advice.candidates[0].confidence }} confidence. {{ advice.candidates[0].reason }}.</p>{% endif %}{% if not advice.candidates %}<p>No name-based suggestion — choose a field or Ignore.</p>{% endif %}{% if advice.warning %}<p role='alert'>{{ advice.warning }}</p>{% endif %}<label>Mapping <select name='mapping_{{ loop.index0 }}'><option value=''{% if advice.selected == '' %} selected{% endif %}>Choose a field</option>{% if advice.candidates %}<optgroup label='Suggested fields'>{% for candidate in advice.candidates %}<option value='{{ candidate.field_key }}'{% if advice.selected == candidate.field_key %} selected{% endif %}>[{{ candidate.confidence }}] {{ candidate.field_name }} — {{ candidate.reason }}</option>{% endfor %}</optgroup>{% endif %}<optgroup label='All fields'>{% for field in fields %}{% if field.key not in advice.candidate_keys %}<option value='{{ field.key }}'{% if advice.selected == field.key %} selected{% endif %}>{{ field.name }} ({{ field.key }})</option>{% endif %}{% endfor %}</optgroup><option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Ignore</option></select></label></fieldset>{% endfor %}
-    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>Validate and preview</button>
-  </form>
-{% endblock %}
+{% macro mapping_option(key, name, selected, group, order) -%}
+<option value='{{ key }}'{% if selected == key %} selected{% endif %} data-option-label='{{ name }}' data-option-group='{{ group }}' data-option-order='{{ order }}'>{{ name }}</option>
+{%- endmacro %}
+<form id='import-step-form' class='form import-mapping' data-import-mapping data-required-keys='{{ required_keys|tojson }}' method='post' action='{{ url_for("preview_record_import", key=dataset.key, token=state.token) }}' novalidate>
+  <ul class='mapping-list' role='list'>
+  {% for advice in assistance.columns %}{% set index = loop.index0 %}
+    <li class='mapping-row'>
+      <div class='mapping-source'>
+        <strong id='mapping-source-{{ index }}'>{{ advice.header }}</strong>
+        {% if advice.samples %}<p class='mapping-examples' id='mapping-examples-{{ index }}'>Examples: {% for sample in advice.samples %}<code>{{ sample }}</code>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+        {% if mapping_samples[index] != advice.samples %}<details class='mapping-details'><summary>Full example values</summary><ul>{% for sample in mapping_samples[index] %}<li><code>{{ sample }}</code></li>{% endfor %}</ul></details>{% endif %}
+        {% else %}<p class='mapping-examples' id='mapping-examples-{{ index }}'>No non-empty example values.</p>{% endif %}
+      </div>
+      <span class='mapping-arrow' aria-hidden='true'>→</span>
+      <div class='mapping-target'>
+        <label class='visually-hidden' for='mapping-{{ index }}'>Target field for {{ advice.header }}</label>
+        <select id='mapping-{{ index }}' name='mapping_{{ index }}' aria-describedby='mapping-examples-{{ index }} mapping-choice-{{ index }}{% if mapping_errors.get(index) %} mapping-error-{{ index }}{% endif %}'{% if mapping_errors.get(index) %} aria-invalid='true'{% endif %}>
+          <option value=''{% if advice.selected == '' %} selected{% endif %}>{% if advice.warning == 'Multiple possible fields — choose one' %}Multiple matches — choose one{% else %}Choose a field{% endif %}</option>
+          <optgroup label='Suggested fields' data-option-group='suggested'>{% for candidate in advice.candidates %}{% if candidate.field_key == advice.selected or candidate.field_key not in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}</optgroup>
+          <optgroup label='Available fields' data-option-group='available'>{% for field in fields %}{% if field.key not in advice.candidate_keys and (field.key == advice.selected or field.key not in assistance.mapping) %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
+          <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Do not import</option>
+          <optgroup label='Already mapped' data-option-group='used'>{% for candidate in advice.candidates %}{% if candidate.field_key != advice.selected and candidate.field_key in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}{% for field in fields %}{% if field.key not in advice.candidate_keys and field.key != advice.selected and field.key in assistance.mapping %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
+        </select>
+        <details class='mapping-rationale' data-mapping-tooltip>
+          <summary aria-describedby='mapping-rationale-{{ index }}' id='mapping-choice-{{ index }}' data-mapping-choice class='badge mapping-choice {% if mapping_errors.get(index) %}badge-error{% elif advice.selected == "" %}badge-warning{% elif advice.selected is not none %}badge-success{% endif %}'>{% if mapping_errors.get(index) %}Mapping error{% elif advice.selected == '' %}Needs a choice{% elif advice.selected is none %}Do not import{% else %}Mapped{% endif %}</summary>
+          <div id='mapping-rationale-{{ index }}' role='tooltip' class='mapping-tooltip'>
+            {% if advice.candidates %}
+              <strong>Suggestion: {{ advice.candidates[0].field_name }}</strong>
+              <p>{{ advice.candidates[0].confidence }} confidence in this automatic suggestion.</p>
+              {% for candidate in advice.candidates %}{% if candidate.reason != advice.warning %}<p>{{ candidate.field_name }}: {{ candidate.reason }}.</p>{% endif %}{% endfor %}
+            {% else %}<p>No automatic suggestion is available for this source column.</p>{% endif %}
+            {% if advice.warning %}<p class='mapping-warning'>{{ advice.warning }}</p>{% endif %}
+          </div>
+        </details>
+        {% if mapping_errors.get(index) %}<p class='error-text mapping-error' id='mapping-error-{{ index }}'>{{ mapping_errors[index] }}</p>{% endif %}
+      </div>
+    </li>
+  {% endfor %}
+  </ul>
+  <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+</form>

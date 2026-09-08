@@ -22,6 +22,7 @@ from refrncr.services import (
     DatasetFieldService,
     DatasetRecordService,
     NotFoundError,
+    RecordConflictError,
     RecordValidationError,
     ValidationError,
     canonicalize_record_value,
@@ -34,7 +35,7 @@ MAX_ZIP_ENTRIES = 1_000
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 MAX_REPORTED_ROWS = 100
-PREVIEW_ROWS = 20
+PREVIEW_ROWS = 10
 IMPORT_TTL_SECONDS = 15 * 60
 MAX_STAGED_BYTES = 50 * 1024 * 1024
 MAX_WORKSHEET_SOURCE_ROWS = 100_001
@@ -176,6 +177,11 @@ class StagedImport:
     mapping: tuple[str | None, ...] | None
     schema_fingerprint: tuple | None
     expires_at: float
+    step: int = 1
+    mapping_ready: bool = False
+    validation_valid: bool = False
+    busy: bool = False
+    imported_count: int | None = None
 
 
 class TransientImportStore:
@@ -196,11 +202,28 @@ class TransientImportStore:
         self._states: dict[str, StagedImport] = {}
         self._lock = threading.Lock()
 
-    def create(self, actor_id, session_id, dataset_id, filename, content, kind) -> StagedImport:
+    def create(
+        self, actor_id, session_id, dataset_id, filename, content, kind, previous=None
+    ) -> StagedImport:
         with self._lock:
             self._cleanup()
+            if previous is not None:
+                if self._states.get(previous.token) != previous or previous.busy:
+                    raise NotFoundError("Import not found")
+            if previous is None and any(
+                (item.actor_id, item.session_id, item.dataset_id)
+                == (actor_id, session_id, dataset_id)
+                and item.imported_count is None
+                for item in self._states.values()
+            ):
+                raise NotFoundError("Import not found")
             used_bytes = sum(len(item.content) for item in self._states.values())
-            if len(self._states) >= self.capacity or used_bytes + len(content) > self.max_bytes:
+            if previous is not None:
+                used_bytes -= len(previous.content)
+            if (
+                len(self._states) - (previous is not None) >= self.capacity
+                or used_bytes + len(content) > self.max_bytes
+            ):
                 raise ImportValidationError(
                     "Temporary import capacity is unavailable; try again later"
                 )
@@ -220,6 +243,8 @@ class TransientImportStore:
                 None,
                 self.clock() + self.ttl,
             )
+            if previous is not None:
+                self._states.pop(previous.token)
             self._states[token] = state
             return state
 
@@ -237,11 +262,36 @@ class TransientImportStore:
 
     def update(self, state: StagedImport, **changes) -> StagedImport:
         with self._lock:
-            if self._states.get(state.token) != state:
+            self._cleanup()
+            if self._states.get(state.token) != state or state.busy:
                 raise NotFoundError("Import not found")
             updated = replace(state, **changes)
             self._states[state.token] = updated
             return updated
+
+    def active(self, actor_id, session_id, dataset_id):
+        with self._lock:
+            self._cleanup()
+            return next(
+                (
+                    state
+                    for state in reversed(tuple(self._states.values()))
+                    if (state.actor_id, state.session_id, state.dataset_id)
+                    == (actor_id, session_id, dataset_id)
+                    and state.imported_count is None
+                ),
+                None,
+            )
+
+    def claim(self, state):
+        return self.update(state, busy=True)
+
+    def finish(self, claimed, **changes):
+        # A concurrent logout/expiry must never resurrect an import.
+        with self._lock:
+            self._cleanup()
+            if self._states.get(claimed.token) == claimed:
+                self._states[claimed.token] = replace(claimed, busy=False, **changes)
 
     def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
         with self._lock:
@@ -252,6 +302,8 @@ class TransientImportStore:
                 session_id,
                 dataset_id,
             ):
+                raise NotFoundError("Import not found")
+            if state.busy:
                 raise NotFoundError("Import not found")
             self._states.pop(token)
             return state
@@ -396,7 +448,7 @@ def build_mapping_assistance(
                 for candidate in candidates
             )
     if selected_mapping is None:
-        selections: list[str | None] = [""] * len(source.headers)
+        selections: list[str | None] = ["" if candidates else None for candidates in candidate_sets]
         eligible: dict[str, list[tuple[int, int]]] = {}
         for index, candidates in enumerate(candidate_sets):
             if not candidates or candidates[0].confidence != "High":
@@ -640,90 +692,226 @@ class DatasetRecordImportService:
         self.authorization = records.authorization
         self.store = store or TransientImportStore()
 
+    def active(self, actor_id, session_id, dataset_key):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        return self.store.active(actor_id, session_id, dataset.id)
+
+    def state(self, actor_id, session_id, dataset_key, token):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        state = self.store.get(token, actor_id, session_id, dataset.id)
+        if state.busy:
+            raise NotFoundError("Import not found")
+        return state
+
     def begin(self, actor_id, session_id, dataset_key, filename, content):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        previous = self.store.active(actor_id, session_id, dataset.id)
         safe_name = _safe_filename(filename)
         source = parse_source(safe_name, content)
-        state = self.store.create(actor_id, session_id, dataset.id, safe_name, content, source.kind)
-        if source.kind == "xlsx" and len(source.worksheets) == 1:
-            state = self.store.update(state, worksheet=source.worksheets[0])
-            source = parse_source(safe_name, content, state.worksheet)
-        return (
-            state,
-            source,
-            self._assistance(dataset.id, source) if source.headers else None,
+        if source.kind == "xlsx":
+            worksheet = None
+            if previous and previous.kind == "xlsx" and previous.worksheet in source.worksheets:
+                worksheet = previous.worksheet
+            elif len(source.worksheets) == 1:
+                worksheet = source.worksheets[0]
+            if worksheet:
+                source = parse_source(safe_name, content, worksheet)
+        assistance = self._assistance(dataset.id, source) if source.headers else None
+        mapping = assistance.mapping if assistance else None
+        if previous and previous.mapping is not None and source.headers:
+            old = parse_source(previous.filename, previous.content, previous.worksheet)
+            if old.kind == source.kind and old.worksheet == source.worksheet:
+                retained = dict(zip(old.headers, previous.mapping, strict=False))
+                with self.uow() as uow:
+                    allowed = {
+                        field.key for field in uow.dataset_fields.list_for_dataset(dataset.id)
+                    }
+                retained = {
+                    header: target
+                    for header, target in retained.items()
+                    if header in source.headers and (target is None or target in allowed)
+                }
+                used = {target for target in retained.values() if target}
+                mapping = tuple(
+                    retained[header]
+                    if header in retained
+                    else ""
+                    if mapping[index] in used
+                    else mapping[index]
+                    for index, header in enumerate(source.headers)
+                )
+                assistance = self._assistance(dataset.id, source, mapping)
+        state = self.store.create(
+            actor_id, session_id, dataset.id, safe_name, content, source.kind, previous
         )
+        state = self.store.update(
+            state, worksheet=source.worksheet, mapping=mapping, step=3 if source.headers else 2
+        )
+        return state, source, assistance
+
+    def navigate(self, actor_id, session_id, dataset_key, token, step):
+        state = self.state(actor_id, session_id, dataset_key, token)
+        if state.imported_count is not None:
+            if step != 5:
+                raise NotFoundError("Import not found")
+            return state
+        source = parse_source(state.filename, state.content, state.worksheet)
+        reachable = {1}
+        if source.kind == "xlsx" and len(source.worksheets) > 1:
+            reachable.add(2)
+        if source.headers:
+            reachable.add(3)
+        if state.mapping_ready:
+            reachable.add(4)
+        if state.validation_valid:
+            reachable.add(5)
+        if step not in reachable:
+            raise NotFoundError("Import not found")
+        return self.store.update(state, step=step)
 
     def select_worksheet(self, actor_id, session_id, dataset_key, token, worksheet):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        state = self.store.get(token, actor_id, session_id, dataset.id)
+        state = self.state(actor_id, session_id, dataset_key, token)
+        if state.imported_count is not None:
+            raise NotFoundError("Import not found")
+        workbook = parse_source(state.filename, state.content)
+        if workbook.kind != "xlsx" or len(workbook.worksheets) <= 1:
+            raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, worksheet)
-        state = self.store.update(state, worksheet=worksheet, mapping=None)
-        return state, source, self._assistance(dataset.id, source)
+        if state.worksheet != worksheet:
+            state = self.store.update(
+                state,
+                worksheet=worksheet,
+                mapping=None,
+                mapping_ready=False,
+                validation_valid=False,
+                schema_fingerprint=None,
+                step=3,
+            )
+        else:
+            state = self.store.update(state, step=3)
+        return state, source, self._assistance(dataset.id, source, state.mapping)
 
     def mapping_assistance(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self.store.get(token, actor_id, session_id, dataset.id)
+        if state.imported_count is not None or state.busy:
+            raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
+        if not source.headers:
+            raise NotFoundError("Import not found")
         return state, source, self._assistance(dataset.id, source, state.mapping)
 
     def preview(self, actor_id, session_id, dataset_key, token, mapping):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self.store.get(token, actor_id, session_id, dataset.id)
+        if state.imported_count is not None or state.busy:
+            raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
+        if not source.headers:
+            raise NotFoundError("Import not found")
+        mapping = tuple(mapping)
+        if mapping != state.mapping:
+            state = self.store.update(
+                state,
+                mapping=mapping,
+                mapping_ready=False,
+                validation_valid=False,
+                schema_fingerprint=None,
+                step=3,
+            )
         preview = self._validate(dataset.id, state.filename, source, mapping)
         self.store.update(
-            state, mapping=preview.mapping, schema_fingerprint=preview.schema_fingerprint
+            state,
+            mapping=preview.mapping,
+            schema_fingerprint=preview.schema_fingerprint,
+            mapping_ready=not preview.non_row_errors,
+            validation_valid=preview.valid,
+            step=3 if preview.non_row_errors else 4,
         )
         return preview
 
     def saved_preview(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self.store.get(token, actor_id, session_id, dataset.id)
-        if state.mapping is None:
+        if not state.mapping_ready or state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
-        return self._validate(dataset.id, state.filename, source, state.mapping)
+        preview = self._validate(dataset.id, state.filename, source, state.mapping)
+        self.store.update(
+            state,
+            validation_valid=preview.valid,
+            mapping_ready=not preview.non_row_errors,
+            schema_fingerprint=preview.schema_fingerprint,
+        )
+        return preview
 
-    def confirm(self, actor_id, session_id, dataset_key, token) -> int:
+    def confirm(
+        self, actor_id, session_id, dataset_key, token, *, require_confirmation=False
+    ) -> int:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow() as read_uow:
             target = read_uow.datasets.find_by_key(validated_key)
         if target is None:
             raise NotFoundError("Dataset not found")
         self.records._require_access(actor_id, target, "editor")
-        state = self.store.consume(token, actor_id, session_id, target.id)
-        if state.mapping is None:
+        state = self.store.get(token, actor_id, session_id, target.id)
+        if (
+            state.busy
+            or state.imported_count is not None
+            or (require_confirmation and (state.step != 5 or not state.validation_valid))
+        ):
             raise NotFoundError("Import not found")
-        with self.uow(write=True, serialized=True) as uow:
-            dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self.records._require_access(actor_id, dataset, "editor")
-            source = parse_source(state.filename, state.content, state.worksheet)
-            preview, validated = self._validate_in_uow(
-                uow, dataset.id, state.filename, source, state.mapping
-            )
-            if preview.schema_fingerprint != state.schema_fingerprint:
-                raise ImportValidationError("The Dataset schema changed; upload the import again")
-            if not preview.valid:
-                raise ImportValidationError("The import is no longer valid; upload it again")
-            try:
-                for values, identifier in validated:
-                    record = uow.dataset_records.create(
-                        dataset_id=dataset.id, identifier_key=identifier
+        if not state.mapping_ready:
+            raise NotFoundError("Import not found")
+        claimed = self.store.claim(state)
+        try:
+            with self.uow(write=True, serialized=True) as uow:
+                dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+                self.records._require_access(actor_id, dataset, "editor")
+                source = parse_source(state.filename, state.content, state.worksheet)
+                preview, validated = self._validate_in_uow(
+                    uow, dataset.id, state.filename, source, state.mapping
+                )
+                if preview.schema_fingerprint != state.schema_fingerprint:
+                    raise ImportValidationError(
+                        "The Dataset schema changed; validate the import again"
                     )
-                    uow.flush()
-                    uow.dataset_records.add_values(record, values)
-                    uow.flush()
-                    uow.add_audit(
-                        actor_user_id=actor_id,
-                        object_type="dataset_record",
-                        object_id=record.id,
-                        action="created",
-                    )
-            except PersistenceConflictError as error:
-                DatasetRecordService._raise_record_conflict(error)
-            if validated:
-                dataset.content_updated_at = datetime.now(UTC)
+                if not preview.valid:
+                    raise ImportValidationError("The import is no longer valid; validate it again")
+                try:
+                    for values, identifier in validated:
+                        record = uow.dataset_records.create(
+                            dataset_id=dataset.id, identifier_key=identifier
+                        )
+                        uow.flush()
+                        uow.dataset_records.add_values(record, values)
+                        uow.flush()
+                        uow.add_audit(
+                            actor_user_id=actor_id,
+                            object_type="dataset_record",
+                            object_id=record.id,
+                            action="created",
+                        )
+                except PersistenceConflictError as error:
+                    DatasetRecordService._raise_record_conflict(error)
+                if validated:
+                    dataset.content_updated_at = datetime.now(UTC)
+
+        except (ValidationError, RecordConflictError):
+            self.store.finish(claimed, validation_valid=False, step=4)
+            raise
+        except Exception:
+            self.store.finish(claimed)
+            raise
+        self.store.finish(
+            claimed,
+            content=b"",
+            mapping=None,
+            schema_fingerprint=None,
+            imported_count=len(validated),
+            step=5,
+        )
         return len(validated)
 
     def cancel(self, actor_id, session_id, dataset_key, token):
@@ -927,7 +1115,7 @@ class DatasetRecordImportService:
             error for error in errors if error.row is None or error.row in reported_rows
         )
         sample = tuple(
-            tuple(row.values[index] for index, target in enumerate(mapping) if target is not None)
+            tuple(row.values[mapping.index(field.key)] for field in fields if field.key in mapping)
             for row in source.rows[:PREVIEW_ROWS]
         )
         preview = ImportPreview(

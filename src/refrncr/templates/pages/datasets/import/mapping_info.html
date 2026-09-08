@@ -1,0 +1,12 @@
+<p>Match each source column to one dataset field, or choose Do not import.</p>
+<div class='mapping-intro'>
+  <p class='mapping-metadata'>File: <strong>{{ state.filename }}</strong>{% if source.worksheet %} · Worksheet: {{ source.worksheet }}{% endif %}</p>
+</div>
+  <section aria-label='Mapping completeness' id='mapping-completeness' class='mapping-completeness'>
+    <p data-mapping-summary role='status'>{{ required_keys|select("in", assistance.mapping)|list|length }} of {{ required_keys|length }} required fields mapped · {{ assistance.completeness.unmapped_columns }} choices remaining · {{ assistance.completeness.ignored_columns }} columns ignored</p>
+    <div class='mapping-missing' data-mapping-missing{% if not assistance.completeness.missing_required and not assistance.completeness.missing_identifier %} hidden{% endif %}>
+      <span>Missing required fields:</span>
+      {% for field in fields %}{% if field.key in required_keys %}<span class='badge badge-warning' data-missing-key='{{ field.key }}'{% if field.key in assistance.mapping %} hidden{% endif %}>{{ field.name }}{% if field.key in identifier_keys %} (identifier){% endif %}</span>{% endif %}{% endfor %}
+    </div>
+  </section>
+  <p class='help-text' data-mapping-status role='status'>Map every required and identifier field to continue.</p>

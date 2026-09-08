@@ -13,6 +13,97 @@
   });
   document.querySelector("[data-error-focus]")?.focus();
 
+  document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
+    const trigger = details.querySelector("summary");
+    const tooltip = details.querySelector('[role="tooltip"]');
+    let pinned = false;
+    details.dataset.tooltipReady = "true";
+    const position = () => {
+      if (!details.open) return;
+      const anchor = trigger.getBoundingClientRect();
+      const box = tooltip.getBoundingClientRect();
+      tooltip.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8))}px`;
+      tooltip.style.top = `${Math.max(8, Math.min(anchor.bottom, window.innerHeight - box.height - 8))}px`;
+    };
+    const show = () => { details.open = true; position(); };
+    const hide = () => { details.open = false; pinned = false; };
+    details.addEventListener("mouseenter", show);
+    details.addEventListener("mouseleave", () => { if (!pinned && !details.contains(document.activeElement)) hide(); });
+    trigger.addEventListener("focus", show);
+    details.addEventListener("focusout", (event) => { if (!details.contains(event.relatedTarget)) hide(); });
+    trigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      pinned = !pinned;
+      if (pinned) show(); else hide();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        if (document.activeElement === tooltip) trigger.focus();
+        hide();
+      }
+    });
+    document.addEventListener("pointerdown", (event) => { if (!details.contains(event.target)) hide(); });
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+  });
+
+  document.querySelectorAll("[data-import-mapping]").forEach((form) => {
+    const selects = [...form.querySelectorAll("select")];
+    const optionLists = selects.map((select) => ({
+      select,
+      options: [...select.querySelectorAll("option[data-option-group]")].sort((a, b) => Number(a.dataset.optionOrder) - Number(b.dataset.optionOrder)),
+      groups: Object.fromEntries([...select.querySelectorAll("optgroup[data-option-group]")].map((group) => [group.dataset.optionGroup, group])),
+    }));
+    const required = JSON.parse(form.dataset.requiredKeys);
+    const button = document.querySelector("[data-mapping-continue]");
+    const panel = form.closest(".import-wizard") || form;
+    const status = panel.querySelector("[data-mapping-status]");
+    const update = () => {
+      const values = selects.map((select) => select.value);
+      const mapped = values.filter((value) => value && value !== "__ignored__");
+      const valid = !values.includes("") && new Set(mapped).size === mapped.length && required.every((key) => mapped.includes(key));
+      button.disabled = !valid;
+      optionLists.forEach(({select, options, groups}) => {
+        const selected = select.value;
+        options.forEach((option) => {
+          const used = option.value !== selected && mapped.includes(option.value);
+          const group = groups[used ? "used" : option.dataset.optionGroup];
+          option.textContent = option.dataset.optionLabel;
+          group.append(option);
+        });
+        Object.values(groups).forEach((group) => { group.hidden = !group.children.length; });
+        // Moving native options must not change the user's selection or submitted value.
+        select.value = selected;
+      });
+      const summary = panel.querySelector("[data-mapping-summary]");
+      if (summary) {
+        summary.textContent = `${required.filter((key) => mapped.includes(key)).length} of ${required.length} required fields mapped · ${values.filter((value) => !value).length} choices remaining · ${values.filter((value) => value === "__ignored__").length} columns ignored`;
+        const missing = panel.querySelector("[data-mapping-missing]");
+        missing.hidden = required.every((key) => mapped.includes(key));
+        missing.querySelectorAll("[data-missing-key]").forEach((label) => { label.hidden = mapped.includes(label.dataset.missingKey); });
+        selects.forEach((select) => {
+          const badge = select.closest(".mapping-target").querySelector("[data-mapping-choice]");
+          const duplicate = select.value && select.value !== "__ignored__" && mapped.filter((value) => value === select.value).length > 1;
+          const error = duplicate || select.getAttribute("aria-invalid") === "true";
+          badge.textContent = error ? "Mapping error" : !select.value ? "Needs a choice" : select.value === "__ignored__" ? "Do not import" : "Mapped";
+          badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
+        });
+      }
+      status.textContent = valid ? "All required and identifier fields are mapped. Ready to continue." : "Map every required and identifier field once, and choose a field or Do not import for each column.";
+    };
+    form.addEventListener("change", update);
+    update();
+  });
+  document.querySelectorAll("[data-import-confirm]").forEach((form) => {
+    let pending = false;
+    form.addEventListener("submit", (event) => {
+      if (pending) { event.preventDefault(); return; }
+      pending = true;
+      form.setAttribute("aria-busy", "true");
+      [...form.elements].filter((element) => element.type === "submit").forEach((button) => { button.disabled = true; });
+    });
+  });
+
   const toggle = document.querySelector("[data-nav-toggle]");
   const navigation = document.querySelector("[data-navigation]");
   if (toggle && navigation) {
@@ -153,6 +244,21 @@
     });
   });
 
+  document.querySelectorAll("dialog[data-modal-report]").forEach((dialog) => {
+    dialog.addEventListener("close", () => restoreSidePanelFocus(dialog));
+    dialog.addEventListener("keydown", (event) => {
+      if (event.key !== "Tab") return;
+      const controls = [...dialog.querySelectorAll("button:not([disabled]), a[href], [tabindex='0']")].filter(visibleControl);
+      if (!controls.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    });
+  });
+
   document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
     trigger.addEventListener("click", (event) => {
       if (trigger.hasAttribute("data-record-row") && event.target.closest("a, button, input")) return;
@@ -178,6 +284,7 @@
           selectedRow.setAttribute("aria-selected", "true");
         }
       } else {
+        if (dialog.hasAttribute("data-modal-report")) sidePanelOpeners.set(dialog, trigger);
         dialog.showModal();
       }
     });
