@@ -1,0 +1,97 @@
+.import-wizard { display: flex; flex-direction: column; min-height: min(38rem, 75dvh); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.import-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg); list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.import-steps li > a, .import-steps li > span, .import-steps li > button { display: flex; gap: var(--space-sm); align-items: flex-start; height: 100%; padding: var(--space-sm); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-muted); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
+.import-steps small { display: block; margin-top: var(--space-xs); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
+.import-steps .is-active > span { background: var(--color-row-selected); color: var(--color-link); font-weight: var(--font-weight-bold); box-shadow: inset 0 -3px var(--color-action-primary); }
+.import-steps .is-complete > button, .import-steps .is-complete > a, .import-steps .is-complete > span { color: var(--color-link); }
+.import-steps button:hover, .import-steps a:hover { background: var(--color-action-secondary); }
+.import-step-number { display: inline-grid; place-items: center; flex: 0 0 var(--control-height-compact); height: var(--control-height-compact); border: 1px solid var(--color-border); border-radius: var(--radius-full); }
+.is-active .import-step-number, .is-complete .import-step-number { background: var(--color-action-primary-hover); color: var(--color-action-on-strong); border-color: transparent; }
+.import-content { flex: 1; min-width: 0; padding: var(--space-lg); overflow-wrap: anywhere; }
+.import-content h2 { margin-top: 0; }
+.import-content .form { max-width: none; }
+.import-actions { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.import-actions-forward { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
+.import-actions form { margin: 0; }
+.import-upload-zone { padding: var(--space-xl); border: 2px dashed var(--color-control-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
+.import-upload-zone label { margin-top: 0; }
+.import-summary { display: grid; grid-template-columns: minmax(8rem, 1fr) 2fr; gap: var(--space-md); }
+.import-summary dd { margin: 0; }
+/* Compact mapping is specific to the import wizard; shared controls and badges stay unchanged. */
+.mapping-intro { margin-bottom: var(--space-md); }
+.mapping-intro p { margin: 0 0 var(--space-sm); }
+.mapping-metadata, .mapping-examples, .mapping-details { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.mapping-completeness { margin-bottom: var(--space-md); font-size: var(--font-size-body-sm); }
+.mapping-completeness p { margin: 0; }
+.mapping-missing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); margin-top: var(--space-sm); }
+.mapping-missing[hidden], .mapping-missing [hidden] { display: none; }
+.mapping-list { padding: 0; margin: 0; list-style: none; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.mapping-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.3fr); align-items: center; gap: var(--space-sm); min-height: var(--record-row-min-height); padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-body-sm); line-height: 1.4; }
+.mapping-row + .mapping-row { border-top: 1px solid var(--color-border); }
+.mapping-row:hover, .mapping-row:focus-within { background: var(--color-surface-subtle); }
+.mapping-source, .mapping-target { min-width: 0; }
+.mapping-source strong { display: block; }
+.mapping-examples { margin: 0; font-size: var(--font-size-xs); }
+.mapping-examples code { font-size: inherit; }
+.mapping-arrow { color: var(--color-text-muted); }
+.mapping-target { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; gap: var(--space-xs) var(--space-sm); align-items: center; }
+.import-mapping .mapping-target select { min-width: 0; min-height: var(--control-height-compact); margin: 0; padding: var(--space-xs) var(--space-sm); }
+.mapping-target > .mapping-rationale { justify-self: end; max-width: 100%; }
+.mapping-choice { justify-self: end; color: var(--color-text-muted); background: var(--color-surface-subtle); }
+.mapping-choice.badge-success { color: var(--color-success-text); background: var(--ref-badge-success); }
+.mapping-choice.badge-warning { color: var(--color-warning-text); background: var(--ref-badge-warning); }
+.mapping-choice.badge-error { color: var(--color-error-text); background: var(--ref-badge-error); }
+.mapping-error { grid-column: 1 / -1; }
+.mapping-details summary { cursor: pointer; }
+.mapping-details p, .mapping-warning { margin: var(--space-xs) 0 0; }
+.mapping-details ul { padding-left: var(--space-md); }
+.mapping-warning { color: var(--color-warning-text); }
+@media (max-width: 767px) {
+  .mapping-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm); }
+  .import-mapping .mapping-target select { min-height: var(--control-height); font-size: var(--font-size-body); }
+  .mapping-arrow { display: none; }
+  .mapping-target { grid-template-columns: minmax(0, 1fr); }
+}
+.import-mapping code { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 1023px) { .import-steps { padding: var(--space-sm); } .import-steps li > a, .import-steps li > span, .import-steps li > button { flex-direction: column; } }
+@media (max-width: 767px) {
+  .import-steps { grid-template-columns: 1fr; gap: var(--space-xs); }
+  .import-steps li > a, .import-steps li > span, .import-steps li > button { flex-direction: row; align-items: center; }
+  .import-steps small { display: inline; margin-left: var(--space-sm); }
+  .import-content, .import-actions, .import-upload-zone { padding: var(--space-md); }
+  .import-actions { align-items: flex-end; gap: var(--space-sm); }
+  .import-actions .button { padding-inline: var(--space-sm); }
+  .import-summary { grid-template-columns: 1fr; gap: var(--space-xs); }
+  .import-summary dd { margin-bottom: var(--space-md); }
+}
+
+.import-step-link { width: 100%; border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+
+@media (min-width: 768px) {
+  .app-main:has(> .import-wizard) { display: flex; flex-direction: column; }
+  .app-main:has(> .import-wizard) > .page-header { flex-shrink: 0; }
+  .import-wizard { flex: 1; min-height: 0; overflow: hidden; }
+  .import-wizard > nav, .import-actions { flex-shrink: 0; }
+  .import-content { min-height: 0; overflow-y: auto; }
+  .import-actions { position: static; }
+}
+@media (max-width: 767px) {
+  .app-main:has(> .import-wizard) { overflow-x: clip; }
+  .import-actions { z-index: var(--layer-menu); }
+}
+
+.import-mapping optgroup[data-option-group="used"] { color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
+
+/* Native disclosure fallback; enhanced rationale floats without expanding the row. */
+.mapping-rationale summary { cursor: help; list-style: none; width: fit-content; }
+.mapping-rationale summary::-webkit-details-marker { display: none; }
+.mapping-tooltip { font-size: var(--font-size-body-sm); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); overflow-wrap: anywhere; }
+.mapping-rationale[data-tooltip-ready] .mapping-tooltip { position: fixed; z-index: var(--layer-dialog); width: min(24rem, calc(100vw - 1rem)); max-height: calc(100dvh - 1rem); overflow-y: auto; }
+.mapping-rationale { min-width: 0; }
+.mapping-rationale:not([data-tooltip-ready])[open] { grid-column: 1 / -1; }
+
+.mapping-tooltip p { margin: var(--space-xs) 0 0; }
+
+.mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
+.mapping-heading h2 { margin: 0; }
+.mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid var(--color-text-muted); border-radius: var(--radius-full); color: var(--color-text-muted); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); }

@@ -1,0 +1,560 @@
+"""REF-134 wizard state and browser regressions, alongside the REF-81 safety tests."""
+
+import io
+import re
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
+import pytest
+import test_record_import as import_tests
+from openpyxl import Workbook
+from sqlalchemy import func, select
+from test_record_import import PASSWORD
+from werkzeug.datastructures import MultiDict
+
+from refrncr.models import DatasetRecord
+from refrncr.record_import import TransientImportStore
+from refrncr.services import NotFoundError
+from refrncr.web import create_flask_app
+
+
+@pytest.fixture
+def import_context():
+    return import_tests.import_context.__wrapped__()
+
+
+@pytest.fixture
+def wizard(import_context):
+    factory, services, admin, dataset = import_context
+    app = create_flask_app(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+        dataset_records=services.dataset_records,
+        record_imports=services.record_imports,
+    )
+    app.testing = True
+    client = app.test_client()
+    login = client.get("/login", base_url="https://localhost")
+    csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
+    client.post(
+        "/login",
+        base_url="https://localhost",
+        data={
+            "email": admin.email,
+            "password": PASSWORD,
+            "csrf_token": csrf,
+        },
+    )
+    root = f"/datasets/{dataset.key}/records/import"
+    page = client.get(root, base_url="https://localhost")
+    csrf = re.search("name='csrf_token' value='([^']+)'", page.text)[1]
+
+    class Browser:
+        def get(self, path):
+            return client.get(path, base_url="https://localhost", follow_redirects=True)
+
+        def post(self, path, data=None):
+            values = MultiDict(data.items() if isinstance(data, dict) else data or [])
+            values.setdefault("csrf_token", csrf)
+            return client.post(
+                path, base_url="https://localhost", data=values, follow_redirects=True
+            )
+
+        def upload(self, content=b"code,amount\nA,1\n", filename="records.csv"):
+            page = self.post(root, {"file": (io.BytesIO(content), filename)})
+            assert page.status_code == 200, page.text
+            self.token = page.request.path.split("/import/")[1].split("/step/")[0]
+            self.path = f"{root}/{self.token}"
+            return page
+
+        def preview(self, mapping=("code", "amount")):
+            return self.post(
+                self.path + "/preview",
+                {
+                    f"mapping_{i}": value if value is not None else "__ignored__"
+                    for i, value in enumerate(mapping)
+                },
+            )
+
+        def count(self):
+            with factory() as session:
+                return session.scalar(select(func.count()).select_from(DatasetRecord))
+
+    browser = Browser()
+    browser.root, browser.client, browser.csrf = root, client, csrf
+    browser.services, browser.admin, browser.dataset = services, admin, dataset
+    return browser
+
+
+def states(page):
+    return re.findall("data-step='([1-5])' data-step-status='([^']+)'", page.text)
+
+
+def workbook(sheets=("First", "Second"), headers=("code", "amount")):
+    book = Workbook()
+    book.remove(book.active)
+    for name in sheets:
+        sheet = book.create_sheet(name)
+        sheet.append(headers)
+        sheet.append(("A", "1"))
+    output = io.BytesIO()
+    book.save(output)
+    book.close()
+    return output.getvalue()
+
+
+def test_five_steps_confirmation_refresh_success_and_replay(wizard):
+    assert states(wizard.get(wizard.root)) == [
+        ("1", "active"),
+        ("2", "remaining"),
+        ("3", "remaining"),
+        ("4", "remaining"),
+        ("5", "remaining"),
+    ]
+    mapped = wizard.upload()
+    assert states(mapped) == [
+        ("1", "completed"),
+        ("2", "completed"),
+        ("3", "active"),
+        ("4", "remaining"),
+        ("5", "remaining"),
+    ]
+    assert "Completed automatically" in mapped.text
+    assert wizard.get(wizard.path + "/step/2").status_code == 404
+    assert wizard.get(wizard.path + "/step/4").status_code == 404
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    preview = wizard.preview()
+    assert states(preview)[3] == ("4", "active")
+    assert wizard.count() == 0
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    final = wizard.get(wizard.path + "/step/5")
+    assert states(final)[4] == ("5", "active")
+    for text in (
+        "records.csv",
+        "Not applicable",
+        "Source records",
+        "Mapped fields",
+        "create-only and atomic",
+        "Import records",
+    ):
+        assert text in final.text
+    assert wizard.count() == 0
+    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    success = wizard.post(wizard.path + "/confirm")
+    assert "1 records imported successfully" in success.text
+    assert states(success) == [(str(i), "completed") for i in range(1, 6)]
+    assert "View records" in success.text and "Import another file" in success.text
+    assert wizard.count() == 1
+    assert wizard.get(wizard.path + "/step/5").text == success.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    assert (
+        wizard.post(
+            wizard.path + "/preview", {"mapping_0": "code", "mapping_1": "amount"}
+        ).status_code
+        == 404
+    )
+    assert states(wizard.get(wizard.root))[0] == ("1", "active")
+
+
+@pytest.mark.parametrize("sheets", [("Only",), ("First", "Second")])
+def test_worksheet_skip_or_explicit_selection_and_invalidation(wizard, sheets):
+    page = wizard.upload(workbook(sheets), "records.xlsx")
+    if len(sheets) == 1:
+        assert states(page)[1:3] == [("2", "completed"), ("3", "active")]
+        assert wizard.post(wizard.path + "/worksheet", {"worksheet": "Only"}).status_code == 404
+    else:
+        assert states(page)[1] == ("2", "active")
+        assert "value=''" in page.text
+        assert wizard.get(wizard.path + "/mapping").status_code == 404
+        assert wizard.preview().status_code == 404
+        assert wizard.post(wizard.path + "/worksheet", {"worksheet": ""}).status_code == 400
+        page = wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
+        assert states(page)[2] == ("3", "active")
+        wizard.preview()
+        wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
+        assert wizard.get(wizard.path + "/step/5").status_code == 200
+        changed = wizard.post(wizard.path + "/worksheet", {"worksheet": "Second"})
+        assert states(changed)[3:] == [("4", "remaining"), ("5", "remaining")]
+        assert wizard.get(wizard.path + "/step/5").status_code == 404
+
+
+def test_back_navigation_saves_choices_and_invalidates_only_dependents(wizard):
+    wizard.upload(b"mystery,amount,extra\nA,1,ignore\n")
+    wizard.preview(("code", "amount", None))
+    upload = wizard.get(wizard.path + "/step/1")
+    assert "Current file:" in upload.text
+    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    wizard.get(wizard.path + "/mapping")
+    back = wizard.post(
+        wizard.path + "/preview",
+        {
+            "mapping_0": "code",
+            "mapping_1": "amount",
+            "mapping_2": "active",
+            "go_step": "1",
+        },
+    )
+    assert states(back)[0] == ("1", "active")
+    mapped = wizard.get(wizard.path + "/mapping")
+    assert "value='active' selected" in mapped.text
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+    assert wizard.count() == 0
+
+
+@pytest.mark.parametrize(
+    "mapping", [("code", "code"), ("code", None), ("unknown", "amount"), ("code", "")]
+)
+def test_mapping_rules_cannot_be_bypassed(wizard, mapping):
+    wizard.upload()
+    page = wizard.preview(mapping)
+    assert page.status_code == 400
+    assert states(page)[2] == ("3", "active")
+    assert "data-error-focus" in page.text
+    assert wizard.get(wizard.path + "/step/4").status_code == 404
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    assert wizard.count() == 0
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        [("mapping_0", "code")],
+        [("mapping_0", "code"), ("mapping_0", "amount"), ("mapping_1", "amount")],
+        [("mapping_0", "code"), ("mapping_2", "amount")],
+        [("mapping_0", "code"), ("mapping_1", "amount"), ("step", "5")],
+    ],
+)
+def test_crafted_mapping_cardinality(wizard, values):
+    wizard.upload()
+    assert wizard.post(wizard.path + "/preview", values).status_code == 400
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+
+
+def test_preview_ten_rows_all_mapped_fields_dataset_order_and_empty_marker(wizard):
+    content = b"day,amount,code,active\n" + b"".join(f",1,C{i},\n".encode() for i in range(12))
+    wizard.upload(content)
+    preview = wizard.preview(("day", "amount", "code", "active"))
+    assert preview.status_code == 200
+    table = preview.text.split("<thead>")[1].split("</table>")[0]
+    assert re.findall("<th scope='col'>(.*?)</th>", table) == ["Code", "Amount", "Active", "Day"]
+    assert table.count("<tr>") == 11
+    assert "<td>C9</td>" in table and "<td>C10</td>" not in table
+    assert "<td>—</td>" in table
+    assert "first 10 of 12 records" in preview.text
+    assert wizard.count() == 0
+
+
+@pytest.mark.parametrize("count", [1, 99, 100, 101])
+def test_error_summary_and_capped_accessible_modal(wizard, count):
+    content = b"code,amount\n" + b"<script>,bad<script>\n" * count
+    wizard.upload(content, "<file>.csv")
+    page = wizard.preview()
+    outside = re.sub(r"<dialog\b.*?</dialog>", "", page.text, flags=re.S)
+    dialog = re.search(r"<dialog\b.*?</dialog>", page.text, re.S)[0]
+    assert f"{count} source rows failed validation" in outside
+    assert "No records have been imported." in outside
+    assert "View error report" in outside
+    assert "Failing data row" not in outside
+    assert "<table>" not in outside
+    assert dialog.count("<section>") == min(100, count)
+    assert f"Failing data row {min(100, count)} — source file row {min(100, count) + 1}" in dialog
+    assert ("Showing 100 of 101" in dialog) == (count == 101)
+    assert "aria-labelledby=" in dialog and "aria-describedby=" in dialog
+    assert "data-dialog-close" in dialog
+    assert "bad&lt;script&gt;" in dialog and "Identifier: &lt;script&gt;" in dialog
+    assert "<script>" not in dialog
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+    assert wizard.count() == 0
+
+
+def test_resume_cancel_expiry_and_new_session(wizard):
+    clock = [10.0]
+    wizard.services.record_imports.store = TransientImportStore(clock=lambda: clock[0])
+    wizard.upload()
+    wizard.preview()
+    wizard.get(wizard.path + "/step/1")
+    assert states(wizard.get(wizard.root))[3] == ("4", "active")
+    resumed = wizard.get(wizard.root).text
+    assert "Validation successful. 1 records are ready to import." in resumed
+    assert "Upload corrected file" not in resumed
+    assert "You can return to this import" not in resumed
+    assert wizard.post(wizard.path + "/cancel").status_code == 200
+    assert wizard.get(wizard.path + "/step/4").status_code == 404
+    assert states(wizard.get(wizard.root))[0] == ("1", "active")
+    wizard.upload()
+    wizard.preview()
+    clock[0] += 901
+    assert wizard.get(wizard.path + "/step/4").status_code == 404
+    assert states(wizard.get(wizard.root))[0] == ("1", "active")
+    wizard.upload()
+    wizard.preview()
+    wizard.post("/logout")
+    assert not wizard.services.record_imports.store._states
+
+
+@pytest.mark.parametrize(
+    "headers,expected",
+    [
+        ("mystery,amount,extra", ("code", "amount", None)),
+        ("amount,mystery,extra", ("amount", "code", None)),
+        ("renamed,amount,extra", (None, "amount", None)),
+        ("mystery,amount", ("code", "amount")),
+        ("mystery,amount,extra,code", ("code", "amount", None, "")),
+    ],
+)
+def test_corrected_file_exact_column_compatibility_and_old_token_invalidation(
+    wizard, headers, expected
+):
+    wizard.upload(b"mystery,amount,extra\nA,bad,ignore\n")
+    wizard.preview(("code", "amount", None))
+    old_path = wizard.path
+    values = ",".join("1" if header == "amount" else "A" for header in headers.split(","))
+    corrected = wizard.upload(f"{headers}\n{values}\n".encode(), "corrected.csv")
+    assert corrected.status_code == 200
+    assert wizard.get(old_path + "/step/4").status_code == 404
+    state = next(iter(wizard.services.record_imports.store._states.values()))
+    assert state.mapping == expected
+    assert not state.mapping_ready and not state.validation_valid
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+
+
+def test_corrected_workbook_retains_only_matching_worksheet(wizard):
+    wizard.upload(workbook(), "old.xlsx")
+    wizard.post(wizard.path + "/worksheet", {"worksheet": "Second"})
+    wizard.preview()
+    page = wizard.upload(workbook(), "corrected.xlsx")
+    assert states(page)[2] == ("3", "active")
+    assert "Worksheet: Second" in page.text
+    page = wizard.upload(workbook(("New", "Other")), "changed.xlsx")
+    assert states(page)[1] == ("2", "active")
+    assert wizard.get(wizard.path + "/mapping").status_code == 404
+
+
+def test_rejected_replacement_keeps_active_import(wizard):
+    wizard.upload()
+    wizard.preview()
+    old = wizard.path
+    page = wizard.post(wizard.root, {"file": (io.BytesIO(b"bad"), "bad.json")})
+    assert page.status_code == 400
+    assert wizard.get(old + "/step/4").status_code == 200
+
+
+def test_all_routes_reauthorize_and_reject_cross_session_dataset_and_csrf(wizard):
+    wizard.upload()
+    wizard.preview()
+    for suffix in ("/step/1", "/step/2", "/step/3", "/step/4", "/step/5", "/mapping", "/preview"):
+        other = wizard.client.application.test_client()
+        assert other.get(wizard.path + suffix, base_url="https://localhost").status_code == 302
+    for suffix in ("/confirm", "/cancel", "/worksheet", "/preview"):
+        assert wizard.post(wizard.path + suffix, {"csrf_token": "wrong"}).status_code == 403
+    another = wizard.services.datasets.create_dataset(wizard.admin.id, "other", "Other", "")
+    assert (
+        wizard.get(wizard.path.replace("/imports/", f"/{another.key}/") + "/step/4").status_code
+        == 404
+    )
+    # Another authenticated session of the same user cannot use the token.
+    new = wizard.client.application.test_client()
+    login = new.get("/login", base_url="https://localhost")
+    csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
+    new.post(
+        "/login",
+        base_url="https://localhost",
+        data={"email": wizard.admin.email, "password": PASSWORD, "csrf_token": csrf},
+    )
+    assert new.get(wizard.path + "/step/4", base_url="https://localhost").status_code == 404
+    assert states(new.get(wizard.root, base_url="https://localhost"))[0] == ("1", "active")
+
+
+def test_technical_failure_is_safe_and_retryable(wizard, monkeypatch):
+    wizard.upload()
+    wizard.preview()
+    wizard.get(wizard.path + "/step/5")
+    importer = wizard.services.record_imports
+    original = importer.uow
+
+    def fail_write(*, write=False, serialized=False):
+        if write:
+            raise RuntimeError("SECRET INTERNAL DETAILS")
+        return original(write=write, serialized=serialized)
+
+    monkeypatch.setattr(importer, "uow", fail_write)
+    failed = wizard.post(wizard.path + "/confirm")
+    assert failed.status_code == 503
+    assert "SECRET" not in failed.text
+    assert "No records have been imported." in failed.text
+    assert wizard.count() == 0
+    monkeypatch.setattr(importer, "uow", original)
+    assert "1 records imported successfully" in wizard.post(wizard.path + "/confirm").text
+
+
+def test_conflict_after_preview_requires_new_validation(wizard):
+    wizard.upload()
+    wizard.preview()
+    wizard.get(wizard.path + "/step/5")
+    wizard.services.dataset_records.create_record(
+        wizard.admin.id, wizard.dataset.key, {"code": "A", "amount": "1"}
+    )
+    failed = wizard.post(wizard.path + "/confirm")
+    assert failed.status_code == 409
+    assert states(failed)[3] == ("4", "active")
+    assert "View error report" in failed.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    assert wizard.count() == 1
+
+
+def test_simultaneous_submit_claims_once_and_logout_does_not_resurrect(import_context, monkeypatch):
+    _, services, admin, dataset = import_context
+    importer = services.record_imports
+    state, _, _ = importer.begin(admin.id, "one", dataset.key, "x.csv", b"code,amount\nA,1\n")
+    importer.preview(admin.id, "one", dataset.key, state.token, ("code", "amount"))
+    # Pause immediately after the atomic claim, before touching a database connection.
+    entered, release = Event(), Event()
+    original = importer.store.claim
+
+    def pause(state):
+        original(state)
+        entered.set()
+        assert release.wait(5)
+        raise RuntimeError("paused")
+
+    monkeypatch.setattr(importer.store, "claim", pause)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(pause, importer.store.get(state.token, admin.id, "one", dataset.id))
+        assert entered.wait(5)
+        with pytest.raises(NotFoundError):
+            importer.confirm(admin.id, "one", dataset.key, state.token)
+        claimed = importer.store.get(state.token, admin.id, "one", dataset.id)
+        importer.revoke_session("one")
+        importer.store.finish(claimed, imported_count=1)
+        assert not importer.store._states
+        release.set()
+        with pytest.raises(RuntimeError):
+            future.result()
+
+
+def test_back_from_worksheet_preserves_new_selection(wizard):
+    wizard.upload(workbook(), "file.xlsx")
+    page = wizard.post(wizard.path + "/worksheet", {"worksheet": "Second", "go_step": "1"})
+    assert states(page)[0] == ("1", "active")
+    page = wizard.get(wizard.path + "/step/2")
+    assert "value='Second' selected" in page.text
+    assert wizard.get(wizard.path + "/step/4").status_code == 404
+
+
+def test_unexpected_preview_failure_exposes_no_details(wizard, monkeypatch):
+    wizard.upload()
+    wizard.preview()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("INTERNAL SECRET")
+
+    monkeypatch.setattr(wizard.services.record_imports, "_validate", fail)
+    page = wizard.get(wizard.path + "/step/4")
+    assert page.status_code == 503
+    assert "No records have been imported" in page.text
+    assert "INTERNAL" not in page.text
+    assert wizard.count() == 0
+
+
+def test_changed_mapping_invalidates_old_confirmation_even_when_validation_fails(
+    wizard, monkeypatch
+):
+    wizard.upload(b"code,amount,active\nA,1,true\n")
+    wizard.preview(("code", "amount", None))
+    wizard.get(wizard.path + "/step/5")
+    original = wizard.services.record_imports._validate
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("INTERNAL SECRET")
+
+    monkeypatch.setattr(wizard.services.record_imports, "_validate", fail)
+    page = wizard.preview(("code", "amount", "active"))
+    assert page.status_code == 503
+    assert "value='active' selected" in page.text
+    assert "INTERNAL" not in page.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
+    monkeypatch.setattr(wizard.services.record_imports, "_validate", original)
+    assert wizard.preview(("code", "amount", "active")).status_code == 200
+
+
+def test_compact_mapping_discloses_full_escaped_examples_and_short_options(wizard):
+    long_value = "<script>" + "x" * 100 + "</script>"
+    page = wizard.upload(f"code,amount\n{long_value},1\nB,2\nC,3\nFOURTH,4\n".encode())
+    assert "class='mapping-list' role='list'" in page.text
+    assert "<fieldset" not in page.text
+    assert "Full example values" in page.text
+    assert "&lt;script&gt;" + "x" * 100 + "&lt;/script&gt;" in page.text
+    assert "<script>" + "x" * 100 not in page.text
+    assert "FOURTH" not in page.text
+    assert "Target field for code" in page.text
+    assert "Suggestion: Code" in page.text
+    assert "High confidence in this automatic suggestion." in page.text
+    assert "badge badge-info" not in page.text
+    assert re.search(r"<summary[^>]*data-mapping-choice[^>]*>Mapped</summary>", page.text)
+    assert "aria-describedby='mapping-rationale-0'" in page.text
+    assert "role='tooltip'" in page.text
+    assert re.search(r"<option value='code' selected[^>]*>Code</option>", page.text)
+    assert "mapping-examples-0 mapping-choice-0" in page.text
+    assert "(identifier)" in page.text
+
+
+def test_compact_mapping_errors_keep_control_associations(wizard):
+    wizard.upload()
+    page = wizard.preview(("code", "code"))
+    assert "mapping-error-0" in page.text
+    assert "mapping-error-1" in page.text
+    assert page.text.count("aria-invalid='true'") == 2
+    assert page.text.count(">Mapping error</summary>") == 2
+    assert "data-missing-key='amount'" in page.text
+    assert "This field is mapped more than once" in page.text
+
+
+def test_used_mapping_options_are_grouped_below_available_choices(wizard):
+    page = wizard.upload()
+    code_select = re.search(r"<select id='mapping-0'.*?</select>", page.text, re.S)[0]
+    used = code_select.split("label='Already mapped'", 1)[1]
+    assert "value='amount'" in used
+    assert "value='code'" not in used
+    assert " disabled" not in code_select
+    assert "value='active'" in code_select.split("label='Already mapped'", 1)[0]
+    assert code_select.index("Do not import") < code_select.index("Already mapped")
+
+
+def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_context):
+    _, services, admin, dataset = import_context
+    for key, name in (("dutch_name", "Dutch Name"), ("english_name", "English Name")):
+        services.dataset_fields.create_field(admin.id, dataset.key, key, name, "string")
+    page = wizard.upload(b"name,code,amount\nExample,A,1\n")
+    assert "selected>Multiple matches — choose one</option>" in page.text
+    assert "class='mapping-advice'" not in page.text
+    tooltip = re.search(r"id='mapping-rationale-0'.*?</div>", page.text, re.S)[0]
+    assert "Multiple possible fields — choose one" in tooltip
+    assert page.text.count("Multiple possible fields — choose one") == 1
+
+
+def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
+    page = wizard.upload()
+    assert "aria-label='About column mapping'" in page.text
+    assert "aria-describedby='mapping-instructions'" in page.text
+    instruction = "Match each source column to one dataset field, or choose Do not import."
+    assert page.text.count(instruction) == 1
+    info = page.text.split("id='mapping-instructions'", 1)[1].split("</details>", 1)[0]
+    assert instruction in info
+    assert "File:" in info
+    assert "Mapping completeness" in info
+    assert "data-mapping-status" in info
+    form = page.text.split("id='import-step-form'", 1)[1].split("</form>", 1)[0]
+    assert "mapping-metadata" not in form
+    assert "data-mapping-summary" not in form
+    assert "data-mapping-status" not in form
+    assert "File:" in page.text
+    assert "Mapping completeness" in page.text

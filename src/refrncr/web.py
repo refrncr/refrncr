@@ -7,6 +7,8 @@ import re
 import secrets
 from datetime import UTC
 from decimal import Decimal
+from functools import wraps
+from itertools import islice
 from urllib.parse import unquote, urlsplit
 
 from flask import (
@@ -36,9 +38,13 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.record_import import (
+    DISPLAY_SAMPLE_VALUES,
     MAX_UPLOAD_BYTES,
+    PREVIEW_ROWS,
+    PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
     ImportValidationError,
+    parse_source,
 )
 from refrncr.services import (
     DATASET_FIELD_TYPES,
@@ -582,198 +588,365 @@ def create_flask_app(
         response.call_on_close(artifact.content.close)
         return response
 
-    def render_import_upload(dataset, csrf, error=None, status=200):
-        response = render_authenticated_template(
-            "pages/datasets/import/upload.html",
-            dataset=dataset,
-            current_csrf=csrf,
-            error=error,
-        )
-        return (response, status) if status != 200 else response
+    def import_route(rule, **options):
+        def decorate(function):
+            @wraps(function)
+            def secured_import(*args, **kwargs):
+                try:
+                    return function(*args, **kwargs)
+                except (NotFoundError, AuthorizationError):
+                    return "The import has expired or is unavailable. Upload the file again.", 404
+                except ImportValidationError:
+                    return (
+                        "The import is unavailable. No records have been imported. Upload the file again.",
+                        400,
+                    )
 
-    def render_worksheet(dataset, state, parsed, csrf):
+            return dataset_route(rule, **options)(secured_import)
+
+        return decorate
+
+    def render_import_wizard(dataset, login_session, state=None, *, step=1, error=None, status=200):
+        actor, _session = require_authenticated()
+        fields = dataset_fields.list_fields(actor.id, dataset.key)
+        source = assistance = preview = None
+        required_keys = ()
+        identifier_keys = ()
+        mapping_errors = {}
+        mapping_samples = []
+        if state and state.imported_count is None:
+            if step >= 3:
+                state, source, assistance = record_imports.mapping_assistance(
+                    actor.id, login_session.id, dataset.key, state.token
+                )
+            else:
+                source = parse_source(state.filename, state.content, state.worksheet)
+            if step >= 4:
+                try:
+                    preview = record_imports.saved_preview(
+                        actor.id, login_session.id, dataset.key, state.token
+                    )
+                except NotFoundError:
+                    raise
+                except Exception:
+                    return (
+                        "Validation could not be completed. No records have been imported. Try again.",
+                        503,
+                    )
+                state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
+                if preview.non_row_errors:
+                    step = 3
+                    error = " ".join(item.message for item in preview.non_row_errors)
+                elif step == 5 and not preview.valid:
+                    step = 4
+                if step != state.step:
+                    state = record_imports.navigate(
+                        actor.id, login_session.id, dataset.key, state.token, step
+                    )
+            if source.headers:
+                with record_imports.uow() as uow:
+                    identifier = uow.dataset_business_keys.get(dataset.id)
+                identifier_keys = identifier.field_keys
+                required_keys = tuple(
+                    dict.fromkeys(
+                        [field.key for field in fields if field.is_required]
+                        + list(identifier.field_keys)
+                    )
+                )
+        if assistance:
+            # Full versions of the same bounded display examples, for accessible disclosure.
+            for index in range(len(source.headers)):
+                samples = (
+                    row.values[index]
+                    for row in source.rows[:PROFILE_SCAN_ROWS]
+                    if index not in row.formulas and row.values[index].strip()
+                )
+                mapping_samples.append(tuple(islice(samples, DISPLAY_SAMPLE_VALUES)))
+        if assistance and error:
+            choices = assistance.mapping
+            keys = {field.key for field in fields}
+            for index, choice in enumerate(choices):
+                if choice == "":
+                    mapping_errors[index] = "Choose a field or Do not import."
+                elif choice is not None and choice not in keys:
+                    mapping_errors[index] = "Choose a field from this dataset."
+                elif choice and choices.count(choice) > 1:
+                    mapping_errors[index] = (
+                        "This field is mapped more than once. Choose a different field or Do not import."
+                    )
+        success = state is not None and state.imported_count is not None
+        automatic = source is not None and (source.kind == "csv" or len(source.worksheets) == 1)
+        completed = {
+            1: state is not None,
+            2: bool(source and source.headers),
+            3: bool(state and state.mapping_ready),
+            4: bool(state and state.validation_valid),
+            5: success,
+        }
+        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & validate", "Import")
+        steps = []
+        for number, label in enumerate(labels, 1):
+            done = success or completed[number]
+            reachable = bool(
+                state
+                and not success
+                and number != step
+                and (done or number == 3 and source and source.headers)
+                and not (number == 2 and automatic)
+            )
+            steps.append(dict(number=number, label=label, done=done, reachable=reachable))
+        preview_fields = [field for field in fields if preview and field.key in preview.mapping]
+        preview_rows = (
+            [
+                tuple(row.values[preview.mapping.index(field.key)] for field in preview_fields)
+                for row in preview.source.rows[:PREVIEW_ROWS]
+            ]
+            if preview and preview.valid
+            else []
+        )
+        report_rows = []
+        if preview and preview.errors:
+            rows = {row.number: row for row in preview.source.rows}
+            for number, errors in preview.row_error_groups:
+                row = rows[number]
+                identifier_values = [
+                    row.values[preview.mapping.index(key)]
+                    for key in required_keys
+                    if key in identifier.field_keys and key in preview.mapping
+                ]
+                details = []
+                for item in errors:
+                    value = None
+                    if item.header in preview.source.headers:
+                        index = preview.source.headers.index(item.header)
+                        value = "[Formula]" if index in row.formulas else row.values[index]
+                    details.append(dict(field=item.field, value=value, message=item.message))
+                report_rows.append(
+                    dict(number=number, identifier=" · ".join(identifier_values), errors=details)
+                )
+        back_step = 3 if step == 4 else 4 if step == 5 else 1 if automatic else step - 1
         return render_authenticated_template(
-            "pages/datasets/import/worksheet.html",
+            "pages/datasets/import/wizard.html",
             dataset=dataset,
             state=state,
-            parsed=parsed,
-            current_csrf=csrf,
-        )
-
-    def render_mapping(dataset, fields, state, parsed, assistance, csrf, error=None, status=200):
-        response = render_authenticated_template(
-            "pages/datasets/import/mapping.html",
-            dataset=dataset,
-            fields=fields,
-            state=state,
-            parsed=parsed,
+            step=step,
+            steps=steps,
+            source=source,
             assistance=assistance,
-            current_csrf=csrf,
+            preview=preview,
+            fields=fields,
+            mapping_samples=mapping_samples,
+            mapping_errors=mapping_errors,
+            required_keys=required_keys,
+            identifier_keys=identifier_keys,
+            preview_fields=preview_fields,
+            preview_rows=preview_rows,
+            report_rows=report_rows,
+            success=success,
+            automatic=automatic,
+            back_step=back_step,
             error=error,
-        )
-        return (response, status) if status != 200 else response
+            current_csrf=login_session.csrf_token,
+        ), status
 
-    @dataset_route("/datasets/<key>/records/import", methods=["GET", "POST"])
+    def import_redirect(key, state):
+        return redirect(
+            url_for("dataset_import_step", key=key, token=state.token, step=state.step), code=303
+        )
+
+    @import_route("/datasets/<key>/records/import", methods=["GET", "POST"])
     def import_dataset_records(key: str):
         actor, login_session = require_authenticated()
-        _authorization, _datasets, field_service, _keys, record_service = (
-            require_dataset_dependencies()
-        )
-        try:
-            dataset = record_service.get_dataset_for_add(actor.id, key)
-        except NotFoundError:
-            abort(404)
+        require_dataset_dependencies()
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        state = record_imports.active(actor.id, login_session.id, key)
         if request.method == "GET":
-            return render_import_upload(dataset, login_session.csrf_token)
-        require_csrf(login_session.csrf_token)
-        if set(request.form) != {"csrf_token"} or set(request.files) != {"file"}:
-            return render_import_upload(
-                dataset, login_session.csrf_token, "Submit exactly one import file", 400
-            )
-        uploaded = request.files["file"]
-        content = uploaded.stream.read(MAX_UPLOAD_BYTES + 1)
-        try:
-            state, source, assistance = record_imports.begin(
-                actor.id, login_session.id, key, uploaded.filename or "", content
-            )
-            if not source.headers:
-                return render_worksheet(dataset, state, source, login_session.csrf_token)
-            fields = field_service.list_fields(actor.id, key)
-            return render_mapping(
-                dataset, fields, state, source, assistance, login_session.csrf_token
-            )
-        except ImportValidationError as error:
-            return render_import_upload(dataset, login_session.csrf_token, str(error), 400)
-        except NotFoundError:
-            abort(404)
-
-    @dataset_route("/datasets/<key>/records/import/<token>/worksheet", methods=["POST"])
-    def select_import_worksheet(key: str, token: str):
-        actor, login_session = require_authenticated()
-        _authorization, dataset_service, field_service, _keys, _records = (
-            require_dataset_dependencies()
-        )
+            if state:
+                state = record_imports.navigate(
+                    actor.id,
+                    login_session.id,
+                    key,
+                    state.token,
+                    4 if state.mapping_ready else state.step,
+                )
+                return import_redirect(key, state)
+            return render_import_wizard(dataset, login_session)
         require_csrf(login_session.csrf_token)
         if (
-            set(request.form) != {"csrf_token", "worksheet"}
-            or len(request.form.getlist("worksheet")) != 1
+            set(request.form) != {"csrf_token"}
+            or set(request.files) != {"file"}
+            or len(request.files.getlist("file")) != 1
+        ):
+            return render_import_wizard(
+                dataset, login_session, state, error="Submit exactly one import file", status=400
+            )
+        uploaded = request.files["file"]
+        try:
+            state, _source, _assistance = record_imports.begin(
+                actor.id,
+                login_session.id,
+                key,
+                uploaded.filename or "",
+                uploaded.stream.read(MAX_UPLOAD_BYTES + 1),
+            )
+        except ImportValidationError as error:
+            return render_import_wizard(dataset, login_session, state, error=str(error), status=400)
+        return import_redirect(key, state)
+
+    @import_route("/datasets/<key>/records/import/<token>/step/<int:step>", methods=["GET"])
+    def dataset_import_step(key: str, token: str, step: int):
+        actor, login_session = require_authenticated()
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        state = record_imports.navigate(actor.id, login_session.id, key, token, step)
+        return render_import_wizard(dataset, login_session, state, step=step)
+
+    @import_route("/datasets/<key>/records/import/<token>/worksheet", methods=["POST"])
+    def select_import_worksheet(key: str, token: str):
+        actor, login_session = require_authenticated()
+        require_csrf(login_session.csrf_token)
+        expected = {"csrf_token", "worksheet"}
+        going_back = "go_step" in request.form
+        if going_back:
+            expected.add("go_step")
+        if (
+            set(request.form) != expected
+            or any(len(request.form.getlist(name)) != 1 for name in expected)
+            or going_back
+            and request.form["go_step"] != "1"
         ):
             abort(400)
+        if going_back and not request.form["worksheet"]:
+            state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
+            return import_redirect(key, state)
         try:
-            dataset = dataset_service.get_dataset(actor.id, key)
-            state, source, assistance = record_imports.select_worksheet(
+            state, _source, _assistance = record_imports.select_worksheet(
                 actor.id, login_session.id, key, token, request.form["worksheet"]
             )
-            fields = field_service.list_fields(actor.id, key)
-        except NotFoundError:
-            return "The import has expired or is unavailable. Upload the file again.", 404
         except ImportValidationError as error:
-            return str(error), 400
-        return render_mapping(dataset, fields, state, source, assistance, login_session.csrf_token)
-
-    @dataset_route("/datasets/<key>/records/import/<token>/mapping", methods=["GET"])
-    def review_import_mapping(key: str, token: str):
-        actor, login_session = require_authenticated()
-        _authorization, dataset_service, field_service, _keys, _records = (
-            require_dataset_dependencies()
-        )
-        try:
-            dataset = dataset_service.get_dataset(actor.id, key)
-            fields = field_service.list_fields(actor.id, key)
-            state, source, assistance = record_imports.mapping_assistance(
-                actor.id, login_session.id, key, token
+            dataset = dataset_records.get_dataset_for_add(actor.id, key)
+            state = record_imports.state(actor.id, login_session.id, key, token)
+            return render_import_wizard(
+                dataset, login_session, state, step=2, error=str(error), status=400
             )
-        except NotFoundError:
-            return "The import has expired or is unavailable. Upload the file again.", 404
-        return render_mapping(dataset, fields, state, source, assistance, login_session.csrf_token)
+        if going_back:
+            state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
+        return import_redirect(key, state)
 
-    @dataset_route("/datasets/<key>/records/import/<token>/preview", methods=["GET", "POST"])
+    @import_route("/datasets/<key>/records/import/<token>/mapping", methods=["GET"])
+    def review_import_mapping(key: str, token: str):
+        return dataset_import_step(key, token, 3)
+
+    @import_route("/datasets/<key>/records/import/<token>/preview", methods=["GET", "POST"])
     def preview_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
-        _authorization, dataset_service, field_service, _keys, _records = (
-            require_dataset_dependencies()
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        state, source, _assistance = record_imports.mapping_assistance(
+            actor.id, login_session.id, key, token
+        )
+        if request.method == "GET":
+            return dataset_import_step(key, token, 4)
+        require_csrf(login_session.csrf_token)
+        expected = {f"mapping_{index}" for index in range(len(source.headers))} | {"csrf_token"}
+        target_step = request.form.get("go_step")
+        if target_step is not None:
+            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4", "5"}:
+                abort(400)
+            # Check the original state before accepting a navigation request.
+            record_imports.navigate(actor.id, login_session.id, key, token, int(target_step))
+            expected.add("go_step")
+        if set(request.form) != expected or any(
+            len(request.form.getlist(name)) != 1 for name in expected
+        ):
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=3,
+                error="Submit exactly one mapping for every source column",
+                status=400,
+            )
+        mapping = tuple(
+            None
+            if request.form[f"mapping_{index}"] == "__ignored__"
+            else request.form[f"mapping_{index}"]
+            for index in range(len(source.headers))
         )
         try:
-            dataset = dataset_service.get_dataset(actor.id, key)
-            fields = field_service.list_fields(actor.id, key)
-            if request.method == "GET":
-                preview = record_imports.saved_preview(actor.id, login_session.id, key, token)
-            else:
-                require_csrf(login_session.csrf_token)
-                expected = {f"mapping_{index}" for index in range(250)}
-                supplied = set(request.form) - {"csrf_token"}
-                if not supplied or not supplied <= expected:
-                    raise ImportValidationError(
-                        "Submit exactly one mapping for every source column"
-                    )
-                indices = sorted(int(name.removeprefix("mapping_")) for name in supplied)
-                if indices != list(range(len(indices))) or any(
-                    len(request.form.getlist(f"mapping_{index}")) != 1 for index in indices
-                ):
-                    raise ImportValidationError(
-                        "Submit exactly one mapping for every source column"
-                    )
-                mapping = tuple(
-                    None
-                    if request.form[f"mapping_{index}"] == "__ignored__"
-                    else request.form[f"mapping_{index}"]
-                    for index in indices
-                )
-                preview = record_imports.preview(actor.id, login_session.id, key, token, mapping)
-                if preview.non_row_errors:
-                    state, source, assistance = record_imports.mapping_assistance(
-                        actor.id, login_session.id, key, token
-                    )
-                    return render_mapping(
-                        dataset,
-                        fields,
-                        state,
-                        source,
-                        assistance,
-                        login_session.csrf_token,
-                        error=" ".join(error.message for error in preview.non_row_errors),
-                        status=400,
-                    )
+            preview = record_imports.preview(actor.id, login_session.id, key, token, mapping)
         except NotFoundError:
-            return "The import has expired or is unavailable. Upload the file again.", 404
-        except ImportValidationError as error:
-            return str(error), 400
-        mapped_headers = [
-            (preview.source.headers[index], value) for index, value in enumerate(preview.mapping)
-        ]
-        return render_authenticated_template(
-            "pages/datasets/import/preview.html",
-            dataset=dataset,
-            fields=fields,
-            preview=preview,
-            mapped_headers=mapped_headers,
-            token=token,
-            current_csrf=login_session.csrf_token,
-        )
+            raise
+        except Exception:
+            state = record_imports.state(actor.id, login_session.id, key, token)
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=3,
+                error="Validation could not be completed. No records have been imported. Try again.",
+                status=503,
+            )
+        state = record_imports.state(actor.id, login_session.id, key, token)
+        if target_step in {"1", "2"}:
+            state = record_imports.navigate(
+                actor.id, login_session.id, key, token, int(target_step)
+            )
+            return import_redirect(key, state)
+        if preview.non_row_errors:
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=3,
+                error=" ".join(item.message for item in preview.non_row_errors),
+                status=400,
+            )
+        if target_step == "5" and preview.valid:
+            state = record_imports.navigate(actor.id, login_session.id, key, token, 5)
+        return import_redirect(key, state)
 
-    @dataset_route("/datasets/<key>/records/import/<token>/confirm", methods=["POST"])
+    @import_route("/datasets/<key>/records/import/<token>/confirm", methods=["POST"])
     def confirm_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
-        if set(request.form) != {"csrf_token"}:
+        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
             abort(400)
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
         try:
-            record_imports.confirm(actor.id, login_session.id, key, token)
+            record_imports.confirm(
+                actor.id, login_session.id, key, token, require_confirmation=True
+            )
         except NotFoundError:
-            return "The import has expired or is unavailable. Upload the file again.", 404
-        except (ImportValidationError, RecordConflictError) as error:
-            return str(error), 409
-        return redirect(url_for("dataset_records_view", key=key))
+            raise
+        except (ImportValidationError, RecordConflictError):
+            state = record_imports.state(actor.id, login_session.id, key, token)
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=4,
+                error="The import changed since validation. No records have been imported. Review the validation results before continuing.",
+                status=409,
+            )
+        except Exception:
+            state = record_imports.state(actor.id, login_session.id, key, token)
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=5,
+                error="The import could not be completed. No records have been imported. Try again.",
+                status=503,
+            )
+        return import_redirect(key, record_imports.state(actor.id, login_session.id, key, token))
 
-    @dataset_route("/datasets/<key>/records/import/<token>/cancel", methods=["POST"])
+    @import_route("/datasets/<key>/records/import/<token>/cancel", methods=["POST"])
     def cancel_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
-        try:
-            record_imports.cancel(actor.id, login_session.id, key, token)
-        except NotFoundError:
-            return "The import has expired or is unavailable. Upload the file again.", 404
-        return redirect(url_for("dataset_records_view", key=key))
+        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
+            abort(400)
+        record_imports.cancel(actor.id, login_session.id, key, token)
+        return redirect(url_for("dataset_records_view", key=key), code=303)
 
     def render_record_form(
         dataset,

@@ -449,9 +449,9 @@ def test_mapping_preview_conflicts_atomic_confirmation_and_replay(import_context
         admin.id, "session-one", dataset.key, "../safe<script>.csv", content
     )
     assert state.filename == "safe<script>.csv"
-    assert assistance.mapping == ("code", "amount", "active", "day", "")
-    assert assistance.completeness.unmapped_columns == 1
-    assert assistance.completeness.ignored_columns == 0
+    assert assistance.mapping == ("code", "amount", "active", "day", None)
+    assert assistance.completeness.unmapped_columns == 0
+    assert assistance.completeness.ignored_columns == 1
     assert assistance.columns[0].candidates[0].confidence == "High"
     preview = importer.preview(
         admin.id,
@@ -501,7 +501,7 @@ def test_manual_mapping_and_ignored_choice_survive_validation_errors(import_cont
         "manual.csv",
         b"mystery,amount,extra\nmanual,bad,ignored\n",
     )
-    assert assistance.mapping == ("", "", "")
+    assert assistance.mapping == (None, "", None)
     assert assistance.columns[1].candidates[0].confidence == "Low"
     preview = services.record_imports.preview(
         admin.id,
@@ -839,6 +839,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     client.post(
         "/login",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"email": admin.email, "password": PASSWORD, "csrf_token": csrf},
     )
     upload = client.get(f"/datasets/{dataset.key}/records/import", base_url="https://localhost")
@@ -847,6 +848,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         client.post(
             f"/datasets/{dataset.key}/records/import",
             base_url="https://localhost",
+            follow_redirects=True,
             data={"file": (io.BytesIO(b"code,amount\nX,3\n"), "<file>.csv")},
         ).status_code
         == 403
@@ -854,6 +856,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     unreadable = client.post(
         f"/datasets/{dataset.key}/records/import",
         base_url="https://localhost",
+        follow_redirects=True,
         data={
             "csrf_token": csrf,
             "file": (io.BytesIO(b"PK\x03\x04broken"), "broken.xlsx"),
@@ -865,6 +868,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     mapping = client.post(
         f"/datasets/{dataset.key}/records/import",
         base_url="https://localhost",
+        follow_redirects=True,
         data={
             "csrf_token": csrf,
             "file": (io.BytesIO(b"code,amount\n<script>,3\n"), "<file>.csv"),
@@ -875,14 +879,15 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert "&lt;file&gt;.csv" in body
     assert "High confidence" in body
     assert "2 of 2 required fields mapped" in body
-    assert "0 source columns unmapped; 0 source columns explicitly ignored" in body
+    assert "0 choices remaining · 0 columns ignored" in body
     assert "Examples:" in body
     assert "&lt;script&gt;" in body
     assert "internal score" not in body.casefold()
-    token = body.split("/import/")[1].split("/preview", 1)[0]
+    token = mapping.request.path.split("/import/")[1].split("/step/")[0]
     malformed_mapping = client.post(
         f"/datasets/{dataset.key}/records/import/{token}/preview",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf, "mapping_0": "code"},
     )
     assert malformed_mapping.status_code == 400
@@ -890,40 +895,52 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     incomplete = client.post(
         f"/datasets/{dataset.key}/records/import/{token}/preview",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": ""},
     )
     assert incomplete.status_code == 400
-    assert "Missing required fields: Amount" in incomplete.get_data(as_text=True)
+    assert "Missing required fields:" in incomplete.get_data(as_text=True)
+    assert "data-missing-key='amount'" in incomplete.get_data(as_text=True)
     reopened = client.get(
         f"/datasets/{dataset.key}/records/import/{token}/mapping",
         base_url="https://localhost",
+        follow_redirects=True,
     )
     assert reopened.status_code == 200
     assert "value='code' selected" in reopened.get_data(as_text=True)
     preview = client.post(
         f"/datasets/{dataset.key}/records/import/{token}/preview",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "amount"},
     )
     assert preview.status_code == 200
     assert "&lt;script&gt;" in preview.get_data(as_text=True)
+    final = client.get(
+        f"/datasets/{dataset.key}/records/import/{token}/step/5", base_url="https://localhost"
+    )
+    assert final.status_code == 200
     confirmed = client.post(
         f"/datasets/{dataset.key}/records/import/{token}/confirm",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf},
     )
-    assert confirmed.status_code == 302
+    assert confirmed.status_code == 200
+    assert "1 records imported successfully" in confirmed.get_data(as_text=True)
 
     error_rows = b"code,amount\n" + b"not-a-code,not-a-number\n" * 101
     mapping = client.post(
         f"/datasets/{dataset.key}/records/import",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf, "file": (io.BytesIO(error_rows), "errors.csv")},
     )
-    token = mapping.get_data(as_text=True).split("/import/")[1].split("/preview", 1)[0]
+    token = mapping.request.path.split("/import/")[1].split("/step/")[0]
     error_preview = client.post(
         f"/datasets/{dataset.key}/records/import/{token}/preview",
         base_url="https://localhost",
+        follow_redirects=True,
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "amount"},
     )
     error_body = error_preview.get_data(as_text=True)
@@ -947,3 +964,60 @@ def test_postgresql_import_lock_constraints_and_manual_create_race(postgresql_im
         services.record_imports.confirm(admin.id, "session", dataset.key, state.token)
     with factory() as session:
         assert session.scalar(select(func.count()).select_from(DatasetRecord)) == 1
+
+
+def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context, monkeypatch):
+    from threading import Event
+
+    factory, services, admin, dataset = postgresql_import_context
+    importer = services.record_imports
+    state, _, _ = importer.begin(
+        admin.id, "parallel", dataset.key, "parallel.csv", b"code,amount\nA,1\nB,2\n"
+    )
+    importer.preview(admin.id, "parallel", dataset.key, state.token, ("code", "amount"))
+    importer.navigate(admin.id, "parallel", dataset.key, state.token, 5)
+    claimed, release = Event(), Event()
+    original = importer.store.claim
+
+    def paused_claim(state):
+        result = original(state)
+        claimed.set()
+        assert release.wait(10)
+        return result
+
+    monkeypatch.setattr(importer.store, "claim", paused_claim)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            importer.confirm,
+            admin.id,
+            "parallel",
+            dataset.key,
+            state.token,
+            require_confirmation=True,
+        )
+        assert claimed.wait(10)
+        try:
+            second = executor.submit(
+                importer.confirm,
+                admin.id,
+                "parallel",
+                dataset.key,
+                state.token,
+                require_confirmation=True,
+            )
+            with pytest.raises(NotFoundError):
+                second.result(timeout=5)
+        finally:
+            release.set()
+        assert first.result(timeout=10) == 2
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(DatasetRecord)) == 2
+        assert session.scalar(select(func.count()).select_from(DatasetRecordValue)) == 4
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(AuditEvent)
+                .where(AuditEvent.object_type == "dataset_record", AuditEvent.action == "created")
+            )
+            == 2
+        )

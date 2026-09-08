@@ -1,11 +1,11 @@
-{% extends "base.html" %}
-{% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Import preview</h1><p>File: {{ preview.filename }}</p><p><a href='{{ url_for("review_import_mapping", key=dataset.key, token=token) }}'>Review mappings</a></p>
-  {% if preview.source.worksheet %}<p>Worksheet: {{ preview.source.worksheet }}</p>{% endif %}{% if preview.source.delimiter %}<p>Detected delimiter: {{ preview.source.delimiter }}</p>{% endif %}
-  <dl><dt>Data rows</dt><dd>{{ preview.source.rows|length }}</dd><dt>Valid rows</dt><dd>{{ preview.valid_rows }}</dd><dt>Failing rows</dt><dd>{{ preview.invalid_rows }}</dd><dt>Ignored empty rows</dt><dd>{{ preview.source.ignored_empty_rows }}</dd></dl>
-  <h2>Mappings</h2><ul>{% for header, target in mapped_headers %}<li>{{ header }} → {{ target or 'Ignored' }}</li>{% endfor %}</ul>
-  {% if preview.errors %}<h2>Errors</h2>{% if preview.non_row_errors %}<h3>File and mapping errors</h3><ul>{% for error in preview.non_row_errors %}<li>{{ error.message }}</li>{% endfor %}</ul>{% endif %}{% for row, errors in preview.row_error_groups %}<section><h3>Failing data row {{ loop.index }} — source file row {{ row }}</h3><ul>{% for error in errors %}<li>{% if error.header %}{{ error.header }}: {% endif %}{% if error.field %}{{ error.field }}: {% endif %}{{ error.message }}</li>{% endfor %}</ul></section>{% endfor %}{% if preview.row_report_truncated %}<p>Showing 100 of {{ preview.invalid_rows }} failing data rows. Row numbers above refer to the source file; row 1 is the header. Later failing rows are not shown.</p>{% endif %}{% endif %}
-  <h2>Sample</h2><div class='table-scroll'><table aria-label='Import sample'>{% for row in preview.sample %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</table></div>
-  {% if preview.valid %}<form class='form' method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>Import {{ preview.valid_rows }} records</button></form>{% endif %}
-  <form class='form' method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>Cancel import</button></form>
-{% endblock %}
+<p>File: <strong>{{ state.filename }}</strong>{% if source.worksheet %} · Worksheet: {{ source.worksheet }}{% endif %}</p>
+{% if preview.valid %}
+  <div class='alert alert-success' role='status'>Validation successful. {{ source.rows|length }} records are ready to import.</div>
+  <p>No records have been imported. Showing the first {{ preview_rows|length }} of {{ source.rows|length }} records.</p>
+  <div class='table-scroll' tabindex='0' role='region' aria-label='Import preview table'><table><caption class='visually-hidden'>First ten records, in dataset field order</caption><thead><tr>{% for field in preview_fields %}<th scope='col'>{{ field.name }}</th>{% endfor %}</tr></thead><tbody>{% for row in preview_rows %}<tr>{% for value in row %}<td>{{ value if value|trim else '—' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+{% else %}
+  <div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ preview.invalid_rows }} source rows failed validation. No records have been imported.</div>
+  <p>Correct the errors in your source file, then upload the corrected file. Records cannot be edited here.</p>
+  <button class='button button-secondary' type='button' data-dialog-open='import-error-report'>View error report</button>
+  {% include "pages/datasets/import/error_report.html" %}
+{% endif %}
