@@ -84,7 +84,7 @@ class AuditEvent(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    details: Mapped[dict[str, str] | None] = mapped_column(JSON)
+    details: Mapped[dict[str, str | int] | None] = mapped_column(JSON)
     actor_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     object_type: Mapped[str] = mapped_column(String(100))
     object_id: Mapped[str] = mapped_column(String(100), index=True)

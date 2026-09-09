@@ -347,7 +347,7 @@ class UnitOfWork(Protocol):
         object_type: str,
         object_id: str,
         action: str,
-        details: dict[str, str] | None = None,
+        details: dict[str, str | int] | None = None,
     ) -> None: ...
 
 

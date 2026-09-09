@@ -4,7 +4,8 @@ Community Record imports stage at most 10 MiB in a bounded, process-local transi
 opaque token binds the bytes, mapping, worksheet, actor, login session, and Dataset for 15 minutes.
 Logout removes session-bound imports; confirmation claims the token before reparsing and uses one
 serialized Dataset transaction. Successful confirmation leaves a non-executable completion receipt
-until expiry. No staged content or import history is persisted.
+until expiry. Staged content and wizard state are not persisted. Successful confirmation persists
+the structural audit summary described below; it contains no upload or Record values.
 
 Under REF-73, import requires the central Dataset maintenance capability: active owning-team
 membership or Community administrator access. Confirmation rechecks current authority inside the
@@ -95,7 +96,10 @@ retry within the original TTL. Logout/expiry during processing cannot resurrect 
 the store retains only the bound completion receipt (count and display metadata) until expiry,
 removes source bytes/mapping/schema data, and rejects any further mutation using that token.
 This receipt supports refresh of the success page; it is not an executable import token or a durable
-draft. Persistence, identifier uniqueness, revision 1 and transactional audits are unchanged.
+draft. Persistence, identifier uniqueness and revision 1 are unchanged. REF-149 confirmation emits exactly
+one transactional `dataset.records_imported` summary on the Dataset, with format and committed
+Record/rejected-row counts; it emits no per-Record events. Failures/cancellation/replay emit no
+successful summary. See [audit policy](audit-policy.md).
 
 `tests/test_import_wizard.py` covers navigation, manipulated requests, exact replacement compatibility,
 resume/cancel/expiry/logout, ten-row previews, report boundaries, explicit confirmation, replay,

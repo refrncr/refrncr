@@ -29,7 +29,7 @@ from refrncr.browser_security import (
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
-from refrncr.dataset_export import ExportGenerationError, verify_artifact_readable
+from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -672,7 +672,6 @@ def create_flask_app(
             abort(404)
         except (ExportGenerationError, ValidationError) as error:
             return str(error), 422
-        verify_artifact_readable(artifact)
         try:
             response = send_file(
                 artifact.content,
@@ -684,6 +683,7 @@ def create_flask_app(
         except Exception:
             artifact.content.close()
             raise
+        response.response = logged_export_stream(response.response)
         response.call_on_close(artifact.content.close)
         return response
 

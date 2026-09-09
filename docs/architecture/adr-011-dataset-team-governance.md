@@ -1,6 +1,6 @@
 # ADR-011: Dataset team ownership and independent export access
 
-Status: Accepted for REF-73; implementation validation and merge pending.
+Status: Accepted. REF-73 merged into main in PR #41.
 
 ## Context
 
