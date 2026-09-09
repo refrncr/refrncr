@@ -1,0 +1,7 @@
+{% macro table_row(kind='', search_text=none, panel=false, explicit_role=false) -%}
+  <tr class='{{ kind }} interactive-row' data-row-action{% if panel %} data-record-row{% endif %}{% if explicit_role %} role='row'{% endif %}{% if search_text is not none %} data-list-row data-search-text='{{ search_text }}'{% endif %}>{{ caller() }}</tr>
+{%- endmacro %}
+
+{% macro row_action(label='', href=none, panel=none, accessible_name=none) -%}
+  {% if href is not none %}<a class='row-action' data-row-primary href='{{ href }}' draggable='false'{% if accessible_name %} aria-label='{{ accessible_name }}'{% endif %}>{% else %}<button class='row-action' data-row-primary type='button' data-dialog-open='{{ panel }}' aria-haspopup='dialog' aria-controls='{{ panel }}'{% if accessible_name %} aria-label='{{ accessible_name }}'{% endif %}>{% endif %}<span class='row-action-label'>{% if caller is defined %}{{ caller() }}{% else %}{{ label }}{% endif %}</span><svg class='row-chevron' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true' focusable='false'><path d='m9 6 6 6-6 6'/></svg>{% if href is not none %}</a>{% else %}</button>{% endif %}
+{%- endmacro %}

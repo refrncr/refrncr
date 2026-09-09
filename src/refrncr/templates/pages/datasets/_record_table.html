@@ -1,3 +1,4 @@
+{% from "components/table_row.html" import table_row, row_action %}
 <div class='record-toolbar' aria-label='Record results'>
   <span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>
 </div>
@@ -13,15 +14,15 @@
             </th>
           {% endfor %}
           <th scope='col'>Status</th>
-          <th scope='col'><span class='visually-hidden'>Actions</span></th>
         </tr>
       </thead>
       <tbody>
         {% for record, values, incomplete in rows %}
-          <tr class='record-row' data-record-row data-dialog-open='record-panel-{{ record.id }}'>
+          {% call table_row('record-row', panel=true) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
               <td{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>
+                {% set value_content %}
                 {% if cell_value is none %}
                   <span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>
                 {% elif field.data_type == 'number' %}
@@ -29,13 +30,15 @@
                 {% else %}
                   <span class='cell-content' title='{{ cell_value }}'>{{ cell_value }}</span>
                 {% endif %}
+                {% endset %}
+                {% if field.key == identifier.field_keys[0] %}
+                  {% set primary_label = display_record_value(field, cell_value) if cell_value is not none else "No value" %}
+                  {% call row_action(panel="record-panel-" ~ record.id, accessible_name="View record " ~ primary_label ~ " (" ~ record.id ~ ")") %}{{ value_content }}{% endcall %}
+                {% else %}{{ value_content }}{% endif %}
               </td>
             {% endfor %}
             <td>{% if incomplete %}<span class='badge badge-warning'>Incomplete record</span>{% else %}<span class='badge badge-success'>Complete</span>{% endif %}</td>
-            <td>
-              <button class='button button-secondary' type='button' data-dialog-open='record-panel-{{ record.id }}' aria-label='View record {{ values.get(identifier.field_keys[0], record.id) }} ({{ record.id }})'>View</button>
-            </td>
-          </tr>
+          {% endcall %}
         {% endfor %}
       </tbody>
     </table>

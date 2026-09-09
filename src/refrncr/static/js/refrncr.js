@@ -249,9 +249,15 @@
     });
   });
 
+  const hasRowSelection = () => window.getSelection?.()?.isCollapsed === false;
+  const modifiedRowClick = (event) =>
+    event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0;
+
   document.querySelectorAll("[data-dialog-open]").forEach((trigger) => {
     trigger.addEventListener("click", (event) => {
-      if (trigger.hasAttribute("data-record-row") && event.target.closest("a, button, input")) return;
+      if (trigger.hasAttribute("data-row-primary") &&
+          (event.defaultPrevented || modifiedRowClick(event) ||
+           (event.detail !== 0 && hasRowSelection()))) return;
       const dialog = document.getElementById(trigger.dataset.dialogOpen);
       if (!dialog || typeof dialog.showModal !== "function") return;
       if (trigger.hasAttribute("data-panel-url")) {
@@ -319,17 +325,26 @@
     }
   });
 
-  document.querySelectorAll("[data-row-href]").forEach((row) => {
-    const openRow = () => window.location.assign(row.dataset.rowHref);
-    row.addEventListener("click", (event) => {
-      if (!event.target.closest("a, button, input")) openRow();
-    });
-    row.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openRow();
-      }
-    });
+  // Keep selectable text unobstructed: only enhance unused parts of a row.
+  // The primary anchor/button retains its own native keyboard and pointer behavior.
+  const rowInteractiveSelector =
+    "a, button, input, select, textarea, label, summary, details, [contenteditable]:not([contenteditable='false']), " +
+    "[tabindex], [role], [data-dialog-open]";
+  document.addEventListener("click", (event) => {
+    if (!modifiedRowClick(event) && event.detail !== 0 && hasRowSelection() &&
+        event.target.closest("[data-row-primary]")) event.preventDefault();
+  }, true);
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || modifiedRowClick(event) || hasRowSelection()) return;
+    const row = event.target.closest("tbody tr[data-row-action]");
+    if (!row || row.hidden || row.closest("[inert]")) return;
+    // Cell/row semantics (e.g. role='cell') are not nested controls.
+    const interactive = event.target.closest(rowInteractiveSelector);
+    if (interactive && row.contains(interactive) && interactive !== row &&
+        !interactive.matches("td[role='cell'], th[role='rowheader']")) return;
+    const primary = row.querySelector("[data-row-primary]");
+    if (!primary || primary.matches(":disabled, [aria-disabled='true'], [hidden]")) return;
+    primary.click();
   });
 
   const listSearch = document.querySelector("[data-list-search]");

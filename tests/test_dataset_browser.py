@@ -186,14 +186,15 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "<th scope='col'>Dataset</th>" in page
     assert "<th scope='col' class='numeric-column'>Records</th>" in page
     assert "<th scope='col'>Updated</th>" in page
-    row = re.search(r"<tr class='dataset-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
+    row = re.search(r"<tr class='dataset-row interactive-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
     assert row is not None
     assert "tabindex" not in row.group(1)
     assert "role=" not in row.group(1)
-    assert "data-row-href='/datasets/searchable/records'" in row.group(1)
+    assert "data-row-action" in row.group(1)
     assert "data-list-row" not in row.group(1)
     assert "data-search-text" not in row.group(1)
-    assert "<a href='/datasets/searchable/records'>Name &lt;unsafe&gt;</a>" in row.group(2)
+    assert "data-row-primary href='/datasets/searchable/records'" in row.group(2)
+    assert "<span class='row-action-label'>Name &lt;unsafe&gt;</span>" in row.group(2)
     assert "<td class='numeric-column'>0</td>" in row.group(2)
     assert "Name <unsafe>" not in page
     assert "<markup>" not in page
@@ -383,13 +384,11 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     assert f"data-dialog-open='record-panel-{record.id}'" in page
     assert "<caption class='visually-hidden'>Records</caption>" in page
     assert "data-record-row" in page
-    assert "<tr class='record-row' data-record-row" in page
-    assert "<tr class='record-row' tabindex=" not in page
-    assert "<tr class='record-row' role=" not in page
-    assert (
-        f"type='button' data-dialog-open='record-panel-{record.id}' "
-        f"aria-label='View record EUR ({record.id})'>View</button>" in page
-    )
+    assert "<tr class='record-row interactive-row' data-row-action data-record-row" in page
+    assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", page)
+    assert f"type='button' data-dialog-open='record-panel-{record.id}'" in page
+    assert f"aria-label='View record EUR ({record.id})'" in page
+    assert ">View</button>" not in page
     assert f"id='record-panel-{record.id}'" in page
     assert ">EUR</h2>" in page
     assert f"aria-labelledby='record-panel-title-{record.id}'" in page
@@ -573,7 +572,7 @@ def test_component_css_uses_explicit_contract_selectors(dataset_browser):
     assert "\nform {" not in forms
     assert ".form {" in forms
     assert "\ntbody tr:hover" not in tables
-    assert ".table-scroll tbody tr:hover" in tables
+    assert ".table-scroll tbody tr:not(.interactive-row):hover" in tables
 
 
 def test_local_lucide_set_has_only_template_consumers_and_packaged_notices(dataset_browser):
@@ -623,7 +622,7 @@ def test_record_table_include_and_view_button_pointer_guard(dataset_browser, mon
     assert "pages/datasets/_record_panels.html" in loaded
     assert "pages/datasets/_record_form_fields.html" in loaded
     assert "components/side_panel.html" in loaded
-    assert 'event.target.closest("a, button, input")' in script
+    assert "const rowInteractiveSelector" in script
     assert 'document.querySelectorAll("[data-record-row]").forEach' not in script
 
 
@@ -718,7 +717,7 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
 
-    assert f"aria-label='View record VISIBLE ({visible_record.id})'>View</button>" in page
+    assert f"aria-label='View record VISIBLE ({visible_record.id})'" in page
     assert "Export</summary>" in page
     assert "Configure</a>" not in page
     assert "Import</a>" not in page
