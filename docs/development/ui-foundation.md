@@ -165,17 +165,74 @@ The supported application workspace starts at 768 px and targets tablet and desk
 768 px access is best effort: navigation, forms, and side panels remain operable, while no
 mobile-specific redesign is implied. Pages remain free of horizontal overflow; wide data tables
 retain readable minimum dimensions and scroll horizontally inside their `table-scroll` container.
-Collapsible navigation below 1024 px belongs to REF-128 and is not part of this foundation.
+The shared navigation contract below applies at every supported width, including 320 px.
 
 At desktop/tablet widths (768 px and above), the shared app shell is bounded by the viewport
 height. Main content scrolls independently so long dataset tables cannot push the account
 details, Settings and Log out below the screen. Sidebar navigation can scroll separately
 when necessary, while the account area does not shrink. The same viewport layout serves
-the dedicated Settings shell. Smaller screens retain the existing compact menu and page scroll.
+the dedicated Settings shell. Smaller screens retain page scroll with a temporary navigation drawer.
 Navigation focus outlines sit inside each item so scrolling containers cannot clip them.
 
 Navigation visibility improves clarity but is never authorization. Every route and mutation
 must continue to enforce server-side permissions and CSRF independently.
+
+## Responsive navigation state (REF-128)
+
+Both authenticated shells use `components/navigation.html`, `layouts/app-shell.css` and
+`static/js/navigation.js`. The existing navigation DOM is reused, including active destinations,
+permission-aware links, account context and the CSRF-protected sign-out form. Settings retains
+its own navigation content. No page-specific controller, token, dependency or account preference
+is added. Data tables, record workflows and side-panel controllers retain their existing contracts.
+
+- At **1024 px and wider**, the complete sidebar is expanded by default. Its top-right
+  icon-only control aligns with the wordmark (Back to app in Settings). `panel-left-close`
+  has accessible name and native tooltip **Collapse navigation**. Collapsing hides the entire
+  sidebar and releases its 240 px column to main content. The content header then shows
+  `panel-left-open` at its top-left, named and titled **Expand navigation**. Neither action
+  navigates or reloads. Desktop has no modal overlay or focus trap.
+- Desktop choices use `sessionStorage["refrncr.navigation.desktop"]`, with `expanded` or
+  `collapsed` values. This is tab/browser-session presentation state, shared across shell pages,
+  never a server/account preference. Missing or invalid values default to expanded. Storage
+  failure leaves in-page toggles usable. The small external script runs synchronously in the
+  document head, before styles/content, to apply the stored class before first paint.
+- **Below 1024 px**, CSS reserves no navigation width regardless of desktop storage. The
+  header control is named and titled **Open navigation**. Navigation starts in a closed native
+  dialog and opens as a temporary drawer with the existing overlay colour/shadow. `showModal()`
+  makes the background inert. Initial focus goes to **Close navigation**; Tab/Shift+Tab wrap
+  through visible drawer controls. Escape, the close button or a completed backdrop click
+  closes it and restores the exact opener. Activating a destination closes before navigation.
+- Crossing 1024 px closes any drawer and moves the same sidebar between the modal host and
+  desktop grid. Returning to desktop restores the current desktop choice. Focus moves to a
+  visible navigation control if the previously focused control would become hidden. Drawer
+  interactions never overwrite desktop state. Pages restored from the back/forward cache reread
+  the current session choice. The dialog scrolls vertically on short screens.
+- Native buttons supply Enter/Space, pointer and touch activation, 44 px targets and the
+  shared visible focus ring. Both expose current `aria-expanded` and `aria-controls` pointing
+  to the complete controlled sidebar. Decorative Lucide SVGs use the existing inline macro
+  mechanism and pinned asset licence. State changes are immediate, without animation, so
+  reduced-motion preferences are respected and no intermediate-width layout is introduced.
+
+`test_navigation_javascript.py` exercises default/manual state, restoration before content,
+blocked storage, both breakpoint directions, drawer lifecycle, focus wrapping and restoration.
+Shell response tests cover both icons, native buttons, accessible names, tooltips, controlled
+IDs and early local script loading. Existing interface/dataset tests retain permission, active
+state and sign-out CSRF coverage. DOM doubles do not establish rendered layout or native
+browser modality: review 320, 767, 768, 1023 and 1024 px in a browser, plus a wide desktop;
+check keyboard operation, background inertness, main-width recovery, cross-page retention,
+focus rings, logo/control alignment, overflow and first paint with stored collapsed state.
+
+The optional `tests/javascript/navigation_browser.cjs` regression script asserts real Chrome
+layout, native Enter/Space and touch activation, focus trapping/restoration, drawer dismissal,
+state retention across actual links and reloads, reduced motion and no horizontal overflow at
+all five boundary widths. It requires an externally available Playwright module and browser;
+neither is added as a project dependency or mandatory CI gate. Start a disposable local app,
+create an administrator through setup, then set `REFRNCR_BROWSER_URL` (loopback origin, no
+trailing slash), `REFRNCR_BROWSER_EMAIL` and `REFRNCR_BROWSER_PASSWORD` to that test account.
+Run `node tests/javascript/navigation_browser.cjs`. `REFRNCR_PLAYWRIGHT_MODULE` may point to
+an existing Playwright installation; `REFRNCR_BROWSER_EXECUTABLE` may select local Chrome.
+`REFRNCR_BROWSER_OUTPUT` optionally collects screenshots for visual review. This script reads
+and navigates the test app; it does not change account permissions or dataset contents.
 
 ## CSS loading order
 
@@ -299,17 +356,13 @@ for Users, Teams and the standalone membership page. It reuses the app-shell gri
 width, shared sidebar styling, vertical navigation, management headers and existing page
 content. The normal application sidebar and account controls are not rendered in Settings.
 
-The desktop top row contains Back to app on the left and a Settings icon/title on the right,
-with matching surface and bottom borders. Back to app opens Overview. The sidebar below it
-contains only Access management, Users and Teams. Active navigation uses the existing green
-surface, foreground and `aria-current="page"`. Main content fills the remaining width, with
-one Users or Teams heading and no redundant breadcrumb or horizontal Settings tabs.
-
-Below 768 px, the shared compact menu controller toggles the Settings sidebar through its
-existing `data-nav-toggle` and `data-navigation` hooks. The button is named Settings menu,
-controls `settings-navigation` and exposes `aria-expanded`. Back to app remains available
-above the Settings header. Navigation stays vertical when expanded. No routing or new
-JavaScript controller is introduced.
+Back to app opens Overview and sits in the sidebar heading beside the shared collapse
+control. The Settings icon/title stays in the content header, beside the opener when collapsed.
+The sidebar contains only Access management, Users and Teams. Active navigation uses the
+existing green surface, foreground and `aria-current="page"`. Main content fills the remaining
+width, with one Users or Teams heading and no redundant breadcrumb or horizontal Settings tabs.
+Settings follows the same REF-128 desktop/session and temporary-drawer contract as the normal
+application shell; destinations, permissions and the distinct Settings context are preserved.
 
 `components/flash_messages.html` supplies the same live region to both shells.
 `components/icons.html` shares the existing Settings cogwheel between the account link and

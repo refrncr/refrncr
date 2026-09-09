@@ -801,7 +801,7 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert secondary.count('aria-current="page"') == 1
     assert secondary.count('aria-hidden="true"') == 2
     assert re.search(
-        r'<a class="settings-topbar settings-back" href="/">.*?</svg>Back to app</a>',
+        r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,
         re.S,
     )
@@ -809,8 +809,8 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert f'<h1 class="page-title">{title}</h1>' in body
     assert body.count("<h1") == 1
     assert 'class="breadcrumbs"' not in body
-    assert 'aria-expanded="false" aria-controls="settings-navigation" data-nav-toggle' in body
-    assert 'aria-label="Settings menu"' in body
+    assert 'aria-expanded="false" aria-controls="settings-sidebar" data-nav-open' in body
+    assert 'aria-label="Expand navigation"' in body
     assert '<main id="content" class="app-main settings-content" tabindex="-1">' in body
     assert body.count('class="flash-region"') == 1
     shell_styles = response_text(request(client, "get", "/static/css/layouts/app-shell.css"))

@@ -104,16 +104,6 @@
     });
   });
 
-  const toggle = document.querySelector("[data-nav-toggle]");
-  const navigation = document.querySelector("[data-navigation]");
-  if (toggle && navigation) {
-    toggle.addEventListener("click", () => {
-      const expanded = toggle.getAttribute("aria-expanded") === "true";
-      toggle.setAttribute("aria-expanded", String(!expanded));
-      navigation.classList.toggle("is-open", !expanded);
-    });
-  }
-
   const sidePanelOpeners = new WeakMap();
   const panelLoads = new WeakMap();
   const pendingForms = new WeakSet();
