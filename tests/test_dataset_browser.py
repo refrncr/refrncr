@@ -1237,10 +1237,12 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert "string" in page and "date" in page
     assert "Required" in page and "None" in page
     assert page.count("Edit field") == 2
-    assert page.count("Move up") == 2
-    assert page.count("Move down") == 2
+    for name in ("Zeta", "&lt;script&gt;alert(1)&lt;/script&gt;"):
+        for direction in ("up", "down"):
+            assert f"aria-label='Move {name} {direction}'" in page
     order_forms = re.findall(
-        r"<form method='post' action='/datasets/schema/fields/order'>(.*?)</form>",
+        r"<form class='button-stack' method='post' "
+        r"action='/datasets/schema/fields/order'>(.*?)</form>",
         page,
         re.DOTALL,
     )
@@ -1255,6 +1257,17 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
         assert f"name='field_id' value='{field_id}'" in form
         assert "name='direction' value='up'" in form
         assert "name='direction' value='down'" in form
+        controls = re.findall(r"<button([^>]*)>(.*?)</button>", form, re.DOTALL)
+        assert len(controls) == 2
+        for attributes, content in controls:
+            assert "type='submit'" in attributes
+            assert "button-icon-only" in attributes
+            assert '<svg class="button-icon"' in content
+            assert 'aria-hidden="true"' in content and 'focusable="false"' in content
+            assert not re.sub(r"<[^>]+>", "", content).strip()
+        assert '<path d="m6 15 6-6 6 6"' in controls[0][1]
+        assert '<path d="m6 9 6 6 6-6"' in controls[1][1]
+        assert not re.search(r"draggable|ondrag\w*|ondrop", form, re.IGNORECASE)
     assert "name='direction' value='up' disabled" in order_forms[0]
     assert "name='direction' value='down' disabled" not in order_forms[0]
     assert "name='direction' value='up' disabled" not in order_forms[1]
@@ -1293,7 +1306,7 @@ def test_viewer_and_editor_see_fields_without_schema_controls(dataset_browser, p
     assert "Visible field" in page
     assert "Add field" not in page
     assert "Edit field" not in page
-    assert "Move up" not in page
+    assert "name='direction'" not in page
 
 
 def test_community_admin_override_shows_schema_controls_without_grant(dataset_browser):
@@ -1311,21 +1324,38 @@ def test_community_admin_override_shows_schema_controls_without_grant(dataset_br
     assert request(client, "get", f"/datasets/override/fields/{field.key}/edit").status_code == 200
 
 
-def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(dataset_browser):
+@pytest.mark.parametrize("actor_kind", ["community-admin", "dataset-admin"])
+@pytest.mark.parametrize(
+    "direction, expected_keys",
+    [
+        ("up", ["second", "first", "third"]),
+        ("down", ["first", "third", "second"]),
+    ],
+)
+def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
+    dataset_browser, direction, expected_keys, actor_kind
+):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "ordered")
     fields = [
         create_field(services, admin, dataset, key, key.title())
         for key in ("first", "second", "third")
     ]
-    login(client)
+    if actor_kind == "dataset-admin":
+        actor = services.users.create_user(
+            admin.id, "schema-admin@example.com", "Admin", "user password"
+        )
+        services.grants.create_grant(admin.id, "user", actor.id, "dataset", dataset.id, "admin")
+        login(client, actor.email, "user password")
+    else:
+        login(client)
     expected = [field.id for field in fields]
     csrf = session_csrf(client, services)
     data = {
         "csrf_token": csrf,
         "expected_field_id": expected,
         "field_id": fields[1].id,
-        "direction": "up",
+        "direction": direction,
     }
 
     moved = request(client, "post", "/datasets/ordered/fields/order", data=data)
@@ -1333,12 +1363,22 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(datas
 
     assert moved.status_code == 302
     assert stale.status_code == 409
-    assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
-        "second",
-        "first",
-        "third",
+    assert moved.location == "/datasets/ordered"
+    assert [
+        field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)
+    ] == expected_keys
+    page = body(request(client, "get", moved.location))
+    assert re.findall(r"<span class='field-name'>(.*?)</span>", page) == [
+        key.title() for key in expected_keys
     ]
     with factory() as session:
+        persisted = session.scalars(
+            select(DatasetField)
+            .where(DatasetField.dataset_id == dataset.id)
+            .order_by(DatasetField.display_position)
+        ).all()
+        assert [field.key for field in persisted] == expected_keys
+        assert [field.display_position for field in persisted] == [1, 2, 3]
         assert (
             session.scalar(
                 select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
@@ -2383,3 +2423,74 @@ def test_panel_validation_keeps_server_errors_values_and_csrf(dataset_browser, p
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert form_csrf(response) == csrf
+
+
+@pytest.mark.parametrize("direction", ["up", "down"])
+@pytest.mark.parametrize("permission", ["viewer", "editor", None])
+def test_reorder_rejects_unauthorized_posts_without_order_or_audit_change(
+    dataset_browser, direction, permission
+):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "protected-order")
+    fields = [create_field(services, admin, dataset, key, key) for key in ("a", "b", "c")]
+    actor = services.users.create_user(admin.id, "reader@example.com", "Reader", "user password")
+    if permission:
+        services.grants.create_grant(admin.id, "user", actor.id, "dataset", dataset.id, permission)
+    login(client, actor.email, "user password")
+    response = request(
+        client,
+        "post",
+        "/datasets/protected-order/fields/order",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "expected_field_id": [field.id for field in fields],
+            "field_id": fields[1].id,
+            "direction": direction,
+        },
+    )
+    assert response.status_code == 404
+    assert body(response) == body(request(client, "get", "/does-not-exist"))
+    assert [field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        field.id for field in fields
+    ]
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 0
+        )
+
+
+@pytest.mark.parametrize("direction", ["up", "down"])
+@pytest.mark.parametrize("token", [None, "invalid", "other-session"])
+def test_reorder_requires_session_bound_csrf_without_order_or_audit_change(
+    dataset_browser, direction, token
+):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "csrf-order")
+    fields = [create_field(services, admin, dataset, key, key) for key in ("a", "b", "c")]
+    login(client)
+    data = {
+        "expected_field_id": [field.id for field in fields],
+        "field_id": fields[1].id,
+        "direction": direction,
+    }
+    if token == "other-session":
+        other_client = client.application.test_client()
+        login(other_client)
+        token = session_csrf(other_client, services)
+    if token is not None:
+        data["csrf_token"] = token
+    response = request(client, "post", "/datasets/csrf-order/fields/order", data=data)
+    assert response.status_code == 403
+    assert [field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        field.id for field in fields
+    ]
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 0
+        )

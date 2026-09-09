@@ -60,6 +60,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     for internal_id in (dataset.id, admin.id, *(field.id for field in fields)):
         assert internal_id not in presentation
     field_section = section(page, "fields-heading")
+    assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
     assert f"{count} {'field' if count == 1 else 'fields'}</p>" in field_section
     assert ("Add field" in field_section) == (permission == "admin")
     assert ("configuration-panel" in page) == (permission != "viewer")
@@ -75,7 +76,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert re.findall(
         r"<th scope='col'[^>]*>(?:<span[^>]*>)?(.*?)(?:</span>)?</th>", field_section
     ) == [
-        "Identifier",
+        "Field order",
         "Field",
         "Key",
         "Type",
@@ -90,15 +91,17 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     rows = re.findall(r"<tr>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
-        assert f"<td><span class='field-name'>{field.name}</span></td>" in row
+        assert f"<td><span class='field-name'>{field.name}</span>" in row
         assert f"<td><code class='field-key'>{field.key}</code></td>" in row
-        indicator = row.split("</td>", 1)[0]
+        order_cell, indicator = row.split("</td>")[:2]
+        assert "key-icon" not in order_cell
         if index != 1:
+            assert f"{field.name}</span> <img" in indicator
             assert "images/lucide-key-round.svg" in indicator
             assert "<span class='badge'>Identifier</span>" in row
             assert f"{field.name} is part of the record identifier" in indicator
         else:
-            assert not indicator.strip()
+            assert "key-icon" not in indicator
         if permission == "admin":
             assert f"aria-label='Edit field {field.name}' data-panel-url" in row
             edit = re.search(r"<a class='field-edit-action'[^>]*>(.*?)</a>", row, re.DOTALL)
@@ -106,8 +109,10 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert '<svg class="button-icon"' in edit[1]
             assert 'aria-hidden="true"' in edit[1]
             assert not re.sub(r"<[^>]+>", "", edit[1]).strip()
+            assert "class='button-stack'" in order_cell
+            assert "<button" not in row.rsplit("<td>", 1)[1]
             for direction, boundary in (("up", index == 0), ("down", index == count - 1)):
-                assert f"aria-label='Move {direction} {field.name}'" in row
+                assert f"aria-label='Move {field.name} {direction}'" in row
                 control = re.search(rf"<button[^>]*value='{direction}'([^>]*)>", row)
                 assert control is not None
                 assert ("disabled" in control[1]) == boundary
