@@ -5,6 +5,7 @@ from threading import Event, local
 import pytest
 from alembic import command
 from alembic.config import Config
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
 from sqlalchemy import create_engine, event, func, select, text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -61,7 +62,7 @@ def postgresql_business_key_services():
 
 
 def create_dataset(services, admin, key="dataset"):
-    return services.datasets.create_dataset(admin.id, key, "Dataset", "")
+    return create_owned_dataset(services.datasets, admin.id, key, "Dataset", "")
 
 
 def create_required_field(services, admin, dataset, key, data_type="string", *, unique=False):
@@ -236,14 +237,14 @@ def test_viewer_and_editor_can_read_but_cannot_mutate(business_key_services):
             services.dataset_business_keys.set_business_key(actor.id, dataset.key, ("field",))
 
 
-def test_dataset_admin_and_community_admin_override_can_mutate(business_key_services):
+def test_owning_member_and_community_admin_can_mutate(business_key_services):
     _, factory, services, admin = business_key_services
     dataset = create_dataset(services, admin)
     create_required_field(services, admin, dataset, "field")
     dataset_admin = services.users.create_user(
         admin.id, "dataset-admin@example.com", "Dataset Admin", PASSWORD
     )
-    grant(services, admin, dataset_admin, dataset, "admin")
+    services.memberships.create_membership(admin.id, dataset_admin.id, dataset.owner_team_id)
 
     services.dataset_business_keys.set_business_key(dataset_admin.id, dataset.key, ("field",))
     with factory.begin() as session:
@@ -284,8 +285,7 @@ def test_owner_metadata_does_not_authorize(business_key_services):
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
         )
 
-    with pytest.raises(NotFoundError, match="Dataset not found"):
-        services.dataset_business_keys.get_business_key(owner.id, dataset.key)
+    assert services.dataset_business_keys.get_business_key(owner.id, dataset.key).field_keys == ()
     with pytest.raises(NotFoundError, match="Dataset not found"):
         services.dataset_business_keys.set_business_key(owner.id, dataset.key, ("field",))
     with pytest.raises(NotFoundError, match="Dataset not found"):
@@ -456,12 +456,12 @@ def test_postgresql_populated_downgrade_refuses_then_succeeds(
 
     engine.dispose()
     with pytest.raises(RuntimeError, match="Dataset business-key rows exist"):
-        command.downgrade(config, "0006_ref_74")
+        downgrade_historical_fixture(config, "0006_ref_74")
 
     with factory.begin() as session:
         session.query(DatasetBusinessKeyField).delete()
     engine.dispose()
-    command.downgrade(config, "0006_ref_74")
+    downgrade_historical_fixture(config, "0006_ref_74")
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0006_ref_74"
 

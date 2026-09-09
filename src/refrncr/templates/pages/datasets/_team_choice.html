@@ -1,0 +1,9 @@
+{% macro team_choice(teams, selected, name='owner_team_id', id='owner-team') -%}
+  <div class='form-field'>
+    <label for='{{ id }}'>Owning team</label>
+    <select id='{{ id }}' name='{{ name }}' required>
+      {% if teams|length != 1 %}<option value=''>Choose an owning team</option>{% endif %}
+      {% for team in teams %}<option value='{{ team.id }}'{% if team.id == selected %} selected{% endif %}>{{ team.name }}</option>{% endfor %}
+    </select>
+  </div>
+{%- endmacro %}

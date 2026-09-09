@@ -34,7 +34,7 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await page.getByRole('button',{name:'Sign in',exact:true}).click();
     await page.waitForURL(`${base}/`);
     const cases = [
-      {path:'/datasets',kind:'link',columns:3}, {path:'/teams',kind:'link',columns:2},
+      {path:'/datasets',kind:'link',columns:4}, {path:'/teams',kind:'link',columns:2},
       {path:'/users',kind:'button',columns:4}, {path:'/datasets/row-check/records',kind:'button',columns:3},
     ];
     for (const item of cases) {

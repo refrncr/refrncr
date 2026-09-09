@@ -91,7 +91,7 @@ def test_shared_table_row_controller():
 
 
 @pytest.mark.parametrize(
-    "kind,columns", [("datasets", 3), ("teams", 2), ("users", 4), ("records", 3)]
+    "kind,columns", [("datasets", 4), ("teams", 2), ("users", 4), ("records", 3)]
 )
 def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
     _, services, admin, client = dataset_browser
@@ -152,6 +152,8 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
 def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser):  # noqa: F811
     _, services, admin, client = dataset_browser
     login(client)
+    for team in services.teams.list_teams(admin.id):
+        services.teams.delete_team(admin.id, team.id)
     for path in ("/datasets", "/teams"):
         assert "data-row-action" not in body(request(client, "get", path))
     dataset = create_dataset(services, admin, "empty-rows")

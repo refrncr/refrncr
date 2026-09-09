@@ -62,5 +62,15 @@ Administrators can create, rename, list, and delete multiple teams within the si
 installation. Team names preserve their NFC-normalized display form and are unique using Unicode
 case-insensitive comparison. Administrators can add active users to teams and remove memberships;
 users may belong to multiple teams, and teams may exist without members. Disabling or soft-deleting
-a user retains their memberships, while deleting a team removes its memberships. Team permissions
-are handled by later product stories.
+a user retains their memberships. Ordinary active users can view their own teams. Teams represent
+data domains: each Dataset has exactly one owning team, whose current members can maintain and
+export it. Team deletion requires reassignment of every owned Dataset first.
+
+Every active Community user can discover and read all Datasets and create a Dataset for one of
+their teams. Administrators can create for any team and manage ownership and additional user/team
+export access. Read access alone does not permit export. Historical Dataset viewer/editor/admin
+Grants and creator metadata confer no Dataset rights.
+
+Existing installations must resolve ambiguous ownership before upgrading to REF-73. See
+[Dataset governance and operator preflight](docs/development/dataset-governance.md) for the
+authorization model, migration mapping, concurrency contract and backup/restore procedure.

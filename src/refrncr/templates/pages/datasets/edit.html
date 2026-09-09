@@ -2,6 +2,7 @@
 {% from "components.html" import button, feedback, form_field, readonly_field %}
 {% from "layouts/page.html" import page_header %}
 {% from "components/side_panel.html" import panel_form_actions %}
+{% from "pages/datasets/_team_choice.html" import team_choice %}
 
 {% block title %}Edit dataset · REFRNCR{% endblock %}
 
@@ -29,6 +30,12 @@
       control="textarea"
     ) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    {% if may_govern %}
+      {{ team_choice(teams, selected_team_id) }}
+      <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>
+    {% else %}
+      {{ readonly_field("Owning team", dataset.owner_team_name) }}
+    {% endif %}
   </form>
   </div>
   {% call panel_form_actions(single=true) %}

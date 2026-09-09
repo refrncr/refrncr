@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -21,7 +23,10 @@ def test_sqlite_database_connection():
 
 def test_postgresql_database_connection():
     engine = create_database_engine(
-        "postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test"
+        os.environ.get(
+            "REFRNCR_TEST_POSTGRES_URL",
+            "postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test",
+        )
     )
     session_factory = create_session_factory(engine)
 

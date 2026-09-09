@@ -1,9 +1,10 @@
 # Dataset export security and resource behavior
 
 Dataset export is an authorized, read-only browser operation. The service resolves the Dataset by
-its validated stable key and requires effective viewer access; editor and Dataset-admin grants
-inherit that permission, and the existing active Community-admin override applies. Ownership
-metadata is not consulted. Missing, malformed and inaccessible Dataset keys all use the existing
+its validated stable key and requires the central `can_export_dataset` capability. Current owning-team
+members and active Community administrators qualify automatically; other active users require direct
+or current-team export access. Read access and historical Dataset Grants confer no export rights.
+Creator metadata is not consulted. Missing, malformed and inaccessible Dataset keys all use the existing
 non-disclosing not-found result. The only client-controlled export input is one allowlisted format
 value (`csv`, `xlsx` or `json`).
 
@@ -18,10 +19,10 @@ a successful truncated download. Before response construction, the completed spo
 64 KiB blocks and rewound; a read failure therefore occurs before HTTP success is constructed.
 
 The adapter starts the snapshot before reading the Dataset. PostgreSQL uses a repeatable-read
-transaction; SQLite uses its native read transaction. Fields, the identifier, Records and values
+transaction; SQLite explicitly begins a read transaction because the sqlite3 legacy mode does not start one for SELECT. Fields, the identifier, Records and values
 are read and the artifact is generated before that Unit of Work exits, so one file cannot combine
 schema and data from different committed states. Export takes no write lock, writes no audit event
-and commits no data.
+and commits no data. A revoke committed after the snapshot begins affects subsequent exports; an already authorized snapshot may finish.
 
 CSV uses UTF-8 with BOM, comma delimiters, CRLF records and standard-library RFC 4180 quoting. For
 a string whose first non-whitespace character is `=`, `+`, `-` or `@`, export prefixes one ASCII

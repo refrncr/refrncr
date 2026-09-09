@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import sys
 import warnings
@@ -17,6 +18,7 @@ from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
 from refrncr.browser_security import is_loopback_host
+from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
@@ -133,6 +135,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="SQLite database path (overrides REFRNCR_DATABASE_URL).",
     )
+    preflight = subparsers.add_parser(
+        "dataset-ownership-preflight",
+        help="Inspect REF-73 ownership and optionally upgrade with an explicit mapping.",
+    )
+    database = preflight.add_mutually_exclusive_group()
+    database.add_argument("--database-url")
+    database.add_argument("--database-path", type=Path)
+    preflight.add_argument(
+        "--mapping", type=Path, help="JSON object: Dataset key to existing team ID."
+    )
+    preflight.add_argument(
+        "--upgrade",
+        action="store_true",
+        help="Upgrade after complete validation; stop all writers first.",
+    )
     return parser
 
 
@@ -178,7 +195,7 @@ def resolve_create_admin_configuration(args: argparse.Namespace) -> CreateAdminC
     )
 
 
-def prepare_database(database_url: str | URL) -> None:
+def prepare_database(database_url: str | URL, *, dataset_owner_mapping=None) -> None:
     url = make_url(database_url)
     if url.get_backend_name() == "sqlite" and url.database not in {None, "", ":memory:"}:
         Path(url.database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
@@ -189,6 +206,7 @@ def prepare_database(database_url: str | URL) -> None:
             config = Config()
             config.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
             config.attributes["connection"] = connection
+            config.attributes["dataset_owner_mapping"] = dataset_owner_mapping or {}
             command.upgrade(config, "head")
             _validate_ref_121_schema(connection)
     finally:
@@ -197,7 +215,7 @@ def prepare_database(database_url: str | URL) -> None:
 
 def _validate_ref_121_schema(connection) -> None:
     revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-    if revision not in {"0010_ref_121", "0011_ref_130"}:
+    if revision not in {"0010_ref_121", "0011_ref_130", "0012_ref_73"}:
         return
     inspector = inspect(connection)
     columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}
@@ -263,6 +281,8 @@ def start(configuration: StartConfiguration) -> None:
             ),
             trusted_proxies=configuration.trusted_proxies,
         )
+    except DatasetUpgradeError:
+        raise
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
     local_url = f"http://{configuration.host}:{configuration.port}"
@@ -346,7 +366,37 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "start":
+        if args.command == "dataset-ownership-preflight":
+            from refrncr.dataset_upgrade import ownership_preflight, read_owner_mapping
+
+            database_url = resolve_database_url(args)
+            mapping = read_owner_mapping(args.mapping)
+            engine = create_database_engine(database_url)
+            try:
+                with engine.connect() as connection:
+                    resolved, unresolved = ownership_preflight(connection, mapping)
+                    teams = (
+                        [
+                            dict(row)
+                            for row in connection.execute(
+                                text("SELECT id, name FROM teams ORDER BY name")
+                            ).mappings()
+                        ]
+                        if inspect(connection).has_table("teams")
+                        else []
+                    )
+                print(
+                    json.dumps(
+                        {"resolved": resolved, "unresolved": unresolved, "teams": teams}, indent=2
+                    )
+                )
+                if unresolved:
+                    return 1
+                if args.upgrade:
+                    prepare_database(database_url, dataset_owner_mapping=mapping)
+            finally:
+                engine.dispose()
+        elif args.command == "start":
             start(resolve_start_configuration(args))
         else:
             create_initial_admin(
@@ -363,7 +413,19 @@ def main(
         print(f"refrncr failed: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:
-        action = "start" if args.command == "start" else "create administrator"
+        if args.command == "dataset-ownership-preflight":
+            message = (
+                str(exc)
+                if isinstance(exc, DatasetUpgradeError)
+                else "Database validation or upgrade failed. Check database availability and "
+                "configuration; keep writers stopped and rerun the ownership preflight."
+            )
+            print(f"refrncr failed to check Dataset ownership: {message}", file=sys.stderr)
+            return 1
+        action = {
+            "start": "start",
+            "dataset-ownership-preflight": "check Dataset ownership",
+        }.get(args.command, "create administrator")
         print(f"refrncr failed to {action}: {exc}", file=sys.stderr)
         return 1
     return 0

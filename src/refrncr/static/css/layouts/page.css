@@ -1,5 +1,6 @@
 .page-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg); }
 .page-actions, .form-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.page-header-actions-end > .page-actions { margin-left: auto; justify-content: flex-end; }
 .button-icon { width: 1rem; height: 1rem; margin-right: .4375rem; }
 .button-primary .button-icon { filter: brightness(0) invert(1); }
 .export-menu { position: relative; }

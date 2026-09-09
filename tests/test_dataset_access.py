@@ -2,6 +2,7 @@ import os
 import uuid
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -27,24 +28,25 @@ def dataset_access():
 
 
 def create_dataset(services, admin, key):
-    return services.datasets.create_dataset(admin.id, key, key.title(), f"About {key}")
+    return create_owned_dataset(services.datasets, admin.id, key, key.title(), f"About {key}")
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
-def test_direct_grants_allow_listing_and_read(dataset_access, permission):
+def test_legacy_grants_do_not_limit_universal_listing_and_read(dataset_access, permission):
     _, _, services, admin, user = dataset_access
     visible = create_dataset(services, admin, "visible")
     create_dataset(services, admin, "hidden")
     services.grants.create_grant(admin.id, "user", user.id, "dataset", visible.id, permission)
 
-    assert [dataset.key for dataset in services.datasets.list_datasets(user.id)] == ["visible"]
+    assert [dataset.key for dataset in services.datasets.list_datasets(user.id)] == [
+        "hidden",
+        "visible",
+    ]
     assert services.datasets.get_dataset(user.id, "visible").id == visible.id
 
 
 @pytest.mark.parametrize("team_permission", ["viewer", "editor", "admin"])
-def test_listing_combines_direct_and_current_team_grants_in_key_order(
-    dataset_access, team_permission
-):
+def test_listing_is_independent_of_direct_and_team_grants(dataset_access, team_permission):
     _, _, services, admin, user = dataset_access
     zulu = create_dataset(services, admin, "zulu")
     alpha = create_dataset(services, admin, "alpha")
@@ -56,13 +58,17 @@ def test_listing_combines_direct_and_current_team_grants_in_key_order(
 
     assert [dataset.key for dataset in services.datasets.list_datasets(user.id)] == [
         "alpha",
+        "hidden",
         "zulu",
     ]
 
     services.memberships.delete_membership(admin.id, team.id, membership.id)
-    assert [dataset.key for dataset in services.datasets.list_datasets(user.id)] == ["alpha"]
-    with pytest.raises(NotFoundError, match="^Dataset not found$"):
-        services.datasets.get_dataset(user.id, zulu.key)
+    assert [dataset.key for dataset in services.datasets.list_datasets(user.id)] == [
+        "alpha",
+        "hidden",
+        "zulu",
+    ]
+    assert services.datasets.get_dataset(user.id, zulu.key).id == zulu.id
     assert services.datasets.get_dataset(admin.id, hidden.key).id == hidden.id
 
 
@@ -88,9 +94,8 @@ def test_ownership_does_not_authorize_listing_or_read(dataset_access):
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=user.id)
         )
 
-    assert services.datasets.list_datasets(user.id) == []
-    with pytest.raises(NotFoundError, match="^Dataset not found$"):
-        services.datasets.get_dataset(user.id, dataset.key)
+    assert [d.id for d in services.datasets.list_datasets(user.id)] == [dataset.id]
+    assert services.datasets.get_dataset(user.id, dataset.key).id == dataset.id
     with pytest.raises(NotFoundError, match="^Dataset not found$"):
         services.datasets.update_dataset(user.id, dataset.key, "Changed", "Changed")
 
@@ -136,12 +141,12 @@ def test_missing_and_inaccessible_dataset_are_indistinguishable(dataset_access):
     create_dataset(services, admin, "private")
 
     messages = []
-    for key in ("private", "missing", "INVALID KEY"):
+    for key in ("missing", "INVALID KEY"):
         with pytest.raises(NotFoundError) as captured:
             services.datasets.get_dataset(user.id, key)
         messages.append(str(captured.value))
 
-    assert messages == ["Dataset not found"] * 3
+    assert messages == ["Dataset not found"] * 2
 
 
 def test_listing_uses_bounded_queries_instead_of_per_dataset_authorization(dataset_access):
@@ -161,11 +166,11 @@ def test_listing_uses_bounded_queries_instead_of_per_dataset_authorization(datas
     finally:
         event.remove(engine, "before_cursor_execute", observe)
 
-    assert len(statements) == 3
+    assert len(statements) == 2
 
 
 @pytest.mark.parametrize("permission", ["editor", "admin"])
-def test_editor_or_resource_admin_can_update_metadata(dataset_access, permission):
+def test_owning_member_with_legacy_role_can_update_metadata(dataset_access, permission):
     _, factory, services, admin, user = dataset_access
     dataset = create_dataset(services, admin, "editable")
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
@@ -179,6 +184,7 @@ def test_editor_or_resource_admin_can_update_metadata(dataset_access, permission
             persisted.updated_at,
         )
 
+    services.memberships.create_membership(admin.id, user.id, dataset.owner_team_id)
     updated = services.datasets.update_dataset(
         user.id, dataset.key, "  Résumé  ", "  Description preserved  "
     )
@@ -238,13 +244,14 @@ def test_community_admin_can_update_without_resource_grant(dataset_access):
     assert updated.name == "Changed"
 
 
-def test_current_team_editor_can_update_metadata(dataset_access):
+def test_owning_membership_authorizes_metadata_with_legacy_team_grant(dataset_access):
     _, _, services, admin, user = dataset_access
     dataset = create_dataset(services, admin, "team-edit")
     team = services.teams.create_team(admin.id, "Dataset editors")
     services.memberships.create_membership(admin.id, user.id, team.id)
     services.grants.create_grant(admin.id, "team", team.id, "dataset", dataset.id, "editor")
 
+    services.memberships.create_membership(admin.id, user.id, dataset.owner_team_id)
     updated = services.datasets.update_dataset(user.id, dataset.key, "Team edited", "")
 
     assert updated.name == "Team edited"
@@ -323,6 +330,7 @@ def test_postgresql_dataset_read_list_update_and_rollback(monkeypatch):
             "team",
         ]
         assert services.datasets.get_dataset(user.id, "direct").id == direct.id
+        services.memberships.create_membership(admin.id, user.id, team_dataset.owner_team_id)
         services.datasets.update_dataset(user.id, "team", "Updated", "PostgreSQL")
 
         def fail_audit(_uow, **_values):

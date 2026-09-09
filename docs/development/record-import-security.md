@@ -6,6 +6,12 @@ Logout removes session-bound imports; confirmation claims the token before repar
 serialized Dataset transaction. Successful confirmation leaves a non-executable completion receipt
 until expiry. No staged content or import history is persisted.
 
+Under REF-73, import requires the central Dataset maintenance capability: active owning-team
+membership or Community administrator access. Confirmation rechecks current authority inside the
+same Dataset-locked transaction as persistence. A staged preview grants no continuing rights after
+membership removal or ownership reassignment. Historical Dataset Grants and export access do not
+authorize imports.
+
 CSV parsing uses Python's standard library. Modern `.xlsx` parsing uses `openpyxl` (MIT licensed) in
 read-only mode with formulas left unevaluated. A ZIP preflight bounds entry count, expanded size,
 and compression ratio and rejects macros, external links, and external data connections. Only

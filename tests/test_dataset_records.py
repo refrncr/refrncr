@@ -7,6 +7,7 @@ from threading import Barrier
 import pytest
 from alembic import command
 from alembic.config import Config
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -68,7 +69,7 @@ def postgresql_record_services():
 
 
 def configured_dataset(services, admin, key="records"):
-    dataset = services.datasets.create_dataset(admin.id, key, "Records", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, key, "Records", "")
     fields = {}
     for field_key, data_type, required, unique in (
         ("code", "string", True, False),
@@ -593,6 +594,8 @@ def test_dataset_permission_matrix_and_cross_dataset_record_scope(record_service
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
     services.grants.create_grant(admin.id, "user", editor.id, "dataset", dataset.id, "editor")
     services.grants.create_grant(admin.id, "user", dataset_admin.id, "dataset", dataset.id, "admin")
+    services.memberships.create_membership(admin.id, editor.id, dataset.owner_team_id)
+    services.memberships.create_membership(admin.id, dataset_admin.id, dataset.owner_team_id)
     for actor in (editor, dataset_admin, admin):
         assert services.dataset_records.get_record_for_edit(
             actor.id, dataset.key, record.id
@@ -828,8 +831,8 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-    dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
-    command.downgrade(config, "0007_ref_75")
+    dataset = create_owned_dataset(services.datasets, admin.id, "preserved", "Preserved", "")
+    downgrade_historical_fixture(config, "0007_ref_75")
     field_id = str(uuid.uuid4())
     now = utc_now()
     with factory.begin() as session:

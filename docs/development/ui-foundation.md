@@ -95,11 +95,11 @@ Create and edit remain separate page compositions because their key and action c
 The Dataset-detail page uses a file template under the shared shell. Its existing metadata,
 permission-dependent schema controls, field table, and field-order forms remain unchanged.
 
-The Dataset list uses a file template with Dataset, Records and Updated columns. Counts use
+The Dataset list uses a file template with Dataset, Owning team, Records and Updated columns. Counts use
 the shared `numeric-column` treatment; there are no search, filter or sort controls. Dataset
 names remain keyboard-accessible links and pointer row navigation remains an enhancement.
 REF-130 adds shared `breadcrumbs` and `content_metadata` macros in `components.html`.
-The dataset breadcrumb include supplies Datasets → No owning team → dataset name, with only
+The dataset breadcrumb include supplies Datasets → owning-team display name → dataset name, with only
 Datasets linked and the last item marked as current. Creation uses Datasets → New dataset
 because no dataset exists yet. The records and configuration headings consume the same secondary
 metadata component. The shared `page_context` layout follows the supplied dataset-table HTML
@@ -460,9 +460,8 @@ visual refinements replace the original separate Record identifier section with 
 feedback, shown only when fields exist and no identifier is configured. The warning adds no
 mutation controls. Empty datasets and configured identifiers produce no warning.
 
-Owning team deliberately reads **No owning team**, matching the shared breadcrumb. The current
-model has an initial owning user but no dataset-to-team ownership relation; the product owner
-approved this placeholder. A future ownership story must supply an authorized team display name.
+REF-73 replaces the former **No owning team** placeholder with the persisted owning-team display
+name, matching the shared breadcrumb. Historical creator metadata is not current ownership.
 Do not substitute a user name or expose internal UUIDs. Ordering forms retain UUIDs only in the
 functional hidden inputs required by the existing endpoint.
 
@@ -499,13 +498,13 @@ The SVGs are decorative (`aria-hidden="true"`, `focusable="false"`). Up is nativ
 for the first field and Down for the last; a single field has both disabled. Disabled icons
 use the shared reduced opacity without a button container. Enabled buttons retain native
 keyboard activation and the shared `:focus-visible` outline. The existing server-redirect
-focus behavior is retained; no focus-restoration script is added. Viewers and editors receive
+focus behavior is retained; no focus-restoration script is added. Users outside the owning team who are not Community administrators receive
 no move buttons, and unauthorized direct POST requests remain rejected server-side.
 
 Regression coverage in `test_configure_overview.py` checks first-column placement, shared
 stack class, middle/boundary states and identifier placement. `test_dataset_browser.py`
 checks decorative chevrons, accessible names and escaping, both submit directions and form
-payloads, persisted order after redirect, stale rejection and exactly-one audit, schema-admin
+payloads, persisted order after redirect, stale rejection and exactly-one audit, owning-team/Community-admin
 access and missing/invalid/cross-session CSRF rejection. Existing REF-121 service and database
 tests cover rollback, exact permutations and concurrency. No browser framework is added.
 
@@ -516,7 +515,7 @@ Dataset key padding is removed to align it with other detail values. Other value
 semantic tokens. The table uses its own keyboard-focusable horizontal scroll region; metadata
 remains untruncated, wraps within its region and uses ordinary Jinja escaping.
 
-`test_configure_overview.py` covers viewer/editor/admin presentation, zero/single/multiple fields,
+`test_configure_overview.py` covers read-only, owning-team member and Community-admin presentation, zero/single/multiple fields,
 conditional identifier warnings, canonical ordering after reorder, separate key cells, constraints,
 icon-only editing, boundary controls, internal-ID exclusion and malicious input escaping.
 Existing dataset browser and side-panel controller tests retain authorization, CSRF, not-found
@@ -649,3 +648,54 @@ reviewed at 1440, 768 and 320 px. Ruff and pre-commit checks passed. The mandato
 with PostgreSQL 16 is still required before merge; no commit or push was performed as part
 of this local verification. Actual OS context-menu item selection and a screen-reader session
 were not performed.
+
+## REF-73 Dataset governance
+
+Creation and ownership reassignment share the team-choice form macro. Ownership and additional
+export access reuse the existing sidepanel controller, feedback focus and table/form styles.
+Dataset UI flags come from central service capabilities: read-only configuration is available to
+every active user, maintenance follows owning-team membership, and export is independent.
+See [Dataset governance](dataset-governance.md) for workflow and migration contracts. No CSS tokens are changed. The existing controller receives the opt-in enhancements described below. The reusable `page-header-actions-end` variant keeps
+configuration actions right-aligned. Owning team is edited with metadata through Save dataset;
+the grey `Access management` action opens export management from the header.
+
+### Sectioned action panels and additional access lists
+
+Use one `side-panel-view` containing a scrolling `side-panel-body panel-sections` and a sibling
+`panel_form_actions` footer. The section stack uses shared spacing tokens and removes incidental
+paragraph margins. Do not nest padded panel bodies or alter the shared header to fix local spacing.
+Section headings use `data-panel-section-heading`; subordinate headings may use
+`data-panel-subheading`. Full-page sources retain h2/h3 below their h1. The existing controller
+imports them as native h3/h4 below the dialog's h2 title, preserving IDs and plain text.
+
+`inline-form-action` places a flexible selector and a naturally sized button on one row, with
+shared spacing. At the existing 767px breakpoint it stacks them. `form-label-sentence` is the
+explicit sentence-case label variant. Forms may opt into `data-requires-selection`: JavaScript
+initially disables the submit button until the required selector has a value. Without JavaScript,
+submission remains available and the same server validation reports errors. This enhancement
+never grants authority or replaces server validation. Retain field-associated errors and the
+shared error-summary focus contract.
+
+The `components/access_list.html` macros render semantic lists of explicit user/team access.
+Each row uses an existing decorative identity icon, wrapping display name, visible subject type
+and a secondary removal action with a descriptive accessible name. The list does not derive
+permissions or manufacture rows for automatic access. `empty-state-compact` provides a quiet,
+left-aligned use of the existing empty-state surface and tokens, without a nested card.
+
+Immediately persisted actions can opt into `data-panel-refresh` containing their expected GET
+redirect URL. Only a successful redirect to that exact URL is imported into the open panel.
+Other forms keep their existing navigation behavior; authentication redirects remain navigation.
+`data-panel-success` supplies plain-text confirmation to the refreshed `data-panel-status` node,
+which is revealed, announced and focused. The status is only active for enhanced in-panel updates.
+Late responses cannot replace a closed or reopened panel, and pending requests are never retried
+or duplicated. Server services, POST payloads, CSRF checks, audits and transactions are unchanged.
+
+Use a secondary `Close` link with `data-panel-cancel` in the shared footer for these immediate-action
+panels. Both Close and the header cross restore the exact original trigger after refreshes; the
+full-page link retains its ordinary fallback destination. No additional Save/Done action is needed.
+
+`tests/javascript/export_access_browser.cjs` uses the existing external Playwright convention and
+`tests/browser_table_rows_app.py` fixture. It checks 1440/768/320px empty, user, team, long-name and
+validation states, native keyboard controls, dialog containment, Close/Escape focus restoration,
+200% viewport/text simulations and no-JavaScript server validation. Screenshots are written only
+when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the repository.

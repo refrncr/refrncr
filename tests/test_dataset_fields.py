@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -42,7 +43,7 @@ def field_services():
 
 
 def create_dataset(services, admin, key="dataset"):
-    return services.datasets.create_dataset(admin.id, key, "Dataset", "")
+    return create_owned_dataset(services.datasets, admin.id, key, "Dataset", "")
 
 
 @pytest.mark.parametrize("data_type", ["string", "number", "boolean", "date"])
@@ -410,12 +411,13 @@ def test_viewer_and_editor_can_read_but_cannot_mutate(field_services, permission
         )
 
 
-def test_dataset_admin_can_mutate_schema(field_services):
+def test_owning_member_can_mutate_schema_with_inert_legacy_grant(field_services):
     _, _, services, admin = field_services
     user = services.users.create_user(admin.id, "schema-admin@example.com", "Admin", PASSWORD)
     dataset = create_dataset(services, admin)
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, "admin")
 
+    services.memberships.create_membership(admin.id, user.id, dataset.owner_team_id)
     field = services.dataset_fields.create_field(user.id, dataset.key, "field", "Name", "string")
     assert (
         services.dataset_fields.update_field(
@@ -447,8 +449,7 @@ def test_owner_metadata_does_not_authorize_field_access(field_services):
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
         )
 
-    with pytest.raises(NotFoundError, match="Dataset not found"):
-        services.dataset_fields.list_fields(owner.id, dataset.key)
+    assert len(services.dataset_fields.list_fields(owner.id, dataset.key)) == 1
     with pytest.raises(NotFoundError, match="Dataset not found"):
         services.dataset_fields.create_field(owner.id, dataset.key, "blocked", "Blocked", "string")
     with pytest.raises(NotFoundError, match="Dataset not found"):

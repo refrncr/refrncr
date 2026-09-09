@@ -29,6 +29,17 @@ s.users.create_user(
     "Long" * 18 + " <img src=x onerror=alert(1)>",
     "correct horse battery staple",
 )
+# REF-73 acceptance actors: distinct membership states, without Dataset Grants.
+for label, team_names in (
+    ("single", ("Test data domain",)),
+    ("multiple", ("Test data domain", "Row team")),
+):
+    actor = s.users.create_user(
+        admin.id, f"{label}@example.com", label.title(), "correct horse battery staple"
+    )
+    for team in s.teams.list_teams(admin.id):
+        if team.name in team_names:
+            s.memberships.create_membership(admin.id, actor.id, team.id)
 app = create_flask_app(
     s.users,
     s.authentication,

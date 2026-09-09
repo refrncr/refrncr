@@ -7,6 +7,7 @@ from threading import Event
 
 import pytest
 import test_record_import as import_tests
+from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
 from sqlalchemy import func, select
 from test_record_import import PASSWORD
@@ -355,7 +356,7 @@ def test_all_routes_reauthorize_and_reject_cross_session_dataset_and_csrf(wizard
         assert other.get(wizard.path + suffix, base_url="https://localhost").status_code == 302
     for suffix in ("/confirm", "/cancel", "/worksheet", "/preview"):
         assert wizard.post(wizard.path + suffix, {"csrf_token": "wrong"}).status_code == 403
-    another = wizard.services.datasets.create_dataset(wizard.admin.id, "other", "Other", "")
+    another = create_owned_dataset(wizard.services.datasets, wizard.admin.id, "other", "Other", "")
     assert (
         wizard.get(wizard.path.replace("/imports/", f"/{another.key}/") + "/step/4").status_code
         == 404

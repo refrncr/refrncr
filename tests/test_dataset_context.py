@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
 from sqlalchemy import event, select
 from test_dataset_browser import body, dataset_browser, login, request  # noqa: F401
 from test_dataset_records import (  # noqa: F401
@@ -13,7 +14,7 @@ from test_dataset_records import (  # noqa: F401
 )
 
 from refrncr.models import AuditEvent, Dataset
-from refrncr.services import NotFoundError, RecordConflictError, StaleRecordError, ValidationError
+from refrncr.services import RecordConflictError, StaleRecordError, ValidationError
 
 BASE = datetime(2026, 9, 7, 12, 58, tzinfo=UTC)
 
@@ -24,7 +25,7 @@ def context_services(request):
 
 
 def fresh(services, admin, key="context"):
-    dataset = services.datasets.create_dataset(admin.id, key, key, "")
+    dataset = create_owned_dataset(services.datasets, admin.id, key, key, "")
     return dataset
 
 
@@ -215,19 +216,17 @@ def test_bulk_query_count_and_authorization(context_services, monkeypatch):
     assert all(row.record_count == 0 for row in rows)
     assert grown_queries == initial_queries
     rows, _ = measured(viewer)
-    assert [row.dataset.id for row in rows] == [dataset.id]
+    assert len(rows) == 13
     aggregates = [(sql, params) for sql, params in queries if "count(dataset_records.id)" in sql]
     assert len(aggregates) == 1
     sql, params = aggregates[0]
-    assert "WHERE dataset_records.dataset_id IN" in sql
-    assert "WHERE datasets.id IN" in sql
-    assert dataset.id in str(params)
-    with pytest.raises(NotFoundError):
-        services.datasets.get_dataset_context(viewer.id, "hidden-0")
+    assert "WHERE dataset_records.dataset_id IN" not in sql
+    assert "WHERE datasets.id IN" not in sql
+    assert services.datasets.get_dataset_context(viewer.id, "hidden-0").record_count == 0
     outsider = services.users.create_user(admin.id, "none@example.com", "None", "valid password")
     rows, _ = measured(outsider)
-    assert rows == []
-    assert not any("count(dataset_records.id)" in sql for sql, _ in queries)
+    assert len(rows) == 13
+    assert any("count(dataset_records.id)" in sql for sql, _ in queries)
 
 
 def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
@@ -258,7 +257,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
         breadcrumb = html.split('<nav class="breadcrumbs"')[1].split("</nav>")[0]
         assert "<ol>" in breadcrumb
         assert '<a href="/datasets">Datasets</a>' in breadcrumb
-        assert "<span>No owning team</span>" in breadcrumb
+        assert "<span>Test data domain</span>" in breadcrumb
         assert (
             '<span aria-current="page">&lt;script&gt;unsafe &amp; name&lt;/script&gt;</span>'
             in breadcrumb
@@ -310,7 +309,7 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
         config.attributes["connection"] = connection
         command.stamp(config, "head")
         connection.commit()
-        command.downgrade(config, "0010_ref_121")
+        downgrade_historical_fixture(config, "0010_ref_121")
         connection.commit()
         assert "content_updated_at" not in {
             c["name"] for c in inspect(connection).get_columns("datasets")
@@ -338,7 +337,7 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
             == 2
         )
         connection.commit()
-        command.downgrade(config, "0010_ref_121")
+        downgrade_historical_fixture(config, "0010_ref_121")
         connection.commit()
         after = {
             table: connection.execute(text(f"SELECT * FROM {table} ORDER BY 1")).all()

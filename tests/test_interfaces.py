@@ -842,7 +842,9 @@ def test_settings_visibility_and_direct_access_follow_authenticated_role(interfa
     assert ">Settings</a>" not in body
     assert ">Users</a>" not in body
     assert ">Teams</a>" not in body
-    for path in ("/users", "/teams", "/teams/missing/members"):
+    assert request(client, "get", "/teams").status_code == 200
+    assert request(client, "post", "/teams", data={}).status_code == 403
+    for path in ("/users", "/teams/missing/members"):
         assert request(client, "get", path).status_code == 403
         assert request(client, "post", path, data={}).status_code == 403
 
@@ -1042,7 +1044,7 @@ def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
     admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     users.create_user(admin.id, "member@example.com", "Member", "member password")
     assert login(client, "member@example.com", "member password").status_code == 302
-    assert request(client, "get", "/teams").status_code == 403
+    assert request(client, "get", "/teams").status_code == 200
     assert request(client, "post", "/teams", data={"name": "Forbidden"}).status_code == 403
     assert teams.list_teams(admin.id) == []
 
