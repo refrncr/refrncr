@@ -36,6 +36,8 @@ class Dialog extends Element {
 const first = new Dialog('first'), second = new Dialog('second');
 const opener = (id) => new Element({'data-dialog-open':id});
 const a = opener('first'), b = opener('first'), c = opener('second');
+a.setAttribute('data-row-primary', '');
+let rowTextSelected = false;
 const remote = opener('second'); remote.setAttribute('data-panel-url',''); remote.href = 'https://localhost/form';
 const main = new Element();
 const nodes = {first, second, 'first-title':first.title, 'second-title':second.title, content:main};
@@ -49,7 +51,7 @@ const document = {
 };
 let fetchImpl;
 const requests = [], destinations = [];
-const context = {document, window:{location:{assign(url){destinations.push(url);}}},
+const context = {document, window:{getSelection:()=>({isCollapsed:!rowTextSelected}),location:{assign(url){destinations.push(url);}}},
   fetch:async (...args) => {requests.push(args); return fetchImpl(...args);},
   DOMParser:class {parseFromString(page) { return {querySelector(){return page;}};}},
   FormData:class {constructor(form,submitter) {this.form=form;this.submitter=submitter;}},
@@ -61,7 +63,14 @@ const settle = async () => { for(let i=0;i<15;i++) await Promise.resolve(); };
 const response = (content, status=200) => ({ok:status===200,status,redirected:false,text:async()=>content});
 (async()=>{
   assert.equal(a.listeners.click.length, 1, 'controller registration is idempotent');
-  await a.fire('click');
+  rowTextSelected = true;
+  await a.fire('click', {detail:1});
+  assert.equal(first.modalCalls,0, 'selecting primary button text does not open a panel');
+  rowTextSelected = false;
+  await a.fire('click', {defaultPrevented:true});
+  await a.fire('click', {ctrlKey:true});
+  assert.equal(first.modalCalls,0, 'handled or modified row events do not open a panel');
+  await a.fire('click', {detail:0});
   assert.equal(first.modalCalls,1, 'uses showModal, which supplies native inertness and focus containment');
   assert.equal(document.activeElement,first.input,'focus skips hidden controls and close button');
   await c.fire('click'); assert.equal(second.open,false,'another modal cannot open over this panel');

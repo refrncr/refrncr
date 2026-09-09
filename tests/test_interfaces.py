@@ -668,8 +668,7 @@ def test_user_list_uses_management_layout_and_add_user_panel(interface):
     assert "data-list-search" in body
     assert "<caption class='visually-hidden'>Users</caption>" in body
     assert "class='table-cell-wrap' scope='col'>Email address</th>" in body
-    assert "<tr class='record-row' tabindex=" not in body
-    assert "<tr class='record-row' role=" not in body
+    assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", body)
     assert "aria-label='User filters'" not in body
     assert "data-dialog-open='add-user-panel'" in body
     assert "id='add-user-panel' data-side-panel" in body
@@ -700,13 +699,12 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
         r"<table class='user-management-table' role='table'>(.*?)</table>", body, re.S
     ).group(1)
     headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", table, re.S)
-    assert len(headers) == 5
+    assert len(headers) == 4
     expected_classes = [
         "table-cell-wrap",
         "table-cell-wrap",
         "table-column-secondary",
         "table-column-secondary",
-        "table-column-action",
     ]
     assert [re.search(r"class='([^']+)'", attrs).group(1) for attrs, _ in headers] == (
         expected_classes
@@ -725,13 +723,14 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
         )
         assert [re.search(r"headers='([^']+)'", attrs).group(1) for attrs, _ in cells] == header_ids
         assert all("role='cell'" in attrs for attrs, _ in cells)
-        assert f"<strong>{managed.display_name}</strong>" in rows
+        assert f"<span class='row-action-label'>{managed.display_name}</span>" in rows
         assert managed.email in rows
-        action = cells[-1][1]
+        action = cells[0][1]
         assert "type='button'" in action
         assert "data-dialog-open='user-panel-" in action
         assert "aria-label='View user " in action
-        assert ">View</button>" in action
+        assert "data-row-primary" in action
+        assert ">View</button>" not in row
         assert "disabled" not in action
     assert f"aria-label='View user {managed.display_name} ({managed.id})'" in table
 
@@ -747,19 +746,14 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert hidden == [".user-management-table .table-column-secondary"]
     row_rule = rules[".user-management-table tbody tr"]
     assert "display: grid;" in row_rule
-    assert "grid-template-columns: minmax(0, 1fr) max-content;" in row_rule
+    assert "grid-template-columns: minmax(0, 1fr);" in row_rule
     assert "border-bottom: 1px solid var(--color-border-subtle);" in row_rule
     assert "grid-column: 1;" in rules[".user-management-table .table-cell-wrap"]
     header_rule = rules[".user-management-table thead"]
     assert "position: absolute;" in header_rule
     assert "clip: rect(0 0 0 0);" in header_rule
     assert "display: none" not in header_rule
-    action_rule = rules[".user-management-table td.table-column-action"]
-    assert "display: block;" in action_rule
-    assert "grid-column: 2;" in action_rule
-    assert "grid-row: 1 / 3;" in action_rule
-    assert "align-self: center;" in action_rule
-    assert "white-space: nowrap;" in action_rule
+    assert "table-column-action" not in table
     assert "overflow-wrap: anywhere;" in rules[".user-management-table .table-cell-wrap"]
 
     panel_css = response_text(request(client, "get", "/static/css/components/dialog.css"))
@@ -951,11 +945,16 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert '<h1 class="page-title">Teams</h1>' in body
     assert "data-list-search" in body
     assert "<caption class='visually-hidden'>Teams</caption>" in body
-    assert "<tr class='record-row' tabindex=" not in body
-    assert "<tr class='record-row' role=" not in body
+    assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", body)
     assert "aria-label='Team filters'" not in body
     assert "data-dialog-open='add-team-panel'" in body
-    assert f"href='/teams?open_team={team.id}'" in body
+    table = re.search(r"<table>(.*?)</table>", body, re.S).group(1)
+    assert table.count("data-row-primary") == 1
+    assert "data-row-action" in table
+    assert "Actions" not in table
+    assert ">View</a>" not in table
+    assert "class='row-chevron'" in table
+    assert f"data-row-primary href='/teams?open_team={team.id}'" in table
     body = response_text(request(client, "get", f"/teams?open_team={team.id}"))
     assert f"id='team-panel-{team.id}'" in body
     assert "data-modal-side-panel" in body

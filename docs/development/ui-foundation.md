@@ -249,9 +249,10 @@ stay aligned with the reference values documented in `tokens.css`; custom proper
 used as media-query boundaries.
 
 Broad implicit component selectors are intentionally avoided. Forms that need the shared width
-contract use `.form`; buttons use `.button` plus a variant; hover behaviour for table rows is
-scoped to `.table-scroll`. Plain semantic elements remain available when no component treatment
-is intended.
+contract use `.form`; standard buttons use `.button` plus a variant. The REF-144 primary
+row control uses `.row-action` for its shared anchor/button presentation. Table hover styling
+is scoped to `.table-scroll` or the explicit `.interactive-row` variant. Plain semantic
+elements remain available when no component treatment is intended.
 
 ## Focused login verification (REF-129)
 
@@ -385,19 +386,16 @@ direct access restrictions and existing management regressions. `test_dataset_br
 covers the stylesheet import contract. Before merge, verify both pages at desktop and compact
 widths, including the menu, keyboard focus, Back to app and existing side-panel flows.
 
-The shared `.management-table` scroll container establishes a positioning context so its
-absolutely positioned, visually hidden Actions heading stays within that container at narrow
-widths. This containment fix also applies to the dataset overview using the same variant;
-its content and behavior remain unchanged.
+The shared `.management-table` scroll container establishes a positioning context for
+visually hidden headings at narrow widths. Wide tables scroll within their own region.
 
 The Users table has a `user-management-table` variant below 768 px. Each body row is a
-compact two-column grid: the strong Name sits above Email address in a flexible details
-area, while the named View button occupies an intrinsic-width action column, centered
-across both lines. Role and Status are hidden. Values wrap normally, with `overflow-wrap:
-anywhere` as a fallback for unbroken content that cannot fit. Row borders separate records.
-The desktop header is visually hidden, preserving its column headers, explicit cell/header
-associations and accessible caption. Explicit table roles retain semantics when CSS changes
-the display layout. Desktop and Teams table presentation remain unchanged.
+single flexible column with the bold primary Name button above Email address. The shared
+REF-144 chevron occupies reserved space at the trailing row edge; no View or Actions column
+remains. Role and Status retain their existing mobile visibility rules. Values wrap with
+`overflow-wrap: anywhere` for unbroken content. The visually hidden desktop header retains
+its column headers, explicit cell/header associations and caption. Explicit table roles
+preserve semantics when CSS changes the display layout.
 
 The shared mobile side-panel header reserves a fixed close-button column at the top right
 and lets the title wrap in the remaining space. Compact header padding uses the existing
@@ -505,3 +503,118 @@ before opening another panel; Chrome may include browser chrome in native modal 
 CI's PostgreSQL 16 gate remains pending until the change is pushed after visual review. Local
 integration tests use PostgreSQL 15. No actual dark theme or assistive-technology session was
 verified; the implementation retains semantic tokens and accessible markup.
+
+## Primary table-row actions (REF-144)
+
+A navigational table is a read-only listing whose ordinary item rows each have one clear
+primary detail destination: either an existing page URL or an existing JavaScript side panel.
+The row action must preserve that exact destination and its server-side authorization.
+
+`components/table_row.html` provides `table_row` and `row_action`. Wrap the existing cells in
+`{% call table_row(...) %}` and render one `row_action` in the item's identifying cell.
+Pass `href` for an existing URL, or `panel` for an existing side-panel ID; use `panel=true`
+on the row for the existing selected-panel state. `search_text` preserves list filtering,
+and `explicit_role=true` preserves the user table's responsive semantic roles. The action
+accepts escaped label text or caller content, plus an optional descriptive accessible name.
+Its decorative chevron sits at the trailing edge of the row without adding a column or tab stop.
+Keep any other legitimate actions in their own cells.
+
+The shared variant applies to the dataset and team lists (anchors) and user and record lists
+(panel buttons). The dataset-fields table is configuration and retains its explicit Actions
+column. The import-preview table is non-interactive. Neither uses this variant. Only ordinary
+body rows with one primary destination should adopt it; omit it for empty, summary, selection,
+bulk-action or equally ranked multi-destination rows.
+
+`components/tables.css` shares hover, active and visible focus treatment between both controls.
+It reuses existing semantic tokens; the hover layer preserves underlying row backgrounds and
+the selected-row marker. Underlining and an inset row focus outline supplement colour. The
+existing table-region scroll containment and the user table's compact layout remain in use.
+
+`refrncr.js` delegates unused row-space clicks to the real control. A CSS stretched-control
+overlay is deliberately avoided because it would cover selectable text and nested controls.
+The controller ignores handled events, modified/non-primary clicks, text selections and other
+interactive elements. It adds no row key handler or row tab stop: Enter uses native anchor or
+button behaviour; Space uses native button behaviour. Anchors retain native context menus,
+modified activation and direct navigation without JavaScript. Modifier clicks on unused row
+space are ignored; use the actual link or its chevron for native link actions. Panel buttons
+continue to depend on the existing JavaScript side-panel controller, including focus return.
+Primary links use `draggable="false"` so dragging text selects it instead of starting a link
+drag operation; this does not replace the anchor's URL, context menu or new-tab behaviour.
+No new page URLs or server-side contracts are introduced.
+
+Keep valid `table`, `caption`, `thead`/`tbody`, `tr`, `th scope="col"` and `td` structure.
+The macros place the control inside a cell, never around a row. Do not add row `tabindex`,
+button roles, inline handlers or duplicate controls/names for the same primary destination.
+The identifying text is the visible label; optional accessible names must include it, including
+numeric display formatting. Jinja auto-escaping applies to labels, search text and attributes.
+The SVG chevron has `aria-hidden="true"` and `focusable="false"` and creates no extra tab stop.
+Long record values remain available to assistive technology and in the keyboard-accessible
+record panel. Keep any nested control's own accessible name, focus styling and authorization.
+
+The component must not produce page-level horizontal overflow at 320 px, tablet or desktop
+widths. Keep the `table-scroll` wrapper; deliberately wide record tables scroll internally.
+The chevron is reserved within the last cell (or compact row padding), not an Actions column.
+Hover underlines the primary label; active uses a double underline, and keyboard focus adds
+a 3 px inset outline to the row alongside the primary control's outline. Other row background
+states and the selected-panel marker remain intact; no palette or appearance mode is added.
+
+Example inside a table's `tbody` (one primary control per row):
+
+```jinja
+{% from "components/table_row.html" import table_row, row_action %}
+{% for item in items %}
+  {% call table_row() %}
+    <td>{{ row_action(item.name, href=item.existing_detail_url) }}</td>
+    <td>{{ item.updated_at }}</td>
+  {% endcall %}
+{% endfor %}
+```
+
+For a panel-only item, use `table_row(panel=true, kind='record-row')` and
+`row_action(item.name, panel=item.existing_panel_id)` instead. The existing panel must already
+be rendered with the shared side-panel component. Retain remaining legitimate controls in
+an Actions cell; do not apply either macro to a row with no primary destination or several
+equally ranked destinations. Never rely on hiding an affordance for access control.
+
+### Regression verification
+
+`tests/test_table_rows.py` covers the real four list templates, unchanged destinations,
+identity and formatted labels, escaping, primary-control counts, column removal/retention,
+empty states and the excluded configuration/import-preview tables. The dependency-free
+`tests/javascript/table_rows.cjs` and `side_panels.cjs` exercise delegated event guards,
+selection, nested controls and panel focus-return contracts. They run through pytest.
+
+`tests/javascript/table_rows_browser.cjs` is an optional real-browser check using the same
+external Playwright convention as the navigation regression script. It is not a new mandatory
+CI browser framework. Start the disposable in-memory fixture in a separate terminal:
+
+```sh
+.venv/bin/python tests/browser_table_rows_app.py
+```
+
+Then, with an externally available Playwright installation and Chrome/Chromium executable:
+
+```sh
+REFRNCR_PLAYWRIGHT_MODULE=/path/to/playwright \
+REFRNCR_BROWSER_EXECUTABLE=/path/to/chrome \
+REFRNCR_BROWSER_OUTPUT=/tmp/ref144-browser \
+node tests/javascript/table_rows_browser.cjs
+```
+
+The fixture binds only to `127.0.0.1:5144`, uses disposable test credentials, and discards its
+data when stopped. The script checks all four tables at 1440, 768 and 320 px, native primary
+keyboard activation and focus return, selection/copy, row-space clicks, real new tabs and
+no-JavaScript anchors, nested controls and pagination. It records screenshots and results
+outside the repository when `REFRNCR_BROWSER_OUTPUT` is set. Native OS context-menu item
+selection and a real assistive-technology session remain manual checks; a headless contextmenu
+event and semantic DOM assertions do not claim those checks were performed.
+
+
+Local REF-144 verification (2026-09-09): the full pytest run passed 827 tests with PostgreSQL
+15.18 enabled and no skips. The row browser script passed 18 scenario groups in Chrome
+152.0.7977.83, including hover/active feedback and preservation of selected/warning row states;
+the existing navigation browser regression also passed. Representative screenshots were
+reviewed at 1440, 768 and 320 px. Ruff and pre-commit checks passed. The mandatory CI gate
+with PostgreSQL 16 is still required before merge; no commit or push was performed as part
+of this local verification. Actual OS context-menu item selection and a screen-reader session
+were not performed.

@@ -1,4 +1,5 @@
 {% extends "layouts/settings.html" %}
+{% from "components/table_row.html" import table_row, row_action %}
 {% set settings_title = "Teams" %}
 
 {% block settings_actions %}
@@ -6,6 +7,6 @@
 {% endblock %}
 
 {% block settings_content %}
-  {% if teams %}<div class='table-scroll management-table'><table><caption class='visually-hidden'>Teams</caption><thead><tr><th scope='col'>Name</th><th scope='col'>Last updated</th><th scope='col'><span class='visually-hidden'>Actions</span></th></tr></thead><tbody>{% for team in teams %}{% set team_url = url_for("team_list", open_team=team.id) %}<tr class='record-row' data-row-href='{{ team_url }}' data-list-row data-search-text='{{ team.name }}'><td><strong>{{ team.name }}</strong></td><td>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</td><td><a class='button button-secondary' href='{{ team_url }}' aria-label='View team {{ team.name }} ({{ team.id }})'>View</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2><p>No teams are available.</p></div>{% endif %}
+  {% if teams %}<div class='table-scroll management-table'><table><caption class='visually-hidden'>Teams</caption><thead><tr><th scope='col'>Name</th><th scope='col'>Last updated</th></tr></thead><tbody>{% for team in teams %}{% set team_url = url_for("team_list", open_team=team.id) %}{% call table_row('record-row', search_text=team.name) %}<td>{{ row_action(team.name, href=team_url, accessible_name="View team " ~ team.name ~ " (" ~ team.id ~ ")") }}</td><td>{{ team.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>{% endcall %}{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2><p>No teams are available.</p></div>{% endif %}
   {% include "pages/teams/_team_panels.html" %}
 {% endblock %}
