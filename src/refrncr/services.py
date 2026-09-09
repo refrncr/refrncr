@@ -6,9 +6,11 @@ import secrets
 import threading
 import unicodedata
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -135,8 +137,8 @@ class DatasetDetails:
     key: str
     name: str
     description: str
-    owner_user_id: str
-    owner_display_name: str
+    owner_team_id: str
+    owner_team_name: str
     record_count: int
     last_updated: datetime
 
@@ -577,6 +579,10 @@ class TeamService:
         with self.uow(write=True, serialized=True) as uow:
             actor = require_admin(uow, actor_id)
             team = self._target(uow, team_id, for_update=True)
+            if uow.datasets.owns_datasets(team.id):
+                raise InvalidLifecycleError(
+                    "Reassign this team’s datasets before deleting the team."
+                )
             for grant in uow.grants.list_for_team(team.id, for_update=True):
                 self._add_audit(uow, self._grant_audit(actor.id, grant.id))
                 uow.grants.delete(grant)
@@ -585,8 +591,14 @@ class TeamService:
 
     def list_teams(self, actor_id: str) -> list[TeamRecord]:
         with self.uow() as uow:
-            require_admin(uow, actor_id)
-            return uow.teams.list_by_name()
+            actor = uow.users.get(actor_id)
+            if not DatasetAuthorizationService.active(actor):
+                raise AuthorizationError("Active user access required")
+            teams = uow.teams.list_by_name()
+            if actor.role == "admin":
+                return teams
+            ids = uow.memberships.team_ids_for_user(actor_id)
+            return [team for team in teams if team.id in ids]
 
     @staticmethod
     def _target(uow: UnitOfWork, team_id: str, *, for_update: bool = False) -> TeamRecord:
@@ -627,6 +639,114 @@ class DatasetResourceResolver:
             return uow.datasets.exists(dataset_id)
 
 
+def _valid_identity(value: str) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(UUID(value)) == value
+    except ValueError:
+        return False
+
+
+class DatasetAuthorizationService:
+    """Dataset capabilities, independent of frameworks and legacy resource roles.
+
+    Mutations supply their own unit of work after locking the Dataset. Team then
+    user locks keep authority stable through commit, matching membership lifecycle.
+    Read decisions use fresh persistence and never cache membership or capability.
+    """
+
+    def __init__(self, uow: UnitOfWorkFactory):
+        self.uow = uow
+
+    @staticmethod
+    def active(actor):
+        return actor is not None and actor.is_active and not actor.is_deleted
+
+    def creation_teams(self, actor_id: str, *, uow=None) -> list[TeamRecord]:
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            actor = work.users.get(actor_id)
+            if not self.active(actor):
+                raise AuthorizationError("Active user access required")
+            teams = work.teams.list_by_name()
+            if actor.role == "admin":
+                return teams
+            memberships = set(work.memberships.team_ids_for_user(actor_id))
+            return [team for team in teams if team.id in memberships]
+
+    def can_create_dataset(self, actor_id, team_id=None, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            # Starting the creation flow is open to every active user.
+            if team_id is None:
+                return self.active(work.users.get(actor_id))
+            if not _valid_identity(team_id):
+                return False
+            team = work.teams.get(team_id, for_update=uow is not None)
+            actor = work.users.get(actor_id, for_update=uow is not None)
+            return bool(
+                team
+                and self.active(actor)
+                and (
+                    actor.role == "admin" or team_id in work.memberships.team_ids_for_user(actor_id)
+                )
+            )
+
+    def _decision(self, actor_id, dataset_id, capability, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            dataset = work.datasets.get(dataset_id)
+            if dataset is None:
+                return False
+            mutation = uow is not None and capability not in {"view", "export"}
+            if mutation and capability == "maintain":
+                if work.teams.get(dataset.owner_team_id, for_update=True) is None:
+                    return False
+            actor = work.users.get(actor_id, for_update=mutation)
+            if not self.active(actor):
+                return False
+            if capability == "view" or actor.role == "admin":
+                return True
+            if capability in {"change_owner", "manage_export"}:
+                return False
+            teams = work.memberships.team_ids_for_user(actor_id)
+            if dataset.owner_team_id in teams:
+                return True
+            return capability == "export" and work.dataset_export_access.applies(
+                dataset.id, actor_id, teams
+            )
+
+    def can_view_dataset(self, actor_id, dataset_id, *, uow=None):
+        return self._decision(actor_id, dataset_id, "view", uow=uow)
+
+    def maintainable_resources(self, actor_id):
+        with self.uow() as work:
+            actor = work.users.get(actor_id)
+            if not self.active(actor):
+                raise AuthorizationError("Active user access required")
+            if actor.role == "admin":
+                return AuthorizedResourceSet(True, ())
+            teams = set(work.memberships.team_ids_for_user(actor_id))
+            return AuthorizedResourceSet(
+                False,
+                tuple(item.id for item in work.datasets.list_all() if item.owner_team_id in teams),
+            )
+
+    def can_maintain_dataset(self, actor_id, dataset_id, *, uow=None):
+        return self._decision(actor_id, dataset_id, "maintain", uow=uow)
+
+    def can_export_dataset(self, actor_id, dataset_id, *, uow=None):
+        return self._decision(actor_id, dataset_id, "export", uow=uow)
+
+    def can_change_dataset_owner(self, actor_id, dataset_id, *, uow=None):
+        return self._decision(actor_id, dataset_id, "change_owner", uow=uow)
+
+    def can_manage_export_access(self, actor_id, dataset_id, *, uow=None):
+        return self._decision(actor_id, dataset_id, "manage_export", uow=uow)
+
+
+class StaleDatasetOwnerError(ConflictError):
+    """Persisted ownership no longer matches the form's expected owner."""
+
+
 class DatasetService:
     """Authorized Dataset operations within the one Community installation context."""
 
@@ -634,14 +754,29 @@ class DatasetService:
         self.uow = uow
         self.authorization = authorization
 
-    def create_dataset(self, actor_id: str, key: str, name: str, description: str) -> DatasetRecord:
+    def create_dataset(
+        self, actor_id: str, key: str, name: str, description: str, owner_team_id: str | None = None
+    ) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id, for_update=True)
+            if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
+                raise AuthorizationError("Active user access required")
+            if owner_team_id is None:
+                eligible = self.authorization.datasets.creation_teams(actor_id, uow=uow)
+                if len(eligible) != 1:
+                    raise ValidationError("Choose an owning team. Team membership is required.")
+                owner_team_id = eligible[0].id
+            if not self.authorization.datasets.can_create_dataset(actor_id, owner_team_id, uow=uow):
+                if not self.authorization.datasets.active(uow.users.get(actor_id)):
+                    raise AuthorizationError("Active user access required")
+                raise ValidationError(
+                    "Choose an available owning team you may create datasets for."
+                )
             dataset = uow.datasets.create(
                 key=validate_dataset_key(key),
                 name=normalize_dataset_name(name),
                 description=validate_dataset_description(description),
-                owner_user_id=actor.id,
+                owner_user_id=actor_id,
+                owner_team_id=owner_team_id,
             )
             try:
                 uow.flush()
@@ -649,18 +784,149 @@ class DatasetService:
                 if exc.constraint == "uq_datasets_key":
                     raise ConflictError("Dataset key already exists in this installation") from exc
                 raise
-
-            grant = uow.grants.create(
-                subject_type="user",
-                subject_id=actor.id,
-                resource_type="dataset",
-                resource_id=dataset.id,
-                permission="admin",
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset",
+                object_id=dataset.id,
+                action="created",
+                details={"owner_team_id": owner_team_id, "creator_user_id": actor_id},
             )
-            uow.flush()
-            self._add_audit(uow, self._audit(actor.id, "dataset", dataset.id, "created"))
-            self._add_audit(uow, self._audit(actor.id, "grant", grant.id, "created"))
             return dataset
+
+    def change_owner(self, actor_id, key, expected_owner_team_id, owner_team_id):
+        key = self._validated_lookup_key(key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(key, for_update=True)
+            self._change_owner(uow, actor_id, dataset, expected_owner_team_id, owner_team_id)
+            return dataset
+
+    def _change_owner(self, uow, actor_id, dataset, expected_owner_team_id, owner_team_id):
+        target_team = (
+            uow.teams.get(owner_team_id, for_update=True)
+            if _valid_identity(owner_team_id)
+            else None
+        )
+        # Validate authority before revealing owner or target information.
+        if dataset is None or not self.authorization.datasets.can_change_dataset_owner(
+            actor_id, dataset.id, uow=uow
+        ):
+            raise NotFoundError("Dataset not found")
+        if not _valid_identity(expected_owner_team_id):
+            raise ValidationError("Expected owning team is required. Reopen the form.")
+        if dataset.owner_team_id != expected_owner_team_id:
+            raise StaleDatasetOwnerError("Owning team changed. Reopen the form and try again.")
+        if target_team is None:
+            raise ValidationError("Choose an existing owning team.")
+        if owner_team_id == expected_owner_team_id:
+            return dataset
+        if not uow.datasets.change_owner_if_expected(
+            dataset.id, expected_owner_team_id, owner_team_id
+        ):
+            raise StaleDatasetOwnerError("Owning team changed. Reopen the form and try again.")
+        uow.add_audit(
+            actor_user_id=actor_id,
+            object_type="dataset",
+            object_id=dataset.id,
+            action="owner_changed",
+            details={
+                "previous_owner_team_id": expected_owner_team_id,
+                "owner_team_id": owner_team_id,
+            },
+        )
+        uow.flush()
+
+    def export_access_context(self, actor_id, key):
+        dataset = self.get_dataset(actor_id, key)
+        if not self.authorization.datasets.can_manage_export_access(actor_id, dataset.id):
+            raise NotFoundError("Dataset not found")
+        with self.uow() as uow:
+            teams = uow.teams.list_by_name()
+            users = uow.users.list_by_email()
+            names = {("team", team.id): team.name for team in teams}
+            names.update({("user", user.id): user.display_name for user in users})
+            entries = [
+                (entry, names.get((entry.subject_type, entry.subject_id), "Unavailable"))
+                for entry in uow.dataset_export_access.list_for_dataset(dataset.id)
+            ]
+            return (
+                dataset,
+                teams,
+                [user for user in users if user.is_active and not user.is_deleted],
+                entries,
+            )
+
+    def grant_export_access(self, actor_id, key, subject_type, subject_id):
+        key = self._validated_lookup_key(key)
+        if not _valid_identity(actor_id):
+            raise NotFoundError("Dataset not found")
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(key, for_update=True)
+            valid = False
+            if subject_type == "team" and _valid_identity(subject_id):
+                valid = uow.teams.get(subject_id, for_update=True) is not None
+            elif subject_type == "user" and _valid_identity(subject_id):
+                locked_users = {
+                    user_id: uow.users.get(user_id, for_update=True)
+                    for user_id in sorted({subject_id, actor_id})
+                }
+                valid = self.authorization.datasets.active(locked_users[subject_id])
+            if dataset is None or not self.authorization.datasets.can_manage_export_access(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            if subject_type not in SUBJECT_TYPES or not _valid_identity(subject_id):
+                raise ValidationError("Choose an available user or team.")
+            if not valid:
+                raise ValidationError("Choose an available user or team.")
+            access = uow.dataset_export_access.create(dataset.id, subject_type, subject_id)
+            try:
+                uow.flush()
+            except PersistenceConflictError as exc:
+                if exc.constraint in {
+                    "uq_dataset_export_access_user",
+                    "uq_dataset_export_access_team",
+                }:
+                    raise ConflictError("This user or team already has export access.") from exc
+                raise
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset_export_access",
+                object_id=access.id,
+                action="granted",
+                details={
+                    "dataset_id": dataset.id,
+                    "subject_type": subject_type,
+                    "subject_id": subject_id,
+                },
+            )
+            return access
+
+    def revoke_export_access(self, actor_id, key, access_id):
+        key = self._validated_lookup_key(key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(key, for_update=True)
+            if dataset is None or not self.authorization.datasets.can_manage_export_access(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            access = (
+                uow.dataset_export_access.get(access_id) if _valid_identity(access_id) else None
+            )
+            if access is None or access.dataset_id != dataset.id:
+                raise NotFoundError("Export access not found")
+            uow.add_audit(
+                actor_user_id=actor_id,
+                object_type="dataset_export_access",
+                object_id=access.id,
+                action="revoked",
+                details={
+                    "dataset_id": dataset.id,
+                    "subject_type": access.subject_type,
+                    "subject_id": access.subject_id,
+                },
+            )
+            uow.dataset_export_access.delete(access)
+            uow.flush()
 
     def list_datasets(self, actor_id: str) -> list[DatasetRecord]:
         access = self.authorization.authorized_resources(actor_id, "dataset", "viewer")
@@ -690,15 +956,13 @@ class DatasetService:
     def get_dataset_details(self, actor_id: str, key: str) -> DatasetDetails:
         context = self.get_dataset_context(actor_id, key)
         dataset = context.dataset
-        with self.uow() as uow:
-            owner = uow.users.get(dataset.owner_user_id)
         return DatasetDetails(
             id=dataset.id,
             key=dataset.key,
             name=dataset.name,
             description=dataset.description,
-            owner_user_id=dataset.owner_user_id,
-            owner_display_name=(owner.display_name if owner is not None else dataset.owner_user_id),
+            owner_team_id=dataset.owner_team_id,
+            owner_team_name=context.owner_team_name,
             record_count=context.record_count,
             last_updated=context.last_updated,
         )
@@ -716,16 +980,32 @@ class DatasetService:
             raise NotFoundError("Dataset not found")
         return dataset
 
-    def update_dataset(self, actor_id: str, key: str, name: str, description: str) -> DatasetRecord:
+    def update_dataset(
+        self,
+        actor_id: str,
+        key: str,
+        name: str,
+        description: str,
+        *,
+        owner_change: tuple[str, str] | None = None,
+    ) -> DatasetRecord:
         validated_key = self._validated_lookup_key(key)
         normalized_name = normalize_dataset_name(name)
         validated_description = validate_dataset_description(description)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
+            if owner_change is not None:
+                self._change_owner(uow, actor_id, dataset, *owner_change)
             if dataset is None or not self.authorization.check_access(
-                actor_id, "dataset", dataset.id, "editor"
+                actor_id, "dataset", dataset.id, "editor", uow=uow
             ):
                 raise NotFoundError("Dataset not found")
+            if (
+                owner_change is not None
+                and dataset.name == normalized_name
+                and dataset.description == validated_description
+            ):
+                return dataset
             dataset.name = normalized_name
             dataset.description = validated_description
             dataset.updated_at = _now()
@@ -783,7 +1063,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             validated_required = validate_dataset_field_flag(is_required, "is_required")
             validated_component = validate_dataset_field_flag(
                 is_business_key_component, "is_business_key_component"
@@ -854,7 +1134,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -909,7 +1189,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -982,7 +1262,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -1021,7 +1301,7 @@ class DatasetFieldService:
             raise ValidationError("Field order contains duplicate fields")
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             current = tuple(field.id for field in fields)
             if expected_order != current:
@@ -1073,10 +1353,10 @@ class DatasetFieldService:
         return dataset
 
     def _require_dataset_access(
-        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str
+        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str, *, uow=None
     ) -> None:
         if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, required_permission
+            actor_id, "dataset", dataset.id, required_permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
 
@@ -1149,7 +1429,7 @@ class DatasetBusinessKeyService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin")
+            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
             if not isinstance(field_keys, tuple) or not field_keys:
                 raise ValidationError("At least one business-key field is required")
             if any(not isinstance(field_key, str) for field_key in field_keys):
@@ -1191,10 +1471,10 @@ class DatasetBusinessKeyService:
             return DatasetBusinessKey(dataset_id=dataset.id, field_keys=canonical)
 
     def _require_dataset_access(
-        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str
+        self, actor_id: str, dataset: DatasetRecord | None, required_permission: str, *, uow=None
     ) -> None:
         if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, required_permission
+            actor_id, "dataset", dataset.id, required_permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
 
@@ -1214,7 +1494,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor")
+            self._require_access(actor_id, dataset, "editor", uow=uow)
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             identifier = uow.dataset_business_keys.get(dataset.id)
             values, encoded_identifier = self._validated_values(fields, identifier, submitted)
@@ -1263,7 +1543,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor")
+            self._require_access(actor_id, dataset, "editor", uow=uow)
             existing = uow.dataset_records.get(dataset.id, record_id)
             if existing is None:
                 raise NotFoundError("Record not found")
@@ -1299,7 +1579,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor")
+            self._require_access(actor_id, dataset, "editor", uow=uow)
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             dataset.content_updated_at = _now()
@@ -1389,7 +1669,7 @@ class DatasetRecordService:
         with self.uow() as uow:
             uow.begin_export_snapshot()
             dataset = uow.datasets.find_by_key(validated_key)
-            self._require_access(actor_id, dataset, "viewer")
+            self._require_access(actor_id, dataset, "export", uow=uow)
             fields = tuple(uow.dataset_fields.list_for_dataset(dataset.id))
             identifier = uow.dataset_business_keys.get(dataset.id)
             records = externally_ordered_records(
@@ -1431,10 +1711,10 @@ class DatasetRecordService:
             return uow.dataset_business_keys.get(dataset_id)
 
     def _require_access(
-        self, actor_id: str, dataset: DatasetRecord | None, permission: str
+        self, actor_id: str, dataset: DatasetRecord | None, permission: str, *, uow=None
     ) -> None:
         if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, permission
+            actor_id, "dataset", dataset.id, permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
 
@@ -1534,13 +1814,18 @@ class GrantService:
 class AuthorizationService:
     """Single resource-permission engine plus the separate Community admin rule."""
 
-    def __init__(self, data: PermissionDataSource, resources: ResourceTypeRegistry) -> None:
+    def __init__(
+        self, data: PermissionDataSource, resources: ResourceTypeRegistry, datasets=None
+    ) -> None:
+        self.datasets = datasets
         self.data = data
         self.resources = resources
 
     def effective_permission(
         self, user_id: str, resource_type: str, resource_id: str
     ) -> str | None:
+        if resource_type == "dataset":
+            return None  # Legacy Dataset roles are inert. Use named capabilities.
         context = self.data.load_context(user_id, resource_type, resource_id)
         if not context.subject.exists or not context.subject.active or context.subject.deleted:
             return None
@@ -1548,8 +1833,20 @@ class AuthorizationService:
         return highest_permission(context.permissions)
 
     def check_access(
-        self, user_id: str, resource_type: str, resource_id: str, required: str
+        self, user_id: str, resource_type: str, resource_id: str, required: str, *, uow=None
     ) -> bool:
+        if resource_type == "dataset":
+            if self.datasets is None:
+                return False
+            decisions = {
+                "viewer": self.datasets.can_view_dataset,
+                "editor": self.datasets.can_maintain_dataset,
+                "admin": self.datasets.can_maintain_dataset,
+                "export": self.datasets.can_export_dataset,
+            }
+            if required not in decisions:
+                raise ValidationError("Unknown Dataset capability")
+            return decisions[required](user_id, resource_id, uow=uow)
         GrantService._validate_permission(required)
         context = self.data.load_context(user_id, resource_type, resource_id)
         if context.subject.exists and context.subject.active and not context.subject.deleted:
@@ -1560,6 +1857,12 @@ class AuthorizationService:
         self, user_id: str, resource_type: str, required: str
     ) -> AuthorizedResourceSet:
         GrantService._validate_permission(required)
+        if resource_type == "dataset":
+            if self.datasets is None or not self.datasets.can_create_dataset(user_id):
+                raise AuthorizationError("Active user access required")
+            if required == "viewer":
+                return AuthorizedResourceSet(True, ())
+            return self.datasets.maintainable_resources(user_id)
         context = self.data.load_resource_permissions(user_id, resource_type)
         subject = context.subject
         if not subject.exists or not subject.active or subject.deleted:

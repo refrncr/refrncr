@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from flask import template_rendered
 from jinja2 import BaseLoader
 from sqlalchemy import func, select, update
@@ -32,6 +33,7 @@ def dataset_browser():
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Administrator", PASSWORD)
+    services.teams.create_team(admin.id, "Test data domain")
     client = create_flask_app(
         services.users,
         services.authentication,
@@ -84,7 +86,8 @@ def session_csrf(client, services):
 
 
 def create_dataset(services, admin, key, name=None, description=""):
-    return services.datasets.create_dataset(
+    return create_owned_dataset(
+        services.datasets,
         admin.id,
         key,
         name or key.replace("-", " ").title(),
@@ -260,13 +263,11 @@ def test_shared_shell_navigation_follows_effective_role(dataset_browser):
     assert 'href="/datasets"' in page
     assert 'href="/users"' not in page
     assert 'href="/teams"' not in page
-    assert "New dataset" not in page
+    assert "New dataset" in page
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
-def test_resource_permissions_show_dataset_without_community_admin_create_action(
-    dataset_browser, permission
-):
+def test_legacy_roles_do_not_hide_universal_dataset_create_action(dataset_browser, permission):
     _, services, admin, client = dataset_browser
     user = services.users.create_user(
         admin.id,
@@ -281,7 +282,7 @@ def test_resource_permissions_show_dataset_without_community_admin_create_action
     page = body(request(client, "get", "/datasets"))
 
     assert f"href='/datasets/{dataset.key}/records'" in page
-    assert "+ New dataset" not in page
+    assert "+ New dataset" in page
 
 
 def test_ui_assets_are_local_and_critical_login_controls_are_labelled(dataset_browser):
@@ -718,7 +719,7 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
 
     assert f"aria-label='View record VISIBLE ({visible_record.id})'" in page
-    assert "Export</summary>" in page
+    assert "Export</summary>" not in page
     assert "Configure</a>" not in page
     assert "Import</a>" not in page
     assert "Add record</button>" not in page
@@ -726,7 +727,7 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
     assert "data-panel-mode='delete'" not in page
 
 
-def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser):
+def test_list_is_universal_despite_legacy_grants_and_creator_metadata(dataset_browser):
     factory, services, admin, client = dataset_browser
     user = services.users.create_user(admin.id, "viewer@example.com", "Viewer", "viewer password")
     direct = create_dataset(services, admin, "alpha-direct")
@@ -749,7 +750,7 @@ def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser)
     assert page.index("alpha-direct") < page.index("beta-team")
     assert "href='/datasets/alpha-direct/records'" in page
     assert "href='/datasets/beta-team/records'" in page
-    assert "hidden-owned" not in page
+    assert "hidden-owned" in page
     assert "Create dataset" not in page
     assert "data-list-search" not in page
     assert "data-list-row" not in page
@@ -758,7 +759,7 @@ def test_list_uses_direct_and_team_grants_and_ignores_ownership(dataset_browser)
     assert "Configure" not in body(request(client, "get", "/datasets/beta-team/records"))
 
 
-def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_browser):
+def test_admin_create_flow_persists_owner_and_audit_without_grant(dataset_browser):
     factory, services, admin, client = dataset_browser
     login(client)
     create_form = request(client, "get", "/datasets/new")
@@ -772,6 +773,7 @@ def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_brows
             "name": "  Reference data  ",
             "description": "  Preserved description  ",
             "csrf_token": form_csrf(create_form),
+            "owner_team_id": re.search(r"<option value='([^']+)' selected", body(create_form))[1],
             "owner_user_id": "attacker-controlled",
             "id": "attacker-controlled",
             "updated_at": "1900-01-01",
@@ -790,7 +792,7 @@ def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_brows
         events = set(
             session.execute(
                 select(AuditEvent.object_type, AuditEvent.action).where(
-                    (AuditEvent.object_id == dataset.id) | (AuditEvent.object_id == grant.id)
+                    AuditEvent.object_id == dataset.id
                 )
             ).tuples()
         )
@@ -798,8 +800,8 @@ def test_admin_create_flow_redirects_and_persists_grant_and_audits(dataset_brows
     assert dataset.description == "  Preserved description  "
     assert dataset.owner_user_id == admin.id
     assert dataset.id != "attacker-controlled"
-    assert grant.permission == "admin"
-    assert events == {("dataset", "created"), ("grant", "created")}
+    assert grant is None
+    assert events == {("dataset", "created")}
 
 
 def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
@@ -858,6 +860,7 @@ def test_create_validation_safely_redisplays_values(
         "name": submitted_markup,
         "description": "Description",
         "csrf_token": form_csrf(form),
+        "owner_team_id": re.search(r"<option value='([^']+)' selected", body(form))[1],
         **overrides,
     }
 
@@ -890,6 +893,7 @@ def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
             "name": "Duplicate",
             "description": "Preserved",
             "csrf_token": form_csrf(form),
+            "owner_team_id": re.search(r"<option value='([^']+)' selected", body(form))[1],
         },
     )
 
@@ -916,12 +920,12 @@ def test_create_requires_valid_csrf(dataset_browser, token):
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
 
-def test_non_admin_cannot_use_create_flow(dataset_browser):
+def test_user_without_team_sees_blocked_creation(dataset_browser):
     factory, services, admin, client = dataset_browser
     services.users.create_user(admin.id, "user@example.com", "User", "user password")
     login(client, "user@example.com", "user password")
 
-    assert request(client, "get", "/datasets/new").status_code == 403
+    assert request(client, "get", "/datasets/new").status_code == 200
     response = request(
         client,
         "post",
@@ -933,7 +937,7 @@ def test_non_admin_cannot_use_create_flow(dataset_browser):
             "csrf_token": session_csrf(client, services),
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 400
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
@@ -959,7 +963,7 @@ def test_detail_authorization_owner_display_edit_link_and_escaping(dataset_brows
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=viewer.id)
         )
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
-    services.grants.create_grant(admin.id, "user", editor.id, "dataset", dataset.id, "editor")
+    services.memberships.create_membership(admin.id, editor.id, dataset.owner_team_id)
 
     login(client, "viewer@example.com", "viewer password")
     viewer_page = body(request(client, "get", "/datasets/unsafe"))
@@ -991,16 +995,17 @@ def test_missing_inaccessible_and_owner_only_detail_are_same_404(dataset_browser
         request(client, "get", "/datasets/INVALID"),
     ]
 
-    assert [response.status_code for response in responses] == [404, 404, 404]
-    assert len({body(response) for response in responses}) == 1
+    assert [response.status_code for response in responses] == [200, 404, 404]
+    assert len({body(response) for response in responses[1:]}) == 1
 
 
 @pytest.mark.parametrize("permission", ["editor", "admin"])
-def test_granted_editor_or_admin_can_edit_with_prg_and_audit(dataset_browser, permission):
+def test_owning_member_with_legacy_role_can_edit_with_prg_and_audit(dataset_browser, permission):
     factory, services, admin, client = dataset_browser
     user = services.users.create_user(admin.id, "editor@example.com", "Editor", "user password")
     dataset = create_dataset(services, admin, "editable", "Original", "Original description")
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    services.memberships.create_membership(admin.id, user.id, dataset.owner_team_id)
     login(client, "editor@example.com", "user password")
     edit_form = request(client, "get", "/datasets/editable/edit")
     assert edit_form.status_code == 200
@@ -1345,7 +1350,7 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
         actor = services.users.create_user(
             admin.id, "schema-admin@example.com", "Admin", "user password"
         )
-        services.grants.create_grant(admin.id, "user", actor.id, "dataset", dataset.id, "admin")
+        services.memberships.create_membership(admin.id, actor.id, dataset.owner_team_id)
         login(client, actor.email, "user password")
     else:
         login(client)
@@ -1387,7 +1392,7 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
         )
 
 
-def test_owner_without_permission_cannot_view_schema_or_controls(dataset_browser):
+def test_creator_can_read_schema_without_maintenance_controls(dataset_browser):
     factory, services, admin, client = dataset_browser
     owner = services.users.create_user(admin.id, "owner@example.com", "Owner", "owner password")
     dataset = create_dataset(services, admin, "owned-schema")
@@ -1400,7 +1405,7 @@ def test_owner_without_permission_cannot_view_schema_or_controls(dataset_browser
 
     response = request(client, "get", "/datasets/owned-schema")
 
-    assert response.status_code == 404
+    assert response.status_code == 200
     assert "Add field" not in body(response)
     assert "Edit field" not in body(response)
 
@@ -1500,7 +1505,7 @@ def test_create_field_checkboxes_and_mass_assignment_are_explicit(dataset_browse
     assert field.created_at.year != 1900 and field.updated_at.year != 1900
     assert field.is_required is True and field.is_unique is True
     assert persisted_dataset.owner_user_id == admin.id
-    assert dataset_grant.permission == "admin"
+    assert dataset_grant is None
 
 
 @pytest.mark.parametrize(
@@ -1933,7 +1938,7 @@ def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_wi
     manager = services.users.create_user(
         admin.id, "manager@example.com", "Manager", "user password"
     )
-    services.grants.create_grant(admin.id, "user", manager.id, "dataset", dataset.id, "admin")
+    services.memberships.create_membership(admin.id, manager.id, dataset.owner_team_id)
     login(client, manager.email, "user password")
 
     form = request(client, "get", f"/datasets/{dataset.key}/fields/{required.key}/edit")
@@ -2330,10 +2335,10 @@ def test_configuration_panel_triggers_follow_existing_permissions(dataset_browse
     login(client, user.email)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}"))
-    expected = {"viewer": 0, "editor": 1, "admin": 3}[permission]
+    expected = 0  # Legacy grants supply no maintenance controls.
     assert page.count("data-panel-url") == expected
     assert page.count("id='configuration-panel'") == (1 if expected else 0)
-    assert "data-panel-url" not in body(request(client, "get", "/datasets"))
+    assert "data-panel-url" in body(request(client, "get", "/datasets"))
 
 
 def test_configuration_flows_load_one_shared_panel_and_keep_full_page_fallback(dataset_browser):

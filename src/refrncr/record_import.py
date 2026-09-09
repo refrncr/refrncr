@@ -868,7 +868,7 @@ class DatasetRecordImportService:
         try:
             with self.uow(write=True, serialized=True) as uow:
                 dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-                self.records._require_access(actor_id, dataset, "editor")
+                self.records._require_access(actor_id, dataset, "editor", uow=uow)
                 source = parse_source(state.filename, state.content, state.worksheet)
                 preview, validated = self._validate_in_uow(
                     uow, dataset.id, state.filename, source, state.mapping

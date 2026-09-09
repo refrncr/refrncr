@@ -182,8 +182,11 @@ def test_team_administration_requires_active_administrator(team_services):
             teams.rename_team(actor_id, existing.id, "Forbidden")
         with pytest.raises(AuthorizationError):
             teams.delete_team(actor_id, existing.id)
-        with pytest.raises(AuthorizationError):
-            teams.list_teams(actor_id)
+        if actor_id == regular.id:
+            assert teams.list_teams(actor_id) == []
+        else:
+            with pytest.raises(AuthorizationError):
+                teams.list_teams(actor_id)
 
 
 def test_failed_operations_do_not_create_audit_events(team_services):

@@ -19,9 +19,21 @@ def _run_online_migrations(connection) -> None:
             raise RuntimeError("Could not suspend SQLite foreign-key enforcement for migration")
         connection.commit()
     try:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
+        if sqlite:
+            # sqlite3 legacy transaction control otherwise autocommits initial DDL.
+            with connection.begin():
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
+                context.configure(
+                    connection=connection, target_metadata=target_metadata, transactional_ddl=True
+                )
+                with context.begin_transaction():
+                    context.run_migrations()
+                if connection.exec_driver_sql("PRAGMA foreign_key_check").all():
+                    raise RuntimeError("Migration would break foreign-key relationships")
+        else:
+            context.configure(connection=connection, target_metadata=target_metadata)
+            with context.begin_transaction():
+                context.run_migrations()
     finally:
         if sqlite:
             if connection.in_transaction():

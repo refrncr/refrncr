@@ -4,6 +4,7 @@ import uuid
 import pytest
 from alembic import command
 from alembic.config import Config
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
 from sqlalchemy import create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -26,6 +27,7 @@ from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
     ConflictError,
+    DatasetAuthorizationService,
     DatasetResourceResolver,
     DatasetService,
     GrantService,
@@ -120,6 +122,7 @@ def assert_community_schema(engine):
         "name",
         "description",
         "owner_user_id",
+        "owner_team_id",
         "content_updated_at",
         "created_at",
         "updated_at",
@@ -309,7 +312,7 @@ def test_ref_80_sqlite_migration_backfills_and_downgrades_without_data_loss(tmp_
         )
     engine.dispose()
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "0011_ref_130")
     upgraded = create_database_engine(f"sqlite:///{database}")
     with upgraded.connect() as connection:
         assert (
@@ -332,7 +335,7 @@ def test_ref_80_sqlite_migration_backfills_and_downgrades_without_data_loss(tmp_
     )
     upgraded.dispose()
 
-    command.downgrade(config, "0008_ref_79")
+    downgrade_historical_fixture(config, "0008_ref_79")
     downgraded = create_database_engine(f"sqlite:///{database}")
     assert "revision" not in {
         column["name"] for column in inspect(downgraded).get_columns("dataset_records")
@@ -396,7 +399,7 @@ def test_empty_sqlite_database_upgrades(tmp_path):
         assert session.get(Grant, grant.id) is None
 
     engine.dispose()
-    command.downgrade(config, "0002_ref_34")
+    downgrade_historical_fixture(config, "0002_ref_34")
     downgraded_engine = create_database_engine(f"sqlite:///{database}")
     assert "memberships" not in inspect(downgraded_engine).get_table_names()
     assert "grants" not in inspect(downgraded_engine).get_table_names()
@@ -420,7 +423,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0011_ref_130"
+                "0012_ref_73"
             )
     finally:
         upgraded.dispose()
@@ -447,11 +450,11 @@ def test_ref_121_partial_values_are_canonically_rebuilt(tmp_path, positions):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = services.datasets.create_dataset(admin.id, "partial", "Partial", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "partial", "Partial", "")
     for key in ("zeta", "alpha", "middle"):
         services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
     engine.dispose()
-    command.downgrade(config, "0009_ref_80")
+    downgrade_historical_fixture(config, "0009_ref_80")
     with engine.begin() as connection:
         connection.exec_driver_sql("ALTER TABLE dataset_fields ADD COLUMN display_position INTEGER")
         for key, position in zip(("zeta", "alpha", "middle"), positions, strict=True):
@@ -534,7 +537,7 @@ def test_ref_121_sqlite_upgrade_and_downgrade_preserve_relational_snapshot(tmp_p
     member = services.users.create_user(admin.id, "member@example.com", "Member", "valid password")
     team = services.teams.create_team(admin.id, "Reviewers")
     services.memberships.create_membership(admin.id, member.id, team.id)
-    dataset = services.datasets.create_dataset(admin.id, "preserved", "Preserved", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "preserved", "Preserved", "")
     services.grants.create_grant(admin.id, "team", team.id, "dataset", dataset.id, "editor")
     code = services.dataset_fields.create_field(
         admin.id, dataset.key, "code", "Code", "string", is_required=True
@@ -573,14 +576,14 @@ def test_ref_121_sqlite_upgrade_and_downgrade_preserve_relational_snapshot(tmp_p
     before = snapshot(engine)
     assert before["dataset_records"][0][0] == record.id
     engine.dispose()
-    command.downgrade(config, "0009_ref_80")
+    downgrade_historical_fixture(config, "0009_ref_80")
     command.upgrade(config, "head")
     upgraded = create_database_engine(f"sqlite:///{database}")
     assert snapshot(upgraded) == before
     with upgraded.connect() as connection:
         assert connection.exec_driver_sql("PRAGMA foreign_key_check").all() == []
     upgraded.dispose()
-    command.downgrade(config, "0009_ref_80")
+    downgrade_historical_fixture(config, "0009_ref_80")
     downgraded = create_database_engine(f"sqlite:///{database}")
     try:
         assert snapshot(downgraded) == before
@@ -634,10 +637,10 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = services.datasets.create_dataset(admin.id, "existing", "Existing", "Preserved")
+    dataset = create_owned_dataset(services.datasets, admin.id, "existing", "Existing", "Preserved")
     engine.dispose()
 
-    command.downgrade(config, "0005_ref_72")
+    downgrade_historical_fixture(config, "0005_ref_72")
     command.upgrade(config, "head")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
@@ -665,13 +668,13 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = services.datasets.create_dataset(admin.id, "existing", "Existing", "Preserved")
+    dataset = create_owned_dataset(services.datasets, admin.id, "existing", "Existing", "Preserved")
     field = services.dataset_fields.create_field(
         admin.id, dataset.key, "code", "Code", "string", is_required=True
     )
     engine.dispose()
 
-    command.downgrade(config, "0006_ref_74")
+    downgrade_historical_fixture(config, "0006_ref_74")
     command.upgrade(config, "head")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
@@ -699,8 +702,8 @@ def test_ref_75_sqlite_composite_fk_duplicate_and_cascade_behavior(tmp_path):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    first = services.datasets.create_dataset(admin.id, "first", "First", "")
-    second = services.datasets.create_dataset(admin.id, "second", "Second", "")
+    first = create_owned_dataset(services.datasets, admin.id, "first", "First", "")
+    second = create_owned_dataset(services.datasets, admin.id, "second", "Second", "")
     field = services.dataset_fields.create_field(
         admin.id, first.key, "code", "Code", "string", is_required=True
     )
@@ -743,7 +746,7 @@ def test_ref_75_sqlite_downgrade_fails_closed_for_business_key_state(tmp_path):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = services.datasets.create_dataset(admin.id, "dataset", "Dataset", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "dataset", "Dataset", "")
     services.dataset_fields.create_field(
         admin.id, dataset.key, "code", "Code", "string", is_required=True
     )
@@ -751,13 +754,13 @@ def test_ref_75_sqlite_downgrade_fails_closed_for_business_key_state(tmp_path):
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="Dataset business-key rows exist"):
-        command.downgrade(config, "0006_ref_74")
+        downgrade_historical_fixture(config, "0006_ref_74")
 
     engine = create_database_engine(f"sqlite:///{database}")
     with create_session_factory(engine).begin() as session:
         session.query(DatasetBusinessKeyField).delete()
     engine.dispose()
-    command.downgrade(config, "0006_ref_74")
+    downgrade_historical_fixture(config, "0006_ref_74")
     downgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
         assert "dataset_business_key_fields" not in inspect(downgraded_engine).get_table_names()
@@ -777,12 +780,12 @@ def test_ref_74_sqlite_downgrade_fails_closed_for_field_state(tmp_path):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = services.datasets.create_dataset(admin.id, "dataset", "Dataset", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "dataset", "Dataset", "")
     field = services.dataset_fields.create_field(admin.id, dataset.key, "field", "Field", "string")
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="Dataset field rows exist"):
-        command.downgrade(config, "0005_ref_72")
+        downgrade_historical_fixture(config, "0005_ref_72")
     engine = create_database_engine(f"sqlite:///{database}")
     with create_session_factory(engine).begin() as session:
         assert (
@@ -794,7 +797,7 @@ def test_ref_74_sqlite_downgrade_fails_closed_for_field_state(tmp_path):
         session.execute(text("DELETE FROM dataset_fields WHERE id=:id"), {"id": field.id})
     engine.dispose()
 
-    command.downgrade(config, "0005_ref_72")
+    downgrade_historical_fixture(config, "0005_ref_72")
     downgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
         assert "dataset_fields" not in inspect(downgraded_engine).get_table_names()
@@ -816,11 +819,12 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
     datasets = services.datasets
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    dataset = datasets.create_dataset(admin.id, "downgrade", "Downgrade", "")
+    dataset = create_owned_dataset(datasets, admin.id, "downgrade", "Downgrade", "")
+    services.grants.create_grant(admin.id, "user", admin.id, "dataset", dataset.id, "admin")
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
-        command.downgrade(config, "0004_ref_36")
+        downgrade_historical_fixture(config, "0004_ref_36")
     engine = create_database_engine(f"sqlite:///{database}")
     assert "datasets" in inspect(engine).get_table_names()
     with create_session_factory(engine)() as session:
@@ -840,7 +844,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
-        command.downgrade(config, "0004_ref_36")
+        downgrade_historical_fixture(config, "0004_ref_36")
     engine = create_database_engine(f"sqlite:///{database}")
     assert "datasets" in inspect(engine).get_table_names()
     with create_session_factory(engine).begin() as session:
@@ -852,7 +856,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
         session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
     engine.dispose()
 
-    command.downgrade(config, "0004_ref_36")
+    downgrade_historical_fixture(config, "0004_ref_36")
     downgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
         assert "datasets" not in inspect(downgraded_engine).get_table_names()
@@ -890,7 +894,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0011_ref_130"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0012_ref_73"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
@@ -901,12 +905,14 @@ def test_empty_postgresql_database_upgrades():
         resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
         resources.register("dataset", DatasetResourceResolver(uow))
         grants = GrantService(uow, resources)
-        authorization = AuthorizationService(SqlAlchemyPermissionDataSource(factory), resources)
+        authorization = AuthorizationService(
+            SqlAlchemyPermissionDataSource(factory), resources, DatasetAuthorizationService(uow)
+        )
         datasets = DatasetService(uow, authorization)
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
-        dataset = datasets.create_dataset(
-            admin.id, "alembic-postgresql", "Alembic PostgreSQL", "Migrated schema"
+        dataset = create_owned_dataset(
+            datasets, admin.id, "alembic-postgresql", "Alembic PostgreSQL", "Migrated schema"
         )
         managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
         team = teams.create_team(admin.id, "Straße")
@@ -931,27 +937,31 @@ def test_empty_postgresql_database_upgrades():
                 )
             )
             assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
-            assert dataset_grant.permission == "admin"
+            assert dataset_grant is None
             assert {
                 (event.object_type, event.object_id, event.action)
                 for event in session.scalars(
-                    select(AuditEvent).where(
-                        (AuditEvent.object_type == "dataset")
-                        | (
-                            (AuditEvent.object_type == "grant")
-                            & (AuditEvent.object_id == dataset_grant.id)
-                        )
-                    )
+                    select(AuditEvent).where(AuditEvent.object_type == "dataset")
                 )
             } == {
                 ("dataset", dataset.id, "created"),
-                ("grant", dataset_grant.id, "created"),
             }
+        # Historical REF-72 downgrade protection still covers inert legacy Grants.
+        with factory.begin() as session:
+            session.add(
+                Grant(
+                    subject_type="user",
+                    subject_id=admin.id,
+                    resource_type="dataset",
+                    resource_id=dataset.id,
+                    permission="admin",
+                )
+            )
         application_engine.dispose()
         application_engine = None
 
         with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
-            command.downgrade(config, "0004_ref_36")
+            downgrade_historical_fixture(config, "0004_ref_36")
         application_engine = create_database_engine(schema_url)
         with create_session_factory(application_engine).begin() as session:
             assert session.scalar(select(Dataset.id).where(Dataset.id == dataset.id)) == dataset.id
@@ -964,7 +974,7 @@ def test_empty_postgresql_database_upgrades():
         application_engine = None
 
         with pytest.raises(RuntimeError, match="Dataset rows or Dataset grants exist"):
-            command.downgrade(config, "0004_ref_36")
+            downgrade_historical_fixture(config, "0004_ref_36")
         application_engine = create_database_engine(schema_url)
         assert "datasets" in inspect(application_engine).get_table_names()
         with create_session_factory(application_engine).begin() as session:
@@ -977,7 +987,7 @@ def test_empty_postgresql_database_upgrades():
         application_engine.dispose()
         application_engine = None
 
-        command.downgrade(config, "0004_ref_36")
+        downgrade_historical_fixture(config, "0004_ref_36")
         application_engine = create_database_engine(schema_url)
         assert "datasets" not in inspect(application_engine).get_table_names()
         with create_session_factory(application_engine)() as session:
@@ -989,7 +999,7 @@ def test_empty_postgresql_database_upgrades():
             )
         application_engine.dispose()
         application_engine = None
-        command.downgrade(config, "0002_ref_34")
+        downgrade_historical_fixture(config, "0002_ref_34")
         downgraded_engine = create_database_engine(schema_url)
         try:
             assert "memberships" not in inspect(downgraded_engine).get_table_names()

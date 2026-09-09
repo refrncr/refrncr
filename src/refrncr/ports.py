@@ -72,6 +72,8 @@ class DatasetRecord(Protocol):
     name: str
     description: str
     owner_user_id: str
+    owner_team_id: str
+    owner_team_name: str
     created_at: datetime
     updated_at: datetime
     content_updated_at: datetime | None
@@ -82,6 +84,7 @@ class DatasetOverview:
     dataset: DatasetRecord
     record_count: int
     last_updated: datetime
+    owner_team_name: str = ""
 
     def __post_init__(self) -> None:
         value = self.last_updated
@@ -181,6 +184,8 @@ class TeamOperations(Protocol):
 
 
 class MembershipOperations(Protocol):
+    def team_ids_for_user(self, user_id: str) -> tuple[str, ...]: ...
+
     def get(self, membership_id: str, *, for_update: bool = False) -> MembershipRecord | None: ...
 
     def create(self, *, user_id: str, team_id: str) -> MembershipRecord: ...
@@ -211,6 +216,12 @@ class GrantOperations(Protocol):
 
 
 class DatasetOperations(Protocol):
+    def owns_datasets(self, team_id: str) -> bool: ...
+
+    def change_owner_if_expected(
+        self, dataset_id: str, expected_owner_team_id: str, owner_team_id: str
+    ) -> bool: ...
+
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         """Current working set only; None is reserved for authorized all-resource access."""
         ...
@@ -232,6 +243,7 @@ class DatasetOperations(Protocol):
         name: str,
         description: str,
         owner_user_id: str,
+        owner_team_id: str,
     ) -> DatasetRecord: ...
 
 
@@ -322,6 +334,7 @@ class UnitOfWork(Protocol):
     dataset_fields: DatasetFieldOperations
     dataset_business_keys: DatasetBusinessKeyOperations
     dataset_records: DatasetRecordOperations
+    dataset_export_access: DatasetExportAccessOperations
 
     def begin_export_snapshot(self) -> None: ...
 
@@ -334,6 +347,7 @@ class UnitOfWork(Protocol):
         object_type: str,
         object_id: str,
         action: str,
+        details: dict[str, str] | None = None,
     ) -> None: ...
 
 
@@ -371,3 +385,25 @@ class PermissionDataSource(Protocol):
     def load_resource_permissions(
         self, user_id: str, resource_type: str
     ) -> ResourcePermissionsContext: ...
+
+
+class DatasetExportAccessRecord(Protocol):
+    id: str
+    dataset_id: str
+    subject_type: str
+    subject_id: str
+    created_at: datetime
+
+
+class DatasetExportAccessOperations(Protocol):
+    def get(self, access_id: str) -> DatasetExportAccessRecord | None: ...
+
+    def list_for_dataset(self, dataset_id: str) -> list[DatasetExportAccessRecord]: ...
+
+    def applies(self, dataset_id: str, user_id: str, team_ids: tuple[str, ...]) -> bool: ...
+
+    def create(
+        self, dataset_id: str, subject_type: str, subject_id: str
+    ) -> DatasetExportAccessRecord: ...
+
+    def delete(self, access: DatasetExportAccessRecord) -> None: ...

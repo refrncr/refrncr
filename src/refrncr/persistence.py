@@ -12,6 +12,7 @@ from refrncr.models import (
     AuditEvent,
     Dataset,
     DatasetBusinessKeyField,
+    DatasetExportAccess,
     DatasetField,
     DatasetRecord,
     DatasetRecordValue,
@@ -43,7 +44,7 @@ from refrncr.ports import (
 
 def _locked(statement, session: Session, for_update: bool):
     if for_update and session.get_bind().dialect.name != "sqlite":
-        return statement.with_for_update()
+        return statement.with_for_update().execution_options(populate_existing=True)
     return statement
 
 
@@ -57,6 +58,8 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
     if getattr(diagnostic, "constraint_name", None) == "uq_dataset_fields_dataset_position":
         return "uq_dataset_fields_dataset_position"
     if getattr(diagnostic, "constraint_name", None) in {
+        "uq_dataset_export_access_user",
+        "uq_dataset_export_access_team",
         "uq_dataset_records_dataset_identifier",
         "uq_dataset_record_values_unique_value",
     }:
@@ -80,6 +83,12 @@ def _safe_constraint_name(error: IntegrityError) -> str | None:
         "dataset_record_values.field_id, dataset_record_values.unique_value_key"
     ):
         return "uq_dataset_record_values_unique_value"
+    for subject in ("user", "team"):
+        if str(error.orig) == (
+            "UNIQUE constraint failed: dataset_export_access.dataset_id, "
+            f"dataset_export_access.{subject}_id"
+        ):
+            return f"uq_dataset_export_access_{subject}"
     return None
 
 
@@ -192,6 +201,16 @@ class SqlAlchemyMembershipOperations:
     def delete(self, membership: MembershipRecord) -> None:
         self.session.delete(membership)
 
+    def team_ids_for_user(self, user_id: str) -> tuple[str, ...]:
+        return tuple(
+            self.session.scalars(
+                select(Membership.team_id)
+                .join(Team, Team.id == Membership.team_id)
+                .where(Membership.user_id == user_id)
+                .order_by(Membership.team_id)
+            )
+        )
+
     def list_team_members(self, team_id: str) -> list[tuple[Membership, User]]:
         statement = (
             select(Membership, User)
@@ -245,6 +264,26 @@ class SqlAlchemyDatasetOperations:
     def __init__(self, session: Session) -> None:
         self.session = session
 
+    def owns_datasets(self, team_id: str) -> bool:
+        return (
+            self.session.scalar(select(Dataset.id).where(Dataset.owner_team_id == team_id).limit(1))
+            is not None
+        )
+
+    def change_owner_if_expected(self, dataset_id, expected_owner_team_id, owner_team_id) -> bool:
+        result = self.session.execute(
+            update(Dataset)
+            .where(Dataset.id == dataset_id, Dataset.owner_team_id == expected_owner_team_id)
+            .values(owner_team_id=owner_team_id, updated_at=utc_now())
+        )
+        if result.rowcount == 1:
+            self.session.scalar(
+                select(Dataset)
+                .where(Dataset.id == dataset_id)
+                .execution_options(populate_existing=True)
+            )
+        return result.rowcount == 1
+
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         if dataset_ids == ():
             return []
@@ -264,7 +303,12 @@ class SqlAlchemyDatasetOperations:
         if dataset_ids is not None:
             statement = statement.where(Dataset.id.in_(dataset_ids))
         return [
-            DatasetOverview(dataset, count, dataset.content_updated_at or dataset.created_at)
+            DatasetOverview(
+                dataset,
+                count,
+                dataset.content_updated_at or dataset.created_at,
+                dataset.owner_team_name,
+            )
             for dataset, count in self.session.execute(statement)
         ]
 
@@ -818,6 +862,7 @@ class SqlAlchemyUnitOfWork:
         self.memberships = SqlAlchemyMembershipOperations(self.session)
         self.grants = SqlAlchemyGrantOperations(self.session)
         self.datasets = SqlAlchemyDatasetOperations(self.session)
+        self.dataset_export_access = SqlAlchemyDatasetExportAccessOperations(self.session)
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
         self.dataset_records = SqlAlchemyDatasetRecordOperations(self.session)
@@ -860,6 +905,10 @@ class SqlAlchemyUnitOfWork:
         bind = self.session.get_bind()
         if bind.dialect.name == "postgresql":
             self.session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+        elif bind.dialect.name == "sqlite":
+            # sqlite3 legacy transaction control does not start a transaction for
+            # SELECT. Pin authority and content to the same explicit read snapshot.
+            self.session.connection().exec_driver_sql("BEGIN")
         else:
             self.session.connection()
 
@@ -933,3 +982,48 @@ class SqlAlchemyPermissionDataSource:
                 )
             )
             return ResourcePermissionsContext(subject, tuple(permissions.tuples()))
+
+
+class SqlAlchemyDatasetExportAccessOperations:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get(self, access_id):
+        return self.session.get(DatasetExportAccess, access_id)
+
+    def list_for_dataset(self, dataset_id):
+        return list(
+            self.session.scalars(
+                select(DatasetExportAccess)
+                .where(DatasetExportAccess.dataset_id == dataset_id)
+                .order_by(DatasetExportAccess.created_at, DatasetExportAccess.id)
+            )
+        )
+
+    def applies(self, dataset_id, user_id, team_ids):
+        return (
+            self.session.scalar(
+                select(DatasetExportAccess.id)
+                .where(
+                    DatasetExportAccess.dataset_id == dataset_id,
+                    or_(
+                        DatasetExportAccess.user_id == user_id,
+                        DatasetExportAccess.team_id.in_(team_ids),
+                    ),
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
+    def create(self, dataset_id, subject_type, subject_id):
+        entry = DatasetExportAccess(
+            dataset_id=dataset_id,
+            user_id=subject_id if subject_type == "user" else None,
+            team_id=subject_id if subject_type == "team" else None,
+        )
+        self.session.add(entry)
+        return entry
+
+    def delete(self, access):
+        self.session.delete(access)

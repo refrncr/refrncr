@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h1>Teams</h1>
+  <p>Teams represent data domains. Members maintain their team's datasets. Ask a Community administrator to change your memberships.</p>
+  {% if teams %}<div class='table-scroll'><table><caption>Your teams</caption><thead><tr><th scope='col'>Name</th></tr></thead><tbody>
+    {% for team in teams %}<tr><td>{{ team.name }}</td></tr>{% endfor %}
+  </tbody></table></div>{% else %}<p>You are not a member of any team.</p>{% endif %}
+  {% if dataset_ui_enabled %}<a href='{{ url_for("dataset_list") }}'>Back to datasets</a>{% endif %}
+{% endblock %}

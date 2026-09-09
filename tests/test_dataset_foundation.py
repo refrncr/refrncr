@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -41,10 +42,11 @@ def dataset_services():
     return engine, factory, resources, services, admin
 
 
-def test_create_dataset_persists_metadata_owner_grant_and_audits(dataset_services):
+def test_create_dataset_persists_metadata_team_creator_and_audit(dataset_services):
     _, factory, _, services, admin = dataset_services
 
-    dataset = services.datasets.create_dataset(
+    dataset = create_owned_dataset(
+        services.datasets,
         admin.id,
         "reference_data-1",
         "  Référence data  ",
@@ -69,18 +71,12 @@ def test_create_dataset_persists_metadata_owner_grant_and_audits(dataset_service
             )
         )
         events = list(
-            session.scalars(
-                select(AuditEvent).where(
-                    (AuditEvent.object_type == "dataset")
-                    | ((AuditEvent.object_type == "grant") & (AuditEvent.object_id == grant.id))
-                )
-            )
+            session.scalars(select(AuditEvent).where(AuditEvent.object_type == "dataset"))
         )
     assert persisted.key == dataset.key
-    assert grant.permission == "admin"
+    assert grant is None
     assert {(event.object_type, event.object_id, event.action) for event in events} == {
         ("dataset", dataset.id, "created"),
-        ("grant", grant.id, "created"),
     }
     assert {event.actor_user_id for event in events} == {admin.id}
 
@@ -88,7 +84,7 @@ def test_create_dataset_persists_metadata_owner_grant_and_audits(dataset_service
 @pytest.mark.parametrize("key", ["a", "a" * 100, "a_b-c9"])
 def test_valid_dataset_key_boundaries(dataset_services, key):
     _, _, _, services, admin = dataset_services
-    assert services.datasets.create_dataset(admin.id, key, "Name", "").key == key
+    assert create_owned_dataset(services.datasets, admin.id, key, "Name", "").key == key
 
 
 @pytest.mark.parametrize(
@@ -98,7 +94,7 @@ def test_valid_dataset_key_boundaries(dataset_services, key):
 def test_noncanonical_dataset_keys_are_rejected_without_rewriting(dataset_services, key):
     _, factory, _, services, admin = dataset_services
     with pytest.raises(ValidationError):
-        services.datasets.create_dataset(admin.id, key, "Name", "")
+        create_owned_dataset(services.datasets, admin.id, key, "Name", "")
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
@@ -106,7 +102,7 @@ def test_noncanonical_dataset_keys_are_rejected_without_rewriting(dataset_servic
 def test_dataset_name_is_trimmed_and_nfc_normalized(dataset_services):
     _, _, _, services, admin = dataset_services
     decomposed = "  Cafe\N{COMBINING ACUTE ACCENT}  "
-    dataset = services.datasets.create_dataset(admin.id, "cafe", decomposed, "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "cafe", decomposed, "")
     assert dataset.name == unicodedata.normalize("NFC", decomposed.strip())
 
 
@@ -114,35 +110,35 @@ def test_dataset_name_is_trimmed_and_nfc_normalized(dataset_services):
 def test_invalid_dataset_names_are_rejected(dataset_services, name):
     _, _, _, services, admin = dataset_services
     with pytest.raises(ValidationError):
-        services.datasets.create_dataset(admin.id, "valid", name, "")
+        create_owned_dataset(services.datasets, admin.id, "valid", name, "")
 
 
 def test_dataset_name_maximum_and_description_boundaries(dataset_services):
     _, _, _, services, admin = dataset_services
-    first = services.datasets.create_dataset(admin.id, "first", "n" * 200, "")
+    first = create_owned_dataset(services.datasets, admin.id, "first", "n" * 200, "")
     description = " \nUnicode Ω" + "x" * (10_000 - len(" \nUnicode Ω"))
-    second = services.datasets.create_dataset(admin.id, "second", "Name", description)
+    second = create_owned_dataset(services.datasets, admin.id, "second", "Name", description)
     assert len(first.name) == 200
     assert first.description == ""
     assert second.description == description
     with pytest.raises(ValidationError):
-        services.datasets.create_dataset(admin.id, "third", "Name", "x" * 10_001)
+        create_owned_dataset(services.datasets, admin.id, "third", "Name", "x" * 10_001)
     with pytest.raises(ValidationError):
-        services.datasets.create_dataset(admin.id, "fourth", "Name", None)
+        create_owned_dataset(services.datasets, admin.id, "fourth", "Name", None)
 
 
-def test_owner_cannot_be_supplied_and_key_has_no_public_setter(dataset_services):
+def test_creator_cannot_be_supplied_and_key_has_no_public_setter(dataset_services):
     _, _, _, services, admin = dataset_services
     with pytest.raises(TypeError):
-        services.datasets.create_dataset(
-            admin.id, "dataset", "Name", "", owner_user_id=str(uuid.uuid4())
+        create_owned_dataset(
+            services.datasets, admin.id, "dataset", "Name", "", owner_user_id=str(uuid.uuid4())
         )
-    dataset = services.datasets.create_dataset(admin.id, "dataset", "Name", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "dataset", "Name", "")
     with pytest.raises(AttributeError):
         dataset.key = "replacement"
 
 
-def test_only_active_community_administrator_can_create(dataset_services):
+def test_creation_requires_active_user_and_eligible_team(dataset_services):
     _, factory, _, services, admin = dataset_services
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     inactive = services.users.create_user(
@@ -157,25 +153,27 @@ def test_only_active_community_administrator_can_create(dataset_services):
             update(User).where(User.id == deleted.id).values(is_active=False, is_deleted=True)
         )
 
-    for actor_id in (user.id, inactive.id, deleted.id, str(uuid.uuid4())):
+    with pytest.raises(ValidationError):
+        create_owned_dataset(services.datasets, user.id, "no-membership", "Name", "")
+    for actor_id in (inactive.id, deleted.id, str(uuid.uuid4())):
         with pytest.raises(AuthorizationError):
-            services.datasets.create_dataset(actor_id, f"d-{actor_id[:8]}", "Name", "")
+            create_owned_dataset(services.datasets, actor_id, f"d-{actor_id[:8]}", "Name", "")
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
 
 def test_duplicate_key_has_consistent_conflict_without_partial_rows(dataset_services):
     _, factory, _, services, admin = dataset_services
-    first = services.datasets.create_dataset(admin.id, "duplicate", "First", "")
+    first = create_owned_dataset(services.datasets, admin.id, "duplicate", "First", "")
 
     with pytest.raises(ConflictError, match="Dataset key already exists in this installation"):
-        services.datasets.create_dataset(admin.id, "duplicate", "Second", "")
+        create_owned_dataset(services.datasets, admin.id, "duplicate", "Second", "")
 
     with factory() as session:
         assert session.scalar(select(func.count(Dataset.id))) == 1
         assert (
             session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
-            == 1
+            == 0
         )
         assert (
             session.scalar(
@@ -184,7 +182,7 @@ def test_duplicate_key_has_consistent_conflict_without_partial_rows(dataset_serv
                     | ((AuditEvent.object_type == "grant") & (AuditEvent.action == "created"))
                 )
             )
-            == 2
+            == 1
         )
         assert session.scalar(select(Dataset.id)) == first.id
 
@@ -201,37 +199,38 @@ def test_unrelated_dataset_integrity_failure_is_not_reported_as_duplicate(
 
     monkeypatch.setattr(SqlAlchemyDatasetOperations, "create", create_with_missing_owner)
     with pytest.raises(PersistenceConflictError) as raised:
-        services.datasets.create_dataset(admin.id, "not-duplicate", "Name", "")
+        create_owned_dataset(services.datasets, admin.id, "not-duplicate", "Name", "")
     assert raised.value.constraint is None
     assert str(raised.value) == "A persistence constraint rejected the operation"
     assert_dataset_creation_tables_empty(factory)
 
 
-def test_grant_failure_rolls_back_dataset_and_audits(dataset_services, monkeypatch):
+def test_creation_does_not_call_legacy_grant_persistence(dataset_services, monkeypatch):
     _, factory, _, services, admin = dataset_services
 
     def fail_grant(_self, **_values):
         raise RuntimeError("injected grant failure")
 
     monkeypatch.setattr(SqlAlchemyGrantOperations, "create", fail_grant)
-    with pytest.raises(RuntimeError, match="injected grant failure"):
-        services.datasets.create_dataset(admin.id, "rollback", "Name", "")
-    assert_dataset_creation_tables_empty(factory)
+    dataset = create_owned_dataset(services.datasets, admin.id, "no-grant", "Name", "")
+    assert dataset.owner_team_id
+    with factory() as session:
+        assert session.scalar(select(func.count(Grant.id))) == 0
 
 
-def test_audit_failure_rolls_back_dataset_and_grant(dataset_services, monkeypatch):
+def test_audit_failure_rolls_back_dataset_creation(dataset_services, monkeypatch):
     _, factory, _, services, admin = dataset_services
     calls = 0
 
     def fail_audit(_self, **_values):
         nonlocal calls
         calls += 1
-        if calls == 2:
+        if calls == 1:
             raise RuntimeError("injected audit failure")
 
     monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_audit)
     with pytest.raises(RuntimeError, match="injected audit failure"):
-        services.datasets.create_dataset(admin.id, "rollback", "Name", "")
+        create_owned_dataset(services.datasets, admin.id, "rollback", "Name", "")
     assert_dataset_creation_tables_empty(factory)
 
 
@@ -252,7 +251,7 @@ def assert_dataset_creation_tables_empty(factory):
 
 def test_dataset_resource_resolver_and_grants_use_dataset_id(dataset_services):
     _, _, resources, services, admin = dataset_services
-    dataset = services.datasets.create_dataset(admin.id, "resource", "Name", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "resource", "Name", "")
     user = services.users.create_user(admin.id, "viewer@example.com", "Viewer", "valid password")
 
     resources.require_existing("dataset", dataset.id)
@@ -260,12 +259,12 @@ def test_dataset_resource_resolver_and_grants_use_dataset_id(dataset_services):
         resources.require_existing("dataset", str(uuid.uuid4()))
     grant = services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, "viewer")
     assert grant.resource_id == dataset.id
-    assert services.authorization.effective_permission(user.id, "dataset", dataset.id) == "viewer"
+    assert services.authorization.effective_permission(user.id, "dataset", dataset.id) is None
 
 
 def test_owner_metadata_does_not_create_effective_permission(dataset_services):
     _, factory, _, services, admin = dataset_services
-    dataset = services.datasets.create_dataset(admin.id, "owned", "Name", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "owned", "Name", "")
     user = services.users.create_user(admin.id, "owner@example.com", "Owner", "valid password")
     with factory.begin() as session:
         session.execute(
@@ -273,12 +272,12 @@ def test_owner_metadata_does_not_create_effective_permission(dataset_services):
         )
 
     assert services.authorization.effective_permission(user.id, "dataset", dataset.id) is None
-    assert not services.authorization.check_access(user.id, "dataset", dataset.id, "viewer")
+    assert services.authorization.check_access(user.id, "dataset", dataset.id, "viewer")
 
 
 def test_persisted_dataset_key_cannot_be_changed(dataset_services):
     _, factory, _, services, admin = dataset_services
-    dataset = services.datasets.create_dataset(admin.id, "immutable", "Name", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "immutable", "Name", "")
 
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
@@ -305,7 +304,7 @@ def test_sqlite_concurrent_duplicate_creation_creates_exactly_one(tmp_path):
     def create():
         barrier.wait()
         try:
-            return datasets.create_dataset(admin.id, "raced", "Name", "")
+            return create_owned_dataset(datasets, admin.id, "raced", "Name", "")
         except ConflictError as exc:
             return exc
 
@@ -319,7 +318,7 @@ def test_sqlite_concurrent_duplicate_creation_creates_exactly_one(tmp_path):
         assert session.scalar(select(func.count(Dataset.id))) == 1
         assert (
             session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
-            == 1
+            == 0
         )
 
 
@@ -346,7 +345,7 @@ def test_postgresql_dataset_creation_uniqueness_and_rollback(monkeypatch):
         def create():
             barrier.wait()
             try:
-                return datasets.create_dataset(admin.id, "raced", "Name", "")
+                return create_owned_dataset(datasets, admin.id, "raced", "Name", "")
             except ConflictError as exc:
                 return exc
 
@@ -359,17 +358,17 @@ def test_postgresql_dataset_creation_uniqueness_and_rollback(monkeypatch):
 
         with monkeypatch.context() as scoped:
             scoped.setattr(
-                SqlAlchemyGrantOperations,
-                "create",
+                SqlAlchemyUnitOfWork,
+                "add_audit",
                 lambda _self, **_values: (_ for _ in ()).throw(RuntimeError("grant failure")),
             )
             with pytest.raises(RuntimeError, match="grant failure"):
-                datasets.create_dataset(admin.id, "rollback", "Name", "")
+                create_owned_dataset(datasets, admin.id, "rollback", "Name", "")
         with factory() as session:
             assert session.scalar(select(func.count(Dataset.id))) == 1
             assert (
                 session.scalar(select(func.count(Grant.id)).where(Grant.resource_type == "dataset"))
-                == 1
+                == 0
             )
     finally:
         application_engine.dispose()
@@ -419,7 +418,7 @@ def test_postgresql_actor_deactivation_serializes_with_dataset_creation():
 
         def create_dataset():
             assert deactivation_flushed.wait(timeout=5)
-            return datasets.create_dataset(actor.id, "after-revocation", "Name", "")
+            return create_owned_dataset(datasets, actor.id, "after-revocation", "Name", "")
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             deactivation = executor.submit(deactivate_actor)

@@ -13,6 +13,21 @@
   });
   document.querySelector("[data-error-focus]")?.focus();
 
+  const selectionForms = new WeakSet();
+  const initializeSelectionForms = (root) => {
+    root.querySelectorAll("form[data-requires-selection]").forEach((form) => {
+      if (selectionForms.has(form)) return;
+      const select = form.querySelector("select[required]");
+      const submit = form.querySelector("button[type='submit']");
+      if (!select || !submit) return;
+      selectionForms.add(form);
+      const update = () => { submit.disabled = !select.value || form.getAttribute("aria-busy") === "true"; };
+      select.addEventListener("change", update);
+      update();
+    });
+  };
+  initializeSelectionForms(document);
+
   document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
     const trigger = details.querySelector("summary");
     const tooltip = details.querySelector('[role="tooltip"]');
@@ -130,6 +145,17 @@
     const title = document.getElementById(dialog.getAttribute("aria-labelledby"));
     title.textContent = content.dataset.panelTitle;
     dialog.querySelector("[data-panel-host]").replaceChildren(document.importNode(content, true));
+    const host = dialog.querySelector("[data-panel-host]");
+    initializeSelectionForms(host);
+    host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
+      const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
+      const nested = document.createElement(marker === "data-panel-section-heading" ? "h3" : "h4");
+      nested.id = heading.id;
+      nested.className = heading.className;
+      nested.textContent = heading.textContent;
+      nested.setAttribute(marker, "");
+      heading.replaceWith(nested);
+    });
     if (dialog.open) focusSidePanel(dialog);
     return true;
   };
@@ -207,7 +233,21 @@
           method: "POST", body: data, credentials: "same-origin",
         });
         if (response.redirected) {
-          window.location.assign(response.url);
+          const refresh = form.getAttribute("data-panel-refresh");
+          if (refresh && panelLoads.get(dialog) !== load) return;
+          if (refresh && response.ok && response.url === new URL(refresh, form.action).href &&
+              await renderPanelResponse(dialog, response, load)) {
+            if (panelLoads.get(dialog) !== load) return;
+            const status = dialog.querySelector("[data-panel-host]").querySelector("[data-panel-status]");
+            if (status) {
+              status.hidden = false;
+              status.setAttribute("role", "status");
+              status.textContent = form.dataset.panelSuccess;
+              if (dialog.open) status.focus();
+            }
+          } else {
+            window.location.assign(response.url);
+          }
         } else if (panelLoads.get(dialog) !== load) {
           return;
         } else if (![400, 409].includes(response.status) || !await renderPanelResponse(dialog, response, load)) {
@@ -230,6 +270,10 @@
         pendingForms.delete(dialog);
         buttons.forEach((button) => { button.disabled = false; });
         form.removeAttribute("aria-busy");
+        if (form.hasAttribute("data-requires-selection")) {
+          const select = form.querySelector("select[required]");
+          buttons.forEach((button) => { button.disabled = !select?.value; });
+        }
       }
     });
   });

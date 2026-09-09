@@ -353,6 +353,7 @@ def create_flask_app(
         return render_template(
             "pages/datasets/list.html",
             actor=actor,
+            may_create=_authorization.datasets.can_create_dataset(actor.id),
             datasets=visible_datasets,
             current_actor=actor,
             current_csrf=_login_session.csrf_token,
@@ -368,9 +369,15 @@ def create_flask_app(
         error=None,
         error_field=None,
     ):
-        actor, login_session = require_admin()
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        eligible_teams = _auth.datasets.creation_teams(actor.id)
         return render_template(
             "pages/datasets/create.html",
+            teams=eligible_teams,
+            owner_team_id=request.form.get(
+                "owner_team_id", eligible_teams[0].id if len(eligible_teams) == 1 else ""
+            ),
             key=key,
             name=name,
             description=description,
@@ -398,7 +405,12 @@ def create_flask_app(
         name = request.form.get("name", "")
         description = request.form.get("description", "")
         try:
-            dataset = dataset_service.create_dataset(actor.id, key, name, description)
+            submitted_teams = request.form.getlist("owner_team_id")
+            if len(submitted_teams) != 1 or not submitted_teams[0]:
+                raise ValidationError("Choose an owning team.")
+            dataset = dataset_service.create_dataset(
+                actor.id, key, name, description, submitted_teams[0]
+            )
         except (ValidationError, ConflictError) as error:
             message = str(error)
             if message.startswith("Dataset key"):
@@ -444,6 +456,9 @@ def create_flask_app(
             dataset=dataset,
             editable=editable,
             schema_admin=schema_admin,
+            may_govern=authorization_service.datasets.can_change_dataset_owner(
+                actor.id, dataset.id
+            ),
             fields=fields,
             business_key=business_key,
             current_actor=actor,
@@ -451,6 +466,89 @@ def create_flask_app(
             active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
         )
+
+    def render_dataset_governance(key, mode, error=None):
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        dataset, available_teams, available_users, entries = service.export_access_context(
+            actor.id, key
+        )
+        return render_template(
+            "pages/datasets/governance.html",
+            dataset=dataset,
+            mode=mode,
+            teams=available_teams,
+            users=available_users,
+            entries=entries,
+            selected_subject=request.form.get("subject", ""),
+            error=error,
+            expected_owner_team_id=request.form.get(
+                "expected_owner_team_id", dataset.owner_team_id
+            ),
+            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
+            current_actor=actor,
+            current_csrf=login_session.csrf_token,
+            active_navigation=active_navigation(),
+            dataset_ui_enabled=dataset_ui_enabled,
+        )
+
+    @dataset_route("/datasets/<key>/owner", methods=["GET", "POST"])
+    def dataset_owner(key):
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            try:
+                expected = {"csrf_token", "expected_owner_team_id", "owner_team_id"}
+                if set(request.form) != expected or any(
+                    len(request.form.getlist(item)) != 1 for item in expected
+                ):
+                    raise ValidationError(
+                        "Submit exactly one expected and new owning team. Reopen the form."
+                    )
+                service.change_owner(
+                    actor.id,
+                    key,
+                    request.form["expected_owner_team_id"],
+                    request.form["owner_team_id"],
+                )
+            except (ValidationError, ConflictError) as error:
+                return render_dataset_governance(key, "owner", str(error)), 409 if isinstance(
+                    error, ConflictError
+                ) else 400
+            return redirect(url_for("dataset_detail", key=key))
+        return render_dataset_governance(key, "owner")
+
+    @dataset_route("/datasets/<key>/export-access", methods=["GET", "POST"])
+    def dataset_export_access(key):
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            try:
+                expected = {"csrf_token", "subject"}
+                if set(request.form) != expected or any(
+                    len(request.form.getlist(item)) != 1 for item in expected
+                ):
+                    raise ValidationError("Choose one user or team.")
+                subject_type, separator, subject_id = request.form["subject"].partition(":")
+                if not separator:
+                    raise ValidationError("Choose one user or team.")
+                service.grant_export_access(actor.id, key, subject_type, subject_id)
+            except (ValidationError, ConflictError) as error:
+                return render_dataset_governance(key, "export", str(error)), 409 if isinstance(
+                    error, ConflictError
+                ) else 400
+            return redirect(url_for("dataset_export_access", key=key))
+        return render_dataset_governance(key, "export")
+
+    @dataset_route("/datasets/<key>/export-access/<access_id>/revoke", methods=["POST"])
+    def revoke_dataset_export_access(key, access_id):
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        require_csrf(login_session.csrf_token)
+        service.revoke_export_access(actor.id, key, access_id)
+        return redirect(url_for("dataset_export_access", key=key))
 
     @dataset_route("/datasets/<key>/fields/order", methods=["POST"])
     def move_dataset_field(key: str):
@@ -547,6 +645,7 @@ def create_flask_app(
             rows=rows,
             page=page,
             may_edit=may_edit,
+            may_export=authorization_service.datasets.can_export_dataset(actor.id, dataset.id),
             may_configure=may_configure,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -1213,8 +1312,16 @@ def create_flask_app(
         error=None,
         error_field=None,
     ):
+        auth, service, *_rest = require_dataset_dependencies()
+        may_govern = auth.datasets.can_change_dataset_owner(actor.id, dataset.id)
         return render_template(
             "pages/datasets/edit.html",
+            may_govern=may_govern,
+            teams=auth.datasets.creation_teams(actor.id) if may_govern else [],
+            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
+            expected_owner_team_id=request.form.get(
+                "expected_owner_team_id", dataset.owner_team_id
+            ),
             dataset=dataset,
             name=name,
             description=description,
@@ -1254,10 +1361,25 @@ def create_flask_app(
         name = request.form.get("name", "")
         description = request.form.get("description", "")
         try:
-            dataset = dataset_service.update_dataset(actor.id, key, name, description)
+            owner_change = None
+            if {"owner_team_id", "expected_owner_team_id"} & set(request.form):
+                if any(
+                    len(request.form.getlist(field)) != 1
+                    for field in ("owner_team_id", "expected_owner_team_id")
+                ):
+                    raise ValidationError(
+                        "Submit exactly one expected and new owning team. Reopen the form."
+                    )
+                owner_change = (
+                    request.form["expected_owner_team_id"],
+                    request.form["owner_team_id"],
+                )
+            dataset = dataset_service.update_dataset(
+                actor.id, key, name, description, owner_change=owner_change
+            )
         except NotFoundError:
             abort(404)
-        except ValidationError as error:
+        except (ValidationError, ConflictError) as error:
             try:
                 dataset = dataset_service.get_dataset_for_edit(actor.id, key)
             except NotFoundError:
@@ -1279,7 +1401,7 @@ def create_flask_app(
                     error=message,
                     error_field=error_field,
                 ),
-                400,
+                409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("dataset_detail", key=dataset.key))
 
@@ -1699,7 +1821,16 @@ def create_flask_app(
 
     @app.get("/teams")
     def team_list():
-        actor, login_session = require_admin()
+        actor, login_session = require_authenticated()
+        if actor.role != "admin":
+            return render_template(
+                "pages/teams/readonly.html",
+                teams=teams.list_teams(actor.id),
+                current_actor=actor,
+                current_csrf=login_session.csrf_token,
+                active_navigation=active_navigation(),
+                dataset_ui_enabled=dataset_ui_enabled,
+            )
         managed_teams = teams.list_teams(actor.id)
         open_team = request.args.get("open_team")
         selected_team = next((team for team in managed_teams if team.id == open_team), None)
@@ -1774,6 +1905,12 @@ def create_flask_app(
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):
+        if isinstance(error, NotFoundError) and request.endpoint in {
+            "dataset_owner",
+            "dataset_export_access",
+            "revoke_dataset_export_access",
+        }:
+            return "Dataset not found", 404
         status = 403 if isinstance(error, AuthorizationError) else 400
         return str(error), status
 

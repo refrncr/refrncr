@@ -13,3 +13,9 @@ fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px soli
 
 .form-field [data-password-toggle] { margin-top: var(--space-sm); }
 .form-field [data-password-toggle][hidden] { display: none; }
+
+.inline-form-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); margin-top: var(--space-xs); align-items: stretch; }
+.inline-form-action > select { min-width: 0; margin-top: 0; }
+.inline-form-action > .button { white-space: nowrap; }
+.form-label-sentence, .side-panel-body .form-label-sentence { margin-top: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
+@media (max-width: 767px) { .inline-form-action { grid-template-columns: minmax(0, 1fr); } }

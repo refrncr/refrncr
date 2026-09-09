@@ -40,18 +40,25 @@ a.setAttribute('data-row-primary', '');
 let rowTextSelected = false;
 const remote = opener('second'); remote.setAttribute('data-panel-url',''); remote.href = 'https://localhost/form';
 const main = new Element();
+const selector = new Element(); selector.value = '';
+const grantButton = new Element(); grantButton.matches = () => true;
+const grantForm = new Element({'data-requires-selection':'', 'data-panel-refresh':'/export-access', 'data-panel-success':'Export access granted.'});
+grantForm.action = 'https://localhost/export-access'; grantForm.elements = [grantButton];
+grantForm.querySelector = s => s === 'select[required]' ? selector : s === "button[type='submit']" ? grantButton : null;
+grantForm.prepend = e => { grantForm.error = e; };
 const nodes = {first, second, 'first-title':first.title, 'second-title':second.title, content:main};
 const document = {
   activeElement: null,
   querySelectorAll(selector) {
-    return ({'dialog[data-modal-side-panel]':[first,second], '[data-dialog-open]':[a,b,c,remote], '[data-dialog-close]':[first.closeButton,second.closeButton], '[data-panel-host]':[second.host]})[selector] || [];
+    return ({'form[data-requires-selection]':[grantForm], 'dialog[data-modal-side-panel]':[first,second], '[data-dialog-open]':[a,b,c,remote], '[data-dialog-close]':[first.closeButton,second.closeButton], '[data-panel-host]':[second.host]})[selector] || [];
   },
   querySelector(selector) { return selector === 'dialog[data-modal-side-panel][open]' ? [first,second].find(d => d.open) : null; },
-  getElementById(id) { return nodes[id]; }, addEventListener() {}, importNode(node) { return node; }, createElement() { return new Element(); },
+  getElementById(id) { return nodes[id]; }, addEventListener() {}, importNode(node) { return node; }, createElement(tag) { const e = new Element(); e.tagName = tag.toUpperCase(); return e; },
 };
 let fetchImpl;
 const requests = [], destinations = [];
 const context = {document, window:{getSelection:()=>({isCollapsed:!rowTextSelected}),location:{assign(url){destinations.push(url);}}},
+  URL,
   fetch:async (...args) => {requests.push(args); return fetchImpl(...args);},
   DOMParser:class {parseFromString(page) { return {querySelector(){return page;}};}},
   FormData:class {constructor(form,submitter) {this.form=form;this.submitter=submitter;}},
@@ -62,6 +69,11 @@ vm.runInNewContext(source, context);
 const settle = async () => { for(let i=0;i<15;i++) await Promise.resolve(); };
 const response = (content, status=200) => ({ok:status===200,status,redirected:false,text:async()=>content});
 (async()=>{
+  assert.equal(grantButton.disabled,true,'enhanced selection form starts disabled');
+  selector.value='user:example'; await selector.fire('change'); assert.equal(grantButton.disabled,false);
+  grantForm.setAttribute('aria-busy','true'); await selector.fire('change'); assert.equal(grantButton.disabled,true);
+  grantForm.removeAttribute('aria-busy'); selector.value=''; await selector.fire('change'); assert.equal(grantButton.disabled,true);
+  assert.equal(selector.listeners.change.length,1,'selection initialization is idempotent');
   assert.equal(a.listeners.click.length, 1, 'controller registration is idempotent');
   rowTextSelected = true;
   await a.fire('click', {detail:1});
@@ -120,5 +132,35 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   fetchImpl=async()=>{throw new Error('network');};
   await remote.fire('click'); await settle();
   assert.equal(destinations.at(-1),remote.href,'GET failure falls back to the full page');
+  await second.close();
+  fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
+  const status = new Element({'data-panel-status':''}); status.hidden=true;
+  second.host.querySelector = s => s === '[data-panel-status]' ? status : null;
+  const heading = new Element({'data-panel-section-heading':''}); heading.tagName='H2';
+  let nestedHeading; heading.replaceWith = e => { nestedHeading=e; };
+  second.host.querySelectorAll = s => s.startsWith('[data-panel-section-heading]') ? [heading] : [];
+  selector.value='user:example'; await selector.fire('change');
+  const navigationCount = destinations.length;
+  fetchImpl=async()=>({...response(content),redirected:true,url:grantForm.action});
+  await second.host.fire('submit',{target:grantForm,submitter:grantButton});
+  assert.equal(destinations.length,navigationCount,'opt-in same-page success keeps dialog context');
+  assert.equal(second.open,true); assert.equal(status.hidden,false);
+  assert.equal(status.textContent,'Export access granted.'); assert.equal(status.getAttribute('role'),'status');
+  assert.equal(document.activeElement,status); assert.equal(nestedHeading.tagName,'H3');
+  await second.close(); assert.equal(document.activeElement,remote,'refresh preserves original opener');
+  fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
+  fetchImpl=async()=>({...response(content),redirected:true,url:'https://localhost/login'});
+  await second.host.fire('submit',{target:grantForm,submitter:grantButton});
+  assert.equal(destinations.at(-1),'https://localhost/login','authentication redirects are never imported');
+  let completeMutation;
+  fetchImpl=()=>new Promise(resolve=>{completeMutation=resolve;});
+  const pending=second.host.fire('submit',{target:grantForm,submitter:grantButton});
+  const pendingRequests=requests.length;
+  await second.host.fire('submit',{target:grantForm,submitter:grantButton});
+  assert.equal(requests.length,pendingRequests,'one request per pending panel');
+  await second.close(); const closedDestinations=destinations.length;
+  completeMutation({...response(content),redirected:true,url:grantForm.action}); await pending;
+  assert.equal(destinations.length,closedDestinations,'closed opt-in panel ignores late success');
+  assert.equal(second.open,false);
   console.log('Side-panel controller checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

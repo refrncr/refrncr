@@ -18,7 +18,7 @@ def section(page, heading):
     return page.split(f"<section aria-labelledby='{heading}'>", 1)[1].split("</section>", 1)[0]
 
 
-@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+@pytest.mark.parametrize("permission", ["viewer", "member", "community_admin"])
 @pytest.mark.parametrize("count", [0, 1, 3])
 def test_overview_structure_permissions_and_order_boundaries(dataset_browser, permission, count):  # noqa: F811
     _, services, admin, client = dataset_browser
@@ -32,8 +32,12 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         )
     ]
     actor = services.users.create_user(admin.id, "actor@example.com", "Actor", "user password")
-    services.grants.create_grant(admin.id, "user", actor.id, "dataset", dataset.id, permission)
-    login(client, actor.email, "user password")
+    if permission == "member":
+        services.memberships.create_membership(admin.id, actor.id, dataset.owner_team_id)
+    if permission == "community_admin":
+        login(client)
+    else:
+        login(client, actor.email, "user password")
     response = request(client, "get", "/datasets/overview")
     assert response.status_code == 200
     page = body(response)
@@ -43,7 +47,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "0 records</span>" in page and "Updated <time" in page
     assert page.count("<section ") == 2
     header = page.split("<div class='configuration-overview'>")[0]
-    assert "<div class='page-header'>" in header
+    assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
     assert "class='button button-primary' href='/datasets/overview/records'>View records" in actions
     assert ("Edit dataset" in actions) == (permission != "viewer")
@@ -52,7 +56,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     details = section(page, "dataset-details-heading")
     for label in ("Name", "Description", "Owning team", "Key"):
         assert f"<dt>{label}</dt>" in details
-    assert "<dd>No owning team</dd>" in details
+    assert "<dd>Test data domain</dd>" in details
     assert "No description provided" in details
     assert "<dd><code>overview</code></dd>" in details
     # UUIDs remain legal only in functional hidden ordering inputs.
@@ -62,7 +66,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     field_section = section(page, "fields-heading")
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
     assert f"{count} {'field' if count == 1 else 'fields'}</p>" in field_section
-    assert ("Add field" in field_section) == (permission == "admin")
+    assert ("Add field" in field_section) == (permission != "viewer")
     assert ("configuration-panel" in page) == (permission != "viewer")
     assert "record-identifier-heading" not in page
     assert "No record identifier configured" not in page
@@ -102,7 +106,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert f"{field.name} is part of the record identifier" in indicator
         else:
             assert "key-icon" not in indicator
-        if permission == "admin":
+        if permission != "viewer":
             assert f"aria-label='Edit field {field.name}' data-panel-url" in row
             edit = re.search(r"<a class='field-edit-action'[^>]*>(.*?)</a>", row, re.DOTALL)
             assert edit is not None
@@ -185,7 +189,7 @@ def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monke
     assert "Identifier field is part of the record identifier" in page
 
 
-@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+@pytest.mark.parametrize("permission", ["viewer", "member", "community_admin"])
 @pytest.mark.parametrize("state", ["empty", "unconfigured", "configured"])
 def test_missing_identifier_warning_only_for_existing_fields(
     dataset_browser,  # noqa: F811
@@ -199,8 +203,12 @@ def test_missing_identifier_warning_only_for_existing_fields(
     if state == "configured":
         services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
     actor = services.users.create_user(admin.id, "actor@example.com", "Actor", "user password")
-    services.grants.create_grant(admin.id, "user", actor.id, "dataset", dataset.id, permission)
-    login(client, actor.email, "user password")
+    if permission == "member":
+        services.memberships.create_membership(admin.id, actor.id, dataset.owner_team_id)
+    if permission == "community_admin":
+        login(client)
+    else:
+        login(client, actor.email, "user password")
     page = body(request(client, "get", f"/datasets/{dataset.key}"))
     assert "record-identifier-heading" not in page
     warning = re.search(r"<div class='alert alert-warning'[^>]*>(.*?)</div>", page, re.DOTALL)

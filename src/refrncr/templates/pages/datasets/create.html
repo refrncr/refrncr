@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "components.html" import breadcrumbs, button, feedback, form_field %}
 {% from "layouts/page.html" import page_header %}
+{% from "pages/datasets/_team_choice.html" import team_choice %}
 
 {% block title %}New dataset · REFRNCR{% endblock %}
 
@@ -9,6 +10,10 @@
   {{ page_header("New dataset") }}
   <div class='side-panel-body' data-side-panel-content data-panel-title='New dataset'>
   {{ feedback(error if not error_field else none, id="dataset-create-error", focus=true) }}
+  {% if not teams %}
+    <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>
+    <a class='button button-secondary' href='{{ url_for("team_list") }}'>Go to Teams</a>
+  {% else %}
   <form class='form' novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Key",
@@ -35,11 +40,13 @@
       error=error if error_field == "description" else none,
       control="textarea"
     ) }}
+    {{ team_choice(teams, owner_team_id) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
       <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>
       {{ button("Create dataset", button_type="submit") }}
     </div>
   </form>
+  {% endif %}
   </div>
 {% endblock %}

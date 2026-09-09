@@ -1,7 +1,7 @@
 # Dataset context persistence (REF-130)
 
 Dataset overview and detail context are authorized service reads. `list_dataset_overview`
-resolves viewer access in bulk, then calls the Dataset port's `current_overview` once. The
+resolves active Community read access in bulk, then calls the Dataset port's `current_overview` once. The
 Community adapter scopes both the grouped record-count subquery and dataset rows to those IDs;
 only authorized all-resource access uses an unrestricted scope. Empty access skips the query.
 The result combines dataset data, exact count (including zero), and an aware UTC freshness value.
@@ -10,7 +10,7 @@ There is no overview pagination today; record-page pagination remains unchanged.
 `DatasetRecord` stores only the mutable current working set. Its revision is an optimistic
 concurrency counter, not another row/version. The explicitly named `current_overview` contract
 must continue to count only this working set when historical/publication storage is introduced.
-No versioning, ownership relation, Cloud context, or external runtime dependency is added here.
+REF-73 adds required owning-team context without versioning, Cloud context or external dependencies.
 
 Migration `0011_ref_130` adds nullable `datasets.content_updated_at` with `DateTime(timezone=True)`
 and deterministically backfills every existing row with its `created_at`, irrespective of audit
@@ -29,8 +29,9 @@ Services assign content freshness inside the same serialized, dataset-locked Uni
 
 Identifier membership is part of field-schema structure. Field/schema no-ops return before
 changing freshness. Record edits retain their existing revision/audit behaviour, including saves
-of unchanged values. Name, description, access grants, initial user ownership and unrelated
-metadata do not touch content freshness. No ownership mutation service exists yet. Import staging,
+of unchanged values. Name, description, access grants, historical creator metadata and unrelated
+metadata do not touch content freshness. REF-73 ownership reassignment changes metadata updated_at
+but not content freshness. Import staging,
 preview and failures do not touch it. Any failure, including commit failure after a flush, rolls
 back both the mutation and its timestamp. Operation groups never commit independently.
 
@@ -44,8 +45,8 @@ the existing migration environment suspends SQLite foreign keys during reconstru
 validates them afterwards, preserving dependent rows without a new SQLite version requirement.
 Tests cover populated upgrade/backfill and
 downgrade on SQLite and PostgreSQL, including records, values, fields, identifiers, grants and
-audits. Older migration fixtures seed via the current application and downgrade to the historical
-schema before exercising upgrade; assertions on downgraded schemas select only historical columns.
+audits. Older migration fixtures use the test-only historical-schema constructor before exercising upgrade
+because REF-73 blocks populated production downgrades; assertions on downgraded schemas select only historical columns.
 
 ## Header layout verification
 
@@ -89,7 +90,7 @@ and assistive technology. The isolated snapshot checks do not replace interactiv
 1. At 320 px and desktop width, open the overview, records, configuration, edit and import pages.
    Include empty, populated and long-name datasets. Confirm no horizontal page overflow; wide
    tables scroll within their own container. Confirm right-aligned counts and secondary metadata.
-2. Check the Datasets → No owning team → dataset name breadcrumb. Only Datasets is linked, with
+2. Check the Datasets → owning-team display name → dataset name breadcrumb. Only Datasets is linked, with
    restrained green text and no underline. Grey separators are decorative, and the final dataset
    name is current. Check wrapping with a long unbroken name and increased text size.
 3. Tab through links and primary actions. Confirm logical order, visible focus, and usable table

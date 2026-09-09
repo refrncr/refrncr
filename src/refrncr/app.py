@@ -10,6 +10,7 @@ from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
+    DatasetAuthorizationService,
     DatasetBusinessKeyService,
     DatasetFieldService,
     DatasetRecordService,
@@ -48,7 +49,9 @@ def create_community_services(
     uow = SqlAlchemyUnitOfWorkFactory(sessions)
     permission_data = SqlAlchemyPermissionDataSource(sessions)
     resources.register("dataset", DatasetResourceResolver(uow))
-    authorization = AuthorizationService(permission_data, resources)
+    authorization = AuthorizationService(
+        permission_data, resources, DatasetAuthorizationService(uow)
+    )
     dataset_records = DatasetRecordService(uow, authorization)
     return CommunityServices(
         users=UserService(uow),

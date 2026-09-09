@@ -1,0 +1,622 @@
+"""REF-73 authority, ownership compare-and-set, and orthogonal export contracts."""
+
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
+
+import pytest
+from sqlalchemy import func, select, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import IntegrityError
+from werkzeug.datastructures import MultiDict
+
+from refrncr.app import create_community_services
+from refrncr.db.base import Base
+from refrncr.db.session import create_database_engine, create_session_factory
+from refrncr.models import AuditEvent, Dataset, DatasetExportAccess, DatasetRecord, Grant
+from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
+from refrncr.services import (
+    AuthorizationError,
+    ConflictError,
+    InvalidLifecycleError,
+    NotFoundError,
+    ResourceTypeRegistry,
+    StaleDatasetOwnerError,
+    ValidationError,
+)
+from refrncr.web import create_flask_app
+
+
+@pytest.fixture(params=["sqlite", "postgresql"])
+def governance(request, tmp_path):
+    administrative = None
+    if request.param == "postgresql":
+        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
+        if not url:
+            pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
+        administrative = create_database_engine(url)
+        schema = f"governance_{uuid.uuid4().hex}"
+        with administrative.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
+    else:
+        url = f"sqlite:///{tmp_path / 'governance.db'}"
+    engine = create_database_engine(url)
+    Base.metadata.create_all(engine)
+    factory = create_session_factory(engine)
+    services = create_community_services(factory, ResourceTypeRegistry())
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
+    owner = services.teams.create_team(admin.id, "Data domain")
+    other = services.teams.create_team(admin.id, "Other domain")
+    dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "", owner.id)
+    yield engine, factory, services, admin, user, owner, other, dataset
+    engine.dispose()
+    if administrative:
+        with administrative.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        administrative.dispose()
+
+
+def state(factory, dataset):
+    with factory() as session:
+        row = session.get(Dataset, dataset.id)
+        return row.owner_team_id, row.updated_at, session.scalar(select(func.count(AuditEvent.id)))
+
+
+@pytest.mark.parametrize("kind", ["viewer", "export_user", "export_team", "owner", "admin"])
+def test_complete_capability_matrix(governance, kind):
+    _, factory, s, a, u, owner, other, d = governance
+    if kind == "owner":
+        s.memberships.create_membership(a.id, u.id, owner.id)
+    elif kind == "admin":
+        u = a
+    elif kind == "export_user":
+        s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    elif kind == "export_team":
+        s.memberships.create_membership(a.id, u.id, other.id)
+        s.datasets.grant_export_access(a.id, d.key, "team", other.id)
+    auth = s.authorization.datasets
+    assert auth.can_view_dataset(u.id, d.id)
+    assert auth.can_create_dataset(u.id)
+    assert auth.can_create_dataset(u.id, owner.id) == (kind in {"owner", "admin"})
+    assert auth.can_maintain_dataset(u.id, d.id) == (kind in {"owner", "admin"})
+    assert auth.can_export_dataset(u.id, d.id) == (kind != "viewer")
+    assert auth.can_change_dataset_owner(u.id, d.id) == (kind == "admin")
+    assert auth.can_manage_export_access(u.id, d.id) == (kind == "admin")
+    assert [item.id for item in s.datasets.list_datasets(u.id)] == [d.id]
+    assert s.datasets.get_dataset_details(u.id, d.key).owner_team_name == owner.name
+    assert s.dataset_fields.list_fields(u.id, d.key) == []
+    assert s.dataset_business_keys.get_business_key(u.id, d.key).field_keys == ()
+    assert s.dataset_records.list_records(u.id, d.key).total == 0
+    for fmt in ("csv", "xlsx", "json"):
+        if kind != "viewer":
+            s.dataset_records.export_dataset(u.id, d.key, fmt).content.close()
+        else:
+            with pytest.raises(NotFoundError):
+                s.dataset_records.export_dataset(u.id, d.key, fmt)
+    if kind in {"owner", "admin"}:
+        s.datasets.update_dataset(u.id, d.key, "Changed", "")
+        s.dataset_fields.create_field(u.id, d.key, "code", "Code", "string", True, True, True)
+        row = s.dataset_records.create_record(u.id, d.key, {"code": "NL"})
+        s.dataset_records.update_record(u.id, d.key, row.id, 1, {"code": "BE"})
+        s.dataset_records.delete_record(u.id, d.key, row.id, 2)
+    else:
+        with pytest.raises(NotFoundError):
+            s.datasets.update_dataset(u.id, d.key, "Changed", "")
+        with pytest.raises(NotFoundError):
+            s.dataset_fields.create_field(u.id, d.key, "code", "Code", "string")
+        with pytest.raises(NotFoundError):
+            s.datasets.change_owner(u.id, d.key, owner.id, other.id)
+        with pytest.raises(NotFoundError):
+            s.datasets.grant_export_access(u.id, d.key, "user", u.id)
+    with factory() as session:
+        assert session.scalar(select(func.count(Grant.id))) == 0
+
+
+@pytest.mark.parametrize("kind", ["missing", "inactive", "deleted"])
+def test_ineligible_users_denied_every_capability(governance, kind):
+    _, _, s, a, u, owner, _, d = governance
+    s.memberships.create_membership(a.id, u.id, owner.id)
+    s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    if kind == "inactive":
+        s.users.disable_user(a.id, u.id)
+    elif kind == "deleted":
+        s.users.delete_user(a.id, u.id)
+    actor = "missing" if kind == "missing" else u.id
+    auth = s.authorization.datasets
+    for name in (
+        "can_view_dataset",
+        "can_maintain_dataset",
+        "can_export_dataset",
+        "can_change_dataset_owner",
+        "can_manage_export_access",
+    ):
+        assert not getattr(auth, name)(actor, d.id)
+    assert not auth.can_create_dataset(actor, owner.id)
+    with pytest.raises(AuthorizationError):
+        s.datasets.create_dataset(actor, "denied", "Denied", "", owner.id)
+    with pytest.raises(AuthorizationError):
+        s.datasets.list_datasets(actor)
+    with pytest.raises(NotFoundError):
+        s.datasets.get_dataset(actor, d.key)
+
+
+def test_creation_zero_one_multiple_teams_and_forged_selection(governance):
+    _, factory, s, a, u, owner, other, _ = governance
+    with pytest.raises(ValidationError):
+        s.datasets.create_dataset(u.id, "none", "None", "")
+    first = s.memberships.create_membership(a.id, u.id, owner.id)
+    d = s.datasets.create_dataset(u.id, "single", "Single", "")
+    assert d.owner_team_id == owner.id and d.owner_user_id == u.id
+    with pytest.raises(ValidationError):
+        s.datasets.create_dataset(u.id, "forged", "Forged", "", other.id)
+    s.memberships.create_membership(a.id, u.id, other.id)
+    with pytest.raises(ValidationError):
+        s.datasets.create_dataset(u.id, "ambiguous", "Ambiguous", "")
+    assert (
+        s.datasets.create_dataset(u.id, "chosen", "Chosen", "", other.id).owner_team_id == other.id
+    )
+    s.memberships.delete_membership(a.id, owner.id, first.id)
+    with pytest.raises(ValidationError):
+        s.datasets.create_dataset(u.id, "stale", "Stale", "", owner.id)
+    with factory() as session:
+        audit = session.scalar(select(AuditEvent).where(AuditEvent.object_id == d.id))
+        assert audit.details == {"owner_team_id": owner.id, "creator_user_id": u.id}
+        assert session.scalar(select(func.count(Grant.id))) == 0
+
+
+def test_current_membership_and_export_are_additive(governance):
+    _, _, s, a, u, owner, other, d = governance
+    auth = s.authorization.datasets
+    own = s.memberships.create_membership(a.id, u.id, owner.id)
+    assert auth.can_maintain_dataset(u.id, d.id)
+    s.memberships.delete_membership(a.id, owner.id, own.id)
+    assert not auth.can_maintain_dataset(u.id, d.id)
+    assert not auth.can_export_dataset(u.id, d.id)
+    direct = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    team = s.datasets.grant_export_access(a.id, d.key, "team", other.id)
+    membership = s.memberships.create_membership(a.id, u.id, other.id)
+    s.datasets.revoke_export_access(a.id, d.key, direct.id)
+    assert auth.can_export_dataset(u.id, d.id)
+    s.memberships.delete_membership(a.id, other.id, membership.id)
+    assert not auth.can_export_dataset(u.id, d.id)
+    s.datasets.revoke_export_access(a.id, d.key, team.id)
+    assert not auth.can_maintain_dataset(u.id, d.id)
+
+
+@pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
+@pytest.mark.parametrize("subject_type", ["user", "team"])
+def test_legacy_grants_and_creator_supply_no_maintenance_or_export(
+    governance, permission, subject_type
+):
+    _, factory, s, a, u, owner, other, d = governance
+    with factory.begin() as session:
+        session.get(Dataset, d.id).owner_user_id = u.id
+    if subject_type == "team":
+        s.memberships.create_membership(a.id, u.id, other.id)
+    subject_id = u.id if subject_type == "user" else other.id
+    s.grants.create_grant(a.id, subject_type, subject_id, "dataset", d.id, permission)
+    assert s.authorization.effective_permission(u.id, "dataset", d.id) is None
+    assert not s.authorization.check_access(u.id, "dataset", d.id, "editor")
+    assert not s.authorization.datasets.can_export_dataset(u.id, d.id)
+    s.users.delete_user(a.id, u.id)
+
+
+def test_ownership_cas_stale_noop_and_immediate_transfer(governance):
+    _, factory, s, a, u, owner, other, d = governance
+    s.memberships.create_membership(a.id, u.id, owner.id)
+    access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    original = state(factory, d)
+    s.datasets.change_owner(a.id, d.key, owner.id, owner.id)
+    assert state(factory, d) == original
+    reassigned = s.datasets.change_owner(a.id, d.key, owner.id, other.id)
+    assert reassigned.owner_team_name == other.name
+    changed = state(factory, d)
+    assert changed[0] == other.id and changed[1] != original[1] and changed[2] == original[2] + 1
+    assert not s.authorization.datasets.can_maintain_dataset(u.id, d.id)
+    assert s.authorization.datasets.can_export_dataset(u.id, d.id)
+    for target in (owner.id, other.id):
+        with pytest.raises(StaleDatasetOwnerError):
+            s.datasets.change_owner(a.id, d.key, owner.id, target)
+        assert state(factory, d) == changed
+    with factory() as session:
+        assert session.get(DatasetExportAccess, access.id)
+        event = session.scalar(select(AuditEvent).where(AuditEvent.action == "owner_changed"))
+        assert event.details == {"previous_owner_team_id": owner.id, "owner_team_id": other.id}
+
+
+@pytest.mark.parametrize("expected", [None, "", "bad", "00000000-0000-0000-0000-000000000000"])
+def test_missing_or_tampered_expected_owner_never_writes(governance, expected):
+    _, factory, s, a, _, _, other, d = governance
+    original = state(factory, d)
+    with pytest.raises((ValidationError, StaleDatasetOwnerError)):
+        s.datasets.change_owner(a.id, d.key, expected, other.id)
+    assert state(factory, d) == original
+
+
+def test_team_lifecycle_and_deleted_target(governance):
+    _, factory, s, a, u, owner, other, d = governance
+    with pytest.raises(InvalidLifecycleError):
+        s.teams.delete_team(a.id, owner.id)
+    with pytest.raises(AuthorizationError):
+        s.teams.delete_team(u.id, owner.id)
+    s.teams.delete_team(a.id, other.id)
+    before = state(factory, d)
+    with pytest.raises(ValidationError):
+        s.datasets.change_owner(a.id, d.key, owner.id, other.id)
+    assert state(factory, d) == before
+
+
+@pytest.mark.parametrize("failure", ["audit", "persistence"])
+def test_owner_failure_rolls_back_cas(governance, monkeypatch, failure):
+    _, factory, s, a, _, owner, other, d = governance
+    before = state(factory, d)
+    if failure == "audit":
+
+        def fail(*args, **kwargs):
+            raise RuntimeError("audit failed")
+
+        monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail)
+    else:
+        original = SqlAlchemyDatasetOperations.change_owner_if_expected
+
+        def fail(self, *args):
+            original(self, *args)
+            raise RuntimeError("persistence failed")
+
+        monkeypatch.setattr(SqlAlchemyDatasetOperations, "change_owner_if_expected", fail)
+    with pytest.raises(RuntimeError):
+        s.datasets.change_owner(a.id, d.key, owner.id, other.id)
+    assert state(factory, d) == before
+
+
+def test_two_administrators_have_exactly_one_successful_cas(governance):
+    _, factory, s, a, _, owner, other, d = governance
+    second = s.users.create_user(
+        a.id, "second@example.com", "Second", "valid password", role="admin"
+    )
+    third = s.teams.create_team(a.id, "Third")
+    barrier = Barrier(2)
+
+    def change(actor, target):
+        barrier.wait(timeout=10)
+        try:
+            s.datasets.change_owner(actor, d.key, owner.id, target)
+            return "changed"
+        except StaleDatasetOwnerError:
+            return "stale"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        tasks = [
+            executor.submit(change, a.id, other.id),
+            executor.submit(change, second.id, third.id),
+        ]
+        assert sorted(task.result(timeout=20) for task in tasks) == ["changed", "stale"]
+    with factory() as session:
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "owner_changed")
+            )
+            == 1
+        )
+
+
+def test_target_deleted_while_reassignment_starts(governance):
+    _, factory, s, a, _, owner, other, d = governance
+    before = state(factory, d)
+    started = Event()
+
+    def reassign():
+        started.set()
+        return s.datasets.change_owner(a.id, d.key, owner.id, other.id)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        # Hold the deletion transaction while a separate connection starts the
+        # reassignment. SQLite waits at BEGIN IMMEDIATE; PostgreSQL at the team lock.
+        with s.datasets.uow(write=True, serialized=True) as work:
+            target = work.teams.get(other.id, for_update=True)
+            work.teams.delete(target)
+            work.flush()
+            task = executor.submit(reassign)
+            assert started.wait(timeout=10)
+        with pytest.raises(ValidationError):
+            task.result(timeout=20)
+    assert state(factory, d) == before
+
+
+def test_import_checks_current_membership_at_confirmation(governance):
+    _, factory, s, a, u, owner, _, d = governance
+    membership = s.memberships.create_membership(a.id, u.id, owner.id)
+    s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", is_required=True)
+    s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
+    importer = s.record_imports
+    first, _, _ = importer.begin(u.id, "member-session", d.key, "one.csv", b"code,extra\nA,x\n")
+    assert importer.preview(u.id, "member-session", d.key, first.token, ("code", None)).valid
+    assert importer.confirm(u.id, "member-session", d.key, first.token) == 1
+    second, _, _ = importer.begin(u.id, "member-session", d.key, "two.csv", b"code,extra\nB,x\n")
+    assert importer.preview(u.id, "member-session", d.key, second.token, ("code", None)).valid
+    s.memberships.delete_membership(a.id, owner.id, membership.id)
+    before = state(factory, d)
+    with pytest.raises(NotFoundError):
+        importer.confirm(u.id, "member-session", d.key, second.token)
+    assert state(factory, d) == before
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetRecord.id))) == 1
+
+
+@pytest.mark.parametrize("operation", ["grant", "revoke"])
+def test_export_audit_failure_rolls_back(governance, monkeypatch, operation):
+    _, factory, s, a, u, _, _, d = governance
+    access = None
+    if operation == "revoke":
+        access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    before = state(factory, d)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("audit failed")
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail)
+    with pytest.raises(RuntimeError):
+        if operation == "grant":
+            s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+        else:
+            s.datasets.revoke_export_access(a.id, d.key, access.id)
+    assert state(factory, d) == before
+    assert s.authorization.datasets.can_export_dataset(u.id, d.id) == (operation == "revoke")
+
+
+def test_concurrent_export_grants_are_unique(governance):
+    _, factory, s, a, u, _, _, d = governance
+    barrier = Barrier(2)
+
+    def grant():
+        barrier.wait(timeout=10)
+        try:
+            s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+            return "granted"
+        except ConflictError:
+            return "duplicate"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        tasks = [executor.submit(grant) for _ in range(2)]
+        assert sorted(task.result(timeout=20) for task in tasks) == ["duplicate", "granted"]
+    with factory() as session:
+        assert session.scalar(select(func.count(DatasetExportAccess.id))) == 1
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    AuditEvent.object_type == "dataset_export_access"
+                )
+            )
+            == 1
+        )
+
+
+def test_export_duplicates_constraints_and_cross_dataset_revoke(governance):
+    _, factory, s, a, u, owner, _, d = governance
+    access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    with pytest.raises(ConflictError):
+        s.datasets.grant_export_access(a.id, d.key, "user", u.id)
+    with pytest.raises(IntegrityError), factory.begin() as session:
+        session.add(DatasetExportAccess(dataset_id=d.id, user_id=u.id))
+    with pytest.raises(IntegrityError), factory.begin() as session:
+        session.add(DatasetExportAccess(dataset_id=d.id, user_id=u.id, team_id=owner.id))
+    second = s.datasets.create_dataset(a.id, "second", "Second", "", owner.id)
+    with pytest.raises(NotFoundError):
+        s.datasets.revoke_export_access(a.id, second.key, access.id)
+    s.users.disable_user(a.id, u.id)
+    with pytest.raises(ValidationError):
+        s.datasets.grant_export_access(a.id, second.key, "user", u.id)
+
+
+def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
+    _, factory, s, a, u, owner, other, d = governance
+    app = create_flask_app(
+        s.users,
+        s.authentication,
+        s.sessions,
+        s.teams,
+        s.memberships,
+        authorization=s.authorization,
+        datasets=s.datasets,
+        dataset_fields=s.dataset_fields,
+        dataset_business_keys=s.dataset_business_keys,
+        dataset_records=s.dataset_records,
+    )
+    client = app.test_client()
+    from refrncr.web import SESSION_COOKIE
+
+    def sign_in(actor):
+        token, login = s.sessions.create(actor)
+        client.set_cookie(SESSION_COOKIE, token, domain="localhost")
+        return login.csrf_token
+
+    def get(path):
+        return client.get(path, base_url="https://localhost")
+
+    def post(path, data):
+        return client.post(path, data=data, base_url="https://localhost")
+
+    csrf = sign_in(u)
+    assert get("/datasets/new").status_code == 200
+    assert b"Team membership is required" in get("/datasets/new").data
+    assert get("/teams").status_code == 200
+    for path in ("/datasets", f"/datasets/{d.key}", f"/datasets/{d.key}/records"):
+        assert get(path).status_code == 200
+    assert b"export-menu" not in get(f"/datasets/{d.key}/records").data
+    for fmt in ("csv", "xlsx", "json"):
+        assert get(f"/datasets/{d.key}/records/export?format={fmt}").status_code == 404
+    s.memberships.create_membership(a.id, u.id, owner.id)
+    assert (
+        post(
+            "/datasets",
+            {
+                "key": "created",
+                "name": "Created",
+                "description": "",
+                "owner_team_id": owner.id,
+                "csrf_token": csrf,
+            },
+        ).status_code
+        == 302
+    )
+    assert get(f"/datasets/{d.key}/owner").status_code == 404
+    csrf = sign_in(a)
+    detail = get(f"/datasets/{d.key}").text
+    assert ">Access management</a>" in detail
+    assert "Change owning team</a>" not in detail
+    assert "All active Community users can view this dataset." not in detail
+    edit = get(f"/datasets/{d.key}/edit").text
+    assert "name='expected_owner_team_id'" in edit
+    before = state(factory, d)
+    assert (
+        post(
+            f"/datasets/{d.key}",
+            {
+                "name": "Rejected",
+                "description": "",
+                "csrf_token": csrf,
+                "owner_team_id": other.id,
+            },
+        ).status_code
+        == 400
+    )
+    assert state(factory, d) == before
+    url = f"/datasets/{d.key}/owner"
+    assert f"name='expected_owner_team_id' value='{owner.id}'" in get(url).text
+    assert (
+        post(url, {"owner_team_id": other.id, "expected_owner_team_id": owner.id}).status_code
+        == 403
+    )
+    assert post(url, {"owner_team_id": other.id, "csrf_token": csrf}).status_code == 400
+    before = state(factory, d)
+    assert (
+        post(
+            url,
+            MultiDict(
+                [
+                    ("owner_team_id", other.id),
+                    ("csrf_token", csrf),
+                    ("expected_owner_team_id", owner.id),
+                    ("expected_owner_team_id", other.id),
+                ]
+            ),
+        ).status_code
+        == 400
+    )
+    assert state(factory, d) == before
+    assert (
+        post(
+            url, {"owner_team_id": other.id, "expected_owner_team_id": owner.id, "csrf_token": csrf}
+        ).status_code
+        == 302
+    )
+    before = state(factory, d)
+    response = post(
+        url, {"owner_team_id": owner.id, "expected_owner_team_id": owner.id, "csrf_token": csrf}
+    )
+    assert response.status_code == 409 and b"data-error-focus" in response.data
+    assert state(factory, d) == before
+    s.teams.rename_team(a.id, other.id, '<img src=x onerror="alert(1)">')
+    assert b"&lt;img" in get(f"/datasets/{d.key}").data
+    assert b"<img src=x" not in get(f"/datasets/{d.key}").data
+    access_url = f"/datasets/{d.key}/export-access"
+    empty = get(access_url).text
+    assert "data-panel-title='Access management'" in empty
+    for copy in (
+        "Grant export access",
+        "Additional export access",
+        "User or team",
+        "Select a user or team",
+        "Grant access",
+        "No additional access",
+        "Community administrators can currently export this dataset.",
+        "Members of &lt;img",
+        "Only &lt;img",
+        ">Close</a>",
+    ):
+        assert copy in empty
+    assert "<img src=x" not in empty
+    assert "access-list-row" not in empty
+    assert ">Done</a>" not in empty
+    assert "side-panel-footer-single" in empty
+    assert "inline-form-action" in empty and "form-label-sentence" in empty
+    assert "data-requires-selection" in empty and "data-panel-refresh" in empty
+    invalid = post(access_url, {"subject": "", "csrf_token": csrf})
+    assert invalid.status_code == 400
+    assert "aria-invalid='true' aria-describedby='export-subject-error'" in invalid.text
+    assert "data-error-focus" in invalid.text
+    assert post(access_url, {"subject": f"user:{u.id}"}).status_code == 403
+    assert post(access_url, {"subject": f"user:{u.id}", "csrf_token": csrf}).status_code == 302
+    duplicate = post(access_url, {"subject": f"user:{u.id}", "csrf_token": csrf})
+    assert duplicate.status_code == 409
+    assert f"value='user:{u.id}' selected" in duplicate.text
+    assert post(access_url, {"subject": f"team:{owner.id}", "csrf_token": csrf}).status_code == 302
+    populated = get(access_url).text
+    assert populated.count("class='access-list-row'") == 2
+    assert "class='access-list-type'>User</span>" in populated
+    assert "class='access-list-type'>Team</span>" in populated
+    assert "Remove export access for User" in populated
+    assert "Remove export access for Team Data domain" in populated
+    assert "button-danger" not in populated and "<table" not in populated
+    assert f"Remove export access for {a.id}" not in populated
+    with factory() as session:
+        access = session.scalar(
+            select(DatasetExportAccess).where(DatasetExportAccess.team_id == owner.id)
+        )
+    revoke = f"{access_url}/{access.id}/revoke"
+    assert post(revoke, {}).status_code == 403
+    assert post(revoke, {"csrf_token": csrf}).status_code == 302
+    with factory() as session:
+        assert session.get(DatasetExportAccess, access.id) is None
+        assert {
+            event.action
+            for event in session.scalars(
+                select(AuditEvent).where(AuditEvent.object_id == access.id)
+            )
+        } == {"granted", "revoked"}
+    csrf = sign_in(u)
+    assert get(access_url).status_code == 404
+    for fmt in ("csv", "xlsx", "json"):
+        response = get(f"/datasets/{d.key}/records/export?format={fmt}")
+        assert response.status_code == 200
+        response.close()
+
+
+def test_combined_edit_is_atomic_and_rejects_stale_ownership(governance, monkeypatch):
+    _, factory, s, a, u, owner, other, d = governance
+    before = state(factory, d)
+    s.datasets.update_dataset(a.id, d.key, d.name, d.description, owner_change=(owner.id, owner.id))
+    assert state(factory, d) == before
+    original_audit = SqlAlchemyUnitOfWork.add_audit
+
+    def fail_metadata(self, **values):
+        if values["action"] == "metadata_updated":
+            raise RuntimeError("metadata audit failed")
+        return original_audit(self, **values)
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_metadata)
+    with pytest.raises(RuntimeError):
+        s.datasets.update_dataset(
+            a.id, d.key, "Changed", "Description", owner_change=(owner.id, other.id)
+        )
+    assert state(factory, d) == before
+    assert s.datasets.get_dataset(a.id, d.key).name == d.name
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", original_audit)
+    s.datasets.update_dataset(
+        a.id, d.key, "Changed", "Description", owner_change=(owner.id, other.id)
+    )
+    before = state(factory, d)
+    with pytest.raises(StaleDatasetOwnerError):
+        s.datasets.update_dataset(
+            a.id, d.key, "Stale", "Rejected", owner_change=(owner.id, other.id)
+        )
+    assert state(factory, d) == before
+    assert s.datasets.get_dataset(a.id, d.key).name == "Changed"
+    s.memberships.create_membership(a.id, u.id, other.id)
+    before = state(factory, d)
+    with pytest.raises(NotFoundError):
+        s.datasets.update_dataset(u.id, d.key, "Forged", "", owner_change=(other.id, owner.id))
+    assert state(factory, d) == before

@@ -1,2 +1,2 @@
 {% from "components.html" import breadcrumbs %}
-{{ breadcrumbs([("Datasets", url_for("dataset_list")), ("No owning team", none), (dataset.name, none)]) }}
+{{ breadcrumbs([("Datasets", url_for("dataset_list")), (dataset.owner_team_name, none), (dataset.name, none)]) }}

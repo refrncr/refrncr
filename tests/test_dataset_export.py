@@ -11,6 +11,7 @@ from threading import Event
 from types import SimpleNamespace
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from openpyxl import load_workbook
 from sqlalchemy import create_engine, func, select, text, update
 from sqlalchemy.engine import make_url
@@ -314,7 +315,7 @@ def test_postgresql_export_is_one_snapshot_during_mutation(
     postgresql_export_services, monkeypatch, mutation
 ):
     factory, services, admin = postgresql_export_services
-    dataset = services.datasets.create_dataset(admin.id, "snapshot", "Snapshot", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "snapshot", "Snapshot", "")
     code = services.dataset_fields.create_field(
         admin.id, dataset.key, "code", "Code", "string", True, False
     )
@@ -412,7 +413,7 @@ def browser_setup():
 
 def test_browser_download_headers_parameter_validation_and_no_audit():
     factory, services, admin, client = browser_setup()
-    dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "countries", "Countries", "")
     services.dataset_fields.create_field(
         admin.id, dataset.key, "code", "Code", "string", True, False
     )
@@ -449,7 +450,7 @@ def test_browser_download_headers_parameter_validation_and_no_audit():
 
 def test_response_construction_failure_closes_generated_artifact(monkeypatch):
     _factory, services, admin, client = browser_setup()
-    dataset = services.datasets.create_dataset(admin.id, "response-failure", "Failure", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "response-failure", "Failure", "")
     spool = TrackedBuffer(b"complete")
     monkeypatch.setattr(
         services.dataset_records,
@@ -468,7 +469,7 @@ def test_response_construction_failure_closes_generated_artifact(monkeypatch):
 
 def test_successful_response_close_releases_generated_artifact(monkeypatch):
     _factory, services, admin, client = browser_setup()
-    dataset = services.datasets.create_dataset(admin.id, "response-close", "Close", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "response-close", "Close", "")
     spool = TrackedBuffer(b"[]")
     monkeypatch.setattr(
         services.dataset_records,
@@ -482,21 +483,24 @@ def test_successful_response_close_releases_generated_artifact(monkeypatch):
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
-def test_effective_dataset_permissions_can_export(permission):
+def test_export_requires_explicit_access_despite_legacy_roles(permission):
     _factory, services, admin, _client = browser_setup()
-    dataset = services.datasets.create_dataset(admin.id, "allowed", "Allowed", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "allowed", "Allowed", "")
     user = services.users.create_user(
         admin.id, f"dataset-{permission}@example.com", "Exporter", "valid password"
     )
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    with pytest.raises(NotFoundError):
+        services.dataset_records.export_dataset(user.id, dataset.key, "json")
+    services.datasets.grant_export_access(admin.id, dataset.key, "user", user.id)
     artifact = services.dataset_records.export_dataset(user.id, dataset.key, "json")
     assert content(artifact) == b"[]"
 
 
 def test_unauthorized_and_cross_dataset_export_are_non_disclosing():
     _factory, services, admin, _client = browser_setup()
-    allowed = services.datasets.create_dataset(admin.id, "allowed", "Allowed", "")
-    hidden = services.datasets.create_dataset(admin.id, "hidden", "Hidden", "")
+    allowed = create_owned_dataset(services.datasets, admin.id, "allowed", "Allowed", "")
+    hidden = create_owned_dataset(services.datasets, admin.id, "hidden", "Hidden", "")
     user = services.users.create_user(admin.id, "limited@example.com", "Limited", "valid password")
     services.grants.create_grant(admin.id, "user", user.id, "dataset", allowed.id, "viewer")
     for key in (hidden.key, "missing", "MALFORMED"):
@@ -506,7 +510,7 @@ def test_unauthorized_and_cross_dataset_export_are_non_disclosing():
 
 def test_dataset_ownership_without_grant_does_not_authorize_export():
     factory, services, admin, _client = browser_setup()
-    dataset = services.datasets.create_dataset(admin.id, "owned", "Owned", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "owned", "Owned", "")
     user = services.users.create_user(admin.id, "owner@example.com", "Owner", "valid password")
     with factory.begin() as session:
         session.execute(

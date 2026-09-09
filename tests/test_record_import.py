@@ -7,6 +7,7 @@ from threading import Barrier
 from types import SimpleNamespace
 
 import pytest
+from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
@@ -220,7 +221,7 @@ def import_context():
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-    dataset = services.datasets.create_dataset(admin.id, "imports", "Imports", "")
+    dataset = create_owned_dataset(services.datasets, admin.id, "imports", "Imports", "")
     for key, name, data_type, required, unique in (
         ("code", "Code", "string", True, False),
         ("amount", "Amount", "number", True, False),
@@ -257,7 +258,7 @@ def postgresql_import_context():
         services = create_community_services(factory, ResourceTypeRegistry())
         services.users.bootstrap_organisation()
         admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-        dataset = services.datasets.create_dataset(admin.id, "imports", "Imports", "")
+        dataset = create_owned_dataset(services.datasets, admin.id, "imports", "Imports", "")
         for key in ("code", "amount"):
             services.dataset_fields.create_field(
                 admin.id,

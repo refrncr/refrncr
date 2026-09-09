@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -20,9 +21,10 @@ from sqlalchemy import (
     event,
     false,
     inspect,
+    select,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, column_property, mapped_column
 
 from refrncr.db.base import Base
 
@@ -82,6 +84,7 @@ class AuditEvent(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    details: Mapped[dict[str, str] | None] = mapped_column(JSON)
     actor_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     object_type: Mapped[str] = mapped_column(String(100))
     object_id: Mapped[str] = mapped_column(String(100), index=True)
@@ -172,9 +175,17 @@ class Dataset(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    # owner_user_id is retained as historical creator metadata, never authority.
+    owner_team_id: Mapped[str] = mapped_column(
+        ForeignKey("teams.id", ondelete="RESTRICT"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+    owner_team_name = column_property(
+        select(Team.name).where(Team.id == owner_team_id).scalar_subquery()
     )
 
     content_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -319,3 +330,34 @@ class DatasetRecordValue(Base):
     date_value: Mapped[date | None] = mapped_column(Date, nullable=True)
     canonical_value_key: Mapped[bytes] = mapped_column(LargeBinary(1010))
     unique_value_key: Mapped[bytes | None] = mapped_column(LargeBinary(1010), nullable=True)
+
+
+class DatasetExportAccess(Base):
+    __tablename__ = "dataset_export_access"
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND team_id IS NULL) OR "
+            "(user_id IS NULL AND team_id IS NOT NULL)",
+            name="ck_dataset_export_access_subject",
+        ),
+        UniqueConstraint("dataset_id", "user_id", name="uq_dataset_export_access_user"),
+        UniqueConstraint("dataset_id", "team_id", name="uq_dataset_export_access_team"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    team_id: Mapped[str | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    @property
+    def subject_type(self) -> str:
+        return "user" if self.user_id is not None else "team"
+
+    @property
+    def subject_id(self) -> str:
+        return self.user_id if self.user_id is not None else self.team_id
