@@ -1,0 +1,11 @@
+{% from "components/icons.html" import navigation_icon %}
+
+{% macro navigation_button(controls, expand=false) -%}
+  <button class="navigation-button" type="button" aria-label="{{ 'Expand navigation' if expand else 'Collapse navigation' }}" title="{{ 'Expand navigation' if expand else 'Collapse navigation' }}" aria-expanded="{{ 'false' if expand else 'true' }}" aria-controls="{{ controls }}" {{ 'data-nav-open' if expand else 'data-nav-close' }}>
+    {{ navigation_icon(expand) }}
+  </button>
+{%- endmacro %}
+
+{% macro navigation_drawer() -%}
+  <dialog class="navigation-drawer" aria-label="Navigation" data-navigation-drawer></dialog>
+{%- endmacro %}

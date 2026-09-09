@@ -1,4 +1,5 @@
 {% from "components/icons.html" import settings_icon -%}
+{% from "components/navigation.html" import navigation_button, navigation_drawer -%}
 <!doctype html>
 <html lang="en">
   <head>
@@ -6,6 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}REFRNCR{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='images/logo-mark.svg') }}" type="image/svg+xml">
+    <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
     <script src="{{ url_for('static', filename='js/refrncr.js') }}" defer></script>
   </head>
@@ -14,17 +16,16 @@
     {% block layout %}
     <div class="app-shell" data-responsive-shell>
       <header class="app-header">
-        <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-          <img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="REFRNCR" width="148" height="42">
-        </a>
-        {% if current_actor %}
-          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle>
-            <span aria-hidden="true">☰</span><span>Menu</span>
-          </button>
-        {% endif %}
+        {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
       </header>
       {% if current_actor %}
-        <aside class="app-sidebar" data-navigation>
+        <aside class="app-sidebar" data-navigation id="application-navigation">
+          <div class="navigation-heading">
+            <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
+              <img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="REFRNCR" width="148" height="42">
+            </a>
+            {{ navigation_button('application-navigation') }}
+          </div>
           <nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation">
             <p class="nav-label">Navigation</p>
             <a class="nav-item{{ ' is-active' if active_navigation == 'home' else '' }}" href="{{ url_for('index') }}"{% if active_navigation == 'home' %} aria-current="page"{% endif %}>Overview</a>
@@ -49,6 +50,7 @@
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>
+      {% if current_actor %}{{ navigation_drawer() }}{% endif %}
     </div>
     {% endblock %}
     {% block scripts %}{% endblock %}

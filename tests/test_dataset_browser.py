@@ -218,6 +218,33 @@ def test_shared_shell_marks_active_navigation_and_exposes_account_context(datase
     assert "data-responsive-shell" in page
 
 
+@pytest.mark.parametrize("path", ["/", "/datasets", "/users", "/teams"])
+def test_shared_navigation_controls_and_local_bootstrap(dataset_browser, path):
+    _, _, _, client = dataset_browser
+    login(client)
+    page = body(request(client, "get", path))
+    target = "settings-sidebar" if path in ("/users", "/teams") else "application-navigation"
+    for expanded, action, icon, arrow in (
+        ("true", "Collapse", "close", "m16 15-3-3 3-3"),
+        ("false", "Expand", "open", "m14 9 3 3-3 3"),
+    ):
+        button = re.search(
+            rf'<button[^>]*aria-label="{action} navigation".*?</button>', page, re.S
+        ).group()
+        assert 'type="button"' in button
+        assert f'title="{action} navigation"' in button
+        assert f'aria-expanded="{expanded}"' in button
+        assert f'aria-controls="{target}"' in button
+        assert f'data-icon="panel-left-{icon}"' in button
+        assert f'<path d="{arrow}"/>' in button
+        assert 'aria-hidden="true" focusable="false"' in button
+    assert f'id="{target}"' in page
+    assert '<dialog class="navigation-drawer" aria-label="Navigation"' in page
+    script = '<script src="/static/js/navigation.js"></script>'
+    assert script in page
+    assert page.index(script) < page.index('<link rel="stylesheet"')
+
+
 def test_shared_shell_navigation_follows_effective_role(dataset_browser):
     _, services, admin, client = dataset_browser
     viewer = services.users.create_user(
