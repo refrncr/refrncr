@@ -1,11 +1,12 @@
 import os
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
-from sqlalchemy import create_engine, func, inspect, select, text
+from sqlalchemy import MetaData, create_engine, func, inspect, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
@@ -600,17 +601,71 @@ def test_populated_ref_36_sqlite_database_upgrades_to_ref_72(tmp_path):
     command.upgrade(config, "0004_ref_36")
 
     engine = create_database_engine(f"sqlite:///{database}")
-    factory = create_session_factory(engine)
-    uow = SqlAlchemyUnitOfWorkFactory(factory)
-    users = UserService(uow)
-    teams = TeamService(uow)
-    resources = ResourceTypeRegistry()
-    resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
-    grants = GrantService(uow, resources)
-    users.bootstrap_organisation()
-    admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    team = teams.create_team(admin.id, "Existing team")
-    grant = grants.create_grant(admin.id, "team", team.id, "test-resource", "resource-1", "viewer")
+    # Populate the actual historical schema, without assuming current ORM/service
+    # columns existed in REF-36 (audit details arrived with REF-73).
+    metadata = MetaData()
+    metadata.reflect(engine)
+    assert "details" not in metadata.tables["audit_events"].c
+    admin_id, team_id, grant_id = (str(uuid.uuid4()) for _ in range(3))
+    timestamp = datetime(2025, 1, 1, tzinfo=UTC)
+    with engine.begin() as connection:
+        connection.execute(
+            metadata.tables["organisations"].insert(), {"id": "community", "created_at": timestamp}
+        )
+        connection.execute(
+            metadata.tables["users"].insert(),
+            dict(
+                id=admin_id,
+                email="admin@example.com",
+                display_name="Admin",
+                password_hash="historical-test-only-verifier",
+                role="admin",
+                is_active=True,
+                is_deleted=False,
+                created_at=timestamp,
+                updated_at=timestamp,
+            ),
+        )
+        connection.execute(
+            metadata.tables["teams"].insert(),
+            dict(
+                id=team_id,
+                name="Existing team",
+                name_key="existing team",
+                created_at=timestamp,
+                updated_at=timestamp,
+            ),
+        )
+        connection.execute(
+            metadata.tables["grants"].insert(),
+            dict(
+                id=grant_id,
+                subject_type="team",
+                subject_id=team_id,
+                resource_type="test-resource",
+                resource_id="resource-1",
+                permission="viewer",
+                created_at=timestamp,
+                updated_at=timestamp,
+            ),
+        )
+        connection.execute(
+            metadata.tables["audit_events"].insert(),
+            [
+                dict(
+                    id=str(uuid.uuid4()),
+                    timestamp=timestamp,
+                    actor_user_id=admin_id,
+                    object_type=kind,
+                    object_id=target,
+                    action="created",
+                )
+                for kind, target in (("user", admin_id), ("team", team_id), ("grant", grant_id))
+            ],
+        )
+        historical_events = connection.execute(
+            select(metadata.tables["audit_events"]).order_by(metadata.tables["audit_events"].c.id)
+        ).all()
     engine.dispose()
 
     command.upgrade(config, "head")
@@ -618,10 +673,16 @@ def test_populated_ref_36_sqlite_database_upgrades_to_ref_72(tmp_path):
     try:
         assert_community_schema(upgraded_engine)
         with create_session_factory(upgraded_engine)() as session:
-            assert session.get(User, admin.id) is not None
-            assert session.get(Team, team.id) is not None
-            assert session.get(Grant, grant.id) is not None
+            assert session.get(User, admin_id) is not None
+            assert session.get(Team, team_id) is not None
+            assert session.get(Grant, grant_id) is not None
             assert session.scalar(select(func.count(Dataset.id))) == 0
+            events = list(session.scalars(select(AuditEvent).order_by(AuditEvent.id)))
+            assert [
+                tuple(getattr(event, key) for key in metadata.tables["audit_events"].c.keys())
+                for event in events
+            ] == historical_events
+            assert all(event.details is None for event in events)
     finally:
         upgraded_engine.dispose()
 

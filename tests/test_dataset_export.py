@@ -381,7 +381,7 @@ def test_postgresql_export_is_one_snapshot_during_mutation(
         {"code": "b", "label": "old-b"},
     ]
     with factory() as session:
-        assert session.scalar(select(func.count(AuditEvent.id))) == before_audits + 1
+        assert session.scalar(select(func.count(AuditEvent.id))) == before_audits + 2
 
 
 def browser_setup():
@@ -411,7 +411,7 @@ def browser_setup():
     return factory, services, admin, client
 
 
-def test_browser_download_headers_parameter_validation_and_no_audit():
+def test_browser_download_headers_parameter_validation_and_request_audit():
     factory, services, admin, client = browser_setup()
     dataset = create_owned_dataset(services.datasets, admin.id, "countries", "Countries", "")
     services.dataset_fields.create_field(
@@ -428,7 +428,7 @@ def test_browser_download_headers_parameter_validation_and_no_audit():
     assert response.headers["Content-Disposition"] == "attachment; filename=countries.json"
     assert json.loads(response.data) == [{"code": "NL"}]
     with factory() as session:
-        assert session.scalar(select(func.count(AuditEvent.id))) == audits_before
+        assert session.scalar(select(func.count(AuditEvent.id))) == audits_before + 1
 
     csv_download = client.get("/datasets/countries/records/export?format=csv", base_url=HTTPS)
     assert csv_download.headers["Content-Disposition"] == "attachment; filename=countries.csv"

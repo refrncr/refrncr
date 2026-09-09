@@ -472,10 +472,11 @@ def test_mapping_preview_conflicts_atomic_confirmation_and_replay(import_context
         assert (
             session.scalar(
                 select(func.count(AuditEvent.id)).where(
-                    AuditEvent.object_type == "dataset_record", AuditEvent.action == "created"
+                    AuditEvent.object_type == "dataset",
+                    AuditEvent.action == "dataset.records_imported",
                 )
             )
-            == 2
+            == 1
         )
 
     duplicate, _, _ = importer.begin(
@@ -549,7 +550,7 @@ def test_mapping_rules_formula_schema_change_and_token_bindings(import_context):
             session.scalar(
                 select(func.count())
                 .select_from(AuditEvent)
-                .where(AuditEvent.object_type == "dataset_record")
+                .where(AuditEvent.action == "dataset.records_imported")
             )
             == 0
         )
@@ -772,7 +773,7 @@ def test_unexpected_late_persistence_failures_roll_back_entire_import(
                 def fail_audit(**values):
                     nonlocal calls
                     calls += 1
-                    if calls == 2:
+                    if calls == 1:
                         raise RuntimeError("injected audit failure")
                     return original(**values)
 
@@ -795,7 +796,7 @@ def test_unexpected_late_persistence_failures_roll_back_entire_import(
             session.scalar(
                 select(func.count())
                 .select_from(AuditEvent)
-                .where(AuditEvent.object_type == "dataset_record")
+                .where(AuditEvent.action == "dataset.records_imported")
             )
             == 0
         )
@@ -1018,7 +1019,10 @@ def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context
             session.scalar(
                 select(func.count())
                 .select_from(AuditEvent)
-                .where(AuditEvent.object_type == "dataset_record", AuditEvent.action == "created")
+                .where(
+                    AuditEvent.object_type == "dataset",
+                    AuditEvent.action == "dataset.records_imported",
+                )
             )
-            == 2
+            == 1
         )

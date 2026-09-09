@@ -18,6 +18,7 @@ from argon2.low_level import Type
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
@@ -393,10 +394,13 @@ class UserService:
             return user
 
     def change_email(self, actor_id: str, target_id: str, email: str) -> UserRecord:
-        with self.uow(write=True) as uow:
+        with self.uow(write=True, serialized=True) as uow:
             actor = require_admin(uow, actor_id)
             target = self._target(uow, target_id)
-            target.email = normalize_email(email)
+            normalized = normalize_email(email)
+            if target.email == normalized:
+                return target
+            target.email = normalized
             try:
                 uow.flush()
             except PersistenceConflictError as exc:
@@ -426,8 +430,14 @@ class UserService:
             if action == "enabled":
                 if target.is_deleted:
                     raise InvalidLifecycleError("Deleted users cannot be enabled")
+                if target.is_active:
+                    return target
                 target.is_active = True
             else:
+                if (action == "disabled" and not target.is_active) or (
+                    action == "deleted" and target.is_deleted
+                ):
+                    return target
                 if target.role == "admin" and target.is_active and not target.is_deleted:
                     active_admins = uow.users.count_active_admins()
                     if active_admins == 1:
@@ -465,7 +475,7 @@ class UserService:
 
     @staticmethod
     def _target(uow: UnitOfWork, target_id: str) -> UserRecord:
-        target = uow.users.get(target_id)
+        target = uow.users.get(target_id, for_update=True)
         if target is None:
             raise NotFoundError("User not found")
         return target
@@ -488,7 +498,8 @@ class UserService:
 
     @staticmethod
     def _add_audit(uow: UnitOfWork, audit: AuditEntry) -> None:
-        uow.add_audit(
+        record_audit(
+            uow,
             actor_user_id=audit.actor_user_id,
             object_type=audit.object_type,
             object_id=audit.object_id,
@@ -565,8 +576,11 @@ class TeamService:
     def rename_team(self, actor_id: str, team_id: str, name: str) -> TeamRecord:
         with self.uow(write=True, serialized=True) as uow:
             actor = require_admin(uow, actor_id)
-            team = self._target(uow, team_id)
-            team.name = normalize_team_name(name)
+            team = self._target(uow, team_id, for_update=True)
+            normalized = normalize_team_name(name)
+            if team.name == normalized:
+                return team
+            team.name = normalized
             team.updated_at = _now()
             try:
                 uow.flush()
@@ -784,7 +798,8 @@ class DatasetService:
                 if exc.constraint == "uq_datasets_key":
                     raise ConflictError("Dataset key already exists in this installation") from exc
                 raise
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset",
                 object_id=dataset.id,
@@ -823,7 +838,8 @@ class DatasetService:
             dataset.id, expected_owner_team_id, owner_team_id
         ):
             raise StaleDatasetOwnerError("Owning team changed. Reopen the form and try again.")
-        uow.add_audit(
+        record_audit(
+            uow,
             actor_user_id=actor_id,
             object_type="dataset",
             object_id=dataset.id,
@@ -888,7 +904,8 @@ class DatasetService:
                 }:
                     raise ConflictError("This user or team already has export access.") from exc
                 raise
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset_export_access",
                 object_id=access.id,
@@ -914,7 +931,8 @@ class DatasetService:
             )
             if access is None or access.dataset_id != dataset.id:
                 raise NotFoundError("Export access not found")
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset_export_access",
                 object_id=access.id,
@@ -1000,11 +1018,7 @@ class DatasetService:
                 actor_id, "dataset", dataset.id, "editor", uow=uow
             ):
                 raise NotFoundError("Dataset not found")
-            if (
-                owner_change is not None
-                and dataset.name == normalized_name
-                and dataset.description == validated_description
-            ):
+            if dataset.name == normalized_name and dataset.description == validated_description:
                 return dataset
             dataset.name = normalized_name
             dataset.description = validated_description
@@ -1095,7 +1109,8 @@ class DatasetFieldService:
                 current_key = uow.dataset_business_keys.get(dataset.id)
                 replacement_keys = tuple(sorted((*current_key.field_keys, field.key)))
                 uow.dataset_business_keys.replace(dataset.id, replacement_keys)
-                uow.add_audit(
+                record_audit(
+                    uow,
                     actor_user_id=actor_id,
                     object_type="dataset",
                     object_id=dataset.id,
@@ -1237,7 +1252,8 @@ class DatasetFieldService:
                 else:
                     replacement_keys.discard(field.key)
                 uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
-                uow.add_audit(
+                record_audit(
+                    uow,
                     actor_user_id=actor_id,
                     object_type="dataset",
                     object_id=dataset.id,
@@ -1312,7 +1328,8 @@ class DatasetFieldService:
                 return tuple(fields)
             dataset.content_updated_at = _now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset",
                 object_id=dataset.id,
@@ -1376,7 +1393,8 @@ class DatasetFieldService:
 
     @staticmethod
     def _add_audit(uow: UnitOfWork, actor_id: str, field_id: str, action: str) -> None:
-        uow.add_audit(
+        record_audit(
+            uow,
             actor_user_id=actor_id,
             object_type="dataset_field",
             object_id=field_id,
@@ -1460,7 +1478,8 @@ class DatasetBusinessKeyService:
 
             dataset.content_updated_at = _now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset",
                 object_id=dataset.id,
@@ -1512,7 +1531,8 @@ class DatasetRecordService:
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
             dataset.content_updated_at = _now()
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset_record",
                 object_id=record.id,
@@ -1550,6 +1570,14 @@ class DatasetRecordService:
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             identifier = uow.dataset_business_keys.get(dataset.id)
             values, encoded_identifier = self._validated_values(fields, identifier, submitted)
+            # Check stale input before accepting a normalized no-op. The Dataset
+            # lock serializes supported writes throughout this comparison.
+            if existing.revision != expected_revision:
+                raise StaleRecordError("Record changed since this form was opened")
+            if {value.field_id: value.canonical_key for value in existing.values} == {
+                value.field_id: value.canonical_key for value in values
+            }:
+                return existing
             try:
                 updated = uow.dataset_records.update_if_revision(
                     dataset.id, record_id, expected_revision, encoded_identifier
@@ -1561,7 +1589,8 @@ class DatasetRecordService:
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
             dataset.content_updated_at = _now()
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset_record",
                 object_id=record_id,
@@ -1583,7 +1612,8 @@ class DatasetRecordService:
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             dataset.content_updated_at = _now()
-            uow.add_audit(
+            record_audit(
+                uow,
                 actor_user_id=actor_id,
                 object_type="dataset_record",
                 object_id=record_id,
@@ -1661,22 +1691,43 @@ class DatasetRecordService:
             ExportGenerationError,
             externally_ordered_records,
             generate_export,
+            verify_artifact_readable,
         )
 
         if not isinstance(format_name, str) or format_name not in {"csv", "xlsx", "json"}:
             raise ExportGenerationError("Choose exactly one supported export format")
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
-        with self.uow() as uow:
-            uow.begin_export_snapshot()
-            dataset = uow.datasets.find_by_key(validated_key)
-            self._require_access(actor_id, dataset, "export", uow=uow)
-            fields = tuple(uow.dataset_fields.list_for_dataset(dataset.id))
-            identifier = uow.dataset_business_keys.get(dataset.id)
-            records = externally_ordered_records(
-                uow.dataset_records.iterate_all(dataset.id),
-                lambda record: self._record_sort_key(record, identifier.field_keys),
-            )
-            return generate_export(format_name, fields, records, dataset.key)
+        artifact = None
+        try:
+            with self.uow() as uow:
+                uow.begin_export_snapshot()
+                dataset = uow.datasets.find_by_key(validated_key)
+                self._require_access(actor_id, dataset, "export", uow=uow)
+                dataset_id = dataset.id
+                fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
+                identifier = uow.dataset_business_keys.get(dataset_id)
+                records = externally_ordered_records(
+                    uow.dataset_records.iterate_all(dataset_id),
+                    lambda record: self._record_sort_key(record, identifier.field_keys),
+                )
+                artifact = generate_export(format_name, fields, records, dataset.key)
+                verify_artifact_readable(artifact)
+            # Authorization and content were pinned to the completed snapshot.
+            # Close it before acquiring the audit writer (including SQLite).
+            with self.uow(write=True) as uow:
+                record_audit(
+                    uow,
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset_id,
+                    action="dataset.export_requested",
+                    details={"format": format_name},
+                )
+            return artifact
+        except BaseException:
+            if artifact is not None:
+                artifact.content.close()
+            raise
 
     @staticmethod
     def _record_sort_key(record: StoredRecord, identifier_keys: tuple[str, ...]):
@@ -1761,6 +1812,8 @@ class GrantService:
             actor = require_admin(uow, actor_id)
             self._validate_permission(permission)
             grant = self._target(uow, grant_id, for_update=True)
+            if grant.permission == permission:
+                return grant
             grant.permission = permission
             grant.updated_at = _now()
             self._add_audit(uow, self._audit(actor.id, grant.id, "permission_changed"))

@@ -4,6 +4,7 @@ import csv
 import heapq
 import io
 import json
+import logging
 import pickle
 import tempfile
 from collections.abc import Callable, Iterable, Iterator
@@ -21,6 +22,20 @@ from refrncr.ports import DatasetFieldRecord, StoredRecord
 SPOOL_MEMORY_LIMIT = 1024 * 1024
 SORT_CHUNK_RECORDS = 1000
 MAX_MERGE_RUNS = 64
+
+
+def logged_export_stream(iterable):
+    """Keep an accurate request event when transport fails; log no payload/exception."""
+    try:
+        try:
+            yield from iterable
+        finally:
+            close = getattr(iterable, "close", None)
+            if close is not None:
+                close()
+    except Exception:
+        logging.getLogger(__name__).error("Dataset export stream failed")
+        raise
 
 
 class ExportGenerationError(Exception):

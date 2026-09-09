@@ -28,8 +28,8 @@ Services assign content freshness inside the same serialized, dataset-locked Uni
 - existing field-order replacement and move operations that actually change ordering.
 
 Identifier membership is part of field-schema structure. Field/schema no-ops return before
-changing freshness. Record edits retain their existing revision/audit behaviour, including saves
-of unchanged values. Name, description, access grants, historical creator metadata and unrelated
+changing freshness. REF-149 Record edits compare canonical values after checking the expected revision; unchanged
+values preserve revision, freshness and audit history. Name, description, access grants, historical creator metadata and unrelated
 metadata do not touch content freshness. REF-73 ownership reassignment changes metadata updated_at
 but not content freshness. Import staging,
 preview and failures do not touch it. Any failure, including commit failure after a flush, rolls

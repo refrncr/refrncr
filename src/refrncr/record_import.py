@@ -17,6 +17,7 @@ from xml.etree.ElementTree import ParseError
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
+from refrncr.audit import record_audit
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
     DatasetFieldService,
@@ -887,16 +888,22 @@ class DatasetRecordImportService:
                         uow.flush()
                         uow.dataset_records.add_values(record, values)
                         uow.flush()
-                        uow.add_audit(
-                            actor_user_id=actor_id,
-                            object_type="dataset_record",
-                            object_id=record.id,
-                            action="created",
-                        )
                 except PersistenceConflictError as error:
                     DatasetRecordService._raise_record_conflict(error)
                 if validated:
                     dataset.content_updated_at = datetime.now(UTC)
+                    record_audit(
+                        uow,
+                        actor_user_id=actor_id,
+                        object_type="dataset",
+                        object_id=dataset.id,
+                        action="dataset.records_imported",
+                        details={
+                            "format": source.kind,
+                            "record_count": len(validated),
+                            "rejected_row_count": preview.invalid_rows,
+                        },
+                    )
 
         except (ValidationError, RecordConflictError):
             self.store.finish(claimed, validation_valid=False, step=4)

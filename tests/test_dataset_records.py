@@ -233,7 +233,7 @@ def test_update_uniqueness_self_reuse_and_rollback(record_services):
             admin.id,
             dataset.key,
             first.id,
-            2,
+            1,
             {"code": "two", "amount": "2", "day": "2024-01-01"},
         )
     with pytest.raises(RecordConflictError, match="unique"):
@@ -241,12 +241,12 @@ def test_update_uniqueness_self_reuse_and_rollback(record_services):
             admin.id,
             dataset.key,
             first.id,
-            2,
+            1,
             {"code": "changed", "amount": "3", "day": "2024-01-02"},
         )
     with factory() as session:
         persisted = session.get(DatasetRecord, first.id)
-        assert persisted.revision == 2
+        assert persisted.revision == 1
     services.dataset_records.update_record(
         admin.id,
         dataset.key,

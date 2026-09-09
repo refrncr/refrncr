@@ -74,3 +74,10 @@ Grants and creator metadata confer no Dataset rights.
 Existing installations must resolve ambiguous ownership before upgrading to REF-73. See
 [Dataset governance and operator preflight](docs/development/dataset-governance.md) for the
 authorization model, migration mapping, concurrency contract and backup/restore procedure.
+
+## Audit coverage
+
+See the [audit policy](docs/development/audit-policy.md),
+[functional inventory](docs/development/audit-inventory.json) and
+[coverage matrix](docs/development/audit-coverage.json) for service-level audit contracts,
+transactional mutation events, import summaries and prepared export request semantics.

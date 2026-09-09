@@ -1,6 +1,6 @@
 # Dataset export security and resource behavior
 
-Dataset export is an authorized, read-only browser operation. The service resolves the Dataset by
+Dataset export is an authorized data-extraction operation with a durable prepared-request audit event. The service resolves the Dataset by
 its validated stable key and requires the central `can_export_dataset` capability. Current owning-team
 members and active Community administrators qualify automatically; other active users require direct
 or current-team export access. Read access and historical Dataset Grants confer no export rights.
@@ -15,14 +15,18 @@ joined, server-side streaming query, sorted in bounded chunks of 1,000 records, 
 temporary merge runs, and merged in the existing REF-79/80 order. Multi-pass consolidation keeps
 at most 64 merge runs open at once. Every run and output spool is
 closed on success or failure. This prevents a late serializer or workbook error from looking like
-a successful truncated download. Before response construction, the completed spool is read once in
+a successful truncated download. Inside the service snapshot, the completed spool is read once in
 64 KiB blocks and rewound; a read failure therefore occurs before HTTP success is constructed.
 
 The adapter starts the snapshot before reading the Dataset. PostgreSQL uses a repeatable-read
 transaction; SQLite explicitly begins a read transaction because the sqlite3 legacy mode does not start one for SELECT. Fields, the identifier, Records and values
 are read and the artifact is generated before that Unit of Work exits, so one file cannot combine
-schema and data from different committed states. Export takes no write lock, writes no audit event
-and commits no data. A revoke committed after the snapshot begins affects subsequent exports; an already authorized snapshot may finish.
+schema and data from different committed states. Artifact generation takes no write lock. After preparation and readability preflight, the service
+closes that snapshot and commits `dataset.export_requested` in a separate audit-only Unit of Work
+before returning the artifact. Audit failure closes the spool and produces no download. A later
+stream error keeps the accurate request event and uses fixed technical logging, without a second
+domain event. See [audit policy](audit-policy.md) and
+[ADR-012](../architecture/adr-012-audit-export-boundary.md). A revoke committed after the snapshot begins affects subsequent exports; an already authorized snapshot may finish.
 
 CSV uses UTF-8 with BOM, comma delimiters, CRLF records and standard-library RFC 4180 quoting. For
 a string whose first non-whitespace character is `=`, `+`, `-` or `@`, export prefixes one ASCII
