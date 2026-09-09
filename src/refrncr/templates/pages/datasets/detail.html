@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon %}
+{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
@@ -36,11 +36,21 @@
         <div class='table-scroll configuration-table' role='region' aria-label='Dataset fields' tabindex='0'>
           <table>
             <caption class='visually-hidden'>Dataset fields</caption>
-            <thead><tr><th scope='col' class='identifier-column'><span class='visually-hidden'>Identifier</span></th><th scope='col'>Field</th><th scope='col'><span class='visually-hidden'>Key</span></th><th scope='col'>Type</th><th scope='col'>Constraints</th><th scope='col'>Actions</th></tr></thead>
+            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col'>Field</th><th scope='col'><span class='visually-hidden'>Key</span></th><th scope='col'>Type</th><th scope='col'>Constraints</th><th scope='col'>Actions</th></tr></thead>
             <tbody>{% for field in fields %}
               <tr>
-                <td class='identifier-column'>{% if field.key in business_key.field_keys %}<img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}</td>
-                <td><span class='field-name'>{{ field.name }}</span></td>
+                <td class='field-order-column'>
+                  {% if schema_admin %}
+                    <form class='button-stack' method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
+                      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+                      {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
+                      <input type='hidden' name='field_id' value='{{ field.id }}'>
+                      <button class='button button-icon-only' aria-label='Move {{ field.name }} up' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}>{{ chevron_up_icon() }}</button>
+                      <button class='button button-icon-only' aria-label='Move {{ field.name }} down' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}>{{ chevron_down_icon() }}</button>
+                    </form>
+                  {% endif %}
+                </td>
+                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}</td>
                 <td><code class='field-key'>{{ field.key }}</code></td>
                 <td>{{ field.data_type }}</td>
                 <td>
@@ -55,13 +65,6 @@
                   {% if schema_admin %}
                     <div class='field-actions'>
                       <a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>
-                      <form method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
-                        <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-                        {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
-                        <input type='hidden' name='field_id' value='{{ field.id }}'>
-                        <button class='button button-secondary' aria-label='Move up {{ field.name }}' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}><span aria-hidden='true'>↑</span></button>
-                        <button class='button button-secondary' aria-label='Move down {{ field.name }}' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}><span aria-hidden='true'>↓</span></button>
-                      </form>
                     </div>
                   {% else %}<span class='section-description'>Read only</span>{% endif %}
                 </td>

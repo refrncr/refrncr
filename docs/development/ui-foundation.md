@@ -466,17 +466,48 @@ approved this placeholder. A future ownership story must supply an authorized te
 Do not substitute a user name or expose internal UUIDs. Ordering forms retain UUIDs only in the
 functional hidden inputs required by the existing endpoint.
 
-The table has Identifier, Field, Key, Type, Constraints and Actions columns in canonical field
-display order. Identifier and Key headings are visually hidden but available to assistive
-technology. The compact identifier column shows the existing decorative key SVG beside hidden
-text naming its field. Constraints shows Required, Unique and Identifier badges, or None when
-no constraint applies. Keys are muted monospace values in their own column.
+The table has Field order, Field, Key, Type, Constraints and Actions columns in canonical field
+display order. Field order and Key headings are visually hidden but available to assistive
+technology. Identifier fields show the existing decorative key SVG after the field name,
+separated by a space, with hidden text naming the field and its identifier role. Constraints
+shows Required, Unique and Identifier badges, or None when no constraint applies. Keys are muted monospace values in their own column.
 
 Actions and their heading are right-aligned. Edit field uses the shared `file_pen_icon` macro
 without a button border or background, retaining the existing authorized route, accessible
-field name, keyboard focus and minimum click area. Up/down controls preserve their existing
-forms, permissions and programmatic boundary-disabled states. The Fields header retains one
-Add field trigger in both populated and empty states.
+field name, keyboard focus and minimum click area. The Fields header retains one Add field
+trigger in both populated and empty states.
+
+### Field-order chevrons (REF-137)
+
+The first column contains a `button-stack` form for each field visible to a schema admin.
+Two native submit buttons use `button button-icon-only` and the shared `chevron_up_icon`
+and `chevron_down_icon` macros. They are vertically stacked with no gap, visible border,
+background or shadow. Each hit area is 24 × 24 px; the centered 36 px stack extends into
+existing cell padding so it does not increase the table row height. Keep that padding when
+reusing this stack in tables. The Edit control remains in Actions.
+
+The form retains the REF-121 POST destination `/datasets/<key>/fields/order`, session-bound
+`csrf_token`, complete `expected_field_id` sequence and the row's `field_id`. The clicked
+button supplies `direction=up` or `direction=down`; both share this single form. Each action
+moves exactly one position through the existing `move_field` service. Its authorization,
+Dataset lock, stale-order validation, atomic persistence and audit event are unchanged.
+The existing redirect reloads Configure dataset with the persisted canonical order.
+There is no drag-and-drop, drag handle, client-side sorting or new JavaScript controller.
+
+Accessible names are `Move [field name] up` and `Move [field name] down`, escaped by Jinja.
+The SVGs are decorative (`aria-hidden="true"`, `focusable="false"`). Up is natively disabled
+for the first field and Down for the last; a single field has both disabled. Disabled icons
+use the shared reduced opacity without a button container. Enabled buttons retain native
+keyboard activation and the shared `:focus-visible` outline. The existing server-redirect
+focus behavior is retained; no focus-restoration script is added. Viewers and editors receive
+no move buttons, and unauthorized direct POST requests remain rejected server-side.
+
+Regression coverage in `test_configure_overview.py` checks first-column placement, shared
+stack class, middle/boundary states and identifier placement. `test_dataset_browser.py`
+checks decorative chevrons, accessible names and escaping, both submit directions and form
+payloads, persisted order after redirect, stale rejection and exactly-one audit, schema-admin
+access and missing/invalid/cross-session CSRF rejection. Existing REF-121 service and database
+tests cover rollback, exact permutations and concurrency. No browser framework is added.
 
 `layouts/configuration.css` supplies the overview and field-table variant. No tokens, service
 contracts, domain rules, persistence operations or dependencies were added. The explicitly
@@ -492,7 +523,7 @@ Existing dataset browser and side-panel controller tests retain authorization, C
 and panel lifecycle regression coverage.
 
 Final local verification used Chrome at 1440, 768 and 320 px with populated, empty and long/malicious
-metadata fixtures. Six semantic columns, hidden Key heading, 48 px identifier column, separate
+metadata fixtures. Six semantic columns, hidden Key heading, 48 px leading column, separate
 name/key cells, right-aligned actions and borderless file-pen presentation were verified. No
 page overflow occurred; wide tables scrolled internally. Keyboard order, visible focus, reachable
 actions and read-only viewer presentation were checked. All three panel entry points opened with

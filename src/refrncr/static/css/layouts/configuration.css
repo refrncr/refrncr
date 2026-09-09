@@ -15,19 +15,21 @@
 .section-header h2, .section-header p { margin: 0; }
 .configuration-table { position: relative; }
 .configuration-table table { min-width: var(--data-table-min-width); table-layout: fixed; }
-.configuration-table .identifier-column { width: var(--space-xxl); padding-inline: var(--space-sm); text-align: center; }
+.configuration-table .field-order-column { width: var(--space-xxl); padding-inline: var(--space-sm); text-align: center; }
+.configuration-table .field-order-column .button-stack { vertical-align: middle; }
 .configuration-table th:nth-child(2) { width: 22%; }
 .configuration-table th:nth-child(3) { width: 18%; }
 .configuration-table th:nth-child(4) { width: 12%; }
-.configuration-table th:nth-child(5) { width: 24%; }
+.configuration-table th:last-child { width: calc(var(--control-height-compact) + var(--space-lg) + var(--space-xs) + 2 * var(--space-md)); }
 .configuration-table td { vertical-align: middle; }
 .configuration-table th:last-child, .configuration-table td:last-child { text-align: right; }
-.configuration-table .field-actions { justify-content: flex-end; }
+.configuration-table .field-actions { justify-content: flex-end; flex-wrap: nowrap; }
 .configuration-table .field-actions .button-icon { margin: 0; }
 .field-edit-action { display: inline-flex; align-items: center; justify-content: center; min-width: var(--control-height-compact); min-height: var(--control-height-compact); color: var(--color-text-secondary); text-decoration: none; }
 .field-edit-action:hover { color: var(--color-link-hover); }
-.constraint-list, .field-actions, .field-actions form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.constraint-list, .field-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
 .constraint-list .badge { background: var(--color-surface-subtle); color: var(--color-text-secondary); }
 @media (max-width: 767px) {
+  .configuration-table th:last-child { width: calc(var(--control-height-compact) + var(--space-lg) + var(--space-xs) + 2 * var(--space-sm)); }
   .detail-list > div { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 }
