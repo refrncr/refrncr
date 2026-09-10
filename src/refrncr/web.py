@@ -32,6 +32,7 @@ from refrncr.browser_security import (
     BrowserCookiePolicy,
 )
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
+from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -50,7 +51,6 @@ from refrncr.record_import import (
     parse_source,
 )
 from refrncr.services import (
-    DATASET_FIELD_TYPES,
     AuthenticationService,
     AuthorizationError,
     AuthorizationService,
@@ -122,6 +122,12 @@ def create_flask_app(
 ) -> Flask:
     app = Flask(__name__)
     audit_history = audit_history or AuditHistoryService(users.uow)
+
+    app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
+
+    @app.template_filter("record_value_text")
+    def record_value_text(value, data_type):
+        return "" if value is None else get_datatype(data_type).text(value)
 
     @app.template_filter("absolute_utc")
     def absolute_utc(value):
@@ -698,7 +704,7 @@ def create_flask_app(
         def display_record_value(field, value):
             if field.data_type == "number" and isinstance(value, Decimal):
                 return f"{value:.{numeric_scales[field.key]}f}"
-            return value
+            return get_datatype(field.data_type).text(value) if value is not None else None
 
         record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
         range_start = (page.page - 1) * page.page_size + 1 if page.total else 0
@@ -1218,13 +1224,10 @@ def create_flask_app(
         return redirect(url_for("dataset_records_view", key=key))
 
     def record_form_values(record):
-        values = {}
-        for value in record.values:
-            if value.data_type == "boolean":
-                values[value.field_key] = "true" if value.value else "false"
-            else:
-                values[value.field_key] = str(value.value)
-        return values
+        return {
+            value.field_key: get_datatype(value.data_type).text(value.value)
+            for value in record.values
+        }
 
     def parsed_record_form(fields, infrastructure):
         expected = {field.key for field in fields}
@@ -1511,7 +1514,7 @@ def create_flask_app(
             is_business_key_component=is_business_key_component,
             error=error,
             current_csrf=csrf,
-            type_choices=DATASET_FIELD_TYPES,
+            type_choices=tuple(DATATYPES.values()),
         )
 
     @dataset_route("/datasets/<key>/fields/new", methods=["GET"])
@@ -1585,7 +1588,7 @@ def create_flask_app(
             is_business_key_component=is_business_key_component,
             error=error,
             current_csrf=csrf,
-            type_choices=DATASET_FIELD_TYPES,
+            type_choices=tuple(DATATYPES.values()),
         )
 
     @dataset_route("/datasets/<key>/fields/<field_key>/edit", methods=["GET"])

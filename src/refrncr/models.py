@@ -27,6 +27,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, column_property, mapped_column
 
+from refrncr.datatypes import DATASET_FIELD_TYPES
 from refrncr.db.base import Base
 
 
@@ -218,7 +219,7 @@ class DatasetField(Base):
         CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_dataset_fields_key_length"),
         CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_dataset_fields_name_length"),
         CheckConstraint(
-            "data_type IN ('string', 'number', 'boolean', 'date')",
+            "data_type IN (" + ", ".join(repr(value) for value in DATASET_FIELD_TYPES) + ")",
             name="ck_dataset_fields_data_type",
         ),
         UniqueConstraint("dataset_id", "key", name="uq_dataset_fields_dataset_key"),

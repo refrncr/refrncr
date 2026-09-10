@@ -18,11 +18,12 @@
   {% set panel_id = "record-panel-" ~ record.id %}
   {% set title_id = "record-panel-title-" ~ record.id %}
   {% set description_id = "record-panel-description-" ~ record.id %}
-  {% call side_panel(panel_id, values.get(identifier.field_keys[0], record.id), title_id, "View record", description_id, true, "record") %}
+  {% set primary_value = record.values|selectattr('field_key', 'equalto', identifier.field_keys[0])|first %}
+  {% call side_panel(panel_id, primary_value.value|record_value_text(primary_value.data_type) if primary_value else record.id, title_id, "View record", description_id, true, "record") %}
     <section class='side-panel-view' data-panel-view='view'>
       <div class='side-panel-body'>
         <dl class='record-details'>
-          {% for field in fields %}<div><dt>{{ field.name }}</dt><dd>{{ values.get(field.key, '—') }}</dd></div>{% endfor %}
+          {% for field in fields %}<div><dt>{{ field.name }}</dt><dd>{{ display_record_value(field, values.get(field.key)) if values.get(field.key) is not none else '—' }}</dd></div>{% endfor %}
         </dl>
       </div>
       {% if may_edit %}

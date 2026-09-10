@@ -53,7 +53,7 @@
                 </td>
                 <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}</td>
                 <td><code class='field-key'>{{ field.key }}</code></td>
-                <td>{{ field.data_type }}</td>
+                <td>{{ field.data_type|datatype_label }}</td>
                 <td>
                   <div class='constraint-list'>
                     {% if field.is_required %}<span class='badge'>Required</span>{% endif %}

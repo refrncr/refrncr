@@ -276,7 +276,7 @@ def test_field_name_rejects_invalid_lengths(field_services, name):
         services.dataset_fields.create_field(admin.id, dataset.key, "field", name, "string")
 
 
-@pytest.mark.parametrize("data_type", ["integer", "datetime", "String", ""])
+@pytest.mark.parametrize("data_type", ["decimal", "uuid", "String", ""])
 def test_unsupported_field_type_is_rejected(field_services, data_type):
     _, _, services, admin = field_services
     dataset = create_dataset(services, admin)

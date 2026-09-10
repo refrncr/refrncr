@@ -32,8 +32,10 @@ camelCase boundaries, and treats underscores, hyphens, and repeated whitespace a
 separators. Original headers and values remain unchanged for display and validation.
 
 Each source column is profiled once from at most the first 100 parsed source rows. At
-most 25 non-empty, non-formula values per column are checked with the same string, decimal, boolean,
-and date grammar used by manual Record entry. The mapping page displays at most the first three of
+most 25 non-empty, non-formula values per column are checked with the same nine canonical
+datatype grammars used by manual Record entry. See [Field datatypes](field-datatypes.md).
+This does not introduce source-format recognition or locale variants (REF-154).
+The mapping page displays at most the first three of
 those values, truncating display text at 80 characters. Formula text and cached formula results are
 never profiled or displayed.
 

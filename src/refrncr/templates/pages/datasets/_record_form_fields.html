@@ -9,7 +9,7 @@
           <option value='false'{% if values is not none and values.get(field.key) == false %} selected{% endif %}>No</option>
         </select>
       {% else %}
-        <input id='{{ prefix }}-{{ field.key }}' name='{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}'{% if values is not none %} value='{{ values.get(field.key, "") }}'{% endif %}{% if field.is_required %} required{% endif %}{% if initial_focus and loop.first %} autofocus data-initial-focus{% endif %}>
+        <input id='{{ prefix }}-{{ field.key }}' name='{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}'{% if values is not none %} value='{{ values.get(field.key)|record_value_text(field.data_type) }}'{% endif %}{% if field.is_required %} required{% endif %}{% if initial_focus and loop.first %} autofocus data-initial-focus{% endif %}>
       {% endif %}
     </div>
   {% endfor %}

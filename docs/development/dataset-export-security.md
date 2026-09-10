@@ -41,3 +41,15 @@ literal string cells because Excel numeric cells cannot retain them exactly; pre
 external value takes precedence over an unsafe numeric approximation.
 JSON is emitted directly as UTF-8. Decimal tokens come from Python `Decimal` in plain fixed-point
 notation, without conversion through binary floating point or exponent notation.
+
+REF-145 extends canonical export to Integer, Float, Time, DateTime and Timestamp.
+CSV/JSON use the [central datatype forms](field-datatypes.md), including UTC `Z`
+for Timestamp. JSON Integer and Float are native numbers. XLSX uses canonical text
+for these new types to retain exact digits, fractions and explicit UTC; original
+four-type cell behavior is retained. Configurable output formats and additional
+typed Excel rendering belong to REF-152, not this datatype foundation.
+
+Typed value and pre-format numeric bounds come from the datatype catalog. String
+quoting/formula defenses remain serializer responsibilities. An invalid value
+aborts the prepared export without an audit event; XLSX cleanup also closes its
+write-only XML generator and removes its temporary file on this path.

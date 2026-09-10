@@ -1239,7 +1239,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert page.index("zeta") < page.index("alpha")
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
-    assert "string" in page and "date" in page
+    assert "String" in page and "Date" in page
     assert "Required" in page and "None" in page
     assert page.count("Edit field") == 2
     for name in ("Zeta", "&lt;script&gt;alert(1)&lt;/script&gt;"):
@@ -1513,7 +1513,7 @@ def test_create_field_checkboxes_and_mass_assignment_are_explicit(dataset_browse
     [
         {"key": "INVALID"},
         {"name": "   "},
-        {"data_type": "datetime"},
+        {"data_type": "uuid"},
     ],
 )
 def test_create_field_validation_is_safe_and_preserves_values(dataset_browser, overrides):
@@ -1765,7 +1765,7 @@ def test_invalid_field_edit_redisplays_escaped_value_without_mutation(dataset_br
         "/datasets/invalid-field-edit/fields/field",
         data={
             "name": markup,
-            "data_type": "datetime",
+            "data_type": "uuid",
             "csrf_token": form_csrf(form),
         },
     )

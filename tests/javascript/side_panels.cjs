@@ -40,6 +40,10 @@ a.setAttribute('data-row-primary', '');
 let rowTextSelected = false;
 const remote = opener('second'); remote.setAttribute('data-panel-url',''); remote.href = 'https://localhost/form';
 const main = new Element();
+const datatype = new Element({'data-field-datatype':''});
+const identifier = new Element(); identifier.checked = true;
+datatype.selectedOptions = [{dataset:{identifierEligible:'true'}}];
+datatype.closest = s => s === 'form' ? {querySelector:()=>identifier} : null;
 const selector = new Element(); selector.value = '';
 const grantButton = new Element(); grantButton.matches = () => true;
 const grantForm = new Element({'data-requires-selection':'', 'data-panel-refresh':'/export-access', 'data-panel-success':'Export access granted.'});
@@ -50,7 +54,7 @@ const nodes = {first, second, 'first-title':first.title, 'second-title':second.t
 const document = {
   activeElement: null,
   querySelectorAll(selector) {
-    return ({'form[data-requires-selection]':[grantForm], 'dialog[data-modal-side-panel]':[first,second], '[data-dialog-open]':[a,b,c,remote], '[data-dialog-close]':[first.closeButton,second.closeButton], '[data-panel-host]':[second.host]})[selector] || [];
+    return ({'[data-field-datatype]':[datatype], 'form[data-requires-selection]':[grantForm], 'dialog[data-modal-side-panel]':[first,second], '[data-dialog-open]':[a,b,c,remote], '[data-dialog-close]':[first.closeButton,second.closeButton], '[data-panel-host]':[second.host]})[selector] || [];
   },
   querySelector(selector) { return selector === 'dialog[data-modal-side-panel][open]' ? [first,second].find(d => d.open) : null; },
   getElementById(id) { return nodes[id]; }, addEventListener() {}, importNode(node) { return node; }, createElement(tag) { const e = new Element(); e.tagName = tag.toUpperCase(); return e; },
@@ -69,6 +73,17 @@ vm.runInNewContext(source, context);
 const settle = async () => { for(let i=0;i<15;i++) await Promise.resolve(); };
 const response = (content, status=200) => ({ok:status===200,status,redirected:false,text:async()=>content});
 (async()=>{
+  assert.equal(identifier.disabled,false);
+  assert.equal(identifier.checked,true);
+  datatype.selectedOptions = [{dataset:{identifierEligible:'false'}}];
+  await datatype.fire('change');
+  assert.equal(identifier.disabled,true,'Float cannot be selected as an identifier');
+  assert.equal(identifier.checked,false,'changing to Float clears membership');
+  datatype.selectedOptions = [{dataset:{identifierEligible:'true'}}];
+  await datatype.fire('change');
+  assert.equal(identifier.disabled,false,'eligible types re-enable membership');
+  assert.equal(identifier.checked,false,'membership is never silently restored');
+  assert.equal(datatype.listeners.change.length,1,'datatype initialization is idempotent');
   assert.equal(grantButton.disabled,true,'enhanced selection form starts disabled');
   selector.value='user:example'; await selector.fire('change'); assert.equal(grantButton.disabled,false);
   grantForm.setAttribute('aria-busy','true'); await selector.fire('change'); assert.equal(grantButton.disabled,true);
@@ -94,12 +109,19 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   first.candidates=[]; await a.fire('click'); assert.equal(document.activeElement,first.closeButton); await first.close();
   await c.fire('click'); assert.equal(document.activeElement,second.input); await second.close(); assert.equal(document.activeElement,c);
   const field = new Element(); const content = {dataset:{panelTitle:'Edit field'},candidates:[field]};
+  const loadedType = new Element({'data-field-datatype':''});
+  const loadedIdentifier = new Element(); loadedIdentifier.checked=true;
+  loadedType.selectedOptions = [{dataset:{identifierEligible:'false'}}];
+  loadedType.closest = s => s === 'form' ? {querySelector:()=>loadedIdentifier} : null;
+  second.host.querySelectorAll = s => s === '[data-field-datatype]' ? [loadedType] : [];
   fetchImpl=async()=>response(content);
   let prevented=false;
   await remote.fire('click',{metaKey:true,preventDefault(){prevented=true;}});
   assert.equal(prevented,false); assert.equal(second.open,false,'modified clicks preserve normal links');
   await remote.fire('click',{preventDefault(){prevented=true;}}); await settle();
   assert.equal(prevented,true); assert.equal(second.title.textContent,'Edit field'); assert.equal(document.activeElement,field);
+  assert.equal(loadedIdentifier.disabled,true,'loaded Field panels initialize datatype controls');
+  assert.equal(loadedIdentifier.checked,false);
   const cancel=new Element(); cancel.closest=(selector)=>selector==='[data-panel-cancel]'?cancel:null;
   await second.host.fire('click',{target:cancel}); assert.equal(document.activeElement,remote); assert.equal(second.open,false);
   await remote.fire('click'); await settle();

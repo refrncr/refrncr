@@ -5,11 +5,11 @@ import heapq
 import io
 import json
 import logging
+import os
 import pickle
 import tempfile
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
-from datetime import date, datetime
 from decimal import Decimal
 from typing import BinaryIO
 
@@ -17,6 +17,7 @@ from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font
 
+from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.ports import DatasetFieldRecord, StoredRecord
 
 SPOOL_MEMORY_LIMIT = 1024 * 1024
@@ -61,8 +62,10 @@ def verify_artifact_readable(artifact: ExportArtifact) -> None:
 
 
 def _plain_decimal(value: object) -> str:
-    if not isinstance(value, Decimal) or not value.is_finite():
-        raise ExportGenerationError("The Dataset contains an invalid number")
+    try:
+        get_datatype("number").validate_typed(value)
+    except DatatypeError:
+        raise ExportGenerationError("The Dataset contains an invalid number") from None
     return format(value, "f")
 
 
@@ -83,18 +86,13 @@ def _record_values(record: StoredRecord) -> dict[str, object]:
 
 
 def _validate_value(field: DatasetFieldRecord, value: object) -> object:
-    valid = (
-        (field.data_type == "string" and isinstance(value, str))
-        or (field.data_type == "number" and isinstance(value, Decimal) and value.is_finite())
-        or (field.data_type == "boolean" and isinstance(value, bool))
-        or (
-            field.data_type == "date"
-            and isinstance(value, date)
-            and not isinstance(value, datetime)
-        )
-    )
-    if not valid:
-        raise ExportGenerationError("The Dataset contains an invalid stored value")
+    try:
+        datatype = get_datatype(field.data_type)
+        datatype.validate_typed(value)
+        if field.data_type != "string":
+            datatype.text(value)
+    except DatatypeError:
+        raise ExportGenerationError("The Dataset contains an invalid stored value") from None
     return value
 
 
@@ -127,7 +125,7 @@ def write_csv(target: BinaryIO, fields, records) -> None:
             elif field.data_type == "boolean":
                 row.append("true" if value else "false")
             else:
-                row.append(value.isoformat())
+                row.append(get_datatype(field.data_type).text(value))
         writer.writerow(row)
     text.flush()
     text.detach()
@@ -154,8 +152,10 @@ def write_json(target: BinaryIO, fields, records) -> None:
                 value = _validate_value(field, value)
                 if field.data_type == "number":
                     rendered = _plain_decimal(value)
-                elif field.data_type == "date":
-                    rendered = json.dumps(value.isoformat())
+                elif field.data_type in {"integer", "float"}:
+                    rendered = get_datatype(field.data_type).text(value)
+                elif field.data_type in {"date", "time", "datetime", "timestamp"}:
+                    rendered = json.dumps(get_datatype(field.data_type).text(value))
                 else:
                     rendered = json.dumps(value, ensure_ascii=False, allow_nan=False)
             target.write(rendered.encode("utf-8"))
@@ -194,13 +194,33 @@ def write_xlsx(target: BinaryIO, fields, records, title: str) -> None:
                     cell = WriteOnlyCell(worksheet, value=value)
                     cell.number_format = "yyyy-mm-dd"
                     row.append(cell)
+                elif value is not None and field.data_type in {
+                    "integer",
+                    "float",
+                    "time",
+                    "datetime",
+                    "timestamp",
+                }:
+                    # Canonical text is lossless across Excel's numeric/time precision limits.
+                    # Configurable genuine typed cells belong to REF-152.
+                    row.append(get_datatype(field.data_type).text(value))
                 else:
                     row.append(value)
             worksheet.append(row)
         worksheet.close()
         workbook.save(target)
     finally:
-        workbook.close()
+        try:
+            for sheet in workbook.worksheets:
+                if not sheet.closed:
+                    sheet.close()
+                # Workbook.close() only closes the archive, not write-only XML
+                # generators or their temporary files when validation aborts save.
+                writer = sheet._writer
+                if writer is not None and os.path.exists(writer.out):
+                    writer.cleanup()
+        finally:
+            workbook.close()
 
 
 def _worksheet_title(value: str) -> str:
