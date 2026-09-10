@@ -472,7 +472,7 @@ def test_record_aware_schema_guards_and_safe_changes(record_services):
 
     with pytest.raises(ValidationError, match="type cannot change"):
         services.dataset_fields.update_field(
-            admin.id, dataset.key, fields["active"].key, "Active", "date", False, False
+            admin.id, dataset.key, fields["amount"].key, "Amount", "date", True, False
         )
     with pytest.raises(ValidationError, match="Required cannot"):
         services.dataset_fields.update_field(

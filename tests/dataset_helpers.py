@@ -41,6 +41,10 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
+        if current == "0014_ref_145":
+            # REF-145 retains old IDs and permits a lossless downgrade of old types.
+            command.downgrade(config, "0013_ref_39")
+            current = "0013_ref_39"
         if current == "0013_ref_39":
             with connection.begin():
                 Operations(MigrationContext.configure(connection)).drop_index(

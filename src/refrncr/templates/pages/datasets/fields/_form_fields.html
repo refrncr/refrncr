@@ -1,8 +1,10 @@
 {% macro field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, include_key=false) -%}
+  {% set selected_type = type_choices|selectattr('id', 'equalto', data_type)|first %}
   {% if include_key %}<label>Key <input name='key' value='{{ key }}'></label>{% endif %}
   <label>Name <input name='name' value='{{ name }}'></label>
-  <label>Type <select name='data_type'>{% for choice in type_choices %}<option value='{{ choice }}'{% if choice == data_type %} selected{% endif %}>{{ choice }}</option>{% endfor %}</select></label>
+  <label>Data type <select name='data_type' data-field-datatype>{% for choice in type_choices %}<option value='{{ choice.id }}' data-identifier-eligible='{{ 'true' if choice.identifier_eligible else 'false' }}'{% if choice.id == data_type %} selected{% endif %}>{{ choice.label }}</option>{% endfor %}</select></label>
   <label><input type='checkbox' name='is_required'{% if is_required %} checked{% endif %}> Required</label>
   <label><input type='checkbox' name='is_unique'{% if is_unique %} checked{% endif %}> Unique</label>
-  <label><input type='checkbox' name='is_business_key_component'{% if is_business_key_component %} checked{% endif %}> Part of record identifier</label>
+  <label><input type='checkbox' name='is_business_key_component'{% if selected_type and not selected_type.identifier_eligible %} disabled{% endif %}{% if is_business_key_component %} checked{% endif %}> Part of record identifier</label>
+  <p>Float cannot be part of a Record identifier.</p>
 {%- endmacro %}

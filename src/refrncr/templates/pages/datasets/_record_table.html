@@ -9,7 +9,7 @@
       <thead>
         <tr>
           {% for field in fields %}
-            <th scope='col'{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>
+            <th scope='col'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
               {{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'>{% endif %}
             </th>
           {% endfor %}
@@ -21,14 +21,14 @@
           {% call table_row('record-row', panel=true) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
-              <td{% if field.data_type == 'number' %} class='numeric-column'{% endif %}>
+              <td{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
                 {% set value_content %}
                 {% if cell_value is none %}
                   <span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>
-                {% elif field.data_type == 'number' %}
+                {% elif field.data_type in ('integer', 'number', 'float') %}
                   {{ display_record_value(field, cell_value) }}
                 {% else %}
-                  <span class='cell-content' title='{{ cell_value }}'>{{ cell_value }}</span>
+                  <span class='cell-content' title='{{ display_record_value(field, cell_value) }}'>{{ display_record_value(field, cell_value) }}</span>
                 {% endif %}
                 {% endset %}
                 {% if field.key == identifier.field_keys[0] %}

@@ -18,6 +18,7 @@ from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
 from refrncr.audit import record_audit
+from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
     DatasetFieldService,
@@ -361,7 +362,7 @@ def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...
     profiles = []
     for values in sampled:
         compatible = set()
-        for data_type in ("string", "number", "boolean", "date"):
+        for data_type in DATASET_FIELD_TYPES:
             if values and all(_profile_value_matches(data_type, value) for value in values):
                 compatible.add(data_type)
         profiles.append(
@@ -412,10 +413,10 @@ def rank_mapping_candidates(header: str, profile: ColumnTypeProfile, fields) -> 
         if compatibility == "compatible":
             if field.data_type != "string":
                 score += 20
-                reason += f"; values match the {field.data_type.title()} field type"
+                reason += f"; values match the {get_datatype(field.data_type).label} field type"
         elif compatibility == "incompatible":
             score -= 80
-            reason += f"; values do not match the {field.data_type.title()} field type"
+            reason += f"; values do not match the {get_datatype(field.data_type).label} field type"
         confidence = (
             "Low"
             if compatibility == "incompatible"

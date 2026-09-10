@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from typing import Protocol
 
@@ -182,7 +182,7 @@ class RecordValue:
     field_id: str
     field_key: str
     data_type: str
-    value: str | Decimal | bool | date
+    value: str | int | Decimal | float | bool | date | time | datetime
     canonical_key: bytes
     is_unique: bool
 

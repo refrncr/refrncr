@@ -28,6 +28,24 @@
   };
   initializeSelectionForms(document);
 
+  const datatypeControls = new WeakSet();
+  const initializeDatatypeControls = (root) => {
+    root.querySelectorAll("[data-field-datatype]").forEach((select) => {
+      if (datatypeControls.has(select)) return;
+      const component = select.closest("form")?.querySelector("[name='is_business_key_component']");
+      if (!component) return;
+      datatypeControls.add(select);
+      const update = () => {
+        const eligible = select.selectedOptions[0]?.dataset.identifierEligible === "true";
+        component.disabled = !eligible;
+        if (!eligible) component.checked = false;
+      };
+      select.addEventListener("change", update);
+      update();
+    });
+  };
+  initializeDatatypeControls(document);
+
   document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
     const trigger = details.querySelector("summary");
     const tooltip = details.querySelector('[role="tooltip"]');
@@ -148,6 +166,7 @@
     const host = dialog.querySelector("[data-panel-host]");
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
+    initializeDatatypeControls(host);
     host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
       const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
       const nested = document.createElement(marker === "data-panel-section-heading" ? "h3" : "h4");

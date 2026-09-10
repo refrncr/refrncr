@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
-from decimal import Decimal
 from functools import wraps
 from types import SimpleNamespace, TracebackType
 
@@ -24,6 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.models import (
     AuditEvent,
     Dataset,
@@ -592,7 +592,14 @@ class SqlAlchemyDatasetRecordOperations:
                 "boolean_value": None,
                 "date_value": None,
             }
-            typed[f"{value.data_type}_value"] = value.value
+            datatype = get_datatype(value.data_type)
+            decoded = datatype.from_key(value.canonical_key)
+            if type(value.value) is not datatype.python_type or decoded != value.value:
+                raise DatatypeError("Invalid stored canonical value", "invalid_storage")
+            if value.data_type in {"string", "number", "boolean", "date"}:
+                typed[f"{value.data_type}_value"] = value.value
+            else:
+                typed["string_value"] = datatype.text(decoded)
             rows.append(
                 DatasetRecordValue(
                     record_id=record.id,
@@ -624,28 +631,7 @@ class SqlAlchemyDatasetRecordOperations:
         )
         grouped: dict[str, list[RecordValue]] = {record.id: [] for record in records}
         for row, field in values:
-            value = next(
-                candidate
-                for candidate in (
-                    row.string_value,
-                    row.number_value,
-                    row.boolean_value,
-                    row.date_value,
-                )
-                if candidate is not None
-            )
-            if field.data_type == "number":
-                value = Decimal(row.canonical_value_key[1:].decode("ascii"))
-            grouped[row.record_id].append(
-                RecordValue(
-                    field_id=field.id,
-                    field_key=field.key,
-                    data_type=field.data_type,
-                    value=value,
-                    canonical_key=row.canonical_value_key,
-                    is_unique=field.is_unique,
-                )
-            )
+            grouped[row.record_id].append(self._record_value(row, field))
         return [
             StoredRecord(record.id, record.dataset_id, tuple(grouped[record.id]), record.revision)
             for record in records
@@ -682,18 +668,21 @@ class SqlAlchemyDatasetRecordOperations:
 
     @staticmethod
     def _record_value(row: DatasetRecordValue, field: DatasetField) -> RecordValue:
-        value = next(
-            candidate
-            for candidate in (
-                row.string_value,
-                row.number_value,
-                row.boolean_value,
-                row.date_value,
-            )
-            if candidate is not None
-        )
-        if field.data_type == "number":
-            value = Decimal(row.canonical_value_key[1:].decode("ascii"))
+        datatype = get_datatype(field.data_type)
+        value = datatype.from_key(row.canonical_value_key)
+        columns = {
+            "string": row.string_value,
+            "number": row.number_value,
+            "boolean": row.boolean_value,
+            "date": row.date_value,
+        }
+        column = field.data_type if field.data_type in columns else "string"
+        if sum(item is not None for item in columns.values()) != 1 or columns[column] is None:
+            raise DatatypeError("Invalid stored canonical value", "invalid_storage")
+        # Numeric is an approximate SQLite projection; the exact key is authoritative.
+        expected = value if field.data_type in columns else datatype.text(value)
+        if field.data_type != "number" and columns[column] != expected:
+            raise DatatypeError("Invalid stored canonical value", "invalid_storage")
         return RecordValue(
             field.id,
             field.key,
@@ -760,31 +749,7 @@ class SqlAlchemyDatasetRecordOperations:
                 DatasetRecordValue.record_id == record_id,
             )
         )
-        result = []
-        for row, field in rows:
-            value = next(
-                candidate
-                for candidate in (
-                    row.string_value,
-                    row.number_value,
-                    row.boolean_value,
-                    row.date_value,
-                )
-                if candidate is not None
-            )
-            if field.data_type == "number":
-                value = Decimal(row.canonical_value_key[1:].decode("ascii"))
-            result.append(
-                RecordValue(
-                    field.id,
-                    field.key,
-                    field.data_type,
-                    value,
-                    row.canonical_value_key,
-                    field.is_unique,
-                )
-            )
-        return tuple(result)
+        return tuple(self._record_value(row, field) for row, field in rows)
 
     def count(self, dataset_id: str) -> int:
         if not self._available():

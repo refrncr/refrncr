@@ -8,8 +8,7 @@ import unicodedata
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from argon2 import PasswordHasher
@@ -20,6 +19,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
+from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
+from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
@@ -42,7 +43,6 @@ from refrncr.ports import (
 )
 
 SUBJECT_TYPES = {"user", "team"}
-DATASET_FIELD_TYPES = ("string", "number", "boolean", "date")
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -257,9 +257,16 @@ def normalize_dataset_field_name(name: str) -> str:
 
 
 def validate_dataset_field_type(data_type: str) -> str:
-    if not isinstance(data_type, str) or data_type not in DATASET_FIELD_TYPES:
-        raise ValidationError("Field type must be string, number, boolean or date")
-    return data_type
+    try:
+        return get_datatype(data_type).id
+    except DatatypeError as error:
+        raise ValidationError(str(error)) from None
+
+
+def _require_identifier_type(data_type: str) -> None:
+    validate_dataset_field_type(data_type)
+    if not get_datatype(data_type).identifier_eligible:
+        raise ValidationError("Float cannot be part of a Record identifier")
 
 
 def validate_dataset_field_flag(value: bool, label: str) -> bool:
@@ -268,62 +275,11 @@ def validate_dataset_field_flag(value: bool, label: str) -> bool:
     return value
 
 
-_DECIMAL_PATTERN = re.compile(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?")
-
-
-def canonicalize_record_value(data_type: str, raw: str) -> tuple[object, bytes] | None:
-    if not isinstance(raw, str):
-        raise ValidationError("Value must be text")
-    if data_type == "string":
-        value = unicodedata.normalize("NFC", raw.strip())
-        if not value:
-            return None
-        if any(unicodedata.category(character) == "Cc" for character in value):
-            raise ValidationError("Control characters are not allowed")
-        encoded = value.encode("utf-8")
-        if len(encoded) > 1000:
-            raise ValidationError("Value must not exceed 1000 UTF-8 bytes")
-        return value, b"s" + encoded
-    if data_type == "number":
-        if raw == "":
-            return None
-        if _DECIMAL_PATTERN.fullmatch(raw) is None:
-            raise ValidationError("Enter a decimal number without exponent or separators")
-        integer, _, fraction = raw.lstrip("-").partition(".")
-        significant_integer = integer.lstrip("0")
-        precision = len(significant_integer) + len(fraction)
-        if precision > 38 or len(fraction) > 18 or len(integer) > 20:
-            raise ValidationError("Number must have at most 20 integer and 18 fractional digits")
-        try:
-            value = Decimal(raw)
-        except InvalidOperation as exc:
-            raise ValidationError("Enter a valid decimal number") from exc
-        if value == 0:
-            canonical = "0"
-            value = Decimal(0)
-        else:
-            canonical = format(value, "f")
-            if "." in canonical:
-                canonical = canonical.rstrip("0").rstrip(".")
-        return value, b"n" + canonical.encode("ascii")
-    if data_type == "boolean":
-        if raw == "":
-            return None
-        if raw not in {"true", "false"}:
-            raise ValidationError("Choose true or false")
-        value = raw == "true"
-        return value, b"b1" if value else b"b0"
-    if data_type == "date":
-        if raw == "":
-            return None
-        if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", raw) is None:
-            raise ValidationError("Enter a date as YYYY-MM-DD")
-        try:
-            value = date.fromisoformat(raw)
-        except ValueError as exc:
-            raise ValidationError("Enter a valid Gregorian date") from exc
-        return value, b"d" + raw.encode("ascii")
-    raise ValidationError("Unknown field type")
+def canonicalize_record_value(data_type: str, raw: str | None) -> tuple[object, bytes] | None:
+    try:
+        return canonicalize(data_type, raw)
+    except DatatypeError as error:
+        raise ValidationError(str(error)) from None
 
 
 def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -> UserRecord:
@@ -1082,6 +1038,8 @@ class DatasetFieldService:
             validated_component = validate_dataset_field_flag(
                 is_business_key_component, "is_business_key_component"
             )
+            if validated_component:
+                _require_identifier_type(data_type)
             if validated_component and not validated_required:
                 raise ValidationError("A Record identifier field must be required")
             if uow.dataset_records.count(dataset.id) and (
@@ -1171,6 +1129,8 @@ class DatasetFieldService:
                 validated_required,
                 validated_unique,
             )
+            if uow.dataset_business_keys.contains(dataset.id, field.key):
+                _require_identifier_type(validated_type)
             current = (field.name, field.data_type, field.is_required, field.is_unique)
             if replacement == current:
                 return field
@@ -1217,6 +1177,8 @@ class DatasetFieldService:
             validated_component = validate_dataset_field_flag(
                 is_business_key_component, "is_business_key_component"
             )
+            if validated_component:
+                _require_identifier_type(data_type)
             if validated_component and not validated_required:
                 raise ValidationError("A Record identifier field must be required")
 
@@ -1410,9 +1372,10 @@ class DatasetFieldService:
         is_required: bool,
         is_unique: bool,
     ) -> None:
-        has_records = bool(uow.dataset_records.count(dataset_id))
-        if has_records and data_type != field.data_type:
-            raise ValidationError("Field type cannot change after records exist")
+        if data_type != field.data_type and uow.dataset_records.field_has_values(
+            dataset_id, field.id
+        ):
+            raise ValidationError("Field type cannot change while stored values exist")
         if (
             not field.is_required
             and is_required
@@ -1464,6 +1427,7 @@ class DatasetBusinessKeyService:
                 field = uow.dataset_fields.find_by_key(dataset.id, field_key)
                 if field is None:
                     raise ValidationError("Selected Dataset field does not exist")
+                _require_identifier_type(field.data_type)
                 if not field.is_required:
                     raise ValidationError("Every business-key field must be required")
                 components.append(field.key)
@@ -1642,6 +1606,10 @@ class DatasetRecordService:
             raise RecordValidationError({key: "Unknown Dataset field" for key in unknown})
         if not identifier.field_keys:
             raise ValidationError("Configure a Record identifier before adding records")
+        for key in identifier.field_keys:
+            if key not in field_by_key:
+                raise ValidationError("Invalid Record identifier definition")
+            _require_identifier_type(field_by_key[key].data_type)
         errors: dict[str, str] = {}
         values: list[RecordValue] = []
         for field in fields:
@@ -1739,12 +1707,7 @@ class DatasetRecordService:
             if value is None:
                 result.append((1, None))
                 continue
-            result.append(
-                (
-                    0,
-                    value.value.encode("utf-8") if value.data_type == "string" else value.value,
-                )
-            )
+            result.append(get_datatype(value.data_type).ordering_key(value.value))
         return incomplete, tuple(result), record.id
 
     def get_dataset_for_add(self, actor_id: str, dataset_key: str) -> DatasetRecord:
