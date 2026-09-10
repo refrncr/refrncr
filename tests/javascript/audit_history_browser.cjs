@@ -25,6 +25,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await page.waitForURL(base + '/');
       await page.goto(base + '/settings/audit-log?object_type=dataset_record');
       assert.equal(await page.locator('tbody tr').count(), 50);
+      assert.equal(await page.locator('tbody tr td:nth-child(5)').first().textContent(), 'No name to display');
       const utc = await page.locator('tbody time').first().getAttribute('datetime');
       const local = await page.locator('tbody time').first().textContent();
       assert(local.includes('123456') && local.includes('GMT') && local !== utc + ' UTC');
@@ -55,6 +56,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         const expectedObject = (BigInt('0x' + href.split('/').pop().replaceAll('-', '')) + 1000n)
           .toString(16).padStart(32, '0').replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5');
         assert(text.includes(expectedObject), 'Each row loads its own object detail');
+        assert.equal(await dialog.locator('dt').filter({hasText: /^Object$/}).evaluate(e => e.nextElementSibling.textContent), 'No name to display');
         assert(text.includes('updated') && text.includes('dataset_record'));
         assert(text.includes('No additional details') && !text.includes('secret-business-value'));
         assert(await dialog.evaluate(d => d.contains(document.activeElement)));
@@ -64,10 +66,16 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         }
         await page.keyboard.press('Shift+Tab');
         assert(await dialog.evaluate(d => d.contains(document.activeElement)));
+        // Native focus restoration precedes the queued close event. Wait for the
+        // controller's close handler before focusing and opening the next row.
+        await dialog.evaluate(d => {
+          window.auditTestPanelClosed = new Promise(resolve => d.addEventListener('close', () => resolve(), {once: true}));
+        });
         if (index === 1) await dialog.getByRole('link', {name: 'Close', exact: true}).click();
         else if (index === 49) await dialog.getByRole('button', {name: 'Close panel', exact: true}).click();
         else await page.keyboard.press('Escape');
         await dialog.waitFor({state: 'hidden'});
+        await page.evaluate(() => window.auditTestPanelClosed);
         await page.waitForFunction(href => document.activeElement.getAttribute('href') === href, href);
         assert.equal(await page.evaluate(() => document.activeElement.getAttribute('href')), href);
       }
@@ -157,6 +165,16 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await noJS.close();
       if (timezoneId === 'Europe/Amsterdam') {
         await page.setViewportSize({width: 1280, height: 960});
+        await page.goto(base + '/settings/audit-log?action=dataset_record%3Adeleted');
+        assert.equal(await page.locator('tbody tr').count(), 1);
+        assert.equal(await page.locator('tbody tr td:nth-child(5)').textContent(), 'Deleted object');
+        await page.locator('tbody a[data-panel-url]').click();
+        const deletedDialog = page.getByRole('dialog', {name: 'Audit event details'});
+        await deletedDialog.locator('dl').first().waitFor();
+        assert.equal(await deletedDialog.locator('dt').filter({hasText: /^Object$/}).evaluate(e => e.nextElementSibling.textContent), 'Deleted object');
+        assert((await deletedDialog.textContent()).includes('00000000-0000-0000-0000-000000001770'));
+        await page.screenshot({path: screenshotPath('ref39-audit-deleted-record.png'), animations: 'disabled'});
+        await page.keyboard.press('Escape');
         for (const status of [403, 503]) {
           await page.goto(base + '/settings/audit-log?object_type=dataset_record');
           const target = page.locator('tbody a[data-panel-url]').first();

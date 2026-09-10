@@ -19,8 +19,10 @@ from refrncr.audit import EVENTS, AuditContractError
 from refrncr.audit_history import parse_audit_filters, parse_audit_time
 from refrncr.audit_presentation import (
     ACTION_LABELS,
+    ACTION_PRESENTATIONS,
     CONTEXT_LABELS,
     OBJECTS,
+    ActionPresentation,
     ObjectPresentation,
     require_complete_presentation,
 )
@@ -58,7 +60,9 @@ def test_guard_accepts_coherent_extension_and_ignores_unrelated_ui():
     actions["new_type", "created"] = "New type created"
     objects["new_type"] = ObjectPresentation("New type", None)
     unrelated_ui = {"save": "Save changes"}
-    require_complete_presentation(events, actions, objects)
+    presentations = dict(ACTION_PRESENTATIONS)
+    presentations["new_type", "created"] = ActionPresentation("New type created", False)
+    require_complete_presentation(events, actions, objects, presentations=presentations)
     assert unrelated_ui == {"save": "Save changes"}
 
 
@@ -198,7 +202,11 @@ def test_object_id_cannot_resolve_another_type(history, kind):
     h = history
     action = next(action for object_type, action in EVENTS if object_type == kind)
     eid = seed(h, 1, kind=kind, action=action, target=h.reader)[0]
-    expected = "User" if kind == "user" else "Deleted or unavailable object"
+    expected = (
+        "User"
+        if kind == "user"
+        else ("Deleted object" if OBJECTS[kind].resolver else "No name to display")
+    )
     assert h.service.get_event(h.admin, eid).object_label == expected
 
 

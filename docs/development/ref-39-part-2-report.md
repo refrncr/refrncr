@@ -1,5 +1,9 @@
 # REF-39 — onafhankelijke review en oplevering
 
+Dit is het historische verslag van 9 september. De [objectpresentatiecorrectie](ref-39-object-presentation-report.md)
+van 10 september onderscheidt No name to display en Deleted object en bevat het actuele testbewijs.
+Bij aanvang daarvan bestond de eerdere implementatie al als commit `49e8321` op dezelfde branch.
+
 Branch: `feat/ref-39-audit-history`. Basis: actuele `origin/main`, commit `5ffc192`
 (REF-149, PR #42). Geen commit, push, PR of merge uitgevoerd. Lokale review van 9 september 2026;
 GitHub Actions blijft de onafhankelijke gate vóór merge.

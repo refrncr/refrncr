@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import re
 import secrets
 from dataclasses import dataclass, replace
@@ -14,11 +15,19 @@ from refrncr.audit_presentation import (
     DELETED_ACTOR,
     OBJECTS,
     AuditView,
+    event_deletes_object,
     present_event,
     safe_name,
     valid_id,
 )
-from refrncr.ports import AuditFilters, AuditPosition, UnitOfWorkFactory
+from refrncr.ports import (
+    AUDIT_NAMED_OBJECT_TYPES,
+    AuditFilters,
+    AuditObjectRecord,
+    AuditPosition,
+    AuditReadUnavailable,
+    UnitOfWorkFactory,
+)
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError, require_admin
 
 PAGE_SIZE = 50
@@ -182,17 +191,29 @@ class AuditHistoryService:
         names = {}
         for kind, metadata in OBJECTS.items():
             ids = tuple(
-                {e.object_id for e in records if e.object_type == kind and valid_id(e.object_id)}
+                {
+                    e.object_id
+                    for e in records
+                    if e.object_type == kind
+                    and valid_id(e.object_id)
+                    and not event_deletes_object(e)
+                }
             )
-            if metadata.resolver == kind and ids:
-                names.update(
-                    {
-                        (kind, key): name
-                        for key, name in work.audit_history.object_names(
-                            metadata.resolver, ids
-                        ).items()
-                    }
-                )
+            if metadata.resolver is not None and ids:
+                try:
+                    if metadata.resolver != kind or kind not in AUDIT_NAMED_OBJECT_TYPES:
+                        raise ValueError("Invalid resolver mapping")
+                    results = work.audit_history.resolve_objects(kind, ids)
+                    if set(results) != set(ids) or any(
+                        not isinstance(result, AuditObjectRecord) or type(result.exists) is not bool
+                        for result in results.values()
+                    ):
+                        raise ValueError("Incomplete resolver result")
+                except Exception:
+                    # A fixed technical diagnostic, never identifiers, names, SQL or exception data.
+                    logging.getLogger(__name__).error("Audit object resolution failed")
+                    raise AuditReadUnavailable("Audit history is temporarily unavailable") from None
+                names.update({(kind, key): result for key, result in results.items()})
         return (
             tuple(present_event(event, actors, names) for event in records),
             tuple((key, safe_name(actors.get(key), DELETED_ACTOR)) for key in sorted(actor_ids)),

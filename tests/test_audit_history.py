@@ -354,7 +354,7 @@ def test_privacy_current_names_and_html_escaping(history):
         user.is_active, user.is_deleted = False, True
     view = h.service.get_event(h.admin, eid)
     assert view.actor_label == "Deleted user"
-    assert view.object_label == "Deleted or unavailable object"
+    assert view.object_label == "Deleted object"
     assert h.service.list_history(h.admin, AuditFilters(actor=h.reader)).items[0].id == eid
     assert state(h)["audit_events"] == before
     assert safe_name("x" * 201, "fallback") == "fallback"
@@ -430,10 +430,7 @@ def test_object_resolvers_use_only_current_safe_names(history):
     # A field can disappear without deleting its history; never fall back to Record values.
     with h.sessions.begin() as session:
         session.delete(session.get(DatasetField, field.id))
-    assert (
-        h.service.get_event(h.admin, events["dataset_field"].id).object_label
-        == "Deleted or unavailable object"
-    )
+    assert h.service.get_event(h.admin, events["dataset_field"].id).object_label == "Deleted object"
     assert state(h)["audit_events"] == before
 
 
@@ -448,7 +445,7 @@ def test_unknown_contract_and_context_are_not_disclosed(history):
     )[0]
     view = h.service.get_event(h.admin, eid)
     assert view.action == view.object_type == "Unavailable"
-    assert view.object_label == "Deleted or unavailable object" and not view.context
+    assert view.object_label == "No name to display" and not view.context
     approved = seed(
         h,
         1,

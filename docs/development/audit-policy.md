@@ -44,6 +44,14 @@ Cloud tenant-specific audit isolation and SIEM/log shipping belong to `refrncr-c
 descriptions. It preserves REF-149's contracts and introduces no retention infrastructure,
 tamper-evident ledger or audit API.
 
+Audit object presentation distinguishes **No name to display** (no safe name/resolver) from
+**Deleted object** (a successful committed catalogued delete-event, or later absence established
+by a supported named-object resolver). Explicit per-action presentation metadata covers the six
+`deleted` contracts and `dataset_export_access:revoked`; there is no Dataset-delete contract today.
+Delete evidence takes precedence over name resolution. Resolver failures
+remain safe technical errors, never deletion evidence. Record values and identifiers are not names;
+historical per-Record events remain untouched. See the REF-39 guide for per-type decisions.
+
 ## Event names, actors and safe context
 
 Historical actions such as `created`, `deleted`, `metadata_updated`, `business_key_defined` and

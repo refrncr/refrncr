@@ -67,7 +67,10 @@ Actor: actuele `display_name` van een niet-verwijderde user, anders **Deleted us
 E-mail en accountstatus worden niet voor auditidentificatie opgehaald. Objectresolvers:
 `user.display_name`, `team.name`, `dataset.name`, `dataset_field.name`. `membership`, `grant`,
 `dataset_export_access` en `dataset_record` hebben bewust geen naamresolver en tonen
-**Deleted or unavailable object**. Ontbrekende bekende objecten gebruiken dezelfde fallback.
+**No name to display** bij niet-delete-events na de objectpresentatiecorrectie van 10 september.
+Succesvolle catalogus-delete-events, en gezaghebbend vastgesteld ontbrekende resolveerbare objecten,
+tonen **Deleted object**; een lege of onveilige
+naam bewijst geen verwijdering. Deze correctie vervangt de gecombineerde fallback uit deel 1.
 Stabiele actor- en object-ID's staan in details; Recordwaarden en Dataset descriptions nooit.
 
 ## Implementatie en ontwerp

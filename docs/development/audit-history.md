@@ -115,16 +115,53 @@ Unknown extra keys are dropped, invalid approved values suppress context, and un
 contracts show neutral unavailable labels. Raw JSON is never rendered. Nine current context labels
 cover five safe formatter kinds: UUID, bounded count, subject type, import format and export format.
 
-| Object type | Current name resolver | Fallback |
+`ACTION_PRESENTATIONS` attaches a required explicit `deletes_object` decision to every existing
+action label; `ACTION_LABELS` is derived from it. This is presentation metadata, not another event
+catalog. A validated catalog pair with delete semantics takes precedence over current-name lookup:
+its committed event itself establishes deletion, even for an unnamed object. No suffix heuristic
+or speculative Dataset-delete contract is used. The seven current decisions are:
+
+| Object type | Technical action establishing deletion |
+| --- | --- |
+| `user` | `deleted` (soft deletion) |
+| `team` | `deleted` |
+| `membership` | `deleted` |
+| `grant` | `deleted` |
+| `dataset_field` | `deleted` |
+| `dataset_record` | `deleted` |
+| `dataset_export_access` | `revoked` (removes the access row) |
+
+These events show **Deleted object** in both list and detail and do not need an object-name query.
+In the list's Object column, unnamed/deleted fallback labels are italic; resolved names remain
+normal. This uses the central object status, not a comparison with the label text. Detail labels
+retain their normal style.
+There is currently no `dataset:deleted` contract. For **non-delete events**, apply this table:
+
+| Object type | Current name resolver | Object presentation without a name |
 | --- | --- | --- |
-| `user` | Non-deleted `User.display_name` | Deleted or unavailable object |
-| `team` | `Team.name` | Deleted or unavailable object |
-| `dataset` | `Dataset.name` | Deleted or unavailable object |
-| `dataset_field` | `DatasetField.name` | Deleted or unavailable object |
-| `membership` | None; stable ID in detail | Deleted or unavailable object |
-| `grant` | None; stable ID in detail | Deleted or unavailable object |
-| `dataset_export_access` | None; stable ID in detail | Deleted or unavailable object |
-| `dataset_record` | None; never Record values | Deleted or unavailable object |
+| `user` | Non-deleted `User.display_name` | Deleted object only after confirmed absence/soft deletion; otherwise No name to display |
+| `team` | `Team.name` | Deleted object only after confirmed absence; otherwise No name to display |
+| `dataset` | `Dataset.name` | Deleted object only after confirmed absence; otherwise No name to display |
+| `dataset_field` | `DatasetField.name` | Deleted object only after confirmed absence; otherwise No name to display |
+| `membership` | None; stable ID in detail | No name to display |
+| `grant` | None; stable ID in detail | No name to display |
+| `dataset_export_access` | None; stable ID in detail | No name to display |
+| `dataset_record` | None; never Record values or identifier values | No name to display |
+
+For non-delete events, the read port's `resolve_objects` returns one `AuditObjectRecord(exists, name)` per requested ID
+for each supported named type. A completed query establishes absence; an empty/unsafe name does
+not. The central presentation layer derives explicit `resolved`, `unnamed` or `deleted` status
+and its label for both list and detail. Unknown types and invalid IDs have no authoritative
+existence lookup and use **No name to display**, without claiming existence or deletion.
+Missing resolver support, incomplete results and unexpected resolver/database failures never
+become object statuses: they produce the existing neutral 503 response and the fixed technical
+diagnostic `Audit object resolution failed`, without IDs, names, SQL or exception payloads.
+No existence queries are added for intentionally unnamed types, and batching limits are unchanged.
+
+Historical per-Record audit rows remain append-only. A successful new non-empty bulkimport
+produces exactly one `dataset:dataset.records_imported` summary, while manually creating one
+Record still produces one `dataset_record:created`. No import production code is changed by
+this presentation correction; no Record contents or historical name snapshots are reconstructed.
 
 Actors use current non-deleted `User.display_name`, otherwise **Deleted user**. Active/inactive
 status is not displayed; email is never fetched for label resolution. REF-149 permits no system
@@ -151,6 +188,9 @@ at the product owner's request. No visual token or framework was added.
 1. Change event production/allowlists only through REF-149's catalog and audit-policy workflow.
 2. Add an explicit action label and, for a new object type, an `ObjectPresentation` entry.
 3. Decide whether a bounded current-name-only resolver is safe; otherwise declare no resolver.
+   Every action also requires an explicit delete/non-delete decision in `ActionPresentation`;
+   missing decisions, including label-only additions, fail the guard. A named resolver must implement the port's explicit per-ID existence result and be supported
+   by the adapter and completeness guard. Absence of a resolver/name is not evidence of deletion.
 4. Add context labels and a supported validator/formatter for every newly approved context kind.
    Do not render arbitrary dictionaries or invent historical content snapshots.
 5. Extend completeness, privacy, authorization, query-bound and SQLite/PostgreSQL tests.

@@ -57,6 +57,17 @@ class AuditReadUnavailable(Exception):
     """Audit persistence could not complete a read; contains no database details."""
 
 
+AUDIT_NAMED_OBJECT_TYPES = frozenset({"user", "team", "dataset", "dataset_field"})
+
+
+@dataclass(frozen=True, slots=True)
+class AuditObjectRecord:
+    """Authoritative existence result, independent of an absent/unsafe display name."""
+
+    exists: bool
+    name: str | None = None
+
+
 class AuditReadOperations(Protocol):
     def page(
         self,
@@ -73,7 +84,11 @@ class AuditReadOperations(Protocol):
 
     def actor_names(self, ids: tuple[str, ...]) -> dict[str, str]: ...
 
-    def object_names(self, object_type: str, ids: tuple[str, ...]) -> dict[str, str]: ...
+    def resolve_objects(
+        self, object_type: str, ids: tuple[str, ...]
+    ) -> dict[str, AuditObjectRecord]:
+        """One explicit result per ID for a supported named type; failures must raise."""
+        ...
 
 
 class OrganisationRecord(Protocol):

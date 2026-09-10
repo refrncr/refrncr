@@ -42,6 +42,7 @@ from refrncr.models import (
     utc_now,
 )
 from refrncr.ports import (
+    AuditObjectRecord,
     AuditReadUnavailable,
     AuthorizationSubject,
     DatasetBusinessKey,
@@ -951,7 +952,7 @@ class SqlAlchemyAuditReadOperations:
         )
 
     @_audit_read
-    def object_names(self, object_type, ids):
+    def resolve_objects(self, object_type, ids):
         if len(ids) > 50:
             raise ValueError("Audit object lookup exceeds one page")
         columns = {
@@ -960,12 +961,15 @@ class SqlAlchemyAuditReadOperations:
             "dataset": (Dataset.id, Dataset.name),
             "dataset_field": (DatasetField.id, DatasetField.name),
         }.get(object_type)
-        if columns is None or not ids:
+        if columns is None:
+            raise AuditReadUnavailable("Audit object resolution is unavailable")
+        if not ids:
             return {}
         statement = select(*columns).where(columns[0].in_(ids))
         if object_type == "user":
             statement = statement.where(User.is_deleted.is_(False))
-        return dict(self.session.execute(statement).all())
+        names = dict(self.session.execute(statement).all())
+        return {key: AuditObjectRecord(key in names, names.get(key)) for key in ids}
 
 
 class SqlAlchemyUnitOfWork:

@@ -11,6 +11,18 @@ from refrncr.web import create_flask_app
 factory, s, admin, _ = dataset_browser.__wrapped__()
 with factory.begin() as session:
     session.get(User, admin.id).display_name = "Administrator — " + "Long display name " * 5
+    # A retained successful delete event, older than the pagination fixture below.
+    session.add(
+        AuditEvent(
+            id=str(UUID(int=5000)),
+            actor_user_id=admin.id,
+            timestamp=datetime(2025, 1, 1, tzinfo=UTC),
+            object_type="dataset_record",
+            object_id=str(UUID(int=6000)),
+            action="deleted",
+            details=None,
+        )
+    )
     for i in range(125):
         session.add(
             AuditEvent(
