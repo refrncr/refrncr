@@ -46,6 +46,25 @@
   };
   initializeDatatypeControls(document);
 
+  const confirmationForms = new WeakSet();
+  const initializeConfirmations = (root) => {
+    root.querySelectorAll("form[data-exact-confirmation]").forEach((form) => {
+      if (confirmationForms.has(form)) return;
+      confirmationForms.add(form);
+      const input = form.querySelector("[name='confirmation_name']");
+      const update = () => {
+        const matches = input.value === form.dataset.exactConfirmation;
+        input.setCustomValidity(matches ? "" : "Enter the dataset name exactly.");
+        [...form.elements].filter((control) => control.type === "submit").forEach((button) => {
+          button.disabled = !matches || form.getAttribute("aria-busy") === "true";
+        });
+      };
+      input.addEventListener("input", update);
+      update();
+    });
+  };
+  initializeConfirmations(document);
+
   document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
     const trigger = details.querySelector("summary");
     const tooltip = details.querySelector('[role="tooltip"]');
@@ -139,6 +158,7 @@
 
   const sidePanelOpeners = new WeakMap();
   const panelLoads = new WeakMap();
+  const panelParents = new WeakMap();
   const pendingForms = new WeakSet();
   const visibleControl = (element) =>
     !element.closest("[hidden]") && element.getClientRects().length > 0;
@@ -167,6 +187,7 @@
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     initializeDatatypeControls(host);
+    initializeConfirmations(host);
     host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
       const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
       const nested = document.createElement(marker === "data-panel-section-heading" ? "h3" : "h4");
@@ -227,11 +248,27 @@
     }
   };
 
+  const restorePanelParent = (dialog) => {
+    const parent = panelParents.get(dialog);
+    if (!parent) return false;
+    panelParents.delete(dialog);
+    // Invalidate any late confirmation GET/validation response.
+    panelLoads.set(dialog, {});
+    dialog.querySelector("[data-panel-host]").replaceChildren(...parent.children);
+    document.getElementById(dialog.getAttribute("aria-labelledby")).textContent = parent.title;
+    parent.trigger.focus();
+    return true;
+  };
+
   document.querySelectorAll("dialog[data-modal-side-panel]").forEach((dialog) => {
+    dialog.addEventListener("cancel", (event) => {
+      if (restorePanelParent(dialog)) event.preventDefault();
+    });
     dialog.addEventListener("close", () => {
       // Native close events are queued. A newer opening already owns this host.
       if (dialog.open) return;
       panelLoads.delete(dialog);
+      panelParents.delete(dialog);
       resetSidePanel(dialog);
       restoreSidePanelFocus(dialog);
     });
@@ -240,13 +277,26 @@
   document.querySelectorAll("[data-panel-host]").forEach((host) => {
     const dialog = host.closest("dialog");
     host.addEventListener("click", (event) => {
+      const next = event.target.closest("[data-panel-next]");
+      if (next) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
+        event.preventDefault();
+        if (pendingForms.has(dialog) || panelParents.has(dialog)) return;
+        panelParents.set(dialog, {
+          trigger: next, children: [...host.childNodes],
+          title: document.getElementById(dialog.getAttribute("aria-labelledby")).textContent,
+        });
+        loadPanel(dialog, next);
+        return;
+      }
       if (!event.target.closest("[data-panel-cancel]")) return;
       event.preventDefault();
-      dialog.close();
+      if (!restorePanelParent(dialog)) dialog.close();
     });
     host.addEventListener("submit", async (event) => {
       const form = event.target;
       event.preventDefault();
+      if (form.hasAttribute("data-exact-confirmation") && !form.reportValidity()) return;
       if (pendingForms.has(dialog)) return;
       pendingForms.add(dialog);
       const load = panelLoads.get(dialog);
@@ -296,6 +346,10 @@
         pendingForms.delete(dialog);
         buttons.forEach((button) => { button.disabled = false; });
         form.removeAttribute("aria-busy");
+        if (form.hasAttribute("data-exact-confirmation")) {
+          const input = form.querySelector("[name='confirmation_name']");
+          buttons.forEach((button) => { button.disabled = input.value !== form.dataset.exactConfirmation; });
+        }
         if (form.hasAttribute("data-requires-selection")) {
           const select = form.querySelector("select[required]");
           buttons.forEach((button) => { button.disabled = !select?.value; });
@@ -360,7 +414,7 @@
   document.querySelectorAll("[data-dialog-close]").forEach((trigger) => {
     trigger.addEventListener("click", () => {
       const dialog = trigger.closest("dialog");
-      dialog?.close();
+      if (dialog && !restorePanelParent(dialog)) dialog.close();
     });
   });
 

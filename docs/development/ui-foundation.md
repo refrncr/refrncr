@@ -701,3 +701,26 @@ full-page link retains its ordinary fallback destination. No additional Save/Don
 validation states, native keyboard controls, dialog containment, Close/Escape focus restoration,
 200% viewport/text simulations and no-JavaScript server validation. Screenshots are written only
 when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the repository.
+
+## Dataset deletion panels (REF-141)
+
+The Dataset edit form has a separate danger zone using existing warning feedback and danger
+buttons. The shared `.danger-zone` component variant uses existing border/spacing tokens.
+No tokens change. The confirmation is a Dataset workflow template, with current name, Field/Record
+counts, permanent-deletion warning, required labelled name input, error summary and Cancel.
+
+An opt-in `data-panel-next` link replaces the content of the current remote side panel with
+a dedicated confirmation view. Only one modal remains open. The controller retains the parent
+DOM and exact trigger, preserving unsaved inputs. Cancel, Escape and the header close control
+restore the parent view and focus the trigger; closing the parent restores its original opener.
+Late responses cannot overwrite the restored view. Pending forms keep the existing single-POST
+contract. This supports one parent transition, not arbitrary nested dialogs.
+
+`data-exact-confirmation` provides supportive browser validation; the application service always
+checks the current name, timestamp and permission. Successful POST uses 303 to the Dataset list,
+which renders fixed success feedback. The `deleted=1` URL marker is presentation only, never
+authorization or proof of a deletion; it contains no object data. Existing authentication/session
+cookies remain unchanged. Ordinary no-JavaScript links and forms retain full-page fallbacks.
+
+`tests/javascript/dataset_deletion_browser.cjs` exercises the disposable table-row fixture with
+real Chrome at 320/768/1440px. See the REF-141 report for executed results.

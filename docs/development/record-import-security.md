@@ -108,3 +108,15 @@ resume/cancel/expiry/logout, ten-row previews, report boundaries, explicit confi
 conflict recovery and safe retry. The existing REF-81 tests retain parser/security, atomic rollback,
 audit and PostgreSQL concurrency coverage. `tests/test_import_wizard_javascript.py` exercises mapping
 completion, duplicate submission and the report dialog's keyboard/focus behavior using Node.
+
+## Dataset deletion (REF-141)
+
+Deletion and confirmation serialize on the Dataset lock. A confirmation offered after deletion
+fails closed. After claiming a token, confirmation rechecks the original Dataset UUID under
+that lock; reusing a deleted Dataset key cannot transfer the token to a replacement Dataset.
+An import that commits first may subsequently be deleted in its entirety; a deletion that
+commits first permits no imported rows or import-success event. Tokens retain their existing
+actor/session/UUID/TTL binding and replay protections. Inaccessible staged memory is removed
+by the existing lazy TTL cleanup or session revocation; no staged upload file exists.
+This is logical invalidation on use, not an immediate memory-erasure guarantee. No new cleanup
+service is introduced, and no cleanup is represented as part of the database commit.

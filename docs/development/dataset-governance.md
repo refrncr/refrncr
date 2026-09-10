@@ -120,3 +120,14 @@ controls; `dataset_governance_browser.cjs` covers combined ownership saves and s
 `export_access_browser.cjs` covers additional access and accessibility. Use a fresh fixture for each
 creation run. They follow the external Playwright setup in the UI foundation guide and add no
 runtime dependency. Screenshots belong outside the repository.
+
+## Permanent Dataset deletion (REF-141)
+
+Current owning-team members and active Community administrators may delete a Dataset from
+the Edit dataset danger zone. Ordinary viewing, creator metadata, legacy Grants and export
+access do not authorize deletion. The separate confirmation shows current Field/Record counts
+and requires the exact current Dataset name plus unchanged expected metadata timestamp.
+Deletion is permanent and atomic with its one audit event. All operational dependencies
+are removed; users, teams, memberships and append-only history remain. See the
+[dependency inventory and confirmation contract](ref-141-report.md). No soft delete, undo,
+recovery, retention policy, background job or migration is introduced.

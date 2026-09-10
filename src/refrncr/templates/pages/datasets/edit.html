@@ -10,7 +10,7 @@
   {% include "pages/datasets/_breadcrumbs.html" %}
   {{ page_header("Edit dataset") }}
   <div class='side-panel-view' data-side-panel-content data-panel-title='Edit dataset'>
-  <div class='side-panel-body'>
+  <div class='side-panel-body panel-sections'>
   {{ readonly_field("Key", dataset.key, technical=true) }}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}
   <form id='dataset-edit-form' class='form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
@@ -37,6 +37,11 @@
       {{ readonly_field("Owning team", dataset.owner_team_name) }}
     {% endif %}
   </form>
+  <section class='danger-zone' aria-labelledby='dataset-danger-heading'>
+    <h2 id='dataset-danger-heading' data-panel-section-heading>Danger zone</h2>
+    <p>Permanently delete this dataset and its records, fields and access settings.</p>
+    <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-next>Delete dataset</a>
+  </section>
   </div>
   {% call panel_form_actions(single=true) %}
     <button class='button button-primary' type='submit' form='dataset-edit-form'>Save dataset</button>

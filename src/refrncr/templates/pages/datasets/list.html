@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/side_panel.html" import form_side_panel %}
+{% from "components.html" import feedback %}
 
 {% block title %}Datasets · REFRNCR{% endblock %}
 
 {% block content %}
+  {% if deletion_notice %}{{ feedback("Dataset deleted permanently.", kind="success") }}{% endif %}
   <div class='page-header management-list-header'><div><h1>Datasets</h1></div>
     <div class='page-actions'>
       {% if may_create %}<a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset") }}'>+ New dataset</a>{% endif %}

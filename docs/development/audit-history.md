@@ -81,7 +81,7 @@ The first-page maximum excludes newer chronology positions during navigation. In
 the current boundary cannot skip or duplicate previously retained rows. This is keyset navigation,
 not an MVCC snapshot kept alive across HTTP requests: a late-committing/backdated event below the
 maximum can become visible on a later page. No total count, large offset, unbounded event load,
-historical name snapshot or polling query is used.
+reconstructed historical name or polling query is used.
 
 Precisely: a forward traversal preserves every originally retained matching event exactly once,
 assuming existing append-only rows remain unchanged. An insert behind an already passed boundary
@@ -92,7 +92,8 @@ starts a new traversal. REF-39 acceptance criterion 28 records this guarantee, n
 A list read performs at most seven SQL queries: authorization, one page, one actor batch and up
 to four object-name batches. Each resolution query is bounded to 50 objects (51 actors when the
 selected filter is not on the page). Details need at most four queries. List projections omit
-context entirely. Detail queries bound JSON text to 4096 characters before application parsing;
+context except for the bounded `dataset.deleted` name snapshot. Detail queries bound JSON text
+to 4096 characters before application parsing;
 oversized/invalid historic payloads produce no additional details. These are bounded result and
 render sizes, not a promise of constant database scan cost for every sparse filter.
 
@@ -108,21 +109,23 @@ Both engines use the same ordering, boundaries, lookahead, batch projections and
 
 ## Presentation and privacy
 
-`audit_presentation.py` supplies explicit English labels for all 29 catalog pairs and eight object
+`audit_presentation.py` supplies explicit English labels for all 30 catalog pairs and eight object
 types. Context keys/types come from `audit.EVENTS`; they are not copied into a competing contract
 catalog. Only approved structural context validated by `validate_event` is shown as labelled fields.
 Unknown extra keys are dropped, invalid approved values suppress context, and unknown historical
-contracts show neutral unavailable labels. Raw JSON is never rendered. Nine current context labels
-cover five safe formatter kinds: UUID, bounded count, subject type, import format and export format.
+contracts show neutral unavailable labels. Raw JSON is never rendered. Ten current context labels
+cover UUID, bounded count, subject type, import/export format and the REF-141 bounded
+Dataset-name snapshot.
 
 `ACTION_PRESENTATIONS` attaches a required explicit `deletes_object` decision to every existing
 action label; `ACTION_LABELS` is derived from it. This is presentation metadata, not another event
 catalog. A validated catalog pair with delete semantics takes precedence over current-name lookup:
 its committed event itself establishes deletion, even for an unnamed object. No suffix heuristic
-or speculative Dataset-delete contract is used. The seven current decisions are:
+or speculative Dataset-delete contract is used. The eight current decisions are:
 
 | Object type | Technical action establishing deletion |
 | --- | --- |
+| `dataset` | `dataset.deleted` (permanent deletion; bounded name snapshot) |
 | `user` | `deleted` (soft deletion) |
 | `team` | `deleted` |
 | `membership` | `deleted` |
@@ -131,11 +134,13 @@ or speculative Dataset-delete contract is used. The seven current decisions are:
 | `dataset_record` | `deleted` |
 | `dataset_export_access` | `revoked` (removes the access row) |
 
-These events show **Deleted object** in both list and detail and do not need an object-name query.
+These events show **Deleted object** in both list and detail. REF-141 shows
+**name (deleted)** when its approved snapshot is available. Neither requires an object-name query.
 In the list's Object column, unnamed/deleted fallback labels are italic; resolved names remain
 normal. This uses the central object status, not a comparison with the label text. Detail labels
 retain their normal style.
-There is currently no `dataset:deleted` contract. For **non-delete events**, apply this table:
+The Dataset action is exactly `dataset.deleted`, not the historical unprefixed `deleted`.
+For **non-delete events**, apply this table:
 
 | Object type | Current name resolver | Object presentation without a name |
 | --- | --- | --- |

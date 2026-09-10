@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback, form_field, readonly_field %}
+{% from "components/side_panel.html" import panel_form_actions %}
+{% block title %}Delete dataset · REFRNCR{% endblock %}
+{% block content %}
+  <h1>Delete dataset</h1>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Delete dataset'>
+    <div class='side-panel-body panel-sections'>
+      {{ readonly_field("Dataset", deletion.name) }}
+      {{ feedback("Deletion is permanent. All records, fields, record identifiers and access settings will be removed. This cannot be undone.", kind="warning") }}
+      <p>{{ deletion.field_count }} fields and {{ deletion.record_count }} records will be deleted. Audit history will be retained.</p>
+      {{ feedback(error, id="dataset-delete-error", focus=true) }}
+      <form id='dataset-delete-form' class='form' method='post' action='{{ url_for("dataset_delete", dataset_id=deletion.id) }}' data-exact-confirmation='{{ deletion.name }}'>
+        {{ form_field("Dataset name", "confirmation_name", "dataset-delete-name", required=true, autocomplete="off", help_text="Enter the dataset name exactly, including capitalization, accents and spaces.", error_id="dataset-delete-error" if error else none) }}
+        <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+        <input type='hidden' name='expected_updated_at' value='{{ deletion.expected_updated_at }}'>
+      </form>
+    </div>
+    {% call panel_form_actions() %}
+      <a class='button button-secondary' href='{{ url_for("edit_dataset", key=deletion.key) }}' data-panel-cancel>Cancel</a>
+      <button class='button button-danger' type='submit' form='dataset-delete-form'>Delete dataset</button>
+    {% endcall %}
+  </div>
+{% endblock %}

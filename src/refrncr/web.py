@@ -40,7 +40,7 @@ from refrncr.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
-from refrncr.ports import AuditReadUnavailable
+from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.record_import import (
     DISPLAY_SAMPLE_VALUES,
     MAX_UPLOAD_BYTES,
@@ -428,6 +428,7 @@ def create_flask_app(
             actor=actor,
             may_create=_authorization.datasets.can_create_dataset(actor.id),
             datasets=visible_datasets,
+            deletion_notice=request.args.getlist("deleted") == ["1"],
             current_actor=actor,
             current_csrf=_login_session.csrf_token,
             active_navigation=active_navigation(),
@@ -1474,6 +1475,47 @@ def create_flask_app(
                 409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("dataset_detail", key=dataset.key))
+
+    @dataset_route("/datasets/id/<dataset_id>/delete", methods=["GET", "POST"])
+    def dataset_delete(dataset_id: str):
+        actor, login_session = require_authenticated()
+        _auth, service, *_rest = require_dataset_dependencies()
+        error = None
+        status = 200
+        try:
+            if request.method == "POST":
+                require_csrf(login_session.csrf_token)
+                # A duplicate/missing field cannot select a favorable value.
+                name = request.form.getlist("confirmation_name")
+                expected = request.form.getlist("expected_updated_at")
+                service.delete_dataset(
+                    actor.id,
+                    dataset_id,
+                    name[0] if len(name) == 1 else None,
+                    expected[0] if len(expected) == 1 else None,
+                )
+                return redirect(url_for("dataset_list", deleted="1"), code=303)
+        except NotFoundError:
+            abort(404)
+        except (ValidationError, ConflictError) as failure:
+            error = str(failure)
+            status = 409 if isinstance(failure, ConflictError) else 400
+        except PersistenceConflictError:
+            error = (
+                "Dataset deletion could not be completed. Reopen the confirmation and try again."
+            )
+            status = 409
+        try:
+            context = service.get_dataset_for_deletion(actor.id, dataset_id)
+        except NotFoundError:
+            abort(404)
+        except PersistenceConflictError:
+            abort(503, description="Dataset confirmation is temporarily unavailable.")
+        return render_authenticated_template(
+            "pages/datasets/delete.html",
+            deletion=context,
+            error=error,
+        ), status
 
     def require_dataset_schema_admin(actor_id: str, key: str):
         (

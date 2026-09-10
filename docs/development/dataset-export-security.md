@@ -53,3 +53,12 @@ Typed value and pre-format numeric bounds come from the datatype catalog. String
 quoting/formula defenses remain serializer responsibilities. An invalid value
 aborts the prepared export without an audit event; XLSX cleanup also closes its
 write-only XML generator and removes its temporary file on this path.
+
+## Dataset deletion (REF-141)
+
+An export whose authorized snapshot starts after deletion cannot resolve the Dataset and
+fails with the established non-disclosing result without an export event. A snapshot already
+in progress or successfully prepared artifact retains ADR-012 semantics, even if deletion
+commits before the export audit writer. Its contents remain coherent and its technical cleanup
+closes all spools normally. There is no persisted export-status row to cascade. Deletion does
+not recall files already prepared or downloaded.

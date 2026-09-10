@@ -13,7 +13,6 @@ from sqlalchemy import (
     delete,
     func,
     inspect,
-    literal,
     or_,
     select,
     text,
@@ -279,6 +278,48 @@ class SqlAlchemyGrantOperations:
 
 
 class SqlAlchemyDatasetOperations:
+    def deletion_counts(self, dataset_id: str) -> tuple[int, int]:
+        return (
+            self.session.scalar(
+                select(func.count())
+                .select_from(DatasetField)
+                .where(DatasetField.dataset_id == dataset_id)
+            ),
+            self.session.scalar(
+                select(func.count())
+                .select_from(DatasetRecord)
+                .where(DatasetRecord.dataset_id == dataset_id)
+            ),
+        )
+
+    def delete_with_dependents(self, dataset_id: str) -> None:
+        # REF-141 inventory: values RESTRICT Field deletion. Do not rely on
+        # unspecified ordering of multiple database cascades from Dataset.
+        for model in (
+            DatasetRecordValue,
+            DatasetRecord,
+            DatasetBusinessKeyField,
+            DatasetField,
+            DatasetExportAccess,
+        ):
+            self.session.execute(
+                delete(model)
+                .where(model.dataset_id == dataset_id)
+                .execution_options(synchronize_session=False)
+            )
+        self.session.execute(
+            delete(Grant)
+            .where(Grant.resource_type == "dataset", Grant.resource_id == dataset_id)
+            .execution_options(synchronize_session=False)
+        )
+        result = self.session.execute(
+            delete(Dataset)
+            .where(Dataset.id == dataset_id)
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount != 1:
+            raise PersistenceConflictError()
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
@@ -844,11 +885,21 @@ class SqlAlchemyAuditReadOperations:
 
     @staticmethod
     def _statement(*, detail=False):
-        # Never load unbounded historical JSON into the application. Lists do not
-        # need context; details project at most 4096 characters before JSON parsing.
+        # Never load unbounded historical JSON. Lists only need the REF-141
+        # deletion snapshot; details retain the same 4096-character ceiling.
         context = cast(AuditEvent.details, Text)
         details = (
-            case((func.length(context) <= 4096, context), else_=None) if detail else literal(None)
+            case((func.length(context) <= 4096, context), else_=None)
+            if detail
+            else case(
+                (
+                    (AuditEvent.object_type == "dataset")
+                    & (AuditEvent.action == "dataset.deleted")
+                    & (func.length(context) <= 4096),
+                    context,
+                ),
+                else_=None,
+            )
         )
         return select(
             AuditEvent.id,
@@ -939,19 +990,31 @@ class SqlAlchemyAuditReadOperations:
 
 class SqlAlchemyUnitOfWork:
     def __init__(
-        self, sessions: sessionmaker[Session], *, write: bool = False, serialized: bool = False
+        self,
+        sessions: sessionmaker[Session],
+        *,
+        write: bool = False,
+        serialized: bool = False,
+        translate_errors: bool = False,
     ) -> None:
         self.sessions = sessions
         self.write = write
         self.serialized = serialized
+        self.translate_errors = translate_errors
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self.sessions()
-        if self.write:
-            if self.serialized and self.session.get_bind().dialect.name == "sqlite":
-                self.session.connection().exec_driver_sql("BEGIN IMMEDIATE")
-            else:
-                self.session.begin()
+        try:
+            if self.write:
+                if self.serialized and self.session.get_bind().dialect.name == "sqlite":
+                    self.session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+                else:
+                    self.session.begin()
+        except SQLAlchemyError:
+            self.session.close()
+            if self.translate_errors:
+                raise PersistenceConflictError() from None
+            raise
         self.users = SqlAlchemyUserOperations(self.session)
         self.audit_history = SqlAlchemyAuditReadOperations(self.session)
         self.teams = SqlAlchemyTeamOperations(self.session)
@@ -980,6 +1043,8 @@ class SqlAlchemyUnitOfWork:
                         raise PasswordHashReplacementError(
                             "Password hash replacement failed"
                         ) from None
+                    if self.translate_errors:
+                        raise PersistenceConflictError() from None
                     raise
                 except Exception:
                     self.session.rollback()
@@ -988,6 +1053,8 @@ class SqlAlchemyUnitOfWork:
                 self.session.rollback()
         finally:
             self.session.close()
+        if self.translate_errors and isinstance(exc_value, SQLAlchemyError):
+            raise PersistenceConflictError() from None
         return False
 
     def flush(self) -> None:
@@ -1016,8 +1083,12 @@ class SqlAlchemyUnitOfWorkFactory:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self.sessions = sessions
 
-    def __call__(self, *, write: bool = False, serialized: bool = False) -> SqlAlchemyUnitOfWork:
-        return SqlAlchemyUnitOfWork(self.sessions, write=write, serialized=serialized)
+    def __call__(
+        self, *, write: bool = False, serialized: bool = False, translate_errors: bool = False
+    ) -> SqlAlchemyUnitOfWork:
+        return SqlAlchemyUnitOfWork(
+            self.sessions, write=write, serialized=serialized, translate_errors=translate_errors
+        )
 
 
 class SqlAlchemyPermissionDataSource:
