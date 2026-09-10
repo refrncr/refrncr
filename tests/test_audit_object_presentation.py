@@ -194,6 +194,7 @@ def test_live_unnamed_objects_and_new_import_preserve_historical_events(history)
 
 
 DELETE_PAIRS = (
+    ("dataset", "dataset.deleted"),
     ("user", "deleted"),
     ("team", "deleted"),
     ("membership", "deleted"),

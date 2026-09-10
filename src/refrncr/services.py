@@ -717,12 +717,78 @@ class StaleDatasetOwnerError(ConflictError):
     """Persisted ownership no longer matches the form's expected owner."""
 
 
+@dataclass(frozen=True, slots=True)
+class DatasetDeletion:
+    id: str
+    key: str
+    name: str
+    field_count: int
+    record_count: int
+    expected_updated_at: str
+
+
 class DatasetService:
     """Authorized Dataset operations within the one Community installation context."""
 
     def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
         self.uow = uow
         self.authorization = authorization
+
+    def get_dataset_for_deletion(self, actor_id: str, dataset_id: str) -> DatasetDeletion:
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset = self._deletion_target(uow, actor_id, dataset_id)
+            return self._deletion_context(uow, dataset)
+
+    def delete_dataset(
+        self, actor_id: str, dataset_id: str, confirmation_name: str, expected_updated_at: str
+    ) -> DatasetDeletion:
+        with self.uow(write=True, serialized=True, translate_errors=True) as uow:
+            dataset = self._deletion_target(uow, actor_id, dataset_id, for_update=True)
+            if expected_updated_at != self._deletion_timestamp(dataset):
+                raise ConflictError("Dataset changed. Reopen the confirmation and try again.")
+            # Deliberately no strip, normalization, locale or casefold comparison.
+            if not isinstance(confirmation_name, str) or confirmation_name != dataset.name:
+                raise ValidationError("Enter the current dataset name exactly to confirm deletion.")
+            result = self._deletion_context(uow, dataset)
+            uow.datasets.delete_with_dependents(dataset.id)
+            record_audit(
+                uow,
+                actor_user_id=actor_id,
+                object_type="dataset",
+                object_id=result.id,
+                action="dataset.deleted",
+                details={"dataset_name": result.name},
+            )
+            uow.flush()
+            return result
+
+    def _deletion_target(self, uow, actor_id, dataset_id, *, for_update=False):
+        if not _valid_identity(actor_id) or not _valid_identity(dataset_id):
+            raise NotFoundError("Dataset not found")
+        dataset = uow.datasets.get(dataset_id, for_update=for_update)
+        if dataset is None or not self.authorization.datasets.can_maintain_dataset(
+            actor_id, dataset.id, uow=uow
+        ):
+            raise NotFoundError("Dataset not found")
+        return dataset
+
+    @staticmethod
+    def _deletion_timestamp(dataset):
+        value = dataset.updated_at
+        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        return value.isoformat(timespec="microseconds")
+
+    def _deletion_context(self, uow, dataset):
+        fields, records = uow.datasets.deletion_counts(dataset.id)
+        return DatasetDeletion(
+            dataset.id,
+            dataset.key,
+            dataset.name,
+            fields,
+            records,
+            self._deletion_timestamp(dataset),
+        )
 
     def create_dataset(
         self, actor_id: str, key: str, name: str, description: str, owner_team_id: str | None = None
@@ -1750,7 +1816,16 @@ class GrantService:
         permission: str,
     ) -> GrantRecord:
         with self.uow(write=True, serialized=True) as uow:
+            # Legacy Dataset Grants remain inert but must not outlive deletion.
+            # Match the Dataset → actor lock order before checking existence.
+            dataset = (
+                uow.datasets.get(resource_id, for_update=True)
+                if resource_type == "dataset" and _valid_identity(resource_id)
+                else None
+            )
             actor = require_admin(uow, actor_id)
+            if resource_type == "dataset" and dataset is None:
+                raise NotFoundError("Resource not found")
             self._validate_permission(permission)
             if subject_type not in SUBJECT_TYPES:
                 raise ValidationError("Subject type must be user or team")

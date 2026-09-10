@@ -16,12 +16,12 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 
 ## Decisions and scope
 
-The current inventory contains 80 public application-service operations, plus 36 security,
-transient, technical and administrative operations. Its 116 decisions are 31 domain-audited,
-19 security logging required, 11 technical logging only and 55 intentionally excluded. There are
-46 explicitly declared HTTP routes (45 Flask and one health route), six CLI flows including the
+The current inventory contains 82 public application-service operations, plus 36 security,
+transient, technical and administrative operations. Its 118 decisions are 32 domain-audited,
+19 security logging required, 11 technical logging only and 56 intentionally excluded. There are
+47 explicitly declared HTTP routes (46 Flask and one health route), six CLI flows including the
 opt-in `python -m refrncr.argon2_benchmark`, and documented implicit framework endpoints. The
-catalog supports 29 `(object_type, action)` contracts. REF-39 adds two intentionally excluded reads;
+catalog supports 30 `(object_type, action)` contracts. REF-39 adds two intentionally excluded reads;
 the guard compares symbols rather than freezing these counts.
 
 Domain audit records committed business changes and prepared authorized Dataset export requests.
@@ -47,7 +47,7 @@ tamper-evident ledger or audit API.
 Audit object presentation distinguishes **No name to display** (no safe name/resolver) from
 **Deleted object** (a successful committed catalogued delete-event, or later absence established
 by a supported named-object resolver). Explicit per-action presentation metadata covers the six
-`deleted` contracts and `dataset_export_access:revoked`; there is no Dataset-delete contract today.
+`deleted` contracts and `dataset_export_access:revoked`; REF-141 adds `dataset:dataset.deleted` with a bounded name snapshot.
 Delete evidence takes precedence over name resolution. Resolver failures
 remain safe technical errors, never deletion evidence. Record values and identifiers are not names;
 historical per-Record events remain untouched. See the REF-39 guide for per-type decisions.
@@ -79,14 +79,19 @@ Currently stored structural context is restricted to:
 - canonical UUIDs for owning teams, creator, Dataset and export-access subject;
 - subject enum `user` or `team`;
 - canonical format `CSV`, `Excel`, or `JSON` (import permits CSV/Excel only);
-- integer import counts between 0 and 10,000, matching the parser limit.
+- integer import counts between 0 and 10,000, matching the parser limit;
+- only for `dataset.deleted`, a Dataset-name snapshot of at most 200 codepoints.
+  The central validator bounds before processing, strips controls/direction overrides
+  and substitutes a neutral label if nothing displayable remains. Confirmation itself
+  still compares the unmodified stored name exactly.
 
 Enums are limited to 16 input characters before NFC/whitespace/case normalization and then allowlisted.
 UUIDs are exactly 36 canonical characters; counts reject booleans, strings, floats and out-of-range
-values. No arbitrary text field or list is currently approved. A future field-key context requires
+values. No other arbitrary text field or list is approved. A future field-key context requires
 an explicit bounded validator and contract/test change; merely putting it in a dictionary is not enough.
 
-Never include names/descriptions as business content, old/new Record values, uploads, downloads,
+Except for the explicit REF-141 Dataset-name snapshot, never include names/descriptions as
+business content, old/new Record values, uploads, downloads,
 filenames, local paths, passwords, API keys, credentials, session/CSRF tokens, SQL, stack traces or
 unbounded request data. The JSON column already supports scalar counts, so only its Python annotation
 changes; no new migration/schema/dependency is needed. Historical ORM reads are not retroactively
@@ -219,3 +224,18 @@ and `dataset_governance_browser.cjs` cover access changes, duplicates, revocatio
 use a fresh fixture for each script. These optional checks add no dependency or CI requirement.
 Persisted audit counts, rollback and safe context are asserted by the SQLite/PostgreSQL service and
 Flask tests, not inferred from a successful download.
+
+## Dataset deletion (REF-141)
+
+`DatasetService.delete_dataset` authorizes the current Dataset administrator and compares
+the current name exactly, with the expected UTC metadata timestamp checked under its lock.
+It deletes the [inventoried operational dependencies](ref-141-report.md), preserving all
+historical events, then writes exactly one `dataset.deleted` on the Dataset UUID in the same
+Unit of Work. The only context key is `dataset_name`; counts are returned to the caller but
+are not persisted because they are unnecessary for this deletion contract. There are no
+per-child events. Denied, mismatched, stale, repeated and rolled-back requests produce no
+delete event. SQL constraints, audit flush and commit failures roll back the complete write.
+
+The production name validator is shared by audit list/detail presentation. Both show the
+snapshot with an explicit deleted status; neither resolves or links a current Dataset.
+Existing historical events remain unchanged and retain their existing fallback rules.

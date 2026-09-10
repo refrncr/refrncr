@@ -85,7 +85,7 @@ def test_historical_action_names_and_object_types_are_stable():
         "dataset": (
             "created owner_changed metadata_updated business_key_defined "
             "business_key_updated field_order_updated dataset.records_imported "
-            "dataset.export_requested"
+            "dataset.export_requested dataset.deleted"
         ),
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted",

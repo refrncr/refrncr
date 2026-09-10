@@ -25,7 +25,8 @@ class Dialog extends Element {
     this.closeButton = new Element({'data-dialog-close':''}); this.closeButton.dialog = this;
     this.input = new Element(); this.hiddenInput = new Element(); this.hiddenInput.hidden = true;
     this.host = new Element({'data-panel-host':''}); this.host.dialog = this;
-    this.host.replaceChildren = (...children) => { this.children = children; this.candidates = children[0]?.candidates || []; };
+    this.host.childNodes = [];
+    this.host.replaceChildren = (...children) => { this.host.childNodes = children; this.children = children; this.candidates = children[0]?.candidates || []; };
     this.candidates = [this.hiddenInput, this.input]; this.modalCalls = 0;
   }
   showModal() { this.open = true; this.modalCalls++; }
@@ -103,8 +104,10 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   await c.fire('click'); assert.equal(second.open,false,'another modal cannot open over this panel');
   await first.closeButton.fire('click'); assert.equal(first.open,false); assert.equal(document.activeElement,a);
   await b.fire('click');
-  // Native Escape closes the dialog and dispatches close; no custom key handler cancels it.
-  assert.equal(first.listeners.cancel,undefined); assert.equal(first.listeners.keydown,undefined);
+  // Native Escape still closes a panel without a parent confirmation view.
+  let escapePrevented = false;
+  await first.fire('cancel', {preventDefault(){escapePrevented = true;}});
+  assert.equal(escapePrevented,false); assert.equal(first.listeners.keydown,undefined);
   await first.close(); assert.equal(document.activeElement,b,'restores the particular opener');
   first.candidates=[]; await a.fire('click'); assert.equal(document.activeElement,first.closeButton); await first.close();
   await c.fire('click'); assert.equal(document.activeElement,second.input); await second.close(); assert.equal(document.activeElement,c);
@@ -184,5 +187,27 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   completeMutation({...response(content),redirected:true,url:grantForm.action}); await pending;
   assert.equal(destinations.length,closedDestinations,'closed opt-in panel ignores late success');
   assert.equal(second.open,false);
+  // A dedicated confirmation replaces content within one modal, retaining the
+  // parent DOM (and unsaved input), then restores the exact initiating action.
+  fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
+  const next = new Element({'data-panel-next':''}); next.href='https://localhost/delete';
+  next.closest = selector => selector === '[data-panel-next]' ? next : null;
+  const parentChildren = second.host.childNodes;
+  fetchImpl=async()=>response({dataset:{panelTitle:'Delete dataset'},candidates:[field]});
+  await second.host.fire('click',{target:next}); await settle();
+  assert.equal(second.title.textContent,'Delete dataset'); assert.equal(second.open,true);
+  const openedCount=second.modalCalls;
+  await second.fire('cancel',{preventDefault(){escapePrevented=true;}});
+  assert.equal(escapePrevented,true); assert.equal(second.open,true);
+  assert.equal(second.title.textContent,'Edit field'); assert.equal(second.children[0],parentChildren[0]);
+  assert.equal(document.activeElement,next); assert.equal(second.modalCalls,openedCount);
+  let lateConfirmation;
+  fetchImpl=()=>new Promise(resolve=>{lateConfirmation=resolve;});
+  await second.host.fire('click',{target:next});
+  await second.host.fire('click',{target:cancel});
+  assert.equal(document.activeElement,next); assert.equal(second.title.textContent,'Edit field');
+  lateConfirmation(response({dataset:{panelTitle:'Too late'},candidates:[field]})); await settle();
+  assert.equal(second.title.textContent,'Edit field','late confirmation response cannot replace restored edit view');
+  await second.close(); assert.equal(document.activeElement,remote);
   console.log('Side-panel controller checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -279,6 +279,12 @@ class GrantOperations(Protocol):
 
 
 class DatasetOperations(Protocol):
+    def deletion_counts(self, dataset_id: str) -> tuple[int, int]: ...
+
+    def delete_with_dependents(self, dataset_id: str) -> None:
+        """Delete the inventoried operational rows; never delete audit history or commit."""
+        ...
+
     def owns_datasets(self, team_id: str) -> bool: ...
 
     def change_owner_if_expected(
@@ -417,7 +423,7 @@ class UnitOfWork(Protocol):
 
 class UnitOfWorkFactory(Protocol):
     def __call__(
-        self, *, write: bool = False, serialized: bool = False
+        self, *, write: bool = False, serialized: bool = False, translate_errors: bool = False
     ) -> AbstractContextManager[UnitOfWork]: ...
 
 

@@ -105,6 +105,7 @@ MUTATIONS = (
     "GrantService.change_permission",
     "GrantService.delete_grant",
     "DatasetService.create_dataset",
+    "DatasetService.delete_dataset",
     "DatasetService.change_owner",
     "DatasetService.update_dataset",
     "DatasetService.grant_export_access",
@@ -173,6 +174,11 @@ def prepare(c, operation):
             ]
         return lambda actor: s.grants.delete_grant(actor, g.id), [("grant", "deleted", g.id)]
     if cls == "DatasetService":
+        if method == "delete_dataset":
+            target = s.datasets.get_dataset_for_deletion(a.id, d.id)
+            return lambda actor: s.datasets.delete_dataset(
+                actor, d.id, target.name, target.expected_updated_at
+            ), [("dataset", "dataset.deleted", d.id)]
         if method == "create_dataset":
             return lambda actor: s.datasets.create_dataset(
                 actor, "new", "New", "Secret", c.owner.id
@@ -726,6 +732,12 @@ def test_invalid_input_or_lifecycle_never_creates_success_event(context, operati
         "GrantService.delete_grant": lambda: s.grants.delete_grant(a.id, missing),
         "DatasetService.create_dataset": lambda: s.datasets.create_dataset(
             a.id, "Invalid Key", "Name", "", c.owner.id
+        ),
+        "DatasetService.delete_dataset": lambda: s.datasets.delete_dataset(
+            a.id,
+            d.id,
+            "Wrong name",
+            s.datasets.get_dataset_for_deletion(a.id, d.id).expected_updated_at,
         ),
         "DatasetService.change_owner": lambda: s.datasets.change_owner(
             a.id, d.key, c.owner.id, missing

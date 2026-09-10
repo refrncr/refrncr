@@ -2508,7 +2508,8 @@
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3693,7 +3694,8 @@
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4071,7 +4073,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "Browser transport, CSRF, request-size and exception hooks"
+        "Browser transport, CSRF, request-size and exception hooks",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4259,6 +4262,88 @@
       ],
       "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
       "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "delete_dataset",
+      "service": "refrncr.services.DatasetService.delete_dataset",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31: Dataset mutation/extraction or access-change outcome; missing/inactive actor, denied capability, malformed/missing/cross-Dataset target, forged owning team/subject, stale/duplicate or invalid format/input. Use safe actor/Dataset/target IDs, allowlisted format/count and reason codes; no descriptions, names, values or payload. Ordinary concurrency is not automatically suspicious.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [
+        [
+          "dataset",
+          "dataset.deleted"
+        ]
+      ],
+      "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
+      "actor_source": "Authenticated service actor_id from resolved browser session; trusted programmatic caller must establish principal before invocation.",
+      "allowed_context": {
+        "dataset:dataset.deleted": {
+          "dataset_name": "dataset_name"
+        }
+      },
+      "success": "Delete every inventoried operational dependent and Dataset; retain history and commit exactly one dataset.deleted with bounded dataset_name.",
+      "validation_failure": "No successful domain event; reject without committed business state changes.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "Expected UTC updated_at must match under the Dataset lock; exact current-name confirmation is always required.",
+      "no_op": "No event and no business timestamp/revision changes; absent/deleted targets may return the existing safe error.",
+      "rollback": "Business change, cleanup, timestamps and audit share the same UoW; insertion/flush/commit failure rolls all back.",
+      "duplicate_retry": "Exactly one committed deletion/event; later or losing requests fail not-found or stale/conflict without another event.",
+      "tests": [
+        "tests/test_dataset_deletion.py::test_atomic_deletion_preserves_history",
+        "tests/test_dataset_deletion.py::test_confirmation_is_exact_codepoints",
+        "tests/test_dataset_deletion.py::test_authorization_and_non_disclosing_targets",
+        "tests/test_dataset_deletion.py::test_stale_confirmation_cannot_delete",
+        "tests/test_dataset_deletion.py::test_database_failure_rolls_back_every_row",
+        "tests/test_dataset_deletion.py::test_concurrent_deletes_and_replay_commit_one_event",
+        "tests/test_dataset_deletion.py::test_delete_serializes_with_mutation",
+        "tests/test_dataset_deletion.py::test_deletion_on_complete_migration_chain",
+        "tests/test_dataset_deletion.py::test_deleted_name_snapshot_and_history_presentation",
+        "tests/test_dataset_deletion.py::test_web_csrf_exact_confirmation_prg_and_replay"
+      ],
+      "implementation_status": "REF-141 locally verified on SQLite 3.51.0 and PostgreSQL 16.15; GitHub CI pending.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing installation database / AuditEvent."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "get_dataset_for_deletion",
+      "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: denied protected read or suspicious malformed/cross-resource lookup. Keep non-disclosing responses; ordinary successful reads produce neither domain history nor mandatory per-read security logs.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_dataset_deletion.py::test_atomic_deletion_preserves_history",
+        "tests/test_dataset_deletion.py::test_authorization_and_non_disclosing_targets",
+        "tests/test_dataset_deletion.py::test_web_denied_targets_are_uniform"
+      ],
+      "implementation_status": "REF-141 locally verified on SQLite 3.51.0 and PostgreSQL 16.15; GitHub CI pending.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     }
   ]

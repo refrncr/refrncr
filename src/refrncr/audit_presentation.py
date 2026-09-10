@@ -36,6 +36,7 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("grant", "permission_changed"): ActionPresentation("Access permission changed", False),
         ("grant", "deleted"): ActionPresentation("Access revoked", True),
         ("dataset", "created"): ActionPresentation("Dataset created", False),
+        ("dataset", "dataset.deleted"): ActionPresentation("Dataset deleted", True),
         ("dataset", "owner_changed"): ActionPresentation("Dataset owning team changed", False),
         ("dataset", "metadata_updated"): ActionPresentation("Dataset metadata updated", False),
         ("dataset", "business_key_defined"): ActionPresentation("Record identifier defined", False),
@@ -92,6 +93,7 @@ CONTEXT_LABELS = MappingProxyType(
         "previous_owner_team_id": "Previous owning team ID",
         "creator_user_id": "Creator user ID",
         "dataset_id": "Dataset ID",
+        "dataset_name": "Dataset name at deletion",
         "subject_type": "Subject type",
         "subject_id": "Subject ID",
         "format": "Format",
@@ -99,7 +101,9 @@ CONTEXT_LABELS = MappingProxyType(
         "rejected_row_count": "Rows rejected",
     }
 )
-FORMAT_KINDS = frozenset({"uuid", "count", "subject", "import_format", "export_format"})
+FORMAT_KINDS = frozenset(
+    {"uuid", "count", "subject", "import_format", "export_format", "dataset_name"}
+)
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
 SYSTEM_ACTORS = MappingProxyType({})
 DELETED_ACTOR = "Deleted user"
@@ -258,6 +262,10 @@ def present_event(event, actor_names, objects):
         objects.get((event.object_type, event.object_id)) if known else None,
         deleted_by_event=known and event_deletes_object(event),
     )
+    if pair == ("dataset", "dataset.deleted"):
+        context = safe_context(event)
+        if context:
+            obj = ObjectResolution("deleted", f"{context[0][1]} (deleted)")
     timestamp = event.timestamp
     timestamp = (
         timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC)

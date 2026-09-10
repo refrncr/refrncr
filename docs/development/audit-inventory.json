@@ -79,7 +79,9 @@
     "refrncr.record_import.DatasetRecordImportService.cancel",
     "refrncr.record_import.DatasetRecordImportService.revoke_session",
     "refrncr.audit_history.AuditHistoryService.list_history",
-    "refrncr.audit_history.AuditHistoryService.get_event"
+    "refrncr.audit_history.AuditHistoryService.get_event",
+    "refrncr.services.DatasetService.delete_dataset",
+    "refrncr.services.DatasetService.get_dataset_for_deletion"
   ],
   "routes": [
     {
@@ -757,6 +759,21 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.audit_history.AuditHistoryService.get_event"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_delete",
+      "path": "/datasets/id/<dataset_id>/delete",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf",
+        "refrncr.services.DatasetService.delete_dataset",
+        "refrncr.services.DatasetService.get_dataset_for_deletion"
       ]
     }
   ],

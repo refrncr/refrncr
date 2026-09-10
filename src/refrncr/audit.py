@@ -7,7 +7,7 @@ Operation registration is explicit; discovery belongs to the CI guard.
 import re
 from dataclasses import dataclass
 from types import MappingProxyType
-from unicodedata import normalize
+from unicodedata import category, normalize
 from uuid import UUID
 
 
@@ -33,7 +33,8 @@ class EventContract:
         if self.actor != "required":
             raise AuditContractError("This installation has no anonymous/system audit actor")
         if len(dict(self.context)) != len(self.context) or any(
-            kind not in {"uuid", "count", "subject", "import_format", "export_format"}
+            kind
+            not in {"uuid", "count", "subject", "import_format", "export_format", "dataset_name"}
             for _key, kind in self.context
         ):
             raise AuditContractError("Invalid context contract")
@@ -79,6 +80,7 @@ _EVENTS = (
         (("format", "import_format"), ("record_count", "count"), ("rejected_row_count", "count")),
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
+    EventContract("dataset", "dataset.deleted", (("dataset_name", "dataset_name"),)),
 )
 EVENTS = MappingProxyType({(event.object_type, event.action): event for event in _EVENTS})
 
@@ -119,6 +121,13 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
         elif kind == "count":
             if type(value) is not int or not 0 <= value <= 10_000:
                 raise AuditContractError("Audit count is outside the allowed range")
+        elif kind == "dataset_name":
+            # REF-141's sole business-name exception. Bound before any processing;
+            # remove invisible controls, never store description or request context.
+            if not isinstance(value, str) or not 1 <= len(value) <= 200:
+                raise AuditContractError("Invalid Dataset name snapshot")
+            value = "".join(c for c in value if category(c) not in {"Cc", "Cf", "Cs"})
+            value = value.strip() or "No name to display"
         else:
             # Bound before normalization, then store only canonical enum members.
             if not isinstance(value, str) or len(value) > 16:
@@ -246,6 +255,8 @@ _audited("TeamService", "delete_team", ("team", "deleted"), ("grant", "deleted")
 _read("TeamService", "list_teams")
 _read("MembershipService", "list_team_members list_eligible_users")
 _audited("DatasetService", "create_dataset", ("dataset", "created"))
+_audited("DatasetService", "delete_dataset", ("dataset", "dataset.deleted"))
+_read("DatasetService", "get_dataset_for_deletion")
 _audited("DatasetService", "change_owner", ("dataset", "owner_changed"))
 _audited(
     "DatasetService",

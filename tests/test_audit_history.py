@@ -272,7 +272,7 @@ def test_dataset_and_team_grants_do_not_authorize(history, permission):
 def test_all_contracts_have_safe_presentations(history):
     h = history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 29
+    assert len(EVENTS) == len(ACTION_LABELS) == 30
     assert set(OBJECTS) == {kind for kind, _ in EVENTS}
     assert not SYSTEM_ACTORS and {c.actor for c in EVENTS.values()} == {"required"}
     actions = dict(ACTION_LABELS)
@@ -290,6 +290,7 @@ def test_all_contracts_have_safe_presentations(history):
             "subject": "user",
             "import_format": "CSV",
             "export_format": "JSON",
+            "dataset_name": "Historical Dataset name",
         }
         details = {key: values[formatter] for key, formatter in contract.context}
         eid = seed(h, 1, first=i, kind=kind, action=action, details=details)[0]
@@ -399,7 +400,9 @@ def test_bounded_queries_many_actors_and_types(history):
         assert len(queries) <= 7
         assert all(q.lstrip().upper().startswith("SELECT") for q in queries)
         assert "LIMIT" in queries[1] and "OFFSET" not in queries[1].upper().replace("OFFSET ?", "")
-        assert "audit_events.details" not in queries[1]
+        # REF-141 conditionally projects only bounded Dataset deletion snapshots.
+        assert "CASE WHEN" in queries[1] and "length(" in queries[1]
+        assert all(not item.context for item in page.items)
         queries.clear()
         detail = h.service.get_event(h.admin, page.items[0].id)
         assert not detail.context and len(queries) <= 4
