@@ -1,0 +1,64 @@
+{% extends "layouts/settings.html" %}
+{% from "components/side_panel.html" import form_side_panel %}
+{% set settings_title = "Audit log" %}
+
+{% block settings_content %}
+  <form class="audit-filters" action="{{ url_for('audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
+    <div class="form-field">
+      <label for="audit-start">Start date and time (inclusive)</label>
+      <input id="audit-start" name="start" type="text" value="{{ filters.get('start', '') }}" maxlength="40" aria-describedby="audit-time-help" data-audit-date>
+    </div>
+    <div class="form-field">
+      <label for="audit-end">End date and time (exclusive)</label>
+      <input id="audit-end" name="end" type="text" value="{{ filters.get('end', '') }}" maxlength="40" aria-describedby="audit-time-help" data-audit-date>
+    </div>
+    <div class="form-field">
+      <label for="audit-actor">Actor</label>
+      <select id="audit-actor" name="actor" aria-describedby="audit-actor-help">
+        <option value="">All actors</option>
+        {% for id, label in page.actors %}<option value="{{ id }}"{% if filters.get('actor') == id %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-field">
+      <label for="audit-action">Action</label>
+      <select id="audit-action" name="action"><option value="">All actions</option>
+        {% for value, label in actions %}<option value="{{ value }}"{% if filters.get('action') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="form-field">
+      <label for="audit-type">Object type</label>
+      <select id="audit-type" name="object_type"><option value="">All object types</option>
+        {% for value, label in object_types %}<option value="{{ value }}"{% if filters.get('object_type') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="page-actions"><button class="button button-primary" type="submit">Apply filters</button><a class="button button-secondary" href="{{ url_for('audit_list') }}">Clear filters</a></div>
+    <p class="help-text audit-filter-help" id="audit-time-help">Enter ISO date and time with Z for UTC or an explicit offset, for example 2026-09-09T12:00:00Z.</p>
+    <p class="help-text audit-filter-help" id="audit-actor-help">Choose an actor from this page. You can also filter by an actor from any event’s details.</p>
+    <p class="error-text audit-filter-help" id="audit-date-error" role="alert" tabindex="-1" hidden></p>
+  </form>
+  {% if page.items %}
+    <div class="table-scroll management-table" role="region" aria-label="Audit history" tabindex="0">
+      <table class="audit-table">
+        <caption class="visually-hidden">Installation audit history, newest events first</caption>
+        <thead><tr>{% for label in ['Timestamp', 'Actor', 'Action', 'Object type', 'Object', 'Details'] %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for item in page.items %}
+          <tr>
+            <td><time datetime="{{ item.timestamp }}" data-local-time>{{ item.timestamp }} UTC</time></td>
+            <td><bdi>{{ item.actor_label }}</bdi></td><td>{{ item.action_label }}</td>
+            <td>{{ item.object_type_label }}</td>
+            <td>{% if item.object_status in ('deleted', 'unnamed') %}<i><bdi>{{ item.object_label }}</bdi></i>{% else %}<bdi>{{ item.object_label }}</bdi>{% endif %}</td>
+            <td><a href="{{ url_for('audit_detail', event_id=item.id) }}" data-panel-url data-dialog-open="audit-detail-panel">View details<span class="visually-hidden">: {{ item.action_label }}, {{ item.timestamp }}, event {{ item.id }}</span></a></td>
+          </tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+    <nav class="pagination" aria-label="Audit history pages">
+      {% if previous_url %}<a class="button button-secondary" href="{{ previous_url }}" rel="prev">Newer events</a>{% endif %}
+      {% if next_url %}<a class="button button-secondary" href="{{ next_url }}" rel="next">Older events</a>{% endif %}
+    </nav>
+  {% else %}
+    <div class="empty-state"><h2>{{ 'No matching events' if filters else 'No audit events yet' }}</h2><p>{{ 'No events match these filters.' if filters else 'Successful audited activity will appear here.' }}</p></div>
+  {% endif %}
+  {{ form_side_panel('audit-detail-panel') }}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/audit-time.js') }}" defer></script>{% endblock %}

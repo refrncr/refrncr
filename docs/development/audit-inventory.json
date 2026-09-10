@@ -77,7 +77,9 @@
     "refrncr.record_import.DatasetRecordImportService.saved_preview",
     "refrncr.record_import.DatasetRecordImportService.confirm",
     "refrncr.record_import.DatasetRecordImportService.cancel",
-    "refrncr.record_import.DatasetRecordImportService.revoke_session"
+    "refrncr.record_import.DatasetRecordImportService.revoke_session",
+    "refrncr.audit_history.AuditHistoryService.list_history",
+    "refrncr.audit_history.AuditHistoryService.get_event"
   ],
   "routes": [
     {
@@ -731,6 +733,30 @@
       ],
       "operations": [
         "refrncr.app.health"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.audit_list",
+      "path": "/settings/audit-log",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.audit_history.AuditHistoryService.list_history"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.audit_detail",
+      "path": "/settings/audit-log/<event_id>",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.audit_history.AuditHistoryService.get_event"
       ]
     }
   ],

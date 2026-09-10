@@ -472,4 +472,12 @@ for _symbol, _classification, _reason in (
 ):
     OPERATIONS[_symbol] = Operation(_classification, rationale=_reason)
 
+_register(
+    "AuditHistoryService",
+    "list_history get_event",
+    "intentionally excluded",
+    module="audit_history",
+    rationale="Administrator-only audit history read; no business state change or domain event.",
+)
+
 OPERATIONS = MappingProxyType(OPERATIONS)

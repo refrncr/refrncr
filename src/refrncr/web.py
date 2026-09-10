@@ -24,6 +24,8 @@ from flask import (
 )
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
+from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
@@ -37,6 +39,7 @@ from refrncr.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
+from refrncr.ports import AuditReadUnavailable
 from refrncr.record_import import (
     DISPLAY_SAMPLE_VALUES,
     MAX_UPLOAD_BYTES,
@@ -115,8 +118,10 @@ def create_flask_app(
     login_limiter: LoginAttemptLimiter | None = None,
     source_resolver: SourceIdentityResolver | None = None,
     authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
+    audit_history: AuditHistoryService | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    audit_history = audit_history or AuditHistoryService(users.uow)
 
     @app.template_filter("absolute_utc")
     def absolute_utc(value):
@@ -226,6 +231,8 @@ def create_flask_app(
 
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
+        if endpoint.startswith("audit_"):
+            return "audit"
         if endpoint == "index":
             return "home"
         if endpoint.startswith("dataset_") or endpoint in {
@@ -274,6 +281,66 @@ def create_flask_app(
         if resolved is None:
             abort(403)
         return resolved
+
+    @app.after_request
+    def protect_audit_response(response):
+        if (request.endpoint or "").startswith("audit_"):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Referrer-Policy"] = "same-origin"
+        return response
+
+    def audit_error(message, status=400):
+        return render_authenticated_template("pages/audit/error.html", error=message), status
+
+    @app.get("/settings/audit-log")
+    def audit_list():
+        actor, _session = require_admin()
+        try:
+            if len(request.query_string) > 4096:
+                raise ValidationError(
+                    "The audit filter URL is too long. Clear filters to start again."
+                )
+            filters, cursor = parse_audit_filters(request.args.items(multi=True))
+            page = audit_history.list_history(actor.id, filters, cursor)
+        except AuthorizationError:
+            abort(403)
+        except ValidationError as error:
+            return audit_error(str(error))
+        except AuditReadUnavailable:
+            return audit_error("Audit history is temporarily unavailable. Try again later.", 503)
+        values = filter_values(filters)
+        return render_authenticated_template(
+            "pages/audit/list.html",
+            page=page,
+            filters=values,
+            next_url=url_for("audit_list", **values, cursor=page.next_cursor)
+            if page.next_cursor
+            else None,
+            previous_url=url_for("audit_list", **values, cursor=page.previous_cursor)
+            if page.previous_cursor
+            else None,
+            actions=sorted(
+                (f"{kind}:{action}", label) for (kind, action), label in ACTION_LABELS.items()
+            ),
+            object_types=sorted((key, value.label) for key, value in OBJECTS.items()),
+        )
+
+    @app.get("/settings/audit-log/<event_id>")
+    def audit_detail(event_id):
+        actor, _session = require_admin()
+        try:
+            item = audit_history.get_event(actor.id, event_id)
+            if request.args:
+                raise ValidationError("This audit detail link contains unsupported parameters.")
+        except AuthorizationError:
+            abort(403)
+        except NotFoundError:
+            abort(404)
+        except ValidationError as error:
+            return audit_error(str(error))
+        except AuditReadUnavailable:
+            return audit_error("Audit history is temporarily unavailable. Try again later.", 503)
+        return render_authenticated_template("pages/audit/detail.html", item=item)
 
     def require_dataset_dependencies():
         if (

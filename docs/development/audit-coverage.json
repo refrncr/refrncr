@@ -2506,7 +2506,9 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.audit_list GET /settings/audit-log",
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3689,7 +3691,9 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.audit_list GET /settings/audit-log",
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4187,6 +4191,74 @@
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending.",
       "exclusion_reason": "Post-preparation transport failure retains the accurate request event; one fixed diagnostic without exception payload.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "AuditHistoryService",
+      "operation": "list_history",
+      "service": "refrncr.audit_history.AuditHistoryService.list_history",
+      "interface_entrypoints": [
+        "refrncr.web.audit_list GET /settings/audit-log"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: denied protected read or suspicious malformed/cross-resource lookup. Keep non-disclosing responses; ordinary successful reads produce neither domain history nor mandatory per-read security logs.",
+      "technical_logging": "Neutral unavailable response on persistence read failure; no SQL, request/context payload or exception details in the response or domain audit.",
+      "events": [],
+      "object_identifier": "Existing AuditEvent ID for details; query actor ID is only a filter, never authority.",
+      "actor_source": "Active Community administrator from a resolved session; independently revalidated by the service.",
+      "allowed_context": {},
+      "success": "Bounded read of existing audit events, safe current labels and approved structural context only; no writes.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_audit_history.py::test_service_authorization_and_read_only",
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
+        "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
+      ],
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "AuditHistoryService",
+      "operation": "get_event",
+      "service": "refrncr.audit_history.AuditHistoryService.get_event",
+      "interface_entrypoints": [
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: denied protected read or suspicious malformed/cross-resource lookup. Keep non-disclosing responses; ordinary successful reads produce neither domain history nor mandatory per-read security logs.",
+      "technical_logging": "Neutral unavailable response on persistence read failure; no SQL, request/context payload or exception details in the response or domain audit.",
+      "events": [],
+      "object_identifier": "Existing AuditEvent ID for details; query actor ID is only a filter, never authority.",
+      "actor_source": "Active Community administrator from a resolved session; independently revalidated by the service.",
+      "allowed_context": {},
+      "success": "Bounded read of existing audit events, safe current labels and approved structural context only; no writes.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_audit_history.py::test_service_authorization_and_read_only",
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
+        "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
+      ],
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     }
   ]

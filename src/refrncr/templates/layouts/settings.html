@@ -18,6 +18,10 @@
         <p class="nav-label">Access management</p>
         <a class="nav-item{{ ' is-active' if active_navigation == 'users' else '' }}" href="{{ url_for('user_list') }}"{% if active_navigation == 'users' %} aria-current="page"{% endif %}>{{ user_icon() }}Users</a>
         <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>{{ team_icon() }}Teams</a>
+        {% if current_actor and current_actor.role == 'admin' %}
+          <p class="nav-label">Activity</p>
+          <a class="nav-item{{ ' is-active' if active_navigation == 'audit' else '' }}" href="{{ url_for('audit_list') }}"{% if active_navigation == 'audit' %} aria-current="page"{% endif %}>Audit log</a>
+        {% endif %}
       </nav>
     </aside>
     <main id="content" class="app-main settings-content" tabindex="-1">

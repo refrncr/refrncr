@@ -77,6 +77,10 @@ authorization model, migration mapping, concurrency contract and backup/restore 
 
 ## Audit coverage
 
+Active Community administrators can browse **Settings → Audit log**. See
+[audit history](docs/development/audit-history.md) for filters, safe detail presentation,
+UTC/local time, cursor navigation and the read-only security boundary.
+
 See the [audit policy](docs/development/audit-policy.md),
 [functional inventory](docs/development/audit-inventory.json) and
 [coverage matrix](docs/development/audit-coverage.json) for service-level audit contracts,

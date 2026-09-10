@@ -1,8 +1,9 @@
 # ADR-012: Validate audit contracts in services and audit completed export preparation
 
 Status: Accepted for REF-149. The product owner approved the separate export audit transaction;
-implementation remains uncommitted on `feat/ref-149-audit-coverage`. Part-2 review and full local
-SQLite/PostgreSQL 16 validation passed; GitHub CI remains pending.
+REF-149 merged into `main` through PR #42 (commit `5ffc192`). Part-2 review and full local
+SQLite/PostgreSQL 16 validation are recorded in its historical reports. REF-39 builds its read
+interface on these merged contracts without changing this decision.
 
 ## Context
 

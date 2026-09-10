@@ -146,6 +146,7 @@
     title.textContent = content.dataset.panelTitle;
     dialog.querySelector("[data-panel-host]").replaceChildren(document.importNode(content, true));
     const host = dialog.querySelector("[data-panel-host]");
+    window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
       const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
@@ -154,6 +155,10 @@
       nested.className = heading.className;
       nested.textContent = heading.textContent;
       nested.setAttribute(marker, "");
+      if (heading.hasAttribute("data-initial-focus")) {
+        nested.setAttribute("data-initial-focus", "");
+        nested.setAttribute("tabindex", "-1");
+      }
       heading.replaceWith(nested);
     });
     if (dialog.open) focusSidePanel(dialog);
@@ -205,6 +210,8 @@
 
   document.querySelectorAll("dialog[data-modal-side-panel]").forEach((dialog) => {
     dialog.addEventListener("close", () => {
+      // Native close events are queued. A newer opening already owns this host.
+      if (dialog.open) return;
       panelLoads.delete(dialog);
       resetSidePanel(dialog);
       restoreSidePanelFocus(dialog);
@@ -280,12 +287,14 @@
 
   document.querySelectorAll("dialog[data-modal-report]").forEach((dialog) => {
     dialog.addEventListener("close", () => restoreSidePanelFocus(dialog));
+  });
+  document.querySelectorAll("dialog[data-modal-report], dialog[data-modal-side-panel]").forEach((dialog) => {
     dialog.addEventListener("keydown", (event) => {
       if (event.key !== "Tab") return;
-      const controls = [...dialog.querySelectorAll("button:not([disabled]), a[href], [tabindex='0']")].filter(visibleControl);
+      const controls = [...dialog.querySelectorAll("button:not([disabled]), a[href], input:not([type='hidden']):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex='0']")].filter((element) => element.getAttribute("tabindex") !== "-1" && visibleControl(element));
       if (!controls.length) return;
       const first = controls[0], last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {
         event.preventDefault(); last.focus();
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault(); first.focus();

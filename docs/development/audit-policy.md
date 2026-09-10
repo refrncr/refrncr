@@ -16,12 +16,12 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 
 ## Decisions and scope
 
-The current inventory contains 78 public application-service operations, plus 36 security,
-transient, technical and administrative operations. Its 114 decisions are 31 domain-audited,
-19 security logging required, 11 technical logging only and 53 intentionally excluded. There are
-44 explicitly declared HTTP routes (43 Flask and one health route), six CLI flows including the
+The current inventory contains 80 public application-service operations, plus 36 security,
+transient, technical and administrative operations. Its 116 decisions are 31 domain-audited,
+19 security logging required, 11 technical logging only and 55 intentionally excluded. There are
+46 explicitly declared HTTP routes (45 Flask and one health route), six CLI flows including the
 opt-in `python -m refrncr.argon2_benchmark`, and documented implicit framework endpoints. The
-catalog supports 29 `(object_type, action)` contracts. These counts describe REF-149's review;
+catalog supports 29 `(object_type, action)` contracts. REF-39 adds two intentionally excluded reads;
 the guard compares symbols rather than freezing these counts.
 
 Domain audit records committed business changes and prepared authorized Dataset export requests.
@@ -39,9 +39,18 @@ audit records never contain exceptions, raw SQL or traces.
 
 Community remains installation-scoped, with no tenant/organisation columns or Cloud composition.
 Cloud tenant-specific audit isolation and SIEM/log shipping belong to `refrncr-cloud`.
-[REF-39](https://cleverhorizons.atlassian.net/browse/REF-39) owns future rich audit-history presentation.
-Its future before/after presentation must respect this policy's prohibition on Record contents and
-Dataset descriptions. REF-149 adds no UI, retention infrastructure, tamper-evident ledger or API.
+[REF-39](https://cleverhorizons.atlassian.net/browse/REF-39) adds administrator-only
+[audit-history presentation](audit-history.md), without before/after Record contents or Dataset
+descriptions. It preserves REF-149's contracts and introduces no retention infrastructure,
+tamper-evident ledger or audit API.
+
+Audit object presentation distinguishes **No name to display** (no safe name/resolver) from
+**Deleted object** (a successful committed catalogued delete-event, or later absence established
+by a supported named-object resolver). Explicit per-action presentation metadata covers the six
+`deleted` contracts and `dataset_export_access:revoked`; there is no Dataset-delete contract today.
+Delete evidence takes precedence over name resolution. Resolver failures
+remain safe technical errors, never deletion evidence. Record values and identifiers are not names;
+historical per-Record events remain untouched. See the REF-39 guide for per-type decisions.
 
 ## Event names, actors and safe context
 

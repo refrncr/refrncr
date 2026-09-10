@@ -317,13 +317,15 @@ navigation. Other POST errors retain the form and announce an error; network fai
 automatically retry mutations. Stale GET/validation responses cannot overwrite a newly opened
 form. Only one mutation per panel may be pending at a time.
 
-Opening calls native `showModal()`: the browser supplies background inertness, Tab focus
-containment and Escape closing. Focus moves to a visible error summary, an invalid control,
+Opening calls native `showModal()`: the browser supplies background inertness and Escape
+closing. The shared controller wraps Tab/Shift+Tab within visible dialog controls, including
+read-only panels. Focus moves to a visible error summary, an invalid control,
 or the first relevant visible form control; the close button is the fallback. Error summaries
 use `data-error-focus` and `tabindex="-1"`; invalid controls retain their accessible error
 references. Closing through Cancel, the close button or native Escape restores the exact
 trigger, including when several triggers share a host. If that trigger has disappeared,
-focus returns to the main content. Controller registration is idempotent. Without JavaScript
+focus returns to the main content. Initial-focus markers survive section-heading normalization;
+queued close events cannot discard a newer opening. Controller registration is idempotent. Without JavaScript
 (or native dialog support), links and full-page forms continue to work.
 
 `test_dataset_browser.py` covers rendering, shared composition, permission-aware triggers,
@@ -353,15 +355,15 @@ association, including on full-page fallbacks. Creation panels retain their Canc
 ## Community Settings (REF-132)
 
 `layouts/settings.html` overrides the base layout to provide a dedicated Settings workspace
-for Users, Teams and the standalone membership page. It reuses the app-shell grid and sidebar
+for Users, Teams, Audit log and the standalone membership page. It reuses the app-shell grid and sidebar
 width, shared sidebar styling, vertical navigation, management headers and existing page
 content. The normal application sidebar and account controls are not rendered in Settings.
 
 Back to app opens Overview and sits in the sidebar heading beside the shared collapse
 control. The Settings icon/title stays in the content header, beside the opener when collapsed.
-The sidebar contains only Access management, Users and Teams. Active navigation uses the
+The sidebar contains Access management (Users and Teams) and Activity (Audit log). Active navigation uses the
 existing green surface, foreground and `aria-current="page"`. Main content fills the remaining
-width, with one Users or Teams heading and no redundant breadcrumb or horizontal Settings tabs.
+width, with one page heading and no redundant breadcrumb or horizontal Settings tabs.
 Settings follows the same REF-128 desktop/session and temporary-drawer contract as the normal
 application shell; destinations, permissions and the distinct Settings context are preserved.
 
