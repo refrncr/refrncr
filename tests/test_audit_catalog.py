@@ -330,6 +330,7 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
         "dataset_records": "DatasetRecordService",
         "record_service": "DatasetRecordService",
         "record_imports": "DatasetRecordImportService",
+        "audit_history": "AuditHistoryService",
     }
     tree = ast.parse((ROOT / "src/refrncr/web.py").read_text())
     functions = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
@@ -352,7 +353,10 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     and receiver.id in receivers
                     and function.attr != "uow"
                 ):
-                    module = "record_import" if receiver.id == "record_imports" else "services"
+                    module = {
+                        "record_imports": "record_import",
+                        "audit_history": "audit_history",
+                    }.get(receiver.id, "services")
                     found.add(f"refrncr.{module}.{receivers[receiver.id]}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:
                 found.update(service_calls(function.id, seen))

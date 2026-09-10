@@ -41,6 +41,13 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
+        if current == "0013_ref_39":
+            with connection.begin():
+                Operations(MigrationContext.configure(connection)).drop_index(
+                    "ix_audit_events_timestamp_id", table_name="audit_events"
+                )
+                connection.execute(text("UPDATE alembic_version SET version_num='0012_ref_73'"))
+            current = "0012_ref_73"
         if current == "0012_ref_73":
             mapping = dict(
                 connection.execute(text("SELECT key, owner_team_id FROM datasets")).all()

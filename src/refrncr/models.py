@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     LargeBinary,
     Numeric,
@@ -81,6 +82,7 @@ class LoginSession(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
+    __table_args__ = (Index("ix_audit_events_timestamp_id", "timestamp", "id"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

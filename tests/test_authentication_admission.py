@@ -84,6 +84,7 @@ def make_app(authentication, limiter=None, admission=None, sessions=None):
         object(),
         login_limiter=limiter,
         authentication_admission=admission,
+        audit_history=object(),  # This fixture exercises only login admission.
     )
     app.testing = True
     return app, sessions

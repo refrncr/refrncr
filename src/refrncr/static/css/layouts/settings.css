@@ -5,3 +5,15 @@
 .settings-sidebar .nav-item { display: flex; align-items: center; gap: var(--space-sm); font-weight: var(--font-weight-regular); }
 .settings-back .button-icon, .settings-topbar .button-icon, .settings-sidebar .button-icon { flex-shrink: 0; margin: 0; }
 .settings-title .button-icon { width: var(--space-lg); height: var(--space-lg); }
+.audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--space-md); margin-bottom: var(--space-lg); }
+.audit-filters .form-field { min-width: 0; margin: 0; }
+.audit-filters .form-field + .form-field { margin-top: 0; }
+.audit-filters label { margin-top: 0; }
+.audit-filters .page-actions { align-self: end; }
+.audit-filter-help { grid-column: 1 / -1; margin: 0; }
+.audit-table { min-width: var(--data-table-min-width); }
+.audit-table td { max-width: 20rem; overflow-wrap: anywhere; }
+.audit-table time { font-variant-numeric: tabular-nums; }
+.audit-details { margin: 0; }
+.audit-details dt { font-weight: var(--font-weight-semibold); margin-top: var(--space-md); }
+.audit-details dd { margin: var(--space-xs) 0 0; overflow-wrap: anywhere; }

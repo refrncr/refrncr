@@ -1,0 +1,30 @@
+{% extends "layouts/settings.html" %}
+{% from "components/side_panel.html" import panel_form_actions %}
+{% set settings_title = "Audit event details" %}
+
+{% block settings_content %}
+  <div class="side-panel-view" data-side-panel-content data-panel-title="Audit event details">
+    <div class="side-panel-body panel-sections">
+      <h2 data-panel-section-heading data-initial-focus tabindex="-1">{{ item.action_label }}</h2>
+      <dl class="audit-details">
+        <dt>Local timestamp</dt><dd><time datetime="{{ item.timestamp }}" data-local-time>{{ item.timestamp }} UTC</time></dd>
+        <dt>Exact UTC timestamp</dt><dd><time datetime="{{ item.timestamp }}">{{ item.timestamp }} UTC</time></dd>
+        <dt>Actor</dt><dd><bdi>{{ item.actor_label }}</bdi></dd>
+        <dt>Actor ID</dt><dd><code>{{ item.actor_id }}</code></dd>
+        <dt>Action</dt><dd>{{ item.action_label }}</dd>
+        <dt>Technical action</dt><dd><code>{{ item.action }}</code></dd>
+        <dt>Object type</dt><dd>{{ item.object_type_label }}</dd>
+        <dt>Technical object type</dt><dd><code>{{ item.object_type }}</code></dd>
+        <dt>Object</dt><dd><bdi>{{ item.object_label }}</bdi></dd>
+        <dt>Object ID</dt><dd><code>{{ item.object_id }}</code></dd>
+      </dl>
+      <section aria-labelledby="audit-context-title">
+        <h2 id="audit-context-title" data-panel-section-heading>Additional details</h2>
+        {% if item.context %}<dl class="audit-details">{% for label, value in item.context %}<dt>{{ label }}</dt><dd><bdi>{{ value }}</bdi></dd>{% endfor %}</dl>{% else %}<p>No additional details</p>{% endif %}
+      </section>
+      {% if item.actor_id != 'Unavailable' %}<p><a href="{{ url_for('audit_list', actor=item.actor_id) }}">Filter by this actor</a></p>{% endif %}
+    </div>
+    {% call panel_form_actions(single=true) %}<a class="button button-secondary" href="{{ url_for('audit_list') }}" data-panel-cancel>Close</a>{% endcall %}
+  </div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/audit-time.js') }}" defer></script>{% endblock %}

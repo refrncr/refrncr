@@ -58,7 +58,9 @@ const document = {
   activeElement:null,
   querySelectorAll(selector) {
     return ({'[data-mapping-tooltip]':[tip], '[data-import-mapping]':[mapping], '[data-import-confirm]':[confirm],
-      'dialog[data-modal-report]':[dialog], '[data-dialog-open]':[opener],
+      'dialog[data-modal-report]':[dialog],
+      'dialog[data-modal-report], dialog[data-modal-side-panel]':[dialog],
+      '[data-dialog-open]':[opener],
       '[data-dialog-close]':[close]})[selector] || [];
   },
   querySelector: selector => selector === '[data-mapping-continue]' ? advance : null,

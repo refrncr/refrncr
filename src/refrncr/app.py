@@ -4,6 +4,7 @@ from a2wsgi import WSGIMiddleware
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.audit_history import AuditHistoryService
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.record_import import DatasetRecordImportService
@@ -28,6 +29,7 @@ from refrncr.web import create_flask_app
 
 @dataclass(frozen=True)
 class CommunityServices:
+    audit_history: AuditHistoryService
     users: UserService
     authentication: AuthenticationService
     sessions: SessionService
@@ -54,6 +56,7 @@ def create_community_services(
     )
     dataset_records = DatasetRecordService(uow, authorization)
     return CommunityServices(
+        audit_history=AuditHistoryService(uow),
         users=UserService(uow),
         authentication=AuthenticationService(uow),
         sessions=SessionService(sessions),
@@ -84,6 +87,7 @@ def create_application(
     record_imports: DatasetRecordImportService | None = None,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
+    audit_history: AuditHistoryService | None = None,
 ) -> FastAPI:
     users.bootstrap_organisation()
     app = FastAPI(title="refrncr")
@@ -106,6 +110,7 @@ def create_application(
         record_imports=record_imports,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
+        audit_history=audit_history,
     )
     app.mount("/", WSGIMiddleware(flask_app))
     return app

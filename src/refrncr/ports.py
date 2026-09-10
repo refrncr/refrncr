@@ -28,6 +28,54 @@ class AuditEntry:
     action: str
 
 
+@dataclass(frozen=True, slots=True)
+class AuditFilters:
+    start: datetime | None = None
+    end: datetime | None = None
+    actor: str = ""
+    action: str = ""
+    object_type: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class AuditPosition:
+    timestamp: datetime
+    id: str
+
+
+class AuditEventRecord(Protocol):
+    id: str
+    timestamp: datetime
+    actor_user_id: str
+    object_type: str
+    object_id: str
+    action: str
+    details: object
+
+
+class AuditReadUnavailable(Exception):
+    """Audit persistence could not complete a read; contains no database details."""
+
+
+class AuditReadOperations(Protocol):
+    def page(
+        self,
+        filters: AuditFilters,
+        *,
+        before: AuditPosition | None,
+        ceiling: AuditPosition | None,
+        newer: bool = False,
+    ) -> tuple[AuditEventRecord, ...]:
+        """At most 51 events: descending timestamp/ID, ascending when newer=True."""
+        ...
+
+    def get(self, event_id: str) -> AuditEventRecord | None: ...
+
+    def actor_names(self, ids: tuple[str, ...]) -> dict[str, str]: ...
+
+    def object_names(self, object_type: str, ids: tuple[str, ...]) -> dict[str, str]: ...
+
+
 class OrganisationRecord(Protocol):
     id: str
 
@@ -326,6 +374,7 @@ class DatasetRecordOperations(Protocol):
 
 
 class UnitOfWork(Protocol):
+    audit_history: AuditReadOperations
     users: UserOperations
     teams: TeamOperations
     memberships: MembershipOperations
