@@ -22,6 +22,7 @@ from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
+from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
@@ -150,6 +151,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Upgrade after complete validation; stop all writers first.",
     )
+    publication = subparsers.add_parser(
+        "dataset-publication-preflight",
+        help="Validate all existing Datasets before the REF-83 upgrade; stop writers first.",
+    )
+    database = publication.add_mutually_exclusive_group()
+    database.add_argument("--database-url")
+    database.add_argument("--database-path", type=Path)
+    publication.add_argument("--upgrade", action="store_true")
     return parser
 
 
@@ -221,6 +230,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0012_ref_73",
         "0013_ref_39",
         "0014_ref_145",
+        "0015_ref_83",
     }:
         return
     inspector = inspect(connection)
@@ -288,7 +298,7 @@ def start(configuration: StartConfiguration) -> None:
             ),
             trusted_proxies=configuration.trusted_proxies,
         )
-    except DatasetUpgradeError:
+    except (DatasetUpgradeError, VersionUpgradeError):
         raise
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
@@ -373,7 +383,26 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "dataset-ownership-preflight":
+        if args.command == "dataset-publication-preflight":
+            database_url = resolve_database_url(args)
+            engine = create_database_engine(database_url)
+            try:
+                with engine.connect() as connection:
+                    revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
+                    if revision not in {"0014_ref_145", "0015_ref_83"}:
+                        raise CliError(
+                            "Standalone publication preflight requires schema 0014_ref_145 or "
+                            "later. Older supported upgrades run the full preflight automatically."
+                        )
+                    invalid = publication_preflight(connection)
+                print(json.dumps({"invalid_dataset_ids": invalid}, indent=2))
+                if invalid:
+                    return 1
+                if args.upgrade:
+                    prepare_database(database_url)
+            finally:
+                engine.dispose()
+        elif args.command == "dataset-ownership-preflight":
             from refrncr.dataset_upgrade import ownership_preflight, read_owner_mapping
 
             database_url = resolve_database_url(args)
@@ -420,10 +449,18 @@ def main(
         print(f"refrncr failed: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:
+        if args.command == "dataset-publication-preflight":
+            message = (
+                str(exc)
+                if isinstance(exc, VersionUpgradeError)
+                else "Publication preflight or upgrade failed; keep writers stopped and retry."
+            )
+            print(f"refrncr failed: {message}", file=sys.stderr)
+            return 1
         if args.command == "dataset-ownership-preflight":
             message = (
                 str(exc)
-                if isinstance(exc, DatasetUpgradeError)
+                if isinstance(exc, (DatasetUpgradeError, VersionUpgradeError))
                 else "Database validation or upgrade failed. Check database availability and "
                 "configuration; keep writers stopped and rerun the ownership preflight."
             )

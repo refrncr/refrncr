@@ -19,7 +19,20 @@ if (output) fs.mkdirSync(output, {recursive:true});
   const emptySelection = () => page.evaluate(() => getSelection().removeAllRanges());
   const overflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `page overflow at ${page.viewportSize().width}`);
   const openedPanel = () => page.locator('dialog[data-modal-side-panel][open]');
-  const closePanel = async primary => { await page.keyboard.press('Escape'); assert.equal(await openedPanel().count(),0); await page.waitForFunction(id=>document.activeElement?.getAttribute('aria-controls')===id,await primary.getAttribute('aria-controls')); assert(await primary.evaluate(e => e === document.activeElement), 'focus returns to the primary button'); };
+  const closePanel = async primary => {
+    // Native dialog.close() queues its close event after removing [open].
+    // Wait for the shared controller's completed restoration before reopening.
+    const dialog = openedPanel();
+    await dialog.evaluate(node => {
+      node.dataset.testClosed = 'pending';
+      node.addEventListener('close', () => { node.dataset.testClosed = 'done'; }, {once:true});
+    });
+    await page.keyboard.press('Escape');
+    assert.equal(await openedPanel().count(), 0);
+    await page.waitForFunction(() => !!document.querySelector('dialog[data-test-closed="done"]'));
+    assert(await primary.evaluate(e => e === document.activeElement), 'focus returns to the primary button');
+    await page.locator('dialog[data-test-closed="done"]').evaluateAll(nodes => nodes.forEach(node => delete node.dataset.testClosed));
+  };
   const dragText = async locator => {
     await locator.scrollIntoViewIfNeeded();
     const box = await locator.boundingBox();

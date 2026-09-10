@@ -7,7 +7,7 @@ from threading import Barrier
 import pytest
 from alembic import command
 from alembic.config import Config
-from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -572,6 +572,7 @@ def test_viewer_lists_but_cannot_add(record_services):
     dataset, _ = configured_dataset(services, admin)
     viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", PASSWORD)
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    publish_dataset(services, admin.id, dataset)
     assert services.dataset_records.list_records(viewer.id, dataset.key).records == ()
     with pytest.raises(NotFoundError, match="Dataset not found"):
         services.dataset_records.create_record(

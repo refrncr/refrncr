@@ -11,7 +11,7 @@ from threading import Event
 from types import SimpleNamespace
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from openpyxl import load_workbook
 from sqlalchemy import create_engine, func, select, text, update
 from sqlalchemy.engine import make_url
@@ -455,14 +455,14 @@ def test_response_construction_failure_closes_generated_artifact(monkeypatch):
     monkeypatch.setattr(
         services.dataset_records,
         "export_dataset",
-        lambda *_args: ExportArtifact(spool, "application/json", "json"),
+        lambda *_args, **_kwargs: ExportArtifact(spool, "application/json", "json"),
     )
     monkeypatch.setattr(
         "refrncr.web.send_file",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("response failed")),
     )
     response = client.get(f"/datasets/{dataset.key}/records/export?format=json", base_url=HTTPS)
-    assert response.status_code == 500
+    assert response.status_code == 503
     assert b"response failed" not in response.data
     assert spool.was_closed
 
@@ -474,7 +474,7 @@ def test_successful_response_close_releases_generated_artifact(monkeypatch):
     monkeypatch.setattr(
         services.dataset_records,
         "export_dataset",
-        lambda *_args: ExportArtifact(spool, "application/json", "json"),
+        lambda *_args, **_kwargs: ExportArtifact(spool, "application/json", "json"),
     )
     response = client.get(f"/datasets/{dataset.key}/records/export?format=json", base_url=HTTPS)
     assert response.status_code == 200 and response.data == b"[]"
@@ -490,6 +490,7 @@ def test_export_requires_explicit_access_despite_legacy_roles(permission):
         admin.id, f"dataset-{permission}@example.com", "Exporter", "valid password"
     )
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    publish_dataset(services, admin.id, dataset)
     with pytest.raises(NotFoundError):
         services.dataset_records.export_dataset(user.id, dataset.key, "json")
     services.datasets.grant_export_access(admin.id, dataset.key, "user", user.id)

@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
 import pytest
+from dataset_helpers import publish_dataset
 from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 from test_dataset_governance import governance, state  # noqa: F401
@@ -22,6 +23,7 @@ def test_each_service_boundary(governance, kind):  # noqa: F811
     code = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
     spare = s.dataset_fields.create_field(a.id, d.key, "spare", "Spare", "string")
     row = s.dataset_records.create_record(a.id, d.key, {"code": "NL"})
+    publish_dataset(s, a.id, d)
     entry = s.datasets.grant_export_access(a.id, d.key, "team", other.id)
     if kind in {"owner", "inactive", "deleted"}:
         s.memberships.create_membership(a.id, u.id, owner.id)
@@ -151,6 +153,7 @@ def test_all_governance_writes_rollback_after_flush(governance, monkeypatch, ope
 
 def test_export_snapshot_survives_concurrent_revoke(governance, monkeypatch):  # noqa: F811
     engine, _, s, a, u, _, _, d = governance
+    publish_dataset(s, a.id, d)
     if engine.dialect.name == "sqlite":
         with engine.connect() as connection:
             connection.exec_driver_sql("PRAGMA journal_mode=WAL")

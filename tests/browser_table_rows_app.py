@@ -1,5 +1,6 @@
 """Disposable in-memory app for the optional REF-144 browser regression script."""
 
+from dataset_helpers import publish_dataset
 from test_dataset_browser import create_dataset, create_field, dataset_browser
 
 from refrncr.web import create_flask_app
@@ -18,6 +19,7 @@ for i in range(52):
             "description": "Selectable row text " + ("Long" * 100 if i == 0 else str(i)),
         },
     )
+publish_dataset(s, admin.id, d)
 create_dataset(s, admin, "empty-check", "Empty check")
 create_dataset(s, admin, "long-check", "Long" * 18 + " <img src=x onerror=alert(1)>")
 s.teams.create_team(admin.id, "Row team")

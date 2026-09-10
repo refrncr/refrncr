@@ -11,18 +11,19 @@
       {% if may_export %}<details class='export-menu'>
         <summary class='button button-secondary'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-download.svg") }}' alt='' aria-hidden='true'>Export</summary>
         <div class='export-menu-options' aria-label='Export format'>
-          <a href='{{ url_for("export_dataset_records", key=dataset.key, format="csv") }}'>CSV</a>
-          <a href='{{ url_for("export_dataset_records", key=dataset.key, format="xlsx") }}'>Excel</a>
-          <a href='{{ url_for("export_dataset_records", key=dataset.key, format="json") }}'>JSON</a>
+          <a href='{{ url_for("export_dataset_records", key=dataset.key, version_id=version_state.version.id if version_state else none, format="csv") }}'>CSV</a>
+          <a href='{{ url_for("export_dataset_records", key=dataset.key, version_id=version_state.version.id if version_state else none, format="xlsx") }}'>Excel</a>
+          <a href='{{ url_for("export_dataset_records", key=dataset.key, version_id=version_state.version.id if version_state else none, format="json") }}'>JSON</a>
         </div>
       </details>{% endif %}
-      <a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key) }}'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-settings-2.svg") }}' alt='' aria-hidden='true'>{{ 'Configure' if may_configure else 'View configuration' }}</a>
+      <a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_state.version.id if version_state else none) }}'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-settings-2.svg") }}' alt='' aria-hidden='true'>{{ 'Configure' if may_configure else 'View configuration' }}</a>
       {% if may_edit %}
         <a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-upload.svg") }}' alt='' aria-hidden='true'>Import</a>
         <button class='button button-primary' type='button' data-dialog-open='add-record-panel'><img class='button-icon' src='{{ url_for("static", filename="images/lucide-plus.svg") }}' alt='' aria-hidden='true'>Add record</button>
       {% endif %}
     </div>
   </div>
+  {% include 'pages/datasets/versions/_navigation.html' %}
   {% include "pages/datasets/_record_table.html" %}
   {% include "pages/datasets/_record_panels.html" %}
 {% endblock %}

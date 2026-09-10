@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from flask import template_rendered
 from jinja2 import BaseLoader
 from sqlalchemy import func, select, update
@@ -281,7 +281,7 @@ def test_legacy_roles_do_not_hide_universal_dataset_create_action(dataset_browse
 
     page = body(request(client, "get", "/datasets"))
 
-    assert f"href='/datasets/{dataset.key}/records'" in page
+    assert dataset.key not in page  # A legacy Grant cannot expose an unpublished concept.
     assert "+ New dataset" in page
 
 
@@ -714,6 +714,7 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
         admin.id, "record-viewer@example.com", "Record viewer", "viewer password"
     )
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
+    publish_dataset(services, admin.id, dataset)
     login(client, viewer.email, "viewer password")
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
@@ -741,6 +742,10 @@ def test_list_is_universal_despite_legacy_grants_and_creator_metadata(dataset_br
         session.execute(
             update(Dataset).where(Dataset.id == hidden.id).values(owner_user_id=user.id)
         )
+    versions = {
+        item.key: publish_dataset(services, admin.id, item)
+        for item in (direct, team_dataset, hidden)
+    }
     login(client, "viewer@example.com", "viewer password")
 
     response = request(client, "get", "/datasets")
@@ -748,8 +753,8 @@ def test_list_is_universal_despite_legacy_grants_and_creator_metadata(dataset_br
 
     assert response.status_code == 200
     assert page.index("alpha-direct") < page.index("beta-team")
-    assert "href='/datasets/alpha-direct/records'" in page
-    assert "href='/datasets/beta-team/records'" in page
+    assert f"href='/datasets/alpha-direct/versions/{versions[direct.key].id}/records'" in page
+    assert f"href='/datasets/beta-team/versions/{versions[team_dataset.key].id}/records'" in page
     assert "hidden-owned" in page
     assert "Create dataset" not in page
     assert "data-list-search" not in page
@@ -965,6 +970,7 @@ def test_detail_authorization_owner_display_edit_link_and_escaping(dataset_brows
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
     services.memberships.create_membership(admin.id, editor.id, dataset.owner_team_id)
 
+    publish_dataset(services, admin.id, dataset)
     login(client, "viewer@example.com", "viewer password")
     viewer_page = body(request(client, "get", "/datasets/unsafe"))
     assert "<script>alert(1)</script>" not in viewer_page
@@ -995,8 +1001,8 @@ def test_missing_inaccessible_and_owner_only_detail_are_same_404(dataset_browser
         request(client, "get", "/datasets/INVALID"),
     ]
 
-    assert [response.status_code for response in responses] == [200, 404, 404]
-    assert len({body(response) for response in responses[1:]}) == 1
+    assert [response.status_code for response in responses] == [404, 404, 404]
+    assert len({body(response) for response in responses}) == 1
 
 
 @pytest.mark.parametrize("permission", ["editor", "admin"])
@@ -1284,9 +1290,9 @@ def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browse
     create_dataset(services, admin, "revoked-during-read")
     login(client)
     monkeypatch.setattr(
-        services.dataset_fields,
-        "list_fields",
-        lambda _actor_id, _dataset_key: (_ for _ in ()).throw(NotFoundError()),
+        services.dataset_versions,
+        "read",
+        lambda *args, **kwargs: (_ for _ in ()).throw(NotFoundError()),
     )
 
     response = request(client, "get", "/datasets/revoked-during-read")
@@ -1304,6 +1310,7 @@ def test_viewer_and_editor_see_fields_without_schema_controls(dataset_browser, p
     dataset = create_dataset(services, admin, "visible-schema")
     create_field(services, admin, dataset, "field", "Visible field", "boolean", True, True)
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    publish_dataset(services, admin.id, dataset)
     login(client, f"{permission}@example.com", "user password")
 
     page = body(request(client, "get", "/datasets/visible-schema"))
@@ -1401,6 +1408,7 @@ def test_creator_can_read_schema_without_maintenance_controls(dataset_browser):
         session.execute(
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
         )
+    publish_dataset(services, admin.id, dataset)
     login(client, "owner@example.com", "owner password")
 
     response = request(client, "get", "/datasets/owned-schema")
@@ -1916,6 +1924,7 @@ def test_viewer_and_editor_see_record_identifier_without_management_controls(
         admin.id, f"{permission}@example.com", permission.title(), "user password"
     )
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
+    publish_dataset(services, admin.id, dataset)
     login(client, user.email, "user password")
 
     detail = body(request(client, "get", f"/datasets/{dataset.key}"))

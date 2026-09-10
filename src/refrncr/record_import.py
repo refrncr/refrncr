@@ -878,6 +878,10 @@ class DatasetRecordImportService:
                     uow, dataset.id, state.filename, source, state.mapping
                 )
                 if preview.schema_fingerprint != state.schema_fingerprint:
+                    if preview.schema_fingerprint[1:] == state.schema_fingerprint[1:]:
+                        raise ImportValidationError(
+                            "The import is no longer valid; the Dataset changed. Validate again."
+                        )
                     raise ImportValidationError(
                         "The Dataset schema changed; validate the import again"
                     )
@@ -894,6 +898,7 @@ class DatasetRecordImportService:
                 except PersistenceConflictError as error:
                     DatasetRecordService._raise_record_conflict(error)
                 if validated:
+                    dataset.revision += 1
                     dataset.content_updated_at = datetime.now(UTC)
                     record_audit(
                         uow,
@@ -983,6 +988,7 @@ class DatasetRecordImportService:
                 ImportError(None, None, None, "Map every required and identifier field")
             )
         fingerprint = (
+            uow.datasets.get(dataset_id).revision,
             tuple(
                 (
                     field.id,

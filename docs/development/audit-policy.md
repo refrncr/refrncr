@@ -239,3 +239,26 @@ delete event. SQL constraints, audit flush and commit failures roll back the com
 The production name validator is shared by audit list/detail presentation. Both show the
 snapshot with an explicit deleted status; neither resolves or links a current Dataset.
 Existing historical events remain unchanged and retain their existing fallback rules.
+
+## REF-83 version operations
+
+Publication and Scheduled cancellation each emit exactly one centrally registered
+`dataset.version_published` or `dataset.version_cancelled`, on object type `dataset`
+and the stable Dataset UUID. The trusted actor is reloaded and authorized through the
+existing Dataset governance service in the same transaction. Context contains only
+version number, ISO effective date, the existing bounded/sanitized Dataset-name snapshot,
+Field count and Record count. Version/count fields accept nonnegative integers up to
+2,147,483,647; this does not change the import count limit of 10,000. Description,
+release note and Record values never enter audit context.
+
+Version rows, complete contents, Dataset revision and the matching event share one write
+UoW. Denied, stale, invalid, identical, losing, replayed and rolled-back operations create
+no success event. Cancellation retains the version number and content. List/detail use
+the safe name snapshot when the current Dataset is missing; deletion preserves all
+historical events. Existing deletion/import context labels retain their meanings.
+
+The controlled Version 1 upgrade remains an operator migration, classified as technical
+only. Its publisher is explicitly represented by a null publisher ID (System) in version
+metadata; no user or anonymous domain audit actor is invented. Migration revision and
+preflight results establish the upgrade outcome. The existing audit coverage guard now
+also rejects direct catalog bypass in the version service module.

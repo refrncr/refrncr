@@ -36,6 +36,12 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("grant", "permission_changed"): ActionPresentation("Access permission changed", False),
         ("grant", "deleted"): ActionPresentation("Access revoked", True),
         ("dataset", "created"): ActionPresentation("Dataset created", False),
+        ("dataset", "dataset.version_published"): ActionPresentation(
+            "Dataset version published", False
+        ),
+        ("dataset", "dataset.version_cancelled"): ActionPresentation(
+            "Dataset version cancelled", False
+        ),
         ("dataset", "dataset.deleted"): ActionPresentation("Dataset deleted", True),
         ("dataset", "owner_changed"): ActionPresentation("Dataset owning team changed", False),
         ("dataset", "metadata_updated"): ActionPresentation("Dataset metadata updated", False),
@@ -92,17 +98,29 @@ CONTEXT_LABELS = MappingProxyType(
         "owner_team_id": "Owning team ID",
         "previous_owner_team_id": "Previous owning team ID",
         "creator_user_id": "Creator user ID",
+        "version_number": "Version number",
+        "effective_date": "Effective date",
+        "field_count": "Fields",
         "dataset_id": "Dataset ID",
-        "dataset_name": "Dataset name at deletion",
+        "dataset_name": "Dataset name snapshot",
         "subject_type": "Subject type",
         "subject_id": "Subject ID",
         "format": "Format",
-        "record_count": "Records imported",
+        "record_count": "Records",
         "rejected_row_count": "Rows rejected",
     }
 )
 FORMAT_KINDS = frozenset(
-    {"uuid", "count", "subject", "import_format", "export_format", "dataset_name"}
+    {
+        "uuid",
+        "count",
+        "subject",
+        "import_format",
+        "export_format",
+        "dataset_name",
+        "version_count",
+        "calendar_date",
+    }
 )
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
 SYSTEM_ACTORS = MappingProxyType({})
@@ -205,7 +223,11 @@ def safe_context(event):
         return ()
     return tuple(
         (
-            CONTEXT_LABELS.get(key, "Additional detail"),
+            "Dataset name at deletion"
+            if key == "dataset_name" and event.action == "dataset.deleted"
+            else "Records imported"
+            if key == "record_count" and event.action == "dataset.records_imported"
+            else CONTEXT_LABELS.get(key, "Additional detail"),
             str(validated[key]).capitalize() if kind == "subject" else str(validated[key]),
         )
         for key, kind in contract.context
@@ -266,6 +288,13 @@ def present_event(event, actor_names, objects):
         context = safe_context(event)
         if context:
             obj = ObjectResolution("deleted", f"{context[0][1]} (deleted)")
+    if pair in {("dataset", "dataset.version_published"), ("dataset", "dataset.version_cancelled")}:
+        context = dict(safe_context(event))
+        name = context.get("Dataset name snapshot")
+        if name and obj.status != "resolved":
+            obj = ObjectResolution(
+                obj.status, name + (" (deleted)" if obj.status == "deleted" else "")
+            )
     timestamp = event.timestamp
     timestamp = (
         timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC)

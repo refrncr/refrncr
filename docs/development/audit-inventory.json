@@ -1,87 +1,94 @@
 {
   "service_operations": [
-    "refrncr.services.UserService.bootstrap_organisation",
-    "refrncr.services.UserService.create_initial_admin",
-    "refrncr.services.UserService.has_users",
-    "refrncr.services.UserService.create_user",
-    "refrncr.services.UserService.change_email",
-    "refrncr.services.UserService.disable_user",
-    "refrncr.services.UserService.enable_user",
-    "refrncr.services.UserService.delete_user",
-    "refrncr.services.UserService.list_users",
+    "refrncr.audit_history.AuditHistoryService.get_event",
+    "refrncr.audit_history.AuditHistoryService.list_history",
+    "refrncr.dataset_versions.DatasetVersionService.cancel",
+    "refrncr.dataset_versions.DatasetVersionService.context",
+    "refrncr.dataset_versions.DatasetVersionService.history",
+    "refrncr.dataset_versions.DatasetVersionService.overview",
+    "refrncr.dataset_versions.DatasetVersionService.publish",
+    "refrncr.dataset_versions.DatasetVersionService.read",
+    "refrncr.dataset_versions.DatasetVersionService.review",
+    "refrncr.record_import.DatasetRecordImportService.active",
+    "refrncr.record_import.DatasetRecordImportService.begin",
+    "refrncr.record_import.DatasetRecordImportService.cancel",
+    "refrncr.record_import.DatasetRecordImportService.confirm",
+    "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
+    "refrncr.record_import.DatasetRecordImportService.navigate",
+    "refrncr.record_import.DatasetRecordImportService.preview",
+    "refrncr.record_import.DatasetRecordImportService.revoke_session",
+    "refrncr.record_import.DatasetRecordImportService.saved_preview",
+    "refrncr.record_import.DatasetRecordImportService.select_worksheet",
+    "refrncr.record_import.DatasetRecordImportService.state",
     "refrncr.services.AuthenticationService.authenticate",
-    "refrncr.services.TeamService.create_team",
-    "refrncr.services.TeamService.rename_team",
-    "refrncr.services.TeamService.delete_team",
-    "refrncr.services.TeamService.list_teams",
+    "refrncr.services.AuthorizationService.authorized_resources",
+    "refrncr.services.AuthorizationService.check_access",
+    "refrncr.services.AuthorizationService.effective_permission",
     "refrncr.services.DatasetAuthorizationService.active",
-    "refrncr.services.DatasetAuthorizationService.creation_teams",
-    "refrncr.services.DatasetAuthorizationService.can_create_dataset",
-    "refrncr.services.DatasetAuthorizationService.can_view_dataset",
-    "refrncr.services.DatasetAuthorizationService.maintainable_resources",
-    "refrncr.services.DatasetAuthorizationService.can_maintain_dataset",
-    "refrncr.services.DatasetAuthorizationService.can_export_dataset",
     "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
+    "refrncr.services.DatasetAuthorizationService.can_create_dataset",
+    "refrncr.services.DatasetAuthorizationService.can_export_dataset",
+    "refrncr.services.DatasetAuthorizationService.can_maintain_dataset",
     "refrncr.services.DatasetAuthorizationService.can_manage_export_access",
-    "refrncr.services.DatasetService.create_dataset",
-    "refrncr.services.DatasetService.change_owner",
-    "refrncr.services.DatasetService.export_access_context",
-    "refrncr.services.DatasetService.grant_export_access",
-    "refrncr.services.DatasetService.revoke_export_access",
-    "refrncr.services.DatasetService.list_datasets",
-    "refrncr.services.DatasetService.list_dataset_overview",
-    "refrncr.services.DatasetService.get_dataset_context",
-    "refrncr.services.DatasetService.get_dataset",
-    "refrncr.services.DatasetService.get_dataset_details",
-    "refrncr.services.DatasetService.get_dataset_for_edit",
-    "refrncr.services.DatasetService.update_dataset",
-    "refrncr.services.DatasetFieldService.create_field",
-    "refrncr.services.DatasetFieldService.list_fields",
-    "refrncr.services.DatasetFieldService.get_field",
-    "refrncr.services.DatasetFieldService.update_field",
-    "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
-    "refrncr.services.DatasetFieldService.delete_field",
-    "refrncr.services.DatasetFieldService.replace_order",
-    "refrncr.services.DatasetFieldService.move_field",
+    "refrncr.services.DatasetAuthorizationService.can_view_dataset",
+    "refrncr.services.DatasetAuthorizationService.creation_teams",
+    "refrncr.services.DatasetAuthorizationService.maintainable_resources",
     "refrncr.services.DatasetBusinessKeyService.get_business_key",
     "refrncr.services.DatasetBusinessKeyService.set_business_key",
+    "refrncr.services.DatasetFieldService.create_field",
+    "refrncr.services.DatasetFieldService.delete_field",
+    "refrncr.services.DatasetFieldService.get_field",
+    "refrncr.services.DatasetFieldService.list_fields",
+    "refrncr.services.DatasetFieldService.move_field",
+    "refrncr.services.DatasetFieldService.replace_order",
+    "refrncr.services.DatasetFieldService.update_field",
+    "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
     "refrncr.services.DatasetRecordService.create_record",
-    "refrncr.services.DatasetRecordService.get_record_for_edit",
-    "refrncr.services.DatasetRecordService.update_record",
     "refrncr.services.DatasetRecordService.delete_record",
-    "refrncr.services.DatasetRecordService.list_records",
     "refrncr.services.DatasetRecordService.export_dataset",
     "refrncr.services.DatasetRecordService.get_dataset_for_add",
-    "refrncr.services.GrantService.create_grant",
+    "refrncr.services.DatasetRecordService.get_record_for_edit",
+    "refrncr.services.DatasetRecordService.list_records",
+    "refrncr.services.DatasetRecordService.update_record",
+    "refrncr.services.DatasetService.change_owner",
+    "refrncr.services.DatasetService.create_dataset",
+    "refrncr.services.DatasetService.delete_dataset",
+    "refrncr.services.DatasetService.export_access_context",
+    "refrncr.services.DatasetService.get_dataset",
+    "refrncr.services.DatasetService.get_dataset_context",
+    "refrncr.services.DatasetService.get_dataset_details",
+    "refrncr.services.DatasetService.get_dataset_for_deletion",
+    "refrncr.services.DatasetService.get_dataset_for_edit",
+    "refrncr.services.DatasetService.grant_export_access",
+    "refrncr.services.DatasetService.list_dataset_overview",
+    "refrncr.services.DatasetService.list_datasets",
+    "refrncr.services.DatasetService.revoke_export_access",
+    "refrncr.services.DatasetService.update_dataset",
     "refrncr.services.GrantService.change_permission",
+    "refrncr.services.GrantService.create_grant",
     "refrncr.services.GrantService.delete_grant",
-    "refrncr.services.AuthorizationService.effective_permission",
-    "refrncr.services.AuthorizationService.check_access",
-    "refrncr.services.AuthorizationService.authorized_resources",
     "refrncr.services.MembershipService.create_membership",
     "refrncr.services.MembershipService.delete_membership",
-    "refrncr.services.MembershipService.list_team_members",
     "refrncr.services.MembershipService.list_eligible_users",
+    "refrncr.services.MembershipService.list_team_members",
+    "refrncr.services.SessionService.cleanup",
     "refrncr.services.SessionService.create",
     "refrncr.services.SessionService.resolve",
     "refrncr.services.SessionService.resolve_with_session",
     "refrncr.services.SessionService.revoke",
-    "refrncr.services.SessionService.cleanup",
-    "refrncr.record_import.DatasetRecordImportService.active",
-    "refrncr.record_import.DatasetRecordImportService.state",
-    "refrncr.record_import.DatasetRecordImportService.begin",
-    "refrncr.record_import.DatasetRecordImportService.navigate",
-    "refrncr.record_import.DatasetRecordImportService.select_worksheet",
-    "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
-    "refrncr.record_import.DatasetRecordImportService.preview",
-    "refrncr.record_import.DatasetRecordImportService.saved_preview",
-    "refrncr.record_import.DatasetRecordImportService.confirm",
-    "refrncr.record_import.DatasetRecordImportService.cancel",
-    "refrncr.record_import.DatasetRecordImportService.revoke_session",
-    "refrncr.audit_history.AuditHistoryService.list_history",
-    "refrncr.audit_history.AuditHistoryService.get_event",
-    "refrncr.services.DatasetService.delete_dataset",
-    "refrncr.services.DatasetService.get_dataset_for_deletion"
+    "refrncr.services.TeamService.create_team",
+    "refrncr.services.TeamService.delete_team",
+    "refrncr.services.TeamService.list_teams",
+    "refrncr.services.TeamService.rename_team",
+    "refrncr.services.UserService.bootstrap_organisation",
+    "refrncr.services.UserService.change_email",
+    "refrncr.services.UserService.create_initial_admin",
+    "refrncr.services.UserService.create_user",
+    "refrncr.services.UserService.delete_user",
+    "refrncr.services.UserService.disable_user",
+    "refrncr.services.UserService.enable_user",
+    "refrncr.services.UserService.has_users",
+    "refrncr.services.UserService.list_users"
   ],
   "routes": [
     {
@@ -104,6 +111,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.overview",
         "refrncr.services.DatasetAuthorizationService.can_create_dataset",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.SessionService.resolve_with_session"
@@ -117,8 +125,8 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.services.DatasetAuthorizationService.creation_teams"
+        "refrncr.services.DatasetAuthorizationService.creation_teams",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     },
     {
@@ -129,10 +137,10 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.DatasetAuthorizationService.creation_teams",
         "refrncr.services.DatasetService.create_dataset",
         "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.require_csrf",
-        "refrncr.services.DatasetAuthorizationService.creation_teams"
+        "refrncr.web.require_csrf"
       ]
     },
     {
@@ -143,11 +151,8 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
-        "refrncr.services.DatasetBusinessKeyService.get_business_key",
-        "refrncr.services.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetService.get_dataset_details",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -215,12 +220,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.AuthorizationService.check_access",
-        "refrncr.services.DatasetAuthorizationService.can_export_dataset",
-        "refrncr.services.DatasetBusinessKeyService.get_business_key",
-        "refrncr.services.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.list_records",
-        "refrncr.services.DatasetService.get_dataset_context",
+        "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -744,9 +744,9 @@
         "GET"
       ],
       "operations": [
+        "refrncr.audit_history.AuditHistoryService.list_history",
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.audit_history.AuditHistoryService.list_history"
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     },
     {
@@ -756,9 +756,9 @@
         "GET"
       ],
       "operations": [
+        "refrncr.audit_history.AuditHistoryService.get_event",
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.audit_history.AuditHistoryService.get_event"
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     },
     {
@@ -770,10 +770,91 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.require_csrf",
         "refrncr.services.DatasetService.delete_dataset",
-        "refrncr.services.DatasetService.get_dataset_for_deletion"
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_detail",
+      "path": "/datasets/<key>/versions/<version_id>",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_versions_view",
+      "path": "/datasets/<key>/versions",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.history",
+        "refrncr.dataset_versions.DatasetVersionService.review",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_version_publish",
+      "path": "/datasets/<key>/versions/publish",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.publish",
+        "refrncr.dataset_versions.DatasetVersionService.review",
+        "refrncr.services.DatasetService.get_dataset_for_edit",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_version_cancel",
+      "path": "/datasets/<key>/versions/<version_id>/cancel",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.cancel",
+        "refrncr.dataset_versions.DatasetVersionService.history",
+        "refrncr.services.DatasetService.get_dataset_for_edit",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_records_view",
+      "path": "/datasets/<key>/versions/<version_id>/records",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.export_dataset_records",
+      "path": "/datasets/<key>/versions/<version_id>/records/export",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_export.logged_export_stream",
+        "refrncr.services.DatasetRecordService.export_dataset",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     }
   ],
@@ -822,6 +903,18 @@
       "operations": [
         "refrncr.cli.build_parser"
       ]
+    },
+    {
+      "symbol": "refrncr dataset-publication-preflight",
+      "operations": [
+        "refrncr.version_upgrade.publication_preflight",
+        "refrncr.cli.prepare_database"
+      ],
+      "arguments": [
+        "--database-url",
+        "--database-path",
+        "--upgrade"
+      ]
     }
   ],
   "notes": [
@@ -869,13 +962,16 @@
     "refrncr.web.handle_oversized_request",
     "refrncr.web.index",
     "refrncr.web.require_cookie_settings",
-    "refrncr.web.require_csrf"
+    "refrncr.web.require_csrf",
+    "refrncr.version_upgrade.publication_preflight",
+    "refrncr.version_upgrade.create_initial_versions"
   ],
   "cli_parser_commands": [
     "start",
     "user",
     "create-admin",
-    "dataset-ownership-preflight"
+    "dataset-ownership-preflight",
+    "dataset-publication-preflight"
   ],
   "implicit_interfaces": [
     {

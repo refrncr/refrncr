@@ -85,7 +85,8 @@ def test_historical_action_names_and_object_types_are_stable():
         "dataset": (
             "created owner_changed metadata_updated business_key_defined "
             "business_key_updated field_order_updated dataset.records_imported "
-            "dataset.export_requested dataset.deleted"
+            "dataset.export_requested dataset.deleted "
+            "dataset.version_published dataset.version_cancelled"
         ),
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted",
@@ -211,11 +212,13 @@ def test_every_audited_operation_has_behavior_cases():
     behaviors = {
         f"refrncr.services.{name}"
         for name in MUTATIONS
-        if not name.startswith("DatasetRecordImportService")
+        if not name.startswith(("DatasetRecordImportService", "DatasetVersionService"))
     }
     behaviors.update(
         {
             "refrncr.record_import.DatasetRecordImportService.confirm",
+            "refrncr.dataset_versions.DatasetVersionService.publish",
+            "refrncr.dataset_versions.DatasetVersionService.cancel",
             "refrncr.services.UserService.create_initial_admin",
             "refrncr.services.DatasetRecordService.export_dataset",
         }

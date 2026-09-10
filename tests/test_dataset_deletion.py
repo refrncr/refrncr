@@ -510,7 +510,12 @@ def test_dataset_foreign_key_inventory(context):  # noqa: F811
         for fk in schema.get_foreign_keys(table)
         if fk["referred_table"] == "datasets"
     }
-    assert direct == {"dataset_fields", "dataset_records", "dataset_export_access"}
+    assert direct == {
+        "dataset_fields",
+        "dataset_records",
+        "dataset_export_access",
+        "dataset_versions",
+    }
     assert all(fk["referred_table"] == "users" for fk in schema.get_foreign_keys("audit_events"))
 
 
@@ -528,7 +533,7 @@ def test_deletion_on_complete_migration_chain(audit_db):  # noqa: F811
     c = context.__wrapped__(audit_db)
     populate(c)
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014_ref_145"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
     with pytest.raises(IntegrityError), c.sessions.begin() as session:
         session.add(DatasetRecord(dataset_id=str(uuid4()), identifier_key=b"test", revision=1))
     # Field RESTRICT is effective on the real migrated schema too.

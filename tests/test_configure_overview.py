@@ -1,10 +1,12 @@
 """REF-142 configuration presentation over existing authorized service reads."""
 
 import re
+from dataclasses import replace
 from html import escape
 from types import SimpleNamespace
 
 import pytest
+from dataset_helpers import publish_dataset
 from test_dataset_browser import (  # noqa: F401
     body,
     create_dataset,
@@ -38,7 +40,14 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         login(client)
     else:
         login(client, actor.email, "user password")
+    version = (
+        publish_dataset(services, admin.id, dataset) if permission == "viewer" and count else None
+    )
     response = request(client, "get", "/datasets/overview")
+    if permission == "viewer" and not count:
+        assert response.status_code == 404
+        assert b"Reference data" not in response.data
+        return
     assert response.status_code == 200
     page = body(response)
     assert re.findall(r"<h1[^>]*>(.*?)</h1>", page) == ["Reference data"]
@@ -49,7 +58,12 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     header = page.split("<div class='configuration-overview'>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
-    assert "class='button button-primary' href='/datasets/overview/records'>View records" in actions
+    records_url = (
+        f"/datasets/overview/versions/{version.id}/records"
+        if version
+        else "/datasets/overview/records"
+    )
+    assert f"class='button button-primary' href='{records_url}'>View records" in actions
     assert ("Edit dataset" in actions) == (permission != "viewer")
     if permission != "viewer":
         assert "class='button button-secondary' data-panel-url" in actions
@@ -134,7 +148,10 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         )
         reordered = body(request(client, "get", "/datasets/overview"))
         reordered_fields = section(reordered, "fields-heading")
-        assert reordered_fields.index("Last field") < reordered_fields.index("First field")
+        if permission == "viewer":
+            assert reordered_fields.index("First field") < reordered_fields.index("Last field")
+        else:
+            assert reordered_fields.index("Last field") < reordered_fields.index("First field")
 
 
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F811
@@ -175,12 +192,16 @@ def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monke
         is_required=True,
         is_unique=False,
     )
-    monkeypatch.setattr(services.dataset_fields, "list_fields", lambda *_: [field])
-    monkeypatch.setattr(
-        services.dataset_business_keys,
-        "get_business_key",
-        lambda *_: SimpleNamespace(field_keys=(malicious_key,)),
-    )
+    original_read = services.dataset_versions.read
+
+    def untrusted_read(*args, **kwargs):
+        return replace(
+            original_read(*args, **kwargs),
+            fields=(field,),
+            identifier=SimpleNamespace(field_keys=(malicious_key,)),
+        )
+
+    monkeypatch.setattr(services.dataset_versions, "read", untrusted_read)
     login(client)
     page = body(request(client, "get", f"/datasets/{dataset.key}"))
     assert malicious_key not in page
@@ -209,7 +230,15 @@ def test_missing_identifier_warning_only_for_existing_fields(
         login(client)
     else:
         login(client, actor.email, "user password")
-    page = body(request(client, "get", f"/datasets/{dataset.key}"))
+    if permission == "viewer" and state == "configured":
+        publish_dataset(services, admin.id, dataset)
+    response = request(client, "get", f"/datasets/{dataset.key}")
+    if permission == "viewer" and state != "configured":
+        assert response.status_code == 404
+        assert b"No record identifier configured" not in response.data
+        return
+    assert response.status_code == 200
+    page = body(response)
     assert "record-identifier-heading" not in page
     warning = re.search(r"<div class='alert alert-warning'[^>]*>(.*?)</div>", page, re.DOTALL)
     assert (warning is not None) == (state == "unconfigured")

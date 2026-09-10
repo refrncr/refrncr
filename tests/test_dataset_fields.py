@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -398,9 +398,12 @@ def test_viewer_and_editor_can_read_but_cannot_mutate(field_services, permission
         admin.id, f"{permission}@example.com", permission.title(), PASSWORD
     )
     dataset = create_dataset(services, admin)
-    field = services.dataset_fields.create_field(admin.id, dataset.key, "field", "Name", "string")
+    field = services.dataset_fields.create_field(
+        admin.id, dataset.key, "field", "Name", "string", True
+    )
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
 
+    publish_dataset(services, admin.id, dataset)
     assert services.dataset_fields.list_fields(user.id, dataset.key)[0].id == field.id
     assert services.dataset_fields.get_field(user.id, dataset.key, field.key).id == field.id
     with pytest.raises(NotFoundError, match="Dataset not found"):
@@ -443,12 +446,13 @@ def test_owner_metadata_does_not_authorize_field_access(field_services):
     _, factory, services, admin = field_services
     owner = services.users.create_user(admin.id, "owner@example.com", "Owner", PASSWORD)
     dataset = create_dataset(services, admin)
-    services.dataset_fields.create_field(admin.id, dataset.key, "field", "Name", "string")
+    services.dataset_fields.create_field(admin.id, dataset.key, "field", "Name", "string", True)
     with factory.begin() as session:
         session.execute(
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
         )
 
+    publish_dataset(services, admin.id, dataset)
     assert len(services.dataset_fields.list_fields(owner.id, dataset.key)) == 1
     with pytest.raises(NotFoundError, match="Dataset not found"):
         services.dataset_fields.create_field(owner.id, dataset.key, "blocked", "Blocked", "string")

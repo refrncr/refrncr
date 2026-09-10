@@ -146,12 +146,22 @@
     form.addEventListener("change", update);
     update();
   });
-  document.querySelectorAll("[data-import-confirm]").forEach((form) => {
+  const setSubmitBusy = (form, busy) => {
+    if (busy) form.setAttribute("aria-busy", "true");
+    else form.removeAttribute("aria-busy");
+    if (!form.hasAttribute("data-busy-message")) return;
+    const status = form.querySelector("[data-submit-status]");
+    if (status) {
+      status.textContent = busy ? form.dataset.busyMessage : "";
+      status.hidden = !busy;
+    }
+  };
+  document.querySelectorAll("[data-import-confirm], [data-single-submit]").forEach((form) => {
     let pending = false;
     form.addEventListener("submit", (event) => {
       if (pending) { event.preventDefault(); return; }
       pending = true;
-      form.setAttribute("aria-busy", "true");
+      setSubmitBusy(form, true);
       [...form.elements].filter((element) => element.type === "submit").forEach((button) => { button.disabled = true; });
     });
   });
@@ -303,7 +313,7 @@
       const buttons = [...form.elements].filter((control) => control.matches("button[type='submit']"));
       const data = new FormData(form, event.submitter);
       buttons.forEach((button) => { button.disabled = true; });
-      form.setAttribute("aria-busy", "true");
+      setSubmitBusy(form, true);
       try {
         const response = await fetch(form.action, {
           method: "POST", body: data, credentials: "same-origin",
@@ -345,7 +355,7 @@
       } finally {
         pendingForms.delete(dialog);
         buttons.forEach((button) => { button.disabled = false; });
-        form.removeAttribute("aria-busy");
+        setSubmitBusy(form, false);
         if (form.hasAttribute("data-exact-confirmation")) {
           const input = form.querySelector("[name='confirmation_name']");
           buttons.forEach((button) => { button.disabled = input.value !== form.dataset.exactConfirmation; });

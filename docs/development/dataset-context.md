@@ -1,11 +1,15 @@
 # Dataset context persistence (REF-130)
 
-Dataset overview and detail context are authorized service reads. `list_dataset_overview`
-resolves active Community read access in bulk, then calls the Dataset port's `current_overview` once. The
-Community adapter scopes both the grouped record-count subquery and dataset rows to those IDs;
-only authorized all-resource access uses an unrestricted scope. Empty access skips the query.
-The result combines dataset data, exact count (including zero), and an aware UTC freshness value.
-There is no overview pagination today; record-page pagination remains unchanged.
+Dataset overview and detail context are authorized service reads. REF-83 now delegates
+content selection to `DatasetVersionService`: active owning-team members and Community
+administrators use concept context; other active users use Current snapshot metadata/counts.
+No Current means no visible Dataset for ordinary users. Selection and current authority share
+one coherent read transaction. Current snapshots use a batched window query and concept counts
+remain one grouped query, without per-Dataset lookups. `current_overview` itself still counts
+only working Records. Snapshot headers use their publication timestamp and snapshot count;
+owning-team names remain current administrative context. See [Dataset versions](dataset-versions.md).
+There is no overview pagination; selected Record pages retain the existing canonical sort and
+50-row page size, with explicit version links keeping subsequent pages on the same snapshot.
 
 `DatasetRecord` stores only the mutable current working set. Its revision is an optimistic
 concurrency counter, not another row/version. The explicitly named `current_overview` contract

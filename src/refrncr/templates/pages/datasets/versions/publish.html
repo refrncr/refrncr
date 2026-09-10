@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback, form_field, readonly_field %}
+{% from "components/side_panel.html" import panel_form_actions %}
+{% block title %}Publish version · REFRNCR{% endblock %}
+{% block content %}
+  <h1>Publish version</h1>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Publish version'>
+    <div class='side-panel-body panel-sections'>
+      {{ feedback(error, id='publication-error', focus=true) }}
+      {% if review %}{% set revision, number, content, summary = review %}
+        {{ readonly_field('Next version', 'Version ' ~ number) }}
+        {{ readonly_field('Dataset', content.name) }}
+        <p>{{ content.fields|length }} {{ 'field' if content.fields|length == 1 else 'fields' }} and {{ content.records|length }} {{ 'record' if content.records|length == 1 else 'records' }}.</p>
+        <dl class='detail-list'>
+          <div><dt>Fields</dt><dd>{{ summary.fields_added }} added · {{ summary.fields_changed }} changed · {{ summary.fields_removed }} removed</dd></div>
+          <div><dt>Records</dt><dd>{{ summary.records_added }} added · {{ summary.records_changed }} changed · {{ summary.records_removed }} removed</dd></div>
+        </dl>
+        <form id='publication-form' class='form' method='post' action='{{ url_for("dataset_version_publish", key=dataset.key) }}' data-single-submit data-busy-message='Publishing version…' novalidate>
+          <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+          <input type='hidden' name='dataset_id' value='{{ dataset.id }}'>
+          <input type='hidden' name='expected_revision' value='{{ revision }}'>
+          {{ form_field('Effective date', 'effective_date', 'publication-date', type='date', required=true, value=effective_date, min_value=today, help_text='Choose today or a future day. Calendar dates use UTC.', error_id='publication-error' if error else none) }}
+          {{ form_field('Release note (optional)', 'release_note', 'publication-note', control='textarea', value=release_note, max_length=2000, help_text='Up to 2,000 characters.', error_id='publication-error' if error else none) }}
+          {{ form_field('I reviewed this version and confirm publication.', 'confirmed', 'publication-confirmed', type='checkbox', required=true, value='yes', error_id='publication-error' if error else none) }}
+          <p data-submit-status role='status' hidden></p>
+        </form>
+      {% endif %}
+    </div>
+    {% call panel_form_actions() %}
+      <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}' data-panel-cancel>Cancel</a>
+      {% if review %}<button class='button button-primary' type='submit' form='publication-form'>Publish version</button>{% endif %}
+    {% endcall %}
+  </div>
+{% endblock %}

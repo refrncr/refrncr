@@ -40,7 +40,7 @@ from refrncr.services import (
 )
 
 
-def assert_community_schema(engine):
+def assert_community_schema(engine, *, dataset_revision=True):
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     assert {
@@ -117,7 +117,7 @@ def assert_community_schema(engine):
     grant_checks = {constraint["name"] for constraint in inspector.get_check_constraints("grants")}
     assert {"ck_grants_subject_type", "ck_grants_permission"} <= grant_checks
     dataset_columns = {column["name"] for column in inspector.get_columns("datasets")}
-    assert dataset_columns == {
+    assert dataset_columns == ({"revision"} if dataset_revision else set()) | {
         "id",
         "key",
         "name",
@@ -424,7 +424,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0014_ref_145"
+                "0015_ref_83"
             )
     finally:
         upgraded.dispose()
@@ -453,7 +453,15 @@ def test_ref_121_partial_values_are_canonically_rebuilt(tmp_path, positions):
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     dataset = create_owned_dataset(services.datasets, admin.id, "partial", "Partial", "")
     for key in ("zeta", "alpha", "middle"):
-        services.dataset_fields.create_field(admin.id, dataset.key, key, key, "string")
+        services.dataset_fields.create_field(
+            admin.id,
+            dataset.key,
+            key,
+            key,
+            "string",
+            is_required=True,
+            is_business_key_component=key == "alpha",
+        )
     engine.dispose()
     downgrade_historical_fixture(config, "0009_ref_80")
     with engine.begin() as connection:
@@ -702,12 +710,16 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     engine.dispose()
 
     downgrade_historical_fixture(config, "0005_ref_72")
-    command.upgrade(config, "head")
+    command.upgrade(config, "0014_ref_145")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
-        assert_community_schema(upgraded_engine)
+        assert_community_schema(upgraded_engine, dataset_revision=False)
         with create_session_factory(upgraded_engine)() as session:
-            persisted = session.get(Dataset, dataset.id)
+            persisted = session.execute(
+                select(Dataset.key, Dataset.name, Dataset.description).where(
+                    Dataset.id == dataset.id
+                )
+            ).one()
             assert (persisted.key, persisted.name, persisted.description) == (
                 "existing",
                 "Existing",
@@ -716,6 +728,12 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
             assert session.scalar(select(func.count(DatasetField.id))) == 0
     finally:
         upgraded_engine.dispose()
+
+    from refrncr.version_upgrade import VersionUpgradeError
+
+    with pytest.raises(VersionUpgradeError) as failure:
+        command.upgrade(config, "head")
+    assert failure.value.invalid == (dataset.id,)
 
 
 def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
@@ -736,12 +754,16 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     engine.dispose()
 
     downgrade_historical_fixture(config, "0006_ref_74")
-    command.upgrade(config, "head")
+    command.upgrade(config, "0014_ref_145")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
-        assert_community_schema(upgraded_engine)
+        assert_community_schema(upgraded_engine, dataset_revision=False)
         with create_session_factory(upgraded_engine)() as session:
-            persisted_dataset = session.get(Dataset, dataset.id)
+            persisted_dataset = session.execute(
+                select(Dataset.key, Dataset.name, Dataset.description).where(
+                    Dataset.id == dataset.id
+                )
+            ).one()
             persisted_field = session.get(DatasetField, field.id)
             assert (persisted_dataset.key, persisted_dataset.description) == (
                 "existing",
@@ -751,6 +773,12 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
             assert session.scalar(select(func.count(DatasetBusinessKeyField.dataset_id))) == 0
     finally:
         upgraded_engine.dispose()
+
+    from refrncr.version_upgrade import VersionUpgradeError
+
+    with pytest.raises(VersionUpgradeError) as failure:
+        command.upgrade(config, "head")
+    assert failure.value.invalid == (dataset.id,)
 
 
 def test_ref_75_sqlite_composite_fk_duplicate_and_cascade_behavior(tmp_path):
@@ -955,7 +983,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0014_ref_145"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

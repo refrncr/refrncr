@@ -41,6 +41,13 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
+        if current == "0015_ref_83":
+            # This helper constructs historical fixtures, not a production downgrade.
+            # REF-83's populated downgrade guard is tested independently.
+            with connection.begin():
+                connection.execute(text("DELETE FROM dataset_versions"))
+            command.downgrade(config, "0014_ref_145")
+            current = "0014_ref_145"
         if current == "0014_ref_145":
             # REF-145 retains old IDs and permits a lossless downgrade of old types.
             command.downgrade(config, "0013_ref_39")
@@ -89,3 +96,37 @@ def downgrade_historical_fixture(config, revision):
             connection.close()
             engine.dispose()
     command.downgrade(config, revision)
+
+
+def publish_dataset(services, actor_id, dataset):
+    """Explicitly prepare and publish a readable fixture under REF-83's rules."""
+    from refrncr.datatypes import get_datatype
+    from refrncr.models import utc_now
+
+    fields = services.dataset_fields.list_fields(actor_id, dataset.key)
+    identifier = services.dataset_business_keys.get_business_key(actor_id, dataset.key)
+    if not identifier.field_keys:
+        eligible = next(
+            (
+                field
+                for field in fields
+                if field.is_required and get_datatype(field.data_type).identifier_eligible
+            ),
+            None,
+        )
+        if eligible:
+            services.dataset_business_keys.set_business_key(actor_id, dataset.key, (eligible.key,))
+        else:
+            services.dataset_fields.create_field(
+                actor_id,
+                dataset.key,
+                "publication_id",
+                "Publication identifier",
+                "string",
+                is_required=True,
+                is_business_key_component=True,
+            )
+    target = services.datasets.get_dataset(actor_id, dataset.key)
+    return services.dataset_versions.publish(
+        actor_id, dataset.id, utc_now().date(), "", target.revision
+    )

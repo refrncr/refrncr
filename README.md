@@ -85,3 +85,14 @@ See the [audit policy](docs/development/audit-policy.md),
 [functional inventory](docs/development/audit-inventory.json) and
 [coverage matrix](docs/development/audit-coverage.json) for service-level audit contracts,
 transactional mutation events, import summaries and prepared export request semantics.
+
+
+### Published Dataset versions
+
+REF-83 adds immutable complete publications with UTC effective dates. Ordinary users read the
+Current snapshot; active owning-team members and Community administrators manage the concept,
+publish and cancel Scheduled versions. Historical Grants grant no editing or publication rights.
+See [Dataset versions and upgrade preflight](docs/development/dataset-versions.md) before upgrading
+an existing installation: every Dataset must have valid Fields, an identifier and valid values.
+The controlled upgrade creates one System-published Version 1 per valid Dataset and fails closed
+if any Dataset is invalid. Back up the database and stop writers before the upgrade.

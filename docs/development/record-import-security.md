@@ -120,3 +120,13 @@ actor/session/UUID/TTL binding and replay protections. Inaccessible staged memor
 by the existing lazy TTL cleanup or session revocation; no staged upload file exists.
 This is logical invalidation on use, not an immediate memory-erasure guarantee. No new cleanup
 service is introduced, and no cleanup is represented as part of the database commit.
+
+## REF-83 interaction
+
+Imports continue writing only the concept tables. Preview fingerprints include the
+Dataset revision as well as Field/identifier configuration. Confirmation rejects a
+revision changed by metadata, Field/Record operations, another import or version lifecycle
+changes, and requires review again. Authorization and the original Dataset UUID are still
+checked under the same lock. A committed import increments the Dataset revision once;
+rollback leaves both unchanged. Existing Scheduled/Current/Expired snapshots are never
+updated by import. Administrative access changes remain subject to current authorization.

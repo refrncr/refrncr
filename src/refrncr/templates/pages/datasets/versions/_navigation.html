@@ -1,0 +1,6 @@
+<nav class='page-actions' aria-label='Dataset versions'>
+  {% if version_state %}
+    <span class='badge'>Version {{ version_state.version.number }} · {{ version_state.status }} · Read only</span>
+  {% else %}<span class='badge'>Concept · Working copy</span>{% endif %}
+  <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Versions</a>
+</nav>

@@ -84,6 +84,21 @@ def test_cli_preflight_and_explicit_upgrade(governance, tmp_path, capsys):  # no
     assert output["unresolved"][0]["key"] == "countries"
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0011_ref_130"
+    # The CLI upgrades through REF-83 too: supply a valid zero-Record schema.
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO dataset_fields (id,dataset_id,key,name,data_type,is_required,"
+                "is_unique,display_position,created_at,updated_at) VALUES "
+                "('code','dataset','code','Code','string',true,true,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO dataset_business_key_fields (dataset_id,field_key) "
+                "VALUES ('dataset','code')"
+            )
+        )
     mapping = tmp_path / "owners.json"
     mapping.write_text(json.dumps({"countries": "two"}))
     assert cli.main([*args, "--mapping", str(mapping), "--upgrade"]) == 0
@@ -116,18 +131,18 @@ def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noq
         resolved, unresolved = ownership_preflight(c)
     if memberships == 1:
         assert resolved == {"dataset": "one"} and not unresolved
-        migrate(engine, "head")
+        migrate(engine, "0012_ref_73")
     else:
         assert unresolved[0]["key"] == "countries"
         with pytest.raises(DatasetUpgradeError):
-            migrate(engine, "head")
+            migrate(engine, "0012_ref_73")
         with engine.connect() as c:
             assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0011_ref_130"
             assert "owner_team_id" not in {
                 col["name"] for col in inspect(c).get_columns("datasets")
             }
             assert not inspect(c).has_table("dataset_export_access")
-        migrate(engine, "head", {"countries": "two"})
+        migrate(engine, "0012_ref_73", {"countries": "two"})
     with engine.connect() as c:
         assert c.execute(text("SELECT owner_user_id, owner_team_id FROM datasets")).one() == (
             "creator",
@@ -147,7 +162,7 @@ def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noq
     with engine.connect() as c:
         assert c.scalar(text("SELECT count(*) FROM grants")) == 1
         assert not inspect(c).has_table("dataset_export_access")
-    migrate(engine, "head")
+    migrate(engine, "0012_ref_73")
 
 
 def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch):  # noqa: F811
@@ -155,7 +170,7 @@ def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch
     legacy(engine)
     for mapping in ({"unknown": "one"}, {"countries": "deleted"}):
         with pytest.raises(DatasetUpgradeError):
-            migrate(engine, "head", mapping)
+            migrate(engine, "0012_ref_73", mapping)
     from alembic.operations import Operations
 
     original = Operations.create_table
@@ -168,12 +183,12 @@ def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch
     with monkeypatch.context() as patch:
         patch.setattr(Operations, "create_table", fail)
         with pytest.raises(RuntimeError, match="simulated DDL failure"):
-            migrate(engine, "head", {"countries": "one"})
+            migrate(engine, "0012_ref_73", {"countries": "one"})
     with engine.connect() as c:
         assert c.scalar(text("SELECT version_num FROM alembic_version")) == "0011_ref_130"
         assert "owner_team_id" not in {col["name"] for col in inspect(c).get_columns("datasets")}
         assert c.scalar(text("SELECT count(*) FROM datasets")) == 1
-    migrate(engine, "head", {"countries": "one"})
+    migrate(engine, "0012_ref_73", {"countries": "one"})
 
 
 def test_mapping_file_rejects_duplicates_and_non_objects(tmp_path):
@@ -231,8 +246,8 @@ def test_multiple_datasets_repeated_preflight_preserves_legacy_roles(governance,
             assert resolved == {"dataset": "one"}
             assert [row["key"] for row in unresolved] == ["second"]
         with pytest.raises(DatasetUpgradeError):
-            migrate(engine, "head", {"countries": "one"})
-    migrate(engine, "head", {"second": "two"})
+            migrate(engine, "0012_ref_73", {"countries": "one"})
+    migrate(engine, "0012_ref_73", {"second": "two"})
     with engine.connect() as c:
         assert c.execute(text("SELECT * FROM grants ORDER BY id")).all() == original
         assert (

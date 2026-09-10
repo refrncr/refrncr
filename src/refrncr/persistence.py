@@ -31,6 +31,7 @@ from refrncr.models import (
     DatasetField,
     DatasetRecord,
     DatasetRecordValue,
+    DatasetVersion,
     Grant,
     LoginSession,
     Membership,
@@ -296,6 +297,7 @@ class SqlAlchemyDatasetOperations:
         # REF-141 inventory: values RESTRICT Field deletion. Do not rely on
         # unspecified ordering of multiple database cascades from Dataset.
         for model in (
+            DatasetVersion,
             DatasetRecordValue,
             DatasetRecord,
             DatasetBusinessKeyField,
@@ -555,6 +557,15 @@ class SqlAlchemyDatasetRecordOperations:
 
     def _available(self) -> bool:
         return inspect(self.session.get_bind()).has_table("dataset_records")
+
+    def identifier_keys(self, dataset_id):
+        return dict(
+            self.session.execute(
+                select(DatasetRecord.id, DatasetRecord.identifier_key).where(
+                    DatasetRecord.dataset_id == dataset_id
+                )
+            ).all()
+        )
 
     def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecord:
         record = DatasetRecord(dataset_id=dataset_id, identifier_key=identifier_key, revision=1)
@@ -894,7 +905,15 @@ class SqlAlchemyAuditReadOperations:
             else case(
                 (
                     (AuditEvent.object_type == "dataset")
-                    & (AuditEvent.action == "dataset.deleted")
+                    & (
+                        AuditEvent.action.in_(
+                            (
+                                "dataset.deleted",
+                                "dataset.version_published",
+                                "dataset.version_cancelled",
+                            )
+                        )
+                    )
                     & (func.length(context) <= 4096),
                     context,
                 ),
@@ -1025,6 +1044,9 @@ class SqlAlchemyUnitOfWork:
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
         self.dataset_records = SqlAlchemyDatasetRecordOperations(self.session)
+        from refrncr.version_persistence import SqlAlchemyVersionOperations
+
+        self.versions = SqlAlchemyVersionOperations(self.session)
         return self
 
     def __exit__(

@@ -171,6 +171,7 @@ class Dataset(Base):
         CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_datasets_name_length"),
         CheckConstraint("length(description) <= 10000", name="ck_datasets_description_length"),
         UniqueConstraint("key", name="uq_datasets_key"),
+        CheckConstraint("revision >= 1", name="ck_datasets_revision"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -192,6 +193,7 @@ class Dataset(Base):
     )
 
     content_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     @hybrid_property
     def key(self) -> str:
@@ -364,3 +366,122 @@ class DatasetExportAccess(Base):
     @property
     def subject_id(self) -> str:
         return self.user_id if self.user_id is not None else self.team_id
+
+
+class DatasetVersion(Base):
+    __tablename__ = "dataset_versions"
+    __table_args__ = (
+        UniqueConstraint("dataset_id", "number", name="uq_dataset_versions_number"),
+        CheckConstraint("number >= 1", name="ck_dataset_versions_number"),
+        CheckConstraint("length(release_note) <= 2000", name="ck_dataset_versions_note"),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_dataset_versions_name"),
+        CheckConstraint("length(description) <= 10000", name="ck_dataset_versions_description"),
+        CheckConstraint(
+            "(cancelled_at IS NULL AND cancelling_actor_id IS NULL) OR "
+            "(cancelled_at IS NOT NULL AND cancelling_actor_id IS NOT NULL)",
+            name="ck_dataset_versions_cancellation",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    number: Mapped[int] = mapped_column(Integer)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    publisher_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    effective_date: Mapped[date] = mapped_column(Date)
+    release_note: Mapped[str] = mapped_column(Text, default="")
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text)
+    field_count: Mapped[int] = mapped_column(Integer)
+    record_count: Mapped[int] = mapped_column(Integer)
+    fields_added: Mapped[int] = mapped_column(Integer)
+    fields_changed: Mapped[int] = mapped_column(Integer)
+    fields_removed: Mapped[int] = mapped_column(Integer)
+    records_added: Mapped[int] = mapped_column(Integer)
+    records_changed: Mapped[int] = mapped_column(Integer)
+    records_removed: Mapped[int] = mapped_column(Integer)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelling_actor_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+
+
+class DatasetVersionField(Base):
+    __tablename__ = "dataset_version_fields"
+    __table_args__ = (
+        UniqueConstraint("version_id", "key", name="uq_version_fields_key"),
+        UniqueConstraint("version_id", "display_position", name="uq_version_fields_position"),
+        CheckConstraint("display_position >= 1", name="ck_version_fields_position"),
+        CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_version_fields_key"),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_version_fields_name"),
+        CheckConstraint("NOT is_identifier OR is_required", name="ck_version_fields_identifier"),
+        CheckConstraint(
+            "data_type IN (" + ", ".join(repr(t) for t in DATASET_FIELD_TYPES) + ")",
+            name="ck_version_fields_type",
+        ),
+    )
+    version_id: Mapped[str] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    key: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(200))
+    data_type: Mapped[str] = mapped_column(String(20))
+    is_required: Mapped[bool] = mapped_column(Boolean)
+    is_unique: Mapped[bool] = mapped_column(Boolean)
+    display_position: Mapped[int] = mapped_column(Integer)
+    is_identifier: Mapped[bool] = mapped_column(Boolean)
+
+
+class DatasetVersionRecord(Base):
+    __tablename__ = "dataset_version_records"
+    __table_args__ = (
+        UniqueConstraint("version_id", "identifier_key", name="uq_version_records_identifier"),
+        CheckConstraint("length(identifier_key) BETWEEN 1 AND 2000", name="ck_version_records_key"),
+    )
+    version_id: Mapped[str] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+
+
+class DatasetVersionValue(Base):
+    __tablename__ = "dataset_version_values"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["version_id", "record_id"],
+            ["dataset_version_records.version_id", "dataset_version_records.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["version_id", "field_id"],
+            ["dataset_version_fields.version_id", "dataset_version_fields.id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("version_id", "field_id", "unique_key", name="uq_version_values_unique"),
+        CheckConstraint("length(canonical_key) BETWEEN 1 AND 1010", name="ck_version_values_key"),
+    )
+    version_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    record_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    field_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    canonical_key: Mapped[bytes] = mapped_column(LargeBinary(1010))
+    canonical_text: Mapped[str] = mapped_column(Text)
+    unique_key: Mapped[bytes | None] = mapped_column(LargeBinary(1010))
+
+
+def _immutable_version_row(_mapper, _connection, _row):
+    from refrncr.ports import PersistenceConflictError
+
+    raise PersistenceConflictError()
+
+
+# Lifecycle cancellation is a narrow conditional SQL operation in the adapter.
+# ORM callers cannot edit metadata/content or delete individual version rows.
+for _snapshot_model in (
+    DatasetVersion,
+    DatasetVersionField,
+    DatasetVersionRecord,
+    DatasetVersionValue,
+):
+    event.listen(_snapshot_model, "before_update", _immutable_version_row)
+    event.listen(_snapshot_model, "before_delete", _immutable_version_row)
