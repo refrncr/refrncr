@@ -6,6 +6,12 @@
 .alert-warning { border-color: var(--color-warning); color: var(--color-warning-text); background: var(--color-warning-surface); }
 .alert-info { border-color: var(--color-info); color: var(--color-info-text); background: var(--color-info-surface); }
 
-/* Shared context for every concept content page and form. */
-.concept-banner { width: 100%; box-sizing: border-box; padding: var(--space-lg); margin-block: var(--space-lg); border: 1px solid var(--color-info); border-radius: var(--radius-md); background: var(--color-info-surface); overflow-wrap: anywhere; }
-.concept-banner h2 { margin-top: 0; }
+/* Shared context for every concept content page and form: a compact draft-status strip. */
+.concept-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); width: 100%; box-sizing: border-box; padding: .625rem .75rem .625rem var(--space-md); margin-block: var(--space-lg); border: 1px solid var(--color-status-draft-border); border-radius: var(--radius-lg); background: var(--color-status-draft-surface); overflow-wrap: anywhere; }
+.concept-banner-text { display: flex; flex: 1 1 22rem; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); min-width: 0; }
+.concept-banner h2 { display: inline-flex; align-items: center; gap: var(--space-sm); margin: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); line-height: var(--line-height-control); }
+.concept-banner p { margin: 0; font-size: var(--font-size-body-sm); }
+.concept-banner-note { flex-basis: 100%; color: var(--color-text-muted); }
+.concept-banner .page-actions { flex-shrink: 0; }
+.concept-banner .button-secondary { background: transparent; }
+.concept-banner .button-secondary:hover { background: var(--color-surface); }
