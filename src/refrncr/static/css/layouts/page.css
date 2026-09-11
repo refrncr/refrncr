@@ -54,3 +54,9 @@
 .section-tab { padding: .625rem .75rem; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--color-text-muted); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-decoration: none; white-space: nowrap; }
 .section-tab:hover { color: var(--color-text); }
 .section-tab[aria-current="page"] { border-bottom-color: var(--color-action-primary); color: var(--color-text); }
+/* A separator that would start a wrapped metadata line is clipped: each separator sits in the
+   gap before its item, so only the one at a line start falls outside the clipped box. */
+.metadata { --metadata-separator-width: .5em; overflow: hidden; column-gap: calc(var(--metadata-separator-width) + 2 * var(--space-sm)); }
+.metadata [aria-hidden="true"] { display: inline-block; width: var(--metadata-separator-width); text-align: center; }
+.metadata > [aria-hidden="true"] { margin-inline: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
+.metadata > .metadata-item { margin-inline-start: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
