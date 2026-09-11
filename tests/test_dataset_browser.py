@@ -198,7 +198,14 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "data-search-text" not in row.group(1)
     assert "data-row-primary href='/datasets/searchable/records'" in row.group(2)
     assert "<span class='row-action-label'>Name &lt;unsafe&gt;</span>" in row.group(2)
-    assert "<td class='numeric-column'>0</td>" in row.group(2)
+    assert "<th scope='col'>Version</th>" in page
+    cells = re.findall(r"<td[^>]*>(.*?)</td>", row.group(2), re.DOTALL)
+    assert len(cells) == 5
+    assert "Concept in progress" not in cells[0]
+    assert "href='/datasets/searchable/versions'" in cells[-1]
+    assert "Concept in progress" in cells[-1]
+    assert "Current" not in row.group(2)
+    assert "<td class='numeric-column'>—</td>" in row.group(2)
     assert "Name <unsafe>" not in page
     assert "<markup>" not in page
     assert "+ New dataset" in page
@@ -347,7 +354,7 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     create_field(services, admin, dataset, "active", "Actief", data_type="boolean")
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "<div class='page-actions record-page-actions'>" in page
     assert "images/lucide-download.svg" in page
@@ -357,7 +364,7 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "Export</summary>" in page
     assert "format=csv" in page and "format=xlsx" in page and "format=json" in page
     assert "class='button button-secondary'" in page and "Import</a>" in page
-    assert "href='/datasets/button-actions'>" in page and "Configure</a>" in page
+    assert "href='/datasets/button-actions/concept'>" in page and "Configure</a>" in page
     assert "data-dialog-open='add-record-panel'" in page
     assert "<dialog class='side-panel' id='add-record-panel' data-side-panel" in page
     assert "New button-action record" in page
@@ -367,7 +374,8 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "for='new-record-code'" in page
     assert "id='new-record-code' name='code' type='text' required autofocus" in page
     assert "id='new-record-active' name='active'" in page
-    assert "Search records" not in page
+    assert "role='search' aria-label='Search records'" in page
+    assert "name='q'" in page
     assert ">Filter</button>" not in page and ">Sort</button>" not in page
     assert "Showing 0–0 of 0" in page
 
@@ -380,7 +388,7 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     record = services.dataset_records.create_record(admin.id, dataset.key, {"code": "EUR"})
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert f"data-dialog-open='record-panel-{record.id}'" in page
     assert "<caption class='visually-hidden'>Records</caption>" in page
@@ -424,7 +432,7 @@ def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
     )
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert re.search(r"<th scope='col' class='numeric-column'>\s*Amount", page)
     for value in ("1.200", "3.456", "0.000", "-2.500"):
@@ -450,7 +458,7 @@ def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "<span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>" in page
 
@@ -463,7 +471,7 @@ def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "ABC"})
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
     stylesheet = body(request(client, "get", "/static/css/components/tables.css"))
 
     assert "<table class='record-table'>" in page
@@ -489,11 +497,11 @@ def test_record_table_retains_readable_width_inside_scroll_container(dataset_bro
     )
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
     tokens = body(request(client, "get", "/static/css/tokens.css"))
     tables = body(request(client, "get", "/static/css/components/tables.css"))
 
-    assert re.search(r"<div class='table-scroll'>\s*<table class='record-table'>", page)
+    assert re.search(r"<div class='table-scroll'[^>]*>\s*<table class='record-table'>", page)
     assert "--data-table-min-width: 48rem" in tokens
     assert (
         ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }"
@@ -516,7 +524,7 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     )
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
     tables = body(request(client, "get", "/static/css/components/tables.css"))
     dialog = body(request(client, "get", "/static/css/components/dialog.css"))
 
@@ -614,7 +622,7 @@ def test_record_table_include_and_view_button_pointer_guard(dataset_browser, mon
 
     monkeypatch.setattr(loader, "get_source", record_source)
 
-    response = request(client, "get", f"/datasets/{dataset.key}/records")
+    response = request(client, "get", f"/datasets/{dataset.key}/concept/records")
     script = body(request(client, "get", "/static/js/refrncr.js"))
 
     assert response.status_code == 200
@@ -635,7 +643,7 @@ def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "FOCUS"})
     login(client)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}/records"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
     script = body(request(client, "get", "/static/js/refrncr.js"))
 
     assert "data-side-panel data-modal-side-panel" in page
@@ -691,14 +699,14 @@ def test_record_table_pagination_keeps_range_and_links(dataset_browser):
         services.dataset_records.create_record(admin.id, dataset.key, {"code": f"VALUE-{index:02}"})
     login(client)
 
-    first = body(request(client, "get", f"/datasets/{dataset.key}/records"))
-    second = body(request(client, "get", f"/datasets/{dataset.key}/records?page=2"))
+    first = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
+    second = body(request(client, "get", f"/datasets/{dataset.key}/concept/records?page=2"))
 
     assert "Showing 1–50 of 51" in first
-    assert "href='/datasets/pages/records?page=2'>Next</a>" in first
+    assert "href='/datasets/pages/concept/records?page=2'>Next</a>" in first
     assert ">Previous</a>" not in first
     assert "Showing 51–51 of 51" in second
-    assert "href='/datasets/pages/records?page=1'>Previous</a>" in second
+    assert "href='/datasets/pages/concept/records?page=1'>Previous</a>" in second
     assert ">Next</a>" not in second
 
 
@@ -742,10 +750,8 @@ def test_list_is_universal_despite_legacy_grants_and_creator_metadata(dataset_br
         session.execute(
             update(Dataset).where(Dataset.id == hidden.id).values(owner_user_id=user.id)
         )
-    versions = {
-        item.key: publish_dataset(services, admin.id, item)
-        for item in (direct, team_dataset, hidden)
-    }
+    for item in (direct, team_dataset, hidden):
+        publish_dataset(services, admin.id, item)
     login(client, "viewer@example.com", "viewer password")
 
     response = request(client, "get", "/datasets")
@@ -753,8 +759,8 @@ def test_list_is_universal_despite_legacy_grants_and_creator_metadata(dataset_br
 
     assert response.status_code == 200
     assert page.index("alpha-direct") < page.index("beta-team")
-    assert f"href='/datasets/alpha-direct/versions/{versions[direct.key].id}/records'" in page
-    assert f"href='/datasets/beta-team/versions/{versions[team_dataset.key].id}/records'" in page
+    assert "href='/datasets/alpha-direct/records'" in page
+    assert "href='/datasets/beta-team/records'" in page
     assert "hidden-owned" in page
     assert "Create dataset" not in page
     assert "data-list-search" not in page
@@ -787,7 +793,7 @@ def test_admin_create_flow_persists_owner_and_audit_without_grant(dataset_browse
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/reference-data")
+    assert response.headers["Location"].endswith("/datasets/reference-data/concept")
     assert "reference-data" in body(request(client, "get", "/datasets"))
     with factory() as session:
         dataset = session.scalar(select(Dataset).where(Dataset._key == "reference-data"))
@@ -806,7 +812,7 @@ def test_admin_create_flow_persists_owner_and_audit_without_grant(dataset_browse
     assert dataset.owner_user_id == admin.id
     assert dataset.id != "attacker-controlled"
     assert grant is None
-    assert events == {("dataset", "created")}
+    assert events == {("dataset", "created"), ("dataset", "dataset.concept_created")}
 
 
 def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(dataset_browser):
@@ -982,7 +988,9 @@ def test_detail_authorization_owner_display_edit_link_and_escaping(dataset_brows
     assert "Edit dataset" not in viewer_page
 
     login(client, "editor@example.com", "editor password")
-    assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe"))
+    assert "Edit dataset" not in body(request(client, "get", "/datasets/unsafe"))
+    services.dataset_versions.create_concept(admin.id, dataset.id)
+    assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe/concept"))
 
 
 def test_missing_inaccessible_and_owner_only_detail_are_same_404(dataset_browser):
@@ -996,9 +1004,9 @@ def test_missing_inaccessible_and_owner_only_detail_are_same_404(dataset_browser
     login(client, "user@example.com", "user password")
 
     responses = [
-        request(client, "get", "/datasets/private"),
-        request(client, "get", "/datasets/missing"),
-        request(client, "get", "/datasets/INVALID"),
+        request(client, "get", "/datasets/private/concept"),
+        request(client, "get", "/datasets/missing/concept"),
+        request(client, "get", "/datasets/INVALID/concept"),
     ]
 
     assert [response.status_code for response in responses] == [404, 404, 404]
@@ -1036,7 +1044,7 @@ def test_owning_member_with_legacy_role_can_edit_with_prg_and_audit(dataset_brow
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/editable")
+    assert response.headers["Location"].endswith("/datasets/editable/concept")
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
         audits = session.scalar(
@@ -1218,7 +1226,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     dataset = create_dataset(services, admin, "schema")
     login(client)
 
-    empty_page = body(request(client, "get", "/datasets/schema"))
+    empty_page = body(request(client, "get", "/datasets/schema/concept"))
     assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
@@ -1232,7 +1240,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
 
     template_rendered.connect(record_template, client.application)
     try:
-        response = request(client, "get", "/datasets/schema")
+        response = request(client, "get", "/datasets/schema/concept")
     finally:
         template_rendered.disconnect(record_template, client.application)
     page = body(response)
@@ -1295,7 +1303,7 @@ def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browse
         lambda *args, **kwargs: (_ for _ in ()).throw(NotFoundError()),
     )
 
-    response = request(client, "get", "/datasets/revoked-during-read")
+    response = request(client, "get", "/datasets/revoked-during-read/concept")
 
     assert response.status_code == 404
     assert body(response) == body(request(client, "get", "/does-not-exist"))
@@ -1329,7 +1337,7 @@ def test_community_admin_override_shows_schema_controls_without_grant(dataset_br
         session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
     login(client)
 
-    page = body(request(client, "get", "/datasets/override"))
+    page = body(request(client, "get", "/datasets/override/concept"))
 
     assert "Add field" in page
     assert "Edit field" in page
@@ -1375,7 +1383,7 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
 
     assert moved.status_code == 302
     assert stale.status_code == 409
-    assert moved.location == "/datasets/ordered"
+    assert moved.location == "/datasets/ordered/concept"
     assert [
         field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)
     ] == expected_keys
@@ -1455,7 +1463,7 @@ def test_admin_create_field_browser_flow_accepts_supported_types(dataset_browser
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/create-field")
+    assert response.headers["Location"].endswith("/datasets/create-field/concept")
     field = services.dataset_fields.get_field(admin.id, dataset.key, data_type)
     assert field.data_type == data_type
     assert field.is_required is False
@@ -1667,7 +1675,7 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/edit-field")
+    assert response.headers["Location"].endswith("/datasets/edit-field/concept")
     with factory() as session:
         persisted = session.get(DatasetField, original_id)
         assert persisted.key == "stable_key"
@@ -1899,12 +1907,12 @@ def test_record_identifier_detail_is_compact_canonical_and_marks_each_component(
     create_field(services, admin, dataset, "alpha", "Alpha", is_required=True)
     login(client)
 
-    unconfigured = body(request(client, "get", "/datasets/business-key"))
+    unconfigured = body(request(client, "get", "/datasets/business-key/concept"))
     assert "No record identifier configured" in unconfigured
     assert "Business key" not in unconfigured
 
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("zeta", "alpha"))
-    configured = body(request(client, "get", "/datasets/business-key"))
+    configured = body(request(client, "get", "/datasets/business-key/concept"))
     assert "No record identifier configured" not in configured
     assert configured.index("Zeta") < configured.index("Alpha")
     assert configured.count("images/lucide-key-round.svg") == 2
@@ -1971,7 +1979,7 @@ def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_wi
         },
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}")
+    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}/concept")
     assert services.dataset_business_keys.get_business_key(manager.id, dataset.key).field_keys == (
         required.key,
     )
@@ -2184,7 +2192,7 @@ def test_identifier_field_content_is_escaped_on_detail_and_edit_form(dataset_bro
     login(client)
 
     for response in (
-        request(client, "get", f"/datasets/{dataset.key}"),
+        request(client, "get", f"/datasets/{dataset.key}/concept"),
         request(client, "get", f"/datasets/{dataset.key}/fields/unsafe/edit"),
     ):
         assert response.status_code == 200
@@ -2207,7 +2215,7 @@ def test_dataset_admin_deletes_normal_field_with_prg_and_audit(dataset_browser):
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}")
+    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}/concept")
     with factory() as session:
         assert session.get(DatasetField, field.id) is None
         assert (
@@ -2343,7 +2351,7 @@ def test_configuration_panel_triggers_follow_existing_permissions(dataset_browse
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
     login(client, user.email)
 
-    page = body(request(client, "get", f"/datasets/{dataset.key}"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept"))
     expected = 0  # Legacy grants supply no maintenance controls.
     assert page.count("data-panel-url") == expected
     assert page.count("id='configuration-panel'") == (1 if expected else 0)
@@ -2364,7 +2372,7 @@ def test_configuration_flows_load_one_shared_panel_and_keep_full_page_fallback(d
             return original_loader.get_source(environment, template)
 
     client.application.jinja_env.loader = TrackingLoader()
-    for page_path in ["/datasets", "/datasets/panel-forms"]:
+    for page_path in ["/datasets", "/datasets/panel-forms/concept"]:
         page = body(request(client, "get", page_path))
         assert page.count("id='configuration-panel'") == 1
         assert "aria-labelledby='configuration-panel-title'" in page

@@ -819,6 +819,10 @@
         [
           "dataset",
           "created"
+        ],
+        [
+          "dataset",
+          "dataset.concept_created"
         ]
       ],
       "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
@@ -827,6 +831,10 @@
         "dataset:created": {
           "owner_team_id": "uuid",
           "creator_user_id": "uuid"
+        },
+        "dataset:dataset.concept_created": {
+          "baseline_version_number": "version_count",
+          "concept_revision": "version_count"
         }
       },
       "success": "Exactly one declared event for the committed change.",
@@ -1242,10 +1250,34 @@
       "operation": "get_dataset_for_edit",
       "service": "refrncr.services.DatasetService.get_dataset_for_edit",
       "interface_entrypoints": [
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
+        "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
+        "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
+        "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
+        "refrncr.web.cancel_record_import POST /datasets/<key>/records/import/<token>/cancel",
+        "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
+        "refrncr.web.create_dataset_record POST /datasets/<key>/records",
+        "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
+        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1842,6 +1874,7 @@
       "operation": "export_dataset",
       "service": "refrncr.services.DatasetRecordService.export_dataset",
       "interface_entrypoints": [
+        "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export"
       ],
@@ -2465,17 +2498,32 @@
       "operation": "resolve_with_session",
       "service": "refrncr.services.SessionService.resolve_with_session",
       "interface_entrypoints": [
+        "refrncr.web.audit_list GET /settings/audit-log",
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
         "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
+        "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -2489,6 +2537,7 @@
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
@@ -2505,16 +2554,7 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -2936,10 +2976,11 @@
       "operation": "can_change_dataset_owner",
       "service": "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
       "interface_entrypoints": [
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>"
+        "refrncr.web.update_dataset POST /datasets/<key>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3654,17 +3695,25 @@
       "operation": "for_request",
       "service": "refrncr.browser_security.BrowserCookiePolicy.for_request",
       "interface_entrypoints": [
+        "refrncr.web.audit_list GET /settings/audit-log",
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
         "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
         "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
+        "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -3678,6 +3727,7 @@
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
@@ -3696,16 +3746,7 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3803,7 +3844,8 @@
         "refrncr start",
         "refrncr user create-admin",
         "refrncr dataset-ownership-preflight --upgrade",
-        "refrncr dataset-publication-preflight"
+        "refrncr dataset-publication-preflight",
+        "refrncr dataset-concept-preflight"
       ],
       "kind": "mutation",
       "classification": "technical logging only",
@@ -4070,6 +4112,7 @@
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
@@ -4084,7 +4127,6 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
         "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",
@@ -4460,7 +4502,6 @@
       "service": "refrncr.dataset_versions.DatasetVersionService.review",
       "interface_entrypoints": [
         "Trusted programmatic service invocation; browser interface follows in part 2.",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
@@ -4625,8 +4666,15 @@
       "service": "refrncr.dataset_versions.DatasetVersionService.history",
       "interface_entrypoints": [
         "Trusted programmatic service invocation; browser interface follows in part 2.",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4659,9 +4707,11 @@
       "service": "refrncr.dataset_versions.DatasetVersionService.read",
       "interface_entrypoints": [
         "Trusted programmatic service invocation; browser interface follows in part 2.",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
       ],
       "kind": "read",
@@ -4674,7 +4724,7 @@
       "object_identifier": "Stable Dataset UUID.",
       "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
       "allowed_context": {},
-      "success": "Return one coherent authorized source. Ordinary users only see Current/Expired published contents; administrator concept access is explicit.",
+      "success": "Return one coherent authorized source, including explicit concept identifier search and read-only baseline tombstones. Ordinary users only see Current/Expired published contents.",
       "validation_failure": "No change or success event.",
       "authorization_failure": "Non-disclosing not found; no mutation or event.",
       "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
@@ -4683,11 +4733,339 @@
       "duplicate_retry": "Dataset lock and revision check allow at most one committed publication for a revision.",
       "tests": [
         "tests/test_dataset_version_views.py::test_no_current_never_exposes_concept",
-        "tests/test_dataset_version_views.py::test_current_and_historical_pages_use_only_snapshot_content"
+        "tests/test_dataset_version_views.py::test_current_and_historical_pages_use_only_snapshot_content",
+        "tests/test_record_system_status.py::test_system_status_is_distinct_from_content_and_tombstones_are_read_only"
       ],
-      "implementation_status": "REF-83 part 2 implementation and validation in progress.",
+      "implementation_status": "Implemented; REF-84 system status/tombstone regression coverage added.",
       "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "Dataset concept review",
+      "operation": "open_review",
+      "service": "refrncr.dataset_diff.DatasetDiffService.open_review",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review"
+      ],
+      "kind": "read",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [
+        [
+          "dataset",
+          "dataset.version_diff_viewed"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {
+        "dataset:dataset.version_diff_viewed": {
+          "baseline_version_number": "version_count",
+          "concept_revision": "version_count",
+          "fields_added": "version_count",
+          "fields_changed": "version_count",
+          "fields_removed": "version_count",
+          "records_added": "version_count",
+          "records_changed": "version_count",
+          "records_removed": "version_count"
+        }
+      },
+      "success": "One committed bounded diff-view event before returning a new review.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "A valid no-change review is audited only on opening.",
+      "rollback": "No review result or success event after audit insertion or commit failure.",
+      "duplicate_retry": "A new explicit open is a new review; child requests never audit.",
+      "tests": [
+        "tests/test_dataset_diff.py::test_audit_once_no_noise_and_no_change",
+        "tests/test_dataset_diff.py::test_open_audit_failure_rolls_back",
+        "tests/test_dataset_diff.py::test_authorization_every_operation",
+        "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
+        "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "Dataset concept review",
+      "operation": "review",
+      "service": "refrncr.dataset_diff.DatasetDiffService.review",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read only within the authorized revision and baseline; no event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "A valid no-change review is audited only on opening.",
+      "rollback": "No review result or success event after audit insertion or commit failure.",
+      "duplicate_retry": "A new explicit open is a new review; child requests never audit.",
+      "tests": [
+        "tests/test_dataset_diff.py::test_audit_once_no_noise_and_no_change",
+        "tests/test_dataset_diff.py::test_open_audit_failure_rolls_back",
+        "tests/test_dataset_diff.py::test_authorization_every_operation",
+        "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
+        "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "Dataset concept review",
+      "operation": "field_detail",
+      "service": "refrncr.dataset_diff.DatasetDiffService.field_detail",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read only within the authorized revision and baseline; no event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "A valid no-change review is audited only on opening.",
+      "rollback": "No review result or success event after audit insertion or commit failure.",
+      "duplicate_retry": "A new explicit open is a new review; child requests never audit.",
+      "tests": [
+        "tests/test_dataset_diff.py::test_audit_once_no_noise_and_no_change",
+        "tests/test_dataset_diff.py::test_open_audit_failure_rolls_back",
+        "tests/test_dataset_diff.py::test_authorization_every_operation",
+        "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
+        "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "Dataset concept review",
+      "operation": "record_detail",
+      "service": "refrncr.dataset_diff.DatasetDiffService.record_detail",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read only within the authorized revision and baseline; no event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "A valid no-change review is audited only on opening.",
+      "rollback": "No review result or success event after audit insertion or commit failure.",
+      "duplicate_retry": "A new explicit open is a new review; child requests never audit.",
+      "tests": [
+        "tests/test_dataset_diff.py::test_audit_once_no_noise_and_no_change",
+        "tests/test_dataset_diff.py::test_open_audit_failure_rolls_back",
+        "tests/test_dataset_diff.py::test_authorization_every_operation",
+        "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
+        "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "concept_context",
+      "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
+        "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
+        "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
+        "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
+        "refrncr.web.cancel_record_import POST /datasets/<key>/records/import/<token>/cancel",
+        "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
+        "refrncr.web.create_dataset_record POST /datasets/<key>/records",
+        "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
+        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read/technical operation follows the explicit concept contract.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Duplicate concept creation fails without another event.",
+      "rollback": "Concept, working data and event roll back together.",
+      "duplicate_retry": "At most one active concept and one committed creation event.",
+      "tests": [
+        "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
+        "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
+      "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "create_concept",
+      "service": "refrncr.dataset_versions.DatasetVersionService.create_concept",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [
+        [
+          "dataset",
+          "dataset.concept_created"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {
+        "dataset:dataset.concept_created": {
+          "baseline_version_number": "version_count",
+          "concept_revision": "version_count"
+        }
+      },
+      "success": "Concept creation, initialization and audit commit atomically; reads do not write.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Duplicate concept creation fails without another event.",
+      "rollback": "Concept, working data and event roll back together.",
+      "duplicate_retry": "At most one active concept and one committed creation event.",
+      "tests": [
+        "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
+        "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "",
+      "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "concept_preflight",
+      "service": "refrncr.concept_upgrade.concept_preflight",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr dataset-concept-preflight"
+      ],
+      "kind": "read",
+      "classification": "technical logging only",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read/technical operation follows the explicit concept contract.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Duplicate concept creation fails without another event.",
+      "rollback": "Concept, working data and event roll back together.",
+      "duplicate_retry": "At most one active concept and one committed creation event.",
+      "tests": [
+        "tests/test_concept_migration.py::test_lossless_migration_and_retry"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
+      "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "migrate_concepts",
+      "service": "refrncr.concept_upgrade.migrate_concepts",
+      "interface_entrypoints": [
+        "Trusted programmatic caller"
+      ],
+      "kind": "mutation",
+      "classification": "technical logging only",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Read/technical operation follows the explicit concept contract.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Duplicate concept creation fails without another event.",
+      "rollback": "Concept, working data and event roll back together.",
+      "duplicate_retry": "At most one active concept and one committed creation event.",
+      "tests": [
+        "tests/test_concept_migration.py::test_lossless_migration_and_retry"
+      ],
+      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
+      "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     }
   ]
 }

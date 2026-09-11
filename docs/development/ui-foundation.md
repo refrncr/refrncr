@@ -749,3 +749,39 @@ rejection, busy/double submit, escaped release notes, historical views and downl
 for panel animations before checking bounds/screenshots. Existing navigation and table regression
 scripts cover their original breakpoint set. These structural/accessibility checks do not claim
 certification by a human screen-reader user. See the REF-83 report for exact results.
+
+
+## REF-84 concept context component
+
+The explicit lifecycle correction is product functionality with a shared concept banner,
+header Versions action (existing icon family), and quiet table change indicators. It reuses
+existing spacing, radius, info-surface and button tokens; no new design token or dependency.
+`components/concept.html` owns the banner/action markup, with shared styling in feedback.css.
+Versions uses aligned Concept and published-version rows with the same columns.
+Versions offers Review changes for a reviewable concept. Publish version is a page action
+on concept and review pages, using the existing REF-83 sidepanel and form. The panel's
+optional Review changes link also supports a first publication without a baseline.
+
+Current is read-only for every user. Versions is the central lifecycle page; its Concept
+row opens the explicit concept even before edits. Concept pages/forms identify themselves
+with You’re working on a concept, pinned baseline (or No published version yet), status and
+View current version. Review/Publish are hidden when unchanged, and stale cancellation
+states explicitly explain preserved edits and blocked publication/replacement. Shared
+native panels retain Escape, focus trapping and opener restoration. Content strings remain
+escaped, and the banner uses text as well as colour.
+
+The application shell has no empty top bar. Content starts at the top with its normal
+page padding. The navigation opener sits inside the content area when the sidebar is
+collapsed or displayed as a mobile drawer. The labelled Settings header remains part
+of the separate Settings layout.
+
+The Record table ends with one system Status column before its row chevron. A System
+sublabel, accessible name Status (application metadata), interface typography and column
+boundary distinguish it from user Fields. Published uses a green success badge; Edited/Added use info
+badges, Deleted an error badge on a muted row. No green Complete badge remains. Content
+Fields named Status, Change and Validation retain their names and actual values.
+Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
+Escape and focus restoration. Search and deterministic pagination include old identifiers.
+The metadata line counts surviving Records plus a separate marked-for-deletion count.
+Wide tables remain keyboard-scrollable at 320/768/1440. Configure Field badges reuse shared
+classification and never enter button accessible names. No new design tokens were added.

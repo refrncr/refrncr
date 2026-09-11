@@ -16,15 +16,15 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 
 ## Decisions and scope
 
-The current inventory contains 82 public application-service operations, plus 36 security,
-transient, technical and administrative operations. Its 118 decisions are 32 domain-audited,
-19 security logging required, 11 technical logging only and 56 intentionally excluded. There are
-47 explicitly declared HTTP routes (46 Flask and one health route), six CLI flows including the
-opt-in `python -m refrncr.argon2_benchmark`, and documented implicit framework endpoints. The
-catalog supports 30 `(object_type, action)` contracts. REF-39 adds two intentionally excluded reads;
-the guard compares symbols rather than freezing these counts.
+The current inventory contains 93 public application-service operations and 38 security,
+transient, technical and administrative operations. Its 131 decisions are 35 domain-audited,
+19 security logging required, 13 technical logging only and 64 intentionally excluded.
+There are 56 explicitly declared HTTP route entries and seven CLI flows, plus documented
+implicit framework endpoints. The catalog supports 33 `(object_type, action)` contracts.
+The guard compares symbols rather than freezing these counts.
 
 Domain audit records committed business changes and prepared authorized Dataset export requests.
+REF-84 adds the explicitly approved successful review-opening exception described below.
 Ordinary Dataset listing, viewing, page navigation, policy checks, preview, staged-import navigation
 and cancellation create no successful domain event. Authorization/validation/stale/rollback failures
 never masquerade as successful changes. Retention cleanup, startup, singleton bootstrap and operator
@@ -262,3 +262,48 @@ only. Its publisher is explicitly represented by a null publisher ID (System) in
 metadata; no user or anonymous domain audit actor is invented. Migration revision and
 preflight results establish the upgrade outcome. The existing audit coverage guard now
 also rejects direct catalog bypass in the version service module.
+
+## REF-84: explicit audited review-read exception
+
+The product owner approved `dataset.version_diff_viewed` on 2026-09-11 as an
+explicit exception to REF-149's ordinary-read exclusion. Opening a new valid
+concept review emits exactly one event on the stable Dataset ID with its trusted
+actor, baseline version number, concept revision and six Added/Changed/Removed
+Field/Record counts. All eight context values are bounded integers. No names,
+identifiers, descriptions, definitions, values, search terms or request tokens
+are stored. This does not change the policy for ordinary reads or REF-39 history.
+
+Opening uses the existing serialized write UoW and Dataset → team → actor locks.
+It authorizes and computes a coherent summary before inserting the event; it
+returns only after commit. Insertion/commit failure returns no review result and
+rolls back the event. Denied, missing, stale, invalid and failed opens emit no
+successful event. The event describes the server's accepted review opening, not
+confirmed rendering or client receipt. A fresh explicit open is a new review;
+refreshing or navigating an already opened review is a child read and emits none.
+Summary/Fields/Records, search, filters, pagination and details independently
+reauthorize and verify the pinned revision and baseline without writing audit.
+
+Review content is calculated on demand and is never persisted or cached.
+The HTTP review carries a signed, session-bound identity; it does not create a
+review-completed state or a publication prerequisite. See the REF-84 report for
+baseline, pagination, validation evidence and operational characteristics.
+
+
+### Explicit concept creation (REF-84)
+
+`DatasetVersionService.create_concept` emits `dataset.concept_created` on the trusted
+Dataset UUID with the trusted actor. Its only context fields are bounded integer
+`baseline_version_number` (0 means no published baseline) and `concept_revision`.
+No concept UUID, content, identifier, grants, token, path or request payload enters context.
+Row creation, optional snapshot initialization and audit commit in one serialized UoW;
+duplicate, denied, insert/commit failure and rollback produce no success event.
+Dataset creation invokes this same operation in its transaction, so a successful Dataset
+creation has both the existing created event and one concept-created event.
+
+Current/Concept navigation, Versions metadata and ordinary detail/filter/pagination reads
+remain excluded. The approved `dataset.version_diff_viewed` exception applies only to
+opening a new valid, changed review, including first concepts with no baseline. Its bounded
+baseline number is 0 in that case. No-change, missing, denied or stale requests have no
+successful review event. Child reads inside the same signed concept/revision/baseline
+review add no events; audit insert/commit failure returns no review result. Migration
+0016/preflight remains a technical operator operation, with no invented domain actor/event.

@@ -27,7 +27,9 @@ def previous_schema(c):
     # Construct the real preceding migration schema, preserving populated fixture rows.
     with c.engine.connect() as connection:
         config = config_for(connection)
-        command.stamp(config, "0015_ref_83")
+        connection.execute(text("DELETE FROM dataset_concepts"))
+        connection.commit()
+        command.stamp(config, "0016_ref_84")
         command.downgrade(config, "0014_ref_145")
 
 
@@ -134,7 +136,7 @@ def test_empty_upgrade_from_every_supported_revision(audit_db, revision):  # noq
         config = config_for(connection)
         command.upgrade(config, revision)
         command.upgrade(config, "head")
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016_ref_84"
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 0
 
 

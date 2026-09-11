@@ -41,6 +41,13 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
+        if current == "0016_ref_84":
+            # Historical fixture construction only; lifecycle downgrade safety has
+            # dedicated tests. Preserve every working-content and audit row.
+            with connection.begin():
+                connection.execute(text("DELETE FROM dataset_concepts"))
+            command.downgrade(config, "0015_ref_83")
+            current = "0015_ref_83"
         if current == "0015_ref_83":
             # This helper constructs historical fixtures, not a production downgrade.
             # REF-83's populated downgrade guard is tested independently.

@@ -18,6 +18,7 @@ from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
 from refrncr.browser_security import is_loopback_host
+from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
@@ -159,6 +160,14 @@ def build_parser() -> argparse.ArgumentParser:
     database.add_argument("--database-url")
     database.add_argument("--database-path", type=Path)
     publication.add_argument("--upgrade", action="store_true")
+    concept = subparsers.add_parser(
+        "dataset-concept-preflight",
+        help="Validate working copies before explicit concept migration; stop writers first.",
+    )
+    database = concept.add_mutually_exclusive_group()
+    database.add_argument("--database-url")
+    database.add_argument("--database-path", type=Path)
+    concept.add_argument("--upgrade", action="store_true")
     return parser
 
 
@@ -231,6 +240,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0013_ref_39",
         "0014_ref_145",
         "0015_ref_83",
+        "0016_ref_84",
     }:
         return
     inspector = inspect(connection)
@@ -298,7 +308,7 @@ def start(configuration: StartConfiguration) -> None:
             ),
             trusted_proxies=configuration.trusted_proxies,
         )
-    except (DatasetUpgradeError, VersionUpgradeError):
+    except (DatasetUpgradeError, VersionUpgradeError, ConceptUpgradeError):
         raise
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
@@ -383,18 +393,28 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "dataset-publication-preflight":
+        if args.command in {"dataset-publication-preflight", "dataset-concept-preflight"}:
             database_url = resolve_database_url(args)
             engine = create_database_engine(database_url)
             try:
                 with engine.connect() as connection:
                     revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
-                    if revision not in {"0014_ref_145", "0015_ref_83"}:
+                    allowed = (
+                        {"0015_ref_83", "0016_ref_84"}
+                        if args.command == "dataset-concept-preflight"
+                        else {"0014_ref_145", "0015_ref_83", "0016_ref_84"}
+                    )
+                    if revision not in allowed:
                         raise CliError(
-                            "Standalone publication preflight requires schema 0014_ref_145 or "
-                            "later. Older supported upgrades run the full preflight automatically."
+                            f"{args.command} requires one of these schemas: "
+                            f"{', '.join(sorted(allowed))}. "
+                            "Older supported upgrades run the full preflight automatically."
                         )
-                    invalid = publication_preflight(connection)
+                    invalid = (
+                        concept_preflight(connection)
+                        if args.command == "dataset-concept-preflight"
+                        else publication_preflight(connection)
+                    )
                 print(json.dumps({"invalid_dataset_ids": invalid}, indent=2))
                 if invalid:
                     return 1
@@ -449,18 +469,18 @@ def main(
         print(f"refrncr failed: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:
-        if args.command == "dataset-publication-preflight":
+        if args.command in {"dataset-publication-preflight", "dataset-concept-preflight"}:
             message = (
                 str(exc)
-                if isinstance(exc, VersionUpgradeError)
-                else "Publication preflight or upgrade failed; keep writers stopped and retry."
+                if isinstance(exc, (VersionUpgradeError, ConceptUpgradeError))
+                else "Preflight or upgrade failed; keep writers stopped and retry."
             )
             print(f"refrncr failed: {message}", file=sys.stderr)
             return 1
         if args.command == "dataset-ownership-preflight":
             message = (
                 str(exc)
-                if isinstance(exc, (DatasetUpgradeError, VersionUpgradeError))
+                if isinstance(exc, (DatasetUpgradeError, VersionUpgradeError, ConceptUpgradeError))
                 else "Database validation or upgrade failed. Check database availability and "
                 "configuration; keep writers stopped and rerun the ownership preflight."
             )

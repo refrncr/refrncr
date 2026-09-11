@@ -348,7 +348,11 @@ def test_postgresql_export_is_one_snapshot_during_mutation(
     monkeypatch.setattr(SqlAlchemyDatasetRecordOperations, "iterate_all", synchronized_iterate)
 
     def export():
-        return content(services.dataset_records.export_dataset(admin.id, dataset.key, "json"))
+        return content(
+            services.dataset_records.export_dataset(
+                admin.id, dataset.key, "json", prefer_concept=True
+            )
+        )
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         pending = executor.submit(export)
@@ -422,7 +426,7 @@ def test_browser_download_headers_parameter_validation_and_request_audit():
 
     with factory() as session:
         audits_before = session.scalar(select(func.count(AuditEvent.id)))
-    response = client.get("/datasets/countries/records/export?format=json", base_url=HTTPS)
+    response = client.get("/datasets/countries/concept/records/export?format=json", base_url=HTTPS)
     assert response.status_code == 200
     assert response.content_type == "application/json; charset=utf-8"
     assert response.headers["Content-Disposition"] == "attachment; filename=countries.json"
@@ -430,21 +434,25 @@ def test_browser_download_headers_parameter_validation_and_request_audit():
     with factory() as session:
         assert session.scalar(select(func.count(AuditEvent.id))) == audits_before + 1
 
-    csv_download = client.get("/datasets/countries/records/export?format=csv", base_url=HTTPS)
+    csv_download = client.get(
+        "/datasets/countries/concept/records/export?format=csv", base_url=HTTPS
+    )
     assert csv_download.headers["Content-Disposition"] == "attachment; filename=countries.csv"
     assert list(csv.reader(io.StringIO(csv_download.data[3:].decode("utf-8"), newline=""))) == [
         ["code"],
         ["NL"],
     ]
 
-    excel_download = client.get("/datasets/countries/records/export?format=xlsx", base_url=HTTPS)
+    excel_download = client.get(
+        "/datasets/countries/concept/records/export?format=xlsx", base_url=HTTPS
+    )
     assert excel_download.headers["Content-Disposition"] == "attachment; filename=countries.xlsx"
     workbook = load_workbook(io.BytesIO(excel_download.data), data_only=False)
     assert list(workbook.active.values) == [("code",), ("NL",)]
     workbook.close()
 
     for suffix in ("", "?format=pdf", "?format=csv&format=json", "?format="):
-        rejected = client.get("/datasets/countries/records/export" + suffix, base_url=HTTPS)
+        rejected = client.get("/datasets/countries/concept/records/export" + suffix, base_url=HTTPS)
         assert rejected.status_code == 400
 
 

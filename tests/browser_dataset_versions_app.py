@@ -43,11 +43,13 @@ history, record = source("history", "History demo")
 s.dataset_versions.clock = lambda: now - timedelta(days=2)
 publish(history, note="First published version")
 s.dataset_versions.clock = lambda: now - timedelta(days=1)
+s.dataset_versions.create_concept(admin.id, history.id)
 s.dataset_records.update_record(
     admin.id, history.key, record.id, 1, {"code": "FIRST", "label": "Second published value"}
 )
 publish(history, note="Current version")
 s.dataset_versions.clock = lambda: now
+s.dataset_versions.create_concept(admin.id, history.id)
 s.datasets.update_dataset(admin.id, history.key, "Unpublished history name", "DRAFT DESCRIPTION")
 s.dataset_records.update_record(
     admin.id, history.key, record.id, 2, {"code": "FIRST", "label": "DRAFT ONLY"}

@@ -1,9 +1,14 @@
 {% from "components/table_row.html" import table_row, row_action %}
 <div class='record-toolbar' aria-label='Record results'>
+  <form method='get' role='search' aria-label='Search records'>
+    <label class='visually-hidden' for='record-search'>Search identifier</label>
+    <input id='record-search' name='q' value='{{ record_search }}' maxlength='200' placeholder='Search identifier'>
+    <button class='button button-secondary' type='submit'>Search</button>
+  </form>
   <span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>
 </div>
 {% if rows %}
-  <div class='table-scroll'>
+  <div class='table-scroll' role='region' aria-label='Records' tabindex='0'>
     <table class='record-table'>
       <caption class='visually-hidden'>Records</caption>
       <thead>
@@ -13,12 +18,13 @@
               {{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'>{% endif %}
             </th>
           {% endfor %}
-          <th scope='col'>Status</th>
+          <th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>
         </tr>
       </thead>
       <tbody>
         {% for record, values, incomplete in rows %}
-          {% call table_row('record-row', panel=true) %}
+          {% set status = record_states.get(record.id, 'Published') %}
+          {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
               <td{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
@@ -32,21 +38,22 @@
                 {% endif %}
                 {% endset %}
                 {% if field.key == identifier.field_keys[0] %}
-                  {% set primary_label = display_record_value(field, cell_value) if cell_value is not none else "No value" %}
-                  {% call row_action(panel="record-panel-" ~ record.id, accessible_name="View record " ~ primary_label ~ " (" ~ record.id ~ ")") %}{{ value_content }}{% endcall %}
+                  {% set primary_label = record_labels.get(record.id) if status == "Deleted" else (display_record_value(field, cell_value) if cell_value is not none else "No value") %}
+                  {% call row_action(panel="record-panel-" ~ record.id, accessible_name="View " ~ ('deleted ' if status == 'Deleted' else '') ~ "record " ~ primary_label ~ " (" ~ record.id ~ ")") %}{% if status == 'Deleted' %}<span class='cell-content'>{{ primary_label }}</span>{% else %}{{ value_content }}{% endif %}{% endcall %}
                 {% else %}{{ value_content }}{% endif %}
               </td>
             {% endfor %}
-            <td>{% if incomplete %}<span class='badge badge-warning'>Incomplete record</span>{% else %}<span class='badge badge-success'>Complete</span>{% endif %}</td>
+
+            <td class='record-system-status'><span class='badge {{ "badge-success" if status == "Published" else "badge-error" if status == "Deleted" else "badge-info" }}'>{{ status }}</span></td>
           {% endcall %}
         {% endfor %}
       </tbody>
     </table>
   </div>
 {% else %}
-  <div class='empty-state'><h2>No records yet</h2><p>No records are available.</p></div>
+  <div class='empty-state'><h2>{{ 'No matching records' if record_search else 'No records yet' }}</h2><p>{{ 'Try another identifier.' if record_search else 'No records are available.' }}</p></div>
 {% endif %}
 <nav class="pagination" aria-label="Record pages">
-  {% if page.page > 1 %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, page=page.page-1) }}'>Previous</a>{% endif %}
-  {% if page.page * page.page_size < page.total %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, page=page.page+1) }}'>Next</a>{% endif %}
+  {% if page.page > 1 %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, page=page.page-1, q=record_search or none) }}'>Previous</a>{% endif %}
+  {% if page.page * page.page_size < page.total %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, page=page.page+1, q=record_search or none) }}'>Next</a>{% endif %}
 </nav>

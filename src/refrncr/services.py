@@ -727,6 +727,19 @@ class DatasetDeletion:
     expected_updated_at: str
 
 
+def _require_concept(uow, dataset_id):
+    concept = uow.concepts.get(dataset_id)
+    if concept is None:
+        raise ConflictError("Start a New concept before editing this Dataset.")
+    return concept
+
+
+def _advance_concept(uow, dataset):
+    _require_concept(uow, dataset.id)
+    dataset.revision += 1
+    uow.concepts.touch(dataset.id, _now())
+
+
 def _version_reads(service):
     from refrncr.dataset_versions import DatasetVersionService
 
@@ -837,6 +850,7 @@ class DatasetService:
                 action="created",
                 details={"owner_team_id": owner_team_id, "creator_user_id": actor_id},
             )
+            _version_reads(self).create_concept(actor_id, dataset.id, uow=uow)
             return dataset
 
     def change_owner(self, actor_id, key, expected_owner_team_id, owner_team_id):
@@ -1036,9 +1050,10 @@ class DatasetService:
                 actor_id, "dataset", dataset.id, "editor", uow=uow
             ):
                 raise NotFoundError("Dataset not found")
+            _require_concept(uow, dataset.id)
             if dataset.name == normalized_name and dataset.description == validated_description:
                 return dataset
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.name = normalized_name
             dataset.description = validated_description
             dataset.updated_at = _now()
@@ -1127,7 +1142,7 @@ class DatasetFieldService:
                 if exc.constraint == "uq_dataset_fields_dataset_key":
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "created")
             if validated_component:
@@ -1213,7 +1228,7 @@ class DatasetFieldService:
             field.is_required = validated_required
             field.is_unique = validated_unique
             field.updated_at = _now()
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
@@ -1294,7 +1309,7 @@ class DatasetFieldService:
                     ),
                 )
 
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             if definition_changed:
                 field.name = normalized_name
@@ -1325,7 +1340,7 @@ class DatasetFieldService:
             uow.flush()
             remaining = uow.dataset_fields.list_for_dataset(dataset.id)
             uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field_id, "deleted")
 
@@ -1358,7 +1373,7 @@ class DatasetFieldService:
                 raise ValidationError("Field order must contain every current field exactly once")
             if proposed_order == current:
                 return tuple(fields)
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
             record_audit(
@@ -1400,6 +1415,12 @@ class DatasetFieldService:
             actor_id, "dataset", dataset.id, required_permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if required_permission in {"admin", "editor"}:
+            if uow is not None:
+                _require_concept(uow, dataset.id)
+            else:
+                with self.uow() as work:
+                    _require_concept(work, dataset.id)
 
     @staticmethod
     def _validated_dataset_lookup_key(key: str) -> str:
@@ -1505,7 +1526,7 @@ class DatasetBusinessKeyService:
             if uow.dataset_records.count(dataset.id):
                 raise ValidationError("Record identifier cannot change after records exist")
 
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
             record_audit(
@@ -1526,6 +1547,12 @@ class DatasetBusinessKeyService:
             actor_id, "dataset", dataset.id, required_permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if required_permission in {"admin", "editor"}:
+            if uow is not None:
+                _require_concept(uow, dataset.id)
+            else:
+                with self.uow() as work:
+                    _require_concept(work, dataset.id)
 
 
 class DatasetRecordService:
@@ -1563,7 +1590,7 @@ class DatasetRecordService:
                 if error.constraint == "uq_dataset_record_values_unique_value":
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1622,7 +1649,7 @@ class DatasetRecordService:
                 uow.flush()
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1646,7 +1673,7 @@ class DatasetRecordService:
             self._require_access(actor_id, dataset, "editor", uow=uow)
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
-            dataset.revision += 1
+            _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1713,7 +1740,15 @@ class DatasetRecordService:
     def list_records(self, actor_id: str, dataset_key: str, page: int = 1) -> RecordPage:
         return _version_reads(self).read(actor_id, dataset_key, page=page, prefer_concept=True).page
 
-    def export_dataset(self, actor_id: str, dataset_key: str, format_name: str, *, version_id=None):
+    def export_dataset(
+        self,
+        actor_id: str,
+        dataset_key: str,
+        format_name: str,
+        *,
+        version_id=None,
+        prefer_concept=False,
+    ):
         from refrncr.dataset_export import (
             ExportGenerationError,
             externally_ordered_records,
@@ -1732,7 +1767,7 @@ class DatasetRecordService:
                 self._require_access(actor_id, dataset, "export", uow=uow)
                 dataset_id = dataset.id
                 _dataset, selected, _maintain = _version_reads(self)._selection(
-                    uow, actor_id, validated_key, version_id, prefer_concept=True
+                    uow, actor_id, validated_key, version_id, prefer_concept=prefer_concept
                 )
                 if selected is None:
                     fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
@@ -1802,6 +1837,12 @@ class DatasetRecordService:
             actor_id, "dataset", dataset.id, permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if permission in {"admin", "editor"}:
+            if uow is not None:
+                _require_concept(uow, dataset.id)
+            else:
+                with self.uow() as work:
+                    _require_concept(work, dataset.id)
 
 
 class GrantService:

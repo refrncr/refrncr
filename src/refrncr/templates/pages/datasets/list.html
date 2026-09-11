@@ -13,10 +13,11 @@
     </div>
   </div>
   {% if datasets %}<div class='table-scroll management-table'><table aria-label='Datasets'><caption class='visually-hidden'>Datasets</caption><thead><tr>
-    <th scope='col'>Dataset</th><th scope='col'>Owning team</th><th scope='col' class='numeric-column'>Records</th><th scope='col'>Updated</th></tr></thead><tbody>
+    <th scope='col'>Dataset</th><th scope='col'>Owning team</th><th scope='col' class='numeric-column'>Records</th><th scope='col'>Updated</th><th scope='col'>Version</th></tr></thead><tbody>
     {% for context in datasets %}{% set dataset = context.dataset %}{% call table_row('dataset-row') %}
-      <td>{{ row_action(dataset.name, href=url_for("dataset_records_view", key=dataset.key, version_id=dataset.version_id if dataset.version_id is defined else none)) }} <span class='badge'>{{ 'Version ' ~ dataset.version_number if dataset.version_number is defined else 'Concept' }}</span></td>
-      <td>{{ context.owner_team_name }}</td><td class='numeric-column'>{{ context.record_count }}</td><td><time datetime='{{ context.last_updated.isoformat() }}'>{{ context.last_updated|absolute_utc }}</time></td>
+      <td>{{ row_action(dataset.name, href=url_for("dataset_records_view", key=dataset.key)) }}</td>
+      <td>{{ context.owner_team_name }}</td><td class='numeric-column'>{{ '—' if context.no_current else context.record_count }}</td><td>{% if context.no_current %}—{% else %}<time datetime='{{ context.last_updated.isoformat() }}'>{{ context.last_updated|absolute_utc }}</time>{% endif %}</td>
+      <td>{% if not context.no_current %}Version {{ dataset.version_number }}{% else %}—{% endif %}{% if context.concept_in_progress %} <a class='badge badge-info badge-link badge-subtle' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Concept in progress</a>{% endif %}</td>
     {% endcall %}{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>
     <p>No datasets are available.</p></div>{% endif %}
   {% if may_create %}{{ form_side_panel() }}{% endif %}

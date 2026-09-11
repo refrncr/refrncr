@@ -1,7 +1,8 @@
 # ADR-014: Complete relational Dataset snapshots and calendar validity
 
-Status: Implemented for REF-83 on the local feature branch; see the implementation report
-for validation. GitHub CI remains the independent pre-merge gate.
+Status: REF-83 foundation is merged in `main` (`a3f8fed`). The REF-84 extension below
+is local and uncommitted; see its implementation report for validation. GitHub CI
+remains the independent pre-merge gate.
 
 ## Context
 
@@ -79,3 +80,25 @@ Delta storage requires reconstruction and is explicitly outside scope. Mutable
 status flags require jobs to remain correct. Timestamps alone do not provide a
 monotonic optimistic revision. Reusing live Field foreign keys would prevent
 historical independence after edits or deletions.
+
+## REF-84 extension (product decisions 2026-09-11)
+
+Detailed review computes a diff on demand from these existing relational snapshots.
+It binds the active concept identity/revision and pinned baseline identity/status, including
+Scheduled activation, and uses existing coherent read transactions and authorization.
+The diff itself adds no persisted diff, cache or alternative publication path.
+The subsequent explicit concept lifecycle is specified separately in [ADR-015](adr-015-explicit-dataset-concepts.md).
+
+The shared REF-83/REF-84 classifier compares canonical Record values only in surviving
+Fields with the same canonical datatype; structural schema changes and datatype changes
+are Field changes. Retyped Field values are excluded from Record counts and changed-value
+details because they are not comparable. Relative
+Field moves use deterministic longest-increasing-subsequence matching. Historical stored
+summary counts are not rewritten. The existing publication service accepts an optional
+review identity and validates it under its established lock; review remains optional.
+
+A successful new review commits one bounded `dataset.version_diff_viewed` event before
+returning its result. This is the explicitly approved REF-149 ordinary-read exception;
+child reads have no additional events, and audit failure returns no result. Implementation,
+query/memory limits and validation are in `docs/development/ref-84-report.md`. These choices extend this decision's snapshot/read boundary. ADR-015 records the
+subsequent persistent concept lifecycle approved in the manual UI review.

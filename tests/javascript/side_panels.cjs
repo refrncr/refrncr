@@ -209,5 +209,20 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   lateConfirmation(response({dataset:{panelTitle:'Too late'},candidates:[field]})); await settle();
   assert.equal(second.title.textContent,'Edit field','late confirmation response cannot replace restored edit view');
   await second.close(); assert.equal(document.activeElement,remote);
+  // Read-only detail paging replaces content without a nested confirmation.
+  fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
+  const detailPage = new Element({'data-panel-page':''}); detailPage.href='https://localhost/review?detail_page=2';
+  detailPage.closest = selector => selector === '[data-panel-page]' ? detailPage : null;
+  fetchImpl=async()=>response({dataset:{panelTitle:'Record changes'},candidates:[field]});
+  await second.host.fire('click',{target:detailPage}); await settle();
+  assert.equal(second.title.textContent,'Record changes');
+  assert.equal(requests.at(-1)[1].method ?? 'GET','GET');
+  assert.equal(requests.at(-1)[0],detailPage.href);
+  let pagingEscapePrevented=false;
+  await second.fire('cancel',{preventDefault(){pagingEscapePrevented=true;}});
+  assert.equal(pagingEscapePrevented,false,'native Escape remains available after paging');
+  await second.close();
+  assert.equal(second.open,false,'Escape closes after detail paging, with no parent page');
+  assert.equal(document.activeElement,remote,'paging preserves the original list opener');
   console.log('Side-panel controller checks passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -146,3 +146,22 @@ Field definitions/order/identifier membership and Record/import changes incremen
 normalized no-ops do not. Publication compares it under the existing Dataset lock.
 Ownership/access changes are excluded from content comparison and continue using their
 existing authorization and concurrency contracts.
+
+
+## REF-84 concept authority
+
+Current is the normal browser selection for every role. Active owning-team members and
+Community administrators alone can create/open/edit an explicit concept; legacy viewer,
+editor and export grants do not grant this capability. The create operation serializes
+on Dataset and commits its row with one `dataset.concept_created` event. Every content
+writer also checks active concept state inside its existing authorized write transaction.
+Old mutation URLs without a concept return a safe conflict and New concept/Current links.
+Denied concept requests are non-disclosing. Governance operations remain independent of
+content lifecycle. Concept export remains administrator-only through explicit selection;
+ordinary export authority continues to apply to Current/Expired snapshots only.
+
+Cancellation of a concept's Scheduled baseline atomically makes it Stale through the
+existing cancellation marker. Administrators retain access to every edit, while ordinary
+users see only eligible snapshots. No rebase/discard/recovery permission is invented.
+The stale concept cannot be published or replaced in this scope; data remains preserved
+for REF-155 or a separate recovery story.

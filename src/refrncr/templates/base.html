@@ -15,9 +15,6 @@
     <a class="skip-link" href="#content">Skip to content</a>
     {% block layout %}
     <div class="app-shell" data-responsive-shell>
-      <header class="app-header">
-        {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
-      </header>
       {% if current_actor %}
         <aside class="app-sidebar" data-navigation id="application-navigation">
           <div class="navigation-heading">
@@ -47,6 +44,7 @@
         </aside>
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
+        {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>

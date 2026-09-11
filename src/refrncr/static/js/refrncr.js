@@ -287,6 +287,13 @@
   document.querySelectorAll("[data-panel-host]").forEach((host) => {
     const dialog = host.closest("dialog");
     host.addEventListener("click", (event) => {
+      const page = event.target.closest("[data-panel-page]");
+      if (page) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
+        event.preventDefault();
+        if (!pendingForms.has(dialog)) loadPanel(dialog, page);
+        return;
+      }
       const next = event.target.closest("[data-panel-next]");
       if (next) {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;

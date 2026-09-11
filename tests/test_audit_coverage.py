@@ -200,7 +200,7 @@ def prepare(c, operation):
         if method == "create_dataset":
             return lambda actor: s.datasets.create_dataset(
                 actor, "new", "New", "Secret", c.owner.id
-            ), [("dataset", "created", None)]
+            ), [("dataset", "created", None), ("dataset", "dataset.concept_created", None)]
         if method == "change_owner":
             return lambda actor: s.datasets.change_owner(actor, d.key, c.owner.id, c.other.id), [
                 ("dataset", "owner_changed", d.id)
@@ -476,7 +476,7 @@ def test_export_prepared_then_audit_committed_before_return(context, monkeypatch
 
     monkeypatch.setattr(SqlAlchemyUnitOfWork, "__exit__", exit_uow)
     before = {e.id for e in audits(c)}
-    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, format_name)
+    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, format_name, prefer_concept=True)
     try:
         assert stages == ["read_closed", "write_closed"]
         events = [e for e in audits(c) if e.id not in before]
@@ -535,7 +535,7 @@ def test_export_preparation_or_audit_failure_closes_artifact_without_event(
     elif failure == "audit_commit":
         monkeypatch.setattr(Session, "commit", fail)
     with pytest.raises(RuntimeError):
-        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "json")
+        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "json", prefer_concept=True)
     assert all(artifact.content.closed for artifact in artifacts)
     assert snapshot(c) == before
 
@@ -561,14 +561,16 @@ def browser(c):
 def test_export_authentication_authorization_format_and_trusted_browser_actor(context):
     c = context
     client = browser(c)
-    url = f"/datasets/{c.d.key}/records/export"
+    url = f"/datasets/{c.d.key}/concept/records/export"
     before = {e.id for e in audits(c)}
     assert client.get(url + "?format=json", base_url="https://localhost").status_code == 302
     for actor in (c.u, c.a):
         token, _ = c.s.sessions.create(actor)
         client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
         for invalid in ("", "?format=pdf", "?format=csv&format=json"):
-            assert client.get(url + invalid, base_url="https://localhost").status_code == 400
+            assert client.get(url + invalid, base_url="https://localhost").status_code == (
+                404 if actor == c.u else 400
+            )
         if actor == c.u:
             assert client.get(url + "?format=json", base_url="https://localhost").status_code == 404
     assert {e.id for e in audits(c)} == before
@@ -607,7 +609,7 @@ def test_post_stream_failure_retains_one_request_event_and_logs_safely(
     monkeypatch.setattr(web, "send_file", send)
     before = {e.id for e in audits(c)}
     response = client.get(
-        f"/datasets/{c.d.key}/records/export?format=json",
+        f"/datasets/{c.d.key}/concept/records/export?format=json",
         base_url="https://localhost",
         buffered=False,
     )
@@ -707,7 +709,9 @@ def test_export_snapshot_remains_coherent_during_writes(context, monkeypatch):
 
     monkeypatch.setattr(SqlAlchemyDatasetRecordOperations, "iterate_all", paused)
     with ThreadPoolExecutor(max_workers=1) as pool:
-        pending = pool.submit(s.dataset_records.export_dataset, a.id, d.key, "json")
+        pending = pool.submit(
+            s.dataset_records.export_dataset, a.id, d.key, "json", prefer_concept=True
+        )
         assert ready.wait(timeout=10)
         try:
             s.dataset_records.update_record(a.id, d.key, record.id, 1, {"code": "new"})
@@ -946,7 +950,7 @@ def test_response_construction_failure_keeps_request_and_closes_artifact(context
     monkeypatch.setattr(web, "send_file", fail)
     before = {e.id for e in audits(c)}
     response = client.get(
-        f"/datasets/{c.d.key}/records/export?format=json", base_url="https://localhost"
+        f"/datasets/{c.d.key}/concept/records/export?format=json", base_url="https://localhost"
     )
     assert response.status_code == 503
     assert b"response construction" not in response.data
@@ -963,7 +967,7 @@ def test_export_head_and_options_have_explicit_audit_semantics(context, method):
     client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
     before = {e.id for e in audits(c)}
     response = client.open(
-        f"/datasets/{c.d.key}/records/export?format=json",
+        f"/datasets/{c.d.key}/concept/records/export?format=json",
         method=method,
         base_url="https://localhost",
     )

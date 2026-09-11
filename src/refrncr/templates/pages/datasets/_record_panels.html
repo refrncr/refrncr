@@ -4,7 +4,7 @@
 {% if may_edit %}
   {% call side_panel("add-record-panel", "New " ~ record_type ~ " record", "add-record-title", "Add record", "add-record-description") %}
     <form class='side-panel-form' method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
-      <div class='side-panel-body'>{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
+      <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <footer class='side-panel-footer'>
         <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
@@ -15,27 +15,29 @@
 {% endif %}
 
 {% for record, values, incomplete in rows %}
+  {% set deleted = record_states.get(record.id) == 'Deleted' %}
+  {% set record_may_edit = may_edit and not deleted %}
   {% set panel_id = "record-panel-" ~ record.id %}
   {% set title_id = "record-panel-title-" ~ record.id %}
   {% set description_id = "record-panel-description-" ~ record.id %}
-  {% set primary_value = record.values|selectattr('field_key', 'equalto', identifier.field_keys[0])|first %}
-  {% call side_panel(panel_id, primary_value.value|record_value_text(primary_value.data_type) if primary_value else record.id, title_id, "View record", description_id, true, "record") %}
+  {% call side_panel(panel_id, record_labels.get(record.id) or record.id, title_id, "View record", description_id, true, "record") %}
     <section class='side-panel-view' data-panel-view='view'>
-      <div class='side-panel-body'>
+      <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
+        {% if deleted %}<p class='record-deletion-notice'><span class='badge badge-error'>Deleted</span> This Record will be removed when you publish. These read-only values are from the basis version.</p>{% endif %}
         <dl class='record-details'>
-          {% for field in fields %}<div><dt>{{ field.name }}</dt><dd>{{ display_record_value(field, values.get(field.key)) if values.get(field.key) is not none else '—' }}</dd></div>{% endfor %}
+          {% for field, value in record_details[record.id] %}<div><dt>{{ field.name }}</dt><dd>{{ display_record_value(field, value) if value is not none else '—' }}</dd></div>{% endfor %}
         </dl>
       </div>
-      {% if may_edit %}
+      {% if record_may_edit %}
         <footer class='side-panel-footer'>
           <button class='button button-secondary' type='button' data-panel-mode='edit'>Edit</button>
           <button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>
         </footer>
       {% endif %}
     </section>
-    {% if may_edit %}
+    {% if record_may_edit %}
       <form class='side-panel-view side-panel-form' data-panel-view='edit' hidden method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
-        <div class='side-panel-body'>{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
+        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
         <footer class='side-panel-footer'>
@@ -44,7 +46,7 @@
         </footer>
       </form>
       <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
-        <div class='side-panel-body'>
+        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
           <h3>Delete record?</h3>
           <p class='delete-confirmation'>This deletion cannot be undone.</p>
           <input type='hidden' name='confirm' value='yes'>

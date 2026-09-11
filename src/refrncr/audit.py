@@ -90,7 +90,29 @@ _EVENTS = (
         (("format", "import_format"), ("record_count", "count"), ("rejected_row_count", "count")),
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
+    EventContract(
+        "dataset",
+        "dataset.concept_created",
+        (("baseline_version_number", "version_count"), ("concept_revision", "version_count")),
+    ),
     EventContract("dataset", "dataset.deleted", (("dataset_name", "dataset_name"),)),
+    EventContract(
+        "dataset",
+        "dataset.version_diff_viewed",
+        tuple(
+            (name, "version_count")
+            for name in (
+                "baseline_version_number",
+                "concept_revision",
+                "fields_added",
+                "fields_changed",
+                "fields_removed",
+                "records_added",
+                "records_changed",
+                "records_removed",
+            )
+        ),
+    ),
     *(
         EventContract(
             "dataset",
@@ -292,7 +314,12 @@ for _service, _object, _methods in (
 _audited("TeamService", "delete_team", ("team", "deleted"), ("grant", "deleted"))
 _read("TeamService", "list_teams")
 _read("MembershipService", "list_team_members list_eligible_users")
-_audited("DatasetService", "create_dataset", ("dataset", "created"))
+_audited(
+    "DatasetService",
+    "create_dataset",
+    ("dataset", "created"),
+    ("dataset", "dataset.concept_created"),
+)
 _audited("DatasetService", "delete_dataset", ("dataset", "dataset.deleted"))
 _read("DatasetService", "get_dataset_for_deletion")
 _audited("DatasetService", "change_owner", ("dataset", "owner_changed"))
@@ -549,7 +576,7 @@ _register(
     rationale="Authorized publication review; no persisted content or event.",
 )
 
-for _name in ("overview", "context", "history", "read"):
+for _name in ("overview", "context", "history", "read", "concept_context"):
     _register(
         "DatasetVersionService",
         _name,
@@ -567,6 +594,33 @@ for _name in ("publication_preflight", "create_initial_versions"):
         rationale=(
             "Stopped-writer operator migration/preflight; no authenticated actor or domain event."
         ),
+    )
+
+_audited(
+    "DatasetDiffService",
+    "open_review",
+    ("dataset", "dataset.version_diff_viewed"),
+    module="dataset_diff",
+)
+_register(
+    "DatasetDiffService",
+    "review field_detail record_detail",
+    "intentionally excluded",
+    module="dataset_diff",
+    rationale="Child read in one authorized revision-bound review; opening owns the event.",
+)
+
+_audited(
+    "DatasetVersionService",
+    "create_concept",
+    ("dataset", "dataset.concept_created"),
+    module="dataset_versions",
+)
+
+for _name in ("concept_preflight", "migrate_concepts"):
+    OPERATIONS[f"refrncr.concept_upgrade.{_name}"] = Operation(
+        "technical logging only",
+        rationale="Stopped-writer concept migration/preflight; no invented actor or domain event.",
     )
 
 OPERATIONS = MappingProxyType(OPERATIONS)

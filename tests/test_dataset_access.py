@@ -30,6 +30,7 @@ def dataset_access():
 def create_dataset(services, admin, key):
     dataset = create_owned_dataset(services.datasets, admin.id, key, key.title(), f"About {key}")
     publish_dataset(services, admin.id, dataset)
+    services.dataset_versions.create_concept(admin.id, dataset.id)
     return dataset
 
 

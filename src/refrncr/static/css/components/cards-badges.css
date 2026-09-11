@@ -4,6 +4,8 @@
 .badge-warning { color: var(--color-warning-text); background: var(--ref-badge-warning); }
 .badge-error { color: var(--color-error-text); background: var(--ref-badge-error); }
 .badge-info { color: var(--color-info-text); background: var(--ref-badge-info); }
+.badge-subtle { font-size: .6875rem; font-weight: var(--font-weight-regular); }
+a.badge-link, a.badge-link:hover { text-decoration: none; }
 .empty-state { padding: var(--space-xxl) var(--space-lg); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); text-align: center; }
 .empty-state h2 { margin-top: 0; }
 .empty-state-compact { padding: var(--space-md); border: 0; background: var(--color-surface-subtle); text-align: left; }

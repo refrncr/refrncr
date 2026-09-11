@@ -40,6 +40,9 @@ def old_database(engine):
             "day": "2024-02-29",
         },
     )
+    # Strip only new lifecycle metadata to construct the historical fixture.
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM dataset_concepts"))
     migrate(engine, "0013_ref_39", downgrade=True)
     return services, admin, dataset, fields
 

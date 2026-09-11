@@ -54,6 +54,23 @@ class SqlAlchemyVersionOperations:
             )
         )
 
+    def get(self, dataset_id, version_id):
+        row = self.session.scalar(
+            select(DatasetVersion).where(
+                DatasetVersion.dataset_id == dataset_id, DatasetVersion.id == version_id
+            )
+        )
+        return self._version(row) if row else None
+
+    def latest_non_cancelled(self, dataset_id):
+        row = self.session.scalar(
+            select(DatasetVersion)
+            .where(DatasetVersion.dataset_id == dataset_id, DatasetVersion.cancelled_at.is_(None))
+            .order_by(DatasetVersion.number.desc())
+            .limit(1)
+        )
+        return self._version(row) if row else None
+
     def current_for_datasets(self, dataset_ids, today):
         if dataset_ids == ():
             return {}
@@ -169,7 +186,7 @@ class SqlAlchemyVersionOperations:
             )
         )
 
-    def iterate_records(self, version):
+    def iterate_records(self, version, *, record_ids=None):
         statement = (
             select(DatasetVersionRecord, DatasetVersionValue, DatasetVersionField)
             .outerjoin(
@@ -186,6 +203,8 @@ class SqlAlchemyVersionOperations:
             .order_by(DatasetVersionRecord.id, DatasetVersionValue.field_id)
             .execution_options(yield_per=1000)
         )
+        if record_ids is not None:
+            statement = statement.where(DatasetVersionRecord.id.in_(record_ids))
         current, values = None, []
         for record, value, field in self.session.execute(statement):
             if current is not None and current != record.id:

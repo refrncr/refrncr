@@ -91,7 +91,7 @@ def test_shared_table_row_controller():
 
 
 @pytest.mark.parametrize(
-    "kind,columns", [("datasets", 4), ("teams", 2), ("users", 4), ("records", 3)]
+    "kind,columns", [("datasets", 5), ("teams", 2), ("users", 4), ("records", 3)]
 )
 def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
     _, services, admin, client = dataset_browser
@@ -103,7 +103,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
     record = services.dataset_records.create_record(admin.id, dataset.key, {"code": name})
     team = services.teams.create_team(admin.id, name)
     user = services.users.create_user(admin.id, "row@example.com", name, "valid password")
-    path = f"/datasets/{dataset.key}/records" if kind == "records" else f"/{kind}"
+    path = f"/datasets/{dataset.key}/concept/records" if kind == "records" else f"/{kind}"
     login(client)
     html = body(request(client, "get", path))
     table = re.search(r"<table\b[^>]*>(.*?)</table>", html, re.S).group(1)
@@ -121,7 +121,11 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         assert "tabindex" not in attrs and "role='button'" not in attrs
         elements = Elements(contents).elements
         controls = [(tag, attrs) for tag, attrs in elements if tag in ("a", "button", "input")]
-        assert len(controls) == 1
+        if kind == "datasets":
+            assert len(controls) == 2
+            assert controls[1][1]["href"] == "/datasets/row-contract/versions"
+        else:
+            assert len(controls) == 1
         tag, control = controls[0]
         assert "data-row-primary" in control
         assert tag == ("a" if kind in ("datasets", "teams") else "button")
@@ -159,8 +163,10 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     dataset = create_dataset(services, admin, "empty-rows")
     create_field(services, admin, dataset, "code", "Code", is_required=True)
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
-    assert "data-row-action" not in body(request(client, "get", "/datasets/empty-rows/records"))
-    html = body(request(client, "get", "/datasets/empty-rows"))
+    assert "data-row-action" not in body(
+        request(client, "get", "/datasets/empty-rows/concept/records")
+    )
+    html = body(request(client, "get", "/datasets/empty-rows/concept"))
     assert "data-row-action" not in html
     assert "<th scope='col'>Actions</th>" in html
     assert "aria-label='Edit field Code'" in html
@@ -185,7 +191,7 @@ def test_numeric_identifier_primary_name_includes_visible_formatted_value(datase
     for value in ("1.2", "1.234"):
         services.dataset_records.create_record(admin.id, dataset.key, {"code": value})
     login(client)
-    html = body(request(client, "get", "/datasets/numeric-rows/records"))
+    html = body(request(client, "get", "/datasets/numeric-rows/concept/records"))
     controls = re.findall(r"<button\b([^>]*data-row-primary[^>]*)>(.*?)</button>", html, re.S)
     assert len(controls) == 2
     for attrs, content in controls:

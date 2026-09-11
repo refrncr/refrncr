@@ -17,6 +17,10 @@ th { background: var(--color-table-heading); color: var(--color-text-secondary);
 .record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text-data); font-family: var(--font-data); font-size: var(--font-size-xs); font-style: normal; font-weight: var(--font-weight-regular); vertical-align: middle; }
 .cell-content { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); margin-top: var(--space-md); }
+/* Reusable property/value comparison table variant. */
+.diff-table { table-layout: fixed; min-width: 30rem; }
+.diff-table th, .diff-table td, .diff-value { overflow-wrap: anywhere; }
+.diff-value { white-space: pre-wrap; }
 /* Shared URL and side-panel row variants; no overlay covers selectable text. */
 .interactive-row { position: relative; }
 .interactive-row:has(.row-action:not(:disabled):not([aria-disabled="true"])) { cursor: pointer; }
@@ -47,3 +51,10 @@ th { background: var(--color-table-heading); color: var(--color-text-secondary);
   .user-management-table .table-cell-wrap { grid-column: 1; overflow-wrap: anywhere; }
   .user-management-table td[headers="user-column-email"] { color: var(--color-text-secondary); }
 }
+
+/* Application metadata stays distinct from user-defined Dataset Fields. */
+.record-table .record-system-status { width: 9rem; border-inline-start: 1px solid var(--color-border); font-family: var(--font-interface); }
+.system-column-label { display: block; font-size: .6875rem; font-weight: var(--font-weight-regular); text-transform: none; letter-spacing: normal; }
+.record-table .record-tombstone td { background-color: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.record-toolbar form { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.record-toolbar form input { flex: 1 1 12rem; width: auto; max-width: 22rem; }

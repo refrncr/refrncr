@@ -379,12 +379,12 @@ def test_pending_import_expires_and_export_snapshot_survives(context):  # noqa: 
     c = context
     populate(c)
     staged = stage_import(c)
-    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv")
+    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", prefer_concept=True)
     remove(c)
     with pytest.raises(NotFoundError):
         c.s.record_imports.confirm(c.a.id, "session", c.d.key, staged.token)
     with pytest.raises(NotFoundError):
-        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv")
+        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", prefer_concept=True)
     try:
         assert b"private-value" in artifact.content.read()
     finally:
@@ -515,6 +515,7 @@ def test_dataset_foreign_key_inventory(context):  # noqa: F811
         "dataset_records",
         "dataset_export_access",
         "dataset_versions",
+        "dataset_concepts",
     }
     assert all(fk["referred_table"] == "users" for fk in schema.get_foreign_keys("audit_events"))
 
@@ -533,7 +534,7 @@ def test_deletion_on_complete_migration_chain(audit_db):  # noqa: F811
     c = context.__wrapped__(audit_db)
     populate(c)
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016_ref_84"
     with pytest.raises(IntegrityError), c.sessions.begin() as session:
         session.add(DatasetRecord(dataset_id=str(uuid4()), identifier_key=b"test", revision=1))
     # Field RESTRICT is effective on the real migrated schema too.
@@ -643,7 +644,9 @@ def test_export_in_progress_retains_coherent_snapshot_during_delete(context, mon
         return remove(c, target)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        exporting = pool.submit(c.s.dataset_records.export_dataset, c.a.id, c.d.key, "csv")
+        exporting = pool.submit(
+            c.s.dataset_records.export_dataset, c.a.id, c.d.key, "csv", prefer_concept=True
+        )
         assert reading.wait(timeout=10)
         deleting = pool.submit(delete)
         try:

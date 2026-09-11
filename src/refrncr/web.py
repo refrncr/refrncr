@@ -32,9 +32,11 @@ from refrncr.browser_security import (
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
+from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
+from refrncr.diff_contracts import STATUSES, DiffCriteria
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -52,6 +54,7 @@ from refrncr.record_import import (
     ImportValidationError,
     parse_source,
 )
+from refrncr.review_tokens import decode_review, encode_review
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -122,8 +125,12 @@ def create_flask_app(
     authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
     audit_history: AuditHistoryService | None = None,
     dataset_versions: DatasetVersionService | None = None,
+    review_signing_key: bytes | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    review_secret = (
+        review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
+    )
     audit_history = audit_history or AuditHistoryService(users.uow)
 
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
@@ -182,6 +189,7 @@ def create_flask_app(
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
+    dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
     cookie_policy = BrowserCookiePolicy(
         session_max_age=int(sessions.lifetime.total_seconds()),
         allow_loopback_http=allow_loopback_http,
@@ -274,6 +282,57 @@ def create_flask_app(
             return "teams"
         return ""
 
+    concept_endpoints = {
+        "edit_dataset",
+        "update_dataset",
+        "move_dataset_field",
+        "new_dataset_field",
+        "create_dataset_field",
+        "edit_dataset_field",
+        "update_dataset_field",
+        "delete_dataset_field",
+        "new_dataset_record",
+        "create_dataset_record",
+        "edit_dataset_record",
+        "delete_dataset_record",
+        "import_dataset_records",
+        "dataset_import_step",
+        "select_import_worksheet",
+        "review_import_mapping",
+        "preview_record_import",
+        "confirm_record_import",
+        "cancel_record_import",
+        "dataset_version_review",
+        "dataset_version_record_diff",
+        "dataset_version_field_diff",
+        "dataset_version_publish",
+    }
+
+    @app.before_request
+    def bind_concept_context():
+        values = request.view_args or {}
+        if (
+            dataset_ui_enabled
+            and values.get("key")
+            and (request.endpoint in concept_endpoints or values.get("concept"))
+        ):
+            actor, session = require_authenticated()
+            if request.method == "POST":
+                require_csrf(session.csrf_token)
+            try:
+                datasets.get_dataset_for_edit(actor.id, values["key"])
+                g.concept_ui = dataset_versions.concept_context(actor.id, values["key"])
+            except NotFoundError:
+                abort(404)
+            except ConflictError as error:
+                return render_authenticated_template(
+                    "pages/datasets/concept_required.html", key=values["key"], error=str(error)
+                ), 409
+
+    @app.context_processor
+    def concept_template_context():
+        return {"concept_ui": getattr(g, "concept_ui", None)}
+
     def render_authenticated_template(template_name: str, **context):
         resolved = authenticated()
         actor = resolved[0] if resolved else None
@@ -298,9 +357,23 @@ def create_flask_app(
 
     @app.after_request
     def protect_audit_response(response):
-        if (request.endpoint or "").startswith("audit_"):
+        endpoint = request.endpoint or ""
+        if (
+            endpoint.startswith("audit_")
+            or endpoint in concept_endpoints
+            or (request.view_args or {}).get("concept", False)
+            or endpoint
+            in {
+                "dataset_version_review",
+                "dataset_version_record_diff",
+                "dataset_version_field_diff",
+            }
+            or (endpoint == "dataset_version_publish" and "review" in request.args)
+        ):
             response.headers["Cache-Control"] = "no-store"
-            response.headers["Referrer-Policy"] = "same-origin"
+            response.headers["Referrer-Policy"] = (
+                "no-referrer" if "review" in request.args else "same-origin"
+            )
         return response
 
     def audit_error(message, status=400):
@@ -526,17 +599,29 @@ def create_flask_app(
                 error_field=error_field,
             )
             return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(url_for("dataset_detail", key=dataset.key))
+        return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
 
-    @dataset_route("/datasets/<key>", methods=["GET"])
-    @dataset_route("/datasets/<key>/versions/<version_id>", methods=["GET"])
+    @dataset_route("/datasets/<key>/concept", methods=["GET"], defaults={"concept": True})
+    @dataset_route("/datasets/<key>", methods=["GET"], defaults={"concept": False})
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>", methods=["GET"], defaults={"concept": False}
+    )
     @version_errors
-    def dataset_detail(key: str, version_id=None):
+    def dataset_detail(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
-        view = dataset_versions.read(
-            actor.id, key, version_id, page=None, prefer_concept=version_id is None
-        )
+        try:
+            view = dataset_versions.read(
+                actor.id, key, version_id, page=None, prefer_concept=concept
+            )
+        except NotFoundError:
+            if version_id is not None or concept:
+                raise
+            history = dataset_versions.history(actor.id, key)
+            return render_authenticated_template(
+                "pages/datasets/no_current.html", dataset=history.context.dataset, history=history
+            )
+
         dataset = view.context.dataset
         editable = view.state is None and view.may_maintain
         return render_authenticated_template(
@@ -545,25 +630,40 @@ def create_flask_app(
             context=view.context,
             editable=editable,
             schema_admin=editable,
-            may_govern=editable
+            may_start_concept=view.may_maintain and view.concept is None,
+            may_govern=view.may_maintain
             and authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
             fields=view.fields,
+            field_states={
+                change.id: "Edited" if change.status == "Changed" else change.status
+                for change in (g.concept_ui.field_changes if concept else ())
+            },
             business_key=view.identifier,
             version_state=view.state,
         )
+
+    @dataset_route("/datasets/<key>/concept/new", methods=["POST"])
+    @version_errors
+    def dataset_concept_create(key):
+        actor, session = require_authenticated()
+        require_csrf(session.csrf_token)
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        try:
+            dataset_versions.create_concept(actor.id, dataset.id)
+        except ConflictError as error:
+            return render_authenticated_template(
+                "pages/datasets/concept_required.html",
+                key=key,
+                error=str(error),
+                already_active=True,
+            ), 409
+        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @dataset_route("/datasets/<key>/versions", methods=["GET"])
     @version_errors
     def dataset_versions_view(key):
         actor, _session = require_authenticated()
         history = dataset_versions.history(actor.id, key)
-        available, reason = False, None
-        if history.may_maintain:
-            try:
-                dataset_versions.review(actor.id, history.context.dataset.id)
-                available = True
-            except (ConflictError, ValidationError) as error:
-                reason = str(error)
         notice = {
             "published": "Dataset version published.",
             "cancelled": "Scheduled version cancelled.",
@@ -573,21 +673,179 @@ def create_flask_app(
             history=history,
             dataset=history.context.dataset,
             context=history.context,
-            publish_available=available,
-            publish_reason=reason,
             notice=notice,
+            review_available=bool(history.concept_summary and history.concept_summary.can_review),
         )
+
+    def review_error(key, message=STALE_MESSAGE, status=409):
+        return render_authenticated_template(
+            "pages/datasets/versions/review_error.html", key=key, error=message
+        ), status
+
+    def review_identity(actor, session, dataset):
+        tokens = request.args.getlist("review")
+        if len(tokens) != 1:
+            raise NotFoundError("Review not found")
+        try:
+            identity = decode_review(tokens[0], session.id, review_secret)
+        except ValueError:
+            raise ConflictError("This review link is no longer valid. Reload the review.") from None
+        if identity.dataset_id != dataset.id or identity.actor_id != actor.id:
+            raise NotFoundError("Review not found")
+        return identity, tokens[0]
+
+    def review_parameters(*, detail=False):
+        allowed = {"review", "section", "q", "status", "anchor", "backwards"}
+        if detail:
+            allowed.add("detail_page")
+        if (
+            set(request.args) - allowed
+            or len(request.query_string) > 4096
+            or any(
+                len(request.args.getlist(name)) != 1 for name in request.args if name != "status"
+            )
+        ):
+            raise ValidationError("Choose valid review parameters.")
+        section = request.args.get("section", "Summary")
+        if section not in {"Summary", "Fields", "Records"} or request.args.get(
+            "backwards", "0"
+        ) not in {"0", "1"}:
+            raise ValidationError("Choose valid review parameters.")
+        criteria = DiffCriteria(
+            tuple(request.args.getlist("status")) or STATUSES,
+            request.args.get("q", ""),
+            request.args.get("anchor", ""),
+            request.args.get("backwards", "0") == "1",
+        )
+        # Service revalidates every supplied criterion for trusted programmatic callers.
+        dataset_diff._criteria(criteria)
+        return section, criteria
+
+    def review_url(key, token, section="Summary", criteria=None, **changes):
+        criteria = criteria or DiffCriteria()
+        values = dict(
+            review=token,
+            section=section,
+            q=criteria.search,
+            status=list(criteria.statuses),
+            anchor=criteria.anchor,
+            backwards="1" if criteria.backwards else "0",
+        )
+        values.update(changes)
+        return url_for("dataset_version_review", key=key, **values)
+
+    @dataset_route("/datasets/<key>/versions/review", methods=["GET"])
+    @version_errors
+    def dataset_version_review(key):
+        actor, session = require_authenticated()
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        try:
+            if not request.args:
+                opened = dataset_diff.open_review(actor.id, dataset.id)
+                token = encode_review(opened.identity, session.id, review_secret)
+                return redirect(review_url(key, token), code=303)
+            identity, token = review_identity(actor, session, dataset)
+            section, criteria = review_parameters()
+            result = dataset_diff.review(actor.id, identity, section, criteria)
+            return render_authenticated_template(
+                "pages/datasets/versions/review.html",
+                dataset=dataset,
+                identity=identity,
+                token=token,
+                section=section,
+                criteria=criteria,
+                result=result,
+                sections={
+                    name: review_url(key, token, name) for name in ("Summary", "Fields", "Records")
+                },
+                page_url=lambda **values: review_url(key, token, section, criteria, **values),
+                detail_url=lambda kind, object_id: url_for(
+                    "dataset_version_record_diff"
+                    if kind == "record"
+                    else "dataset_version_field_diff",
+                    key=key,
+                    object_id=object_id,
+                    review=token,
+                    section=section,
+                    q=criteria.search,
+                    status=list(criteria.statuses),
+                    anchor=criteria.anchor,
+                    backwards="1" if criteria.backwards else "0",
+                ),
+            )
+        except ConflictError as error:
+            return review_error(key, str(error))
+        except ValidationError as error:
+            return review_error(key, str(error), 400)
+
+    def render_diff_detail(key, object_id, kind):
+        actor, session = require_authenticated()
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        try:
+            identity, token = review_identity(actor, session, dataset)
+            section, criteria = review_parameters(detail=True)
+            if kind == "record":
+                raw_page = request.args.get("detail_page", "1")
+                if len(raw_page) > 10 or not raw_page.isascii() or not raw_page.isdigit():
+                    raise ValidationError("Choose a valid detail page.")
+                item = dataset_diff.record_detail(actor.id, identity, object_id, int(raw_page))
+            else:
+                item = dataset_diff.field_detail(actor.id, identity, object_id)
+            return render_authenticated_template(
+                "pages/datasets/versions/diff_detail.html",
+                dataset=dataset,
+                identity=identity,
+                kind=kind,
+                item=item,
+                return_url=review_url(key, token, section, criteria),
+                detail_page_url=lambda number: url_for(
+                    "dataset_version_record_diff",
+                    key=key,
+                    object_id=object_id,
+                    review=token,
+                    section=section,
+                    q=criteria.search,
+                    status=list(criteria.statuses),
+                    anchor=criteria.anchor,
+                    backwards="1" if criteria.backwards else "0",
+                    detail_page=number,
+                ),
+            )
+        except ConflictError as error:
+            return review_error(key, str(error))
+        except ValidationError as error:
+            return review_error(key, str(error), 400)
+
+    @dataset_route("/datasets/<key>/versions/review/records/<object_id>", methods=["GET"])
+    @version_errors
+    def dataset_version_record_diff(key, object_id):
+        return render_diff_detail(key, object_id, "record")
+
+    @dataset_route("/datasets/<key>/versions/review/fields/<object_id>", methods=["GET"])
+    @version_errors
+    def dataset_version_field_diff(key, object_id):
+        return render_diff_detail(key, object_id, "field")
 
     @dataset_route("/datasets/<key>/versions/publish", methods=["GET", "POST"])
     @version_errors
     def dataset_version_publish(key):
         actor, session = require_authenticated()
         dataset = datasets.get_dataset_for_edit(actor.id, key)
+        expected_review, review_token = None, None
+        if request.method == "POST":
+            require_csrf(session.csrf_token)
+        if "review" in request.args:
+            try:
+                expected_review, review_token = review_identity(actor, session, dataset)
+                dataset_diff.review(actor.id, expected_review)
+            except ConflictError as failure:
+                if request.method == "POST":
+                    return redirect(review_url(key, request.args["review"]), code=303)
+                return review_error(key, str(failure))
         error, status = None, 200
         effective = request.form.get("effective_date", "")[:10]
         note = request.form.get("release_note", "")[:2000]
         if request.method == "POST":
-            require_csrf(session.csrf_token)
             if request.form.getlist("dataset_id") != [dataset.id]:
                 raise NotFoundError("Dataset not found")
             try:
@@ -607,19 +865,29 @@ def create_flask_app(
                     raise ValidationError("Review the publication form again.")
                 expected = parse_expected_revision(revisions[0])
                 dataset_versions.publish(
-                    actor.id, dataset.id, effective_date, request.form["release_note"], expected
+                    actor.id,
+                    dataset.id,
+                    effective_date,
+                    request.form["release_note"],
+                    expected,
+                    expected_review=expected_review,
                 )
                 return redirect(
                     url_for("dataset_versions_view", key=key, notice="published"), code=303
                 )
             except (ValidationError, ConflictError) as failure:
+                if expected_review is not None and isinstance(failure, ConflictError):
+                    return redirect(review_url(key, review_token), code=303)
                 error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
         review = None
         try:
             review = dataset_versions.review(actor.id, dataset.id)
+            if expected_review is not None and review[0] != expected_review.revision:
+                return review_error(key)
         except (ValidationError, ConflictError) as failure:
             error, status = error or str(failure), 409
         today = dataset_versions._today().date().isoformat()
+        concept_summary = dataset_versions.history(actor.id, key).concept_summary
         return render_authenticated_template(
             "pages/datasets/versions/publish.html",
             dataset=dataset,
@@ -628,6 +896,9 @@ def create_flask_app(
             effective_date=effective or today,
             release_note=note,
             today=today,
+            review_token=review_token,
+            review_available=bool(review_token)
+            or bool(concept_summary and concept_summary.can_review),
         ), status
 
     @dataset_route("/datasets/<key>/versions/<version_id>/cancel", methods=["GET", "POST"])
@@ -771,7 +1042,7 @@ def create_flask_app(
             abort(400, description=str(error))
         except StaleFieldOrderError as error:
             abort(409, description=str(error))
-        return redirect(url_for("dataset_detail", key=key))
+        return redirect(url_for("dataset_detail", key=key, concept=True))
 
     def parse_page_parameter() -> int:
         values = request.args.getlist("page")
@@ -781,22 +1052,46 @@ def create_flask_app(
             abort(400, description="Page must be a canonical positive integer")
         return int(values[0])
 
-    @dataset_route("/datasets/<key>/records", methods=["GET"])
-    @dataset_route("/datasets/<key>/versions/<version_id>/records", methods=["GET"])
+    @dataset_route("/datasets/<key>/concept/records", methods=["GET"], defaults={"concept": True})
+    @dataset_route("/datasets/<key>/records", methods=["GET"], defaults={"concept": False})
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>/records",
+        methods=["GET"],
+        defaults={"concept": False},
+    )
     @version_errors
-    def dataset_records_view(key: str, version_id=None):
+    def dataset_records_view(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
-        view = dataset_versions.read(
-            actor.id, key, version_id, parse_page_parameter(), prefer_concept=version_id is None
-        )
+        try:
+            view = dataset_versions.read(
+                actor.id,
+                key,
+                version_id,
+                parse_page_parameter(),
+                prefer_concept=concept,
+                search=request.args.get("q", ""),
+            )
+        except NotFoundError:
+            if version_id is not None or concept:
+                raise
+            history = dataset_versions.history(actor.id, key)
+            return render_authenticated_template(
+                "pages/datasets/no_current.html", dataset=history.context.dataset, history=history
+            )
+
         context, fields, identifier, page = view.context, view.fields, view.identifier, view.page
         dataset = context.dataset
         may_edit = may_configure = view.state is None and view.may_maintain
         rows = [
             (
                 record,
-                {value.field_key: value.value for value in record.values},
+                {
+                    field.key: value.value
+                    for field in fields
+                    for value in record.values
+                    if field.id == value.field_id and field.data_type == value.data_type
+                },
                 any(
                     key not in {value.field_key for value in record.values}
                     for key in identifier.field_keys
@@ -819,7 +1114,9 @@ def create_flask_app(
 
         def display_record_value(field, value):
             if field.data_type == "number" and isinstance(value, Decimal):
-                return f"{value:.{numeric_scales[field.key]}f}"
+                return (
+                    f"{value:.{numeric_scales.get(field.key, max(0, -value.as_tuple().exponent))}f}"
+                )
             return get_datatype(field.data_type).text(value) if value is not None else None
 
         record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
@@ -837,6 +1134,22 @@ def create_flask_app(
             may_export=view.may_export,
             version_state=view.state,
             may_configure=may_configure,
+            may_start_concept=view.may_maintain and view.concept is None,
+            record_states=view.record_states or {},
+            record_labels=view.record_labels or {},
+            record_details={
+                record.id: tuple(
+                    (field, next((v.value for v in record.values if v.field_id == field.id), None))
+                    for field in (
+                        view.baseline_fields
+                        if view.record_states.get(record.id) == "Deleted"
+                        else fields
+                    )
+                )
+                for record in page.records
+            },
+            deleted_count=view.deleted_count,
+            record_search=view.search,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
             active_navigation=active_navigation(),
@@ -847,10 +1160,17 @@ def create_flask_app(
             display_record_value=display_record_value,
         )
 
-    @dataset_route("/datasets/<key>/records/export", methods=["GET"])
-    @dataset_route("/datasets/<key>/versions/<version_id>/records/export", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/concept/records/export", methods=["GET"], defaults={"concept": True}
+    )
+    @dataset_route("/datasets/<key>/records/export", methods=["GET"], defaults={"concept": False})
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>/records/export",
+        methods=["GET"],
+        defaults={"concept": False},
+    )
     @version_errors
-    def export_dataset_records(key: str, version_id=None):
+    def export_dataset_records(key: str, version_id=None, concept=False):
         actor, _login_session = require_authenticated()
         _authorization, _datasets, _fields, _business_keys, record_service = (
             require_dataset_dependencies()
@@ -860,7 +1180,7 @@ def create_flask_app(
             return "Choose exactly one supported export format", 400
         try:
             artifact = record_service.export_dataset(
-                actor.id, key, formats[0], version_id=version_id
+                actor.id, key, formats[0], version_id=version_id, prefer_concept=concept
             )
         except NotFoundError:
             abort(404)
@@ -1239,7 +1559,7 @@ def create_flask_app(
         if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
             abort(400)
         record_imports.cancel(actor.id, login_session.id, key, token)
-        return redirect(url_for("dataset_records_view", key=key), code=303)
+        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     def render_record_form(
         dataset,
@@ -1342,7 +1662,7 @@ def create_flask_app(
             )
         except NotFoundError:
             abort(404)
-        return redirect(url_for("dataset_records_view", key=key))
+        return redirect(url_for("dataset_records_view", key=key, concept=True))
 
     def record_form_values(record):
         return {
@@ -1442,7 +1762,7 @@ def create_flask_app(
             )
         except NotFoundError:
             abort(404)
-        return redirect(url_for("dataset_records_view", key=key))
+        return redirect(url_for("dataset_records_view", key=key, concept=True))
 
     @dataset_route("/datasets/<key>/records/<record_id>/delete", methods=["GET", "POST"])
     def delete_dataset_record(key: str, record_id: str):
@@ -1482,7 +1802,7 @@ def create_flask_app(
             except NotFoundError:
                 abort(404)
             else:
-                return redirect(url_for("dataset_records_view", key=key))
+                return redirect(url_for("dataset_records_view", key=key, concept=True))
         response = render_authenticated_template(
             "pages/datasets/records/delete.html",
             dataset=dataset,
@@ -1594,7 +1914,7 @@ def create_flask_app(
                 ),
                 409 if isinstance(error, ConflictError) else 400,
             )
-        return redirect(url_for("dataset_detail", key=dataset.key))
+        return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
 
     @dataset_route("/datasets/id/<dataset_id>/delete", methods=["GET", "POST"])
     def dataset_delete(dataset_id: str):
@@ -1725,7 +2045,7 @@ def create_flask_app(
                 error=str(error),
             )
             return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(url_for("dataset_detail", key=key))
+        return redirect(url_for("dataset_detail", key=key, concept=True))
 
     def render_dataset_field_edit_form(
         dataset,
@@ -1821,7 +2141,7 @@ def create_flask_app(
                 ),
                 400,
             )
-        return redirect(url_for("dataset_detail", key=key))
+        return redirect(url_for("dataset_detail", key=key, concept=True))
 
     @dataset_route("/datasets/<key>/fields/<field_key>/delete", methods=["POST"])
     def delete_dataset_field(key: str, field_key: str):
@@ -1855,7 +2175,7 @@ def create_flask_app(
                 ),
                 400,
             )
-        return redirect(url_for("dataset_detail", key=key))
+        return redirect(url_for("dataset_detail", key=key, concept=True))
 
     @app.route("/setup", methods=["GET", "POST"])
     def setup():

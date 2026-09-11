@@ -38,7 +38,7 @@ def setup(c, *, populated=True):
 
 
 def revision(c):
-    return c.s.datasets.get_dataset(c.a.id, c.d.key).revision
+    return c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).revision
 
 
 def publish(c, *, day=None, actor=None, expected=None):
@@ -76,10 +76,14 @@ def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
     assert first.number == 1 and first.publisher_id == c.a.id
     with pytest.raises(FrozenInstanceError):
         first.name = "tampered"
+    with pytest.raises(ConflictError, match="concept"):
+        publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
     with pytest.raises(ConflictError, match="matches"):
         publish(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Updated", "new description")
     second = publish(c, day=NOW.date() + timedelta(days=1))
+    c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Later"}
     )
@@ -92,16 +96,16 @@ def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
     with pytest.raises(ConflictError, match="Scheduled"):
         publish(c)
     c.service.cancel(c.a.id, c.d.id, second.id)
-    third = publish(c)
-    assert third.number == 3
+    with pytest.raises(ConflictError, match="cancelled"):
+        publish(c)
+    assert c.service.concept_context(c.a.id, c.d.key).stale
     assert content(c, second).name == "Updated"
     assert {s.version.number: s.status for s in version_states(versions(c), NOW.date())} == {
-        1: "Expired",
+        1: "Current",
         2: "Cancelled",
-        3: "Current",
     }
     events = [e for e in audits(c) if e.action.startswith("dataset.version_")]
-    assert [e.action for e in events].count("dataset.version_published") == 3
+    assert [e.action for e in events].count("dataset.version_published") == 2
     assert [e.action for e in events].count("dataset.version_cancelled") == 1
     assert all(
         "Café" not in str(e.details) and c.d.description not in str(e.details) for e in events
@@ -205,6 +209,7 @@ def test_canonical_revert_and_administration_are_not_changes(context):  # noqa: 
     c = context
     setup(c)
     publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "different"}
     )
@@ -435,10 +440,7 @@ def test_publication_serializes_with_working_mutations(context, monkeypatch, mut
         finally:
             release.set()
         winning.result(timeout=20)
-        if first == "mutate" or mutation in {"import", "delete"}:
-            with pytest.raises((ConflictError, NotFoundError, ValidationError)):
-                losing.result(timeout=20)
-        else:
+        with pytest.raises((ConflictError, NotFoundError, ValidationError)):
             losing.result(timeout=20)
     if first == "publish":
         assert len(versions(c)) == 1
@@ -456,6 +458,7 @@ def test_cancellation_and_publication_serialize(context, monkeypatch, first):  #
     c = context
     setup(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
+    c.service.create_concept(c.a.id, c.d.id)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed", "")
     expected = revision(c)
     held, release = Event(), Event()
@@ -493,7 +496,9 @@ def test_cancellation_and_publication_serialize(context, monkeypatch, first):  #
             cancelling.result(timeout=20)
             with pytest.raises(ConflictError):
                 publishing.result(timeout=20)
-    assert publish(c).number == 2
+    with pytest.raises(ConflictError, match="cancelled"):
+        publish(c)
+    assert c.service.concept_context(c.a.id, c.d.key).stale
     assert len([e for e in audits(c) if e.action == "dataset.version_cancelled"]) == 1
 
 

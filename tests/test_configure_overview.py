@@ -43,7 +43,8 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     version = (
         publish_dataset(services, admin.id, dataset) if permission == "viewer" and count else None
     )
-    response = request(client, "get", "/datasets/overview")
+    url = "/datasets/overview" + ("" if permission == "viewer" else "/concept")
+    response = request(client, "get", url)
     if permission == "viewer" and not count:
         assert response.status_code == 404
         assert b"Reference data" not in response.data
@@ -54,14 +55,14 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
-    assert page.count("<section ") == 2
+    assert page.count("<section ") == (2 if permission == "viewer" else 3)
     header = page.split("<div class='configuration-overview'>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
     records_url = (
         f"/datasets/overview/versions/{version.id}/records"
         if version
-        else "/datasets/overview/records"
+        else "/datasets/overview/concept/records"
     )
     assert f"class='button button-primary' href='{records_url}'>View records" in actions
     assert ("Edit dataset" in actions) == (permission != "viewer")
@@ -137,16 +138,18 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         else:
             assert "<form" not in row and "<button" not in row and "Edit field" not in row
     if count == 3:
-        assert "None" in rows[1] and "<span class='badge'>" not in rows[1]
+        assert "None" in rows[1] and "Identifier</span>" not in rows[1]
         assert field_section.index("First field") < field_section.index("Last field")
         # Presentation follows changed canonical display order, not alphabetical identifier keys.
+        if permission == "viewer":
+            services.dataset_versions.create_concept(admin.id, dataset.id)
         services.dataset_fields.replace_order(
             admin.id,
             dataset.key,
             tuple(f.id for f in fields),
             tuple(f.id for f in reversed(fields)),
         )
-        reordered = body(request(client, "get", "/datasets/overview"))
+        reordered = body(request(client, "get", url))
         reordered_fields = section(reordered, "fields-heading")
         if permission == "viewer":
             assert reordered_fields.index("First field") < reordered_fields.index("Last field")
@@ -164,11 +167,11 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F8
         admin.id, dataset.key, "f" * 100, field_name, "string", True, False, True
     )
     login(client)
-    page = body(request(client, "get", f"/datasets/{dataset.key}"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept"))
     assert name not in page and description not in page and field_name not in page
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
-    assert page.count("<section ") == 2
+    assert page.count("<section ") == 3
     assert page.count("<table>") == 1
     assert "aria-label='Edit field &lt;img" in page
 
@@ -203,7 +206,7 @@ def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monke
 
     monkeypatch.setattr(services.dataset_versions, "read", untrusted_read)
     login(client)
-    page = body(request(client, "get", f"/datasets/{dataset.key}"))
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept"))
     assert malicious_key not in page
     escaped_key = escape(malicious_key).replace("&quot;", "&#34;")
     assert escaped_key in section(page, "fields-heading")
@@ -232,7 +235,9 @@ def test_missing_identifier_warning_only_for_existing_fields(
         login(client, actor.email, "user password")
     if permission == "viewer" and state == "configured":
         publish_dataset(services, admin.id, dataset)
-    response = request(client, "get", f"/datasets/{dataset.key}")
+    response = request(
+        client, "get", f"/datasets/{dataset.key}" + ("" if permission == "viewer" else "/concept")
+    )
     if permission == "viewer" and state != "configured":
         assert response.status_code == 404
         assert b"No record identifier configured" not in response.data

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Delete record</h1>{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}<p>Record identifier: {{ identifier }}</p><p>This deletion cannot be undone.</p>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Delete record</h1>{% include 'pages/datasets/concepts/_banner.html' %}{% if error %}<p class='alert alert-error' role='alert'>{{ error }}</p>{% endif %}<p>Record identifier: {{ identifier }}</p><p>This deletion cannot be undone.</p>
   <form class='form' method='post'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><input type='hidden' name='expected_revision' value='{{ record.revision }}'><label><input type='checkbox' name='confirm' value='yes'> I confirm permanent deletion</label><button class='button button-danger' type='submit'>Delete record</button></form>
 {% endblock %}
