@@ -7,7 +7,7 @@
 {% block content %}
   {% include 'pages/datasets/_breadcrumbs.html' %}
   <h1>{{ title }}</h1>
-  <div class='side-panel-view' data-side-panel-content data-panel-title='{{ title }}'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='{{ title }}' data-panel-eyebrow='{{ dataset.name }}'>
     {% if mode == 'owner' %}
     <div class='side-panel-body'>
       {{ feedback(error, id='governance-error', focus=true) }}

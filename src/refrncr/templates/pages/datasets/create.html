@@ -8,7 +8,7 @@
 {% block content %}
   {{ breadcrumbs([("Datasets", url_for("dataset_list")), ("New dataset", none)]) }}
   {{ page_header("New dataset") }}
-  <div class='side-panel-body' data-side-panel-content data-panel-title='New dataset'>
+  <div class='side-panel-body' data-side-panel-content data-panel-title='New dataset' data-panel-eyebrow='Datasets'>
   {{ feedback(error if not error_field else none, id="dataset-create-error", focus=true) }}
   {% if not teams %}
     <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>

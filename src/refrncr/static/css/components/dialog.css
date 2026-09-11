@@ -64,3 +64,9 @@ main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[dat
 /* The first footer step towards deletion is outlined; the confirming submit stays solid. */
 .side-panel-footer .button-danger[type="button"] { border-color: var(--color-action-danger); background: var(--color-surface); color: var(--color-action-danger); }
 .side-panel-footer .button-danger[type="button"]:hover { background: var(--color-error-surface); color: var(--color-action-danger-hover); }
+/* Fetched panel forms: their actions form the fixed panel footer, like the record panels. */
+.side-panel [data-side-panel-content].side-panel-body { display: flex; flex-direction: column; }
+.side-panel [data-side-panel-content].side-panel-body > form { display: flex; flex: 1 0 auto; flex-direction: column; }
+.side-panel [data-side-panel-content].side-panel-body .form-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); margin: auto calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.side-panel [data-side-panel-content].side-panel-body .form-actions > * { width: 100%; }
+@media (max-width: 767px) { .side-panel [data-side-panel-content].side-panel-body .form-actions { margin-inline: calc(-1 * var(--space-md)); padding: var(--space-md); } }

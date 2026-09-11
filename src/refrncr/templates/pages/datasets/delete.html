@@ -4,7 +4,7 @@
 {% block title %}Delete dataset · REFRNCR{% endblock %}
 {% block content %}
   <h1>Delete dataset</h1>
-  <div class='side-panel-view' data-side-panel-content data-panel-title='Delete dataset'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Delete dataset' data-panel-eyebrow='{{ dataset.name }}'>
     <div class='side-panel-body panel-sections'>
       {{ readonly_field("Dataset", deletion.name) }}
       {{ feedback("Deletion is permanent. All records, fields, record identifiers and access settings will be removed. This cannot be undone.", kind="warning") }}

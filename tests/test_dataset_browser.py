@@ -504,9 +504,11 @@ def test_record_table_retains_readable_width_inside_scroll_container(dataset_bro
     assert re.search(r"<div class='table-scroll'[^>]*>\s*<table class='record-table'>", page)
     assert "--data-table-min-width: 48rem" in tokens
     assert (
-        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }"
+        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }"
         in tables
     )
+    assert ".record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }" in tables
+    assert "text-overflow: ellipsis" in tables
     assert ".table-scroll { width: 100%; overflow-x: auto;" in tables
     assert not re.search(r"\.record-table\s+th[^}]*white-space:\s*nowrap", tables)
     assert "currencies" not in tables.lower()

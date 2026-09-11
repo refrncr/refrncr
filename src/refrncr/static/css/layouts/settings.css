@@ -19,3 +19,9 @@
 .audit-details { margin: 0; }
 .audit-details dt { font-weight: var(--font-weight-semibold); margin-top: var(--space-md); }
 .audit-details dd { margin: var(--space-xs) 0 0; overflow-wrap: anywhere; }
+/* Action kind as a dot beside the label; the label stays the carrier of meaning. */
+.audit-action { display: inline-flex; align-items: baseline; gap: var(--space-sm); }
+.audit-action::before { content: ""; width: .375rem; height: .375rem; border-radius: var(--radius-full); background: var(--color-control-border); flex-shrink: 0; transform: translateY(-.1em); }
+.audit-action[data-action-kind="addition"]::before { background: var(--color-success); }
+.audit-action[data-action-kind="removal"]::before { background: var(--color-error); }
+.audit-action[data-action-kind="review"]::before { background: var(--color-info); }

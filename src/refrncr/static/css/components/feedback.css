@@ -20,3 +20,5 @@
 .side-panel-body .concept-banner .concept-banner-note { display: none; }
 .side-panel-body .concept-banner .page-actions { width: 100%; gap: var(--space-xs); }
 .side-panel-body .concept-banner .button { flex: 1 1 auto; min-height: 2rem; padding: .3125rem .625rem; font-size: var(--font-size-sm); white-space: nowrap; }
+/* On pages the explanatory note continues the status line instead of taking its own row. */
+.concept-banner-note { flex-basis: auto; }

@@ -4,7 +4,7 @@
 {% block title %}Cancel version · REFRNCR{% endblock %}
 {% block content %}
   <h1>Cancel version</h1>
-  <div class='side-panel-view' data-side-panel-content data-panel-title='Cancel version'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Cancel version' data-panel-eyebrow='{{ dataset.name }}'>
     <div class='side-panel-body panel-sections'>
       {{ readonly_field('Dataset', state.version.name) }}
       {{ readonly_field('Version', 'Version ' ~ state.version.number) }}

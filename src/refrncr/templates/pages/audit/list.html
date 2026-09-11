@@ -44,7 +44,7 @@
         <tbody>{% for item in page.items %}
           <tr>
             <td><time datetime="{{ item.timestamp }}" data-local-time>{{ item.timestamp }} UTC</time></td>
-            <td><bdi>{{ item.actor_label }}</bdi></td><td>{{ item.action_label }}</td>
+            <td><bdi>{{ item.actor_label }}</bdi></td><td><span class='audit-action' data-action-kind='{{ "removal" if "delet" in item.action or "remov" in item.action else "addition" if "creat" in item.action or "add" in item.action or "publish" in item.action else "review" if "review" in item.action else "change" }}'>{{ item.action_label }}</span></td>
             <td>{{ item.object_type_label }}</td>
             <td>{% if item.object_status in ('deleted', 'unnamed') %}<i><bdi>{{ item.object_label }}</bdi></i>{% else %}<bdi>{{ item.object_label }}</bdi>{% endif %}</td>
             <td><a href="{{ url_for('audit_detail', event_id=item.id) }}" data-panel-url data-dialog-open="audit-detail-panel">View details<span class="visually-hidden">: {{ item.action_label }}, {{ item.timestamp }}, event {{ item.id }}</span></a></td>

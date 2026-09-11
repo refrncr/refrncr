@@ -95,3 +95,10 @@
 .mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
 .mapping-heading h2 { margin: 0; }
 .mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid var(--color-text-muted); border-radius: var(--radius-full); color: var(--color-text-muted); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); }
+
+/* Drop zone: centred icon, label and file control; the native picker button reads as a secondary button. */
+.import-upload-zone { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg); border-width: 1.5px; text-align: center; }
+.import-upload-icon { width: 1.75rem; height: 1.75rem; opacity: .7; }
+.import-upload-zone input[type="file"] { width: auto; max-width: 100%; min-height: 0; margin-top: 0; padding: 0; border: 0; background: transparent; font-size: var(--font-size-body-sm); }
+.import-upload-zone input[type="file"]::file-selector-button { margin-right: var(--space-sm); padding: .4375rem .75rem; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: var(--font-weight-semibold) .8125rem/var(--line-height-control) var(--font-interface); cursor: pointer; }
+.import-upload-zone .help-text { margin: 0; }
