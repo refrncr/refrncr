@@ -63,6 +63,6 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-toolbar:has(+ .table-scroll) { margin-bottom: 0; border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .record-toolbar + .table-scroll { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 /* Exception rows: concept changes and pending removals get an edge marker next to their badge. */
-.record-table .record-changed > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
+.record-table .record-row:has(> .record-system-status .badge-draft) > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
 .record-table .record-tombstone > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-removed-border); }
 .row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }

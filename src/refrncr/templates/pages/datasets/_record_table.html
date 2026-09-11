@@ -24,7 +24,7 @@
       <tbody>
         {% for record, values, incomplete in rows %}
           {% set status = record_states.get(record.id, 'Published') %}
-          {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row' if status == 'Published' else 'record-row record-changed', panel=true) %}
+          {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
               <td{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
