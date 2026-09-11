@@ -22,7 +22,7 @@
 .account-name { font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .account-role, .account-link { font-size: var(--font-size-sm); font-weight: var(--font-weight-regular); }
 .account-role { color: var(--color-text-muted); }
-.app-main { min-width: 0; padding: clamp(var(--space-md), 4vw, var(--space-xxl)); background: var(--color-surface); overflow-x: hidden; transition: margin-right var(--motion-duration-layout) var(--motion-easing-standard); }
+.app-main { --app-main-padding: clamp(var(--space-md), 4vw, var(--space-xxl)); min-width: 0; padding: var(--app-main-padding); background: var(--color-surface); overflow-x: hidden; transition: margin-right var(--motion-duration-layout) var(--motion-easing-standard); }
 .app-main-anonymous { grid-column: 1 / -1; width: min(100%, 34rem); margin-inline: auto; background: transparent; }
 /* Both authenticated shells share the same sidebar and drawer state contract. */
 .app-shell > [data-navigation] { grid-column: 1; grid-row: 1 / -1; }
@@ -64,6 +64,19 @@
   .app-shell { display: block; }
   .primary-navigation { min-height: auto; }
   .account-context { margin-top: var(--space-lg); }
+  /* The white work surface fills the phone screen, also on short pages. */
+  .app-main:not(.app-main-anonymous, .settings-content) { min-height: 100vh; min-height: 100dvh; }
 }
 .app-shell:not(.settings-shell) { grid-template-rows: minmax(0, 1fr); }
-.app-main > [data-nav-open] { margin-bottom: var(--space-sm); }
+.app-main > [data-nav-open], .mobile-bar > [data-nav-open] { margin-bottom: var(--space-sm); }
+/* Below 1024px a slim bar carries the menu, the logo and the page name. On desktop the bar
+   dissolves: only the expand control remains, shown when navigation is collapsed (REF-84). */
+.mobile-bar { display: contents; }
+.mobile-bar-brand, .mobile-bar-title { display: none; }
+@media (max-width: 1023px) {
+  .mobile-bar { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; margin: calc(-1 * var(--app-main-padding)) calc(-1 * var(--app-main-padding)) var(--app-main-padding); padding: var(--space-sm) var(--app-main-padding); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+  .mobile-bar > [data-nav-open] { flex-shrink: 0; margin: 0 0 0 calc(-1 * var(--space-sm)); }
+  .mobile-bar-brand { display: flex; flex-shrink: 0; }
+  .mobile-bar-brand img { display: block; width: auto; height: 1.75rem; }
+  .mobile-bar-title { display: block; min-width: 0; margin-left: var(--space-xs); padding-left: var(--space-md); border-left: 1px solid var(--color-border); overflow: hidden; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+}

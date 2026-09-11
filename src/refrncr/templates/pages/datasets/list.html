@@ -12,7 +12,7 @@
       {% if may_create %}<a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset") }}'>+ New dataset</a>{% endif %}
     </div>
   </div>
-  {% if datasets %}<div class='table-scroll management-table'><table aria-label='Datasets'><caption class='visually-hidden'>Datasets</caption><thead><tr>
+  {% if datasets %}<div class='table-scroll management-table'><table class='dataset-table' aria-label='Datasets'><caption class='visually-hidden'>Datasets</caption><thead><tr>
     <th scope='col'>Dataset</th><th scope='col'>Owning team</th><th scope='col' class='numeric-column'>Records</th><th scope='col'>Updated</th><th scope='col'>Version</th></tr></thead><tbody>
     {% for context in datasets %}{% set dataset = context.dataset %}{% call table_row('dataset-row') %}
       <td>{{ row_action(dataset.name, href=url_for("dataset_records_view", key=dataset.key)) }}<span class='row-secondary technical'>{{ dataset.key }}</span></td>

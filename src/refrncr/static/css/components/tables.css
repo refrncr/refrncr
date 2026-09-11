@@ -14,6 +14,8 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-toolbar span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }
 .record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }
+/* The cap limits how wide a column asks to be; once the table is laid out, the text fills its cell. */
+.record-table .cell-content { min-width: 100%; }
 /* Content-sized columns keep short headings (ISO code 3) readable; long headings still wrap. */
 .record-table thead th { min-width: 8rem; }
 .record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
@@ -28,7 +30,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .interactive-row { position: relative; }
 .interactive-row:has(.row-action:not(:disabled):not([aria-disabled="true"])) { cursor: pointer; }
 .interactive-row > td:last-child { padding-inline-end: var(--space-xxl); }
-.row-action { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; text-decoration: none; overflow-wrap: anywhere; cursor: pointer; user-select: text; }
+.row-action { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; text-decoration: none; overflow-wrap: break-word; cursor: pointer; user-select: text; }
 .management-table .row-action { font-weight: var(--font-weight-bold); }
 .row-action:hover { color: inherit; }
 .row-action-label { display: block; min-width: 0; }
@@ -68,7 +70,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 /* Exception rows: concept changes and pending removals get an edge marker next to their badge. */
 .record-table .record-row:has(> .record-system-status .badge-draft) > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
 .record-table .record-tombstone > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-removed-border); }
-.row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }
+.row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: break-word; }
 /* Row headers name the row; they are not column headings. */
 tbody th[scope="row"] { background: transparent; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
 .management-table tbody th[scope="row"] { white-space: nowrap; }
@@ -80,6 +82,9 @@ tbody th[scope="row"] { background: transparent; color: var(--color-text); font-
 /* Toolbar note: read-only state of a published version, next to the result count. */
 .record-toolbar .record-toolbar-note { margin: 0 0 0 auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-toolbar:has(.record-toolbar-note) > span { margin-left: var(--space-md); }
+
+/* Table text breaks between words only; a table that no longer fits scrolls sideways. */
+.table-scroll time { white-space: nowrap; }
 
 /* Local time: the timezone is named once in the column heading; rows group per local day. */
 .table-zone { font-family: var(--font-technical); letter-spacing: normal; text-transform: none; }

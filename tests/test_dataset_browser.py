@@ -185,7 +185,7 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "data-list-search" not in page
     assert "dataset-tabs" not in page
     assert "button-tab" not in page
-    assert "<table aria-label='Datasets'>" in page
+    assert "<table class='dataset-table' aria-label='Datasets'>" in page
     assert "<th scope='col'>Dataset</th>" in page
     assert "<th scope='col' class='numeric-column'>Records</th>" in page
     assert "<th scope='col'>Updated</th>" in page

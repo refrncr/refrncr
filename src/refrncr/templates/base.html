@@ -45,7 +45,12 @@
         </aside>
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
-        {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
+        {% if current_actor %}{% set mobile_title = self.title().split(' · ')[0] %}
+        <div class="mobile-bar">
+          {{ navigation_button('application-navigation', expand=true) }}
+          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="" width="99" height="28"></a>
+          {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
+        </div>{% endif %}
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>
