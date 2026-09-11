@@ -33,3 +33,14 @@ label:has(> input:is([type="checkbox"], [type="radio"])) > input { flex-shrink: 
 .form-field:has(> input:is([type="checkbox"], [type="radio"])) > input { grid-column: 1; grid-row: 1; margin: .125rem 0 0; }
 .form-field:has(> input:is([type="checkbox"], [type="radio"])) > label { grid-column: 2; grid-row: 1; margin-top: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
 .form-field:has(> input:is([type="checkbox"], [type="radio"])) > :not(input, label) { grid-column: 2; }
+
+/* Controls inside wrapping labels keep the interface face, even where labels are mono. */
+label > input:not([type="checkbox"], [type="radio"]), label > select, label > textarea { font-family: var(--font-interface); font-size: var(--font-size-body); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }
+.field-option-help { margin: .125rem 0 var(--space-sm) calc(1.25rem + var(--space-sm)); }
+.required-mark { color: var(--color-error); }
+/* Password visibility toggle sits inside the field as a quiet text button. */
+.form-field:has(> [data-password-toggle]:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.form-field:has(> [data-password-toggle]:not([hidden])) > label, .form-field:has(> [data-password-toggle]:not([hidden])) > :not(input, [data-password-toggle]) { grid-column: 1 / -1; }
+.form-field:has(> [data-password-toggle]:not([hidden])) > input { grid-column: 1 / -1; grid-row: 2; padding-right: 7.5rem; }
+.form-field > [data-password-toggle]:not([hidden]) { grid-column: 2; grid-row: 2; z-index: 1; margin: var(--space-xs) .375rem 0 0; min-height: 2rem; padding: 0 .625rem; border-color: transparent; background: transparent; color: var(--color-link); }
+.form-field > [data-password-toggle]:not([hidden]):hover { background: var(--color-surface-subtle); }

@@ -8,7 +8,7 @@
         <dl class='record-details'>
           <div><dt>Name</dt><dd>{{ user.display_name }}</dd></div>
           <div><dt>Email address</dt><dd>{{ user.email }}</dd></div>
-          <div><dt>Role</dt><dd>{{ 'Administrator' if user.role == 'admin' else 'User' }}</dd></div>
+          <div><dt>Role</dt><dd>{{ 'Administrator' if user.role == 'admin' else 'User' }}<span class='help-text role-help'>{{ 'Manages users, teams, access and every dataset.' if user.role == 'admin' else 'Works on datasets owned by their teams.' }}</span></dd></div>
           <div><dt>Status</dt><dd>{{ 'Deleted' if user.is_deleted else ('Active' if user.is_active else 'Inactive') }}</dd></div>
         </dl>
         {% if not user.is_deleted %}

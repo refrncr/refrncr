@@ -16,6 +16,14 @@
   {% else %}
   <form class='form' novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
+      "Name",
+      "name",
+      "dataset-name",
+      required=true,
+      value=name,
+      error=error if error_field == "name" else none
+    ) }}
+    {{ form_field(
       "Key",
       "key",
       "dataset-key",
@@ -23,14 +31,6 @@
       value=key,
       help_text="A permanent technical identifier.",
       error=error if error_field == "key" else none
-    ) }}
-    {{ form_field(
-      "Name",
-      "name",
-      "dataset-name",
-      required=true,
-      value=name,
-      error=error if error_field == "name" else none
     ) }}
     {{ form_field(
       "Description",

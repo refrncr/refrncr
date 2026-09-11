@@ -63,3 +63,4 @@
 .metadata .badge { margin-inline-start: var(--space-xs); vertical-align: .05em; }
 .metadata-warning { color: var(--color-error); }
 .management-list-header .page-context > .metadata { padding-block-start: var(--space-xs); }
+.member-list form .button { min-height: 2rem; padding: .25rem .625rem; }

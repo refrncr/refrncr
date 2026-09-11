@@ -24,8 +24,9 @@
     <section class='side-panel-view' data-panel-view='view'>
       <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
         {% if deleted %}<p class='record-deletion-notice'><span class='badge badge-removed'>Deleted</span> This Record will be removed when you publish. These read-only values are from the basis version.</p>{% endif %}
+        {% if version_state %}<p class='panel-context'>Version {{ version_state.version.number }} · published, read only</p>{% endif %}
         <dl class='record-details'>
-          {% for field, value in record_details[record.id] %}<div><dt>{{ field.name }}</dt><dd>{{ display_record_value(field, value) if value is not none else '—' }}</dd></div>{% endfor %}
+          {% for field, value in record_details[record.id] %}<div><dt>{{ field.name }}{% if field.key in identifier.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'> (record identifier)</span>{% endif %}</dt><dd>{{ display_record_value(field, value) if value is not none else '—' }}</dd></div>{% endfor %}
         </dl>
       </div>
       {% if record_may_edit %}
