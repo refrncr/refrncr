@@ -372,6 +372,7 @@ class DatasetVersion(Base):
     __tablename__ = "dataset_versions"
     __table_args__ = (
         UniqueConstraint("dataset_id", "number", name="uq_dataset_versions_number"),
+        Index("uq_dataset_versions_dataset_id", "dataset_id", "id", unique=True),
         CheckConstraint("number >= 1", name="ck_dataset_versions_number"),
         CheckConstraint("length(release_note) <= 2000", name="ck_dataset_versions_note"),
         CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_dataset_versions_name"),
@@ -485,3 +486,26 @@ for _snapshot_model in (
 ):
     event.listen(_snapshot_model, "before_update", _immutable_version_row)
     event.listen(_snapshot_model, "before_delete", _immutable_version_row)
+
+
+class DatasetConcept(Base):
+    __tablename__ = "dataset_concepts"
+    __table_args__ = (
+        UniqueConstraint("id", name="uq_dataset_concepts_id"),
+        CheckConstraint("start_revision >= 1", name="ck_dataset_concepts_revision"),
+        ForeignKeyConstraint(
+            ["dataset_id", "base_version_id"],
+            ["dataset_versions.dataset_id", "dataset_versions.id"],
+            ondelete="CASCADE",
+            name="fk_concepts_baseline",
+        ),
+    )
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String(36), default=new_id)
+    base_version_id: Mapped[str | None] = mapped_column(String(36))
+    creator_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    start_revision: Mapped[int] = mapped_column(Integer)

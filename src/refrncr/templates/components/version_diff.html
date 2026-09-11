@@ -1,0 +1,19 @@
+{% macro value(text, absent=false) -%}
+  {% if absent %}<span class='help-text'>Not present</span>{% elif text is none %}<span class='help-text'>No value</span>{% elif text|length > 1000 %}<details><summary>Read full value</summary><div class='diff-value'>{{ text }}</div></details>{% else %}<div class='diff-value'>{{ text }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro properties(items, caption) -%}
+  <div class='table-scroll' role='region' aria-label='{{ caption }}' tabindex='0'>
+    <table class='diff-table'>
+      <caption class='visually-hidden'>{{ caption }}</caption>
+      <thead><tr><th scope='col'>Property</th><th scope='col'>Before</th><th scope='col'>After</th></tr></thead>
+      <tbody>{% for item in items %}<tr><th scope='row'>{{ item.name }}</th><td>{{ value(item.before) }}</td><td>{{ value(item.after) }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+{%- endmacro %}
+
+{% macro field_changes(item) -%}
+  <p><span class='badge'>{{ item.status }}</span>{% if item.moved %} <span class='badge'>Moved</span>{% endif %}</p>
+  {% if item.datatype_changed %}<p class='alert alert-warning'>Datatype changed. Interpretation or presentation may differ; publication still validates the values.</p>{% endif %}
+  {{ properties(item.properties, 'Field changes: ' ~ item.name) }}
+{%- endmacro %}

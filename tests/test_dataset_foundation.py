@@ -77,6 +77,7 @@ def test_create_dataset_persists_metadata_team_creator_and_audit(dataset_service
     assert grant is None
     assert {(event.object_type, event.object_id, event.action) for event in events} == {
         ("dataset", dataset.id, "created"),
+        ("dataset", dataset.id, "dataset.concept_created"),
     }
     assert {event.actor_user_id for event in events} == {admin.id}
 
@@ -182,7 +183,7 @@ def test_duplicate_key_has_consistent_conflict_without_partial_rows(dataset_serv
                     | ((AuditEvent.object_type == "grant") & (AuditEvent.action == "created"))
                 )
             )
-            == 1
+            == 2
         )
         assert session.scalar(select(Dataset.id)) == first.id
 

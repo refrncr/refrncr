@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components.html" import feedback %}
 {% block content %}
-<header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>Add records to {{ dataset.name }}</p></div></header>
+<header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>Add records to {{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
 <section class='import-wizard' aria-label='Record import wizard'>
   <nav aria-label='Import progress'><ol class='import-steps'>
     {% for item in steps %}<li class='{{ "is-active" if item.number == step and not success else "is-complete" if item.done else "is-remaining" }}' data-step='{{ item.number }}' data-step-status='{{ "completed" if success else "active" if item.number == step else "completed" if item.done else "remaining" }}'>
@@ -36,9 +36,9 @@
   <footer class='import-actions'>
     <div>{% if not success and step in (2, 3) %}<button class='button button-secondary' type='submit' form='import-step-form' name='go_step' value='{{ back_step }}'>Back</button>{% elif not success and step > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=back_step) }}'>Back</a>{% endif %}</div>
     <div class='import-actions-forward'>
-      {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View records</a>
+      {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>View records</a>
       {% else %}
-        {% if state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>{{ 'Cancel import' if step == 4 else 'Cancel' }}</button></form>{% else %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>Cancel</a>{% endif %}
+        {% if state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>{{ 'Cancel import' if step == 4 else 'Cancel' }}</button></form>{% else %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>{% endif %}
         {% if step == 4 %}{% if preview.valid %}<a class='button button-primary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=5) }}'>Continue</a>{% else %}<button class='button button-primary' disabled>Continue</button>{% endif %}
         {% else %}<button class='button button-primary' type='submit' form='import-step-form'{% if step == 3 %} data-mapping-continue{% endif %}>{{ 'Import records' if step == 5 else 'Continue' }}</button>{% endif %}
       {% endif %}

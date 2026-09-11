@@ -29,6 +29,7 @@ async function screenshot(page, name) {
   if (output) await page.screenshot({path: path.join(output, `${name}.png`), fullPage: true});
 }
 async function openPanel(page, opener, input) {
+  await page.waitForLoadState('load');
   await opener.focus();
   await opener.press('Enter');
   await page.locator(input).waitFor({state: 'visible'});
@@ -59,6 +60,7 @@ async function closedWithFocus(page, opener) {
       await login(page, 'owner@example.com');
       const versionsURL = `${base}/datasets/publish-${width}/versions`;
       await page.goto(versionsURL);
+      await page.getByRole('link', {name: 'Concept', exact: true}).click();
       const opener = page.getByRole('link', {name: 'Publish version', exact: true});
       await openPanel(page, opener, '#publication-date');
       await noOverflow(page);
@@ -69,7 +71,12 @@ async function closedWithFocus(page, opener) {
       await page.locator('#publication-date').waitFor({state: 'visible'});
       await page.locator('dialog[open]').getByRole('link', {name: 'Cancel', exact: true}).click();
       await closedWithFocus(page, opener);
-      assert.equal(await page.locator('table tbody tr').count(), 0, 'close mutated versions');
+      await page.getByRole('link', {name: 'Versions', exact: true}).click();
+      assert.equal(await page.locator('table tbody tr').count(), 1, 'close mutated versions');
+      assert.equal(await page.getByRole('link', {name: 'Concept', exact: true}).count(), 1);
+      assert.equal(await page.getByRole('link', {name: 'Version 1', exact: true}).count(), 0);
+      await page.getByRole('link', {name: 'Concept', exact: true}).click();
+      await page.waitForLoadState('load');
       await opener.click();
       await page.locator('#publication-date').waitFor({state: 'visible'});
       await page.locator('dialog[open]').getByRole('button', {name: 'Publish version', exact: true}).click();
@@ -112,7 +119,6 @@ async function closedWithFocus(page, opener) {
       await noOverflow(page);
       await screenshot(page, `scheduled-${width}`);
       await page.getByRole('link', {name: 'Version 1', exact: true}).click();
-      await page.getByRole('link', {name: 'View records', exact: true}).click();
       assert.match(await page.locator('body').innerText(), /Published value/);
       assert.equal(await page.getByRole('button', {name: 'Add record', exact: true}).count(), 0);
       assert.equal(await page.getByText('Export', {exact: true}).count(), 0, 'Scheduled export exposed');
@@ -130,6 +136,8 @@ async function closedWithFocus(page, opener) {
       await page.waitForURL(`${versionsURL}?notice=cancelled`);
       assert.match(await page.locator('table tbody').innerText(), /Cancelled/);
       assert.equal(await page.getByRole('link', {name: 'Version 1', exact: true}).count(), 0);
+      await page.getByRole('button', {name: '+ New version', exact: true}).click();
+      await page.waitForLoadState('load');
       await page.getByRole('link', {name: 'Publish version', exact: true}).click();
       await page.locator('#publication-date').waitFor({state: 'visible'});
       assert.match(await page.locator('dialog[open]').innerText(), /Version 2/);
@@ -144,13 +152,12 @@ async function closedWithFocus(page, opener) {
     await reader.goto(`${base}/datasets`);
     assert(!/Private future|Publication 320|Unpublished history name/.test(await reader.locator('body').innerText()));
     await reader.getByRole('link', {name: 'History demo', exact: true}).click();
-    assert.match(reader.url(), /\/versions\/[^/]+\/records$/);
+    assert.equal(reader.url(), `${base}/datasets/history/records`);
     assert.match(await reader.locator('body').innerText(), /Second published value/);
     assert(!/DRAFT ONLY|Add record|Export/.test(await reader.locator('main').innerText()));
     await reader.getByRole('link', {name: 'Versions', exact: true}).click();
     assert.match(await reader.locator('table tbody').innerText(), /Expired/);
     await reader.getByRole('link', {name: 'Version 1', exact: true}).click();
-    await reader.getByRole('link', {name: 'View records', exact: true}).click();
     assert.match(await reader.locator('body').innerText(), /Published value/);
     assert(!/Second published value|DRAFT ONLY/.test(await reader.locator('body').innerText()));
     await reader.getByRole('button', {name: /^View record FIRST /}).click();
@@ -168,7 +175,6 @@ async function closedWithFocus(page, opener) {
     for (const version of [2, 1]) {
       await exporter.goto(`${base}/datasets/history/versions`);
       await exporter.getByRole('link', {name: `Version ${version}`, exact: true}).click();
-      await exporter.getByRole('link', {name: 'View records', exact: true}).click();
       for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
         await exporter.locator('.export-menu summary').click();
         const promise = exporter.waitForEvent('download');
@@ -189,6 +195,8 @@ async function closedWithFocus(page, opener) {
     const importContext = await observedContext({viewport: {width: 320, height: 950}, colorScheme: 'light'});
     const importer = await importContext.newPage();
     await login(importer, 'owner@example.com');
+    await importer.goto(`${base}/datasets/future-only/versions`);
+    await importer.getByRole('button', {name: '+ New version', exact: true}).click();
     await importer.goto(`${base}/datasets/future-only/records/import`);
     await importer.locator('#import-file').setInputFiles({name: 'records.csv', mimeType: 'text/csv', buffer: Buffer.from('code,label\nIMPORTED,Concept import only\n')});
     await importer.getByRole('button', {name: 'Continue', exact: true}).click();
@@ -202,7 +210,6 @@ async function closedWithFocus(page, opener) {
     assert.match(await importer.locator('main').innerText(), /Concept import only/);
     await importer.getByRole('link', {name: 'Versions', exact: true}).click();
     await importer.getByRole('link', {name: 'Version 1', exact: true}).click();
-    await importer.getByRole('link', {name: 'View records', exact: true}).click();
     assert.match(await importer.locator('main').innerText(), /Published value/);
     assert(!/Concept import only|IMPORTED/.test(await importer.locator('main').innerText()));
     await noOverflow(importer);
@@ -213,6 +220,7 @@ async function closedWithFocus(page, opener) {
     const nojs = await nojsContext.newPage();
     await login(nojs, 'owner@example.com');
     await nojs.goto(`${base}/datasets/publish-nojs/versions`);
+    await nojs.getByRole('link', {name: 'Concept', exact: true}).click();
     await nojs.getByRole('link', {name: 'Publish version', exact: true}).click();
     await nojs.getByRole('button', {name: 'Publish version', exact: true}).click();
     assert.match(await nojs.locator('#publication-error').innerText(), /Confirm/);

@@ -96,7 +96,9 @@ def test_complete_capability_matrix(governance, kind):
     assert s.dataset_records.list_records(u.id, d.key).total == 0
     for fmt in ("csv", "xlsx", "json"):
         if kind != "viewer":
-            s.dataset_records.export_dataset(u.id, d.key, fmt).content.close()
+            s.dataset_records.export_dataset(
+                u.id, d.key, fmt, prefer_concept=kind in {"owner", "admin"}
+            ).content.close()
         else:
             with pytest.raises(NotFoundError):
                 s.dataset_records.export_dataset(u.id, d.key, fmt)
@@ -473,6 +475,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert ">Access management</a>" in detail
     assert "Change owning team</a>" not in detail
     assert "All active Community users can view this dataset." not in detail
+    s.dataset_versions.create_concept(a.id, d.id)
     edit = get(f"/datasets/{d.key}/edit").text
     assert "name='expected_owner_team_id'" in edit
     before = state(factory, d)

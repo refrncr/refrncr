@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "components.html" import breadcrumbs %}
+{% from "layouts/page.html" import page_context %}
+{% from "components/side_panel.html" import form_side_panel %}
+{% from "components/version_diff.html" import properties, field_changes %}
+{% block title %}Review changes · {{ dataset.name }} · REFRNCR{% endblock %}
+{% block content %}
+<div data-version-review>
+  <div class='page-header'>
+    {% call page_context('Review changes') %}
+      {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review changes', none)]) }}
+    {% endcall %}
+    <div class='page-actions'>
+      <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Versions</a>
+      {% if identity.baseline_status != 'Scheduled' and (section != 'Summary' or result.has_changes) %}
+        <a class='button button-primary' href='{{ url_for("dataset_version_publish", key=dataset.key, review=token) }}' data-panel-url data-dialog-open='review-panel'>Publish version</a>
+      {% endif %}
+    </div>
+  </div>
+  {% include 'pages/datasets/concepts/_banner.html' %}
+  <p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Concept revision {{ identity.revision }}</p>
+  <p class='help-text'>This review is read only and optional before publication.</p>
+  {% if identity.baseline_status == 'Scheduled' %}<p class='help-text'>Publication is available after the Scheduled version becomes Current or is cancelled. Restart this review after that change.</p>{% endif %}
+  <nav class='page-actions' aria-label='Review sections'>
+    {% for name, href in sections.items() %}<a class='button {{ "button-primary" if name == section else "button-secondary" }}' href='{{ href }}'{% if name == section %} aria-current='page'{% endif %}>{{ name }}</a>{% endfor %}
+  </nav>
+  <h2>{{ section }}</h2>
+  {% if section == 'Summary' %}
+    {% if result.metadata %}{{ properties(result.metadata, 'Dataset metadata changes') }}{% endif %}
+    <div class='table-scroll' role='region' aria-label='Change counts' tabindex='0'>
+      <table><caption>Change counts</caption><thead><tr><th scope='col'>Content</th><th scope='col'>Added</th><th scope='col'>Changed</th><th scope='col'>Removed</th></tr></thead>
+      <tbody><tr><th scope='row'>Fields</th><td>{{ result.counts.fields_added }}</td><td>{{ result.counts.fields_changed }}</td><td>{{ result.counts.fields_removed }}</td></tr>
+      <tr><th scope='row'>Records</th><td>{{ result.counts.records_added }}</td><td>{{ result.counts.records_changed }}</td><td>{{ result.counts.records_removed }}</td></tr></tbody></table>
+    </div>
+    {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The concept matches this published version.</p></div>{% endif %}
+  {% else %}
+    <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Removed</p>
+    {% if section == 'Records' %}
+      <form class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
+        <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
+        <label for='diff-search'>Search old or new identifier</label>
+        <input id='diff-search' type='search' name='q' value='{{ criteria.search }}' maxlength='200'>
+        <fieldset><legend>Change status</legend>{% for status in ['Added', 'Changed', 'Removed'] %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses %} checked{% endif %}> {{ status }}</label>{% endfor %}</fieldset>
+        <div class='form-actions'><button class='button button-primary' type='submit'>Apply filters</button><a class='button button-secondary' href='{{ sections.Records }}'>Clear filters</a></div>
+      </form>
+      <p class='help-text'>{{ result.total }} matching changes · 50 per page. Search checks identifiers only; no selected statuses means all statuses.</p>
+      {% if result.items %}<div class='table-scroll management-table' role='region' aria-label='Record changes' tabindex='0'>
+        <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Removed</caption>
+        <thead><tr><th scope='col'>Status</th><th scope='col'>Identifier</th><th scope='col'>Old identifier</th><th scope='col'>Changed values</th></tr></thead>
+        <tbody>{% for item in result.items %}<tr class='interactive-row record-row' data-record-row data-row-action>
+          <td><span class='badge'>{{ item.status }}</span></td>
+          <td><a class='row-action' data-row-primary data-panel-url data-dialog-open='review-panel' href='{{ detail_url("record", item.id) }}'><span class='visually-hidden'>Review record </span><span class='row-action-label'>{{ item.after_identifier or item.before_identifier }}</span></a></td>
+          <td>{% if item.status == 'Changed' and item.before_identifier != item.after_identifier %}{{ item.before_identifier }}{% else %}—{% endif %}</td>
+          <td>{{ item.changed_values if item.status == 'Changed' else '—' }}</td>
+        </tr>{% endfor %}</tbody></table>
+      </div>{% endif %}
+    {% else %}
+      <p class='help-text'>{{ result.total }} changed Fields · 50 per page.</p>
+      {% for item in result.items %}<section class='panel-sections'>
+        <h3><a href='{{ detail_url("field", item.id) }}' data-panel-url data-dialog-open='review-panel'>{{ item.name }}</a></h3>
+        {{ field_changes(item) }}
+      </section>{% endfor %}
+    {% endif %}
+    {% if not result.items %}<div class='empty-state'><h3>No matching changes</h3><p>There are no changes in this view.</p></div>{% endif %}
+    <nav class='pagination' aria-label='Change pages'>
+      {% if result.previous %}<a class='button button-secondary' href='{{ page_url(anchor=result.previous, backwards="1") }}'>Previous page</a>{% endif %}
+      {% if result.next %}<a class='button button-secondary' href='{{ page_url(anchor=result.next, backwards="0") }}'>Next page</a>{% endif %}
+    </nav>
+  {% endif %}
+  {{ form_side_panel('review-panel') }}
+</div>
+{% endblock %}
+{% block scripts %}<script src='{{ url_for("static", filename="js/version-diff.js") }}' defer></script>{% endblock %}

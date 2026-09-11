@@ -23,3 +23,18 @@ def test_side_panel_controller():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_version_diff_history_controller():
+    root = Path(__file__).parents[1]
+    result = subprocess.run(
+        [
+            "node",
+            str(root / "tests/javascript/version_diff.cjs"),
+            str(root / "src/refrncr/static/js/version-diff.js"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from refrncr.concept_contracts import ActiveConcept
 from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOverview, StoredRecord
 
 if TYPE_CHECKING:
@@ -146,6 +147,12 @@ class VersionRead:
     state: VersionState | None
     may_maintain: bool
     may_export: bool
+    concept: ActiveConcept | None = None
+    record_states: Mapping[str, str] | None = None
+    deleted_count: int = 0
+    baseline_fields: tuple[SnapshotField, ...] = ()
+    record_labels: Mapping[str, str] | None = None
+    search: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,3 +161,5 @@ class VersionHistory:
     entries: tuple[VersionState, ...]
     publisher_names: Mapping[str, str]
     may_maintain: bool
+    concept: ActiveConcept | None = None
+    concept_summary: object = None

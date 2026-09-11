@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from refrncr.dataset_versions import compare_snapshots, validated_snapshot
+from refrncr.dataset_versions import validated_snapshot
 from refrncr.models import Dataset, utc_now
 from refrncr.persistence import (
     SqlAlchemyDatasetBusinessKeyOperations,
@@ -13,7 +13,7 @@ from refrncr.persistence import (
     SqlAlchemyDatasetRecordOperations,
 )
 from refrncr.services import ValidationError
-from refrncr.version_contracts import APPLICATION_TIMEZONE
+from refrncr.version_contracts import APPLICATION_TIMEZONE, SummaryCounts
 from refrncr.version_persistence import SqlAlchemyVersionOperations
 
 
@@ -71,7 +71,9 @@ def create_initial_versions(connection):
         versions = SqlAlchemyVersionOperations(session)
         for dataset in _datasets(session):
             content = validated_snapshot(_work(session), dataset)
-            _, summary = compare_snapshots(content, None)
+            summary = SummaryCounts(
+                fields_added=len(content.fields), records_added=len(content.records)
+            )
             versions.append(dataset.id, 1, now, None, now.date(), "", content, summary)
         session.flush()
     # No commit: the caller owns DDL, data, and migration revision atomically.

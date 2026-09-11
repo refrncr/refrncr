@@ -556,12 +556,12 @@ def test_browser_add_list_validation_security_and_escaping(record_services):
         data={"code": "<b>safe</b>", "amount": "2", "csrf_token": form_csrf},
     )
     assert created.status_code == 302
-    listing = client.get(f"/datasets/{dataset.key}/records", base_url="https://localhost")
+    listing = client.get(f"/datasets/{dataset.key}/concept/records", base_url="https://localhost")
     assert "&lt;b&gt;safe&lt;/b&gt;" in listing.get_data(as_text=True)
     assert "images/lucide-key-round.svg" in listing.get_data(as_text=True)
     assert (
         client.get(
-            f"/datasets/{dataset.key}/records?page=1&page=2", base_url="https://localhost"
+            f"/datasets/{dataset.key}/concept/records?page=1&page=2", base_url="https://localhost"
         ).status_code
         == 400
     )
@@ -654,10 +654,11 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
         data={"email": admin.email, "password": PASSWORD, "csrf_token": csrf},
     )
 
-    listing = client.get(f"/datasets/{dataset.key}/records", base_url="https://localhost")
+    listing = client.get(f"/datasets/{dataset.key}/concept/records", base_url="https://localhost")
     assert "Edit" in listing.get_data(as_text=True)
     assert listing.status_code == 200
-    assert listing.get_data(as_text=True).count("Incomplete record") == 2
+    assert listing.get_data(as_text=True).count(">Added</span>") == 3
+    assert "Incomplete record" not in listing.get_data(as_text=True)
     assert "slegacy" not in listing.get_data(as_text=True)
     edit_url = f"/datasets/{dataset.key}/records/{record.id}/edit"
     edit = client.get(edit_url, base_url="https://localhost")
@@ -861,5 +862,6 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     assert upgraded_services.dataset_business_keys.get_business_key(
         admin.id, dataset.key
     ).field_keys == ("code",)
+    upgraded_services.dataset_versions.create_concept(admin.id, dataset.id)
     record = upgraded_services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
     assert record.dataset_id == dataset.id

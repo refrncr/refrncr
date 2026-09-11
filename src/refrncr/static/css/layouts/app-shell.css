@@ -1,5 +1,4 @@
 .app-shell { min-height: 100vh; display: grid; grid-template: auto 1fr / var(--sidebar-width) minmax(0, 1fr); }
-.app-header { grid-column: 2; min-height: calc(var(--control-height) + var(--space-md)); gap: var(--space-sm); min-width: 0; display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) var(--space-lg); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
 .brand { display: inline-flex; }
 .brand img { display: block; height: 2.625rem; width: auto; }
 .app-sidebar, .settings-sidebar { display: flex; flex-direction: column; min-width: 0; padding: var(--space-lg); background: var(--color-surface); border-right: 1px solid var(--color-border); }
@@ -58,7 +57,8 @@
 }
 @media (max-width: 767px) {
   .app-shell { display: block; }
-  .app-header { position: sticky; z-index: var(--layer-header); top: 0; }
   .primary-navigation { min-height: auto; }
   .account-context { margin-top: var(--space-lg); }
 }
+.app-shell:not(.settings-shell) { grid-template-rows: minmax(0, 1fr); }
+.app-main > [data-nav-open] { margin-bottom: var(--space-sm); }

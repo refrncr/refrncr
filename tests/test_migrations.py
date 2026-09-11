@@ -424,7 +424,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0015_ref_83"
+                "0016_ref_84"
             )
     finally:
         upgraded.dispose()
@@ -926,7 +926,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
             session.scalar(
                 select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
             )
-            == 1
+            == 2
         )
     with create_session_factory(engine).begin() as session:
         session.execute(Dataset.__table__.delete().where(Dataset.id == dataset.id))
@@ -958,7 +958,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
                 session.scalar(
                     select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
                 )
-                == 1
+                == 2
             )
     finally:
         downgraded_engine.dispose()
@@ -983,7 +983,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0016_ref_84"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
@@ -1034,6 +1034,7 @@ def test_empty_postgresql_database_upgrades():
                 )
             } == {
                 ("dataset", dataset.id, "created"),
+                ("dataset", dataset.id, "dataset.concept_created"),
             }
         # Historical REF-72 downgrade protection still covers inert legacy Grants.
         with factory.begin() as session:
@@ -1084,7 +1085,7 @@ def test_empty_postgresql_database_upgrades():
                 session.scalar(
                     select(func.count(AuditEvent.id)).where(AuditEvent.object_type == "dataset")
                 )
-                == 1
+                == 2
             )
         application_engine.dispose()
         application_engine = None

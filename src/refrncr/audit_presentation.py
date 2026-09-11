@@ -35,7 +35,13 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("grant", "created"): ActionPresentation("Access granted", False),
         ("grant", "permission_changed"): ActionPresentation("Access permission changed", False),
         ("grant", "deleted"): ActionPresentation("Access revoked", True),
+        ("dataset", "dataset.concept_created"): ActionPresentation(
+            "Dataset concept created", False
+        ),
         ("dataset", "created"): ActionPresentation("Dataset created", False),
+        ("dataset", "dataset.version_diff_viewed"): ActionPresentation(
+            "Dataset changes reviewed", False
+        ),
         ("dataset", "dataset.version_published"): ActionPresentation(
             "Dataset version published", False
         ),
@@ -99,6 +105,14 @@ CONTEXT_LABELS = MappingProxyType(
         "previous_owner_team_id": "Previous owning team ID",
         "creator_user_id": "Creator user ID",
         "version_number": "Version number",
+        "baseline_version_number": "Baseline version",
+        "concept_revision": "Concept revision",
+        "fields_added": "Fields added",
+        "fields_changed": "Fields changed",
+        "fields_removed": "Fields removed",
+        "records_added": "Records added",
+        "records_changed": "Records changed",
+        "records_removed": "Records removed",
         "effective_date": "Effective date",
         "field_count": "Fields",
         "dataset_id": "Dataset ID",

@@ -5,8 +5,9 @@
 {% block content %}
   <h1>Publish version</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Publish version'>
-    <div class='side-panel-body panel-sections'>
+    <div class='side-panel-body panel-sections'>{% include 'pages/datasets/concepts/_banner.html' %}
       {{ feedback(error, id='publication-error', focus=true) }}
+      {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_review", key=dataset.key) }}'>Review changes</a></p>{% endif %}
       {% if review %}{% set revision, number, content, summary = review %}
         {{ readonly_field('Next version', 'Version ' ~ number) }}
         {{ readonly_field('Dataset', content.name) }}
@@ -15,7 +16,7 @@
           <div><dt>Fields</dt><dd>{{ summary.fields_added }} added · {{ summary.fields_changed }} changed · {{ summary.fields_removed }} removed</dd></div>
           <div><dt>Records</dt><dd>{{ summary.records_added }} added · {{ summary.records_changed }} changed · {{ summary.records_removed }} removed</dd></div>
         </dl>
-        <form id='publication-form' class='form' method='post' action='{{ url_for("dataset_version_publish", key=dataset.key) }}' data-single-submit data-busy-message='Publishing version…' novalidate>
+        <form id='publication-form' class='form' method='post' action='{{ url_for("dataset_version_publish", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_publish", key=dataset.key) }}' data-single-submit data-busy-message='Publishing version…' novalidate>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <input type='hidden' name='dataset_id' value='{{ dataset.id }}'>
           <input type='hidden' name='expected_revision' value='{{ revision }}'>

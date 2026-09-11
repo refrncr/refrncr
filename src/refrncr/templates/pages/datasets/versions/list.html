@@ -1,29 +1,30 @@
 {% extends "base.html" %}
-{% from "components.html" import feedback, content_metadata %}
+{% from "components/concept.html" import new_concept with context %}
+{% from "components.html" import feedback %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "layouts/page.html" import page_context %}
 {% block title %}Versions · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name ~ " versions", content_metadata(context.record_count, context.last_updated)) %}
+    {% call page_context(dataset.name ~ " versions", '') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions'>
-      <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>{{ 'View concept' if history.may_maintain else 'View Current records' }}</a>
-      {% if publish_available %}<a class='button button-primary' href='{{ url_for("dataset_version_publish", key=dataset.key) }}' data-panel-url data-dialog-open='version-panel'>Publish version</a>{% endif %}
+      {% if review_available %}<a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key) }}'>Review changes</a>{% endif %}
+      <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
+      {% if history.may_maintain and not history.concept %}{{ new_concept(dataset.key) }}{% endif %}
     </div>
   </div>
   {{ feedback(notice, kind='success') }}
-  {% if publish_reason %}<p class='help-text'>{{ publish_reason }}</p>{% endif %}
   <p class='help-text'>Effective dates use UTC calendar days. Published content is read only.</p>
-  {% if history.entries %}
+  {% if history.entries or history.concept %}
     <div class='table-scroll management-table' role='region' aria-label='Dataset versions' tabindex='0'>
       <table>
         <caption class='visually-hidden'>Dataset versions, newest version first</caption>
         <thead><tr>{% for label in ['Version', 'Status', 'Effective date', 'End date', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col'>{{ label }}</th>{% endfor %}</tr></thead>
-        <tbody>{% for state in history.entries %}{% set version = state.version %}
+        <tbody>{% if history.concept and not history.concept.base_version_id %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
-            <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_detail", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
+            <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
             <td><span class='badge'>{{ state.status }}</span></td>
             <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date.isoformat() }}</time></td>
             <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date.isoformat() }}</time>{% else %}—{% endif %}</td>
@@ -32,6 +33,7 @@
             <td>{{ version.release_note or '—' }}</td>
             <td>{% if state.status == 'Scheduled' and history.may_maintain %}<a class='button button-danger' href='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=version.id) }}' data-panel-url data-dialog-open='version-panel' aria-label='Cancel Version {{ version.number }}'>Cancel version</a>{% else %}—{% endif %}</td>
           </tr>
+          {% if history.concept and history.concept.base_version_id == version.id %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}
         {% endfor %}</tbody>
       </table>
     </div>

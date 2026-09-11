@@ -1,11 +1,12 @@
 # Dataset context persistence (REF-130)
 
 Dataset overview and detail context are authorized service reads. REF-83 now delegates
-content selection to `DatasetVersionService`: active owning-team members and Community
-administrators use concept context; other active users use Current snapshot metadata/counts.
+content selection to `DatasetVersionService`. Normal browser routes use Current snapshot
+metadata/counts for every user. Administrators
+select active concept content through explicit concept routes.
 No Current means no visible Dataset for ordinary users. Selection and current authority share
-one coherent read transaction. Current snapshots use a batched window query and concept counts
-remain one grouped query, without per-Dataset lookups. `current_overview` itself still counts
+one coherent read transaction. Current snapshots use a batched window query and active
+concept identities use one batched query, without per-Dataset lookups. `current_overview` itself still counts
 only working Records. Snapshot headers use their publication timestamp and snapshot count;
 owning-team names remain current administrative context. See [Dataset versions](dataset-versions.md).
 There is no overview pagination; selected Record pages retain the existing canonical sort and
@@ -102,3 +103,28 @@ and assistive technology. The isolated snapshot checks do not replace interactiv
 4. Check contrast using existing secondary-text and link tokens. Confirm every timestamp is
    English UTC and names containing HTML-like characters display as text.
 5. Repeat with JavaScript disabled; dataset links, context, and forms remain usable.
+
+
+## REF-84 explicit selection
+
+Dataset list Records/Updated describe Current snapshot count/publication time, never the
+concept. Without Current these cells show an em dash. Only administrators see the secondary
+Concept in progress link, which opens Versions; the Dataset name always opens Current.
+No role-dependent or session-wide implicit mode is used. Explicit concept headers retain
+working content timestamps/counts, and their banner states the pinned baseline and change
+status. See [ADR-015](../architecture/adr-015-explicit-dataset-concepts.md).
+
+The Dataset list's rightmost **Version** column shows `Version N` without `Current`, or
+`Concept in progress` for an administrator who can see an active concept. The concept
+label links to Versions and replaces the version name in that cell. No selected publication
+and no visible concept displays an em dash. The Dataset-name cell contains only its name.
+
+Published Dataset detail/Records pages show `Version N` first in the shared content
+metadata line, before Record count and Updated time. The separate version/status/read-only
+line is removed; snapshot authorization and concept banners retain their behavior.
+
+Record pages now expose one system Status column (Published/Edited/Added/Deleted).
+Concept result pagination includes baseline tombstones, but `context.record_count` always
+counts surviving working Records. `deleted_count` is separate and dataset-wide; `page.total`
+counts matching displayed rows, including tombstones. Record identifier search is explicit
+per request; there is no session-wide selection. Published pages show Published only.

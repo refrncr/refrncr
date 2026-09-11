@@ -1,9 +1,11 @@
 # Dataset versions: domain and controlled upgrade (REF-83)
 
-Implementation: REF-83 on `feat/ref-83-dataset-versioning`; see the
-[validation report](ref-83-report.md) for local checks and CI status.
+Foundation: REF-83 is merged in `main` (`a3f8fed`); see its
+[validation report](ref-83-report.md). The local REF-84 extension is documented below
+and in the [review implementation report](ref-84-report.md).
 
-The concept is the existing Dataset working set. Each publication stores its complete
+An active concept is an explicit editing round backed by the existing Dataset working set.
+Its persistent lifecycle is defined in [ADR-015](../architecture/adr-015-explicit-dataset-concepts.md). Each publication stores its complete
 name, description, ordered Field definitions (including required/unique flags and canonical
 datatypes), identifier membership, stable Record IDs and canonical values. Null is an
 absent value row. Snapshots exclude owning teams, memberships, Grants, export access,
@@ -20,7 +22,7 @@ version's effective date. Displayed end date is the preceding calendar day. With
 publications effective on the same date, the highest version number wins; earlier ones
 have empty intervals and remain Expired history. No calendar date has two Current versions.
 
-Only cancellation actor/timestamp is persisted as lifecycle state. Scheduled, Current and
+For published versions, only cancellation actor/timestamp is persisted as lifecycle state. Scheduled, Current and
 Expired are computed on reads, requiring no scheduler. Cancelled snapshots never activate.
 One Scheduled version blocks further publication until its date arrives or it is cancelled.
 Cancellation rechecks the UTC day under the lock and preserves snapshot and number.
@@ -31,7 +33,7 @@ complete copy and audit are synchronous and commit atomically. A failure rolls e
 back. Version numbers start at one, include cancelled versions and are unique per Dataset.
 Dataset revision checks reject stale publication and duplicate submissions. Content equality
 uses canonical values and stable Field/Record identities rather than modification timestamps.
-A fully reverted change is not publishable. The summary contains only six counts, never a
+A fully reverted change remains an active concept but is not reviewable or publishable. The summary contains only six counts, never a
 detailed diff or before/after value storage.
 
 ## Operator upgrade
@@ -84,9 +86,10 @@ can consume substantial memory and block writes; background publication belongs 
 ## Published reads and browser workflow
 
 `DatasetVersionService` selects content and current REF-73 permissions within one coherent
-read Unit of Work. Active owning-team members and Community administrators retain the
-existing concept management context. Every other active Community user sees only Current
-snapshots in Dataset lists, configuration and Records. A Dataset without Current content
+read Unit of Work. Every active Community user, including Dataset administrators, sees Current snapshots
+through normal browser Dataset lists, configuration and Records. Administrators enter
+their explicitly active concept through its Versions row. Trusted maintenance helpers
+can request the concept explicitly; the web routes never infer that choice from the role. A Dataset without Current content
 is absent from their list and its routes return the same non-disclosing 404 as missing data.
 Historical viewer/editor/admin Grants do not restore concept access. Current owning-team
 and additional export permissions apply equally to all retained versions, never historical
@@ -116,7 +119,7 @@ calendar boundary in the transaction. Busy status and disabled submit controls p
 submission visually; revision/locking remain authoritative on the server. CSRF and stable
 Dataset identity prevent forged requests and stale forms targeting a reused key.
 
-Lists use one batched Current-window query, grouped concept counts and bulk authorization;
+Lists use one batched Current-window query, active-concept identities and bulk authorization;
 query count does not grow with Dataset count. Version history batches publisher names (10
 SELECTs including authority/context), and Records use a single joined value read (14 SELECTs
 including the three current capabilities). Regression tests compare one/many versions and
@@ -124,3 +127,110 @@ Records. Like existing Records pagination, canonical ordering currently material
 Record set in memory before slicing 50 rows: O(records + values) memory and O(records log records)
 ordering work. No claim of database-side record pagination is made. Version history currently
 loads all version metadata. Export retains bounded external sorting and spooling instead.
+
+## Detailed concept review (REF-84)
+
+**Review changes** on Versions or the Publish version panel opens a read-only review
+for active owning-team members and Community administrators. It compares the active concept
+at one revision to its pinned baseline, including Scheduled. Without a published baseline,
+Summary and detailed review use all-added counts without a synthetic stored snapshot.
+An unchanged concept offers neither review nor publication. Summary, Fields and Records share the same baseline and revision.
+
+The product decision of 2026-09-11 corrects REF-83's shared classification: Field
+additions/removals and datatype-only changes count only as Field changes. Records
+match stable UUIDs and count as Changed only when canonical content differs in surviving
+Fields with the same canonical datatype. Values in retyped Fields are not comparable
+and do not enter Record counts or Changed value details. Relative Field moves use deterministic longest-increasing-subsequence matching;
+inserting/removing a Field does not mark its neighbours moved. Identifier membership
+is versioned; component order remains immutable Field-key order.
+
+Record lists support combined Added/Changed/Removed filters and a literal, NFC/casefolded
+search of old/new identifiers (maximum 200 characters). Values are not searchable.
+Sort is status, datatype-aware identifier (new for Changed), then UUID. Field sort is
+status, casefolded name, UUID. Lists and value details have 50 entries per page. Changed
+details contain only changed surviving values; Added/Removed show all relevant Fields,
+including explicit nulls. Scrollable tables support keyboard navigation, and long values
+remain available through native disclosure controls. Shared sidepanels preserve the list
+state and opener focus, including when paging values; Escape and Close dismiss them.
+
+Every request reauthorizes and validates revision plus baseline identity/status. Concept
+writes, publication/cancellation and Scheduled activation invalidate the review. Stale
+responses contain no Before/After content and offer Reload review. Back/Refresh revalidate
+through no-store responses and BFCache restoration handling. Publication uses the existing
+REF-83 form, CSRF, validation and transaction, with optional review identity checked under
+the same write lock. Review is never a mandatory gate or persisted approval status.
+
+Browser review links carry a session/actor-bound HMAC signature, never diff content. The
+application factory accepts `review_signing_key` for a shared, securely injected server key
+across workers. By default a key is generated per application instance; restart invalidates
+old links. Independently generated keys are not interchangeable between workers. Do not
+hard-code or expose the key. Responses use `Cache-Control: no-store` and review links use
+`Referrer-Policy: no-referrer`.
+
+Review opening is the explicit REF-149 read-audit exception: one atomically committed
+`dataset.version_diff_viewed` event containing only actor/Dataset identity and eight bounded
+integer context fields. Child navigation produces no events. Audit insert/commit failure
+returns no review. See [audit policy](audit-policy.md) and the
+[REF-84 implementation and measured validation report](ref-84-report.md).
+
+Review uses scalar streams and SQL aggregates, bounded Record heaps and paged value reads.
+There is no diff storage/cache, full value graph, N+1 query, background job, download, API,
+Cloud infrastructure, new role, arbitrary historical comparison or approval workflow.
+Opening performs linear canonical integrity scans and holds the Dataset write lock through
+audit commit. Child list CPU is linear in candidate identifiers; Field memory is O(schema).
+These are explicit limits, not a claim of constant-time or unlimited-size performance.
+
+## Explicit concept lifecycle and migration 0016
+
+Normal links and breadcrumbs select Current. **Versions** is a header action with the
+existing history icon; no standalone tab remains. Versions exposes **+ New version**
+(the authoritative concept-create operation) only to administrators with no active concept.
+Its aligned **Concept** row appears beneath the pinned baseline, or above the list for a
+first concept, using the same columns as published versions. Draft/Stale is shown in Status;
+unavailable publication metadata is an em dash. The row opens the concept. Review changes
+is available on Versions and concept pages; Publish version remains on concept and review
+pages. The Publish panel also offers optional review before the first publication.
+Versions has no Record-count/date subtitle.
+
+The shared full-width banner appears on concept Records/configuration, Field and Record
+forms, import and review/publication pages. **View current version** only changes selection;
+it preserves edits. Current and Expired remain read-only, with no Configure/Import/Add
+record. Content Fields named Status, Change or Validation are never repurposed. A final
+system Status column shows Published, Edited, Added or Deleted. Configure uses the same Field classification for quiet badges.
+
+Publication closes the concept only after successful snapshot/audit commit. A Scheduled
+result also closes it; New concept may bind Scheduled but cannot publish a second Scheduled
+version. Cancellation of that pinned Scheduled baseline preserves the concept as Stale,
+without rebase or base-ID change. Edits remain administrator-only. Publication/replacement
+stay blocked until a later recovery workflow; REF-155/discard is not implemented here.
+
+For an existing `0015_ref_83` database, stop writers and back up, then run
+`refrncr dataset-concept-preflight` with the existing database configuration. The JSON
+report lists invalid Dataset IDs without content. Correct reported data before retrying.
+`refrncr dataset-concept-preflight --upgrade` repeats preflight and atomically installs
+`0016_ref_84`. Equal working copies are inactive; divergent/unpublished copies become
+active with original content preserved. No migration audit event or synthetic snapshot is
+created. Null creator displays System (migration). Startup uses the same migration chain;
+older supported schemas still run unchanged 0015 first. Active concepts block downgrade;
+restore the matching pre-upgrade backup if rollback is required.
+
+## Record system Status and Deleted rows
+
+Status uses the same REF-83/84 classifier: Changed maps to Edited, Removed to Deleted,
+Added remains Added, and a surviving unchanged Record is Published. Published snapshot
+pages show Published. There is no Complete/Incomplete system badge; existing publication
+validation still applies. Configure Field badges retain their existing classifier.
+
+The concept table includes read-only Deleted rows from its pinned baseline. Deleted rows
+are muted with a text badge; opening one shows all original baseline Fields/values and
+explains that publication removes it. They cannot be edited, and ordinary users cannot
+access this concept representation. Removed/recreated identifiers remain distinct UUID rows.
+Deleted data never re-enters working content or the next published snapshot.
+
+The header counts surviving concept Records separately, for example `24 records · 1 marked
+for deletion`. Result pagination counts all matching rows, including Deleted. Search is a
+literal, normalized case-insensitive identifier substring (maximum 200 characters); Deleted
+uses the old identifier. Typed sort uses each row's source identifier fields, datatype tags
+and stable UUID ties. Page links preserve search. Metadata counts stay dataset-wide even
+when searching. Current reads remain separate, and no navigation/search/detail audit event
+is added; only explicitly opening a new valid detailed review retains the REF-149 exception.

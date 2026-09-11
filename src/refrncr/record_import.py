@@ -898,7 +898,9 @@ class DatasetRecordImportService:
                 except PersistenceConflictError as error:
                     DatasetRecordService._raise_record_conflict(error)
                 if validated:
-                    dataset.revision += 1
+                    from refrncr.services import _advance_concept
+
+                    _advance_concept(uow, dataset)
                     dataset.content_updated_at = datetime.now(UTC)
                     record_audit(
                         uow,

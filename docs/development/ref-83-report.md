@@ -388,3 +388,18 @@ git add \
   tests/test_field_datatype_migration.py \
   tests/test_migrations.py
 ```
+
+
+## Subsequent REF-84 product correction (2026-09-11)
+
+The merged REF-83 evidence above is historical. The approved REF-84 correction replaces
+implicit working-copy selection with the explicit active-concept lifecycle in ADR-015.
+Current becomes the normal browser selection for administrators too. Create starts an
+editing round; successful existing publication closes it atomically. Snapshot validation,
+authorization, effective dating, one Scheduled version and publication audit stay intact.
+First concepts use no baseline/synthetic snapshot and publish Version 1. Cancelling a
+pinned Scheduled baseline preserves a Stale concept and blocks publication/replacement
+pending recovery. Shared REF-83/84 classification counts Field additions/removals/datatype
+changes only as Field changes; unchanged surviving canonical Record content is not Changed.
+Migration 0015 is unchanged; 0016 preserves existing divergent content. Validation of this
+correction, rather than the historical merged code, is in [REF-84 report](ref-84-report.md).

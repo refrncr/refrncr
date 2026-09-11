@@ -1047,6 +1047,12 @@ class SqlAlchemyUnitOfWork:
         from refrncr.version_persistence import SqlAlchemyVersionOperations
 
         self.versions = SqlAlchemyVersionOperations(self.session)
+        from refrncr.diff_persistence import SqlAlchemyDiffOperations
+
+        self.version_diff = SqlAlchemyDiffOperations(self.session)
+        from refrncr.concept_persistence import SqlAlchemyConceptOperations
+
+        self.concepts = SqlAlchemyConceptOperations(self.session)
         return self
 
     def __exit__(

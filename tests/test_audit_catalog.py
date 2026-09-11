@@ -86,7 +86,8 @@ def test_historical_action_names_and_object_types_are_stable():
             "created owner_changed metadata_updated business_key_defined "
             "business_key_updated field_order_updated dataset.records_imported "
             "dataset.export_requested dataset.deleted "
-            "dataset.version_published dataset.version_cancelled"
+            "dataset.version_published dataset.version_cancelled "
+            "dataset.version_diff_viewed dataset.concept_created"
         ),
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted",
@@ -221,6 +222,8 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.dataset_versions.DatasetVersionService.cancel",
             "refrncr.services.UserService.create_initial_admin",
             "refrncr.services.DatasetRecordService.export_dataset",
+            "refrncr.dataset_diff.DatasetDiffService.open_review",
+            "refrncr.dataset_versions.DatasetVersionService.create_concept",
         }
     )
     assert behaviors == {
@@ -334,6 +337,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
         "record_service": "DatasetRecordService",
         "record_imports": "DatasetRecordImportService",
         "audit_history": "AuditHistoryService",
+        "dataset_versions": "DatasetVersionService",
+        "dataset_diff": "DatasetDiffService",
     }
     tree = ast.parse((ROOT / "src/refrncr/web.py").read_text())
     functions = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
@@ -355,10 +360,13 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     isinstance(receiver, ast.Name)
                     and receiver.id in receivers
                     and function.attr != "uow"
+                    and not function.attr.startswith("_")
                 ):
                     module = {
                         "record_imports": "record_import",
                         "audit_history": "audit_history",
+                        "dataset_versions": "dataset_versions",
+                        "dataset_diff": "dataset_diff",
                     }.get(receiver.id, "services")
                     found.add(f"refrncr.{module}.{receivers[receiver.id]}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:

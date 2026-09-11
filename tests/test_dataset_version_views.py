@@ -59,6 +59,7 @@ def payload(c, csrf, *, day=None, note="Release"):
 
 
 def mutate_concept(c):
+    c.service.create_concept(c.a.id, c.d.id)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Private draft", "Private description")
     c.s.dataset_fields.update_field(
         c.a.id, c.d.key, "label", "Private field", "string", False, False
@@ -113,18 +114,20 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
         response = request(browser, "get", f"/datasets/{c.d.key}{suffix}")
         assert response.status_code == 200
         assert "Private" not in response.text
-        assert "Version 1" in response.text and "Read only" in response.text
+        metadata = response.text.split('<p class="metadata">', 1)[1].split("</p>", 1)[0]
+        assert metadata.index("Version 1") < metadata.index("1 record") < metadata.index("Updated")
+        assert "Current · Read only" not in response.text
         assert "Edit field" not in response.text and "Add record" not in response.text
         if suffix.endswith("records"):
             assert "Café" in response.text
         else:
             assert c.d.description in response.text
-        assert f"/versions/{version.id}" in response.text
+        assert f"/datasets/{c.d.key}/versions" in response.text
     listing = request(browser, "get", "/datasets")
     assert c.d.name in listing.text and "Private" not in listing.text
     assert snapshot(c) == before
     owner_browser, _ = client(c)
-    concept = request(owner_browser, "get", f"/datasets/{c.d.key}/records")
+    concept = request(owner_browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert "Private value" in concept.text and "Concept" in concept.text
     historical = request(owner_browser, "get", f"/datasets/{c.d.key}/versions/{version.id}/records")
     assert "Private" not in historical.text and "Edit" not in historical.text
@@ -181,6 +184,7 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):  # noqa: F81
     c = context
     configured(c)
     first = publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Secret future", "")
     future = NOW.date() + timedelta(days=1)
     scheduled = publish(c, day=future)
@@ -314,6 +318,7 @@ def test_snapshot_pagination_and_deleted_source_objects(context):  # noqa: F811
             )
         )
     version = publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
     for record in concept_records:
         c.s.dataset_records.delete_record(c.a.id, c.d.key, record.id, 1)
     c.s.dataset_fields.delete_field(c.a.id, c.d.key, "label")
@@ -367,6 +372,7 @@ def test_history_and_record_reads_have_constant_query_count(context):  # noqa: F
     _, history_queries = measured(lambda: c.service.history(c.u.id, c.d.key))
     _, record_queries = measured(lambda: c.service.read(c.u.id, c.d.key))
     for index in range(5):
+        c.service.create_concept(c.a.id, c.d.id)
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"b{index}"})
         publish(c)
     history, grown_history = measured(lambda: c.service.history(c.u.id, c.d.key))

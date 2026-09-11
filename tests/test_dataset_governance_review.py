@@ -24,6 +24,7 @@ def test_each_service_boundary(governance, kind):  # noqa: F811
     spare = s.dataset_fields.create_field(a.id, d.key, "spare", "Spare", "string")
     row = s.dataset_records.create_record(a.id, d.key, {"code": "NL"})
     publish_dataset(s, a.id, d)
+    s.dataset_versions.create_concept(a.id, d.id)
     entry = s.datasets.grant_export_access(a.id, d.key, "team", other.id)
     if kind in {"owner", "inactive", "deleted"}:
         s.memberships.create_membership(a.id, u.id, owner.id)

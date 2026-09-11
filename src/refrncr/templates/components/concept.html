@@ -1,0 +1,22 @@
+{% from 'components/icons.html' import history_icon %}
+{% from 'components/side_panel.html' import form_side_panel %}
+{% macro new_concept(key) -%}
+<form method='post' action='{{ url_for("dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>+ New version</button></form>
+{%- endmacro %}
+{% macro versions_action(key) -%}
+<a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>
+{%- endmacro %}
+{% macro banner(key, ui, actions=true, publication_panel=false) -%}
+{% if ui %}
+<section class='concept-banner' aria-label='Concept context'>
+<h2>You’re working on a concept</h2>
+<p>Changes are not visible in the current published version until you publish them.</p>
+<p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. This concept cannot be published or replaced until a later recovery workflow is available.{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p>
+<div class='page-actions'>
+<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
+{% if actions and ui.can_review %}<a class='button button-secondary' href='{{ url_for("dataset_version_review", key=key) }}'>Review changes</a>{% endif %}
+{% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_publish", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Publish version</a>{% endif %}
+</div></section>
+{% if actions and ui.may_publish and publication_panel %}{{ form_side_panel('concept-publication-panel') }}{% endif %}
+{% endif %}
+{%- endmacro %}

@@ -29,3 +29,7 @@
 {% macro navigation_icon(expand=false) -%}
   <svg class="button-icon" data-icon="panel-left-{{ 'open' if expand else 'close' }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="{{ 'm14 9 3 3-3 3' if expand else 'm16 15-3-3 3-3' }}"/></svg>
 {%- endmacro %}
+
+{% macro history_icon() -%}
+<svg class='button-icon' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true' focusable='false'><path d='M3 12a9 9 0 1 0 2.6-6.4L3 8'/><path d='M3 3v5h5M12 7v5l4 2'/></svg>
+{%- endmacro %}

@@ -85,7 +85,9 @@ def test_all_types_persist_read_export_and_canonical_noop(datatype_services):
     assert snapshot(factory) == before
 
     for format_name in ("csv", "json", "xlsx"):
-        artifact = services.dataset_records.export_dataset(admin.id, dataset.key, format_name)
+        artifact = services.dataset_records.export_dataset(
+            admin.id, dataset.key, format_name, prefer_concept=True
+        )
         try:
             payload = artifact.content.read()
         finally:
@@ -418,7 +420,7 @@ def test_browser_catalog_float_guard_trusted_actor_and_canonical_edit(record_ser
             assert f"value='{text}'" in body
     # The embedded Record-sidepanel editor is a separate rendering path from
     # /records/<id>/edit and must round-trip the same canonical text.
-    page = client.get("/datasets/types/records", base_url="https://localhost").get_data(
+    page = client.get("/datasets/types/concept/records", base_url="https://localhost").get_data(
         as_text=True
     )
     for type_id, _raw, text, _value in CASES:

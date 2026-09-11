@@ -64,7 +64,9 @@ def test_record_lifecycle_counts_revisions_and_failures(context_services, monkey
     monkeypatch.setattr("refrncr.services._now", lambda: BASE)
     first = services.dataset_records.create_record(admin.id, "context", {"code": "A"})
     assert stamp(services, admin) == BASE != previous
-    assert services.datasets.list_dataset_overview(admin.id)[0].record_count == 1
+    overview = services.datasets.list_dataset_overview(admin.id)[0]
+    assert overview.no_current and overview.record_count == 0
+    assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
     monkeypatch.setattr("refrncr.services._now", lambda: BASE + timedelta(minutes=1))
     second = services.dataset_records.create_record(admin.id, "context", {"code": "B"})
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 2
@@ -246,11 +248,14 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
     assert "<th scope='col'>Dataset</th>" in page
     assert "<th scope='col' class='numeric-column'>Records</th>" in page
     assert "<th scope='col'>Updated</th>" in page
-    assert "<td class='numeric-column'>1</td>" in page
-    assert "7 Sep 2026, 12:58 UTC" in page
+    assert "<td class='numeric-column'>—</td>" in page
+    assert "<th scope='col'>Version</th>" in page
+    assert "href='/datasets/context/versions'>Concept in progress</a>" in page
+    assert "No current version" not in page
+    assert "7 Sep 2026, 12:58 UTC" not in page
     for path in (
-        "/datasets/context",
-        "/datasets/context/records",
+        "/datasets/context/concept",
+        "/datasets/context/concept/records",
         "/datasets/context/edit",
         "/datasets/context/records/import",
     ):
@@ -267,7 +272,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
         )
         assert breadcrumb.count("<a ") == 1
         assert "<script>unsafe" not in html
-        if path in ("/datasets/context", "/datasets/context/records"):
+        if path in ("/datasets/context/concept", "/datasets/context/concept/records"):
             assert re.search(
                 r'<div class="page-context">'
                 r'\s*<nav class="breadcrumbs".*?</nav>\s*<h1 class="page-title">.*?</h1>'
@@ -354,7 +359,9 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
         connection.commit()
         command.upgrade(config, "head")
         connection.commit()
-    assert stamp(services, admin) == BASE
+    with factory() as session:
+        stored = session.get(Dataset, dataset.id)
+        assert stored.content_updated_at.replace(tzinfo=UTC) == BASE
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
 
 

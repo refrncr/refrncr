@@ -222,7 +222,9 @@ def test_persisted_values_have_exact_typed_comparison(reviewed, type_id, inputs)
     if type_id == "number":
         with localcontext() as context:
             context.prec = 2
-            artifact = services.dataset_records.export_dataset(admin.id, dataset.key, "json")
+            artifact = services.dataset_records.export_dataset(
+                admin.id, dataset.key, "json", prefer_concept=True
+            )
             try:
                 output = json.load(artifact.content, parse_float=Decimal)
             finally:

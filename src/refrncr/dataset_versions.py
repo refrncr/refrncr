@@ -1,11 +1,15 @@
 """Authoritative synchronous Dataset publication and cancellation use cases."""
 
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import date
+from itertools import chain
 from types import MappingProxyType
+from unicodedata import normalize
 
 from refrncr.audit import record_audit
 from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.models import utc_now
 from refrncr.ports import (
     DatasetBusinessKey,
@@ -131,44 +135,72 @@ def _validated_snapshot(uow, dataset):
     return SnapshotContent(name, description, snapshots, tuple(sorted(records, key=lambda r: r.id)))
 
 
-def compare_snapshots(current, previous):
-    def counts(new, old):
-        return (
-            len(new.keys() - old.keys()),
-            sum(new[k] != old[k] for k in new.keys() & old.keys()),
-            len(old.keys() - new.keys()),
-        )
-
-    def fields(content):
-        return {f.id: f for f in content.fields} if content else {}
-
-    def records(content):
-        return (
-            {
-                r.id: tuple(sorted((v.field_id, v.data_type, v.canonical_key) for v in r.values))
-                for r in content.records
-            }
-            if content
-            else {}
-        )
-
-    summary = SummaryCounts(
-        *counts(fields(current), fields(previous)), *counts(records(current), records(previous))
-    )
-    changed = (
-        previous is None
-        or current.name != previous.name
-        or current.description != previous.description
-        or any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
-    )
-    return changed, summary
-
-
 class DatasetVersionService:
     def __init__(self, uow, authorization, *, clock=utc_now):
         self.uow = uow
         self.authorization = authorization
         self.clock = clock
+
+    def create_concept(self, actor_id, dataset_id, *, uow=None):
+        """The single concept-create operation, also used by Dataset creation."""
+        try:
+            with (
+                nullcontext(uow)
+                if uow is not None
+                else self.uow(write=True, serialized=True, translate_errors=True) as work
+            ):
+                dataset = self._target(work, actor_id, dataset_id, write=True)
+                if work.concepts.get(dataset.id) is not None:
+                    raise ConflictError("This Dataset already has an active concept.")
+                baseline = work.versions.latest_non_cancelled(dataset.id)
+                now = self._today()
+                if baseline is not None:
+                    baseline_fields = work.versions.fields(baseline)
+                    if len(
+                        baseline_fields
+                    ) != baseline.field_count or not work.version_diff.validate_snapshot(baseline):
+                        raise ValidationError("Invalid published snapshot")
+                    identifier = work.dataset_business_keys.get(dataset.id)
+                    current_fields = tuple(
+                        SnapshotField(
+                            f.id,
+                            dataset.id,
+                            f.key,
+                            f.name,
+                            f.data_type,
+                            f.is_required,
+                            f.is_unique,
+                            f.display_position,
+                            f.key in identifier.field_keys,
+                        )
+                        for f in work.dataset_fields.list_for_dataset(dataset.id)
+                    )
+                    changes = classify_fields(current_fields, baseline_fields)
+                    if (
+                        changes
+                        or dataset.name != baseline.name
+                        or dataset.description != baseline.description
+                        or any(work.version_diff.counts(dataset.id, baseline.id))
+                    ):
+                        work.concepts.initialize(dataset, baseline, now)
+                dataset.revision += 1
+                concept = work.concepts.create(
+                    dataset.id, baseline.id if baseline else None, actor_id, now, dataset.revision
+                )
+                record_audit(
+                    work,
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset.id,
+                    action="dataset.concept_created",
+                    details={
+                        "baseline_version_number": baseline.number if baseline else 0,
+                        "concept_revision": dataset.revision,
+                    },
+                )
+            return concept
+        except PersistenceConflictError:
+            raise ConflictError("Concept could not be started. Reload and try again.") from None
 
     def _today(self):
         instant = self.clock()
@@ -211,22 +243,36 @@ class DatasetVersionService:
             uow.begin_export_snapshot()
             maintenance = self.authorization.maintainable_resources(actor_id, uow=uow)
             rows = uow.datasets.current_overview(None)
-            if maintenance.all_resources:
-                return rows
-            allowed = set(maintenance.resource_ids)
+            allowed = (
+                {row.dataset.id for row in rows}
+                if maintenance.all_resources
+                else set(maintenance.resource_ids)
+            )
             current = uow.versions.current_for_datasets(None, self._today().date())
-            result = [
-                row
-                if row.dataset.id in allowed
-                else self._published_context(
-                    row.dataset, current[row.dataset.id], row.owner_team_name
+            concepts = uow.concepts.list_for_datasets(tuple(allowed))
+            result = []
+            for row in rows:
+                dataset = row.dataset
+                if dataset.id in current:
+                    item = self._published_context(
+                        dataset, current[dataset.id], row.owner_team_name
+                    )
+                elif dataset.id in allowed:
+                    item = DatasetOverview(dataset, 0, dataset.created_at, row.owner_team_name)
+                else:
+                    continue
+                result.append(
+                    replace(
+                        item,
+                        concept_in_progress=dataset.id in concepts,
+                        no_current=dataset.id not in current,
+                    )
                 )
-                for row in rows
-                if row.dataset.id in allowed or row.dataset.id in current
-            ]
             return sorted(result, key=lambda row: (row.dataset.name.casefold(), row.dataset.key))
 
-    def _selection(self, uow, actor_id, key, version_id=None, *, prefer_concept=False):
+    def _selection(
+        self, uow, actor_id, key, version_id=None, *, prefer_concept=False, allow_unpublished=False
+    ):
         try:
             key = validate_dataset_key(key)
         except ValidationError:
@@ -237,7 +283,7 @@ class DatasetVersionService:
         ):
             raise NotFoundError("Dataset not found")
         maintain = self.authorization.can_maintain_dataset(actor_id, dataset.id, uow=uow)
-        if prefer_concept and maintain and version_id is None:
+        if prefer_concept and maintain and version_id is None and uow.concepts.get(dataset.id):
             return dataset, None, maintain
         today = self._today().date()
         states = version_states(uow.versions.list_for_dataset(dataset.id), today)
@@ -253,6 +299,8 @@ class DatasetVersionService:
             ),
             None,
         )
+        if state is None and allow_unpublished and maintain and version_id is None:
+            return dataset, None, maintain
         if (
             state is None
             or state.status == "Cancelled"
@@ -283,7 +331,11 @@ class DatasetVersionService:
     def history(self, actor_id, key):
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
-            dataset, selected, maintain = self._selection(uow, actor_id, key, prefer_concept=True)
+            dataset, selected, maintain = self._selection(
+                uow, actor_id, key, allow_unpublished=True
+            )
+            concept = uow.concepts.get(dataset.id) if maintain else None
+            concept_view = self._concept_context(uow, actor_id, dataset) if concept else None
             today = self._today().date()
             entries = tuple(
                 self._visible_state(state, maintain, today)
@@ -294,18 +346,51 @@ class DatasetVersionService:
             names = uow.audit_history.actor_names(
                 tuple(
                     {state.version.publisher_id for state in entries if state.version.publisher_id}
+                    | ({concept.creator_id} if concept and concept.creator_id else set())
                 )
             )
             return VersionHistory(
-                self._read_context(uow, dataset, selected),
+                self._read_context(uow, dataset, selected)
+                if selected
+                else DatasetOverview(dataset, 0, dataset.created_at, dataset.owner_team_name),
                 entries,
                 MappingProxyType(names),
                 maintain,
+                concept,
+                concept_view,
             )
 
-    def read(self, actor_id, key, version_id=None, page=1, *, prefer_concept=False):
+    def _concept_context(self, uow, actor_id, dataset):
+        from refrncr.concept_contracts import ConceptContext
+        from refrncr.dataset_diff import DatasetDiffService
+
+        diff = DatasetDiffService(self)
+        target, identity, state, _current, _previous, changes = diff._load(
+            uow, actor_id, dataset.id, allow_stale=True
+        )
+        concept = uow.concepts.get(dataset.id)
+        names = uow.audit_history.actor_names((concept.creator_id,)) if concept.creator_id else {}
+        return ConceptContext(
+            concept,
+            state,
+            diff._summary(uow, target, identity, state, changes),
+            changes,
+            names.get(concept.creator_id, "Deleted user")
+            if concept.creator_id
+            else "System (migration)",
+        )
+
+    def concept_context(self, actor_id, key):
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset, _state, _maintain = self._selection(uow, actor_id, key, prefer_concept=True)
+            return self._concept_context(uow, actor_id, dataset)
+
+    def read(self, actor_id, key, version_id=None, page=1, *, prefer_concept=False, search=""):
         if page is not None and (type(page) is not int or page < 1):
             raise ValidationError("Page must be a positive integer")
+        if not isinstance(search, str) or len(search) > 200:
+            raise ValidationError("Identifier search must not exceed 200 characters")
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             dataset, state, maintain = self._selection(
@@ -322,20 +407,57 @@ class DatasetVersionService:
                     dataset.id, tuple(sorted(field.key for field in fields if field.is_identifier))
                 )
                 records = uow.versions.iterate_records(state.version) if page is not None else ()
-            ordered = sorted(
-                records,
-                key=lambda record: DatasetRecordService._record_sort_key(
-                    record, identifier.field_keys
-                ),
-            )
+            concept = uow.concepts.get(dataset.id) if maintain else None
+            baseline_fields, removed = (), ()
+            if state is None and concept.base_version_id and page is not None:
+                baseline = uow.versions.get(dataset.id, concept.base_version_id)
+                baseline_fields = uow.versions.fields(baseline)
+                removed = tuple(uow.version_diff.removed_records(dataset.id, baseline))
+            deleted_ids = {record.id for record in removed}
+            old_keys = tuple(sorted(field.key for field in baseline_fields if field.is_identifier))
+            labels = {}
+
+            def sort_key(record):
+                keys = old_keys if record.id in deleted_ids else identifier.field_keys
+                values = {value.field_key: value for value in record.values}
+                labels[record.id] = " · ".join(
+                    get_datatype(values[key].data_type).text(values[key].value)
+                    if key in values
+                    else "—"
+                    for key in keys
+                )
+                incomplete, components, _id = DatasetRecordService._record_sort_key(record, keys)
+                # Old/new identifier datatypes can differ. Type tags preserve typed ordering
+                # within each datatype and make their combined ordering total and stable.
+                return (
+                    incomplete,
+                    tuple(
+                        (component[0], values[key].data_type if key in values else "", component[1])
+                        for key, component in zip(keys, components, strict=True)
+                    ),
+                    record.id,
+                )
+
+            ordered = sorted(chain(records, removed), key=sort_key)
+            term = normalize("NFC", search).casefold()
+            if term:
+                ordered = [r for r in ordered if term in normalize("NFC", labels[r.id]).casefold()]
             page_size = DatasetRecordService.PAGE_SIZE
             start = ((page or 1) - 1) * page_size
             record_page = RecordPage(
                 tuple(ordered[start : start + page_size]),
                 page or 1,
                 page_size,
-                context.record_count,
+                len(ordered) if page is not None else context.record_count,
             )
+            states = (
+                uow.version_diff.record_states(
+                    dataset.id, concept.base_version_id, tuple(r.id for r in record_page.records)
+                )
+                if state is None
+                else {}
+            )
+            statuses = {"Changed": "Edited", "Added": "Added", "Removed": "Deleted"}
             export = self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
             return VersionRead(
                 context,
@@ -345,6 +467,14 @@ class DatasetVersionService:
                 state,
                 maintain,
                 export and (state is None or state.status in {"Current", "Expired"}),
+                concept,
+                MappingProxyType(
+                    {r.id: statuses.get(states.get(r.id), "Published") for r in record_page.records}
+                ),
+                len(removed),
+                baseline_fields,
+                MappingProxyType({r.id: labels[r.id] for r in record_page.records}),
+                search,
             )
 
     def review(self, actor_id, dataset_id):
@@ -355,29 +485,75 @@ class DatasetVersionService:
             return dataset.revision, number, content, summary
 
     def _prepare(self, uow, dataset, today):
+        from refrncr.services import _require_concept
+
+        concept = _require_concept(uow, dataset.id)
         versions = uow.versions.list_for_dataset(dataset.id)
+        baseline = next((v for v in versions if v.id == concept.base_version_id), None)
+        if concept.base_version_id is not None and (
+            baseline is None or baseline.cancelled_at is not None
+        ):
+            raise ConflictError(
+                "The concept basis was cancelled. Publication is blocked; "
+                "your changes are preserved."
+            )
         if any(s.status == "Scheduled" for s in version_states(versions, today)):
             raise ConflictError("Cancel the Scheduled version or wait until it is Current")
         content = validated_snapshot(uow, dataset)
         latest = next((v for v in versions if v.cancelled_at is None), None)
-        previous = uow.versions.content(latest) if latest else None
-        changed, summary = compare_snapshots(content, previous)
+        if (latest.id if latest else None) != concept.base_version_id:
+            raise ConflictError(
+                "The concept basis is no longer the latest version. Your changes are preserved."
+            )
+        if latest is None:
+            summary = SummaryCounts(
+                fields_added=len(content.fields), records_added=len(content.records)
+            )
+            changed = True
+        else:
+            if not uow.version_diff.validate_snapshot(latest):
+                raise ValidationError("Invalid published snapshot")
+            fields = classify_fields(content.fields, uow.versions.fields(latest))
+            summary = summary_counts(fields, uow.version_diff.counts(dataset.id, latest.id))
+            changed = (
+                content.name != latest.name
+                or content.description != latest.description
+                or any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
+            )
         if not changed:
             raise ConflictError("Dataset content matches the latest published version")
         return content, summary, max((v.number for v in versions), default=0) + 1
 
-    def publish(self, actor_id, dataset_id, effective_date, release_note, expected_revision):
+    def publish(
+        self,
+        actor_id,
+        dataset_id,
+        effective_date,
+        release_note,
+        expected_revision,
+        *,
+        expected_review=None,
+    ):
         try:
             with self.uow(write=True, serialized=True, translate_errors=True) as uow:
                 dataset = self._target(uow, actor_id, dataset_id, write=True)
                 if type(expected_revision) is not int or expected_revision != dataset.revision:
                     raise ConflictError("Dataset changed. Review the current content again.")
+                if expected_review is not None:
+                    # Optional REF-84 context, checked under this same publication lock.
+                    # Ordinary REF-83 publication remains independent of detailed review.
+                    from refrncr.dataset_diff import DatasetDiffService
+
+                    diff = DatasetDiffService(self)
+                    review_state = diff._load(uow, actor_id, dataset_id, expected_review)[2]
                 now = self._today()
                 if type(effective_date) is not date or effective_date < now.date():
                     raise ValidationError("Effective date must be today or a future calendar date")
                 if not isinstance(release_note, str) or len(release_note) > MAX_RELEASE_NOTE:
                     raise ValidationError("Release note must not exceed 2000 characters")
                 content, summary, number = self._prepare(uow, dataset, now.date())
+                if expected_review is not None:
+                    diff._calendar_check(review_state)
                 version = uow.versions.append(
                     dataset.id,
                     number,
@@ -389,6 +565,7 @@ class DatasetVersionService:
                     summary,
                 )
                 dataset.revision += 1
+                uow.concepts.close(dataset.id)
                 self._audit(uow, actor_id, version, "dataset.version_published")
                 return version
         except PersistenceConflictError:
