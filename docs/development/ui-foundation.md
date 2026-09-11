@@ -12,9 +12,9 @@ fits. Do not recolour, distort, rotate, or add effects to either asset.
 
 The typography contract is:
 
-- Montserrat 500 for the wordmark and page-level headings;
-- Inter 400–700 for interface text;
-- JetBrains Mono 400 for technical identifiers and code-like values;
+- Instrument Sans 500–600 for page-level headings (the wordmark is the SVG logo);
+- IBM Plex Sans 400–700 for interface text;
+- IBM Plex Mono 400 for technical identifiers, code-like values, record data and mono labels;
 - system fonts remain the fallback.
 
 The required upstream WOFF2 files and their OFL notices are packaged below `static/fonts/` and
@@ -107,10 +107,10 @@ reference: a flat column-flex group with no breadcrumb/title gap, zero child mar
 `--space-sm` (8 px) padding before metadata. This reproduces the reference's single collapsed
 8 px heading/paragraph margin without relying on margin collapse inside flex layout.
 The `.page-title` class shares the canonical heading font family and wrapping rule, using
-`--font-size-page-title` (28 px), semibold weight and normal font line-height. Other `h1` styles
-remain unchanged. Breadcrumbs use regular 12 px Inter, normal line-height, uppercase presentation
-and `--letter-spacing-label` (0.5 px). Breadcrumb links use the lighter `--color-breadcrumb-link` (#2c8156), with 4.55:1 contrast
-on the #f9f9f9 background. This closely follows the reference green while retaining AA contrast.
+`--font-size-page-title` (24 px since the visual refresh), semibold weight and normal font line-height. Other `h1`
+styles use the same size. Breadcrumbs use regular 12 px JetBrains Mono, normal line-height, uppercase presentation
+and `--letter-spacing-label` (0.08 em). Breadcrumb links use the accent via `--color-breadcrumb-link` (#0f7a4f), with 4.97:1 contrast
+on the #f4f7f5 background and 5.36:1 on white.
 Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px Inter, normal line-height,
 tabular figures and one inline-flex row with 8 px horizontal gaps. The decorative bullet has
 `aria-hidden="true"` and is grouped with Updated so it cannot wrap alone. Whitespace between the
@@ -379,7 +379,7 @@ of route-level `require_admin()` and service authorization.
 The normal app account area retains the refined Settings and Log out links. They share Inter,
 regular weight and `--font-size-sm` with the role label, `1em` icons, a 6 px
 `--account-link-icon-gap`, and no button surface or underline. `--color-account-link` supplies
-the muted blue-grey foreground. Links have no extra vertical padding, with 3 px above Settings
+the muted green-grey foreground. Links have no extra vertical padding, with 3 px above Settings
 to distinguish account details from actions. Log out remains a CSRF-protected POST button.
 
 `test_interfaces.py` covers the dedicated shell, absence of normal navigation, navigation
@@ -777,11 +777,54 @@ of the separate Settings layout.
 
 The Record table ends with one system Status column before its row chevron. A System
 sublabel, accessible name Status (application metadata), interface typography and column
-boundary distinguish it from user Fields. Published uses a green success badge; Edited/Added use info
-badges, Deleted an error badge on a muted row. No green Complete badge remains. Content
+boundary distinguish it from user Fields. Since the visual refresh, Published reads as plain muted text;
+Edited/Added use draft badges and Deleted a removed badge on a muted row, each with a row edge marker. No green Complete badge remains. Content
 Fields named Status, Change and Validation retain their names and actual values.
 Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
 Escape and focus restoration. Search and deterministic pagination include old identifiers.
 The metadata line counts surviving Records plus a separate marked-for-deletion count.
 Wide tables remain keyboard-scrollable at 320/768/1440. Configure Field badges reuse shared
 classification and never enter button accessible names. No new design tokens were added.
+
+
+## Visual refresh: alignment with the website design
+
+The application adopts the palette and component treatment of the refrncr website design v1, so
+product screenshots and the running application read as one identity. Token names are unchanged;
+only values and a few additions differ.
+
+Tokens (`tokens.css`):
+
+- accent `--ref-green-500` is #0f7a4f (primary buttons, links, active navigation), hover #0c6341;
+- neutrals are biased toward the accent (#f4f7f5 background, #f7faf8 subtle surface, #e2e9e5
+  borders, #5d6d65 muted text, #101915 text) instead of pure greys;
+- feedback colours move to the same family: success #0f7a4f, warning #a35b06, error #b42318,
+  info #0b5cad, each with a matching surface and darker text colour;
+- new lifecycle tokens `--color-status-draft|published|removed` with `-surface` and `-border`
+  variants; they express concept/version state and are separate from feedback colours;
+- new `--color-border-strong` (#c7d2cc) for secondary controls, `--font-size-label` (11 px) for
+  mono labels and column headings, `--font-size-page-title` 24 px, softer green-tinted shadows.
+
+All text pairs meet WCAG 2.2 AA: text 17.9:1 on white, muted text 5.1:1 on the background,
+white on the accent 5.4:1, draft text 7.3:1 on its surface, removed text 9.3:1 on its surface.
+
+Global components:
+
+- the sidebar uses the subtle surface; the content area is white;
+- navigation items are compact, regular weight, with a semibold accent state; navigation labels,
+  breadcrumbs, table headings, side-panel eyebrows and record/field labels use the mono face;
+- secondary buttons are white with `--color-border-strong`;
+- `.badge` is a quiet mono pill; status variants (`badge-success|warning|error|info|draft|
+  published|removed`) add a dot so colour is never the only signal;
+- a record toolbar directly followed by its table renders as one bordered object;
+- the concept banner is a compact draft-status strip: a Concept (or Stale) badge, the existing
+  heading text, basis and status, the explanatory note and the existing actions.
+
+Component variants: the expected state reads as plain text (`.status-quiet`) and badges are
+reserved for exceptions — Published records, Active users. Concept rows use draft badges, Current
+versions the published badge, Scheduled versions the info badge. The dataset list shows the
+permanent key under each name, because dataset names are not unique.
+
+Not part of the refresh (product functionality, tracked separately): the Overview content, the
+other website-mockup proposals. The website typefaces (Instrument Sans, IBM Plex Sans, IBM Plex
+Mono) are packaged as Latin and Latin Extended WOFF2 subsets; see `static/licenses/ASSET-SOURCES.md`.
