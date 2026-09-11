@@ -3,6 +3,8 @@
 {% from "components/search_field.html" import search_field %}
 {% set settings_title = "Users" %}
 
+{% block settings_meta %}{% set active_users = users|rejectattr('is_deleted')|list %}{% set administrators = active_users|selectattr('role', 'equalto', 'admin')|list %}<p class='metadata'>{{ active_users|length }} {{ 'user' if active_users|length == 1 else 'users' }} · {{ administrators|length }} {{ 'administrator' if administrators|length == 1 else 'administrators' }}</p>{% endblock %}
+
 {% block settings_actions %}
   {{ search_field('user-search', 'Search users', 'Search by name or email…', list_search=true) }}<button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button>
 {% endblock %}

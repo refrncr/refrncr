@@ -7,7 +7,8 @@
 {% block content %}
 <div data-version-review>
   <div class='page-header'>
-    {% call page_context('Review changes') %}
+    {% set review_meta %}<p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Concept revision {{ identity.revision }} · read only, optional before publication</p>{% endset %}
+    {% call page_context('Review changes', review_meta) %}
       {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review changes', none)]) }}
     {% endcall %}
     <div class='page-actions'>
@@ -18,8 +19,6 @@
     </div>
   </div>
   {% include 'pages/datasets/concepts/_banner.html' %}
-  <p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Concept revision {{ identity.revision }}</p>
-  <p class='help-text'>This review is read only and optional before publication.</p>
   {% if identity.baseline_status == 'Scheduled' %}<p class='help-text'>Publication is available after the Scheduled version becomes Current or is cancelled. Restart this review after that change.</p>{% endif %}
   <nav class='section-tabs' aria-label='Review sections'>
     {% for name, href in sections.items() %}<a class='section-tab' href='{{ href }}'{% if name == section %} aria-current='page'{% endif %}>{{ name }}</a>{% endfor %}

@@ -7,7 +7,7 @@
 
 {% block content %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context(dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none)) %}
+    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -26,7 +26,7 @@
         <div><dt>Name</dt><dd>{{ dataset.name }}</dd></div>
         <div><dt>Description</dt><dd>{{ dataset.description or 'No description provided' }}</dd></div>
         <div><dt>Owning team</dt><dd>{{ dataset.owner_team_name }}</dd></div>
-        <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
+        <div><dt>Key</dt><dd><code>{{ dataset.key }}</code> <span class='help-text'>Permanent · used in exports and the API</span></dd></div>
       </dl>
     </section>
     {% if fields and not business_key.field_keys %}
@@ -34,7 +34,7 @@
     {% endif %}
     <section aria-labelledby='fields-heading'>
       <div class='page-header section-header'>
-        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p></div>
+        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }} · the order here is the column order in tables and exports</p></div>
         {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}
       </div>
       {% if fields %}

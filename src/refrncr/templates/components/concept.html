@@ -10,7 +10,7 @@
 {% if ui %}
 <section class='concept-banner' aria-label='Concept context'>
 <div class='concept-banner-text'>
-<h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}'>{{ 'Stale' if ui.stale else 'Concept' }}</span> You’re working on a concept</h2>
+<h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}' aria-hidden='true'>{{ 'Stale' if ui.stale else 'Concept' }}</span> You’re working on a concept</h2>
 <p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. This concept cannot be published or replaced until a later recovery workflow is available.{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p>
 <p class='concept-banner-note'>Changes are not visible in the current published version until you publish them.</p>
 </div>

@@ -60,3 +60,6 @@
 .metadata [aria-hidden="true"] { display: inline-block; width: var(--metadata-separator-width); text-align: center; }
 .metadata > [aria-hidden="true"] { margin-inline: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
 .metadata > .metadata-item { margin-inline-start: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
+.metadata .badge { margin-inline-start: var(--space-xs); vertical-align: .05em; }
+.metadata-warning { color: var(--color-error); }
+.management-list-header .page-context > .metadata { padding-block-start: var(--space-xs); }

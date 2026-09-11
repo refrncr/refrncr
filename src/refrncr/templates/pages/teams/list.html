@@ -3,6 +3,8 @@
 {% from "components/search_field.html" import search_field %}
 {% set settings_title = "Teams" %}
 
+{% block settings_meta %}{% if teams %}<p class='metadata'>{{ teams|length }} {{ 'team' if teams|length == 1 else 'teams' }}</p>{% endif %}{% endblock %}
+
 {% block settings_actions %}
   {{ search_field('team-search', 'Search teams', 'Search by name…', list_search=true) }}<button class='button button-primary' type='button' data-dialog-open='add-team-panel'>+ New team</button>
 {% endblock %}

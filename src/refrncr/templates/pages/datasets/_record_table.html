@@ -2,9 +2,11 @@
 {% from "components/search_field.html" import search_field %}
 <div class='record-toolbar' aria-label='Record results'>
   <form method='get' role='search' aria-label='Search records'>
-    {{ search_field('record-search', 'Search identifier', 'Search identifier', name='q', value=record_search, maxlength=200) }}
+    {% set identifier_names = fields|selectattr('key', 'in', identifier.field_keys)|map(attribute='name')|list %}
+    {{ search_field('record-search', 'Search identifier', ('Search by ' ~ identifier_names|join(' + ')) if identifier_names else 'Search identifier', name='q', value=record_search, maxlength=200) }}
     <button class='button button-secondary' type='submit'>Search</button>
   </form>
+  {% if version_state %}<p class='record-toolbar-note'>Published version · read only</p>{% endif %}
   <span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>
 </div>
 {% if rows %}

@@ -77,3 +77,6 @@ tbody th[scope="row"] { background: transparent; color: var(--color-text); font-
 .table-scroll + .pagination { justify-content: flex-end; align-items: center; margin-top: 0; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-top: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--color-surface); }
 .table-scroll + .pagination .pagination-status { margin-right: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .version-tag { font-family: var(--font-technical); font-size: var(--font-size-xs); color: var(--color-text-secondary); white-space: nowrap; }
+/* Toolbar note: read-only state of a published version, next to the result count. */
+.record-toolbar .record-toolbar-note { margin: 0 0 0 auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
+.record-toolbar:has(.record-toolbar-note) > span { margin-left: var(--space-md); }

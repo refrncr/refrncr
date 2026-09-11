@@ -7,7 +7,7 @@
 
 {% block content %}
   {% if deletion_notice %}{{ feedback("Dataset deleted permanently.", kind="success") }}{% endif %}
-  <div class='page-header management-list-header'><div><h1>Datasets</h1></div>
+  <div class='page-header management-list-header'><div><h1>Datasets</h1>{% if datasets %}<p class='metadata'>{{ datasets|length }} {{ 'dataset' if datasets|length == 1 else 'datasets' }}</p>{% endif %}</div>
     <div class='page-actions'>
       {% if may_create %}<a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset") }}'>+ New dataset</a>{% endif %}
     </div>
