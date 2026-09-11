@@ -12,7 +12,9 @@
 .audit-filters .page-actions { align-self: end; }
 .audit-filter-help { grid-column: 1 / -1; margin: 0; }
 .audit-table { min-width: var(--data-table-min-width); }
-.audit-table td { max-width: 20rem; overflow-wrap: anywhere; }
+.audit-table td { max-width: 20rem; overflow-wrap: break-word; }
+/* Short identity and action columns never break inside a word. */
+.audit-table td:nth-child(2), .audit-table td:last-child, .audit-table th:last-child { white-space: nowrap; }
 .audit-table time { font-variant-numeric: tabular-nums; }
 .audit-details { margin: 0; }
 .audit-details dt { font-weight: var(--font-weight-semibold); margin-top: var(--space-md); }

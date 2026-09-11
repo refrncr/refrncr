@@ -65,3 +65,6 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-table .record-row:has(> .record-system-status .badge-draft) > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
 .record-table .record-tombstone > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-removed-border); }
 .row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }
+/* Row headers name the row; they are not column headings. */
+tbody th[scope="row"] { background: transparent; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
+.management-table tbody th[scope="row"] { white-space: nowrap; }
