@@ -80,3 +80,10 @@ tbody th[scope="row"] { background: transparent; color: var(--color-text); font-
 /* Toolbar note: read-only state of a published version, next to the result count. */
 .record-toolbar .record-toolbar-note { margin: 0 0 0 auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-toolbar:has(.record-toolbar-note) > span { margin-left: var(--space-md); }
+
+/* Local time: the timezone is named once in the column heading; rows group per local day. */
+.table-zone { font-family: var(--font-technical); letter-spacing: normal; text-transform: none; }
+.table-day-row th { padding-block: .375rem; background: var(--color-surface-subtle); color: var(--color-text-muted); letter-spacing: var(--letter-spacing-eyebrow); }
+.table-scroll tbody tr.table-day-row:hover { background: transparent; }
+tbody + tbody .table-day-row th { border-top: 1px solid var(--color-border); }
+table time[title] { cursor: help; text-decoration: underline dotted var(--color-control-border); text-underline-offset: .2em; }

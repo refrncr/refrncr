@@ -5,12 +5,20 @@
 .settings-sidebar .nav-item { display: flex; align-items: center; gap: var(--space-sm); font-weight: var(--font-weight-regular); }
 .settings-back .button-icon, .settings-topbar .button-icon, .settings-sidebar .button-icon { flex-shrink: 0; margin: 0; }
 .settings-title .button-icon { width: var(--space-lg); height: var(--space-lg); }
-.audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--space-md); margin-bottom: var(--space-lg); }
+/* Compact filter bar: the head of the audit table object. */
+.audit-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: var(--space-sm) var(--space-md); align-items: end; margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
 .audit-filters .form-field { min-width: 0; margin: 0; }
 .audit-filters .form-field + .form-field { margin-top: 0; }
-.audit-filters label { margin-top: 0; }
-.audit-filters .page-actions { align-self: end; }
-.audit-filter-help { grid-column: 1 / -1; margin: 0; }
+.audit-filters label { margin-top: 0; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.audit-filters :is(input, select) { min-height: var(--control-height-compact); padding-block: .3125rem; font-size: var(--font-size-body-sm); }
+.audit-filter-actions { display: flex; gap: var(--space-sm); }
+.audit-filter-help { grid-column: 1 / -1; margin: 0; color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.audit-filter-help + .audit-filter-help { margin-top: calc(-1 * var(--space-xs)); }
+.audit-filters:has(+ .table-scroll) { margin-bottom: 0; border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.audit-filters + .table-scroll { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.audit-filters + .table-scroll:has(+ .pagination) { border-radius: 0; }
+@media (max-width: 1279px) { .audit-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } .audit-filter-actions { grid-column: 1 / -1; } }
+@media (max-width: 639px) { .audit-filters { grid-template-columns: minmax(0, 1fr); } }
 .audit-table { min-width: var(--data-table-min-width); }
 .audit-table td { max-width: 20rem; overflow-wrap: break-word; }
 /* Short identity and action columns never break inside a word. */

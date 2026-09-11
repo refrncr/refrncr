@@ -25,6 +25,21 @@ for (const zone of ['UTC', 'Europe/Amsterdam', 'America/New_York', 'Asia/Tokyo',
       assert.equal(times[i].textContent, expected);
     }
   });
+  // Lists use the compact notation; the exact local instant moves to the title.
+  const compactValue = '2026-03-29T01:00:00.654321+00:00';
+  for (const mode of ['time', 'datetime']) {
+    const compact = {dataset: {localTime: mode}, getAttribute: () => compactValue, textContent: compactValue + ' UTC'};
+    vm.runInContext(source, vm.createContext({window: {}, Date, Intl,
+      document: {querySelectorAll: selector => selector.startsWith('time') ? [compact] : []}}));
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {year: 'numeric', month: 'numeric',
+      day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'})
+      .formatToParts(new Date(compactValue)).map(part => [part.type, part.value]));
+    const time = `${p.hour}:${p.minute}:${p.second}`;
+    const day = `${Number(p.day)} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][p.month - 1]} ${p.year}`;
+    assert.equal(compact.textContent, mode === 'time' ? time : `${day}, ${time}`);
+    assert(compact.title.includes('654321') && compact.title.includes('GMT'));
+    assert.equal(compact.dataset.localDay, day);
+  }
   const original = window.refrncrLocalTime;
   vm.runInContext(source, context);
   assert.equal(window.refrncrLocalTime, original);
@@ -41,4 +56,4 @@ for (const intl of [undefined, {}, {DateTimeFormat() { throw Error('unsupported'
   assert.equal(input.type, 'text');
   assert.equal(input.value, '2026-10-25T01:30:00.123456+00:00');
 }
-console.log('PASS: six timezones, DST spring/fall, date boundary, six-digit precision, invalid calendar/unsupported Intl form fallback, duplicate guard');
+console.log('PASS: six timezones, compact list notation, DST spring/fall, date boundary, six-digit precision, invalid calendar/unsupported Intl form fallback, duplicate guard');

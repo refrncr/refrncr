@@ -840,6 +840,16 @@ reserved for exceptions — Published records, Active users. Concept rows use dr
 versions the published badge, Scheduled versions the info badge. The dataset list shows the
 permanent key under each name, because dataset names are not unique.
 
+Time notation: one notation, `11 Sep 2026, 15:18:35`. Server-rendered summaries keep the
+authoritative UTC form (`absolute_utc`, labelled UTC). Lists that `audit-time.js` localises
+(`time[data-local-time="datetime"]`, or `"time"` inside a `table[data-local-days]`) show local
+time to the second, name the browser timezone once in the column heading
+(`[data-local-timezone]`) and keep the exact local instant with microseconds and offset in the
+`title`; detail views (`data-local-time` without a value) keep the full-precision text. Day-grouped
+tables split rows into one `tbody` per local day, each opened by a `.table-day-row` heading cell
+(`scope="rowgroup"`); without script, rows keep their full UTC timestamp and are not grouped.
+The audit filters form a compact bar at the head of the audit table object.
+
 Not part of the refresh (product functionality, tracked separately): the Overview content, the
 other website-mockup proposals. The website typefaces (Instrument Sans, IBM Plex Sans, IBM Plex
 Mono) are packaged as Latin and Latin Extended WOFF2 subsets; see `static/licenses/ASSET-SOURCES.md`.
