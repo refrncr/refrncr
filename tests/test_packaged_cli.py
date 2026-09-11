@@ -148,14 +148,15 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/static/css/components/cards-badges.css",
         "refrncr/static/css/components/tables.css",
         "refrncr/static/css/components/dialog.css",
-        "refrncr/static/fonts/montserrat/Montserrat-Medium.woff2",
-        "refrncr/static/fonts/inter/Inter-Regular.woff2",
-        "refrncr/static/fonts/inter/Inter-SemiBold.woff2",
-        "refrncr/static/fonts/inter/Inter-Bold.woff2",
-        "refrncr/static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
-        "refrncr/static/licenses/OFL-Montserrat.txt",
-        "refrncr/static/licenses/OFL-Inter.txt",
-        "refrncr/static/licenses/OFL-JetBrains-Mono.txt",
+        "refrncr/static/fonts/instrument-sans/instrument-sans-latin-500-normal.woff2",
+        "refrncr/static/fonts/instrument-sans/instrument-sans-latin-600-normal.woff2",
+        "refrncr/static/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2",
+        "refrncr/static/fonts/ibm-plex-sans/ibm-plex-sans-latin-600-normal.woff2",
+        "refrncr/static/fonts/ibm-plex-sans/ibm-plex-sans-latin-700-normal.woff2",
+        "refrncr/static/fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2",
+        "refrncr/static/licenses/OFL-Instrument-Sans.txt",
+        "refrncr/static/licenses/OFL-IBM-Plex-Sans.txt",
+        "refrncr/static/licenses/OFL-IBM-Plex-Mono.txt",
         "refrncr/static/licenses/LICENSE-Lucide.txt",
         "refrncr/static/licenses/ASSET-SOURCES.md",
     } <= files
@@ -200,9 +201,9 @@ def test_sdist_contains_ui_runtime_and_licenses(installed_artifact):
     assert {
         "src/refrncr/static/css/components/dialog.css",
         "src/refrncr/static/css/layouts/app-shell.css",
-        "src/refrncr/static/fonts/inter/Inter-Regular.woff2",
-        "src/refrncr/static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
-        "src/refrncr/static/fonts/montserrat/Montserrat-Medium.woff2",
+        "src/refrncr/static/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2",
+        "src/refrncr/static/fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2",
+        "src/refrncr/static/fonts/instrument-sans/instrument-sans-latin-600-normal.woff2",
         "src/refrncr/static/licenses/ASSET-SOURCES.md",
         "src/refrncr/static/licenses/LICENSE-Lucide.txt",
         "src/refrncr/templates/pages/datasets/records.html",
@@ -265,11 +266,11 @@ def test_installed_console_help_and_http_startup(installed_artifact):
         assert "refrncr" in body
         for asset in (
             "static/css/components/dialog.css",
-            "static/fonts/montserrat/Montserrat-Medium.woff2",
-            "static/fonts/inter/Inter-Regular.woff2",
-            "static/fonts/inter/Inter-SemiBold.woff2",
-            "static/fonts/inter/Inter-Bold.woff2",
-            "static/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2",
+            "static/fonts/instrument-sans/instrument-sans-latin-600-normal.woff2",
+            "static/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2",
+            "static/fonts/ibm-plex-sans/ibm-plex-sans-latin-600-normal.woff2",
+            "static/fonts/ibm-plex-sans/ibm-plex-sans-latin-700-normal.woff2",
+            "static/fonts/ibm-plex-mono/ibm-plex-mono-latin-400-normal.woff2",
         ):
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{port}/{asset}", timeout=1

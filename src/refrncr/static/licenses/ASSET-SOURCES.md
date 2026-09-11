@@ -5,6 +5,21 @@ their upstream projects.
 
 ## Fonts
 
+The application typefaces are shared with the refrncr website. Each weight is served as a Latin and a
+Latin Extended subset, selected by `unicode-range`.
+
+- Instrument Sans Medium 500 and SemiBold 600: `instrument-sans-{latin,latin-ext}-{500,600}-normal.woff2`,
+  from the Fontsource package `@fontsource/instrument-sans` 5.3.0; licensed under
+  `OFL-Instrument-Sans.txt`.
+- IBM Plex Sans Regular 400, SemiBold 600 and Bold 700:
+  `ibm-plex-sans-{latin,latin-ext}-{400,600,700}-normal.woff2`, from `@fontsource/ibm-plex-sans`
+  5.3.0; licensed under `OFL-IBM-Plex-Sans.txt`.
+- IBM Plex Mono Regular 400: `ibm-plex-mono-{latin,latin-ext}-400-normal.woff2`, from
+  `@fontsource/ibm-plex-mono` 5.3.0; licensed under `OFL-IBM-Plex-Mono.txt`.
+
+The following earlier typefaces are no longer referenced by `tokens.css`. They stay packaged until
+their removal is approved:
+
 - Montserrat Medium 500: `Montserrat-Medium.woff2`, from the official Montserrat
   source at commit `cc8daf2e7085006b9c112542fc82b58afc13521d`; licensed under
   `OFL-Montserrat.txt`.

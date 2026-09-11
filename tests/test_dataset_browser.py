@@ -550,12 +550,15 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
         "components/tables.css",
         "components/dialog.css",
     )
-    fonts = (
-        "montserrat/Montserrat-Medium.woff2",
-        "inter/Inter-Regular.woff2",
-        "inter/Inter-SemiBold.woff2",
-        "inter/Inter-Bold.woff2",
-        "jetbrains-mono/JetBrainsMono-Regular.woff2",
+    fonts = tuple(
+        f"{family}/{family}-{subset}-{weight}-normal.woff2"
+        for family, weights in (
+            ("instrument-sans", (500, 600)),
+            ("ibm-plex-sans", (400, 600, 700)),
+            ("ibm-plex-mono", (400,)),
+        )
+        for weight in weights
+        for subset in ("latin", "latin-ext")
     )
     for filename in css_files:
         assert request(client, "get", f"/static/css/{filename}").status_code == 200
@@ -564,10 +567,12 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
         assert response.status_code == 200
         assert response.mimetype == "font/woff2"
     tokens = body(request(client, "get", "/static/css/tokens.css"))
-    assert tokens.count("@font-face") == 5
-    assert "Montserrat-Medium.woff2" in tokens and "font-weight: 500" in tokens
-    assert "Inter-Regular.woff2" in tokens and "Inter-SemiBold.woff2" in tokens
-    assert "Inter-Bold.woff2" in tokens and "JetBrainsMono-Regular.woff2" in tokens
+    assert tokens.count("@font-face") == len(fonts) == 12
+    for filename in fonts:
+        assert f'url("../fonts/{filename}")' in tokens
+    assert '--font-display: "Instrument Sans"' in tokens
+    assert '--font-interface: "IBM Plex Sans"' in tokens
+    assert '--font-technical: "IBM Plex Mono"' in tokens
     assert "http://" not in tokens and "https://" not in tokens
 
 
