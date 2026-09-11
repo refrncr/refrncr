@@ -25,7 +25,7 @@
         <tbody>{% if history.concept and not history.concept.base_version_id %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
             <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
-            <td><span class='badge'>{{ state.status }}</span></td>
+            <td><span class='badge{{ " badge-published" if state.status == "Current" else " badge-info" if state.status == "Scheduled" else "" }}'>{{ state.status }}</span></td>
             <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date.isoformat() }}</time></td>
             <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date.isoformat() }}</time>{% else %}—{% endif %}</td>
             <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time>{{ version.published_at|absolute_utc }}</time></td>
