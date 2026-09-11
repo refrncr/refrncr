@@ -2,7 +2,7 @@
 table { width: 100%; border-collapse: collapse; font-size: var(--font-size-body-sm); }
 caption { padding: var(--space-md); font-weight: var(--font-weight-bold); text-align: left; }
 th, td { padding: .75rem var(--space-md); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
-th { background: var(--color-table-heading); color: var(--color-text-secondary); font-size: var(--font-size-xs); letter-spacing: .04em; text-transform: uppercase; }
+th { background: var(--color-table-heading); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: .08em; text-transform: uppercase; }
 .table-scroll tbody tr:not(.interactive-row):hover { background: var(--color-row-hover); }
 .management-table { position: relative; box-shadow: var(--shadow-sm); }
 .management-table th, .management-table td { padding-block: 1rem; }
@@ -58,3 +58,11 @@ th { background: var(--color-table-heading); color: var(--color-text-secondary);
 .record-table .record-tombstone td { background-color: var(--color-surface-subtle); color: var(--color-text-secondary); }
 .record-toolbar form { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 .record-toolbar form input { flex: 1 1 12rem; width: auto; max-width: 22rem; }
+
+/* Toolbar and table read as one bordered object. */
+.record-toolbar:has(+ .table-scroll) { margin-bottom: 0; border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.record-toolbar + .table-scroll { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+/* Exception rows: concept changes and pending removals get an edge marker next to their badge. */
+.record-table .record-changed > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
+.record-table .record-tombstone > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-removed-border); }
+.row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: anywhere; }

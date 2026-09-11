@@ -32,7 +32,7 @@
 }
 
 .page-header > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.breadcrumbs { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
+.breadcrumbs { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
 .breadcrumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-sm); list-style: none; margin: 0; padding: 0; }
 .breadcrumbs li { min-width: 0; overflow-wrap: anywhere; }
 .breadcrumbs a { color: var(--color-breadcrumb-link); text-decoration: none; }
