@@ -724,3 +724,28 @@ cookies remain unchanged. Ordinary no-JavaScript links and forms retain full-pag
 
 `tests/javascript/dataset_deletion_browser.cjs` exercises the disposable table-row fixture with
 real Chrome at 320/768/1440px. See the REF-141 report for executed results.
+
+
+## REF-83 version workflows
+
+Classification: product functionality presented through existing global components. Dataset
+context now distinguishes `Concept · Working copy` from `Version N · Status · Read only`, with
+Versions navigation. The Versions page reuses page headers, breadcrumbs, responsive table
+containers/caption/column headers, textual badges and standard actions. No new design token,
+CSS selector, component variant, framework or dependency is introduced.
+
+Publish/cancel reuse the shared remote side-panel host and full-page fallback. Publish shows
+counts only, UTC calendar date, bounded release note and an explicit confirmation. Cancel uses
+the existing destructive button and explains retained administrator history and number retention.
+The shared field macro supports optional `min` and `maxlength`; the shared submit controller
+supports opt-in single submit and a visible `role=status` busy message. Server validation still
+controls dates, permission, revision and confirmation. Error feedback receives focus and fields
+reference it; Cancel/Escape restores the trigger without mutation. Snapshot record panels reuse
+existing read-only content and expose no mutation controls.
+
+Chrome acceptance covers 320/768/1440 px in light mode, keyboard activation, initial focus,
+Tab containment, Escape/Cancel restoration, error focus, native date constraints plus server
+rejection, busy/double submit, escaped release notes, historical views and downloads. Tests wait
+for panel animations before checking bounds/screenshots. Existing navigation and table regression
+scripts cover their original breakpoint set. These structural/accessibility checks do not claim
+certification by a human screen-reader user. See the REF-83 report for exact results.

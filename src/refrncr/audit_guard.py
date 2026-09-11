@@ -86,7 +86,12 @@ def verify_inventory(root):
             module_commands.append(module)
         discovered.update(discover_service_operations(source, module))
         routes.extend(discover_routes(source, module))
-        if module in {"refrncr.services", "refrncr.record_import", "refrncr.web"}:
+        if module in {
+            "refrncr.services",
+            "refrncr.record_import",
+            "refrncr.web",
+            "refrncr.dataset_versions",
+        }:
             for node in ast.walk(ast.parse(source)):
                 if isinstance(node, ast.Call) and (
                     ast.unparse(node.func) in {"AuditEvent", "uow.add_audit"}

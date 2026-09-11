@@ -5,7 +5,7 @@ from threading import Event, local
 import pytest
 from alembic import command
 from alembic.config import Config
-from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import create_engine, event, func, select, text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -226,6 +226,7 @@ def test_viewer_and_editor_can_read_but_cannot_mutate(business_key_services):
     grant(services, admin, viewer, dataset, "viewer")
     grant(services, admin, editor, dataset, "editor")
 
+    publish_dataset(services, admin.id, dataset)
     assert services.dataset_business_keys.get_business_key(viewer.id, dataset.key).field_keys == (
         "field",
     )
@@ -285,7 +286,10 @@ def test_owner_metadata_does_not_authorize(business_key_services):
             update(Dataset).where(Dataset.id == dataset.id).values(owner_user_id=owner.id)
         )
 
-    assert services.dataset_business_keys.get_business_key(owner.id, dataset.key).field_keys == ()
+    publish_dataset(services, admin.id, dataset)
+    assert services.dataset_business_keys.get_business_key(owner.id, dataset.key).field_keys == (
+        "field",
+    )
     with pytest.raises(NotFoundError, match="Dataset not found"):
         services.dataset_business_keys.set_business_key(owner.id, dataset.key, ("field",))
     with pytest.raises(NotFoundError, match="Dataset not found"):

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.audit_history import AuditHistoryService
+from refrncr.dataset_versions import DatasetVersionService
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.record_import import DatasetRecordImportService
@@ -29,6 +30,7 @@ from refrncr.web import create_flask_app
 
 @dataclass(frozen=True)
 class CommunityServices:
+    dataset_versions: DatasetVersionService
     audit_history: AuditHistoryService
     users: UserService
     authentication: AuthenticationService
@@ -54,8 +56,10 @@ def create_community_services(
     authorization = AuthorizationService(
         permission_data, resources, DatasetAuthorizationService(uow)
     )
-    dataset_records = DatasetRecordService(uow, authorization)
+    versions = DatasetVersionService(uow, authorization.datasets)
+    dataset_records = DatasetRecordService(uow, authorization, versions=versions)
     return CommunityServices(
+        dataset_versions=versions,
         audit_history=AuditHistoryService(uow),
         users=UserService(uow),
         authentication=AuthenticationService(uow),
@@ -64,9 +68,9 @@ def create_community_services(
         memberships=MembershipService(uow),
         grants=GrantService(uow, resources),
         authorization=authorization,
-        datasets=DatasetService(uow, authorization),
-        dataset_fields=DatasetFieldService(uow, authorization),
-        dataset_business_keys=DatasetBusinessKeyService(uow, authorization),
+        datasets=DatasetService(uow, authorization, versions=versions),
+        dataset_fields=DatasetFieldService(uow, authorization, versions=versions),
+        dataset_business_keys=DatasetBusinessKeyService(uow, authorization, versions=versions),
         dataset_records=dataset_records,
         record_imports=DatasetRecordImportService(dataset_records),
     )
@@ -88,6 +92,7 @@ def create_application(
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
     audit_history: AuditHistoryService | None = None,
+    dataset_versions: DatasetVersionService | None = None,
 ) -> FastAPI:
     users.bootstrap_organisation()
     app = FastAPI(title="refrncr")
@@ -111,6 +116,7 @@ def create_application(
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
         audit_history=audit_history,
+        dataset_versions=dataset_versions,
     )
     app.mount("/", WSGIMiddleware(flask_app))
     return app

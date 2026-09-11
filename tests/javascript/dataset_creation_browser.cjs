@@ -54,8 +54,14 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         }
         assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
         if(output) await page.screenshot({path:`${output}/${kind}-${width}.png`});
-        // Existing universally readable Dataset: no administrator actions for any of these actors.
-        await page.goto(`${base}/datasets/empty-check`);
+        // Ordinary readers cannot open an unpublished concept, even through a direct URL.
+        if (kind === 'row') {
+          const unavailable = await page.goto(`${base}/datasets/empty-check`);
+          assert.equal(unavailable.status(), 404);
+          assert(!/Empty check/.test(await page.locator('body').innerText()));
+        }
+        // The fixture explicitly publishes row-check; current REF-73 permissions still apply.
+        await page.goto(`${base}/datasets/row-check`);
         assert.equal(await page.getByRole('link',{name:'Access management',exact:true}).count(),0);
         assert.equal(await page.getByRole('link',{name:'Edit dataset',exact:true}).count(),kind==='row'?0:1);
         await page.getByRole('link',{name:'View records',exact:true}).click();

@@ -6,6 +6,7 @@ Operation registration is explicit; discovery belongs to the CI guard.
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 from unicodedata import category, normalize
 from uuid import UUID
@@ -34,7 +35,16 @@ class EventContract:
             raise AuditContractError("This installation has no anonymous/system audit actor")
         if len(dict(self.context)) != len(self.context) or any(
             kind
-            not in {"uuid", "count", "subject", "import_format", "export_format", "dataset_name"}
+            not in {
+                "uuid",
+                "count",
+                "subject",
+                "import_format",
+                "export_format",
+                "dataset_name",
+                "version_count",
+                "calendar_date",
+            }
             for _key, kind in self.context
         ):
             raise AuditContractError("Invalid context contract")
@@ -81,6 +91,20 @@ _EVENTS = (
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
     EventContract("dataset", "dataset.deleted", (("dataset_name", "dataset_name"),)),
+    *(
+        EventContract(
+            "dataset",
+            action,
+            (
+                ("version_number", "version_count"),
+                ("effective_date", "calendar_date"),
+                ("dataset_name", "dataset_name"),
+                ("field_count", "version_count"),
+                ("record_count", "version_count"),
+            ),
+        )
+        for action in ("dataset.version_published", "dataset.version_cancelled")
+    ),
 )
 EVENTS = MappingProxyType({(event.object_type, event.action): event for event in _EVENTS})
 
@@ -121,8 +145,22 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
         elif kind == "count":
             if type(value) is not int or not 0 <= value <= 10_000:
                 raise AuditContractError("Audit count is outside the allowed range")
+        elif kind == "version_count":
+            if type(value) is not int or not 0 <= value <= 2_147_483_647:
+                raise AuditContractError("Version count is outside the allowed range")
+        elif kind == "calendar_date":
+            if (
+                not isinstance(value, str)
+                or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None
+            ):
+                raise AuditContractError("Invalid effective date")
+            try:
+                date.fromisoformat(value)
+            except ValueError:
+                raise AuditContractError("Invalid effective date") from None
         elif kind == "dataset_name":
-            # REF-141's sole business-name exception. Bound before any processing;
+            # The bounded business-name exception shared by REF-141 and REF-83.
+            # Bound before any processing;
             # remove invisible controls, never store description or request context.
             if not isinstance(value, str) or not 1 <= len(value) <= 200:
                 raise AuditContractError("Invalid Dataset name snapshot")
@@ -490,5 +528,45 @@ _register(
     module="audit_history",
     rationale="Administrator-only audit history read; no business state change or domain event.",
 )
+
+_audited(
+    "DatasetVersionService",
+    "publish",
+    ("dataset", "dataset.version_published"),
+    module="dataset_versions",
+)
+_audited(
+    "DatasetVersionService",
+    "cancel",
+    ("dataset", "dataset.version_cancelled"),
+    module="dataset_versions",
+)
+_register(
+    "DatasetVersionService",
+    "review",
+    "intentionally excluded",
+    module="dataset_versions",
+    rationale="Authorized publication review; no persisted content or event.",
+)
+
+for _name in ("overview", "context", "history", "read"):
+    _register(
+        "DatasetVersionService",
+        _name,
+        "intentionally excluded",
+        module="dataset_versions",
+        rationale=(
+            "Authorized coherent concept/published read; current REF-73 permissions, "
+            "no mutation or domain event."
+        ),
+    )
+
+for _name in ("publication_preflight", "create_initial_versions"):
+    OPERATIONS[f"refrncr.version_upgrade.{_name}"] = Operation(
+        "technical logging only",
+        rationale=(
+            "Stopped-writer operator migration/preflight; no authenticated actor or domain event."
+        ),
+    )
 
 OPERATIONS = MappingProxyType(OPERATIONS)

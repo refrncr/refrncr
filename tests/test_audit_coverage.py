@@ -104,6 +104,8 @@ MUTATIONS = (
     "GrantService.create_grant",
     "GrantService.change_permission",
     "GrantService.delete_grant",
+    "DatasetVersionService.publish",
+    "DatasetVersionService.cancel",
     "DatasetService.create_dataset",
     "DatasetService.delete_dataset",
     "DatasetService.change_owner",
@@ -128,6 +130,22 @@ def prepare(c, operation):
     """Return a concrete operation and its independently expected event/target."""
     s, a, u, d = c.s, c.a, c.u, c.d
     cls, method = operation.split(".")
+    if cls == "DatasetVersionService":
+        from datetime import timedelta
+
+        from refrncr.models import utc_now
+
+        s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
+        revision = s.datasets.get_dataset(a.id, d.key).revision
+        day = utc_now().date() + timedelta(days=1)
+        if method == "publish":
+            return lambda actor: s.dataset_versions.publish(actor, d.id, day, "", revision), [
+                ("dataset", "dataset.version_published", d.id)
+            ]
+        v = s.dataset_versions.publish(a.id, d.id, day, "", revision)
+        return lambda actor: s.dataset_versions.cancel(actor, d.id, v.id), [
+            ("dataset", "dataset.version_cancelled", d.id)
+        ]
     if cls == "UserService":
         if method == "create_user":
             return lambda actor: s.users.create_user(
@@ -269,7 +287,13 @@ def test_declared_event_actor_target_and_safe_context(context, operation):
     actual = {(e.object_type, e.action, e.object_id) for e in events}
     expected = {(kind, action, target or result.id) for kind, action, target in expected}
     assert actual == expected and len(events) == len(expected)
-    module = "record_import" if operation.startswith("DatasetRecordImportService") else "services"
+    module = (
+        "record_import"
+        if operation.startswith("DatasetRecordImportService")
+        else "dataset_versions"
+        if operation.startswith("DatasetVersionService")
+        else "services"
+    )
     declared = OPERATIONS[f"refrncr.{module}.{operation}"].events
     for e in events:
         assert e.actor_user_id == c.a.id and e.timestamp is not None
@@ -321,6 +345,8 @@ def test_every_mutation_rolls_back_business_and_audit(context, monkeypatch, oper
         expected_error = (
             PersistenceConflictError if failure == "database_constraint" else RuntimeError
         )
+        if operation.startswith("DatasetVersionService") and failure == "database_constraint":
+            expected_error = ConflictError
         with pytest.raises(expected_error):
             call(c.a.id)
     assert snapshot(c) == before
@@ -707,6 +733,10 @@ def test_invalid_input_or_lifecycle_never_creates_success_event(context, operati
     if operation == "MembershipService.create_membership":
         s.users.disable_user(a.id, u.id)
     invalid = {
+        "DatasetVersionService.publish": lambda: s.dataset_versions.publish(
+            a.id, d.id, None, "", -1
+        ),
+        "DatasetVersionService.cancel": lambda: s.dataset_versions.cancel(a.id, d.id, missing),
         "UserService.create_user": lambda: s.users.create_user(
             a.id, "invalid", "Name", "valid password"
         ),
@@ -884,9 +914,9 @@ def test_browser_route_inventory_matches_real_registration(context):
         methods = set(row["methods"]) | {"OPTIONS"}
         if "GET" in methods:
             methods.add("HEAD")
-        expected[row["symbol"].split(".")[-1]] = (row["path"], methods)
+        expected[(row["symbol"].split(".")[-1], row["path"])] = methods
     actual = {
-        rule.endpoint: (rule.rule, rule.methods)
+        (rule.endpoint, rule.rule): rule.methods
         for rule in browser(context).application.url_map.iter_rules()
         if rule.endpoint != "static"
     }
@@ -915,8 +945,11 @@ def test_response_construction_failure_keeps_request_and_closes_artifact(context
     monkeypatch.setattr(dataset_export, "generate_export", generate)
     monkeypatch.setattr(web, "send_file", fail)
     before = {e.id for e in audits(c)}
-    with pytest.raises(RuntimeError, match="response construction"):
-        client.get(f"/datasets/{c.d.key}/records/export?format=json", base_url="https://localhost")
+    response = client.get(
+        f"/datasets/{c.d.key}/records/export?format=json", base_url="https://localhost"
+    )
+    assert response.status_code == 503
+    assert b"response construction" not in response.data
     assert len(artifacts) == 1 and artifacts[0].content.closed
     events = [e for e in audits(c) if e.id not in before]
     assert len(events) == 1 and events[0].action == "dataset.export_requested"

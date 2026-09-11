@@ -131,3 +131,18 @@ Deletion is permanent and atomic with its one audit event. All operational depen
 are removed; users, teams, memberships and append-only history remain. See the
 [dependency inventory and confirmation contract](ref-141-report.md). No soft delete, undo,
 recovery, retention policy, background job or migration is introduced.
+
+## REF-83 publication authority (product-owner clarification, 2026-09-10)
+
+The same active owning-team members and Community administrators who maintain concepts
+may publish and cancel Scheduled versions. REF-83's earlier separate editor/publisher
+wording is withdrawn. No editor/publisher role or per-user editing exception is added;
+legacy Dataset Grants remain inert. `DatasetAuthorizationService.can_maintain_dataset`
+is the authoritative decision for all three actions, rechecked inside the locked UoW.
+Current ownership/membership/export access is administrative data, never snapshot content.
+
+REF-83 adds a Dataset revision for content and version lifecycle operations. Metadata,
+Field definitions/order/identifier membership and Record/import changes increment it;
+normalized no-ops do not. Publication compares it under the existing Dataset lock.
+Ownership/access changes are excluded from content comparison and continue using their
+existing authorization and concurrency contracts.

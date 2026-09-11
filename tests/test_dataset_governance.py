@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
 import pytest
+from dataset_helpers import publish_dataset
 from sqlalchemy import func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
@@ -77,6 +78,8 @@ def test_complete_capability_matrix(governance, kind):
     elif kind == "export_team":
         s.memberships.create_membership(a.id, u.id, other.id)
         s.datasets.grant_export_access(a.id, d.key, "team", other.id)
+    if kind not in {"owner", "admin"}:
+        publish_dataset(s, a.id, d)
     auth = s.authorization.datasets
     assert auth.can_view_dataset(u.id, d.id)
     assert auth.can_create_dataset(u.id)
@@ -87,8 +90,9 @@ def test_complete_capability_matrix(governance, kind):
     assert auth.can_manage_export_access(u.id, d.id) == (kind == "admin")
     assert [item.id for item in s.datasets.list_datasets(u.id)] == [d.id]
     assert s.datasets.get_dataset_details(u.id, d.key).owner_team_name == owner.name
-    assert s.dataset_fields.list_fields(u.id, d.key) == []
-    assert s.dataset_business_keys.get_business_key(u.id, d.key).field_keys == ()
+    expected_keys = [] if kind in {"owner", "admin"} else ["publication_id"]
+    assert [field.key for field in s.dataset_fields.list_fields(u.id, d.key)] == expected_keys
+    assert s.dataset_business_keys.get_business_key(u.id, d.key).field_keys == tuple(expected_keys)
     assert s.dataset_records.list_records(u.id, d.key).total == 0
     for fmt in ("csv", "xlsx", "json"):
         if kind != "viewer":
@@ -413,6 +417,7 @@ def test_export_duplicates_constraints_and_cross_dataset_revoke(governance):
 
 def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     _, factory, s, a, u, owner, other, d = governance
+    publish_dataset(s, a.id, d)
     app = create_flask_app(
         s.users,
         s.authentication,

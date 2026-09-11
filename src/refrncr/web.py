@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import re
 import secrets
-from datetime import UTC
+from datetime import UTC, date
 from decimal import Decimal
 from functools import wraps
 from itertools import islice
@@ -22,7 +23,7 @@ from flask import (
     send_file,
     url_for,
 )
-from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
 from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
@@ -32,6 +33,7 @@ from refrncr.browser_security import (
     BrowserCookiePolicy,
 )
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
+from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
@@ -119,6 +121,7 @@ def create_flask_app(
     source_resolver: SourceIdentityResolver | None = None,
     authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
     audit_history: AuditHistoryService | None = None,
+    dataset_versions: DatasetVersionService | None = None,
 ) -> Flask:
     app = Flask(__name__)
     audit_history = audit_history or AuditHistoryService(users.uow)
@@ -171,6 +174,11 @@ def create_flask_app(
     if all(dependency is not None for dependency in existing_dataset_dependencies):
         dataset_records = dataset_records or DatasetRecordService(datasets.uow, authorization)
         record_imports = record_imports or DatasetRecordImportService(dataset_records)
+        dataset_versions = (
+            dataset_versions
+            or datasets.versions
+            or DatasetVersionService(datasets.uow, authorization.datasets)
+        )
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
@@ -364,6 +372,21 @@ def create_flask_app(
             return app.route(rule, **options)
         return lambda function: function
 
+    def version_errors(function):
+        @wraps(function)
+        def secured(*args, **kwargs):
+            try:
+                return function(*args, **kwargs)
+            except (NotFoundError, AuthorizationError):
+                abort(404)
+            except HTTPException:
+                raise
+            except Exception:
+                logging.getLogger(__name__).error("Dataset version operation unavailable")
+                return "Dataset versions are temporarily unavailable. Reload and try again.", 503
+
+        return secured
+
     def require_csrf(expected_token: str | None) -> None:
         submitted_token = request.form.get("csrf_token")
         try:
@@ -506,40 +529,142 @@ def create_flask_app(
         return redirect(url_for("dataset_detail", key=dataset.key))
 
     @dataset_route("/datasets/<key>", methods=["GET"])
-    def dataset_detail(key: str):
+    @dataset_route("/datasets/<key>/versions/<version_id>", methods=["GET"])
+    @version_errors
+    def dataset_detail(key: str, version_id=None):
         actor, login_session = require_authenticated()
-        (
-            authorization_service,
-            dataset_service,
-            field_service,
-            business_key_service,
-            record_service,
-        ) = require_dataset_dependencies()
-        try:
-            dataset = dataset_service.get_dataset_details(actor.id, key)
-            editable = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
-            schema_admin = authorization_service.check_access(
-                actor.id, "dataset", dataset.id, "admin"
-            )
-            fields = field_service.list_fields(actor.id, dataset.key)
-            business_key = business_key_service.get_business_key(actor.id, dataset.key)
-        except NotFoundError:
-            abort(404)
-        return render_template(
+        require_dataset_dependencies()
+        view = dataset_versions.read(
+            actor.id, key, version_id, page=None, prefer_concept=version_id is None
+        )
+        dataset = view.context.dataset
+        editable = view.state is None and view.may_maintain
+        return render_authenticated_template(
             "pages/datasets/detail.html",
             dataset=dataset,
+            context=view.context,
             editable=editable,
-            schema_admin=schema_admin,
-            may_govern=authorization_service.datasets.can_change_dataset_owner(
-                actor.id, dataset.id
-            ),
-            fields=fields,
-            business_key=business_key,
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
+            schema_admin=editable,
+            may_govern=editable
+            and authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
+            fields=view.fields,
+            business_key=view.identifier,
+            version_state=view.state,
         )
+
+    @dataset_route("/datasets/<key>/versions", methods=["GET"])
+    @version_errors
+    def dataset_versions_view(key):
+        actor, _session = require_authenticated()
+        history = dataset_versions.history(actor.id, key)
+        available, reason = False, None
+        if history.may_maintain:
+            try:
+                dataset_versions.review(actor.id, history.context.dataset.id)
+                available = True
+            except (ConflictError, ValidationError) as error:
+                reason = str(error)
+        notice = {
+            "published": "Dataset version published.",
+            "cancelled": "Scheduled version cancelled.",
+        }.get(request.args.get("notice"))
+        return render_authenticated_template(
+            "pages/datasets/versions/list.html",
+            history=history,
+            dataset=history.context.dataset,
+            context=history.context,
+            publish_available=available,
+            publish_reason=reason,
+            notice=notice,
+        )
+
+    @dataset_route("/datasets/<key>/versions/publish", methods=["GET", "POST"])
+    @version_errors
+    def dataset_version_publish(key):
+        actor, session = require_authenticated()
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        error, status = None, 200
+        effective = request.form.get("effective_date", "")[:10]
+        note = request.form.get("release_note", "")[:2000]
+        if request.method == "POST":
+            require_csrf(session.csrf_token)
+            if request.form.getlist("dataset_id") != [dataset.id]:
+                raise NotFoundError("Dataset not found")
+            try:
+                if request.form.getlist("confirmed") != ["yes"]:
+                    raise ValidationError(
+                        "Confirm that you reviewed this version before publishing."
+                    )
+                dates = request.form.getlist("effective_date")
+                if len(dates) != 1 or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", dates[0]) is None:
+                    raise ValidationError("Choose an effective calendar date.")
+                try:
+                    effective_date = date.fromisoformat(dates[0])
+                except ValueError:
+                    raise ValidationError("Choose a valid effective calendar date.") from None
+                revisions = request.form.getlist("expected_revision")
+                if len(revisions) != 1 or len(request.form.getlist("release_note")) != 1:
+                    raise ValidationError("Review the publication form again.")
+                expected = parse_expected_revision(revisions[0])
+                dataset_versions.publish(
+                    actor.id, dataset.id, effective_date, request.form["release_note"], expected
+                )
+                return redirect(
+                    url_for("dataset_versions_view", key=key, notice="published"), code=303
+                )
+            except (ValidationError, ConflictError) as failure:
+                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
+        review = None
+        try:
+            review = dataset_versions.review(actor.id, dataset.id)
+        except (ValidationError, ConflictError) as failure:
+            error, status = error or str(failure), 409
+        today = dataset_versions._today().date().isoformat()
+        return render_authenticated_template(
+            "pages/datasets/versions/publish.html",
+            dataset=dataset,
+            review=review,
+            error=error,
+            effective_date=effective or today,
+            release_note=note,
+            today=today,
+        ), status
+
+    @dataset_route("/datasets/<key>/versions/<version_id>/cancel", methods=["GET", "POST"])
+    @version_errors
+    def dataset_version_cancel(key, version_id):
+        actor, session = require_authenticated()
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        error, status = None, 200
+        if request.method == "POST":
+            require_csrf(session.csrf_token)
+            try:
+                if request.form.getlist("confirmed") != ["yes"]:
+                    raise ValidationError("Confirm cancellation of this Scheduled version.")
+                dataset_versions.cancel(actor.id, dataset.id, version_id)
+                return redirect(
+                    url_for("dataset_versions_view", key=key, notice="cancelled"), code=303
+                )
+            except (ValidationError, ConflictError) as failure:
+                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
+        history = dataset_versions.history(actor.id, key)
+        selected = next(
+            (state for state in history.entries if state.version.id == version_id), None
+        )
+        if selected is None:
+            raise NotFoundError("Dataset version not found")
+        if selected.status != "Scheduled":
+            error, status = (
+                "Only a Scheduled version can be cancelled before its effective date.",
+                409,
+            )
+        return render_authenticated_template(
+            "pages/datasets/versions/cancel.html",
+            dataset=dataset,
+            state=selected,
+            error=error,
+            can_cancel=selected.status == "Scheduled",
+        ), status
 
     def render_dataset_governance(key, mode, error=None):
         actor, login_session = require_authenticated()
@@ -657,27 +782,17 @@ def create_flask_app(
         return int(values[0])
 
     @dataset_route("/datasets/<key>/records", methods=["GET"])
-    def dataset_records_view(key: str):
+    @dataset_route("/datasets/<key>/versions/<version_id>/records", methods=["GET"])
+    @version_errors
+    def dataset_records_view(key: str, version_id=None):
         actor, login_session = require_authenticated()
-        (
-            authorization_service,
-            dataset_service,
-            field_service,
-            business_key_service,
-            record_service,
-        ) = require_dataset_dependencies()
-        try:
-            context = dataset_service.get_dataset_context(actor.id, key)
-            dataset = context.dataset
-            fields = field_service.list_fields(actor.id, key)
-            identifier = business_key_service.get_business_key(actor.id, key)
-            page = record_service.list_records(actor.id, key, parse_page_parameter())
-            may_edit = authorization_service.check_access(actor.id, "dataset", dataset.id, "editor")
-            may_configure = authorization_service.check_access(
-                actor.id, "dataset", dataset.id, "admin"
-            )
-        except NotFoundError:
-            abort(404)
+        require_dataset_dependencies()
+        view = dataset_versions.read(
+            actor.id, key, version_id, parse_page_parameter(), prefer_concept=version_id is None
+        )
+        context, fields, identifier, page = view.context, view.fields, view.identifier, view.page
+        dataset = context.dataset
+        may_edit = may_configure = view.state is None and view.may_maintain
         rows = [
             (
                 record,
@@ -719,7 +834,8 @@ def create_flask_app(
             rows=rows,
             page=page,
             may_edit=may_edit,
-            may_export=authorization_service.datasets.can_export_dataset(actor.id, dataset.id),
+            may_export=view.may_export,
+            version_state=view.state,
             may_configure=may_configure,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -732,7 +848,9 @@ def create_flask_app(
         )
 
     @dataset_route("/datasets/<key>/records/export", methods=["GET"])
-    def export_dataset_records(key: str):
+    @dataset_route("/datasets/<key>/versions/<version_id>/records/export", methods=["GET"])
+    @version_errors
+    def export_dataset_records(key: str, version_id=None):
         actor, _login_session = require_authenticated()
         _authorization, _datasets, _fields, _business_keys, record_service = (
             require_dataset_dependencies()
@@ -741,7 +859,9 @@ def create_flask_app(
         if len(formats) != 1 or formats[0] not in {"csv", "xlsx", "json"}:
             return "Choose exactly one supported export format", 400
         try:
-            artifact = record_service.export_dataset(actor.id, key, formats[0])
+            artifact = record_service.export_dataset(
+                actor.id, key, formats[0], version_id=version_id
+            )
         except NotFoundError:
             abort(404)
         except (ExportGenerationError, ValidationError) as error:
@@ -751,7 +871,7 @@ def create_flask_app(
                 artifact.content,
                 mimetype=artifact.media_type,
                 as_attachment=True,
-                download_name=f"{key}.{artifact.extension}",
+                download_name=artifact.download_name or f"{key}.{artifact.extension}",
                 max_age=0,
             )
         except Exception:

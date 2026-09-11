@@ -5,8 +5,9 @@ its validated stable key and requires the central `can_export_dataset` capabilit
 members and active Community administrators qualify automatically; other active users require direct
 or current-team export access. Read access and historical Dataset Grants confer no export rights.
 Creator metadata is not consulted. Missing, malformed and inaccessible Dataset keys all use the existing
-non-disclosing not-found result. The only client-controlled export input is one allowlisted format
-value (`csv`, `xlsx` or `json`).
+non-disclosing not-found result. The browser accepts one allowlisted format
+value (`csv`, `xlsx` or `json`) and, on version routes, a Dataset-scoped version UUID.
+Neither lookup input supplies authority.
 
 All output is generated before download headers are returned. A `SpooledTemporaryFile` keeps at
 most 1 MiB in memory and rolls larger output to an automatically removed temporary file. CSV and
@@ -62,3 +63,21 @@ in progress or successfully prepared artifact retains ADR-012 semantics, even if
 commits before the export audit writer. Its contents remain coherent and its technical cleanup
 closes all spools normally. There is no persisted export-status row to cascade. Deletion does
 not recall files already prepared or downloaded.
+
+
+## Published Dataset versions (REF-83)
+
+Ordinary default exports select the Current snapshot and never fall back to concept, Scheduled
+or Expired content when Current is absent. Explicit version routes allow Current and Expired
+snapshots only; Scheduled and Cancelled exports return the non-disclosing not-found response.
+Dataset administrators retain their existing concept export from the management context.
+Current `DatasetAuthorizationService` export decisions apply to both flows; legacy Grants
+never acquire authority. Files use `<dataset-key>-v<number>.<format>` for version exports.
+
+Selection, Field definitions, identifier and joined Record/value stream come from the same
+snapshot in the existing read transaction. Concept modifications, source-child deletion and
+key reuse cannot change historical exports. All existing datatype/formula defenses, bounded
+external sorting, spool cleanup and audit-only prepared-request commit remain in force.
+Persistence exceptions are translated through the Unit of Work; unexpected browser failures
+return neutral 503 responses without SQL or exception details. Export audit retains its existing
+format-only payload and does not store the file, release note or Record contents.

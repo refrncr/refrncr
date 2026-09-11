@@ -272,7 +272,7 @@ def test_dataset_and_team_grants_do_not_authorize(history, permission):
 def test_all_contracts_have_safe_presentations(history):
     h = history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 30
+    assert len(EVENTS) == len(ACTION_LABELS) == 32
     assert set(OBJECTS) == {kind for kind, _ in EVENTS}
     assert not SYSTEM_ACTORS and {c.actor for c in EVENTS.values()} == {"required"}
     actions = dict(ACTION_LABELS)
@@ -287,6 +287,8 @@ def test_all_contracts_have_safe_presentations(history):
         values = {
             "uuid": h.reader,
             "count": 12,
+            "version_count": 12,
+            "calendar_date": "2026-09-10",
             "subject": "user",
             "import_format": "CSV",
             "export_format": "JSON",

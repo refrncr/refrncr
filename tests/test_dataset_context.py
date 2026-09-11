@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from dataset_helpers import create_owned_dataset, downgrade_historical_fixture
+from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import event, select
 from test_dataset_browser import body, dataset_browser, login, request  # noqa: F401
 from test_dataset_records import (  # noqa: F401
@@ -209,12 +209,15 @@ def test_bulk_query_count_and_authorization(context_services, monkeypatch):
         return result, len(queries)
 
     _, initial_queries = measured(admin)
+    published = [dataset]
     for index in range(12):
-        fresh(services, admin, f"hidden-{index}")
+        published.append(fresh(services, admin, f"hidden-{index}"))
     rows, grown_queries = measured(admin)
     assert len(rows) == 13
     assert all(row.record_count == 0 for row in rows)
     assert grown_queries == initial_queries
+    for item in published:
+        publish_dataset(services, admin.id, item)
     rows, _ = measured(viewer)
     assert len(rows) == 13
     aggregates = [(sql, params) for sql, params in queries if "count(dataset_records.id)" in sql]
@@ -299,6 +302,10 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
     dataset = configure(services, admin)
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
     untouched = fresh(services, admin, "empty")
+    # REF-83 requires even a zero-Record Dataset to have a publishable schema.
+    services.dataset_fields.create_field(
+        admin.id, untouched.key, "code", "Code", "string", True, True, True
+    )
     with factory.begin() as session:
         for key in (dataset.id, untouched.id):
             row = session.get(Dataset, key)

@@ -57,7 +57,7 @@ const document = {
   handlers:{},
   activeElement:null,
   querySelectorAll(selector) {
-    return ({'[data-mapping-tooltip]':[tip], '[data-import-mapping]':[mapping], '[data-import-confirm]':[confirm],
+    return ({'[data-mapping-tooltip]':[tip], '[data-import-mapping]':[mapping], '[data-import-confirm], [data-single-submit]':[confirm],
       'dialog[data-modal-report]':[dialog],
       'dialog[data-modal-report], dialog[data-modal-side-panel]':[dialog],
       '[data-dialog-open]':[opener],

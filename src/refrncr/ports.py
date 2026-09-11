@@ -140,6 +140,7 @@ class DatasetRecord(Protocol):
     created_at: datetime
     updated_at: datetime
     content_updated_at: datetime | None
+    revision: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,6 +350,8 @@ class DatasetBusinessKeyOperations(Protocol):
 
 
 class DatasetRecordOperations(Protocol):
+    def identifier_keys(self, dataset_id: str) -> dict[str, bytes]: ...
+
     def create(self, *, dataset_id: str, identifier_key: bytes) -> DatasetRecordRow: ...
 
     def get(self, dataset_id: str, record_id: str) -> StoredRecord | None: ...
@@ -395,6 +398,8 @@ class DatasetRecordOperations(Protocol):
 
 
 class UnitOfWork(Protocol):
+    write: bool
+    versions: VersionOperations
     audit_history: AuditReadOperations
     users: UserOperations
     teams: TeamOperations
@@ -477,3 +482,35 @@ class DatasetExportAccessOperations(Protocol):
     ) -> DatasetExportAccessRecord: ...
 
     def delete(self, access: DatasetExportAccessRecord) -> None: ...
+
+
+class VersionOperations(Protocol):
+    """Append complete snapshots; never expose mutable rows or individual deletion.
+
+    Append and cancellation require the parent Dataset write lock. All operations
+    participate in the caller's UoW; none commits. Content/results are immutable.
+    """
+
+    def list_for_dataset(self, dataset_id): ...
+
+    def current_for_datasets(self, dataset_ids, today): ...
+
+    def append(
+        self,
+        dataset_id,
+        number,
+        published_at,
+        publisher_id,
+        effective_date,
+        release_note,
+        content,
+        summary,
+    ): ...
+
+    def cancel(self, dataset_id, version_id, actor_id, timestamp, today): ...
+
+    def fields(self, version): ...
+
+    def iterate_records(self, version): ...
+
+    def content(self, version): ...

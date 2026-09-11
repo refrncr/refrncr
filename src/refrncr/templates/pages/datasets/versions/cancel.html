@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback, form_field, readonly_field %}
+{% from "components/side_panel.html" import panel_form_actions %}
+{% block title %}Cancel version · REFRNCR{% endblock %}
+{% block content %}
+  <h1>Cancel version</h1>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Cancel version'>
+    <div class='side-panel-body panel-sections'>
+      {{ readonly_field('Dataset', state.version.name) }}
+      {{ readonly_field('Version', 'Version ' ~ state.version.number) }}
+      {{ readonly_field('Effective date', state.version.effective_date.isoformat()) }}
+      {{ feedback('This version will not become Current. Its immutable snapshot remains in administrator history, and its number will never be reused.', kind='warning') }}
+      {{ feedback(error, id='cancellation-error', focus=true) }}
+      {% if can_cancel %}
+        <form id='cancellation-form' class='form' method='post' action='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=state.version.id) }}' data-single-submit data-busy-message='Cancelling version…' novalidate>
+          <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+          {{ form_field('I confirm cancellation of this Scheduled version.', 'confirmed', 'cancellation-confirmed', type='checkbox', required=true, value='yes', error_id='cancellation-error' if error else none) }}
+          <p data-submit-status role='status' hidden></p>
+        </form>
+      {% endif %}
+    </div>
+    {% call panel_form_actions() %}
+      <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}' data-panel-cancel>Cancel</a>
+      {% if can_cancel %}<button class='button button-danger' type='submit' form='cancellation-form'>Cancel version</button>{% endif %}
+    {% endcall %}
+  </div>
+{% endblock %}

@@ -12,13 +12,13 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false) -%}
+{% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false, min_value=none, max_length=none) -%}
   <div class='form-field'>
     <label for='{{ id }}'>{{ label }}</label>
     {% if control == 'textarea' %}
-      <textarea id='{{ id }}' name='{{ name }}'{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>{{ value if value is not none else '' }}</textarea>
+      <textarea id='{{ id }}' name='{{ name }}'{% if max_length is not none %} maxlength='{{ max_length }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>{{ value if value is not none else '' }}</textarea>
     {% else %}
-      <input id='{{ id }}' name='{{ name }}' type='{{ type }}'{% if value is not none %} value='{{ value }}'{% endif %}{% if autocomplete %} autocomplete='{{ autocomplete }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>
+      <input id='{{ id }}' name='{{ name }}' type='{{ type }}'{% if min_value is not none %} min='{{ min_value }}'{% endif %}{% if max_length is not none %} maxlength='{{ max_length }}'{% endif %}{% if value is not none %} value='{{ value }}'{% endif %}{% if autocomplete %} autocomplete='{{ autocomplete }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if help_text or error or error_id %} aria-describedby='{% if help_text %}{{ id }}-help{% endif %}{% if help_text and (error or error_id) %} {% endif %}{% if error %}{{ id }}-error{% elif error_id %}{{ error_id }}{% endif %}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>
     {% endif %}
     {% if password_toggle and type == 'password' %}
       <button class="button button-secondary" type="button" aria-controls="{{ id }}" data-password-toggle hidden>Show password</button>

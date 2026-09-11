@@ -2,7 +2,7 @@ import os
 import uuid
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -28,7 +28,9 @@ def dataset_access():
 
 
 def create_dataset(services, admin, key):
-    return create_owned_dataset(services.datasets, admin.id, key, key.title(), f"About {key}")
+    dataset = create_owned_dataset(services.datasets, admin.id, key, key.title(), f"About {key}")
+    publish_dataset(services, admin.id, dataset)
+    return dataset
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
@@ -166,7 +168,7 @@ def test_listing_uses_bounded_queries_instead_of_per_dataset_authorization(datas
     finally:
         event.remove(engine, "before_cursor_execute", observe)
 
-    assert len(statements) == 2
+    assert len(statements) == 5  # Actor, memberships, datasets, aggregates, Current snapshots.
 
 
 @pytest.mark.parametrize("permission", ["editor", "admin"])

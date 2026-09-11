@@ -48,6 +48,7 @@ class ExportArtifact:
     content: BinaryIO
     media_type: str
     extension: str
+    download_name: str | None = None
 
 
 def verify_artifact_readable(artifact: ExportArtifact) -> None:
@@ -319,7 +320,7 @@ def generate_export(format_name: str, fields, records, dataset_key: str) -> Expo
         else:
             writer(target, fields, records)
         target.seek(0)
-        return ExportArtifact(target, media_type, format_name)
+        return ExportArtifact(target, media_type, format_name, f"{dataset_key}.{format_name}")
     except ExportGenerationError:
         target.close()
         raise

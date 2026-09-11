@@ -24,7 +24,7 @@ from refrncr.services import ResourceTypeRegistry
 
 def old_database(engine):
     Base.metadata.drop_all(engine)
-    migrate(engine, "0013_ref_39")
+    migrate(engine, "head")
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
@@ -40,13 +40,22 @@ def old_database(engine):
             "day": "2024-02-29",
         },
     )
+    migrate(engine, "0013_ref_39", downgrade=True)
     return services, admin, dataset, fields
 
 
 def contents(engine):
     with engine.connect() as connection:
         return {
-            model.__tablename__: connection.execute(select(model.__table__)).all()
+            model.__tablename__: connection.execute(
+                select(
+                    *(
+                        column
+                        for column in model.__table__.columns
+                        if not (model is Dataset and column.name == "revision")
+                    )
+                )
+            ).all()
             for model in (
                 Dataset,
                 DatasetField,
@@ -70,15 +79,22 @@ def test_populated_upgrade_preserves_all_values_identifiers_audits_and_old_ids(a
     engine, _factory, _services = audit_db
     services, admin, dataset, fields = old_database(engine)
     before = contents(engine)
-    migrate(engine, "head")
+    migrate(engine, "0014_ref_145")
     assert contents(engine) == before
     assert "timestamp" in type_constraint(engine)
-    assert services.dataset_fields.get_field(admin.id, dataset.key, "amount").data_type == "number"
-    assert services.dataset_records.list_records(admin.id, dataset.key).records[0].values
+    with engine.connect() as connection:
+        assert (
+            connection.scalar(
+                text("SELECT data_type FROM dataset_fields WHERE dataset_id=:id AND key='amount'"),
+                {"id": dataset.id},
+            )
+            == "number"
+        )
+        assert connection.scalar(text("SELECT count(*) FROM dataset_record_values")) == 4
     migrate(engine, "0013_ref_39", downgrade=True)
     assert contents(engine) == before
     assert "timestamp" not in type_constraint(engine)
-    migrate(engine, "head")
+    migrate(engine, "0014_ref_145")
     assert contents(engine) == before
 
 
@@ -116,7 +132,7 @@ def test_preflight_failure_leaves_historical_state_and_revision_untouched(audit_
             )
     before = contents(engine)
     with pytest.raises(RuntimeError, match="REF-145"):
-        migrate(engine, "head")
+        migrate(engine, "0014_ref_145")
     assert contents(engine) == before
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0013_ref_39"
@@ -128,8 +144,25 @@ def test_preflight_failure_leaves_historical_state_and_revision_untouched(audit_
 def test_new_type_downgrade_fails_without_rewriting_or_discarding_data(audit_db):
     engine, _factory, _services = audit_db
     services, admin, dataset, _fields = old_database(engine)
-    migrate(engine, "head")
-    services.dataset_fields.create_field(admin.id, dataset.key, "instant", "Instant", "timestamp")
+    migrate(engine, "0014_ref_145")
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    with engine.begin() as connection:
+        connection.execute(
+            DatasetField.__table__.insert().values(
+                id=str(uuid4()),
+                dataset_id=dataset.id,
+                key="instant",
+                name="Instant",
+                data_type="timestamp",
+                is_required=False,
+                is_unique=False,
+                display_position=len(_fields) + 1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+        )
     before = contents(engine)
     with pytest.raises(RuntimeError, match="unsupported Field types"):
         migrate(engine, "0013_ref_39", downgrade=True)
@@ -152,7 +185,7 @@ def test_ddl_failure_rolls_back_constraint_and_version(audit_db):
     event.listen(engine, "before_cursor_execute", fail)
     try:
         with pytest.raises(RuntimeError, match="injected datatype DDL failure"):
-            migrate(engine, "head")
+            migrate(engine, "0014_ref_145")
     finally:
         event.remove(engine, "before_cursor_execute", fail)
     assert contents(engine) == before
@@ -183,7 +216,7 @@ def test_every_historical_empty_schema_upgrades_to_exact_nine_types(audit_db, re
     engine, _factory, _services = audit_db
     Base.metadata.drop_all(engine)
     migrate(engine, revision)
-    migrate(engine, "head")
+    migrate(engine, "0014_ref_145")
     constraint = type_constraint(engine)
     for type_id in (
         "string",

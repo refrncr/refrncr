@@ -666,7 +666,7 @@ class DatasetAuthorizationService:
             dataset = work.datasets.get(dataset_id)
             if dataset is None:
                 return False
-            mutation = uow is not None and capability not in {"view", "export"}
+            mutation = uow is not None and work.write and capability not in {"view", "export"}
             if mutation and capability == "maintain":
                 if work.teams.get(dataset.owner_team_id, for_update=True) is None:
                     return False
@@ -687,8 +687,8 @@ class DatasetAuthorizationService:
     def can_view_dataset(self, actor_id, dataset_id, *, uow=None):
         return self._decision(actor_id, dataset_id, "view", uow=uow)
 
-    def maintainable_resources(self, actor_id):
-        with self.uow() as work:
+    def maintainable_resources(self, actor_id, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
             actor = work.users.get(actor_id)
             if not self.active(actor):
                 raise AuthorizationError("Active user access required")
@@ -727,12 +727,21 @@ class DatasetDeletion:
     expected_updated_at: str
 
 
+def _version_reads(service):
+    from refrncr.dataset_versions import DatasetVersionService
+
+    return service.versions or DatasetVersionService(service.uow, service.authorization.datasets)
+
+
 class DatasetService:
     """Authorized Dataset operations within the one Community installation context."""
 
-    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+    def __init__(
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+    ) -> None:
         self.uow = uow
         self.authorization = authorization
+        self.versions = versions
 
     def get_dataset_for_deletion(self, actor_id: str, dataset_id: str) -> DatasetDeletion:
         with self.uow(translate_errors=True) as uow:
@@ -969,29 +978,16 @@ class DatasetService:
             uow.flush()
 
     def list_datasets(self, actor_id: str) -> list[DatasetRecord]:
-        access = self.authorization.authorized_resources(actor_id, "dataset", "viewer")
-        with self.uow() as uow:
-            if access.all_resources:
-                return uow.datasets.list_all()
-            return uow.datasets.list_by_ids(access.resource_ids)
+        return [row.dataset for row in self.list_dataset_overview(actor_id)]
 
     def list_dataset_overview(self, actor_id: str) -> list[DatasetOverview]:
-        access = self.authorization.authorized_resources(actor_id, "dataset", "viewer")
-        with self.uow() as uow:
-            return uow.datasets.current_overview(
-                None if access.all_resources else access.resource_ids
-            )
+        return _version_reads(self).overview(actor_id)
 
     def get_dataset_context(self, actor_id: str, key: str) -> DatasetOverview:
-        dataset = self.get_dataset(actor_id, key)
-        with self.uow() as uow:
-            rows = uow.datasets.current_overview((dataset.id,))
-        if not rows:
-            raise NotFoundError("Dataset not found")
-        return rows[0]
+        return _version_reads(self).context(actor_id, key)
 
     def get_dataset(self, actor_id: str, key: str) -> DatasetRecord:
-        return self._get_dataset_with_access(actor_id, key, "viewer")
+        return self.get_dataset_context(actor_id, key).dataset
 
     def get_dataset_details(self, actor_id: str, key: str) -> DatasetDetails:
         context = self.get_dataset_context(actor_id, key)
@@ -1042,6 +1038,7 @@ class DatasetService:
                 raise NotFoundError("Dataset not found")
             if dataset.name == normalized_name and dataset.description == validated_description:
                 return dataset
+            dataset.revision += 1
             dataset.name = normalized_name
             dataset.description = validated_description
             dataset.updated_at = _now()
@@ -1081,9 +1078,12 @@ class DatasetService:
 class DatasetFieldService:
     """Authorized schema operations scoped through a parent Dataset."""
 
-    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+    def __init__(
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+    ) -> None:
         self.uow = uow
         self.authorization = authorization
+        self.versions = versions
 
     def create_field(
         self,
@@ -1127,6 +1127,7 @@ class DatasetFieldService:
                 if exc.constraint == "uq_dataset_fields_dataset_key":
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "created")
             if validated_component:
@@ -1147,18 +1148,18 @@ class DatasetFieldService:
             return field
 
     def list_fields(self, actor_id: str, dataset_key: str) -> list[DatasetFieldRecord]:
-        dataset = self._get_dataset_with_access(actor_id, dataset_key, "viewer")
-        with self.uow() as uow:
-            return uow.dataset_fields.list_for_dataset(dataset.id)
+        return list(
+            _version_reads(self).read(actor_id, dataset_key, page=None, prefer_concept=True).fields
+        )
 
     def get_field(self, actor_id: str, dataset_key: str, field_key: str) -> DatasetFieldRecord:
-        dataset = self._get_dataset_with_access(actor_id, dataset_key, "viewer")
-        validated_field_key = self._validated_field_lookup_key(field_key)
-        with self.uow() as uow:
-            field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key)
-            if field is None:
-                raise NotFoundError("Dataset field not found")
-            return field
+        key = self._validated_field_lookup_key(field_key)
+        field = next(
+            (field for field in self.list_fields(actor_id, dataset_key) if field.key == key), None
+        )
+        if field is None:
+            raise NotFoundError("Dataset field not found")
+        return field
 
     def update_field(
         self,
@@ -1212,6 +1213,7 @@ class DatasetFieldService:
             field.is_required = validated_required
             field.is_unique = validated_unique
             field.updated_at = _now()
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
@@ -1292,6 +1294,7 @@ class DatasetFieldService:
                     ),
                 )
 
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             if definition_changed:
                 field.name = normalized_name
@@ -1322,6 +1325,7 @@ class DatasetFieldService:
             uow.flush()
             remaining = uow.dataset_fields.list_for_dataset(dataset.id)
             uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             self._add_audit(uow, actor_id, field_id, "deleted")
 
@@ -1354,6 +1358,7 @@ class DatasetFieldService:
                 raise ValidationError("Field order must contain every current field exactly once")
             if proposed_order == current:
                 return tuple(fields)
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
             record_audit(
@@ -1387,15 +1392,6 @@ class DatasetFieldService:
             return self.replace_order(actor_id, dataset_key, expected_order, expected_order)
         proposed[index], proposed[target] = proposed[target], proposed[index]
         return self.replace_order(actor_id, dataset_key, expected_order, tuple(proposed))
-
-    def _get_dataset_with_access(
-        self, actor_id: str, dataset_key: str, required_permission: str
-    ) -> DatasetRecord:
-        validated_key = self._validated_dataset_lookup_key(dataset_key)
-        with self.uow() as uow:
-            dataset = uow.datasets.find_by_key(validated_key)
-        self._require_dataset_access(actor_id, dataset, required_permission)
-        return dataset
 
     def _require_dataset_access(
         self, actor_id: str, dataset: DatasetRecord | None, required_permission: str, *, uow=None
@@ -1459,16 +1455,19 @@ class DatasetFieldService:
 class DatasetBusinessKeyService:
     """Authorized business-key metadata operations scoped through a parent Dataset."""
 
-    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+    def __init__(
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+    ) -> None:
         self.uow = uow
         self.authorization = authorization
+        self.versions = versions
 
     def get_business_key(self, actor_id: str, dataset_key: str) -> DatasetBusinessKey:
-        validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
-        with self.uow() as uow:
-            dataset = uow.datasets.find_by_key(validated_key)
-            self._require_dataset_access(actor_id, dataset, "viewer")
-            return uow.dataset_business_keys.get(dataset.id)
+        return (
+            _version_reads(self)
+            .read(actor_id, dataset_key, page=None, prefer_concept=True)
+            .identifier
+        )
 
     def set_business_key(
         self, actor_id: str, dataset_key: str, field_keys: tuple[str, ...]
@@ -1506,6 +1505,7 @@ class DatasetBusinessKeyService:
             if uow.dataset_records.count(dataset.id):
                 raise ValidationError("Record identifier cannot change after records exist")
 
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
             record_audit(
@@ -1533,9 +1533,12 @@ class DatasetRecordService:
 
     PAGE_SIZE = 50
 
-    def __init__(self, uow: UnitOfWorkFactory, authorization: AuthorizationService) -> None:
+    def __init__(
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+    ) -> None:
         self.uow = uow
         self.authorization = authorization
+        self.versions = versions
 
     def create_record(
         self, actor_id: str, dataset_key: str, submitted: dict[str, str]
@@ -1560,6 +1563,7 @@ class DatasetRecordService:
                 if error.constraint == "uq_dataset_record_values_unique_value":
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1618,6 +1622,7 @@ class DatasetRecordService:
                 uow.flush()
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1641,6 +1646,7 @@ class DatasetRecordService:
             self._require_access(actor_id, dataset, "editor", uow=uow)
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
+            dataset.revision += 1
             dataset.content_updated_at = _now()
             record_audit(
                 uow,
@@ -1705,22 +1711,9 @@ class DatasetRecordService:
         return tuple(values), encoded_identifier
 
     def list_records(self, actor_id: str, dataset_key: str, page: int = 1) -> RecordPage:
-        if not isinstance(page, int) or isinstance(page, bool) or page < 1:
-            raise ValidationError("Page must be a positive integer")
-        dataset = self._find_dataset(actor_id, dataset_key, "viewer")
-        identifier = self._business_key(dataset.id)
-        with self.uow() as uow:
-            records = uow.dataset_records.list_all(dataset.id)
-        records.sort(key=lambda record: self._record_sort_key(record, identifier.field_keys))
-        start = (page - 1) * self.PAGE_SIZE
-        return RecordPage(
-            tuple(records[start : start + self.PAGE_SIZE]),
-            page,
-            self.PAGE_SIZE,
-            len(records),
-        )
+        return _version_reads(self).read(actor_id, dataset_key, page=page, prefer_concept=True).page
 
-    def export_dataset(self, actor_id: str, dataset_key: str, format_name: str):
+    def export_dataset(self, actor_id: str, dataset_key: str, format_name: str, *, version_id=None):
         from refrncr.dataset_export import (
             ExportGenerationError,
             externally_ordered_records,
@@ -1733,22 +1726,38 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         artifact = None
         try:
-            with self.uow() as uow:
+            with self.uow(translate_errors=True) as uow:
                 uow.begin_export_snapshot()
                 dataset = uow.datasets.find_by_key(validated_key)
                 self._require_access(actor_id, dataset, "export", uow=uow)
                 dataset_id = dataset.id
-                fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
-                identifier = uow.dataset_business_keys.get(dataset_id)
+                _dataset, selected, _maintain = _version_reads(self)._selection(
+                    uow, actor_id, validated_key, version_id, prefer_concept=True
+                )
+                if selected is None:
+                    fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
+                    identifier = uow.dataset_business_keys.get(dataset_id)
+                    source = uow.dataset_records.iterate_all(dataset_id)
+                    export_key = dataset.key
+                else:
+                    if selected.status not in {"Current", "Expired"}:
+                        raise NotFoundError("Dataset not found")
+                    fields = uow.versions.fields(selected.version)
+                    identifier = DatasetBusinessKey(
+                        dataset_id,
+                        tuple(sorted(field.key for field in fields if field.is_identifier)),
+                    )
+                    source = uow.versions.iterate_records(selected.version)
+                    export_key = f"{dataset.key}-v{selected.version.number}"
                 records = externally_ordered_records(
-                    uow.dataset_records.iterate_all(dataset_id),
+                    source,
                     lambda record: self._record_sort_key(record, identifier.field_keys),
                 )
-                artifact = generate_export(format_name, fields, records, dataset.key)
+                artifact = generate_export(format_name, fields, records, export_key)
                 verify_artifact_readable(artifact)
             # Authorization and content were pinned to the completed snapshot.
             # Close it before acquiring the audit writer (including SQLite).
-            with self.uow(write=True) as uow:
+            with self.uow(write=True, translate_errors=True) as uow:
                 record_audit(
                     uow,
                     actor_user_id=actor_id,
@@ -1785,10 +1794,6 @@ class DatasetRecordService:
             dataset = uow.datasets.find_by_key(validated)
         self._require_access(actor_id, dataset, permission)
         return dataset
-
-    def _business_key(self, dataset_id: str) -> DatasetBusinessKey:
-        with self.uow() as uow:
-            return uow.dataset_business_keys.get(dataset_id)
 
     def _require_access(
         self, actor_id: str, dataset: DatasetRecord | None, permission: str, *, uow=None
