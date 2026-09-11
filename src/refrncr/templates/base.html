@@ -31,6 +31,7 @@
             {% endif %}
           </nav>
           <div class="account-context">
+            <span class="account-avatar" aria-hidden="true">{{ (current_actor.display_name|trim)[:1]|upper }}</span>
             <p class="account-name">{{ current_actor.display_name }}</p>
             <p class="account-role">{{ 'Administrator' if current_actor.role == 'admin' else 'User' }}</p>
             {% if current_actor.role == 'admin' %}

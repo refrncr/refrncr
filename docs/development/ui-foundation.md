@@ -376,11 +376,13 @@ change. The Settings account link opens `/users`; `/teams` and membership URLs r
 Visibility uses the session-resolved actor's existing `role == 'admin'` condition, independently
 of route-level `require_admin()` and service authorization.
 
-The normal app account area retains the refined Settings and Log out links. They share Inter,
-regular weight and `--font-size-sm` with the role label, `1em` icons, a 6 px
-`--account-link-icon-gap`, and no button surface or underline. `--color-account-link` supplies
-the muted green-grey foreground. Links have no extra vertical padding, with 3 px above Settings
-to distinguish account details from actions. Log out remains a CSRF-protected POST button.
+The normal app account area shows a decorative initial avatar (`aria-hidden`, `--avatar-size` 32 px,
+`--color-avatar-*` tokens) beside the semibold name and muted role. Settings and Log out share one
+row below, 12 px under the role. The links share the interface face, regular weight and
+`--font-size-sm` with the role label, `1em` icons, a 6 px `--account-link-icon-gap`, and no button
+surface or underline; `--color-account-link` supplies the muted green-grey foreground. A CSS grid
+places each direct child, so the block keeps its flat name → role → Settings → Log out order
+without extra wrappers. Log out remains a CSRF-protected POST button.
 
 `test_interfaces.py` covers the dedicated shell, absence of normal navigation, navigation
 contents and active state, page titles, compact menu semantics, account-link visibility,

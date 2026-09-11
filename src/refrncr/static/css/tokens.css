@@ -27,6 +27,7 @@
   --color-status-published: var(--ref-success-text); --color-status-published-surface: var(--ref-success-surface); --color-status-published-border: var(--ref-green-100);
   --color-status-removed: var(--ref-error-text); --color-status-removed-surface: var(--ref-error-surface); --color-status-removed-border: #f2b8b1;
   --color-account-link: var(--ref-gray-600); --account-link-icon-gap: 6px;
+  --color-avatar-surface: var(--ref-green-50); --color-avatar-text: var(--ref-green-600); --color-avatar-border: var(--ref-green-100); --avatar-size: 2rem;
   --color-breadcrumb-link: var(--ref-green-500); /* 4.97:1 on --color-background, 5.36:1 on --color-surface. */
   --color-link: var(--ref-green-600); --color-link-hover: var(--ref-green-900); --color-navigation-selected-border: transparent; --color-navigation-selected-text: var(--ref-green-500); --color-table-heading: var(--ref-gray-25); --color-row-hover: var(--ref-gray-50); --color-row-selected: var(--ref-green-50); --color-focus-ring: var(--ref-info); --color-focus-shadow: var(--ref-green-100); --color-overlay: rgb(13 40 24 / 40%); --color-dialog-overlay: rgb(13 40 24 / 55%);
   --font-display: "Instrument Sans", "Segoe UI", sans-serif; --font-interface: "IBM Plex Sans", "Segoe UI", sans-serif; --font-technical: "IBM Plex Mono", ui-monospace, monospace; --font-data: var(--font-technical);
