@@ -51,7 +51,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         return
     assert response.status_code == 200
     page = body(response)
-    assert re.findall(r"<h1[^>]*>(.*?)</h1>", page) == ["Reference data"]
+    assert re.findall(r"<h1[^>]*>(.*?)</h1>", page) == ["Configure Reference data"]
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
