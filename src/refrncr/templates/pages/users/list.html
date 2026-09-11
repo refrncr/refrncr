@@ -1,9 +1,10 @@
 {% extends "layouts/settings.html" %}
 {% from "components/table_row.html" import table_row, row_action %}
+{% from "components/search_field.html" import search_field %}
 {% set settings_title = "Users" %}
 
 {% block settings_actions %}
-  <label class='visually-hidden' for='user-search'>Search users</label><input id='user-search' type='search' placeholder='Search by name or email…' data-list-search><button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button>
+  {{ search_field('user-search', 'Search users', 'Search by name or email…', list_search=true) }}<button class='button button-primary' type='button' data-dialog-open='add-user-panel'>+ New user</button>
 {% endblock %}
 
 {% block settings_content %}

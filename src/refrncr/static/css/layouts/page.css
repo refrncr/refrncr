@@ -14,7 +14,7 @@
 .management-list-header { flex-wrap: nowrap; align-items: center; }
 .management-list-header h1 { margin: 0; white-space: nowrap; }
 .management-list-header .page-actions { flex: 0 1 auto; flex-wrap: nowrap; margin-left: auto; }
-.management-list-header input { flex: 0 1 22rem; width: min(22rem, 35vw); margin-top: 0; }
+.management-list-header .search-field { flex: 0 1 22rem; width: min(22rem, 35vw); }
 .management-list-header .button { flex: 0 0 auto; white-space: nowrap; }
 .user-state-action, .add-member-form { margin-top: var(--space-xl); }
 .member-list { margin: 0; padding: 0; list-style: none; }
@@ -28,7 +28,7 @@
   .page-actions > *, .form-actions > * { flex: 1 1 auto; }
   .management-list-header { flex-wrap: wrap; }
   .management-list-header .page-actions { width: 100%; flex-wrap: wrap; margin-left: 0; }
-  .management-list-header input { width: 100%; }
+  .management-list-header .search-field { width: 100%; }
 }
 
 .page-header > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }

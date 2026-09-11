@@ -804,7 +804,7 @@ Tokens (`tokens.css`):
   info #0b5cad, each with a matching surface and darker text colour;
 - new lifecycle tokens `--color-status-draft|published|removed` with `-surface` and `-border`
   variants; they express concept/version state and are separate from feedback colours;
-- new `--color-border-strong` (#c7d2cc) for secondary controls, `--font-size-label` (11 px) for
+- `--color-control-border` (#7f9088) for form controls and secondary buttons, `--font-size-label` (11 px) for
   mono labels and column headings, `--font-size-page-title` 24 px, softer green-tinted shadows.
 
 All text pairs meet WCAG 2.2 AA: text 17.9:1 on white, muted text 5.1:1 on the background,
@@ -815,12 +815,25 @@ Global components:
 - the sidebar uses the subtle surface; the content area is white;
 - navigation items are compact, regular weight, with a semibold accent state; navigation labels,
   breadcrumbs, table headings, side-panel eyebrows and record/field labels use the mono face;
-- secondary buttons are white with `--color-border-strong`;
+- secondary buttons are white with `--color-control-border`, matching form controls;
 - `.badge` is a quiet mono pill; status variants (`badge-success|warning|error|info|draft|
   published|removed`) add a dot so colour is never the only signal;
 - a record toolbar directly followed by its table renders as one bordered object;
 - the concept banner is a compact draft-status strip: a Concept (or Stale) badge, the existing
   heading text, basis and status, the explanatory note and the existing actions.
+
+Search: record toolbars and the Users/Teams lists share the `search_field` macro
+(`components/search_field.html`). It renders a visually hidden label, an inline Lucide Search icon
+and a `type='search'` input at `--control-height-compact`, so it matches the adjacent compact
+buttons. Form controls and secondary buttons share `--color-control-border` (#7f9088, 3.36:1 on
+white), which keeps control boundaries at WCAG 1.4.11 contrast.
+
+Side panels: the mode label (View record, Edit record) is a mono eyebrow above the title; the close
+control is a quiet compact icon button. Detail lists separate Fields with hairlines and muted mono
+labels. Record panels (`data-panel-entity="record"`) render values and inputs in the data face, as in
+the record table. The first footer step towards deletion (`.button-danger[type="button"]`) is
+outlined; the confirming submit stays solid. Inside a panel the concept banner drops its explanatory
+note and uses compact buttons; the actions and their visibility rules are unchanged.
 
 Component variants: the expected state reads as plain text (`.status-quiet`) and badges are
 reserved for exceptions — Published records, Active users. Concept rows use draft badges, Current

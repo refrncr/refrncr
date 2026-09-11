@@ -1,7 +1,7 @@
 .button { min-height: var(--control-height-compact); padding: .4375rem .75rem; border: 1px solid transparent; border-radius: var(--radius-md); font: var(--font-weight-semibold) .8125rem/var(--line-height-control) var(--font-interface); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .button-primary { background: var(--color-action-primary); color: var(--color-action-on-strong); }
 .button-primary:hover { background: var(--color-action-primary-hover); color: var(--color-action-on-strong); }
-.button-secondary { border-color: var(--color-border-strong); background: var(--color-surface); color: var(--color-text); }
+.button-secondary { border-color: var(--color-control-border); background: var(--color-surface); color: var(--color-text); }
 .button-secondary:hover { border-color: var(--color-text-muted); background: var(--color-surface-subtle); color: var(--color-text); }
 .button-danger { background: var(--color-action-danger); color: var(--color-action-on-strong); }
 .button-danger:hover { background: var(--color-action-danger-hover); color: var(--color-action-on-strong); }

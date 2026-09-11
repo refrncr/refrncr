@@ -2,7 +2,7 @@
 table { width: 100%; border-collapse: collapse; font-size: var(--font-size-body-sm); }
 caption { padding: var(--space-md); font-weight: var(--font-weight-bold); text-align: left; }
 th, td { padding: .75rem var(--space-md); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
-th { background: var(--color-table-heading); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: .08em; text-transform: uppercase; }
+th { background: var(--color-table-heading); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; }
 .table-scroll tbody tr:not(.interactive-row):hover { background: var(--color-row-hover); }
 .management-table { position: relative; box-shadow: var(--shadow-sm); }
 .management-table th, .management-table td { padding-block: 1rem; }
@@ -10,7 +10,6 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .numeric-column { text-align: right; font-variant-numeric: tabular-nums; }
 .key-icon { display: inline-block; width: 1rem; height: 1rem; vertical-align: -.2em; }
 .record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-.record-toolbar input { width: min(100%, 22rem); margin-top: 0; }
 .record-toolbar span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }
 .record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
@@ -39,7 +38,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .interactive-row:has(.row-action:focus-visible):active { outline: 3px solid var(--color-focus-ring); outline-offset: -3px; }
 @media (max-width: 767px) {
   .record-toolbar { flex-wrap: wrap; }
-  .record-toolbar input { width: 100%; }
+  .record-toolbar .search-field { max-width: none; }
   .record-toolbar span { width: 100%; margin-left: 0; }
   th, td { padding-inline: var(--space-sm); }
   .user-management-table, .user-management-table tbody { display: block; }
@@ -57,7 +56,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .system-column-label { display: block; font-size: .6875rem; font-weight: var(--font-weight-regular); text-transform: none; letter-spacing: normal; }
 .record-table .record-tombstone td { background-color: var(--color-surface-subtle); color: var(--color-text-secondary); }
 .record-toolbar form { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
-.record-toolbar form input { flex: 1 1 12rem; width: auto; max-width: 22rem; }
+.record-toolbar .search-field { flex: 1 1 12rem; max-width: 22rem; }
 
 /* Toolbar and table read as one bordered object. */
 .record-toolbar:has(+ .table-scroll) { margin-bottom: 0; border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }

@@ -1,8 +1,8 @@
 {% from "components/table_row.html" import table_row, row_action %}
+{% from "components/search_field.html" import search_field %}
 <div class='record-toolbar' aria-label='Record results'>
   <form method='get' role='search' aria-label='Search records'>
-    <label class='visually-hidden' for='record-search'>Search identifier</label>
-    <input id='record-search' name='q' value='{{ record_search }}' maxlength='200' placeholder='Search identifier'>
+    {{ search_field('record-search', 'Search identifier', 'Search identifier', name='q', value=record_search, maxlength=200) }}
     <button class='button button-secondary' type='submit'>Search</button>
   </form>
   <span>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>

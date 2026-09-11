@@ -1,0 +1,5 @@
+{% from "components/icons.html" import search_icon %}
+{# Shared compact search control for record toolbars and management lists. #}
+{% macro search_field(id, label, placeholder, name=none, value='', maxlength=none, list_search=false) -%}
+<div class='search-field'><label class='visually-hidden' for='{{ id }}'>{{ label }}</label>{{ search_icon() }}<input id='{{ id }}' type='search'{% if name %} name='{{ name }}'{% endif %} value='{{ value }}'{% if maxlength %} maxlength='{{ maxlength }}'{% endif %} placeholder='{{ placeholder }}'{% if list_search %} data-list-search{% endif %}></div>
+{%- endmacro %}

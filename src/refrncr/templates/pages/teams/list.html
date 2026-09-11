@@ -1,9 +1,10 @@
 {% extends "layouts/settings.html" %}
 {% from "components/table_row.html" import table_row, row_action %}
+{% from "components/search_field.html" import search_field %}
 {% set settings_title = "Teams" %}
 
 {% block settings_actions %}
-  <label class='visually-hidden' for='team-search'>Search teams</label><input id='team-search' type='search' placeholder='Search by name…' data-list-search><button class='button button-primary' type='button' data-dialog-open='add-team-panel'>+ New team</button>
+  {{ search_field('team-search', 'Search teams', 'Search by name…', list_search=true) }}<button class='button button-primary' type='button' data-dialog-open='add-team-panel'>+ New team</button>
 {% endblock %}
 
 {% block settings_content %}

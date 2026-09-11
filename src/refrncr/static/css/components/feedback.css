@@ -15,3 +15,8 @@
 .concept-banner .page-actions { flex-shrink: 0; }
 .concept-banner .button-secondary { background: transparent; }
 .concept-banner .button-secondary:hover { background: var(--color-surface); }
+/* Inside side panels the banner is compact: context line and actions only; the page keeps the full note. */
+.side-panel-body .concept-banner { gap: var(--space-sm); margin-block: 0 var(--space-lg); padding: .625rem .75rem; }
+.side-panel-body .concept-banner .concept-banner-note { display: none; }
+.side-panel-body .concept-banner .page-actions { width: 100%; gap: var(--space-xs); }
+.side-panel-body .concept-banner .button { flex: 1 1 auto; min-height: 2rem; padding: .3125rem .625rem; font-size: var(--font-size-sm); white-space: nowrap; }
