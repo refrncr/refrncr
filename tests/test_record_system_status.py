@@ -5,7 +5,7 @@ import re
 import pytest
 from sqlalchemy import event
 from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_version_views import client, request
+from test_dataset_version_views import client, exported_rows, request
 from test_dataset_versions import publish, setup
 
 from refrncr.services import NotFoundError
@@ -28,7 +28,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         c.a.id, c.d.key, {**content, "code": "Old <identifier>"}
     )
     untouched = c.s.dataset_records.create_record(c.a.id, c.d.key, {**content, "code": "untouched"})
-    publish(c)
+    first = publish(c)
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 2, {**content, "label": "Edited value"}
@@ -45,6 +45,19 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         untouched.id: "Published",
         added.id: "Added",
     }
+    concept_html = request(browser, "get", f"/datasets/{c.d.key}/concept/records").text
+    statuses = re.findall(
+        r"<td class='record-system-status'><span class='badge ([^']+)'>([^<]+)</span></td>",
+        concept_html,
+    )
+    assert sorted(statuses) == sorted(
+        [
+            ("badge-published", "Published"),
+            ("badge-draft", "Edited"),
+            ("badge-draft", "Added"),
+            ("badge-removed", "Deleted"),
+        ]
+    )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
     response = request(browser, "get", f"/datasets/{c.d.key}/concept/records?q=old")
     assert response.status_code == 200
@@ -85,6 +98,31 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     assert current.deleted_count == 0 and current.page.total == 3
     assert deleted.id not in current.record_states
     assert set(current.record_states.values()) == {"Published"}
+    for route in (
+        f"/datasets/{c.d.key}/records",
+        f"/datasets/{c.d.key}/versions/{first.id}/records",
+    ):
+        response = request(browser, "get", route)
+        assert response.status_code == 200
+        html = response.text
+        assert (
+            html.count("class='record-system-status'><span class='badge badge-published'>Published")
+            == 3
+        )
+        assert "Status (application metadata)" in html
+        content_headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
+        assert [re.sub(r"<[^>]+>", "", h).strip() for h in content_headers[2:5]] == [
+            "Status",
+            "Change",
+            "Validation",
+        ]
+        assert ">Complete</span>" in html
+    rows = exported_rows(
+        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", version_id=first.id)
+    )
+    assert len(rows) == 3
+    assert all(set(row) == {"code", "label", "status", "change", "validation"} for row in rows)
+    assert all(row["status"] == "Complete" for row in rows)
 
 
 def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):  # noqa: F811

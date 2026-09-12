@@ -53,6 +53,9 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
   .user-management-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs) var(--space-sm); padding: var(--space-md) var(--space-xxl) var(--space-md) var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
   .user-management-table tbody tr:last-child { border-bottom: 0; }
   .user-management-table td { min-width: 0; padding: 0; border: 0; }
+  .user-management-table td[headers="user-column-name"] { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-sm); align-items: center; }
+  .user-management-table .table-avatar { margin-right: 0; }
+  .user-management-table .table-avatar + .row-action { width: 100%; overflow-wrap: anywhere; }
   .user-management-table .table-column-secondary { display: none; }
   .user-management-table .table-cell-wrap { grid-column: 1; overflow-wrap: anywhere; }
   .user-management-table td[headers="user-column-email"] { color: var(--color-text-secondary); }

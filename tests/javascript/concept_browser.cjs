@@ -39,6 +39,7 @@ async function login(page,email) {
       assert.equal(await page.getByRole('link',{name:'Import',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Versions',exact:true}).count(),1);
       assert.equal(await page.locator('.page-header .page-actions').getByRole('link',{name:'Versions',exact:true}).count(),1);
+      assert.deepEqual(await page.locator("tbody td.record-system-status .badge-published").allTextContents(),["Published","Published","Published"]);
       await shot(page,`current-${width}`);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
       assert.equal(await page.getByRole('link',{name:'View concept',exact:true}).count(),0);
@@ -64,7 +65,7 @@ async function login(page,email) {
       assert.match(await row.innerText(),/Complete/);assert.match(await row.innerText(),/Edited/);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
-      assert.deepEqual(await page.locator('table .record-system-status .visually-hidden').allTextContents(),['Unchanged','Unchanged']);
+      assert.deepEqual(await page.locator('table .record-system-status .badge-published').allTextContents(),['Published','Published']);
       const remove=page.getByRole('button',{name:/View record Verwijderen/});
       await remove.click();await page.locator('dialog[open]').getByRole('button',{name:'Delete',exact:true}).click();
       await page.locator('dialog[open] [data-panel-view="delete"]').getByRole('button',{name:'Delete record',exact:true}).click();
@@ -74,7 +75,7 @@ async function login(page,email) {
       await page.locator('dialog[open]').getByRole('button',{name:'Create record',exact:true}).click();
       await page.waitForURL(`${base}/datasets/${key}/concept/records`);
       assert.match(await page.locator('.page-context .metadata').innerText(),/3 records.*1 marked for deletion/s);
-      assert.deepEqual(await page.locator('tbody td.record-system-status').allTextContents(),['Edited','—Unchanged','Added','Deleted']);
+      assert.deepEqual(await page.locator('tbody td.record-system-status').allTextContents(),['Edited','Published','Added','Deleted']);
       await shot(page,`concept-${width}`);
       await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).scrollIntoViewIfNeeded();
       await shot(page,`system-status-${width}`);
@@ -118,9 +119,18 @@ async function login(page,email) {
       assert.equal(await page.getByRole('button',{name:'+ New version',exact:true}).count(),1);
       await page.getByRole('link',{name:'Version 2',exact:true}).click();
       assert.match(await page.locator('table').innerText(),/Edited concept value/);
-      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),0);
-      assert.equal(await page.locator('tbody td.record-system-status').count(),0);
+      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
+      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),['Published','Published','Published']);
       assert.equal(await page.getByRole('button',{name:/Verwijderen/}).count(),0);
+      await shot(page,`published-status-${width}`);
+      await page.getByRole('link',{name:'Versions',exact:true}).click();
+      await page.getByRole('link',{name:'Version 1',exact:true}).click();
+      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),['Published','Published','Published']);
+      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
+      assert.match(await page.locator('tbody').innerText(),/Published value/);
+      assert(!/Edited concept value/.test(await page.locator('tbody').innerText()));
+      await shot(page,`historical-status-${width}`);
       results.push({width,passed:true});await context.close();
     }
     const context=await browser.newContext();const page=await context.newPage();await login(page,'reader@example.com');

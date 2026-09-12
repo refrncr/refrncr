@@ -4,4 +4,3 @@
 .auth-container { width: min(100%, 30rem); min-width: 0; }
 .auth-container > .brand { display: flex; justify-content: center; margin-bottom: var(--space-lg); }
 .auth-container > .card { margin-bottom: 0; }
-.login-help { margin: var(--space-md) 0 0; text-align: center; }

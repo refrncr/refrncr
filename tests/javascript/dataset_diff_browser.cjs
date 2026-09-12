@@ -159,7 +159,10 @@ async function capture(page, name) {
       await page.locator('#publication-confirmed').check();
       await page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click();
       await page.waitForURL(`${versions}?notice=published`);
-      assert.match(await page.locator('table tbody').innerText(),/VERSION 2/);
+      const publishedVersion = page.getByRole('rowheader').getByRole('link',{name:'Version 2',exact:true});
+      assert.equal(await publishedVersion.count(),1);
+      assert.equal(await publishedVersion.isVisible(),true);
+      assert.match(await publishedVersion.locator('xpath=ancestor::tr').innerText(),/Current/);
       results.push({width, scenarios:['Versions and Publish entrypoints','Summary/Fields/Records','filters','old/new search','pagination','broad detail pagination','null and long values','keyboard/focus/Escape/Close','read-only GET','second-tab stale','Back/Refresh/Reload','stale publication POST rejected','existing publication','no overflow']});
       await context.close();
     }

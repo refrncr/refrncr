@@ -21,7 +21,7 @@
               {{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}{% endif %}
             </th>
           {% endfor %}
-          {% if not version_state %}<th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>{% endif %}
+          <th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>
         </tr>
       </thead>
       <tbody>
@@ -47,7 +47,7 @@
               </td>
             {% endfor %}
 
-            {% if not version_state %}<td class='record-system-status'>{% if status == 'Published' %}<span class='status-quiet' aria-hidden='true'>—</span><span class='visually-hidden'>Unchanged</span>{% else %}<span class='badge {{ "badge-removed" if status == "Deleted" else "badge-draft" }}'>{{ status }}</span>{% endif %}</td>{% endif %}
+            <td class='record-system-status'><span class='badge {{ "badge-published" if status == "Published" else "badge-removed" if status == "Deleted" else "badge-draft" }}'>{{ status }}</span></td>
           {% endcall %}
         {% endfor %}
       </tbody>

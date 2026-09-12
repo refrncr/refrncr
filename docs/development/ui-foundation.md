@@ -78,7 +78,8 @@ server to keep messages in English even without JavaScript. Credential
 failures are shown once as generic form feedback and referenced by both login fields. The
 submitted email is escaped and retained (bounded to the browser identifier limit); the
 password is never rendered back into the response. Setup may safely redisplay the email
-and display name after validation, but never the submitted password.
+and display name after validation, but never the submitted password. Login does not promise
+administrator password resets: no reset UI, service or CLI is currently implemented.
 
 The Dataset-create page combines `page_header`, `form_field`, `feedback`, and link/submit button
 variants. Its Description field selects the generic textarea control while retaining the same
@@ -397,7 +398,9 @@ The Users table has a `user-management-table` variant below 768 px. Each body ro
 single flexible column with the bold primary Name button above Email address. The shared
 REF-144 chevron occupies reserved space at the trailing row edge; no View or Actions column
 remains. Role and Status retain their existing mobile visibility rules. Values wrap with
-`overflow-wrap: anywhere` for unbroken content. The visually hidden desktop header retains
+`overflow-wrap: anywhere` for unbroken content. The mobile Name cell uses a fixed avatar
+track and a shrinkable `minmax(0, 1fr)` text track so long unbroken names cannot push into
+the reserved chevron space. The visually hidden desktop header retains
 its column headers, explicit cell/header associations and caption. Explicit table roles
 preserve semantics when CSS changes the display layout.
 
@@ -418,7 +421,9 @@ visible and noninteractive. The progress list becomes vertical on narrow viewpor
 inside their named keyboard-focusable region.
 
 `.dialog-large` is a shared dialog size/layout variant with a fixed heading/Close area and a
-separately scrollable report body, nearly full-screen below 768 px. The report consumes the existing
+separately scrollable report body. Its inner flex layout inherits the viewport-bounded
+maximum height; the dialog itself never scrolls. Short reports retain their natural height,
+and long reports use nearly the full screen below 768 px. The report consumes the existing
 open/close controller, native modality and Escape handling, adds explicit Tab/Shift+Tab wrapping,
 and restores the exact opener on close. Validation summaries reuse `feedback` and `data-error-focus`.
 Mapping errors are associated with their relevant select; the completeness summary identifies
@@ -779,7 +784,7 @@ of the separate Settings layout.
 
 The Record table ends with one system Status column before its row chevron. A System
 sublabel, accessible name Status (application metadata), interface typography and column
-boundary distinguish it from user Fields. Since the visual refresh, Published reads as plain muted text;
+boundary distinguish it from user Fields. Published uses the green `badge-published` in concept, Current and historical views;
 Edited/Added use draft badges and Deleted a removed badge on a muted row, each with a row edge marker. No green Complete badge remains. Content
 Fields named Status, Change and Validation retain their names and actual values.
 Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
@@ -835,8 +840,8 @@ the record table. The first footer step towards deletion (`.button-danger[type="
 outlined; the confirming submit stays solid. Inside a panel the concept banner drops its explanatory
 note and uses compact buttons; the actions and their visibility rules are unchanged.
 
-Component variants: the expected state reads as plain text (`.status-quiet`) and badges are
-reserved for exceptions — Published records, Active users. Concept rows use draft badges, Current
+Component variants: Active users read as plain text (`.status-quiet`). Record lifecycle states
+always use text badges, including green Published badges in read-only tables. Concept rows use draft badges, Current
 versions the published badge, Scheduled versions the info badge. The dataset list shows the
 permanent key under each name, because dataset names are not unique.
 
