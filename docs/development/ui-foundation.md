@@ -12,9 +12,9 @@ fits. Do not recolour, distort, rotate, or add effects to either asset.
 
 The typography contract is:
 
-- Montserrat 500 for the wordmark and page-level headings;
-- Inter 400–700 for interface text;
-- JetBrains Mono 400 for technical identifiers and code-like values;
+- Instrument Sans 500–600 for page-level headings (the wordmark is the SVG logo);
+- IBM Plex Sans 400–700 for interface text;
+- IBM Plex Mono 400 for technical identifiers, code-like values, record data and mono labels;
 - system fonts remain the fallback.
 
 The required upstream WOFF2 files and their OFL notices are packaged below `static/fonts/` and
@@ -78,7 +78,8 @@ server to keep messages in English even without JavaScript. Credential
 failures are shown once as generic form feedback and referenced by both login fields. The
 submitted email is escaped and retained (bounded to the browser identifier limit); the
 password is never rendered back into the response. Setup may safely redisplay the email
-and display name after validation, but never the submitted password.
+and display name after validation, but never the submitted password. Login does not promise
+administrator password resets: no reset UI, service or CLI is currently implemented.
 
 The Dataset-create page combines `page_header`, `form_field`, `feedback`, and link/submit button
 variants. Its Description field selects the generic textarea control while retaining the same
@@ -107,10 +108,10 @@ reference: a flat column-flex group with no breadcrumb/title gap, zero child mar
 `--space-sm` (8 px) padding before metadata. This reproduces the reference's single collapsed
 8 px heading/paragraph margin without relying on margin collapse inside flex layout.
 The `.page-title` class shares the canonical heading font family and wrapping rule, using
-`--font-size-page-title` (28 px), semibold weight and normal font line-height. Other `h1` styles
-remain unchanged. Breadcrumbs use regular 12 px Inter, normal line-height, uppercase presentation
-and `--letter-spacing-label` (0.5 px). Breadcrumb links use the lighter `--color-breadcrumb-link` (#2c8156), with 4.55:1 contrast
-on the #f9f9f9 background. This closely follows the reference green while retaining AA contrast.
+`--font-size-page-title` (24 px since the visual refresh), semibold weight and normal font line-height. Other `h1`
+styles use the same size. Breadcrumbs use regular 12 px JetBrains Mono, normal line-height, uppercase presentation
+and `--letter-spacing-label` (0.08 em). Breadcrumb links use the accent via `--color-breadcrumb-link` (#0f7a4f), with 4.97:1 contrast
+on the #f4f7f5 background and 5.36:1 on white.
 Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px Inter, normal line-height,
 tabular figures and one inline-flex row with 8 px horizontal gaps. The decorative bullet has
 `aria-hidden="true"` and is grouped with Updated so it cannot wrap alone. Whitespace between the
@@ -376,11 +377,13 @@ change. The Settings account link opens `/users`; `/teams` and membership URLs r
 Visibility uses the session-resolved actor's existing `role == 'admin'` condition, independently
 of route-level `require_admin()` and service authorization.
 
-The normal app account area retains the refined Settings and Log out links. They share Inter,
-regular weight and `--font-size-sm` with the role label, `1em` icons, a 6 px
-`--account-link-icon-gap`, and no button surface or underline. `--color-account-link` supplies
-the muted blue-grey foreground. Links have no extra vertical padding, with 3 px above Settings
-to distinguish account details from actions. Log out remains a CSRF-protected POST button.
+The normal app account area shows a decorative initial avatar (`aria-hidden`, `--avatar-size` 32 px,
+`--color-avatar-*` tokens) beside the semibold name and muted role. Settings and Log out share one
+row below, 12 px under the role. The links share the interface face, regular weight and
+`--font-size-sm` with the role label, `1em` icons, a 6 px `--account-link-icon-gap`, and no button
+surface or underline; `--color-account-link` supplies the muted green-grey foreground. A CSS grid
+places each direct child, so the block keeps its flat name → role → Settings → Log out order
+without extra wrappers. Log out remains a CSRF-protected POST button.
 
 `test_interfaces.py` covers the dedicated shell, absence of normal navigation, navigation
 contents and active state, page titles, compact menu semantics, account-link visibility,
@@ -395,7 +398,9 @@ The Users table has a `user-management-table` variant below 768 px. Each body ro
 single flexible column with the bold primary Name button above Email address. The shared
 REF-144 chevron occupies reserved space at the trailing row edge; no View or Actions column
 remains. Role and Status retain their existing mobile visibility rules. Values wrap with
-`overflow-wrap: anywhere` for unbroken content. The visually hidden desktop header retains
+`overflow-wrap: anywhere` for unbroken content. The mobile Name cell uses a fixed avatar
+track and a shrinkable `minmax(0, 1fr)` text track so long unbroken names cannot push into
+the reserved chevron space. The visually hidden desktop header retains
 its column headers, explicit cell/header associations and caption. Explicit table roles
 preserve semantics when CSS changes the display layout.
 
@@ -416,7 +421,9 @@ visible and noninteractive. The progress list becomes vertical on narrow viewpor
 inside their named keyboard-focusable region.
 
 `.dialog-large` is a shared dialog size/layout variant with a fixed heading/Close area and a
-separately scrollable report body, nearly full-screen below 768 px. The report consumes the existing
+separately scrollable report body. Its inner flex layout inherits the viewport-bounded
+maximum height; the dialog itself never scrolls. Short reports retain their natural height,
+and long reports use nearly the full screen below 768 px. The report consumes the existing
 open/close controller, native modality and Escape handling, adds explicit Tab/Shift+Tab wrapping,
 and restores the exact opener on close. Validation summaries reuse `feedback` and `data-error-focus`.
 Mapping errors are associated with their relevant select; the completeness summary identifies
@@ -777,11 +784,77 @@ of the separate Settings layout.
 
 The Record table ends with one system Status column before its row chevron. A System
 sublabel, accessible name Status (application metadata), interface typography and column
-boundary distinguish it from user Fields. Published uses a green success badge; Edited/Added use info
-badges, Deleted an error badge on a muted row. No green Complete badge remains. Content
+boundary distinguish it from user Fields. Published uses the green `badge-published` in concept, Current and historical views;
+Edited/Added use draft badges and Deleted a removed badge on a muted row, each with a row edge marker. No green Complete badge remains. Content
 Fields named Status, Change and Validation retain their names and actual values.
 Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
 Escape and focus restoration. Search and deterministic pagination include old identifiers.
 The metadata line counts surviving Records plus a separate marked-for-deletion count.
 Wide tables remain keyboard-scrollable at 320/768/1440. Configure Field badges reuse shared
 classification and never enter button accessible names. No new design tokens were added.
+
+
+## Visual refresh: alignment with the website design
+
+The application adopts the palette and component treatment of the refrncr website design v1, so
+product screenshots and the running application read as one identity. Token names are unchanged;
+only values and a few additions differ.
+
+Tokens (`tokens.css`):
+
+- accent `--ref-green-500` is #0f7a4f (primary buttons, links, active navigation), hover #0c6341;
+- neutrals are biased toward the accent (#f4f7f5 background, #f7faf8 subtle surface, #e2e9e5
+  borders, #5d6d65 muted text, #101915 text) instead of pure greys;
+- feedback colours move to the same family: success #0f7a4f, warning #a35b06, error #b42318,
+  info #0b5cad, each with a matching surface and darker text colour;
+- new lifecycle tokens `--color-status-draft|published|removed` with `-surface` and `-border`
+  variants; they express concept/version state and are separate from feedback colours;
+- `--color-control-border` (#7f9088) for form controls and secondary buttons, `--font-size-label` (11 px) for
+  mono labels and column headings, `--font-size-page-title` 24 px, softer green-tinted shadows.
+
+All text pairs meet WCAG 2.2 AA: text 17.9:1 on white, muted text 5.1:1 on the background,
+white on the accent 5.4:1, draft text 7.3:1 on its surface, removed text 9.3:1 on its surface.
+
+Global components:
+
+- the sidebar uses the subtle surface; the content area is white;
+- navigation items are compact, regular weight, with a semibold accent state; navigation labels,
+  breadcrumbs, table headings, side-panel eyebrows and record/field labels use the mono face;
+- secondary buttons are white with `--color-control-border`, matching form controls;
+- `.badge` is a quiet mono pill; status variants (`badge-success|warning|error|info|draft|
+  published|removed`) add a dot so colour is never the only signal;
+- a record toolbar directly followed by its table renders as one bordered object;
+- the concept banner is a compact draft-status strip: a Concept (or Stale) badge, the existing
+  heading text, basis and status, the explanatory note and the existing actions.
+
+Search: record toolbars and the Users/Teams lists share the `search_field` macro
+(`components/search_field.html`). It renders a visually hidden label, an inline Lucide Search icon
+and a `type='search'` input at `--control-height-compact`, so it matches the adjacent compact
+buttons. Form controls and secondary buttons share `--color-control-border` (#7f9088, 3.36:1 on
+white), which keeps control boundaries at WCAG 1.4.11 contrast.
+
+Side panels: the mode label (View record, Edit record) is a mono eyebrow above the title; the close
+control is a quiet compact icon button. Detail lists separate Fields with hairlines and muted mono
+labels. Record panels (`data-panel-entity="record"`) render values and inputs in the data face, as in
+the record table. The first footer step towards deletion (`.button-danger[type="button"]`) is
+outlined; the confirming submit stays solid. Inside a panel the concept banner drops its explanatory
+note and uses compact buttons; the actions and their visibility rules are unchanged.
+
+Component variants: Active users read as plain text (`.status-quiet`). Record lifecycle states
+always use text badges, including green Published badges in read-only tables. Concept rows use draft badges, Current
+versions the published badge, Scheduled versions the info badge. The dataset list shows the
+permanent key under each name, because dataset names are not unique.
+
+Time notation: one notation, `11 Sep 2026, 15:18:35`. Server-rendered summaries keep the
+authoritative UTC form (`absolute_utc`, labelled UTC). Lists that `audit-time.js` localises
+(`time[data-local-time="datetime"]`, or `"time"` inside a `table[data-local-days]`) show local
+time to the second, name the browser timezone once in the column heading
+(`[data-local-timezone]`) and keep the exact local instant with microseconds and offset in the
+`title`; detail views (`data-local-time` without a value) keep the full-precision text. Day-grouped
+tables split rows into one `tbody` per local day, each opened by a `.table-day-row` heading cell
+(`scope="rowgroup"`); without script, rows keep their full UTC timestamp and are not grouped.
+The audit filters form a compact bar at the head of the audit table object.
+
+Not part of the refresh (product functionality, tracked separately): the Overview content, the
+other website-mockup proposals. The website typefaces (Instrument Sans, IBM Plex Sans, IBM Plex
+Mono) are packaged as Latin and Latin Extended WOFF2 subsets; see `static/licenses/ASSET-SOURCES.md`.

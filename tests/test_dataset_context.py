@@ -409,7 +409,8 @@ def test_shared_page_context_spacing_keeps_outer_header_layout():
     assert "h1, .page-title {" in base
     assert (
         ".page-title { font-size: var(--font-size-page-title); "
-        "font-weight: var(--font-weight-semibold); line-height: normal; }" in base
+        "font-weight: var(--font-weight-bold); line-height: normal; letter-spacing: -.01em; }"
+        in base
     )
     assert "font-family: var(--font-display)" in base
     for name in ("detail", "records"):

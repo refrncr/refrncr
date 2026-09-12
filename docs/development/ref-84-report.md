@@ -725,3 +725,256 @@ are unchanged. Historical migration helpers preserve their original first-snapsh
 0016 is the previously approved additive lifecycle migration. No personal paths, real
 credentials, debug code, temporary databases or browser artifacts are staged or added to
 the repository; test-only credentials and attack strings are intentional fixtures.
+
+## Independent visual-refresh review corrections — 2026-09-12
+
+This section records the five explicitly requested corrections on
+`feat/ui-visual-refresh`. Earlier sections describe the original REF-84 delivery;
+the results below apply to the visual-refresh branch and supersede its contradictory
+Published presentation guidance. No second review report is introduced.
+
+Review baseline: freshly fetched `origin/main`,
+`cc0ba895da610e1cb1e41aa138e4c8a31632a43a`. Starting HEAD:
+`a346306fc62df945b7f3211189145485f6c4ad67`; the working tree was clean.
+The baseline browser copy was compared byte-for-byte with `git archive origin/main`:
+282 files, zero differences. The complete branch diff and the correction diff were
+reviewed separately. Existing visual-refresh work is preserved.
+
+### Corrections and scope
+
+1. The shared large-report dialog now clips its own overflow and passes its bounded
+   maximum height to the inner flex layout. Only the body scrolls. The fixed heading
+   and Close button remain in view; short reports retain natural height. Existing
+   native modality, Escape, focus containment and restoration are reused.
+2. The shared Record table always renders the application-metadata Status column.
+   Published uses the existing green `badge-published`, including concept, Current
+   and historical tables. Edited/Added/Deleted retain their existing badge variants.
+   The System sublabel, accessible column name and column boundary distinguish a
+   Dataset Field named Status. UUID association, REF-83/84 classification, queries,
+   tombstones and exports are unchanged. The regression verifies exported content
+   Status values remain `Complete`, without adding application metadata to CSV.
+3. The mobile Users variant gives the avatar and name separate grid tracks. The name
+   can shrink and break anywhere within the existing chevron reservation. This rule
+   only applies below 768 px; desktop table layout is unchanged.
+4. The REF-84 browser test locates the Version 2 link within its semantic row header,
+   then asserts that the same row is Current. No assertion depends on CSS uppercase.
+   All later viewport/publication/stale/denied scenarios execute.
+5. Login no longer promises administrator password resets. Its unused help-text CSS
+   rule is removed. No reset functionality was added.
+
+No tokens, dependencies, services, routes, permissions, CSRF handling, audit behavior,
+transaction boundaries, database schema, migrations or API contracts changed in this
+correction. No third classification algorithm was introduced. Component variants are
+large report dialogs and mobile Users rows; Record status restores the existing
+product contract, and login wording is page-specific.
+
+### Files changed by this correction
+
+- `src/refrncr/static/css/components/dialog.css`
+- `src/refrncr/static/css/components/tables.css`
+- `src/refrncr/static/css/layouts/auth.css`
+- `src/refrncr/templates/pages/auth/login.html`
+- `src/refrncr/templates/pages/datasets/_record_table.html`
+- `tests/test_record_system_status.py`
+- `tests/browser_ui_refresh_app.py` (new disposable fixture)
+- `tests/javascript/ui_refresh_browser.cjs` (new real-Chrome regression)
+- `tests/javascript/concept_browser.cjs`
+- `tests/javascript/dataset_diff_browser.cjs`
+- `docs/development/ui-foundation.md`
+- `docs/development/ref-84-report.md`
+
+The new browser fixture contains independent one-error and 100-error imports at each
+width, plus the existing long-name Users fixture. The browser test uploads actual CSV,
+opens the resulting report with the keyboard, verifies PageDown scrolling, waits for
+the native scrollend event, then scrolls to the bottom with a wheel event. It checks
+fixed header geometry, traps focus in both Tab directions, closes with Close and Escape, and verifies
+opener restoration after the native close event. It measures rendered text rectangles
+against the chevron, document/table widths, and compact normal-name rows. It also opens
+Users details using Enter and a click on the email cell. No fixed sleeps are used.
+
+The concept browser regression covers all four statuses, green Published in Current
+before and after publication and Version 1 history, content Status versus metadata
+Status, tombstones, old-identifier search, publication and denied access. Server tests
+exercise the same status presentation and export distinction on both database engines.
+
+### Browser evidence
+
+Actual browser: Google Chrome **152.0.7977.84**, headless, light mode. Report/Users
+viewports: **320 × 900, 768 × 900, 1440 × 900**. Concept/diff scripts retain their own
+950 px height and all three requested widths. The in-app browser backend was unavailable;
+the existing external Playwright convention was used with the installed Google Chrome
+executable, without adding a repository dependency.
+
+| Width | 100-error dialog height | Scroll body visible/content height | One-error dialog height | Users scroll container visible/content width |
+| --- | ---: | ---: | ---: | ---: |
+| 320 | 884 px | 819 / 17,190 px | 347.78 px | 286 / 286 px |
+| 768 | 765 px | 684 / 12,443 px | 308.39 px | 705 / 1,025 px |
+| 1440 | 765 px | 684 / 12,443 px | 308.39 px | 1,102 / 1,102 px |
+
+In each long report, dialog `scrollHeight == clientHeight`; the body alone scrolls.
+The heading rectangle is identical before and after scrolling to the final error.
+Both close mechanisms restore focus. Short reports have no body scrolling. At 320 px,
+the longest name ends at x=254.39 and the chevron starts at x=271: no overlap. No viewport
+has horizontal document overflow. At 768 px the pre-existing desktop table scrolls
+inside its container; the mobile layout begins below 768 px. At 1440 px it fits without
+scrolling. Normal-name rows remain under 100 px high; desktop styling is untouched.
+
+Screenshots and JSON measurements were generated outside the repository, including
+`ui_refresh/report-100-{width}.png`, `report-1-{width}.png`, `users-{width}.png`, and
+`concept/published-status-{width}.png`, `historical-status-{width}.png`. Visual inspection
+confirmed the fixed report heading, compact short report, wrapped mobile name and
+separate green Published column. No screenshots or temporary databases are added here.
+
+Final browser results: **8 passed scripts, 5 known baseline failures, 0 skipped**.
+Passed: `ui_refresh`, `dataset_diff`, `concept`, `dataset_versions`, `audit_history`,
+`navigation`, `export_access`, `audit_export` (all `tests/javascript/*_browser.cjs`).
+The diff result explicitly includes all widths, entrypoints, Summary/Fields/Records,
+filters, identifier search, pagination, long/null values, keyboard/focus/Escape,
+read-only GET, stale second-tab review, Back/Refresh/Reload, rejected stale publication,
+successful publication and denied-user 404. Successful scripts report no page errors.
+
+### Existing browser technical debt — reconfirmed on origin/main
+
+Each script was rerun with a fresh disposable fixture on both current branch and the
+verified origin/main copy. Each fails at the same assertion/locator on both. No test
+was changed to conceal these failures, and none is counted as passing.
+
+| Script | Existing failure on both branches |
+| --- | --- |
+| `table_rows_browser.cjs:59` | Dataset list expects 4 columns; the table has 5. |
+| `field_datatypes_browser.cjs:34` | Add field locator targets a read-only Current page. |
+| `dataset_creation_browser.cjs:46` | Expects the Dataset detail URL after creation; creation now opens the concept URL. |
+| `dataset_governance_browser.cjs:31` | Edit dataset locator targets a read-only Current page. |
+| `dataset_deletion_browser.cjs:35` | Edit dataset locator targets a read-only Current page. |
+
+These five scripts need a separately scoped update to the established lifecycle and
+list contracts. Their scenario tails remain unverified by those scripts. Targeted
+server regressions and the passing concept/version/browser suites provide separate
+coverage; this is not a claim that the entire browser suite is green.
+
+### Validation commands and results
+
+Environment: Python **3.12.2**, SQLite **3.51.0**, PostgreSQL **16.15**
+(`postgres:16`, Debian, aarch64), Node **24.9.0**. PostgreSQL ran in a disposable container
+on loopback port 55484; the existing developer database/container was not used.
+Artifact paths below are represented by `$ARTIFACTS`, an external temporary directory.
+Test credentials are disposable fixture values only.
+
+```sh
+export REFRNCR_TEST_POSTGRES_URL=postgresql+psycopg://refrncr:refrncr@127.0.0.1:55484/refrncr_test
+.venv/bin/python -m pytest tests/test_record_system_status.py tests/test_dataset_diff.py tests/test_dataset_diff_views.py tests/test_dataset_versions.py tests/test_dataset_version_views.py tests/test_concept_lifecycle.py tests/test_record_import.py tests/test_import_wizard.py tests/test_user_management.py tests/test_interfaces.py tests/test_table_rows.py tests/test_authentication.py tests/test_login_throttling.py tests/test_login_javascript.py tests/test_side_panel_javascript.py tests/test_navigation_javascript.py tests/test_import_wizard_javascript.py tests/test_audit_time_javascript.py -q --junitxml="$ARTIFACTS/targeted.xml"
+.venv/bin/python -m pytest --junitxml="$ARTIFACTS/pytest.xml"
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m pre_commit run --all-files
+.venv/bin/python -m pre_commit run --files tests/browser_ui_refresh_app.py tests/javascript/ui_refresh_browser.cjs
+.venv/bin/python - <<'PYJS'
+from pathlib import Path
+import subprocess
+files = sorted(Path('src/refrncr/static/js').glob('*.js')) + sorted(Path('tests/javascript').glob('*.cjs'))
+for file in files:
+    subprocess.run(['node', '--check', str(file)], check=True)
+print(f'{len(files)} JavaScript files passed syntax checks')
+PYJS
+git diff --check
+git diff origin/main --check
+```
+
+`node --check` was applied individually to every `src/refrncr/static/js/*.js` and
+`tests/javascript/*.cjs` file: **23 passed**. Ruff lint passed; format-check reported
+**155 files already formatted**. All seven configured all-files pre-commit hooks passed.
+The additional invocation for the two untracked test files passed its five applicable
+hooks; YAML/TOML hooks report no matching files (not skipped test scenarios).
+
+Targeted pytest: **627 passed, 0 failed, 0 skipped, 1 warning**, 232.91 seconds.
+The warning is the existing Starlette/httpx deprecation. The initial focused run had
+2 new-test failures caused by an exact HTML-whitespace assumption (8 other cases passed);
+the assertions now normalize header markup while preserving exact Field names. The
+final targeted run includes both repaired engine cases. During browser-test development,
+the fixture was corrected to use a valid two-column CSV, scrolling made independent of
+OS keyboard shortcuts, close/scrollend event synchronization added, and the desktop scroll variant
+kept distinct from the strict mobile no-overflow assertion. Production behavior was
+not changed to accommodate those test setup issues.
+
+Browser commands used the existing environment interface, one fresh fixture per script:
+
+```sh
+# Fixture, with PYTHONPATH=src and PYTHONDONTWRITEBYTECODE=1:
+.venv/bin/python tests/browser_<fixture>_app.py
+# Separate process, with REFRNCR_PLAYWRIGHT_MODULE pointing to the existing installation,
+# REFRNCR_BROWSER_EXECUTABLE pointing to Google Chrome, and loopback URL/output configured:
+node tests/javascript/ui_refresh_browser.cjs
+node tests/javascript/dataset_diff_browser.cjs
+node tests/javascript/concept_browser.cjs
+node tests/javascript/dataset_versions_browser.cjs
+node tests/javascript/audit_history_browser.cjs
+node tests/javascript/navigation_browser.cjs
+node tests/javascript/table_rows_browser.cjs
+node tests/javascript/field_datatypes_browser.cjs
+node tests/javascript/dataset_creation_browser.cjs
+node tests/javascript/dataset_governance_browser.cjs
+node tests/javascript/export_access_browser.cjs
+node tests/javascript/audit_export_browser.cjs
+node tests/javascript/dataset_deletion_browser.cjs
+```
+
+Fixture mapping: `ui_refresh:5186`, `dataset_diff:5184`, `concept:5185`,
+`dataset_versions:5183`, `audit_history:5145`, `field_datatypes:5146`;
+`navigation`, `table_rows`, `dataset_creation`, `dataset_governance`, `export_access`,
+`audit_export`, `dataset_deletion` use `table_rows:5144`. Baseline runs use the same
+fixture apps loaded through `runpy.run_path` and port +100, preventing cross-run state.
+The temporary runner waits for successful HTTP readiness without sleeps, then invokes
+the exact node command above and terminates the fixture. No browser assertions were
+removed from the existing scripts.
+
+Full configured pytest matrix with both SQLite and PostgreSQL enabled: **2,708 passed,
+0 failed, 0 errors, 0 skipped, 3 warnings**, **513.36 seconds**. This includes migrations,
+packaged CLI/startup, import, authorization, audit coverage, session security and all
+REF-83/84 regressions. The three warnings are the existing Starlette/httpx deprecation
+and two Python 3.12 SQLite datetime-adapter warnings from the historical REF-75 upgrade
+test. No assertions or skips were added to make this matrix green.
+
+Both Git whitespace checks passed. Final pre-commit all-files and new-file checks passed
+as described above. The branch remains 20 commits ahead of origin/main, 0 behind; this
+correction creates no additional commits. All temporary fixture servers and the dedicated
+PostgreSQL container were stopped after validation. The twelve-file correction is
+technically ready for a local commit within the five authorized findings. This does not
+reclassify the five known baseline browser failures as successful or replace GitHub CI.
+
+### Handoff
+
+The correction has ten modified tracked files and two new untracked browser-test files,
+listed above. The index is empty and HEAD remains the starting commit. No files were
+staged, no commit created and nothing pushed. No unexpected files, debug application
+code, real credentials, personal paths, temporary databases or browser screenshots were
+introduced into the repository. Existing migrations, dependencies and CI configuration
+are unchanged. This is a scoped local-commit handoff; independent GitHub CI remains the
+authority before merge, and the five excluded browser failures remain documented debt.
+Native screen-reader software was not exercised; semantic markup and actual Chrome
+keyboard/focus interaction were tested.
+
+Recommended commit message (not executed):
+
+```text
+fix(ui): resolve visual refresh review findings (REF-84)
+```
+
+Recommended explicit staging list, for the owner after reviewing this handoff (not executed):
+
+```sh
+git add docs/development/ref-84-report.md docs/development/ui-foundation.md \
+  src/refrncr/static/css/components/dialog.css \
+  src/refrncr/static/css/components/tables.css \
+  src/refrncr/static/css/layouts/auth.css \
+  src/refrncr/templates/pages/auth/login.html \
+  src/refrncr/templates/pages/datasets/_record_table.html \
+  tests/test_record_system_status.py tests/browser_ui_refresh_app.py \
+  tests/javascript/ui_refresh_browser.cjs tests/javascript/concept_browser.cjs \
+  tests/javascript/dataset_diff_browser.cjs
+```
+
+Recommended push command, only after the owner creates the local commit (not executed):
+
+```sh
+git push -u origin feat/ui-visual-refresh
+```

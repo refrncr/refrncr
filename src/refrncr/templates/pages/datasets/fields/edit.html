@@ -4,7 +4,7 @@
 {% from "pages/datasets/fields/_form_fields.html" import field_form_fields %}
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Edit field</h1>
-  <div class='side-panel-view' data-side-panel-content data-panel-title='Edit field'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Edit field' data-panel-eyebrow='Configure · {{ dataset.name }}'>
     <div class='side-panel-body'>{% include 'pages/datasets/concepts/_banner.html' %}
       {{ readonly_field("Key", field.key, technical=true) }}
       {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}

@@ -6,7 +6,7 @@
 {% block title %}Versions · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name ~ " versions", '') %}
+    {% call page_context("Versions", '') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions'>
@@ -21,14 +21,14 @@
     <div class='table-scroll management-table' role='region' aria-label='Dataset versions' tabindex='0'>
       <table>
         <caption class='visually-hidden'>Dataset versions, newest version first</caption>
-        <thead><tr>{% for label in ['Version', 'Status', 'Effective date', 'End date', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col'>{{ label }}</th>{% endfor %}</tr></thead>
+        <thead><tr>{% for label in ['Version', 'Status', 'Effective date', 'End date', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col'>{{ label }}{% if label == 'Publication date' %} <span class='table-zone' data-local-timezone>(UTC)</span>{% endif %}</th>{% endfor %}</tr></thead>
         <tbody>{% if history.concept and not history.concept.base_version_id %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
             <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
-            <td><span class='badge'>{{ state.status }}</span></td>
+            <td><span class='badge{{ " badge-published" if state.status == "Current" else " badge-info" if state.status == "Scheduled" else "" }}'>{{ state.status }}</span></td>
             <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date.isoformat() }}</time></td>
             <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date.isoformat() }}</time>{% else %}—{% endif %}</td>
-            <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time>{{ version.published_at|absolute_utc }}</time></td>
+            <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time='datetime'>{{ version.published_at|absolute_utc }}</time></td>
             <td><bdi>{{ 'System' if version.system_published else history.publisher_names.get(version.publisher_id, 'Deleted user') }}</bdi></td>
             <td>{{ version.release_note or '—' }}</td>
             <td>{% if state.status == 'Scheduled' and history.may_maintain %}<a class='button button-danger' href='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=version.id) }}' data-panel-url data-dialog-open='version-panel' aria-label='Cancel Version {{ version.number }}'>Cancel version</a>{% else %}—{% endif %}</td>

@@ -24,11 +24,16 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await page.getByRole('button', {name: 'Sign in', exact: true}).click();
       await page.waitForURL(base + '/');
       await page.goto(base + '/settings/audit-log?object_type=dataset_record');
-      assert.equal(await page.locator('tbody tr').count(), 50);
+      assert.equal(await page.locator('tbody tr:has(td)').count(), 50);
       assert.equal(await page.locator('tbody tr td:nth-child(5)').first().textContent(), 'No name to display');
       const utc = await page.locator('tbody time').first().getAttribute('datetime');
       const local = await page.locator('tbody time').first().textContent();
-      assert(local.includes('123456') && local.includes('GMT') && local !== utc + ' UTC');
+      // Rows show the local time to the second; the exact instant stays in the title.
+      const exact = await page.locator('tbody time').first().getAttribute('title');
+      assert(exact.includes('123456') && exact.includes('GMT') && local !== utc + ' UTC');
+      assert.match(local, /^\d{2}:\d{2}:\d{2}$/);
+      assert(await page.locator('tbody tr.table-day-row th[scope="rowgroup"]').count() >= 1);
+      assert.equal(await page.locator('thead [data-local-timezone]').textContent(), `(${timezoneId})`);
       const date = new Date(utc);
       const expected = new Intl.DateTimeFormat('en-GB', {timeZone: timezoneId,
         hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'}).format(date);
@@ -166,7 +171,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       if (timezoneId === 'Europe/Amsterdam') {
         await page.setViewportSize({width: 1280, height: 960});
         await page.goto(base + '/settings/audit-log?action=dataset_record%3Adeleted');
-        assert.equal(await page.locator('tbody tr').count(), 1);
+        assert.equal(await page.locator('tbody tr:has(td)').count(), 1);
         assert.equal(await page.locator('tbody tr td:nth-child(5)').textContent(), 'Deleted object');
         await page.locator('tbody a[data-panel-url]').click();
         const deletedDialog = page.getByRole('dialog', {name: 'Audit event details'});

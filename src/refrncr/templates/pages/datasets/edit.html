@@ -9,7 +9,7 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}
   {{ page_header("Edit dataset") }}
-  <div class='side-panel-view' data-side-panel-content data-panel-title='Edit dataset'>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='Edit dataset' data-panel-eyebrow='{{ dataset.name }}'>
   <div class='side-panel-body panel-sections'>{% include 'pages/datasets/concepts/_banner.html' %}
   {{ readonly_field("Key", dataset.key, technical=true) }}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}

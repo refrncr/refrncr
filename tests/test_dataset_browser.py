@@ -185,7 +185,7 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "data-list-search" not in page
     assert "dataset-tabs" not in page
     assert "button-tab" not in page
-    assert "<table aria-label='Datasets'>" in page
+    assert "<table class='dataset-table' aria-label='Datasets'>" in page
     assert "<th scope='col'>Dataset</th>" in page
     assert "<th scope='col' class='numeric-column'>Records</th>" in page
     assert "<th scope='col'>Updated</th>" in page
@@ -357,10 +357,9 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "<div class='page-actions record-page-actions'>" in page
-    assert "images/lucide-download.svg" in page
-    assert "images/lucide-settings-2.svg" in page
-    assert "images/lucide-upload.svg" in page
-    assert "images/lucide-plus.svg" in page
+    for label in ("Export</summary>", "Configure</a>", "Import</a>", "Add record</button>"):
+        icon = page.rsplit(label, 1)[0].rsplit('<svg class="button-icon"', 1)
+        assert len(icon) == 2 and "</svg>" in icon[1] and "<button" not in icon[1]
     assert "Export</summary>" in page
     assert "format=csv" in page and "format=xlsx" in page and "format=json" in page
     assert "class='button button-secondary'" in page and "Import</a>" in page
@@ -504,9 +503,11 @@ def test_record_table_retains_readable_width_inside_scroll_container(dataset_bro
     assert re.search(r"<div class='table-scroll'[^>]*>\s*<table class='record-table'>", page)
     assert "--data-table-min-width: 48rem" in tokens
     assert (
-        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: fixed; }"
+        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }"
         in tables
     )
+    assert ".record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }" in tables
+    assert "text-overflow: ellipsis" in tables
     assert ".table-scroll { width: 100%; overflow-x: auto;" in tables
     assert not re.search(r"\.record-table\s+th[^}]*white-space:\s*nowrap", tables)
     assert "currencies" not in tables.lower()
@@ -550,12 +551,15 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
         "components/tables.css",
         "components/dialog.css",
     )
-    fonts = (
-        "montserrat/Montserrat-Medium.woff2",
-        "inter/Inter-Regular.woff2",
-        "inter/Inter-SemiBold.woff2",
-        "inter/Inter-Bold.woff2",
-        "jetbrains-mono/JetBrainsMono-Regular.woff2",
+    fonts = tuple(
+        f"{family}/{family}-{subset}-{weight}-normal.woff2"
+        for family, weights in (
+            ("instrument-sans", (500, 600, 700)),
+            ("ibm-plex-sans", (400, 600, 700)),
+            ("ibm-plex-mono", (400,)),
+        )
+        for weight in weights
+        for subset in ("latin", "latin-ext")
     )
     for filename in css_files:
         assert request(client, "get", f"/static/css/{filename}").status_code == 200
@@ -564,10 +568,12 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
         assert response.status_code == 200
         assert response.mimetype == "font/woff2"
     tokens = body(request(client, "get", "/static/css/tokens.css"))
-    assert tokens.count("@font-face") == 5
-    assert "Montserrat-Medium.woff2" in tokens and "font-weight: 500" in tokens
-    assert "Inter-Regular.woff2" in tokens and "Inter-SemiBold.woff2" in tokens
-    assert "Inter-Bold.woff2" in tokens and "JetBrainsMono-Regular.woff2" in tokens
+    assert tokens.count("@font-face") == len(fonts) == 14
+    for filename in fonts:
+        assert f'url("../fonts/{filename}")' in tokens
+    assert '--font-display: "Instrument Sans"' in tokens
+    assert '--font-interface: "IBM Plex Sans"' in tokens
+    assert '--font-technical: "IBM Plex Mono"' in tokens
     assert "http://" not in tokens and "https://" not in tokens
 
 
@@ -584,23 +590,32 @@ def test_component_css_uses_explicit_contract_selectors(dataset_browser):
     assert ".table-scroll tbody tr:not(.interactive-row):hover" in tables
 
 
-def test_local_lucide_set_has_only_template_consumers_and_packaged_notices(dataset_browser):
+def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browser):
     _, _, _, client = dataset_browser
     repository = Path(__file__).resolve().parents[1]
     image_directory = repository / "src/refrncr/static/images"
+    icons = (repository / "src/refrncr/templates/components/icons.html").read_text()
     template_directory = repository / "src/refrncr/templates"
-    lucide_files = {path.name for path in image_directory.glob("lucide-*.svg")}
     template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
 
-    assert lucide_files == {
-        "lucide-download.svg",
-        "lucide-key-round.svg",
-        "lucide-plus.svg",
-        "lucide-settings-2.svg",
-        "lucide-upload.svg",
+    # Icons render inline so they take the colour of the text around them.
+    assert not list(image_directory.glob("lucide-*.svg"))
+    assert "images/lucide" not in template_source
+    assert {path.name for path in image_directory.iterdir()} == {
+        "logo-horizontal.svg",
+        "logo-mark.svg",
     }
-    for filename in lucide_files:
-        assert filename in template_source
+    macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
+    assert len(macros) == len(set(macros)) >= 20
+    for macro in macros:
+        assert f"import {macro}" in template_source or f", {macro}" in template_source
+        assert icons.count(f"macro {macro}") == 1
+    assert icons.count('stroke="currentColor"') == icons.count("<svg ")
+    assert 'aria-hidden="true" focusable="false"' in icons
+    assert (
+        "filter: brightness"
+        not in (repository / "src/refrncr/static/css/layouts/page.css").read_text()
+    )
     for filename in ("LICENSE-Lucide.txt", "ASSET-SOURCES.md"):
         assert request(client, "get", f"/static/licenses/{filename}").status_code == 200
 
@@ -1284,7 +1299,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
             assert '<svg class="button-icon"' in content
             assert 'aria-hidden="true"' in content and 'focusable="false"' in content
             assert not re.sub(r"<[^>]+>", "", content).strip()
-        assert '<path d="m6 15 6-6 6 6"' in controls[0][1]
+        assert '<path d="m18 15-6-6-6 6"' in controls[0][1]
         assert '<path d="m6 9 6 6 6-6"' in controls[1][1]
         assert not re.search(r"draggable|ondrag\w*|ondrop", form, re.IGNORECASE)
     assert "name='direction' value='up' disabled" in order_forms[0]
@@ -1915,7 +1930,7 @@ def test_record_identifier_detail_is_compact_canonical_and_marks_each_component(
     configured = body(request(client, "get", "/datasets/business-key/concept"))
     assert "No record identifier configured" not in configured
     assert configured.index("Zeta") < configured.index("Alpha")
-    assert configured.count("images/lucide-key-round.svg") == 2
+    assert configured.count('<svg class="key-icon"') == 2
     assert "Alpha" in configured
     assert "Zeta" in configured
 

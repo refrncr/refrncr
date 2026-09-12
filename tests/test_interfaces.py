@@ -791,10 +791,10 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert "Access management" in secondary
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
     assert secondary.count("<a ") == 3
-    assert 'href="/settings/audit-log">Audit log</a>' in secondary
+    assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
     assert secondary.count('aria-current="page"') == 1
-    assert secondary.count('aria-hidden="true"') == 2
+    assert secondary.count('aria-hidden="true"') == 3
     assert re.search(
         r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,

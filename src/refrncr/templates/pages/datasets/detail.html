@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon %}
+{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
 {% block content %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context(dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none)) %}
+    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -28,13 +28,14 @@
         <div><dt>Owning team</dt><dd>{{ dataset.owner_team_name }}</dd></div>
         <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
       </dl>
+      <p class='help-text'>The key is permanent and used in exports and the API.</p>
     </section>
     {% if fields and not business_key.field_keys %}
       {{ feedback("No record identifier configured. Choose one or more fields to uniquely identify each record.", kind="warning") }}
     {% endif %}
     <section aria-labelledby='fields-heading'>
       <div class='page-header section-header'>
-        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p></div>
+        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p>{% if fields %}<p class='section-description'>The order here is the column order in tables and exports.</p>{% endif %}</div>
         {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}
       </div>
       {% if fields %}
@@ -55,7 +56,7 @@
                     </form>
                   {% endif %}
                 </td>
-                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
+                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
                 <td><code class='field-key'>{{ field.key }}</code></td>
                 <td>{{ field.data_type|datatype_label }}</td>
                 <td>

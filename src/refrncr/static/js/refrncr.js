@@ -192,6 +192,11 @@
     if (!content) return false;
     const title = document.getElementById(dialog.getAttribute("aria-labelledby"));
     title.textContent = content.dataset.panelTitle;
+    const eyebrow = dialog.querySelector("[data-panel-eyebrow]");
+    if (eyebrow) {
+      eyebrow.textContent = content.dataset.panelEyebrow || "";
+      eyebrow.hidden = !eyebrow.textContent;
+    }
     dialog.querySelector("[data-panel-host]").replaceChildren(document.importNode(content, true));
     const host = dialog.querySelector("[data-panel-host]");
     window.refrncrLocalTime?.(host);
@@ -219,6 +224,8 @@
     const load = {};
     panelLoads.set(dialog, load);
     document.getElementById(dialog.getAttribute("aria-labelledby")).textContent = "Loading…";
+    const eyebrow = dialog.querySelector("[data-panel-eyebrow]");
+    if (eyebrow) eyebrow.hidden = true;
     dialog.querySelector("[data-panel-host]").replaceChildren();
     try {
       const response = await fetch(trigger.href, {credentials: "same-origin"});

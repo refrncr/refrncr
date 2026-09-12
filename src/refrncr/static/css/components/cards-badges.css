@@ -1,10 +1,10 @@
 .card { margin-bottom: var(--space-lg); padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-.badge { display: inline-flex; gap: var(--space-xs); padding: .2rem .55rem; border-radius: var(--radius-full); font-size: var(--font-size-xs); font-weight: var(--font-weight-bold); }
-.badge-success { color: var(--color-success-text); background: var(--ref-badge-success); }
-.badge-warning { color: var(--color-warning-text); background: var(--ref-badge-warning); }
-.badge-error { color: var(--color-error-text); background: var(--ref-badge-error); }
-.badge-info { color: var(--color-info-text); background: var(--ref-badge-info); }
-.badge-subtle { font-size: .6875rem; font-weight: var(--font-weight-regular); }
+.badge { display: inline-flex; align-items: center; gap: .375rem; padding: .125rem .5rem; border: 1px solid var(--color-border); border-radius: var(--radius-full); background: var(--color-surface-subtle); color: var(--color-text-secondary); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); line-height: 1.5; white-space: nowrap; }
+.badge-success { color: var(--color-success-text); background: var(--ref-badge-success); border-color: var(--color-status-published-border); }
+.badge-warning { color: var(--color-warning-text); background: var(--ref-badge-warning); border-color: var(--color-status-draft-border); }
+.badge-error { color: var(--color-error-text); background: var(--ref-badge-error); border-color: var(--color-status-removed-border); }
+.badge-info { color: var(--color-info-text); background: var(--ref-badge-info); border-color: color-mix(in srgb, var(--color-info) 30%, transparent); }
+.badge-subtle { font-size: var(--font-size-label); font-weight: var(--font-weight-regular); }
 a.badge-link, a.badge-link:hover { text-decoration: none; }
 .empty-state { padding: var(--space-xxl) var(--space-lg); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); text-align: center; }
 .empty-state h2 { margin-top: 0; }
@@ -21,3 +21,15 @@ a.badge-link, a.badge-link:hover { text-decoration: none; }
 .access-list-name { display: block; font-weight: var(--font-weight-semibold); }
 .access-list-type { display: block; font-size: var(--font-size-body-sm); color: var(--color-text-muted); }
 .access-list-row > form { flex-shrink: 0; }
+
+/* Status badges carry a dot plus text, so colour is never the only signal. */
+:is(.badge-success, .badge-warning, .badge-error, .badge-info, .badge-draft, .badge-published, .badge-removed)::before { content: ""; width: .3125rem; height: .3125rem; border-radius: var(--radius-full); background: currentColor; flex-shrink: 0; }
+.badge-draft { color: var(--color-status-draft); background: var(--color-status-draft-surface); border-color: var(--color-status-draft-border); }
+.badge-published { color: var(--color-status-published); background: var(--color-status-published-surface); border-color: var(--color-status-published-border); }
+.badge-removed { color: var(--color-status-removed); background: var(--color-status-removed-surface); border-color: var(--color-status-removed-border); }
+/* The expected state reads as plain text; badges are reserved for exceptions. */
+.status-quiet { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+/* Initial avatar in person tables; decorative, the name follows as the row action. */
+.table-avatar { display: inline-grid; place-items: center; width: 1.625rem; height: 1.625rem; margin-right: var(--space-sm); border: 1px solid var(--color-avatar-border); border-radius: var(--radius-full); background: var(--color-avatar-surface); color: var(--color-avatar-text); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); vertical-align: middle; }
+.table-avatar + .row-action { display: inline-block; width: auto; vertical-align: middle; }
+.role-help { display: block; margin-top: var(--space-xs); }

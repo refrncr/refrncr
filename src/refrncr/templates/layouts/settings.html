@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import back_icon, settings_icon, user_icon, team_icon %}
+{% from "components/icons.html" import back_icon, settings_icon, user_icon, team_icon, audit_icon %}
 
 {% block title %}{{ settings_title }}{% endblock %}
 
@@ -20,14 +20,14 @@
         <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>{{ team_icon() }}Teams</a>
         {% if current_actor and current_actor.role == 'admin' %}
           <p class="nav-label">Activity</p>
-          <a class="nav-item{{ ' is-active' if active_navigation == 'audit' else '' }}" href="{{ url_for('audit_list') }}"{% if active_navigation == 'audit' %} aria-current="page"{% endif %}>Audit log</a>
+          <a class="nav-item{{ ' is-active' if active_navigation == 'audit' else '' }}" href="{{ url_for('audit_list') }}"{% if active_navigation == 'audit' %} aria-current="page"{% endif %}>{{ audit_icon() }}Audit log</a>
         {% endif %}
       </nav>
     </aside>
     <main id="content" class="app-main settings-content" tabindex="-1">
       {% include "components/flash_messages.html" %}
       <header class="page-header management-list-header">
-        <h1 class="page-title">{{ settings_title }}</h1>
+        <div class="page-context"><h1 class="page-title">{{ settings_title }}</h1>{% block settings_meta %}{% endblock %}</div>
         <div class="page-actions">{% block settings_actions %}{% endblock %}</div>
       </header>
       {% block settings_content %}{% endblock %}

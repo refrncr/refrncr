@@ -12,15 +12,77 @@
     }).formatToParts(date);
     return parts.map((part) => part.type === "fractionalSecond" ? value.slice(20, 26) : part.value).join("");
   };
+  // One compact notation across lists: "11 Sep 2026, 15:18:35" or, inside a
+  // day group, "15:18:35". The exact local instant stays available as the title.
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const compactTime = (value, mode) => {
+    const date = new Date(value);
+    const parts = {};
+    new Intl.DateTimeFormat("en-GB", {
+      year: "numeric", month: "numeric", day: "numeric", weekday: "long",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+    }).formatToParts(date).forEach((part) => { parts[part.type] = part.value; });
+    const time = `${parts.hour}:${parts.minute}:${parts.second}`;
+    const day = `${Number(parts.day)} ${months[Number(parts.month) - 1]} ${parts.year}`;
+    return {key: `${parts.year}-${parts.month}-${parts.day}`, day, weekday: parts.weekday,
+      text: mode === "time" ? time : `${day}, ${time}`};
+  };
   window.refrncrLocalTime = (root) => {
     root.querySelectorAll("time[data-local-time]").forEach((element) => {
       try {
-        const formatted = formatTime(element.getAttribute("datetime"));
-        if (formatted) element.textContent = formatted;
+        const value = element.getAttribute("datetime");
+        const formatted = formatTime(value);
+        if (!formatted) return;
+        const mode = element.dataset?.localTime;
+        if (mode === "time" || mode === "datetime") {
+          const local = compactTime(value, mode);
+          element.textContent = local.text;
+          element.title = formatted;
+          Object.assign(element.dataset, {localDay: local.day, localDayKey: local.key, localWeekday: local.weekday});
+          return;
+        }
+        element.textContent = formatted;
       } catch { /* Keep the authoritative UTC fallback. */ }
     });
   };
   window.refrncrLocalTime(document);
+
+  // Group rows per local day; each group starts with a day heading row.
+  document.querySelectorAll("table[data-local-days]").forEach((table) => {
+    const source = table.tBodies?.[0];
+    if (!source?.rows) return;
+    const rows = [...source.rows];
+    const times = rows.map((row) => row.querySelector('time[data-local-time="time"]'));
+    if (!rows.length || times.some((time) => !time?.dataset.localDayKey)) {
+      // Never leave a bare time without its date.
+      times.forEach((time) => { if (time?.dataset.localDayKey) time.textContent = `${time.dataset.localDay}, ${time.textContent}`; });
+      return;
+    }
+    const columns = table.tHead?.rows[0]?.cells.length || 1;
+    let group = null;
+    let key = null;
+    rows.forEach((row, index) => {
+      const time = times[index];
+      if (time.dataset.localDayKey !== key) {
+        key = time.dataset.localDayKey;
+        group = document.createElement("tbody");
+        const heading = group.insertRow();
+        heading.className = "table-day-row";
+        const cell = document.createElement("th");
+        cell.scope = "rowgroup";
+        cell.colSpan = columns;
+        cell.textContent = `${time.dataset.localWeekday} ${time.dataset.localDay}`;
+        heading.append(cell);
+        table.append(group);
+      }
+      group.append(row);
+    });
+    source.remove();
+  });
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (zone) document.querySelectorAll("[data-local-timezone]").forEach((element) => { element.textContent = `(${zone})`; });
+  } catch { /* Keep the UTC label. */ }
 
   const pad = (value) => String(value).padStart(2, "0");
   const localValue = (date, fraction) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${fraction}`;

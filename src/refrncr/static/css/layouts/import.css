@@ -1,8 +1,9 @@
 .import-wizard { display: flex; flex-direction: column; min-height: min(38rem, 75dvh); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-.import-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg); list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-.import-steps li > a, .import-steps li > span, .import-steps li > button { display: flex; gap: var(--space-sm); align-items: flex-start; height: 100%; padding: var(--space-sm); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-muted); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
+.import-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg) var(--space-lg) 0; list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.import-steps li > a, .import-steps li > span, .import-steps li > button { display: flex; gap: var(--space-sm); align-items: flex-start; height: 100%; padding: var(--space-sm) var(--space-sm) var(--space-md); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-muted); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
 .import-steps small { display: block; margin-top: var(--space-xs); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
-.import-steps .is-active > span { background: var(--color-row-selected); color: var(--color-link); font-weight: var(--font-weight-bold); box-shadow: inset 0 -3px var(--color-action-primary); }
+/* The active step is underlined, not filled: the numbered circles carry the progress. */
+.import-steps .is-active > span { border-radius: var(--radius-md) var(--radius-md) 0 0; color: var(--color-link); font-weight: var(--font-weight-semibold); box-shadow: inset 0 -2px var(--color-action-primary); }
 .import-steps .is-complete > button, .import-steps .is-complete > a, .import-steps .is-complete > span { color: var(--color-link); }
 .import-steps button:hover, .import-steps a:hover { background: var(--color-action-secondary); }
 .import-step-number { display: inline-grid; place-items: center; flex: 0 0 var(--control-height-compact); height: var(--control-height-compact); border: 1px solid var(--color-border); border-radius: var(--radius-full); }
@@ -94,4 +95,13 @@
 
 .mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
 .mapping-heading h2 { margin: 0; }
-.mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid var(--color-text-muted); border-radius: var(--radius-full); color: var(--color-text-muted); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); }
+.mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); color: var(--color-text-muted); }
+.mapping-info summary .button-icon { width: 1.125rem; height: 1.125rem; margin: 0; }
+.mapping-info summary:hover { color: var(--color-text); }
+
+/* Drop zone: centred icon, label and file control; the native picker button reads as a secondary button. */
+.import-upload-zone { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg); border-width: 1.5px; text-align: center; }
+.import-upload-zone > .button-icon { width: 1.75rem; height: 1.75rem; opacity: .7; }
+.import-upload-zone input[type="file"] { width: auto; max-width: 100%; min-height: 0; margin-top: 0; padding: 0; border: 0; background: transparent; font-size: var(--font-size-body-sm); }
+.import-upload-zone input[type="file"]::file-selector-button { margin-right: var(--space-sm); padding: .4375rem .75rem; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: var(--font-weight-semibold) .8125rem/var(--line-height-control) var(--font-interface); cursor: pointer; }
+.import-upload-zone .help-text { margin: 0; }

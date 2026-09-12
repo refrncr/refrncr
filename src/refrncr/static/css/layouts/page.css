@@ -2,7 +2,6 @@
 .page-actions, .form-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
 .page-header-actions-end > .page-actions { margin-left: auto; justify-content: flex-end; }
 .button-icon { width: 1rem; height: 1rem; margin-right: .4375rem; }
-.button-primary .button-icon { filter: brightness(0) invert(1); }
 .export-menu { position: relative; }
 .export-menu summary { list-style: none; }
 .export-menu summary::-webkit-details-marker { display: none; }
@@ -14,7 +13,7 @@
 .management-list-header { flex-wrap: nowrap; align-items: center; }
 .management-list-header h1 { margin: 0; white-space: nowrap; }
 .management-list-header .page-actions { flex: 0 1 auto; flex-wrap: nowrap; margin-left: auto; }
-.management-list-header input { flex: 0 1 22rem; width: min(22rem, 35vw); margin-top: 0; }
+.management-list-header .search-field { flex: 0 1 22rem; width: min(22rem, 35vw); }
 .management-list-header .button { flex: 0 0 auto; white-space: nowrap; }
 .user-state-action, .add-member-form { margin-top: var(--space-xl); }
 .member-list { margin: 0; padding: 0; list-style: none; }
@@ -28,11 +27,13 @@
   .page-actions > *, .form-actions > * { flex: 1 1 auto; }
   .management-list-header { flex-wrap: wrap; }
   .management-list-header .page-actions { width: 100%; flex-wrap: wrap; margin-left: 0; }
-  .management-list-header input { width: 100%; }
+  .management-list-header .search-field { width: 100%; }
+  /* Dataset list on phones: name, records and version; team and update time stay on the dataset page. */
+  .dataset-table :is(th, td):is(:nth-child(2), :nth-child(4)) { display: none; }
 }
 
 .page-header > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.breadcrumbs { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
+.breadcrumbs { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
 .breadcrumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-sm); list-style: none; margin: 0; padding: 0; }
 .breadcrumbs li { min-width: 0; overflow-wrap: anywhere; }
 .breadcrumbs a { color: var(--color-breadcrumb-link); text-decoration: none; }
@@ -44,3 +45,23 @@
 .page-context { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
 .page-context > .breadcrumbs, .page-context > .page-title, .page-context > .metadata { margin: 0; }
 .page-context > .metadata { padding-block-start: var(--space-sm); }
+
+/* Title block yields first; actions stay on the title row and wrap within their own column. */
+.page-header > .page-context, .page-header > div:first-child:not(.page-actions) { flex: 1 1 16rem; }
+.page-header > .page-actions { flex: 0 1 auto; justify-content: flex-end; margin-left: auto; }
+
+/* Section tabs: underline marks the current section. */
+.section-tabs { display: flex; gap: var(--space-xs); margin-block: var(--space-lg); border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+.section-tab { padding: .625rem .75rem; border-bottom: 2px solid transparent; margin-bottom: -1px; color: var(--color-text-muted); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-decoration: none; white-space: nowrap; }
+.section-tab:hover { color: var(--color-text); }
+.section-tab[aria-current="page"] { border-bottom-color: var(--color-action-primary); color: var(--color-text); }
+/* A separator that would start a wrapped metadata line is clipped: each separator sits in the
+   gap before its item, so only the one at a line start falls outside the clipped box. */
+.metadata { --metadata-separator-width: .5em; overflow: hidden; column-gap: calc(var(--metadata-separator-width) + 2 * var(--space-sm)); }
+.metadata [aria-hidden="true"] { display: inline-block; width: var(--metadata-separator-width); text-align: center; }
+.metadata > [aria-hidden="true"] { margin-inline: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
+.metadata > .metadata-item { margin-inline-start: calc(-1 * (var(--metadata-separator-width) + var(--space-sm))); }
+.metadata .badge { margin-inline-start: var(--space-xs); vertical-align: .05em; }
+.metadata-warning { color: var(--color-error); }
+.management-list-header .page-context > .metadata { padding-block-start: var(--space-xs); }
+.member-list form .button { min-height: 2rem; padding: .25rem .625rem; }

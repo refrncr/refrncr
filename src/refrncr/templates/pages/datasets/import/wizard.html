@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/icons.html" import info_icon %}
 {% from "components.html" import feedback %}
 {% block content %}
 <header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>Add records to {{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
@@ -14,7 +15,7 @@
     {% if step == 3 %}<div class='mapping-heading'>
       <h2 id='import-step-title'>{{ steps[step - 1].label }}</h2>
       <details class='mapping-rationale mapping-info' data-mapping-tooltip>
-        <summary aria-label='About column mapping' aria-describedby='mapping-instructions'><span aria-hidden='true'>i</span></summary>
+        <summary aria-label='About column mapping' aria-describedby='mapping-instructions'>{{ info_icon() }}</summary>
         <div id='mapping-instructions' class='mapping-tooltip' role='tooltip' tabindex='0'>{% include "pages/datasets/import/mapping_info.html" %}</div>
       </details>
     </div>{% else %}<h2 id='import-step-title'>{{ steps[step - 1].label }}</h2>{% endif %}

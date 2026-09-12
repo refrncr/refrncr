@@ -1,13 +1,14 @@
-{% macro side_panel(panel_id, title, title_id, description=none, description_id=none, has_modes=false, entity=none, auto_open=none) -%}
+{% from "components/icons.html" import close_icon %}
+{% macro side_panel(panel_id, title, title_id, description=none, description_id=none, has_modes=false, entity=none, auto_open=none, eyebrow_slot=false) -%}
   {% set description_id = description_id or panel_id ~ '-description' %}
   <dialog class='side-panel' id='{{ panel_id }}' data-side-panel data-modal-side-panel aria-labelledby='{{ title_id }}'{% if description and description_id %} aria-describedby='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-modes{% endif %}{% if entity %} data-panel-entity='{{ entity }}'{% endif %}{% if auto_open %} data-auto-open='{{ auto_open }}'{% endif %}>
     <div class='side-panel-layout'>
       <header class='side-panel-header'>
         <div>
           <h2 id='{{ title_id }}' tabindex='-1'>{{ title }}</h2>
-          {% if description %}<p{% if description_id %} id='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-subtitle data-default-text='{{ description }}'{% endif %}>{{ description }}</p>{% endif %}
+          {% if description %}<p{% if description_id %} id='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-subtitle data-default-text='{{ description }}'{% endif %}>{{ description }}</p>{% elif eyebrow_slot %}<p data-panel-eyebrow hidden></p>{% endif %}
         </div>
-        <button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>×</button>
+        <button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>{{ close_icon() }}</button>
       </header>
       {{ caller() }}
     </div>
@@ -15,7 +16,7 @@
 {%- endmacro %}
 
 {% macro form_side_panel(panel_id='configuration-panel') -%}
-  {% call side_panel(panel_id, "Configure", panel_id ~ "-title") %}
+  {% call side_panel(panel_id, "Configure", panel_id ~ "-title", eyebrow_slot=true) %}
     <div class='side-panel-view' data-panel-host></div>
   {% endcall %}
 {%- endmacro %}

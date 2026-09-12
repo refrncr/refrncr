@@ -1,7 +1,7 @@
 {% macro record_form_fields(fields, prefix, values=none, initial_focus=false) -%}
   {% for field in fields %}
     <div class='form-field'>
-      <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} *{% endif %}</label>
+      <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} <span class='required-mark' aria-hidden='true'>*</span>{% endif %}</label>
       {% if field.data_type == 'boolean' %}
         <select id='{{ prefix }}-{{ field.key }}' name='{{ field.key }}'{% if field.is_required %} required{% endif %}{% if initial_focus and loop.first %} autofocus data-initial-focus{% endif %}>
           <option value=''>Choose a value</option>

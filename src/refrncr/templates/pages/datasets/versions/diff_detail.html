@@ -4,7 +4,7 @@
 {% block title %}Review details · REFRNCR{% endblock %}
 {% block content %}
 <h1>Review details</h1>
-<div class='side-panel-view' data-side-panel-content data-panel-title='{{ "Record changes" if kind == "record" else "Field changes" }}'>
+<div class='side-panel-view' data-side-panel-content data-panel-title='{{ "Record changes" if kind == "record" else "Field changes" }}' data-panel-eyebrow='Review · {{ dataset.name }}'>
   <div class='side-panel-body panel-sections'>{% include 'pages/datasets/concepts/_banner.html' %}
     {% if kind == 'field' %}
       <h2 id='diff-detail-heading' tabindex='-1' data-initial-focus data-panel-section-heading>{{ item.name }}</h2>
