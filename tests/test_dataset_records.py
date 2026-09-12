@@ -558,7 +558,7 @@ def test_browser_add_list_validation_security_and_escaping(record_services):
     assert created.status_code == 302
     listing = client.get(f"/datasets/{dataset.key}/concept/records", base_url="https://localhost")
     assert "&lt;b&gt;safe&lt;/b&gt;" in listing.get_data(as_text=True)
-    assert "images/lucide-key-round.svg" in listing.get_data(as_text=True)
+    assert '<svg class="key-icon"' in listing.get_data(as_text=True)
     assert (
         client.get(
             f"/datasets/{dataset.key}/concept/records?page=1&page=2", base_url="https://localhost"

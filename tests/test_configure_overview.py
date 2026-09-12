@@ -106,7 +106,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "<span class='badge'>Unique</span>" in field_section
     identifier_count = 1 if count == 1 else 2
     assert field_section.count("<span class='badge'>Identifier</span>") == identifier_count
-    assert field_section.count("images/lucide-key-round.svg") == identifier_count
+    assert field_section.count('<svg class="key-icon"') == identifier_count
     rows = re.findall(r"<tr>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
@@ -115,8 +115,8 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         order_cell, indicator = row.split("</td>")[:2]
         assert "key-icon" not in order_cell
         if index != 1:
-            assert f"{field.name}</span> <img" in indicator
-            assert "images/lucide-key-round.svg" in indicator
+            assert f"{field.name}</span> <svg" in indicator
+            assert '<svg class="key-icon"' in indicator
             assert "<span class='badge'>Identifier</span>" in row
             assert f"{field.name} is part of the record identifier" in indicator
         else:

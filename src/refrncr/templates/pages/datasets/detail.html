@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon %}
+{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
@@ -56,7 +56,7 @@
                     </form>
                   {% endif %}
                 </td>
-                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} <img class='key-icon' src='{{ url_for("static", filename="images/lucide-key-round.svg") }}' alt='' aria-hidden='true'><span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
+                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
                 <td><code class='field-key'>{{ field.key }}</code></td>
                 <td>{{ field.data_type|datatype_label }}</td>
                 <td>

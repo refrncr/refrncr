@@ -2,7 +2,7 @@
 .settings-back { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; color: var(--color-account-link); text-decoration: none; }
 .settings-header { grid-column: 2; justify-content: flex-start; }
 .settings-title { display: flex; align-items: center; gap: var(--space-sm); margin: 0; font-family: var(--font-display); font-size: var(--font-size-heading-sm); font-weight: var(--font-weight-semibold); }
-.settings-sidebar .nav-item { display: flex; align-items: center; gap: var(--space-sm); font-weight: var(--font-weight-regular); }
+.settings-sidebar .nav-item { font-weight: var(--font-weight-regular); }
 .settings-back .button-icon, .settings-topbar .button-icon, .settings-sidebar .button-icon { flex-shrink: 0; margin: 0; }
 .settings-title .button-icon { width: var(--space-lg); height: var(--space-lg); }
 /* Compact filter bar: the head of the audit table object. */

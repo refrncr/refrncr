@@ -5,6 +5,8 @@
 .primary-navigation { display: flex; flex: 1; flex-direction: column; gap: var(--space-sm); }
 .nav-label { margin: 0 0 var(--space-xs); padding-inline: .75rem; color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-eyebrow); text-transform: uppercase; }
 .nav-item { padding: .5rem .75rem; border: 1px solid transparent; border-radius: var(--radius-md); color: var(--color-text-secondary); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); text-decoration: none; }
+.nav-item { display: flex; align-items: center; gap: var(--space-sm); }
+.nav-item .button-icon { flex-shrink: 0; width: 1rem; height: 1rem; margin: 0; }
 .nav-item:hover { background: var(--color-action-secondary); color: var(--color-text); }
 .nav-item:focus-visible { outline-offset: -3px; }
 .nav-item.is-active { border-color: var(--color-navigation-selected-border); background: var(--color-row-selected); color: var(--color-navigation-selected-text); font-weight: var(--font-weight-semibold); }

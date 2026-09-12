@@ -15,7 +15,8 @@
 .side-panel-header h2, .side-panel-header p { margin: 0; }
 .side-panel-header h2 { font-family: var(--font-display); font-size: var(--font-size-heading-sm); font-weight: var(--font-weight-semibold); line-height: var(--line-height-heading); letter-spacing: -.01em; }
 .side-panel-header p { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-eyebrow); text-transform: uppercase; }
-.side-panel-close { min-width: var(--control-height); padding: 0; border-color: transparent; background: transparent; color: var(--color-text); font-size: 2rem; font-weight: var(--font-weight-regular); }
+.side-panel-close { display: grid; place-items: center; min-width: var(--control-height); padding: 0; border-color: transparent; background: transparent; color: var(--color-text); }
+.side-panel-close .button-icon { margin: 0; }
 .side-panel-close:hover { background: var(--color-action-secondary); }
 .side-panel-body { flex: 1; min-height: 0; padding: var(--space-lg); overflow-y: auto; }
 .side-panel-body label, .side-panel-body .form-label, .record-details dt { font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; }
@@ -45,13 +46,14 @@
 
 main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[data-side-panel-content] { padding: 0; }
 
-.dialog-large { width: min(calc(100% - 2rem), 72rem); height: min(85dvh, 56rem); max-height: calc(100dvh - 2rem); }
-.dialog-large-layout { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+/* The report is as tall as its content, up to the viewport. */
+.dialog-large { width: min(calc(100% - 2rem), 72rem); max-height: min(85dvh, 56rem, calc(100dvh - 2rem)); }
+.dialog-large-layout { display: flex; flex-direction: column; max-height: 100%; min-height: 0; }
 .dialog-large-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-lg); border-bottom: 1px solid var(--color-border); }
 .dialog-large-header h2 { margin: 0; }
 .dialog-large-body { overflow: auto; min-height: 0; padding: var(--space-lg); overflow-wrap: anywhere; }
 .dialog-large-body code { white-space: pre-wrap; }
-@media (max-width: 767px) { .dialog-large { width: calc(100% - 1rem); height: calc(100dvh - 1rem); max-height: none; } .dialog-large-header, .dialog-large-body { padding: var(--space-md); } }
+@media (max-width: 767px) { .dialog-large { width: calc(100% - 1rem); max-height: calc(100dvh - 1rem); } .dialog-large-header, .dialog-large-body { padding: var(--space-md); } }
 .dialog-large { max-width: none; }
 .dialog-large-header .button { flex-shrink: 0; white-space: nowrap; }
 
@@ -72,5 +74,6 @@ main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[dat
 @media (max-width: 767px) { .side-panel [data-side-panel-content].side-panel-body .form-actions { margin-inline: calc(-1 * var(--space-md)); padding: var(--space-md); } }
 /* Read-only "Label: value" lines in panels read as a sentence, not as a form label. */
 .side-panel-body p > .form-label:first-child { color: var(--color-text-muted); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }
-.panel-context { margin: 0 0 var(--space-md); padding: .5rem .75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-subtle); color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.panel-context { display: flex; align-items: center; gap: var(--space-sm); margin: 0 0 var(--space-md); padding: .5rem .75rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-subtle); color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .record-details dt .key-icon { width: .875rem; height: .875rem; margin-left: .25rem; }
+.panel-context .button-icon { flex-shrink: 0; width: 1rem; height: 1rem; }
