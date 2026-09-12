@@ -141,6 +141,47 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context): 
     assert request(outsider, "get", created.location).status_code == 404
 
 
+
+def test_current_import_entry_creates_concept_and_opens_existing_wizard(context):  # noqa: F811
+    c = context
+    setup(c)
+    published = publish(c)
+    browser, csrf = client(c)
+
+    current = request(browser, "get", f"/datasets/{c.d.key}/records")
+    assert current.status_code == 200
+    assert "name='next' value='import'" in current.text
+    assert ">Import</button>" in current.text
+
+    invalid = request(
+        browser,
+        "post",
+        f"/datasets/{c.d.key}/concept/new",
+        data={"csrf_token": csrf, "next": "external"},
+    )
+    assert invalid.status_code == 400 and active(c) is None
+
+    created = request(
+        browser,
+        "post",
+        f"/datasets/{c.d.key}/concept/new",
+        data={"csrf_token": csrf, "next": "import"},
+    )
+    assert created.status_code == 303
+    assert created.location.endswith(f"/datasets/{c.d.key}/records/import")
+    wizard = request(browser, "get", created.location)
+    assert wizard.status_code == 200
+    assert "Record import wizard" in wizard.text
+    assert "Upload" in wizard.text and "Column mapping" in wizard.text
+
+    current_with_concept = request(browser, "get", f"/datasets/{c.d.key}/records")
+    assert f"href='/datasets/{c.d.key}/records/import'" in current_with_concept.text
+    historical = request(
+        browser, "get", f"/datasets/{c.d.key}/versions/{published.id}/records"
+    )
+    assert "/records/import" not in historical.text
+
+
 @pytest.mark.parametrize("failure", ["audit", "commit"])
 def test_create_failure_preserves_inactive_content_and_retry(context, monkeypatch, failure):  # noqa: F811
     from sqlalchemy.orm import Session
