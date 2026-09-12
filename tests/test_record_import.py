@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -369,6 +370,21 @@ def workbook_without_dimension_metadata():
     return dimensionless.getvalue()
 
 
+def workbook_with_short_row():
+    """A row without trailing cells, as exporters that omit worksheet dimensions write it."""
+    content = workbook_without_dimension_metadata()
+    source = zipfile.ZipFile(io.BytesIO(content))
+    short = io.BytesIO()
+    with source, zipfile.ZipFile(short, "w", zipfile.ZIP_DEFLATED) as target:
+        for entry in source.infolist():
+            value = source.read(entry)
+            if entry.filename == "xl/worksheets/sheet1.xml":
+                value = re.sub(rb'<c r="B2".*?(?:/>|</c>)', b"", value)
+                assert b'r="B2"' not in value
+            target.writestr(entry, value)
+    return short.getvalue()
+
+
 def test_xlsx_visible_sheet_selection_and_formula_detection():
     content = workbook_bytes(second=True)
     inspected = parse_source("records.xlsx", content)
@@ -385,6 +401,11 @@ def test_xlsx_visible_sheet_selection_and_formula_detection():
     )
     assert dimensionless.headers == ("code", "amount")
     assert dimensionless.rows[0].values == ("A", "1")
+    # REF: a short row keeps its missing trailing columns empty instead of failing the upload.
+    short = parse_source("records.xlsx", workbook_with_short_row(), "Visible <sheet>")
+    assert short.headers == ("code", "amount")
+    assert short.rows[0].values == ("A", "")
+    assert short.rows[0].formulas == frozenset()
     with pytest.raises(ImportValidationError, match="visible"):
         parse_source("records.xlsx", workbook_bytes(hidden_only=True))
     with pytest.raises(ImportValidationError, match="modern Excel"):

@@ -632,10 +632,11 @@ def _inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
                 cells += (None,) * (len(headers) - len(cells))
             values, formulas = [], set()
             for index, cell in enumerate(cells):
-                if cell.data_type == "f":
-                    formulas.add(index)
+                # Without worksheet dimensions a short row has no cell objects to pad with.
+                if cell is None or (cell.value is None and cell.data_type != "f"):
                     values.append("")
-                elif cell.value is None:
+                elif cell.data_type == "f":
+                    formulas.add(index)
                     values.append("")
                 elif isinstance(cell.value, bool):
                     values.append("true" if cell.value else "false")
