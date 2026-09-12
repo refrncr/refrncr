@@ -1140,6 +1140,8 @@ def create_flask_app(
             version_state=view.state,
             may_configure=may_configure,
             may_start_concept=view.may_maintain and view.concept is None,
+            may_import=view.may_maintain and version_id is None,
+            has_active_concept=view.concept is not None,
             record_states=view.record_states or {},
             record_labels=view.record_labels or {},
             record_details={
