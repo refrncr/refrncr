@@ -56,10 +56,10 @@ const emit=async(element,event,target=element)=>{
   for(const fn of element.handlers[event] || []) await fn({target,preventDefault(){},key:event==='keydown'?'Escape':undefined});
 };
 (async()=>{
-  // The mode toggle is always available, so the controller never sets `hidden`.
-  assert.equal(advanced.hidden,undefined);
-  // The effective format composes bare patterns, not the descriptive option labels.
-  assert.equal(effective.textContent,'DD/MM/YYYY HH:mm:ss[.ffffff]');
+  // The toggle is available only when it can open format disclosures.
+  assert.equal(advanced.hidden,false);
+  // The effective summary retains readable labels alongside exact patterns.
+  assert.equal(effective.textContent,'Day first · DD/MM/YYYY + 24-hour, seconds · HH:mm:ss[.ffffff]');
   window.refrncrSourceFormats();window.refrncrSourceFormats();
   assert.equal(form.handlers.change.length,1);
   assert.equal(summary.handlers.click.length,1);
@@ -68,7 +68,7 @@ const emit=async(element,event,target=element)=>{
   await emit(summary,'click');assert.equal(details.open,true);assert.equal(document.activeElement,source);
   await emit(details,'keydown');assert.equal(details.open,false);assert.equal(document.activeElement,summary);
   time.value='v1-time-hm';await emit(form,'change',time);
-  assert.equal(effective.textContent,'DD/MM/YYYY HH:mm');
+  assert.equal(effective.textContent,'Day first · DD/MM/YYYY + 24-hour, minutes · HH:mm');
   assert.equal(requests.length,1);
   assert.match(status.textContent,/could not be refreshed/);
   source.value='native';await emit(form,'change',source);

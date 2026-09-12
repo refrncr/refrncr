@@ -234,3 +234,10 @@ a matching backup is required if those suggestions must also be retained.
 Historical migrations remain unchanged. Startup schema checks and preflight
 commands recognize the new revision; historical test fixtures explicitly
 remove the new table through its real downgrade before exercising old schemas.
+
+The REF-158 completion review retains distinct source examples (at most three),
+with full-column validation independent of this display cap. Individual disclosure
+always exposes its examples; Advanced options is only an all-Fields disclosure
+action, not a separate import mode. Without JavaScript, detected temporal choices
+can reach Preview; an explicit message explains how to enable corrections/live
+examples or replace the source file. See the REF-158 report for current evidence.

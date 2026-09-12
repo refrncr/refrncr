@@ -191,7 +191,6 @@ def temporal_controls(data_type, profile_id):
         if data_type != "date"
         else (),
         "native_label": "Native Excel " + ("datetime" if data_type == "timestamp" else data_type),
-        "native_noun": "datetime" if data_type == "timestamp" else data_type,
         "plain_noun": {
             "date": "date",
             "time": "time",

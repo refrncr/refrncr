@@ -946,8 +946,6 @@ class DatasetRecordImportService:
                     "profiles": profiles,
                     "label": selected_profile.label if selected_profile else "Choose source format",
                     "applicable": field.data_type != "string",
-                    # A CSV holds only text, so "a real date cell" cannot arise there.
-                    "native_possible": source.kind == "xlsx",
                     "timestamp": field.data_type == "timestamp",
                     "temporal": temporal_controls(
                         field.data_type, selected_profile.id if selected_profile else ""

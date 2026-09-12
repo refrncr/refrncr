@@ -2,15 +2,17 @@
 
 Date: 12 September 2026. Community/core scope. Local implementation on
 `feat/ref-158-source-format-ux`, based on up-to-date `main` at `994eba7`.
-No staging, commit, push, PR, merge or migration was performed.
-GitHub Actions remains the independent gate before merge.
+The completion review started from clean local commits `a560a37` and `ee5debe`.
+Commit, push and PR creation are authorized after successful local checks; merging
+requires a separate explicit instruction and green GitHub Actions. No migration.
 
 ## Scope and decisions
 
 Read the supplied request, repository AGENTS.md, complete Jira REF-158,
 REF-154 / US-108, REF-145 and REF-134, and the existing import/security,
 datatype, Concept, audit, UI-foundation and REF-154 delivery documentation.
-The initial tree was clean; there was no uncommitted alternative UX proposal.
+The original implementation and this completion review both started with a clean
+working tree. The two existing local commits are preserved, without rewriting history.
 `git fetch --all --prune`, `git switch main`, `git pull --ff-only` and the
 requested branch creation completed. Jira remains authoritative:
 [REF-158](https://cleverhorizons.atlassian.net/browse/REF-158).
@@ -54,7 +56,7 @@ Baseline screenshot: `/tmp/ref158-before.png`. Temporary baseline script:
 DateTime now offers Source type, eight Date patterns and four Time families.
 The Time labels name 24/12-hour notation and minutes/seconds alongside their exact
 patterns. Date and Time expose only their own components. Native Excel is one
-explicit alternative, including Date/Time; it hides and disables textual
+explicit alternative (valid only for typed cells in XLSX), including Date/Time; it hides and disables textual
 components. Switching back restores transient textual selections; a new native
 proposal uses catalogue-order text defaults only after an explicit switch.
 
@@ -112,7 +114,9 @@ Controls stack below 768 px and align in two columns at larger widths. Source an
 Stored as retain their existing row-paired stacking. All values are escaped and
 bounded to the existing three examples and parser/display length limits; no source
 examples enter persistence or audit. Dynamic switching/live refresh uses JavaScript;
-initial server-rendered proposals still submit through the normal form.
+initial server-rendered proposals still submit through the normal form. A visible
+no-JavaScript message explains that changing mappings/source types and live review
+need JavaScript; detected temporal proposals can still reach Preview without it.
 
 ## Security, state and transactions
 
@@ -149,132 +153,174 @@ canonical stored value, Field configuration, authorization, tenancy or dependenc
 contract changes. Architecture and deployment processes did not change; no ADR
 or external Confluence edit is required.
 
-## Verification
+## Completion review findings
 
-Final successful results are recorded below. No failed/interrupted initial
-run is used as passing evidence. Initial failures identified the audit-read trace,
-the old fieldset assertion, minimal document-only JavaScript initialization and
-the wide-form envelope and multipart decoding; each was corrected and checked
-again. No skip statements, fixed sleeps, softened assertions or warning suppression
-were added. The prior UI test excluding all fieldsets now
-asserts the exact new source-format fieldset and legend required by this story.
-The old timezone-discard test now requires rejection and no saved preference.
+The review compared all changes to `origin/main` (`994eba7`), reread the four Jira
+stories and the repository contracts, and checked the current implementation
+independently of the previous delivery claims. Scope remains Community/core.
 
-| Final check | Passed | Failed | Skipped | Evidence |
-| --- | ---: | ---: | ---: | --- |
-| Full SQLite configuration | 2,241 | 0 | 822 | `/tmp/ref158-definitive-sqlite.log`; 307.87 s |
-| Full PostgreSQL 16 configuration | 3,063 | 0 | 0 | `/tmp/ref158-definitive-pg.log`; 610.33 s |
-| All standalone JavaScript pytest checks | 7 | 0 | 0 | `/tmp/ref158-all-js.log`; also included in full runs |
-| Targeted component/JS verification | 170 | 0 | 0 | `/tmp/ref158-url-encoded-tests.log`; 18.24 s |
-| Real Chrome viewports | 3 | 0 | 0 | `/tmp/ref158-definitive-chrome.log` |
-| JavaScript syntax | 25 files | 0 | 0 | `node --check` on every app JS and test CJS file |
-| Ruff lint and formatting | Passed | 0 | 0 | `.venv/bin/python -m ruff check .` and `format --check .` |
-| pre-commit tracked files | 7 hooks | 0 | 0 | `/tmp/ref158-definitive-hooks.log` |
-| pre-commit new files | 5 hooks | 0 | 2 inapplicable hooks | `/tmp/ref158-definitive-new-hooks.log`; no new YAML/TOML |
-| Diff whitespace | Passed | 0 | 0 | `git diff --check` |
+Corrections within REF-158:
 
-The standalone SQLite skips use the existing PostgreSQL fixture guards, including
-three new parameterizations of the preference-retention test. No skip logic was
-introduced to make a failing test pass. The PostgreSQL configuration executes these
-cases. Both full configurations include source formats, Record imports, wizard,
-datatypes, existing migrations, persistence ports, audit, authorization, Concepts
-and version regressions. Three existing warnings remain: Starlette/httpx and two
-SQLite datetime-adapter deprecations. No warning is suppressed.
+- Removed the added Simple/Advanced mode and its CSS hiding rules. The stable
+  **Advanced options** action opens/closes all format disclosures and is hidden
+  when none apply. Opening one **Change format** exposes its own controls and
+  examples without depending on the state of other Fields.
+- Removed hidden temporal source-type selectors that could hold ambiguity/error
+  focus on an inaccessible CSV control. Native Excel remains explicitly selectable;
+  selecting it for CSV fails the existing native-cell validation.
+- Restored readable Date/Time labels in the wrapping effective summary, alongside
+  exact patterns. Mobile source/stored pairs each show their own visible labels.
+- Added an explanatory no-JavaScript fallback and actual no-JavaScript temporal
+  Preview checks. Kept the existing single main scrolling area and ordinary footer
+  actions. No shared token, global component or new component variant changed.
+- Strengthened Float confirmation to import all four requested notations together
+  and compare actual persisted canonical values: `102.1059`, `67000000.0`,
+  `1250000.0`, `0.000602`.
+- Corrected stale test navigation in the existing UI-refresh and datatype browser
+  regressions (Continue to preview and explicit Concept pages). Their behavioral
+  assertions remain intact; no corresponding product behavior was changed.
 
-Commands use the repository virtual environment:
+The distinct-example refinement is retained: show at most three distinct source
+values with each value's own converted result. Full-column validation still visits
+all rows, including duplicates, after the example cap is reached. Field and
+remembered-format reads remain batched; composition adds no per-column query.
+No new dependency, inline script/style, second parser catalogue, unbounded data
+collection, source-data logging or event is introduced. The two audit-inventory
+lines record the actual existing Field-list read in the review route; they do not
+register an event for format choices or Preview.
+
+## Final local validation
+
+Only successful completed checks count below. Earlier failures exposed the above
+UI/test defects or test-driver assumptions; none was bypassed with skips, fixed
+sleeps, weaker assertions or suppressed warnings. Headless Chrome's native select
+arrow popup did not change values even in an isolated minimal page, so the full
+keyboard correction uses native type-ahead, with actual response, value and focus
+assertions. The no-JavaScript check targets the rendered `noscript p` directly.
+
+| Check | Passed | Failed | Skipped | Warnings | Duration |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Full SQLite configuration | 2,241 | 0 | 822 | 3 | 330.39 s |
+| Full PostgreSQL 16 configuration | 3,063 | 0 | 0 | 3 | 632.28 s |
+| Component regression, including persisted four-value Float import | 168 | 0 | 0 | 0 | 24.57 s |
+| All standalone JavaScript unit checks | 7 | 0 | 0 | 0 | 0.62 s |
+| Package/wheel, CLI, migrations, transactions on both engines | 129 | 0 | 0 | 1 | 33.52 s |
+| REF-158 real Chrome, JavaScript and no-JavaScript | 6 viewport scenarios | 0 | 0 | 0 | 18.02 s |
+| Existing UI-refresh Chrome | 3 viewports | 0 | 0 | 0 | 8.53 s |
+| Existing datatype Chrome | 9 datatypes plus Record/no-JavaScript flows | 0 | 0 | 0 | 10.28 s |
+| Ruff lint | 1 | 0 | 0 | 0 | 0.03 s |
+| Ruff formatting | 164 files | 0 | 0 | 0 | 0.03 s |
+| pre-commit | 7 hooks | 0 | 0 | 0 | 0.73 s |
+| JavaScript syntax | 25 files | 0 | 0 | 0 | 0.69 s |
+| Diff whitespace | 1 | 0 | 0 | 0 | 0.02 s |
+
+The SQLite skips are the existing PostgreSQL fixture guards; all run in the enabled
+PostgreSQL configuration. The three full-suite warnings are the existing
+Starlette/httpx deprecation and two SQLite datetime-adapter deprecations. The
+full suites cover source formats, import/wizard, all datatype and migration
+compatibility, persistence ports, audit, authorization, Concept/version, concurrency,
+replay, failure/rollback and packaged CLI behavior. The final component run further
+strengthens the already passing Float confirmation assertion, without a runtime change.
+
+Commands, using the repository virtual environment:
 
 ```sh
 env -u REFRNCR_TEST_POSTGRES_URL .venv/bin/python -m pytest -q --tb=short
-# Disposable PostgreSQL 16 database on 127.0.0.1:55418; test-only credentials.
-REFRNCR_TEST_POSTGRES_URL='postgresql+psycopg://ref158:ref158-test-only@127.0.0.1:55418/ref158' \
-  .venv/bin/python -m pytest -q --tb=short
-.venv/bin/python -m pytest tests/test_source_format_components.py \
-  tests/test_import_wizard_javascript.py -q --tb=short
+# Configure REFRNCR_TEST_POSTGRES_URL for a disposable PostgreSQL 16 database.
+# Run the same full command with that environment variable set:
+.venv/bin/python -m pytest -q --tb=short
+.venv/bin/python -m pytest tests/test_source_format_components.py -q --tb=short
+.venv/bin/python -m pytest tests/test_audit_time_javascript.py tests/test_import_wizard_javascript.py tests/test_login_javascript.py tests/test_navigation_javascript.py tests/test_side_panel_javascript.py -q --tb=short
+.venv/bin/python -m pytest tests/test_package.py tests/test_packaged_cli.py tests/test_cli.py tests/test_migrations.py tests/test_field_datatype_migration.py tests/test_source_format_transactions.py -q --tb=short
 .venv/bin/python -m ruff check .
 .venv/bin/python -m ruff format --check .
 .venv/bin/python -m pre_commit run --all-files
 git diff --check
+# Syntax check every file returned here with node --check:
+rg --files src/refrncr/static/js tests/javascript -g '*.js' -g '*.cjs'
+# Start each disposable fixture, then run its matching browser script:
 .venv/bin/python tests/browser_source_formats_app.py
-REFRNCR_PLAYWRIGHT_MODULE=/tmp/ref134-browser/node_modules/playwright \
-REFRNCR_BROWSER_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
-  node tests/javascript/source_formats_browser.cjs
+node tests/javascript/source_formats_browser.cjs
+.venv/bin/python tests/browser_ui_refresh_app.py
+node tests/javascript/ui_refresh_browser.cjs
+.venv/bin/python tests/browser_field_datatypes_app.py
+node tests/javascript/field_datatypes_browser.cjs
 ```
 
-Runtime versions: **Python 3.12.2**, **SQLite 3.51.0**, **PostgreSQL 16.15**
-(Debian 16.15-1.pgdg13+2, aarch64). PostgreSQL tests use only the disposable
-`refrncr-ref158-pg16` container on loopback port 55418. The existing development
-database is untouched apart from the suite's pre-existing read-only connectivity
-check. The disposable browser fixture and PostgreSQL container were stopped
-after verification.
+Browser commands use the existing external `REFRNCR_PLAYWRIGHT_MODULE` and
+`REFRNCR_BROWSER_EXECUTABLE` environment convention. The in-app browser reported
+`Browser is not available: iab`; real Chrome was used without adding a dependency.
+Logs and screenshots remain outside Git. Review evidence uses the temporary
+`ref158-review-*` logs, with full suites in `ref158-review-full-sqlite.log` and
+`ref158-review-full-pg.log`, and final source-format Chrome in
+`ref158-review-chrome-final.log`. The temporary PostgreSQL container is
+`refrncr-ref158-pg16`, bound to loopback port 55418. No application database is used;
+the suite's existing development-database connectivity check is read-only.
 
-Browser: **Google Chrome 152.0.7977.84**. The in-app browser bootstrap reported
-`Browser is not available: iab`; the existing external Playwright/real Chrome
-fixture was used. No browser package was added to the project. Viewports:
-**320, 768 and 1440 × 1000 px**. No page errors or console errors were observed.
-Screenshots `/tmp/ref158-{320,768,1440}.png`; 320 and 1440 visually inspected.
-Numeric screenshots: `/tmp/ref158-numeric-{320,768,1440}.png`.
+Versions: Python **3.12.2**, SQLite **3.51.0**, PostgreSQL **16.15** (Debian/aarch64),
+Chrome **152.0.7977.84**, Node **24.9.0**, pytest **8.4.2**, Ruff **0.16.5**,
+pre-commit **4.6.2**, Flask **3.1.3**, Werkzeug **3.1.8**, SQLAlchemy **2.0.52**,
+Alembic **1.19.1**, setuptools **84.0.0**. No version/dependency change is included.
 
-Exact Date/Time layout measurements from Chrome, in CSS pixels:
+## Browser evidence and boundaries
 
-| Viewport | Document width | Date x / y / width | Time x / y / width |
-| ---: | ---: | --- | --- |
-| 320 | 320 | 42 / 446.59375 / 236 | 42 / 526.1875 / 236 |
-| 768 | 768 | 64.71875 / 636.75 / 311.28125 | 392 / 636.75 / 311.28125 |
-| 1440 | 1440 | 322 / 555.234375 / 510 | 848 / 555.234375 / 510 |
+REF-158 runs at **320, 768 and 1440 × 1000 px**, with and without JavaScript.
+The additional UI-refresh suite uses the same widths at 900 px height; datatype
+checks include 1440 and 320 px. Source-format screenshots at 320 and 1440 were
+visually inspected. Exact Date/Time control measurements from the final run:
 
-Chrome covers detected DateTime, all-fields/individual disclosure, Date/Time
-changes and their summaries/examples/errors, focus, keyboard Tab/Escape,
-Preview/back preservation, native/text restoration, real native Excel Date/Time/
-DateTime, ordinary/scientific Float in one column, ambiguity focus, Z/offset versus
-local Timestamp, timezone clearing, delayed-response protection, safe repeated
-initialization and page-overflow assertions at each width.
+| Viewport/document width | Date x / y / width | Time x / y / width |
+| ---: | --- | --- |
+| 320 / 320 | 42 / 446.53125 / 236 | 42 / 526.125 / 236 |
+| 768 / 768 | 64.71875 / 446.875 / 311.28125 | 392 / 446.875 / 311.28125 |
+| 1440 / 1440 | 322 / 446.359375 / 510 | 848 / 446.359375 / 510 |
 
-## Remaining boundaries
+Assertions cover auto-detection, individual/all disclosure, accessible control
+names, live summary/examples and errors, native Date/Time/DateTime switching and
+restoration, both Timestamp representations, irrelevant zone clearing, mixed
+Float, Preview/Back/Refresh, native keyboard selection, tab order, visible focus,
+Escape restoration, repeated initialization and delayed-response protection.
+No console/page errors or horizontal page overflow in the REF-158 scenarios.
 
 No full human screen-reader session or WCAG certification is claimed. Native
-select option menus retain browser/OS presentation; the wrapping summary exposes
-long selected patterns. Existing native Excel precision, six fractional digits,
-IANA database and process-local staged-upload TTL limitations remain.
-GitHub CI cannot run for these uncommitted/unpushed changes and is required before
-merge. This delivery is for local review and commit only.
+select menus retain OS/browser behavior; wrapping summaries expose long patterns.
+Existing Excel precision, six-fractional-digit, IANA-database and process-local
+staging/TTL limits remain. No known unresolved REF-158 defect was found after the
+corrections. GitHub CI is the independent gate before any merge; no merge is authorized.
 
-## Files and recommended Git actions
+## Changed files and Git administration
 
-The explicit list below is also the changed-file inventory. Catalogue/service/web
-files implement composition and validation; templates/CSS/JS implement the shared
-source-format UI; tests/fixtures establish behavior; documentation records the
-contract and its audit-read trace. All changes remain unstaged.
+The complete inventory relative to `origin/main` is below. Changes to the two
+older browser scripts only align their navigation with already existing behavior.
 
-Recommended commands only — none executed:
+- `docs/development/audit-coverage.json`
+- `docs/development/audit-inventory.json`
+- `docs/development/field-datatypes.md`
+- `docs/development/record-import-security.md`
+- `docs/development/ref-154-report.md`
+- `docs/development/ref-158-report.md`
+- `docs/development/ui-foundation.md`
+- `src/refrncr/record_import.py`
+- `src/refrncr/source_formats.py`
+- `src/refrncr/static/css/layouts/import.css`
+- `src/refrncr/static/js/refrncr.js`
+- `src/refrncr/templates/pages/datasets/import/mapping.html`
+- `src/refrncr/templates/pages/datasets/import/source_format.html`
+- `src/refrncr/templates/pages/datasets/import/wizard.html`
+- `src/refrncr/web.py`
+- `tests/browser_source_formats_app.py`
+- `tests/javascript/field_datatypes_browser.cjs`
+- `tests/javascript/source_formats.cjs`
+- `tests/javascript/source_formats_browser.cjs`
+- `tests/javascript/ui_refresh_browser.cjs`
+- `tests/test_import_wizard.py`
+- `tests/test_import_wizard_javascript.py`
+- `tests/test_source_format_components.py`
+- `tests/test_source_format_import.py`
+- `tests/test_source_format_transactions.py`
 
-```sh
-git add \
-  docs/development/audit-coverage.json \
-  docs/development/audit-inventory.json \
-  docs/development/field-datatypes.md \
-  docs/development/record-import-security.md \
-  docs/development/ref-154-report.md \
-  docs/development/ref-158-report.md \
-  docs/development/ui-foundation.md \
-  src/refrncr/record_import.py \
-  src/refrncr/source_formats.py \
-  src/refrncr/static/css/layouts/import.css \
-  src/refrncr/static/js/refrncr.js \
-  src/refrncr/templates/pages/datasets/import/mapping.html \
-  src/refrncr/templates/pages/datasets/import/source_format.html \
-  src/refrncr/web.py \
-  tests/browser_source_formats_app.py \
-  tests/javascript/source_formats.cjs \
-  tests/javascript/source_formats_browser.cjs \
-  tests/test_import_wizard.py \
-  tests/test_import_wizard_javascript.py \
-  tests/test_source_format_components.py \
-  tests/test_source_format_import.py \
-  tests/test_source_format_transactions.py
-git commit -m "feat(import): simplify source format selection (REF-158)"
-git push -u origin feat/ref-158-source-format-ux
-```
-
-Final verified Git state: **19 modified tracked files, 3 new untracked files,
-0 staged files**, on `feat/ref-158-source-format-ux`. No unrelated files or known
-secrets were added. The explicit `git add` list above contains all 22 paths.
+Branch: `feat/ref-158-source-format-ux`. Preserve the existing commits and add the
+review fixes with `feat(import): simplify source format selection (REF-158)`.
+Push only this branch and open a focused PR to `main`, linked to REF-158. The PR
+and conversation record the final commit, CI and Jira status; do not add a
+self-referential commit hash to this committed report. Never merge automatically.

@@ -187,7 +187,7 @@ def form_data(wizard, profile="v1-eu"):
 
 def test_mapping_progressive_disclosure_and_live_examples(wizard):
     page = wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
-    assert "data-advanced-formats" in page.text
+    assert "Advanced options" in page.text
     assert page.text.count("data-format-details open") == 1
     assert "Choose source format" in page.text
     assert "for='source-1'" in page.text

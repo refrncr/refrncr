@@ -70,8 +70,7 @@
 
 /* The wizard grows with its content and the page keeps the single scrollbar: a nested
    scroll container inside the already-scrolling .app-main squeezed short steps such as
-   Upload file and clipped the drop zone. The action bar stays reachable by sticking to
-   the bottom of the viewport while a long column list scrolls past it. */
+   Upload file and clipped the drop zone. The action bar follows the content. */
 .app-main:has(> .import-wizard) { overflow-x: clip; }
 
 .import-mapping optgroup[data-option-group="used"] { color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
@@ -88,7 +87,7 @@
 
 .mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
 .mapping-heading h2 { margin: 0; }
-.mapping-mode-toggle { margin-inline-start: auto; }
+.mapping-format-toggle { margin-inline-start: auto; }
 .mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); color: var(--color-text-muted); }
 .mapping-info summary .button-icon { width: 1.125rem; height: 1.125rem; margin: 0; }
 .mapping-info summary:hover { color: var(--color-text); }
@@ -104,7 +103,6 @@
 .source-format-summary { overflow-wrap: anywhere; }
 /* The header format text is server-rendered and goes stale while the disclosure
    is open; the live effective-format line inside the disclosure replaces it. */
-.source-format-details[open] ~ .source-format-summary .source-format-static,
 .source-formats:has(.source-format-details[open]) .source-format-static { display: none; }
 .source-format-controls { min-width: 0; margin: var(--space-md) 0; padding: 0; border: 0; }
 .source-format-controls label { display: block; margin-block: var(--space-sm) var(--space-xs); }
@@ -119,26 +117,11 @@
 .source-format-details > select, .source-format-details > input { width: 100%; max-width: 100%; }
 .source-format-examples ol { list-style: none; margin: 0; padding: 0; }
 .source-format-example-heads { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin: 0 0 var(--space-xs); color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
-/* Simple mode shows the detected format only. Source type is a correction for the
-   rare case detection is wrong, and the example list is detail most people skip. */
-.import-mapping[data-format-mode="simple"] [data-source-type-field],
-.import-mapping[data-format-mode="simple"] .mapping-details,
-.import-mapping[data-format-mode="simple"] .source-format-summary,
-.import-mapping[data-format-mode="simple"] [data-format-examples] { display: none; }
-/* The column examples describe the target select through aria-describedby, so they are
-   hidden visually rather than removed — a screen reader still reads the example values. */
-.import-mapping[data-format-mode="simple"] .mapping-examples { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-/* A column that needs attention opens on its own and shows everything it needs,
-   even while the rest of the page stays simple. */
-.import-mapping[data-format-mode="simple"] .source-formats:has([data-format-error]) .source-format-summary,
-.import-mapping[data-format-mode="simple"] .source-formats:has([data-format-error]) [data-source-type-field],
-.import-mapping[data-format-mode="simple"] .source-formats:has([data-format-error]) [data-format-examples] { display: block; }
-/* The column examples are clipped rather than removed, so undoing that needs the
-   clip reset, not a display value. */
-.import-mapping[data-format-mode="simple"] .mapping-row:has([data-format-error]) .mapping-examples { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; white-space: normal; }
 .source-format-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin-block: var(--space-md); }
 .source-format-pair > div { min-width: 0; }
 .source-format-pair span, .source-format-pair code { display: block; overflow-wrap: anywhere; white-space: normal; }
 @media (max-width: 40rem) {
   .source-format-pair { grid-template-columns: minmax(0, 1fr); }
+  .source-format-example-heads { display: none; }
+  .source-format-pair .visually-hidden { position: static; width: auto; height: auto; margin: 0; padding: 0; overflow: visible; clip: auto; white-space: normal; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 }

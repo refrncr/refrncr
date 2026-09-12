@@ -13,16 +13,15 @@
       {% if column.temporal %}
         {% set temporal = column.temporal %}
         {% set components = temporal.components %}
-        {% set ask_source = column.native_possible or column.timestamp %}
-        <div data-source-type-field{% if not ask_source %} hidden{% endif %}>
-          <label for='source-{{ index }}'>How is the {{ temporal.plain_noun }} written in your file?<span class='visually-hidden'> For {{ column.key }}</span></label>
+        <div data-source-type-field>
+          <label for='source-{{ index }}'>Source type<span class='visually-hidden'> for {{ column.key }}</span></label>
           <select id='source-{{ index }}' name='source_{{ index }}' data-source-type aria-describedby='source-type-help-{{ index }} {{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
             <option value=''>Choose how it is written</option>
             <option value='text'{% if components.source == 'text' %} selected{% endif %}>As text{% if column.timestamp %}, in local time{% endif %}</option>
-            {% if column.native_possible %}<option value='native'{% if components.source == 'native' %} selected{% endif %}>As a real {{ temporal.plain_noun }} cell in Excel</option>{% endif %}
+            <option value='native'{% if components.source == 'native' %} selected{% endif %}>{{ temporal.native_label }}</option>
             {% if column.timestamp %}<option value='offset'{% if components.source == 'offset' %} selected{% endif %}>As text with Z or an offset (ISO / RFC 3339)</option>{% endif %}
           </select>
-          <p class='help-text' id='source-type-help-{{ index }}'>This is about your file, not about refrncr: values are always stored the same way. Detected automatically — change it only if the detection is wrong.</p>
+          <p class='help-text' id='source-type-help-{{ index }}'>Choose how the {{ temporal.plain_noun }} is written in your file. Native Excel requires a typed cell in an Excel workbook.</p>
         </div>
         <div class='source-format-parts' data-text-formats{% if components.source != 'text' %} hidden{% endif %}>
           {% for part, profiles in [('date', temporal.dates), ('time', temporal.times)] %}

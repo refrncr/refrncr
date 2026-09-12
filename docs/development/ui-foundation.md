@@ -899,4 +899,8 @@ panel content, and delegates form changes. Replaced disclosures are bound once.
 existing `data-local-timezone` output label. Existing generation/abort guards
 protect text being typed from late responses. Dynamic native/text switching and
 live examples use JavaScript; initially detected selections still submit through
-the server-rendered form. See [REF-158 validation](ref-158-report.md).
+the server-rendered form. A visible no-JavaScript message explains the limitations.
+The all-Fields action keeps its **Advanced options** name and is hidden when no
+format disclosures apply; there is no Simple/Advanced mode. Opening a single
+Field always exposes its examples. Stacked mobile pairs show individual visible
+source/stored labels. See [REF-158 validation](ref-158-report.md).

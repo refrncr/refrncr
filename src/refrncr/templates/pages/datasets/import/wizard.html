@@ -18,7 +18,7 @@
         <summary aria-label='About column mapping' aria-describedby='mapping-instructions'>{{ info_icon() }}</summary>
         <div id='mapping-instructions' class='mapping-tooltip' role='tooltip' tabindex='0'>{% include "pages/datasets/import/mapping_info.html" %}</div>
       </details>
-      <button type='button' class='button button-secondary mapping-mode-toggle' data-advanced-formats aria-expanded='false' form='import-step-form'>Advanced</button>
+      <button type='button' class='button button-secondary mapping-format-toggle' data-advanced-formats aria-expanded='false' form='import-step-form' hidden>Advanced options</button>
     </div>{% else %}<h2 id='import-step-title'>{{ steps[step - 1].label }}</h2>{% endif %}
     {{ feedback(error, id='import-error', focus=true) }}
     {% if success %}

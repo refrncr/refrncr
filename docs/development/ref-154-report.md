@@ -596,3 +596,8 @@ identifiers, parsing/detection, successful-confirmation preferences and migratio
 one profile. Irrelevant timezone/fold submissions now fail closed rather than being
 silently removed. Historical test results above are unchanged; current UX and
 new validation evidence are recorded in [the REF-158 report](ref-158-report.md).
+
+The REF-158 completion review also restores the stable Advanced options disclosure
+contract, verifies all four ordinary/scientific Float examples in persisted rows,
+and reruns the inherited security, migration and transaction regressions. The
+linked report supersedes earlier REF-158 local-only Git-status statements.

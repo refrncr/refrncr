@@ -158,16 +158,10 @@
     const details = () => [...form.querySelectorAll("[data-format-details]")];
     const sync = () => {
       const items = details();
-      // With format disclosures the mode follows them; with none, the toggle's own
-      // state stands, because the example values still respond to it.
-      const expanded = items.length
-        ? items.every((item) => item.open)
-        : advanced.getAttribute("aria-expanded") === "true";
+      const expanded = items.length > 0 && items.every((item) => item.open);
       advanced.setAttribute("aria-expanded", String(expanded));
       advanced.setAttribute("aria-controls", items.map((item) => item.id).join(" "));
-      // The label names the mode the control switches to, not the current one.
-      advanced.textContent = expanded ? "Simple" : "Advanced";
-      form.dataset.formatMode = expanded ? "advanced" : "simple";
+      advanced.hidden = items.length === 0;
     };
     const focusError = () => form.querySelector("[data-format-error]")?.focus();
     const updateComponents = (row) => {
@@ -190,10 +184,7 @@
       }
       const summary = row.querySelector("[data-effective-format]");
       summary.textContent = source.value === "text"
-        ? controls.map((control) => {
-            const option = control.selectedOptions[0];
-            return option?.dataset?.pattern || option?.textContent || "";
-          }).filter(Boolean).join(" ")
+        ? controls.map((control) => control.selectedOptions[0]?.textContent || "").join(" + ")
         : source.selectedOptions[0]?.textContent || "Choose source type";
     };
     const bind = () => {

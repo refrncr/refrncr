@@ -282,19 +282,32 @@ def test_native_excel_controls_preview_and_textual_rejection(wizard):
     assert wizard.count() == 0
 
 
-def test_float_column_mixed_notation_confirms_canonical_values(wizard):
+def test_float_column_mixed_notation_confirms_canonical_values(wizard, import_context):
     wizard.services.dataset_fields.create_field(
         wizard.admin.id, wizard.dataset.key, "measure", "Measure", "float", False, False
     )
-    page = wizard.upload(b"code;amount;measure\nA;1;102.1059\nB;1;6.7e+07\n")
+    page = wizard.upload(
+        b"code;amount;measure\nA;1;102.1059\nB;1;6.7e+07\nC;1;1.25e6\nD;1;6.02E-4\n"
+    )
     data = Controls(page.text).data
     assert data["source_2"] == "v1-float"
     assert "Finite decimal or scientific number" in page.text
     assert "102.1059" in page.text and "67000000.0" in page.text
     assert "Validation successful" in wizard.post(wizard.path + "/preview", data).text
     assert wizard.get(wizard.path + "/step/5").status_code == 200
-    assert "2 records imported successfully" in wizard.post(wizard.path + "/confirm").text
-    assert wizard.count() == 2
+    assert "4 records imported successfully" in wizard.post(wizard.path + "/confirm").text
+    assert wizard.count() == 4
+    from sqlalchemy import select
+
+    from refrncr.models import DatasetField, DatasetRecordValue
+
+    with import_context[0]() as session:
+        stored = session.scalars(
+            select(DatasetRecordValue.string_value)
+            .join(DatasetField, DatasetField.id == DatasetRecordValue.field_id)
+            .where(DatasetField.key == "measure")
+        )
+        assert set(stored) == {"102.1059", "67000000.0", "1250000.0", "0.000602"}
 
 
 def test_ref154_catalogue_is_preserved_exactly():
