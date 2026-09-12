@@ -1,34 +1,76 @@
 <div class='source-formats' data-source-formats='{{ index }}'>
-{% if column %}
-  <p class='source-format-summary'><strong>{{ column.datatype }}</strong> · {{ column.label }}{% if column.examples %} · <code>{{ column.examples[0].source }}</code> → <code>{{ column.examples[0].stored }}</code>{% endif %}</p>
+{# A String column has no source format to choose, so the summary would only repeat
+   the example values already shown next to the column header. #}
+{% if column and column.applicable %}
+  <p class='source-format-summary'><strong>{{ column.datatype }}</strong><span class='source-format-static'> · {{ column.label }}</span>{% if column.examples %} · <code>{{ column.examples[0].source }}</code> → <code>{{ column.examples[0].stored }}</code>{% endif %}</p>
 {% endif %}
 {% if column and column.applicable %}
   <details id='source-details-{{ index }}' class='source-format-details' data-format-details{% if column.error %} open{% endif %}>
     <summary>Change format<span class='visually-hidden'> for {{ column.key }}</span></summary>
-    <label for='source-{{ index }}'>Choose source format<span class='visually-hidden'> for {{ column.key }}</span></label>
-    <select id='source-{{ index }}' name='source_{{ index }}'{% if column.error %} aria-invalid='true' aria-describedby='source-error-{{ index }}' data-format-error{% endif %}>
-      <option value=''>Choose source format</option>
-      {% for profile in column.profiles %}<option value='{{ profile.id }}'{% if profile.id == column.choice.get('profile_id') %} selected{% endif %}>{{ profile.label }}</option>{% endfor %}
-    </select>
-    {% if column.timestamp %}
-      <label for='timezone-{{ index }}'>IANA source timezone (required for local timestamps)</label>
-      <input id='timezone-{{ index }}' name='timezone_{{ index }}' value='{{ column.choice.get("timezone", "") }}' maxlength='100' placeholder='Europe/Amsterdam'>
-      <label for='fold-{{ index }}'>Repeated local times</label>
-      <select id='fold-{{ index }}' name='fold_{{ index }}'>
-        <option value=''>Require a decision</option>
-        <option value='earlier'{% if column.choice.get('fold') == 'earlier' %} selected{% endif %}>Earlier occurrence</option>
-        <option value='later'{% if column.choice.get('fold') == 'later' %} selected{% endif %}>Later occurrence</option>
-      </select>
-    {% else %}<input type='hidden' name='timezone_{{ index }}' value=''><input type='hidden' name='fold_{{ index }}' value=''>{% endif %}
-    {% if column.error %}<p class='error-text' id='source-error-{{ index }}'>{{ column.error }}</p>{% endif %}
-    <ol class='source-format-examples' aria-label='Source and stored examples'>
-      {% for example in column.examples %}
-      <li class='source-format-pair'>
-        <div><span>Examples from source</span><code>{{ example.source }}</code>{% if example.source != example.full_source %}<details><summary>Full source value</summary><code>{{ example.full_source }}</code></details>{% endif %}</div>
-        <div><span>Stored as</span><code>{{ example.stored }}</code>{% if example.full_stored and example.stored != example.full_stored %}<details><summary>Full stored value</summary><code>{{ example.full_stored }}</code></details>{% endif %}</div>
-      </li>
-      {% endfor %}
-    </ol>
+    <fieldset class='source-format-controls'>
+      <legend>Source format for {{ column.key }}</legend>
+      {% set error_description = 'source-error-' ~ index if column.error else 'effective-format-' ~ index %}
+      {% if column.temporal %}
+        {% set temporal = column.temporal %}
+        {% set components = temporal.components %}
+        {% set ask_source = column.native_possible or column.timestamp %}
+        <div data-source-type-field{% if not ask_source %} hidden{% endif %}>
+          <label for='source-{{ index }}'>How is the {{ temporal.plain_noun }} written in your file?<span class='visually-hidden'> For {{ column.key }}</span></label>
+          <select id='source-{{ index }}' name='source_{{ index }}' data-source-type aria-describedby='source-type-help-{{ index }} {{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
+            <option value=''>Choose how it is written</option>
+            <option value='text'{% if components.source == 'text' %} selected{% endif %}>As text{% if column.timestamp %}, in local time{% endif %}</option>
+            {% if column.native_possible %}<option value='native'{% if components.source == 'native' %} selected{% endif %}>As a real {{ temporal.plain_noun }} cell in Excel</option>{% endif %}
+            {% if column.timestamp %}<option value='offset'{% if components.source == 'offset' %} selected{% endif %}>As text with Z or an offset (ISO / RFC 3339)</option>{% endif %}
+          </select>
+          <p class='help-text' id='source-type-help-{{ index }}'>This is about your file, not about refrncr: values are always stored the same way. Detected automatically — change it only if the detection is wrong.</p>
+        </div>
+        <div class='source-format-parts' data-text-formats{% if components.source != 'text' %} hidden{% endif %}>
+          {% for part, profiles in [('date', temporal.dates), ('time', temporal.times)] %}
+          {% if profiles %}<div>
+            <label for='{{ part }}-{{ index }}'>{{ part|capitalize }} format<span class='visually-hidden'> for {{ column.key }}</span></label>
+            <select id='{{ part }}-{{ index }}' name='{{ part }}_{{ index }}' aria-describedby='effective-format-{{ index }}{% if column.error %} source-error-{{ index }}{% endif %}'{% if components.source != 'text' %} disabled{% endif %}{% if column.error %} aria-invalid='true'{% endif %}>
+              {% for profile in profiles %}<option value='{{ profile.id }}'{% if profile.id == components.get(part) %} selected{% endif %}{% if profile.pattern %} data-pattern='{{ profile.pattern }}'{% endif %}>{{ profile.label }}</option>{% endfor %}
+            </select>
+          </div>{% endif %}
+          {% endfor %}
+        </div>
+      {% elif column.profiles|length == 1 %}
+        <input type='hidden' name='source_{{ index }}' value='{{ column.choice.get("profile_id", "") }}'>
+      {% else %}
+        <label for='source-{{ index }}'>Choose source format<span class='visually-hidden'> for {{ column.key }}</span></label>
+        <select id='source-{{ index }}' name='source_{{ index }}' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
+          <option value=''>Choose source format</option>
+          {% for profile in column.profiles %}<option value='{{ profile.id }}'{% if profile.id == column.choice.get('profile_id') %} selected{% endif %}>{{ profile.label }}</option>{% endfor %}
+        </select>
+      {% endif %}
+      {% if column.timestamp %}
+        <div data-source-timezone{% if not column.choice.get('profile_id') or column.choice.get('profile_id') == 'v1-offset' %} hidden{% endif %}>
+          <label for='timezone-{{ index }}'>IANA source timezone (required for local timestamps)</label>
+          <input id='timezone-{{ index }}' name='timezone_{{ index }}' value='{{ column.choice.get("timezone", "") }}' maxlength='100' placeholder='Europe/Amsterdam' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
+          <label for='fold-{{ index }}'>Repeated local times</label>
+          <select id='fold-{{ index }}' name='fold_{{ index }}' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
+            <option value=''>Require a decision</option>
+            <option value='earlier'{% if column.choice.get('fold') == 'earlier' %} selected{% endif %}>Earlier occurrence</option>
+            <option value='later'{% if column.choice.get('fold') == 'later' %} selected{% endif %}>Later occurrence</option>
+          </select>
+        </div>
+      {% else %}<input type='hidden' name='timezone_{{ index }}' value=''><input type='hidden' name='fold_{{ index }}' value=''>{% endif %}
+    </fieldset>
+    <p id='effective-format-{{ index }}' data-effective-format tabindex='-1' role='status' aria-live='polite' aria-atomic='true'>{{ column.label }}</p>
+    {% if column.error %}<p class='error-text' id='source-error-{{ index }}'{% if column.profiles|length == 1 %} tabindex='-1' data-format-error{% endif %}>{{ column.error }}</p>{% endif %}
+    {% if column.examples %}
+    <div class='source-format-examples' data-format-examples aria-live='polite' aria-atomic='true'>
+      <p class='source-format-example-heads' aria-hidden='true'><span>Examples from source</span><span>Stored as</span></p>
+      <ol aria-label='Source and stored examples'>
+        {% for example in column.examples %}
+        <li class='source-format-pair'>
+          <div><span class='visually-hidden'>Example from source</span><code>{{ example.source }}</code>{% if example.source != example.full_source %}<details><summary>Full source value</summary><code>{{ example.full_source }}</code></details>{% endif %}</div>
+          <div><span class='visually-hidden'>Stored as</span><code>{{ example.stored }}</code>{% if example.full_stored and example.stored != example.full_stored %}<details><summary>Full stored value</summary><code>{{ example.full_stored }}</code></details>{% endif %}</div>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+    {% endif %}
   </details>
 {% else %}
   <input type='hidden' name='source_{{ index }}' value='{{ column.choice.get("profile_id", "") if column else "" }}'>

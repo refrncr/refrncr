@@ -1589,6 +1589,7 @@
       "operation": "list_fields",
       "service": "refrncr.services.DatasetFieldService.list_fields",
       "interface_entrypoints": [
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",

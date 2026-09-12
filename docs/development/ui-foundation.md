@@ -175,6 +175,12 @@ when necessary, while the account area does not shrink. The same viewport layout
 the dedicated Settings shell. Smaller screens retain page scroll with a temporary navigation drawer.
 Navigation focus outlines sit inside each item so scrolling containers cannot clip them.
 
+The record import wizard is deliberately not a second scroll container inside that shell. It
+grows with its content, so short steps such as Upload file are never squeezed and the drop zone
+is never clipped, and the single main scrollbar serves the whole page. Its action bar closes the
+card instead of sticking: inside a card taller than the viewport a sticky bar parks mid-screen
+with the column list scrolling visibly behind it.
+
 Navigation visibility improves clarity but is never authorization. Every route and mutation
 must continue to enforce server-side permissions and CSRF independently.
 
@@ -858,3 +864,39 @@ The audit filters form a compact bar at the head of the audit table object.
 Not part of the refresh (product functionality, tracked separately): the Overview content, the
 other website-mockup proposals. The website typefaces (Instrument Sans, IBM Plex Sans, IBM Plex
 Mono) are packaged as Latin and Latin Extended WOFF2 subsets; see `static/licenses/ASSET-SOURCES.md`.
+
+
+## Compact import source-format group (REF-158)
+
+Classification: a shared component within the import workflow, with deliberately
+workflow-specific layout in `layouts/import.css`. No design token, global field,
+button, component variant or dependency changes. The existing source-format Jinja
+partial renders initial and live responses; related controls use a native
+fieldset/legend and visible labels. Date and Time controls use the existing native
+select styling and appear side by side from 768 px; they stack at narrower widths.
+Each source/stored example pair retains its existing responsive relationship.
+
+**Source type** distinguishes text from Native Excel; Timestamp also offers
+Z/offset. Only relevant text/zone controls are visible. Switching away from text
+disables those controls; a transient controller cache restores the previous textual
+choices when switching back. A fresh native proposal starts textual choices in
+catalogue order when the importer explicitly chooses text. This browser cache is
+neither an import preference nor saved content. String has no format controls;
+Float and Boolean show their fixed profile and examples without a selector.
+
+**Advanced options** opens/closes all applicable mapped Fields. **Change format**
+opens its own Field and focuses its first control (the effective summary for a
+fixed profile). Escape retains the existing close-and-return-focus contract.
+Invalid controls reference their Field error with `aria-describedby` and expose
+`aria-invalid`; live responses preserve the active visible control. The combined
+summary and a stable polite live region announce effective-format/example updates.
+The summary contains the selected exact pattern as well as the readable clock
+label, so long native-select text is also available as wrapping text.
+
+`window.refrncrSourceFormats(root)` is idempotent, is called for server-imported
+panel content, and delegates form changes. Replaced disclosures are bound once.
+`data-source-timezone` is specific to import input and does not collide with the
+existing `data-local-timezone` output label. Existing generation/abort guards
+protect text being typed from late responses. Dynamic native/text switching and
+live examples use JavaScript; initially detected selections still submit through
+the server-rendered form. See [REF-158 validation](ref-158-report.md).

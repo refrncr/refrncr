@@ -9,7 +9,6 @@ import secrets
 from datetime import UTC, date
 from decimal import Decimal
 from functools import wraps
-from itertools import islice
 from urllib.parse import unquote, urlsplit
 
 from flask import (
@@ -46,11 +45,12 @@ from refrncr.login_security import (
 )
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.record_import import (
-    DISPLAY_SAMPLE_VALUES,
+    MAX_COLUMNS,
     MAX_UPLOAD_BYTES,
     PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
     ImportValidationError,
+    distinct_samples,
     parse_source,
 )
 from refrncr.review_tokens import decode_review, encode_review
@@ -76,6 +76,7 @@ from refrncr.services import (
     ValidationError,
     parse_expected_revision,
 )
+from refrncr.source_formats import SourceFormatError, compose_format, formats_for
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
@@ -163,6 +164,14 @@ def create_flask_app(
     def import_upload_limit():
         if request.endpoint == "import_dataset_records" and request.method == "POST":
             request.max_content_length = MAX_UPLOAD_BYTES + 64 * 1024
+        elif (
+            request.endpoint in {"review_source_formats", "preview_record_import"}
+            and request.method == "POST"
+        ):
+            # Six bounded controls per column, plus CSRF and optional navigation.
+            # Multipart framing must fit the existing 250-column upload contract.
+            request.max_content_length = MAX_COLUMNS * 1024
+            request.max_form_parts = MAX_COLUMNS * 6 + 2
 
     login_limiter = login_limiter or LoginAttemptLimiter()
     source_resolver = source_resolver or SourceIdentityResolver()
@@ -1276,7 +1285,7 @@ def create_flask_app(
                     for row in source.rows[:PROFILE_SCAN_ROWS]
                     if index not in row.formulas and row.values[index].strip()
                 )
-                mapping_samples.append(tuple(islice(samples, DISPLAY_SAMPLE_VALUES)))
+                mapping_samples.append(distinct_samples(samples))
         if assistance:
             format_columns = record_imports.format_assistance(
                 actor.id, login_session.id, dataset.key, state.token
@@ -1445,16 +1454,43 @@ def create_flask_app(
             state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
         return import_redirect(key, state)
 
-    def submitted_source_formats(mapping):
-        return {
-            key: {
-                "profile_id": request.form.get(f"source_{index}", ""),
-                "timezone": request.form.get(f"timezone_{index}", ""),
-                "fold": request.form.get(f"fold_{index}", ""),
-            }
-            for index, key in enumerate(mapping)
-            if key
-        }
+    def submitted_source_formats(mapping, actor, key):
+        fields = {field.key: field.data_type for field in dataset_fields.list_fields(actor.id, key)}
+        choices = {}
+        for index, target in enumerate(mapping):
+            profile = request.form.get(f"source_{index}", "")
+            components = {"source": profile}
+            for part in ("date", "time"):
+                name = f"{part}_{index}"
+                if name in request.form:
+                    components[part] = request.form[name]
+            timezone = request.form.get(f"timezone_{index}", "")
+            fold = request.form.get(f"fold_{index}", "")
+            datatype = fields.get(target)
+            if profile in {"text", "native", "offset"}:
+                try:
+                    profile = compose_format(datatype, components)
+                except SourceFormatError:
+                    abort(400)
+            elif len(components) != 1:
+                abort(400)
+            if profile and profile not in {p.id for p in formats_for(datatype)}:
+                abort(400)
+            if (timezone or fold) and (
+                datatype != "timestamp" or profile == "v1-offset" or not profile
+            ):
+                abort(400)
+            if fold not in {"", "earlier", "later"}:
+                abort(400)
+            if target:
+                choices[target] = {"profile_id": profile, "timezone": timezone, "fold": fold}
+        return choices
+
+    def submitted_component_names(count):
+        # Components are optional only for the unchanged canonical-identifier contract.
+        return {f"{part}_{index}" for part in ("date", "time") for index in range(count)} & set(
+            request.form
+        )
 
     @import_route("/datasets/<key>/records/import/<token>/formats", methods=["POST"])
     def review_source_formats(key: str, token: str):
@@ -1469,6 +1505,7 @@ def create_flask_app(
             for prefix in ("mapping", "source", "timezone", "fold")
             for index in range(len(source.headers))
         } | {"csrf_token"}
+        expected |= submitted_component_names(len(source.headers))
         if set(request.form) != expected or any(
             len(request.form.getlist(name)) != 1 for name in expected
         ):
@@ -1480,7 +1517,12 @@ def create_flask_app(
             for index in range(len(source.headers))
         )
         columns = record_imports.format_assistance(
-            actor.id, login_session.id, key, token, mapping, submitted_source_formats(mapping)
+            actor.id,
+            login_session.id,
+            key,
+            token,
+            mapping,
+            submitted_source_formats(mapping, actor, key),
         )
         return render_template(
             "pages/datasets/import/source_format_fragments.html", format_columns=columns
@@ -1508,6 +1550,7 @@ def create_flask_app(
         }
         if set(request.form) & format_names:
             expected |= format_names
+            expected |= submitted_component_names(len(source.headers))
         target_step = request.form.get("go_step")
         if target_step is not None:
             if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4", "5"}:
@@ -1532,10 +1575,12 @@ def create_flask_app(
             else request.form[f"mapping_{index}"]
             for index in range(len(source.headers))
         )
+        choices = (
+            submitted_source_formats(mapping, actor, key)
+            if set(request.form) & format_names
+            else None
+        )
         try:
-            choices = (
-                submitted_source_formats(mapping) if set(request.form) & format_names else None
-            )
             preview = record_imports.preview(
                 actor.id, login_session.id, key, token, mapping, choices
             )

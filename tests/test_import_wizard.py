@@ -503,7 +503,10 @@ def test_compact_mapping_discloses_full_escaped_examples_and_short_options(wizar
     long_value = "<script>" + "x" * 100 + "</script>"
     page = wizard.upload(f"code,amount\n{long_value},1\nB,2\nC,3\nFOURTH,4\n".encode())
     assert "class='mapping-list' role='list'" in page.text
-    assert "<fieldset" not in page.text
+    assert re.findall(r"<fieldset[^>]*>", page.text) == [
+        "<fieldset class='source-format-controls'>"
+    ]
+    assert "<legend>Source format for amount</legend>" in page.text
     assert "Full example values" in page.text
     assert "&lt;script&gt;" + "x" * 100 + "&lt;/script&gt;" in page.text
     assert "<script>" + "x" * 100 not in page.text

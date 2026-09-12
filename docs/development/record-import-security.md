@@ -137,10 +137,12 @@ The flow remains Upload → optional worksheet selection → Map columns → Pre
 → Confirm. **Advanced options** opens/closes all applicable format disclosures;
 **Change format** opens one Field below its mapping. Collapsed rows identify the
 datatype, proposed format and one compact source-to-canonical conversion.
-String, Boolean and Float have no meaningless multi-format selector.
+String has no source-format disclosure. Boolean and Float expose their fixed profile
+and examples without a meaningless selector.
 
-Expanded native `details` controls contain a labelled **Choose source format**
-select above up to three source/stored pairs. Both sides come from the actual
+Expanded native `details` controls contain a labelled source-format group above
+up to three source/stored pairs. REF-158 replaces the temporal Cartesian dropdown
+with **Source type**, **Date format** and **Time format** native controls. Both sides come from the actual
 staged upload, never fixtures or persisted examples. Each compact value is
 limited to 80 characters. Longer values have an escaped native disclosure,
 bounded by the 4096-character parser limit. On narrow screens each pair stacks
@@ -155,14 +157,40 @@ the native `hidden` attribute, including after mapping changes.
 
 The browser POSTs mapping and source choices to the token-bound `/formats`
 review route to recompute examples using server parsing. This route reauthorizes,
-requires CSRF, validates form shape and changes no state or durable data. Prior
+requires CSRF, validates form shape and changes no state or durable data.
+REF-158 adds datatype validation through the existing Field-list service; the
+audit inventory records that ordinary read, without a new audit event. Prior
 requests are aborted/ignored after newer input, including timezone typing before
 change/blur, so a delayed response cannot replace current input or steal focus; source content never becomes
 HTML through string interpolation. Jinja renders the same shared format partial
 for initial and updated rows. Failure leaves choices available for authoritative
 submission. Mapping changes clear that column's transient format controls.
 
-**Continue to preview** submits the selected profiles. Preview and confirmation
+**Continue to preview** submits the selected components. The HTTP adapter composes
+them into the same canonical profiles used by Preview/Confirm and remembered
+proposals. Existing direct canonical submissions remain supported. Every column
+requires exactly one `mapping_N`, `source_N`, `timezone_N` and `fold_N`. Temporal
+`source_N=text` additionally requires exactly the datatype's `date_N` and/or
+`time_N`; `native` and Timestamp `offset` reject all date/time components. A
+canonical identifier rejects accompanying components. Unknown control names,
+duplicate values, missing parts and datatype-incompatible identifiers fail closed.
+Hidden/disabled text selections are not submitted for native/offset sources.
+Live review sends URL-encoded text controls, matching normal Preview submission;
+no uploaded file is sent again during format review.
+These two POST routes have a bounded 250 KiB body and at most 1,502 multipart
+parts (six controls × the existing 250-column limit, plus CSRF/navigation).
+The prior generic 16 KiB envelope could reject valid wide component forms.
+The upload's 10 MiB limit and other routes' 16 KiB limit remain unchanged.
+Nonempty timezone/fold values are rejected unless the profile is a local Timestamp;
+they are no longer silently discarded. The service independently rejects irrelevant
+zone/fold metadata. Local IANA and DST parsing rules remain unchanged.
+
+Accepted mapping/format submissions invalidate dependent Preview/Confirm state
+through the existing staged-state update. The live example review remains read-only;
+it does not itself replace the previously submitted mapping. No database migration,
+new public API, new step, durable draft or persistent example is introduced.
+
+**Continue to preview** validates the selected profiles. Preview and confirmation
 use the same source parser and immutable choices. Complete-file checks remain
 authoritative; an invalid value outside the three examples fails the import.
 Unknown/ambiguous detection and timezone/fold decisions block progression at

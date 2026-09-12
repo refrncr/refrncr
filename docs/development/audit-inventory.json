@@ -1018,6 +1018,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
+        "refrncr.services.DatasetFieldService.list_fields",
         "refrncr.services.DatasetRecordService.get_dataset_for_add",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
