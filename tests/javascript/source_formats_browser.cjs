@@ -1,0 +1,113 @@
+// Real Chrome regression. Start tests/browser_source_formats_app.py first.
+const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const assert = require('node:assert/strict');
+const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5154';
+if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw Error('Use the disposable loopback fixture');
+(async () => {
+  const browser = await chromium.launch({headless:true, executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
+  try {
+    console.log('Chrome ' + browser.version());
+    for (const width of [320,768,1440]) {
+      const context = await browser.newContext({viewport:{width,height:1000},reducedMotion:'reduce'});
+      const page = await context.newPage();
+      const errors=[];
+      page.on('pageerror',e=>errors.push(e.message));
+      await page.goto(base+'/login');
+      await page.getByLabel('Email address').fill('admin@example.com');
+      await page.getByLabel('Password',{exact:true}).fill('correct horse battery staple');
+      await page.getByRole('button',{name:'Sign in',exact:true}).click();
+      await page.waitForURL(base+'/');
+      const upload = async (content) => {
+        await page.goto(base+'/datasets/imports/records/import');
+        await page.getByLabel('CSV or Excel file').setInputFiles({name:'source.csv',mimeType:'text/csv',buffer:Buffer.from(content)});
+        await page.getByRole('button',{name:'Continue',exact:true}).click();
+        await page.waitForURL(/\/step\/3$/);
+      };
+      await upload('code;unused\nA;12.50\n');
+      assert.equal(await page.locator('[data-format-details]').count(),0);
+      assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false,'Do not show an inert Advanced options button without format choices');
+      const mappedReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await page.getByLabel('Target field for unused',{exact:true}).selectOption('amount');
+      await mappedReview;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.equal(await page.locator('[data-advanced-formats]').isVisible(),true);
+      await page.getByRole('button',{name:'Advanced options',exact:true}).click();
+      assert.equal(await page.locator('[data-format-details][open]').count(),1);
+      assert.equal(await page.getByLabel('Choose source format for amount',{exact:true}).isVisible(),true);
+      const ignoredReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await page.getByLabel('Target field for unused',{exact:true}).selectOption('__ignored__');
+      await ignoredReview;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false);
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await upload('code;amount;day\nA;1.234,56;2024-02-29\nB;2.345,67;2024-03-01\n');
+      const advanced=page.getByRole('button',{name:'Advanced options',exact:true});
+      assert.equal(await page.locator('[data-format-details][open]').count(),0);
+      await advanced.focus();
+      await page.keyboard.press('Space');
+      assert.equal(await page.locator('[data-format-details][open]').count(),2);
+      assert.equal(await advanced.getAttribute('aria-expanded'),'true');
+      await advanced.click();
+      assert.equal(await page.locator('[data-format-details][open]').count(),0);
+      const change=page.getByText('Change format',{exact:false}).filter({hasText:'amount'});
+      await change.focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('[data-format-details][open]').count(),1);
+      const select=page.getByLabel('Choose source format for amount',{exact:true});
+      await page.keyboard.press('Tab');
+      assert.equal(await select.evaluate(e=>document.activeElement===e),true);
+      assert.equal(await select.inputValue(),'v1-eu');
+      const pairs=page.locator('[data-source-formats="1"] .source-format-pair');
+      assert.deepEqual(await pairs.locator('code').allTextContents(),['1.234,56','1234.56','2.345,67','2345.67']);
+      const boxes=await pairs.first().locator(':scope > div').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width};}));
+      if(width===320) assert.ok(boxes[1].y>boxes[0].y && boxes[1].x===boxes[0].x);
+      else {assert.equal(boxes[1].y,boxes[0].y); assert.ok(boxes[1].x>boxes[0].x);}
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('[data-format-details][open]').count(),0);
+      assert.equal(await change.evaluate(e=>document.activeElement===e),true);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      await upload('code;amount;day\nC;1.234;2024-02-29\nD;2.345;2024-03-01\n');
+      assert.equal(await page.locator('[data-format-details][open]').count(),1);
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'source-1');
+      const refresh=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await page.getByLabel('Choose source format for amount',{exact:true}).selectOption('v1-eu');
+      await refresh;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.deepEqual(await page.locator('[data-source-formats="1"] .source-format-pair code').allTextContents(),['1.234','1234','2.345','2345']);
+      await page.screenshot({path:`/tmp/ref154-${width}.png`,fullPage:true});
+      await page.locator('[data-mapping-continue]').click();
+      await page.waitForURL(/\/step\/4$/);
+      await page.getByText('1234',{exact:true}).waitFor();
+      await page.getByText('2345',{exact:true}).waitFor();
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      assert.deepEqual(errors,[]);
+      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await upload('code;amount;day;stamp\nE;12.50;2024-02-29;2024-02-29 12:00:00\n');
+      let releaseReview, reviewReached, reviewFinished;
+      const gate=new Promise(resolve=>{releaseReview=resolve;});
+      const reached=new Promise(resolve=>{reviewReached=resolve;});
+      const finished=new Promise(resolve=>{reviewFinished=resolve;});
+      const holdReview=async route=>{
+        const response=await route.fetch();
+        reviewReached();
+        await gate;
+        try {await route.fulfill({response});} finally {reviewFinished();}
+      };
+      await page.route('**/formats',holdReview);
+      await page.getByLabel('Choose source format for stamp',{exact:true}).selectOption('v1-datetime-ymd-dash-hms');
+      await reached;
+      const zone=page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true});
+      await zone.fill('Europe/London');
+      releaseReview();
+      await finished;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.equal(await zone.inputValue(),'Europe/London','A late review must preserve newly typed timezone text');
+      assert.equal(await zone.evaluate(e=>document.activeElement===e),true);
+      await page.unroute('**/formats',holdReview);
+      await page.getByRole('button',{name:'Cancel',exact:true}).click();
+      console.log(`PASS ${width}: disclosure, labels, paired conversion, keyboard/Escape/focus, ambiguity, Preview, no overflow`);
+      await context.close();
+    }
+  } finally {await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

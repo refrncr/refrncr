@@ -257,6 +257,16 @@ class DatasetField(Base):
         return cls._key
 
 
+class DatasetFieldSourceFormat(Base):
+    """Last committed import proposal; independent of Field configuration/snapshots."""
+
+    __tablename__ = "dataset_field_source_formats"
+    field_id: Mapped[str] = mapped_column(
+        ForeignKey("dataset_fields.id", ondelete="CASCADE"), primary_key=True
+    )
+    choice: Mapped[dict] = mapped_column(JSON)
+
+
 @event.listens_for(DatasetField, "before_update")
 def _prevent_dataset_field_key_update(_mapper, _connection, field: DatasetField) -> None:
     if inspect(field).attrs["_key"].history.has_changes():

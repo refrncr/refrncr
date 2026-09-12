@@ -100,7 +100,7 @@
   });
 
   document.querySelectorAll("[data-import-mapping]").forEach((form) => {
-    const selects = [...form.querySelectorAll("select")];
+    const selects = [...form.querySelectorAll("select[name^='mapping_']")];
     const optionLists = selects.map((select) => ({
       select,
       options: [...select.querySelectorAll("option[data-option-group]")].sort((a, b) => Number(a.dataset.optionOrder) - Number(b.dataset.optionOrder)),
@@ -146,6 +146,84 @@
     form.addEventListener("change", update);
     update();
   });
+  document.querySelectorAll("[data-source-formats-url]").forEach((form) => {
+    const advanced = form.querySelector("[data-advanced-formats]");
+    let generation = 0;
+    let pending = null;
+    const details = () => [...form.querySelectorAll("[data-format-details]")];
+    const sync = () => {
+      advanced.setAttribute("aria-expanded", String(details().length > 0 && details().every((item) => item.open)));
+      advanced.setAttribute("aria-controls", details().map((item) => item.id).join(" "));
+      advanced.hidden = details().length === 0;
+    };
+    const focusError = () => form.querySelector("[data-format-error]")?.focus();
+    const bind = () => {
+      details().forEach((item) => {
+        item.addEventListener("toggle", sync);
+        item.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && item.open) {
+            event.preventDefault();
+            item.open = false;
+            item.querySelector("summary").focus();
+          }
+        });
+      });
+      sync();
+    };
+    advanced.addEventListener("click", () => {
+      const open = advanced.getAttribute("aria-expanded") !== "true";
+      details().forEach((item) => { item.open = open; });
+      sync();
+    });
+    form.addEventListener("input", (event) => {
+      if (!/^timezone_\d+$/.test(event.target.name || "")) return;
+      // Text edits precede change/blur: an older response must not replace the input.
+      ++generation;
+      pending?.abort();
+      form.removeAttribute("aria-busy");
+    });
+    form.addEventListener("change", async (event) => {
+      const index = event.target.name?.match(/^(?:mapping|source|timezone|fold)_(\d+)$/)?.[1];
+      if (index === undefined) return;
+      if (event.target.name.startsWith("mapping_")) {
+        ["source", "timezone", "fold"].forEach((prefix) => { form.elements.namedItem(`${prefix}_${index}`).value = ""; });
+      }
+      const current = ++generation;
+      const open = new Set(details().filter((item) => item.open).map((item) => item.closest("[data-source-formats]").dataset.sourceFormats));
+      const data = new FormData(form);
+      pending?.abort();
+      pending = new AbortController();
+      form.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch(form.dataset.sourceFormatsUrl, {method: "POST", body: data, credentials: "same-origin", signal: pending.signal});
+        if (!response.ok || response.redirected) throw new Error("Format review unavailable");
+        const page = new DOMParser().parseFromString(await response.text(), "text/html");
+        if (current !== generation) return;
+        const focusName = document.activeElement?.name;
+        page.querySelectorAll("[data-source-formats]").forEach((replacement) => {
+          const original = form.querySelector(`[data-source-formats="${replacement.dataset.sourceFormats}"]`);
+          const disclosure = replacement.querySelector("[data-format-details]");
+          if (disclosure && open.has(replacement.dataset.sourceFormats)) disclosure.open = true;
+          original.replaceWith(document.importNode(replacement, true));
+        });
+        bind();
+        const affected = form.querySelector(`[data-source-formats="${index}"] [data-format-error]`);
+        if (affected) affected.focus();
+        else if (focusName && !focusName.startsWith("mapping_")) form.elements.namedItem(focusName)?.focus();
+      } catch (error) {
+        if (error.name !== "AbortError" && current === generation) {
+          const status = form.closest(".import-wizard").querySelector("[data-mapping-status]");
+          status.textContent = "Format examples could not be refreshed. Continue to validate your current choices.";
+        }
+      } finally {
+        if (current === generation) form.removeAttribute("aria-busy");
+      }
+    });
+    form.addEventListener("submit", () => { ++generation; pending?.abort(); });
+    bind();
+    focusError();
+  });
+
   const setSubmitBusy = (form, busy) => {
     if (busy) form.setAttribute("aria-busy", "true");
     else form.removeAttribute("aria-busy");

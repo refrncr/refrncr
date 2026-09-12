@@ -7,6 +7,7 @@ from refrncr.models import (
     DatasetBusinessKeyField,
     DatasetConcept,
     DatasetField,
+    DatasetFieldSourceFormat,
     DatasetRecord,
     DatasetRecordValue,
     DatasetVersionField,
@@ -64,6 +65,18 @@ class SqlAlchemyConceptOperations:
 
     def initialize(self, dataset, version, now):
         # Caller owns the Dataset lock and has established there is no active concept.
+        # Import proposals are installation metadata, not versioned Field configuration.
+        # Preserve them only for the exact Field identities retained by this snapshot.
+        proposals = [
+            {"field_id": field_id, "choice": choice}
+            for field_id, choice in self.session.execute(
+                select(DatasetFieldSourceFormat.field_id, DatasetFieldSourceFormat.choice)
+                .join(
+                    DatasetVersionField, DatasetVersionField.id == DatasetFieldSourceFormat.field_id
+                )
+                .where(DatasetVersionField.version_id == version.id)
+            )
+        ]
         # Preserve source UUIDs; INSERT SELECT avoids materializing any Record/value graph.
         for model in (DatasetRecordValue, DatasetRecord, DatasetBusinessKeyField, DatasetField):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
@@ -96,6 +109,8 @@ class SqlAlchemyConceptOperations:
                 ).where(field.version_id == version.id),
             )
         )
+        if proposals:
+            self.session.execute(insert(DatasetFieldSourceFormat), proposals)
         self.session.execute(
             insert(DatasetBusinessKeyField).from_select(
                 ["dataset_id", "field_key"],

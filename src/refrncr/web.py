@@ -48,7 +48,6 @@ from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.record_import import (
     DISPLAY_SAMPLE_VALUES,
     MAX_UPLOAD_BYTES,
-    PREVIEW_ROWS,
     PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
     ImportValidationError,
@@ -270,6 +269,7 @@ def create_flask_app(
             "import_dataset_records",
             "select_import_worksheet",
             "review_import_mapping",
+            "review_source_formats",
             "preview_record_import",
             "confirm_record_import",
             "cancel_record_import",
@@ -299,6 +299,7 @@ def create_flask_app(
         "dataset_import_step",
         "select_import_worksheet",
         "review_import_mapping",
+        "review_source_formats",
         "preview_record_import",
         "confirm_record_import",
         "cancel_record_import",
@@ -1227,6 +1228,7 @@ def create_flask_app(
         identifier_keys = ()
         mapping_errors = {}
         mapping_samples = []
+        format_columns = []
         if state and state.imported_count is None:
             if step >= 3:
                 state, source, assistance = record_imports.mapping_assistance(
@@ -1275,6 +1277,10 @@ def create_flask_app(
                     if index not in row.formulas and row.values[index].strip()
                 )
                 mapping_samples.append(tuple(islice(samples, DISPLAY_SAMPLE_VALUES)))
+        if assistance:
+            format_columns = record_imports.format_assistance(
+                actor.id, login_session.id, dataset.key, state.token
+            )
         if assistance and error:
             choices = assistance.mapping
             keys = {field.key for field in fields}
@@ -1309,14 +1315,7 @@ def create_flask_app(
             )
             steps.append(dict(number=number, label=label, done=done, reachable=reachable))
         preview_fields = [field for field in fields if preview and field.key in preview.mapping]
-        preview_rows = (
-            [
-                tuple(row.values[preview.mapping.index(field.key)] for field in preview_fields)
-                for row in preview.source.rows[:PREVIEW_ROWS]
-            ]
-            if preview and preview.valid
-            else []
-        )
+        preview_rows = preview.sample if preview and preview.valid else []
         report_rows = []
         if preview and preview.errors:
             rows = {row.number: row for row in preview.source.rows}
@@ -1349,6 +1348,7 @@ def create_flask_app(
             preview=preview,
             fields=fields,
             mapping_samples=mapping_samples,
+            format_columns=format_columns,
             mapping_errors=mapping_errors,
             required_keys=required_keys,
             identifier_keys=identifier_keys,
@@ -1445,6 +1445,47 @@ def create_flask_app(
             state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
         return import_redirect(key, state)
 
+    def submitted_source_formats(mapping):
+        return {
+            key: {
+                "profile_id": request.form.get(f"source_{index}", ""),
+                "timezone": request.form.get(f"timezone_{index}", ""),
+                "fold": request.form.get(f"fold_{index}", ""),
+            }
+            for index, key in enumerate(mapping)
+            if key
+        }
+
+    @import_route("/datasets/<key>/records/import/<token>/formats", methods=["POST"])
+    def review_source_formats(key: str, token: str):
+        actor, login_session = require_authenticated()
+        dataset_records.get_dataset_for_add(actor.id, key)
+        require_csrf(login_session.csrf_token)
+        _state, source, _advice = record_imports.mapping_assistance(
+            actor.id, login_session.id, key, token
+        )
+        expected = {
+            f"{prefix}_{index}"
+            for prefix in ("mapping", "source", "timezone", "fold")
+            for index in range(len(source.headers))
+        } | {"csrf_token"}
+        if set(request.form) != expected or any(
+            len(request.form.getlist(name)) != 1 for name in expected
+        ):
+            abort(400)
+        mapping = tuple(
+            None
+            if request.form[f"mapping_{index}"] == "__ignored__"
+            else request.form[f"mapping_{index}"]
+            for index in range(len(source.headers))
+        )
+        columns = record_imports.format_assistance(
+            actor.id, login_session.id, key, token, mapping, submitted_source_formats(mapping)
+        )
+        return render_template(
+            "pages/datasets/import/source_format_fragments.html", format_columns=columns
+        )
+
     @import_route("/datasets/<key>/records/import/<token>/mapping", methods=["GET"])
     def review_import_mapping(key: str, token: str):
         return dataset_import_step(key, token, 3)
@@ -1460,6 +1501,13 @@ def create_flask_app(
             return dataset_import_step(key, token, 4)
         require_csrf(login_session.csrf_token)
         expected = {f"mapping_{index}" for index in range(len(source.headers))} | {"csrf_token"}
+        format_names = {
+            f"{prefix}_{index}"
+            for prefix in ("source", "timezone", "fold")
+            for index in range(len(source.headers))
+        }
+        if set(request.form) & format_names:
+            expected |= format_names
         target_step = request.form.get("go_step")
         if target_step is not None:
             if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4", "5"}:
@@ -1485,7 +1533,12 @@ def create_flask_app(
             for index in range(len(source.headers))
         )
         try:
-            preview = record_imports.preview(actor.id, login_session.id, key, token, mapping)
+            choices = (
+                submitted_source_formats(mapping) if set(request.form) & format_names else None
+            )
+            preview = record_imports.preview(
+                actor.id, login_session.id, key, token, mapping, choices
+            )
         except NotFoundError:
             raise
         except Exception:

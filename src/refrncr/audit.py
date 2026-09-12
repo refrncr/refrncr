@@ -367,7 +367,7 @@ _audited(
 _register(
     "DatasetRecordImportService",
     "active state begin navigate select_worksheet "
-    "mapping_assistance preview saved_preview cancel revoke_session",
+    "mapping_assistance format_assistance preview saved_preview cancel revoke_session",
     "intentionally excluded",
     module="record_import",
     rationale="Transient preview/receipt state only; no committed "

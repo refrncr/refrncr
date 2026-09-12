@@ -16,11 +16,11 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 
 ## Decisions and scope
 
-The current inventory contains 93 public application-service operations and 38 security,
-transient, technical and administrative operations. Its 131 decisions are 35 domain-audited,
-19 security logging required, 13 technical logging only and 64 intentionally excluded.
-There are 56 explicitly declared HTTP route entries and seven CLI flows, plus documented
-implicit framework endpoints. The catalog supports 33 `(object_type, action)` contracts.
+The current inventory contains 96 public application-service operations and 40 security,
+transient, technical and administrative operations. Its 136 decisions are 36 domain-audited,
+19 security logging required, 15 technical logging only and 66 intentionally excluded.
+There are 61 explicitly declared HTTP route entries and seven CLI flows, plus documented
+implicit framework endpoints. The catalog supports 34 `(object_type, action)` contracts.
 The guard compares symbols rather than freezing these counts.
 
 Domain audit records committed business changes and prepared authorized Dataset export requests.
@@ -307,3 +307,14 @@ baseline number is 0 in that case. No-change, missing, denied or stale requests 
 successful review event. Child reads inside the same signed concept/revision/baseline
 review add no events; audit insert/commit failure returns no review result. Migration
 0016/preflight remains a technical operator operation, with no invented domain actor/event.
+
+
+### Source-format review and confirmed proposals (REF-154)
+
+`DatasetRecordImportService.format_assistance` and the CSRF-protected browser
+`review_source_formats` POST are classified read/review operations. They emit no
+domain event and persist no examples or choices. Confirmation stores the chosen
+source-format metadata in the same Unit of Work as Records and the existing
+single `dataset.records_imported` summary. There is no event per Record or per
+preference, no source-value audit context and no change to REF-73 privileges.
+Rollback/stale/concurrent failures preserve previous proposals and audit exactly.

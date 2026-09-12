@@ -29,6 +29,7 @@ from refrncr.models import (
     DatasetBusinessKeyField,
     DatasetExportAccess,
     DatasetField,
+    DatasetFieldSourceFormat,
     DatasetRecord,
     DatasetRecordValue,
     DatasetVersion,
@@ -510,6 +511,30 @@ class SqlAlchemyDatasetFieldOperations:
         for index, field_id in enumerate(field_ids, 1):
             by_id[field_id].display_position = index
         self.session.flush()
+
+    def source_formats(self, dataset_id):
+        return {
+            key: dict(choice)
+            for key, choice in self.session.execute(
+                select(DatasetField._key, DatasetFieldSourceFormat.choice)
+                .join(
+                    DatasetFieldSourceFormat, DatasetField.id == DatasetFieldSourceFormat.field_id
+                )
+                .where(DatasetField.dataset_id == dataset_id)
+            )
+        }
+
+    def remember_source_formats(self, dataset_id, choices):
+        for field in self.list_for_dataset(dataset_id):
+            if field.key not in choices:
+                continue
+            proposal = self.session.get(DatasetFieldSourceFormat, field.id)
+            if proposal is None:
+                self.session.add(
+                    DatasetFieldSourceFormat(field_id=field.id, choice=dict(choices[field.key]))
+                )
+            else:
+                proposal.choice = dict(choices[field.key])
 
     def _has_display_position(self) -> bool:
         return "display_position" in {
