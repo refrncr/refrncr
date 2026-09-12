@@ -257,7 +257,19 @@ def test_preview_ten_rows_all_mapped_fields_dataset_order_and_empty_marker(wizar
 def test_error_summary_and_capped_accessible_modal(wizard, count):
     content = b"code,amount\n" + b"<script>,bad<script>\n" * count
     wizard.upload(content, "<file>.csv")
-    page = wizard.preview()
+    page = wizard.post(
+        wizard.path + "/preview",
+        {
+            "mapping_0": "code",
+            "mapping_1": "amount",
+            "source_0": "v1-text",
+            "source_1": "v1-plain",
+            "timezone_0": "",
+            "timezone_1": "",
+            "fold_0": "",
+            "fold_1": "",
+        },
+    )
     outside = re.sub(r"<dialog\b.*?</dialog>", "", page.text, flags=re.S)
     dialog = re.search(r"<dialog\b.*?</dialog>", page.text, re.S)[0]
     assert f"{count} source rows failed validation" in outside

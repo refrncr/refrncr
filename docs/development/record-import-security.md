@@ -32,9 +32,9 @@ camelCase boundaries, and treats underscores, hyphens, and repeated whitespace a
 separators. Original headers and values remain unchanged for display and validation.
 
 Each source column is profiled once from at most the first 100 parsed source rows. At
-most 25 non-empty, non-formula values per column are checked with the same nine canonical
-datatype grammars used by manual Record entry. See [Field datatypes](field-datatypes.md).
-This does not introduce source-format recognition or locale variants (REF-154).
+most 25 non-empty, non-formula values per column are checked against the versioned
+source-format catalogue, with canonical datatype validation after conversion. See [Field datatypes](field-datatypes.md).
+This sample supports header mapping only; source-format proposals validate the complete column.
 The mapping page displays at most the first three of
 those values, truncating display text at 80 characters. Formula text and cached formula results are
 never profiled or displayed.
@@ -82,7 +82,7 @@ target fields cannot retain stale mappings. Store capacity and optimistic state 
 apply to replacements, including concurrent requests. Cancel and logout revoke the relevant state;
 expiry is checked on store access and updates. Navigating does not extend the original TTL.
 
-Preview revalidates without writes, displays ten source records with mapped fields in dataset
+Preview revalidates without writes, displays ten canonical records with mapped fields in dataset
 order, and uses the normal em-dash marker for empty cells. Invalid previews display only a summary;
 a large named native dialog contains the existing capped report (first 100 failing **source rows**,
 all messages for each reported row). Submitted values and readable identifiers are escaped;
@@ -130,3 +130,79 @@ changes, and requires review again. Authorization and the original Dataset UUID 
 checked under the same lock. A committed import increments the Dataset revision once;
 rollback leaves both unchanged. Existing Scheduled/Current/Expired snapshots are never
 updated by import. Administrative access changes remain subject to current authorization.
+
+## Source formats within Map columns (REF-154 / US-108)
+
+The flow remains Upload → optional worksheet selection → Map columns → Preview
+→ Confirm. **Advanced options** opens/closes all applicable format disclosures;
+**Change format** opens one Field below its mapping. Collapsed rows identify the
+datatype, proposed format and one compact source-to-canonical conversion.
+String, Boolean and Float have no meaningless multi-format selector.
+
+Expanded native `details` controls contain a labelled **Choose source format**
+select above up to three source/stored pairs. Both sides come from the actual
+staged upload, never fixtures or persisted examples. Each compact value is
+limited to 80 characters. Longer values have an escaped native disclosure,
+bounded by the 4096-character parser limit. On narrow screens each pair stacks
+source first, then stored value; pairs never become two independently reordered
+lists. All controls retain native keyboard behavior and visible focus. Escape
+closes a format disclosure and returns focus to its summary. An unresolved
+format opens its affected disclosure and focuses the first affected selector.
+The aggregate button exposes expanded/controlled state and is enabled by JS;
+individual native disclosures and submission work without JS. When no mapped Field
+has a choice, Advanced options is hidden; the shared button component respects
+the native `hidden` attribute, including after mapping changes.
+
+The browser POSTs mapping and source choices to the token-bound `/formats`
+review route to recompute examples using server parsing. This route reauthorizes,
+requires CSRF, validates form shape and changes no state or durable data. Prior
+requests are aborted/ignored after newer input, including timezone typing before
+change/blur, so a delayed response cannot replace current input or steal focus; source content never becomes
+HTML through string interpolation. Jinja renders the same shared format partial
+for initial and updated rows. Failure leaves choices available for authoritative
+submission. Mapping changes clear that column's transient format controls.
+
+**Continue to preview** submits the selected profiles. Preview and confirmation
+use the same source parser and immutable choices. Complete-file checks remain
+authoritative; an invalid value outside the three examples fails the import.
+Unknown/ambiguous detection and timezone/fold decisions block progression at
+Map columns. An explicitly selected profile with invalid rows retains the
+existing capped Preview error report as well as per-field format feedback when
+returning to mapping. Formula and null defenses are unchanged. No separate
+Simple/Advanced mode or extra wizard step is introduced.
+
+### Remembered proposals and migration
+
+Migration `0017_ref_154`, after `0016_ref_84`, adds only
+`dataset_field_source_formats(field_id PRIMARY KEY/FK, choice JSON)`. The choice
+contains a versioned profile ID and, for local Timestamp profiles, bounded IANA
+timezone/fold selections. It stores no examples, source bytes, filenames, field
+configuration, output format or permissions. Invalid/obsolete proposals are
+not selected unless the new whole column conforms to the current catalogue.
+The editor can always replace a proposal.
+
+The existing DatasetField persistence port reads proposals in a batch and
+writes them only inside the successful import's serialized write Unit of Work,
+after authoritative complete validation. Records, values, proposals, Concept
+revision/content timestamp and the single summary audit event commit together.
+Preview, source review, invalid files, cancel, expiry, stale/racing failures and
+rollback do not update proposals. Import choices are deeply immutable in staged
+state. No preference lives solely in process memory.
+
+Proposals are operational metadata, separate from versioned Field definitions.
+Creating a new Concept preserves proposals for the exact Field identities
+retained from its snapshot; it neither snapshots old choices nor grants new
+rights. Field/Dataset deletion cascades the corresponding proposals. REF-73
+still authorizes current owning-team members and active Community admins; legacy
+editor/admin Grants remain inert. Import-format selection invokes no Dataset
+administration or output-configuration operation.
+
+Stop writers and take a restorable backup, then use the existing configured
+Alembic upgrade/startup process. Upgrade adds an empty table without rewriting
+Records, Fields, published versions or audit. With writers stopped, downgrade
+`0017_ref_154` to `0016_ref_84` drops only remembered proposals; canonical Records
+and audit remain intact. Re-upgrade starts with no remembered proposals. Restoring
+a matching backup is required if those suggestions must also be retained.
+Historical migrations remain unchanged. Startup schema checks and preflight
+commands recognize the new revision; historical test fixtures explicitly
+remove the new table through its real downgrade before exercising old schemas.

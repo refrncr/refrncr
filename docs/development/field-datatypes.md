@@ -170,9 +170,9 @@ exercise supported old-type downgrades before constructing older baselines.
 ## Interfaces, authorization and audit
 
 Manual Record services and current CSV/XLSX adapters use the same canonicalizer.
-Existing XLSX native Boolean/date conversion is retained; extending native
-temporal source interpretation belongs to REF-154. Canonical text cells for the
-new types already pass through the existing adapter. Import security, staging,
+REF-154 source adapters normalize the source representations documented below
+before canonical validation. Native XLSX values retain temporal/numeric type
+information; canonical text remains accepted. Import security, staging,
 schema fingerprinting, atomic confirmation and one-summary-event policy remain.
 
 CSV and JSON serialize new types canonically; JSON Integer/Float remain numbers,
@@ -221,4 +221,55 @@ organisation/tenant keys or hosted-service infrastructure.
 
 REF-150 owns optional semantic validation; REF-151 owns configurable Timestamp
 export timezones; REF-152 owns output formats; REF-153 owns typed JSON import;
-REF-154 owns CSV/XLSX source formats and their UX. None is implemented here.
+These follow-up stories remain outside this change. REF-154 source formats and
+import UX are implemented below.
+
+## CSV/XLSX source catalogue (REF-154)
+
+`source_formats.SOURCE_FORMATS` is the immutable, versioned runtime allowlist.
+Detection, conversion, UI labels/options and catalogue tests consume it. Source
+parsing produces canonical text and then calls the existing datatype contract;
+manual entry and output serialization retain their stricter canonical grammars.
+There is no locale inference or Field precision/scale configuration.
+
+| Catalogue family | Accepted source representations |
+| --- | --- |
+| `v1-plain`, `v1-eu`, `v1-us`, `v1-space-comma`, `v1-space-dot` | Integer/Decimal: ungrouped, `1.234,56`, `1,234.56`, `1 234,56`, `1 234.56`; grouping consists of complete groups of three, with a nonzero first group of at most three digits. Integer rejects fractions. |
+| `v1-float` | Finite ordinary/scientific numbers, including `1.25e6` and `6.02E-4`; existing Float digit/exponent, overflow and underflow bounds apply. |
+| `v1-boolean` | Case-insensitive true/false, yes/no, y/n, 1/0 and ja/nee. All token pairs may coexist in one column. |
+| `v1-date-*` | YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD, DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY, MM-DD-YYYY, MM/DD/YYYY. |
+| `v1-time-*` | HH:mm; HH:mm:ss with optional 1–6 fractional digits; h:mm AM/PM; h:mm:ss AM/PM. AM/PM is uppercase and uses a 1–12 hour. |
+| `v1-datetime-*` | Every catalogued Date/Time combination separated by a space; YYYY-MM-DD also accepts `T`. These profiles apply to DateTime and explicitly zoned local Timestamp sources. |
+| `v1-offset` | The existing explicit-offset/Z Timestamp grammar, normalized to UTC `Z`. |
+| `v1-excel-*` | Native Excel Date, Time, DateTime and Timestamp cells; an Excel datetime becomes Date only at midnight, without silently dropping nonzero time. |
+| `v1-text` | The existing canonical String normalization. No format selector. |
+
+Excel native temporal and numeric values retain their type during staging.
+Native numeric cells use ungrouped numeric interpretation, so an Excel numeric
+cell containing 1.234 is not confused with textual thousands grouping. Decimal
+uses exact Decimal processing of the value exposed by the XLSX reader; this
+cannot restore precision already lost in an Excel floating-point cell.
+
+Real calendar dates, leap years, time ranges and the existing six-digit fraction
+limit are enforced. Decimal uses exact base 10 without exponent text, rounding
+or accounting negatives. NaN/infinities, malformed exponents and overflow fail.
+Only empty CSV values/Excel cells mean null before datatype normalization;
+`NULL`, `N/A` and `-` are ordinary String text or invalid typed values. Whitespace
+is not treated as an empty numeric row. String retains its existing trim/NFC
+contract.
+
+Detection validates the **complete column**, excluding formula cells from
+examples/detection (mapped formulas still fail import). It first checks the
+last confirmed profile against the complete new column. Otherwise it compares
+allowlisted interpretations: equivalent canonical results use catalogue order;
+differing results require a choice. Textual `1.234` is never automatically
+interpreted as a grouped Integer. Day/month ambiguity and mixed formats cannot
+silently select a locale. Choosing a profile applies it to every mapped row.
+
+Local Timestamp profiles require an explicit, bounded IANA timezone. ZoneInfo
+round-trips both fold possibilities through UTC. No matching instant is a DST
+gap and fails; two distinct instants require **Earlier occurrence** or **Later
+occurrence**. That choice applies column-wide. Missing/invalid timezone or fold
+decisions return to Map columns. Unix time and month names remain unsupported.
+See [Record import security](record-import-security.md) for progressive
+disclosure, transaction boundaries and migration/rollback.

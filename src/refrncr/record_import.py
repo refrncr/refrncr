@@ -9,9 +9,12 @@ import threading
 import time
 import unicodedata
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
+from datetime import time as datetime_time
 from pathlib import PurePath
+from types import MappingProxyType
 from xml.etree.ElementTree import ParseError
 
 from openpyxl import load_workbook
@@ -27,7 +30,12 @@ from refrncr.services import (
     RecordConflictError,
     RecordValidationError,
     ValidationError,
-    canonicalize_record_value,
+)
+from refrncr.source_formats import (
+    SourceFormatError,
+    canonical_source,
+    formats_for,
+    propose_format,
 )
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -62,6 +70,14 @@ class SourceRow:
     number: int
     values: tuple[str, ...]
     formulas: frozenset[int] = frozenset()
+    native: tuple[object | None, ...] = ()
+
+    def source_value(self, index):
+        return (
+            self.native[index]
+            if self.native and self.native[index] is not None
+            else self.values[index]
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +93,7 @@ class ParsedSource:
 
 @dataclass(frozen=True, slots=True)
 class ColumnTypeProfile:
-    values: tuple[str, ...]
+    values: tuple[object, ...]
     display_values: tuple[str, ...]
     compatible_types: frozenset[str]
 
@@ -184,6 +200,7 @@ class StagedImport:
     validation_valid: bool = False
     busy: bool = False
     imported_count: int | None = None
+    source_formats: Mapping[str, Mapping[str, str]] | None = None
 
 
 class TransientImportStore:
@@ -267,6 +284,13 @@ class TransientImportStore:
             self._cleanup()
             if self._states.get(state.token) != state or state.busy:
                 raise NotFoundError("Import not found")
+            if changes.get("source_formats") is not None:
+                changes["source_formats"] = MappingProxyType(
+                    {
+                        key: MappingProxyType(dict(choice))
+                        for key, choice in changes["source_formats"].items()
+                    }
+                )
             updated = replace(state, **changes)
             self._states[state.token] = updated
             return updated
@@ -352,10 +376,11 @@ def _safe_sample(value: str) -> str:
 
 def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...]:
     """Profile at most 100 rows and 25 non-empty, non-formula values per column."""
-    sampled: list[list[str]] = [[] for _header in source.headers]
+    sampled: list[list[object]] = [[] for _header in source.headers]
     for row in source.rows[:PROFILE_SCAN_ROWS]:
         for index, value in enumerate(row.values):
-            if index in row.formulas or not value.strip():
+            value = row.source_value(index)
+            if index in row.formulas or value is None or value == "":
                 continue
             if len(sampled[index]) < PROFILE_SAMPLE_VALUES:
                 sampled[index].append(value)
@@ -368,18 +393,24 @@ def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...
         profiles.append(
             ColumnTypeProfile(
                 tuple(values),
-                tuple(_safe_sample(value) for value in values[:DISPLAY_SAMPLE_VALUES]),
+                tuple(_safe_sample(str(value)) for value in values[:DISPLAY_SAMPLE_VALUES]),
                 frozenset(compatible),
             )
         )
     return tuple(profiles)
 
 
-def _profile_value_matches(data_type: str, value: str) -> bool:
-    try:
-        return canonicalize_record_value(data_type, value) is not None
-    except ValidationError:
-        return False
+def _profile_value_matches(data_type: str, value) -> bool:
+    for profile in formats_for(data_type):
+        try:
+            canonical_source(data_type, value, profile.id)
+            return True
+        except SourceFormatError:
+            continue
+    # Local timestamps need a timezone decision, but still support a named mapping.
+    if data_type == "timestamp":
+        return _profile_value_matches("datetime", value)
+    return False
 
 
 def _name_match(header: str, field) -> tuple[int, str, str] | None:
@@ -538,7 +569,7 @@ def parse_csv(content: bytes) -> ParsedSource:
         for number, values in enumerate(reader, 2):
             if len(values) != len(headers):
                 raise ImportValidationError(f"Row {number} has an inconsistent column count")
-            if all(value.strip() == "" for value in values):
+            if all(value == "" for value in values):
                 empty += 1
                 continue
             rows.append(SourceRow(number, tuple(values)))
@@ -630,8 +661,14 @@ def _inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
             cells = cells[: len(headers)]
             if len(cells) < len(headers):
                 cells += (None,) * (len(headers) - len(cells))
-            values, formulas = [], set()
+            values, formulas, native = [], set(), []
             for index, cell in enumerate(cells):
+                native.append(
+                    cell.value
+                    if cell is not None
+                    and isinstance(cell.value, (date, datetime_time, int, float))
+                    else None
+                )
                 # Without worksheet dimensions a short row has no cell objects to pad with.
                 if cell is None or (cell.value is None and cell.data_type != "f"):
                     values.append("")
@@ -640,18 +677,14 @@ def _inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
                     values.append("")
                 elif isinstance(cell.value, bool):
                     values.append("true" if cell.value else "false")
-                elif isinstance(cell.value, (datetime, date)):
-                    values.append(
-                        cell.value.date().isoformat()
-                        if isinstance(cell.value, datetime)
-                        else cell.value.isoformat()
-                    )
+                elif isinstance(cell.value, (date, datetime_time)):
+                    values.append(cell.value.isoformat())
                 else:
                     values.append(str(cell.value))
-            if all(value.strip() == "" for value in values) and not formulas:
+            if all(value == "" for value in values) and not formulas:
                 empty += 1
                 continue
-            rows.append(SourceRow(number, tuple(values), frozenset(formulas)))
+            rows.append(SourceRow(number, tuple(values), frozenset(formulas), tuple(native)))
             if len(rows) > MAX_DATA_ROWS:
                 raise ImportValidationError("The worksheet has more than 10,000 data rows")
         if not rows:
@@ -786,6 +819,7 @@ class DatasetRecordImportService:
                 state,
                 worksheet=worksheet,
                 mapping=None,
+                source_formats=None,
                 mapping_ready=False,
                 validation_valid=False,
                 schema_fingerprint=None,
@@ -805,7 +839,89 @@ class DatasetRecordImportService:
             raise NotFoundError("Import not found")
         return state, source, self._assistance(dataset.id, source, state.mapping)
 
-    def preview(self, actor_id, session_id, dataset_key, token, mapping):
+    def format_assistance(
+        self, actor_id, session_id, dataset_key, token, mapping=None, choices=None
+    ):
+        state, source, assistance = self.mapping_assistance(
+            actor_id, session_id, dataset_key, token
+        )
+        mapping = tuple(mapping) if mapping is not None else assistance.mapping
+        with self.uow() as uow:
+            fields = uow.dataset_fields.list_for_dataset(state.dataset_id)
+            remembered = uow.dataset_fields.source_formats(state.dataset_id)
+        selected = choices if choices is not None else (state.source_formats or {})
+        return self._format_columns(source, fields, mapping, selected, remembered)
+
+    @staticmethod
+    def _format_columns(source, fields, mapping, choices, remembered):
+        by_key = {field.key: field for field in fields}
+        columns = []
+        for index, key in enumerate(mapping):
+            field = by_key.get(key)
+            if field is None or index >= len(source.headers):
+                columns.append(None)
+                continue
+            values = tuple(
+                row.source_value(index) for row in source.rows if index not in row.formulas
+            )
+            raw_choice = choices.get(key, {})
+            if (
+                not isinstance(raw_choice, Mapping)
+                or set(raw_choice) - {"profile_id", "timezone", "fold"}
+                or any(
+                    not isinstance(value, str) or len(value) > 100 for value in raw_choice.values()
+                )
+            ):
+                raise ImportValidationError("Submit a valid bounded source-format choice.")
+            choice = dict(raw_choice)
+            if field.data_type != "timestamp" or choice.get("profile_id") == "v1-offset":
+                choice.pop("timezone", None)
+                choice.pop("fold", None)
+            error = None
+            if not choice.get("profile_id"):
+                choice, error = propose_format(field.data_type, values, remembered.get(key))
+            examples = []
+            failures = 0
+            for row in source.rows:
+                if index in row.formulas:
+                    continue
+                value = row.source_value(index)
+                canonical = None
+                if choice.get("profile_id"):
+                    try:
+                        canonical = canonical_source(field.data_type, value, **choice)
+                    except SourceFormatError as exc:
+                        failures += value is not None and value != ""
+                        error = str(exc)
+                if value != "" and value is not None and len(examples) < DISPLAY_SAMPLE_VALUES:
+                    examples.append(
+                        {
+                            "source": _safe_sample(str(value)),
+                            "full_source": str(value)[:4096],
+                            "stored": _safe_sample(canonical) if canonical is not None else "—",
+                            "full_stored": canonical,
+                        }
+                    )
+            if failures:
+                error = f"{failures} non-empty values do not fit. {error}"
+            profiles = formats_for(field.data_type)
+            selected_profile = next((p for p in profiles if p.id == choice.get("profile_id")), None)
+            columns.append(
+                {
+                    "key": key,
+                    "datatype": get_datatype(field.data_type).label,
+                    "choice": choice,
+                    "error": error,
+                    "examples": examples,
+                    "profiles": profiles,
+                    "label": selected_profile.label if selected_profile else "Choose source format",
+                    "applicable": len(profiles) > 1,
+                    "timestamp": field.data_type == "timestamp",
+                }
+            )
+        return columns
+
+    def preview(self, actor_id, session_id, dataset_key, token, mapping, source_formats=None):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self.store.get(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
@@ -818,12 +934,33 @@ class DatasetRecordImportService:
             state = self.store.update(
                 state,
                 mapping=mapping,
+                source_formats={
+                    key: choice
+                    for key, choice in (state.source_formats or {}).items()
+                    if key in mapping
+                    and state.mapping
+                    and key in state.mapping
+                    and mapping.index(key) == state.mapping.index(key)
+                },
                 mapping_ready=False,
                 validation_valid=False,
                 schema_fingerprint=None,
                 step=3,
             )
-        preview = self._validate(dataset.id, state.filename, source, mapping)
+        columns = self.format_assistance(
+            actor_id, session_id, dataset_key, token, mapping, source_formats
+        )
+        choices = {column["key"]: column["choice"] for column in columns if column is not None}
+        if choices != state.source_formats:
+            state = self.store.update(
+                state,
+                source_formats=choices,
+                validation_valid=False,
+                mapping_ready=False,
+                schema_fingerprint=None,
+                step=3,
+            )
+        preview = self._validate(dataset.id, state.filename, source, mapping, choices)
         self.store.update(
             state,
             mapping=preview.mapping,
@@ -840,7 +977,9 @@ class DatasetRecordImportService:
         if not state.mapping_ready or state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
-        preview = self._validate(dataset.id, state.filename, source, state.mapping)
+        preview = self._validate(
+            dataset.id, state.filename, source, state.mapping, state.source_formats
+        )
         self.store.update(
             state,
             validation_valid=preview.valid,
@@ -876,7 +1015,7 @@ class DatasetRecordImportService:
                     raise NotFoundError("Import not found")
                 source = parse_source(state.filename, state.content, state.worksheet)
                 preview, validated = self._validate_in_uow(
-                    uow, dataset.id, state.filename, source, state.mapping
+                    uow, dataset.id, state.filename, source, state.mapping, state.source_formats
                 )
                 if preview.schema_fingerprint != state.schema_fingerprint:
                     if preview.schema_fingerprint[1:] == state.schema_fingerprint[1:]:
@@ -899,6 +1038,9 @@ class DatasetRecordImportService:
                 except PersistenceConflictError as error:
                     DatasetRecordService._raise_record_conflict(error)
                 if validated:
+                    uow.dataset_fields.remember_source_formats(
+                        dataset.id, state.source_formats or {}
+                    )
                     from refrncr.services import _advance_concept
 
                     _advance_concept(uow, dataset)
@@ -926,6 +1068,7 @@ class DatasetRecordImportService:
             claimed,
             content=b"",
             mapping=None,
+            source_formats=None,
             schema_fingerprint=None,
             imported_count=len(validated),
             step=5,
@@ -945,12 +1088,14 @@ class DatasetRecordImportService:
             identifier = uow.dataset_business_keys.get(dataset_id)
         return build_mapping_assistance(source, fields, identifier, selected_mapping)
 
-    def _validate(self, dataset_id, filename, source, mapping):
+    def _validate(self, dataset_id, filename, source, mapping, source_formats=None):
         with self.uow() as uow:
-            preview, _ = self._validate_in_uow(uow, dataset_id, filename, source, mapping)
+            preview, _ = self._validate_in_uow(
+                uow, dataset_id, filename, source, mapping, source_formats
+            )
             return preview
 
-    def _validate_in_uow(self, uow, dataset_id, filename, source, mapping):
+    def _validate_in_uow(self, uow, dataset_id, filename, source, mapping, source_formats=None):
         fields = uow.dataset_fields.list_for_dataset(dataset_id)
         identifier = uow.dataset_business_keys.get(dataset_id)
         field_by_key = {field.key: field for field in fields}
@@ -1005,6 +1150,17 @@ class DatasetRecordImportService:
             ),
             identifier.field_keys,
         )
+        source_formats = source_formats or {}
+        for index, key in enumerate(mapping):
+            if key in field_by_key and not source_formats.get(key, {}).get("profile_id"):
+                mapping_errors.append(
+                    ImportError(
+                        None,
+                        source.headers[index] if index < len(source.headers) else None,
+                        field_by_key[key].name,
+                        "Choose an unambiguous source format for this field.",
+                    )
+                )
         if mapping_errors:
             return ImportPreview(
                 filename,
@@ -1018,14 +1174,30 @@ class DatasetRecordImportService:
                 (),
                 fingerprint,
             ), []
+        choice_errors = {}
         seen_ids, seen_unique, validated, errors, invalid_rows = set(), set(), [], [], set()
         for row in source.rows:
-            submitted = {
-                target: row.values[index]
-                for index, target in enumerate(mapping)
-                if target is not None
-            }
+            submitted = {}
             row_errors = []
+            for index, target in enumerate(mapping):
+                if target is None or index in row.formulas:
+                    continue
+                try:
+                    submitted[target] = canonical_source(
+                        field_by_key[target].data_type,
+                        row.source_value(index),
+                        **source_formats[target],
+                    )
+                except SourceFormatError as exc:
+                    if exc.requires_choice:
+                        choice_errors[target] = ImportError(
+                            None, source.headers[index], field_by_key[target].name, str(exc)
+                        )
+                    row_errors.append(
+                        ImportError(
+                            row.number, source.headers[index], field_by_key[target].name, str(exc)
+                        )
+                    )
             for index in row.formulas:
                 if mapping[index] is not None:
                     row_errors.append(
@@ -1044,6 +1216,8 @@ class DatasetRecordImportService:
             except RecordValidationError as error:
                 values, encoded = (), b""
                 for key, message in error.errors.items():
+                    if any(item.field == field_by_key[key].name for item in row_errors):
+                        continue
                     index = mapping.index(key)
                     row_errors.append(
                         ImportError(
@@ -1120,6 +1294,7 @@ class DatasetRecordImportService:
                 errors.extend(database_errors)
             else:
                 accepted.append((values, encoded))
+        errors.extend(choice_errors.values())
         errors.sort(
             key=lambda item: (
                 item.row is not None,
@@ -1134,8 +1309,19 @@ class DatasetRecordImportService:
             error for error in errors if error.row is None or error.row in reported_rows
         )
         sample = tuple(
-            tuple(row.values[mapping.index(field.key)] for field in fields if field.key in mapping)
-            for row in source.rows[:PREVIEW_ROWS]
+            tuple(
+                next(
+                    (
+                        get_datatype(value.data_type).text(value.value)
+                        for value in values
+                        if value.field_key == field.key
+                    ),
+                    "",
+                )
+                for field in fields
+                if field.key in mapping
+            )
+            for values, _encoded in accepted[:PREVIEW_ROWS]
         )
         preview = ImportPreview(
             filename,

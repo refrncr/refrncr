@@ -1996,7 +1996,8 @@
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
-        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete"
+        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2245,7 +2246,8 @@
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
-        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2554,7 +2556,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3746,7 +3749,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4127,7 +4131,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "Browser transport, CSRF, request-size and exception hooks"
+        "Browser transport, CSRF, request-size and exception hooks",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -5066,6 +5071,43 @@
       "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
       "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
+    },
+    {
+      "capability": "DatasetRecordImportService",
+      "operation": "format_assistance",
+      "service": "refrncr.record_import.DatasetRecordImportService.format_assistance",
+      "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
+        "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
+        "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
+        "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: import attempt/outcome, unauthorized maintenance, malformed/oversized/unsupported upload, unsafe workbook, schema/uniqueness conflict, cross-Dataset/session claim, expired/replayed/busy token and suspicious mapping tampering. Never include token, session ID, path, filename, headers or row values. Preview/cancel success is not a successful import.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_source_format_import.py::test_example_escaping_bounds_and_format_endpoint_csrf_binding"
+      ],
+      "implementation_status": "REF-154 local implementation; source-format examples are transient, no domain event.",
+      "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "persistence_scope": "Transient process state only; no durable business state."
     }
   ]
 }

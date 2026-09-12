@@ -41,7 +41,7 @@
       {% else %}
         {% if state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>{{ 'Cancel import' if step == 4 else 'Cancel' }}</button></form>{% else %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>{% endif %}
         {% if step == 4 %}{% if preview.valid %}<a class='button button-primary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=5) }}'>Continue</a>{% else %}<button class='button button-primary' disabled>Continue</button>{% endif %}
-        {% else %}<button class='button button-primary' type='submit' form='import-step-form'{% if step == 3 %} data-mapping-continue{% endif %}>{{ 'Import records' if step == 5 else 'Continue' }}</button>{% endif %}
+        {% else %}<button class='button button-primary' type='submit' form='import-step-form'{% if step == 3 %} data-mapping-continue{% endif %}>{{ 'Import records' if step == 5 else 'Continue to preview' if step == 3 else 'Continue' }}</button>{% endif %}
       {% endif %}
     </div>
   </footer>

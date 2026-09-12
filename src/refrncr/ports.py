@@ -320,6 +320,12 @@ class DatasetOperations(Protocol):
 
 
 class DatasetFieldOperations(Protocol):
+    def source_formats(self, dataset_id: str) -> dict[str, dict[str, str]]: ...
+
+    def remember_source_formats(
+        self, dataset_id: str, choices: dict[str, dict[str, str]]
+    ) -> None: ...
+
     def find_by_key(
         self, dataset_id: str, key: str, *, for_update: bool = False
     ) -> DatasetFieldRecord | None: ...

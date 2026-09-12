@@ -94,7 +94,8 @@
     "refrncr.dataset_diff.DatasetDiffService.field_detail",
     "refrncr.dataset_diff.DatasetDiffService.record_detail",
     "refrncr.dataset_versions.DatasetVersionService.concept_context",
-    "refrncr.dataset_versions.DatasetVersionService.create_concept"
+    "refrncr.dataset_versions.DatasetVersionService.create_concept",
+    "refrncr.record_import.DatasetRecordImportService.format_assistance"
   ],
   "routes": [
     {
@@ -464,6 +465,7 @@
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.record_import.DatasetRecordImportService.active",
         "refrncr.record_import.DatasetRecordImportService.begin",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
@@ -484,6 +486,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
@@ -503,6 +506,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
@@ -524,6 +528,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
@@ -544,6 +549,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.preview",
@@ -566,6 +572,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.record_import.DatasetRecordImportService.confirm",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
@@ -999,6 +1006,21 @@
       ],
       "operations": [
         "refrncr.app.health"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.review_source_formats",
+      "path": "/datasets/<key>/records/import/<token>/formats",
+      "methods": [
+        "POST"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.record_import.DatasetRecordImportService.format_assistance",
+        "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
+        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
       ]
     }
   ],

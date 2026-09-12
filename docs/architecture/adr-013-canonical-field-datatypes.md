@@ -60,3 +60,15 @@ revision contract. Configurable output/source formats remain separate stories.
 
 See [the datatype guide](../development/field-datatypes.md) for exact contracts,
 operational upgrade instructions and the future-datatype procedure.
+
+
+## REF-154 source-adapter extension
+
+CSV/XLSX source interpretation uses a separate immutable `source_formats`
+allowlist whose output must pass this ADR's canonical datatype contract. It
+never widens manual entry or rewrites canonical keys. Remembered import proposals
+are separate operational rows attached to Field identity through the existing
+Field persistence port, not Field configuration or published snapshot data.
+Only the locked import confirmation transaction writes proposals; Concept
+initialization preserves them for surviving Field identities. See the import
+security guide for migration 0017, lifecycle and rollback details.

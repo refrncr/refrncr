@@ -644,7 +644,12 @@ def test_preview_error_cap_authorization_and_session_revocation(import_context):
         f"code,amount\n{rows}".encode(),
     )
     preview = services.record_imports.preview(
-        admin.id, "admin-session", dataset.key, state.token, ("code", "amount")
+        admin.id,
+        "admin-session",
+        dataset.key,
+        state.token,
+        ("code", "amount"),
+        {"amount": {"profile_id": "v1-plain"}},
     )
     assert len(preview.errors) == 100
     assert preview.total_errors == 120
@@ -665,7 +670,12 @@ def test_failed_row_report_groups_all_errors_and_limits_rows(import_context, fai
         admin.id, "report", dataset.key, "errors.csv", f"code,amount\n{rows}".encode()
     )
     preview = services.record_imports.preview(
-        admin.id, "report", dataset.key, state.token, ("code", "amount")
+        admin.id,
+        "report",
+        dataset.key,
+        state.token,
+        ("code", "amount"),
+        {"amount": {"profile_id": "v1-plain"}},
     )
     assert preview.invalid_rows == failed_rows
     assert len(preview.row_error_groups) == min(failed_rows, 100)
@@ -964,7 +974,17 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         f"/datasets/{dataset.key}/records/import/{token}/preview",
         base_url="https://localhost",
         follow_redirects=True,
-        data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "amount"},
+        data={
+            "csrf_token": csrf,
+            "mapping_0": "code",
+            "mapping_1": "amount",
+            "source_0": "v1-text",
+            "source_1": "v1-plain",
+            "timezone_0": "",
+            "timezone_1": "",
+            "fold_0": "",
+            "fold_1": "",
+        },
     )
     error_body = error_preview.get_data(as_text=True)
     assert error_preview.status_code == 200
