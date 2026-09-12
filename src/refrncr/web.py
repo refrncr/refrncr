@@ -647,6 +647,9 @@ def create_flask_app(
     def dataset_concept_create(key):
         actor, session = require_authenticated()
         require_csrf(session.csrf_token)
+        next_values = request.form.getlist("next")
+        if len(next_values) > 1 or any(value != "import" for value in next_values):
+            abort(400)
         dataset = datasets.get_dataset_for_edit(actor.id, key)
         try:
             dataset_versions.create_concept(actor.id, dataset.id)
@@ -657,7 +660,9 @@ def create_flask_app(
                 error=str(error),
                 already_active=True,
             ), 409
-        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+        endpoint = "import_dataset_records" if next_values else "dataset_records_view"
+        values = {"key": key} if next_values else {"key": key, "concept": True}
+        return redirect(url_for(endpoint, **values), code=303)
 
     @dataset_route("/datasets/<key>/versions", methods=["GET"])
     @version_errors
