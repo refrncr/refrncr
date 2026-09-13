@@ -173,7 +173,7 @@ def test_live_unnamed_objects_and_new_import_preserve_historical_events(history)
 
     s.dataset_records.delete_record(a, dataset.key, second.id, 1)
     with h.sessions() as session:
-        assert session.get(DatasetRecord, second.id) is None
+        assert session.get(DatasetRecord, second.id).deleted_content is not None
     deleted = next(row for row in h.service.list_history(a).items if row.action == "deleted")
     assert (deleted.object_status, deleted.object_label) == ("deleted", "Deleted object")
     assert h.service.get_event(a, deleted.id) == deleted

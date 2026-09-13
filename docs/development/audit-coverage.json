@@ -1252,6 +1252,7 @@
       "interface_entrypoints": [
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
@@ -1260,6 +1261,7 @@
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -1277,8 +1279,7 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1590,10 +1591,11 @@
       "operation": "list_fields",
       "service": "refrncr.services.DatasetFieldService.list_fields",
       "interface_entrypoints": [
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
@@ -1989,17 +1991,18 @@
       "operation": "get_dataset_for_add",
       "service": "refrncr.services.DatasetRecordService.get_dataset_for_add",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
-        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2043,6 +2046,10 @@
         [
           "dataset",
           "dataset.records_imported"
+        ],
+        [
+          "dataset",
+          "dataset.new_version_imported"
         ]
       ],
       "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
@@ -2052,9 +2059,18 @@
           "format": "import_format",
           "record_count": "count",
           "rejected_row_count": "count"
+        },
+        "dataset:dataset.new_version_imported": {
+          "mode": "import_mode",
+          "format": "import_format",
+          "added": "version_count",
+          "changed": "version_count",
+          "unchanged": "version_count",
+          "deleted": "version_count",
+          "total_processed": "version_count"
         }
       },
-      "success": "Exactly one dataset.records_imported summary for the confirmed non-empty atomic import; no per-Record events. Count is committed inserted rows; rejected_row_count is authoritatively zero for current all-or-nothing imports.",
+      "success": "Create-only adds validated Records; new-version applies the complete canonical difference, records its one-use marker and emits one transactional summary. Unchanged Records are not written.",
       "validation_failure": "No successful domain event; reject without committed business state changes.",
       "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
       "stale_input": "Revalidate schema, authority and uniqueness under Dataset lock; invalid/stale claim produces no summary.",
@@ -2067,7 +2083,8 @@
         "tests/test_audit_coverage.py::test_declared_event_actor_target_and_safe_context",
         "tests/test_audit_coverage.py::test_every_mutation_rolls_back_business_and_audit",
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
-        "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
+        "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
+        "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit"
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
       "exclusion_reason": "",
@@ -2078,6 +2095,7 @@
       "operation": "active",
       "service": "refrncr.record_import.DatasetRecordImportService.active",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import"
       ],
       "kind": "read",
@@ -2109,6 +2127,7 @@
       "operation": "state",
       "service": "refrncr.record_import.DatasetRecordImportService.state",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -2145,6 +2164,7 @@
       "operation": "begin",
       "service": "refrncr.record_import.DatasetRecordImportService.begin",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import"
       ],
       "kind": "mutation",
@@ -2176,6 +2196,7 @@
       "operation": "navigate",
       "service": "refrncr.record_import.DatasetRecordImportService.navigate",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -2243,13 +2264,14 @@
       "operation": "mapping_assistance",
       "service": "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
-        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2311,6 +2333,7 @@
       "operation": "saved_preview",
       "service": "refrncr.record_import.DatasetRecordImportService.saved_preview",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -2512,6 +2535,7 @@
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
         "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
@@ -2528,9 +2552,11 @@
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
@@ -2538,6 +2564,7 @@
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
+        "refrncr.web.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
@@ -2558,9 +2585,7 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3720,9 +3745,11 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
@@ -3752,8 +3779,7 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4110,13 +4136,16 @@
         "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
         "refrncr.web.cancel_record_import POST /datasets/<key>/records/import/<token>/cancel",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
+        "refrncr.web.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
@@ -4134,8 +4163,7 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "Browser transport, CSRF, request-size and exception hooks",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4413,7 +4441,6 @@
       "operation": "publish",
       "service": "refrncr.dataset_versions.DatasetVersionService.publish",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "mutation",
@@ -4461,7 +4488,6 @@
       "operation": "cancel",
       "service": "refrncr.dataset_versions.DatasetVersionService.cancel",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
       ],
       "kind": "mutation",
@@ -4509,7 +4535,6 @@
       "operation": "review",
       "service": "refrncr.dataset_versions.DatasetVersionService.review",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
@@ -4608,7 +4633,6 @@
       "operation": "overview",
       "service": "refrncr.dataset_versions.DatasetVersionService.overview",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_list GET /datasets"
       ],
       "kind": "read",
@@ -4673,7 +4697,6 @@
       "operation": "history",
       "service": "refrncr.dataset_versions.DatasetVersionService.history",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
@@ -4714,7 +4737,6 @@
       "operation": "read",
       "service": "refrncr.dataset_versions.DatasetVersionService.read",
       "interface_entrypoints": [
-        "Trusted programmatic service invocation; browser interface follows in part 2.",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
@@ -4753,7 +4775,6 @@
       "operation": "open_review",
       "service": "refrncr.dataset_diff.DatasetDiffService.open_review",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review"
       ],
       "kind": "read",
@@ -4805,7 +4826,6 @@
       "operation": "review",
       "service": "refrncr.dataset_diff.DatasetDiffService.review",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
@@ -4842,7 +4862,6 @@
       "operation": "field_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.field_detail",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
@@ -4879,7 +4898,6 @@
       "operation": "record_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.record_detail",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
@@ -4916,7 +4934,6 @@
       "operation": "concept_context",
       "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
@@ -4925,6 +4942,7 @@
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -4974,7 +4992,6 @@
       "operation": "create_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.create_concept",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "mutation",
@@ -5017,7 +5034,6 @@
       "operation": "concept_preflight",
       "service": "refrncr.concept_upgrade.concept_preflight",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr dataset-concept-preflight"
       ],
       "kind": "read",
@@ -5080,13 +5096,14 @@
       "operation": "format_assistance",
       "service": "refrncr.record_import.DatasetRecordImportService.format_assistance",
       "interface_entrypoints": [
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
-        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5117,7 +5134,6 @@
       "operation": "review_discard",
       "service": "refrncr.dataset_versions.DatasetVersionService.review_discard",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "read",
@@ -5150,7 +5166,6 @@
       "operation": "discard_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.discard_concept",
       "interface_entrypoints": [
-        "Trusted programmatic caller",
         "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "mutation",
@@ -5224,6 +5239,79 @@
       "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "DatasetRecordImportService",
+      "operation": "eligibility",
+      "service": "refrncr.record_import.DatasetRecordImportService.eligibility",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
+        "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: import attempt/outcome, unauthorized maintenance, malformed/oversized/unsupported upload, unsafe workbook, schema/uniqueness conflict, cross-Dataset/session claim, expired/replayed/busy token and suspicious mapping tampering. Never include token, session ID, path, filename, headers or row values. Preview/cancel success is not a successful import.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "Read the single fail-closed eligibility rule.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_new_version_import.py::test_field_only_and_legacy_eligibility"
+      ],
+      "implementation_status": "Implemented for REF-160; covered by SQLite/PostgreSQL lifecycle and authorization tests.",
+      "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "DatasetRecordService",
+      "operation": "restore_record",
+      "service": "refrncr.services.DatasetRecordService.restore_record",
+      "interface_entrypoints": [
+        "refrncr.web.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31: Dataset mutation/extraction or access-change outcome; missing/inactive actor, denied capability, malformed/missing/cross-Dataset target, forged owning team/subject, stale/duplicate or invalid format/input. Use safe actor/Dataset/target IDs, allowlisted format/count and reason codes; no descriptions, names, values or payload. Ordinary concurrency is not automatically suspicious.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [
+        [
+          "dataset_record",
+          "restored"
+        ]
+      ],
+      "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
+      "actor_source": "Authenticated service actor_id from resolved browser session; trusted programmatic caller must establish principal before invocation.",
+      "allowed_context": {
+        "dataset_record:restored": {}
+      },
+      "success": "Restore the same Record UUID and retained canonical values, advance revisions, and emit one transactional restored event.",
+      "validation_failure": "No successful domain event; reject without committed business state changes.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "Reject mismatched expected revision/owner/order before accepting a same-value no-op; no event or timestamp change. Ownership expectation applies when supplied.",
+      "no_op": "No event and no business timestamp/revision changes; absent/deleted targets may return the existing safe error.",
+      "rollback": "Business change, cleanup, timestamps and audit share the same UoW; insertion/flush/commit failure rolls all back.",
+      "duplicate_retry": "No extra event without another committed change: normalized no-op, missing/stale/unique conflict or consumed import claim rejects replay.",
+      "tests": [
+        "tests/test_new_version_import.py::test_deletion_acknowledgement_retention_undo_and_publication"
+      ],
+      "implementation_status": "Implemented for REF-160; covered by SQLite/PostgreSQL lifecycle and authorization tests.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing installation database / AuditEvent."
     }
   ]
 }

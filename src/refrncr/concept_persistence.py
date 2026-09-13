@@ -18,8 +18,9 @@ from refrncr.models import (
 
 
 class SqlAlchemyConceptOperations:
-    def __init__(self, session):
+    def __init__(self, session, *, legacy_schema=False):
         self.session = session
+        self._legacy_schema = legacy_schema
 
     @staticmethod
     def _view(row):
@@ -40,6 +41,23 @@ class SqlAlchemyConceptOperations:
         }
 
     def create(self, dataset_id, base_version_id, creator_id, now, revision):
+        if self._legacy_schema:
+            # REF-84 runs before REF-160 adds Concept import metadata.
+            from sqlalchemy import MetaData, Table
+
+            table = Table("dataset_concepts", MetaData(), autoload_with=self.session.connection())
+            self.session.execute(
+                table.insert().values(
+                    id=new_id(),
+                    dataset_id=dataset_id,
+                    base_version_id=base_version_id,
+                    creator_id=creator_id,
+                    created_at=now,
+                    updated_at=now,
+                    start_revision=revision,
+                )
+            )
+            return None
         row = DatasetConcept(
             id=new_id(),
             dataset_id=dataset_id,
@@ -58,6 +76,18 @@ class SqlAlchemyConceptOperations:
             update(DatasetConcept)
             .where(DatasetConcept.dataset_id == dataset_id)
             .values(updated_at=now)
+        )
+
+    def record_mutation(self, dataset_id, *, import_result=None):
+        from sqlalchemy import case
+
+        changes = {
+            "records_mutated": case((DatasetConcept.records_mutated.is_(None), None), else_=True)
+        }
+        if import_result is not None:
+            changes["import_result"] = dict(import_result)
+        self.session.execute(
+            update(DatasetConcept).where(DatasetConcept.dataset_id == dataset_id).values(**changes)
         )
 
     def close(self, dataset_id):

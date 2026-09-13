@@ -77,6 +77,10 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ),
         ("dataset_field", "deleted"): ActionPresentation("Dataset field deleted", True),
         ("dataset_record", "created"): ActionPresentation("Record created", False),
+        ("dataset_record", "restored"): ActionPresentation("Record restored", False),
+        ("dataset", "dataset.new_version_imported"): ActionPresentation(
+            "New Record version imported", False
+        ),
         ("dataset_record", "updated"): ActionPresentation("Record updated", False),
         ("dataset_record", "deleted"): ActionPresentation("Record deleted", True),
     }
@@ -126,6 +130,12 @@ CONTEXT_LABELS = MappingProxyType(
         "subject_id": "Subject ID",
         "format": "Format",
         "record_count": "Records",
+        "mode": "Import mode",
+        "added": "Added",
+        "changed": "Changed",
+        "unchanged": "Unchanged",
+        "deleted": "Deleted",
+        "total_processed": "Total processed",
         "rejected_row_count": "Rows rejected",
     }
 )
@@ -135,6 +145,7 @@ FORMAT_KINDS = frozenset(
         "count",
         "subject",
         "import_format",
+        "import_mode",
         "export_format",
         "dataset_name",
         "version_count",

@@ -122,6 +122,7 @@ MUTATIONS = (
     "DatasetRecordService.create_record",
     "DatasetRecordService.update_record",
     "DatasetRecordService.delete_record",
+    "DatasetRecordService.restore_record",
     "DatasetRecordImportService.confirm",
 )
 
@@ -268,6 +269,13 @@ def prepare(c, operation):
             actor, d.key, {"code": "secret-value"}
         ), [("dataset_record", "created", None)]
     r = s.dataset_records.create_record(a.id, d.key, {"code": "secret-old"})
+    if method == "restore_record":
+        s.dataset_records.delete_record(a.id, d.key, r.id, 1)
+        with s.datasets.uow() as work:
+            concept = work.concepts.get(d.id)
+        return lambda actor: s.dataset_records.restore_record(
+            actor, d.key, r.id, 2, concept_id=concept.id
+        ), [("dataset_record", "restored", r.id)]
     if method == "update_record":
         return lambda actor: s.dataset_records.update_record(
             actor, d.key, r.id, 1, {"code": "secret-new"}
@@ -811,6 +819,9 @@ def test_invalid_input_or_lifecycle_never_creates_success_event(context, operati
         ),
         "DatasetRecordService.update_record": lambda: s.dataset_records.update_record(
             a.id, d.key, target, 1, {"code": ""}
+        ),
+        "DatasetRecordService.restore_record": lambda: s.dataset_records.restore_record(
+            a.id, d.key, target, 0, concept_id=missing
         ),
         "DatasetRecordService.delete_record": lambda: s.dataset_records.delete_record(
             a.id, d.key, target, 0

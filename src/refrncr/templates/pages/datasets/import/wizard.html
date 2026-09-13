@@ -2,7 +2,7 @@
 {% from "components/icons.html" import info_icon %}
 {% from "components.html" import feedback %}
 {% block content %}
-<header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>Add records to {{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
+<header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>{{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
 <section class='import-wizard' aria-label='Record import wizard'>
   <nav aria-label='Import progress'><ol class='import-steps'>
     {% for item in steps %}<li class='{{ "is-active" if item.number == step and not success else "is-complete" if item.done else "is-remaining" }}' data-step='{{ item.number }}' data-step-status='{{ "completed" if success else "active" if item.number == step else "completed" if item.done else "remaining" }}'>
@@ -31,8 +31,13 @@
     {% else %}
       <p>Review this final summary before importing.</p>
       <dl class='import-summary'><dt>File name</dt><dd>{{ state.filename }}</dd><dt>Worksheet</dt><dd>{{ source.worksheet or 'Not applicable' }}</dd><dt>Source records</dt><dd>{{ source.rows|length }}</dd><dt>Mapped fields</dt><dd>{{ preview_fields|length }}</dd></dl>
-      <p>This import is create-only and atomic: all records are added together, or none are added. Existing records are never updated.</p>
-      <form id='import-step-form' data-import-confirm method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'></form>
+      {% if mode == 'new_version' %}
+      {% include 'pages/datasets/import/differences.html' %}
+      <p>The complete difference is applied atomically to this Concept.</p>
+      {% else %}<p>This import is create-only and atomic: all records are added together, or none are added. Existing records are never updated.</p>{% endif %}
+      <form id='import-step-form' data-import-confirm method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+      {% if mode == 'new_version' %}<input type='hidden' name='confirmation' value='{{ state.confirmation }}'>
+      {% if preview.counts.Deleted %}<label><input type='checkbox' name='acknowledge_deletions' value='yes' required aria-describedby='deletion-acknowledgement'><span id='deletion-acknowledgement'>I understand that {{ preview.counts.Deleted }} Records will be marked as deleted.</span></label>{% endif %}{% endif %}</form>
     {% endif %}
   </div>
   <footer class='import-actions'>

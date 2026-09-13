@@ -27,6 +27,10 @@ def import_context():
 @pytest.fixture
 def wizard(import_context):
     factory, services, admin, dataset = import_context
+    # Wizard defaults describe the complete two-field schema; tests needing optional
+    # fields add them explicitly alongside the corresponding source columns.
+    for key in ("active", "day"):
+        services.dataset_fields.delete_field(admin.id, dataset.key, key)
     app = create_flask_app(
         services.users,
         services.authentication,
@@ -59,11 +63,17 @@ def wizard(import_context):
 
     class Browser:
         def get(self, path):
-            return client.get(path, base_url="https://localhost", follow_redirects=True)
+            page = client.get(path, base_url="https://localhost", follow_redirects=True)
+            nonce = re.search("name='confirmation' value='([^']+)'", page.text)
+            if nonce:
+                self.confirmation = nonce[1]
+            return page
 
         def post(self, path, data=None):
             values = MultiDict(data.items() if isinstance(data, dict) else data or [])
             values.setdefault("csrf_token", csrf)
+            if path.endswith("/confirm"):
+                values.setdefault("confirmation", getattr(self, "confirmation", "not-confirmed"))
             return client.post(
                 path, base_url="https://localhost", data=values, follow_redirects=True
             )
@@ -96,6 +106,16 @@ def wizard(import_context):
 
 def states(page):
     return re.findall("data-step='([1-5])' data-step-status='([^']+)'", page.text)
+
+
+def optional_field(wizard, key):
+    wizard.services.dataset_fields.create_field(
+        wizard.admin.id,
+        wizard.dataset.key,
+        key,
+        key.title(),
+        "boolean" if key == "active" else "date",
+    )
 
 
 def workbook(sheets=("First", "Second"), headers=("code", "amount")):
@@ -143,18 +163,17 @@ def test_five_steps_confirmation_refresh_success_and_replay(wizard):
         "Not applicable",
         "Source records",
         "Mapped fields",
-        "create-only and atomic",
+        "complete difference is applied atomically",
         "Import records",
     ):
         assert text in final.text
     assert wizard.count() == 0
     assert wizard.get(wizard.path + "/step/5").status_code == 200
     success = wizard.post(wizard.path + "/confirm")
-    assert "1 records imported successfully" in success.text
-    assert states(success) == [(str(i), "completed") for i in range(1, 6)]
-    assert "View records" in success.text and "Import another file" in success.text
+    assert "Import results" in success.text and "Added: 1" in success.text
+    assert "import_results=1" in success.request.url
     assert wizard.count() == 1
-    assert wizard.get(wizard.path + "/step/5").text == success.text
+    assert wizard.get(wizard.path + "/step/5").status_code == 200
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert (
         wizard.post(
@@ -162,7 +181,8 @@ def test_five_steps_confirmation_refresh_success_and_replay(wizard):
         ).status_code
         == 404
     )
-    assert states(wizard.get(wizard.root))[0] == ("1", "active")
+    assert wizard.get(wizard.root).status_code == 400
+    assert "Import already completed" in wizard.get(wizard.root).text
 
 
 @pytest.mark.parametrize("sheets", [("Only",), ("First", "Second")])
@@ -188,8 +208,9 @@ def test_worksheet_skip_or_explicit_selection_and_invalidation(wizard, sheets):
 
 
 def test_back_navigation_saves_choices_and_invalidates_only_dependents(wizard):
-    wizard.upload(b"mystery,amount,extra\nA,1,ignore\n")
-    wizard.preview(("code", "amount", None))
+    optional_field(wizard, "active")
+    wizard.upload(b"mystery,amount,extra\nA,1,true\n")
+    wizard.preview(("code", "amount", "active"))
     upload = wizard.get(wizard.path + "/step/1")
     assert "Current file:" in upload.text
     assert wizard.get(wizard.path + "/step/5").status_code == 200
@@ -199,13 +220,13 @@ def test_back_navigation_saves_choices_and_invalidates_only_dependents(wizard):
         {
             "mapping_0": "code",
             "mapping_1": "amount",
-            "mapping_2": "active",
+            "mapping_2": "__ignored__",
             "go_step": "1",
         },
     )
     assert states(back)[0] == ("1", "active")
     mapped = wizard.get(wizard.path + "/mapping")
-    assert "value='active' selected" in mapped.text
+    assert "value='__ignored__' selected" in mapped.text
     assert wizard.get(wizard.path + "/step/5").status_code == 404
     assert wizard.count() == 0
 
@@ -239,17 +260,24 @@ def test_crafted_mapping_cardinality(wizard, values):
     assert wizard.get(wizard.path + "/step/5").status_code == 404
 
 
-def test_preview_ten_rows_all_mapped_fields_dataset_order_and_empty_marker(wizard):
+def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wizard):
+    optional_field(wizard, "active")
+    optional_field(wizard, "day")
     content = b"day,amount,code,active\n" + b"".join(f",1,C{i},\n".encode() for i in range(12))
     wizard.upload(content)
     preview = wizard.preview(("day", "amount", "code", "active"))
     assert preview.status_code == 200
     table = preview.text.split("<thead>")[1].split("</table>")[0]
-    assert re.findall("<th scope='col'>(.*?)</th>", table) == ["Code", "Amount", "Active", "Day"]
-    assert table.count("<tr>") == 11
-    assert "<td>C9</td>" in table and "<td>C10</td>" not in table
-    assert "<td>—</td>" in table
-    assert "first 10 of 12 records" in preview.text
+    assert re.findall("<th scope='col'>(.*?)</th>", table) == [
+        "Identifier",
+        "Status",
+        "Field values",
+    ]
+    assert re.findall("<dt>(.*?)</dt>", table)[:4] == ["Code", "Amount", "Active", "Day"]
+    assert table.count("<tr>") == 13
+    assert "C9" in table and "C10" in table
+    assert "New value: — (No value)" in table
+    assert "12 differences" in preview.text
     assert wizard.count() == 0
 
 
@@ -296,7 +324,7 @@ def test_resume_cancel_expiry_and_new_session(wizard):
     wizard.get(wizard.path + "/step/1")
     assert states(wizard.get(wizard.root))[3] == ("4", "active")
     resumed = wizard.get(wizard.root).text
-    assert "Validation successful. 1 records are ready to import." in resumed
+    assert "Proposed Record differences" in resumed and "1 differences" in resumed
     assert "Upload corrected file" not in resumed
     assert "You can return to this import" not in resumed
     assert wizard.post(wizard.path + "/cancel").status_code == 200
@@ -405,7 +433,7 @@ def test_technical_failure_is_safe_and_retryable(wizard, monkeypatch):
     assert "No records have been imported." in failed.text
     assert wizard.count() == 0
     monkeypatch.setattr(importer, "uow", original)
-    assert "1 records imported successfully" in wizard.post(wizard.path + "/confirm").text
+    assert "Added: 1" in wizard.post(wizard.path + "/confirm").text
 
 
 def test_conflict_after_preview_requires_new_validation(wizard):
@@ -416,10 +444,9 @@ def test_conflict_after_preview_requires_new_validation(wizard):
         wizard.admin.id, wizard.dataset.key, {"code": "A", "amount": "1"}
     )
     failed = wizard.post(wizard.path + "/confirm")
-    assert failed.status_code == 409
-    assert states(failed)[3] == ("4", "active")
-    assert "View error report" in failed.text
-    assert wizard.post(wizard.path + "/confirm").status_code == 404
+    assert failed.status_code == 400
+    assert "Records in this Concept have already been changed" in failed.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 400
     assert wizard.count() == 1
 
 
@@ -480,8 +507,9 @@ def test_unexpected_preview_failure_exposes_no_details(wizard, monkeypatch):
 def test_changed_mapping_invalidates_old_confirmation_even_when_validation_fails(
     wizard, monkeypatch
 ):
+    optional_field(wizard, "active")
     wizard.upload(b"code,amount,active\nA,1,true\n")
-    wizard.preview(("code", "amount", None))
+    wizard.preview(("code", "amount", "active"))
     wizard.get(wizard.path + "/step/5")
     original = wizard.services.record_imports._validate
 
@@ -489,9 +517,9 @@ def test_changed_mapping_invalidates_old_confirmation_even_when_validation_fails
         raise RuntimeError("INTERNAL SECRET")
 
     monkeypatch.setattr(wizard.services.record_imports, "_validate", fail)
-    page = wizard.preview(("code", "amount", "active"))
+    page = wizard.preview(("code", "amount", None))
     assert page.status_code == 503
-    assert "value='active' selected" in page.text
+    assert "value='__ignored__' selected" in page.text
     assert "INTERNAL" not in page.text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert wizard.get(wizard.path + "/step/5").status_code == 404
@@ -535,6 +563,7 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
 
 
 def test_used_mapping_options_are_grouped_below_available_choices(wizard):
+    optional_field(wizard, "active")
     page = wizard.upload()
     code_select = re.search(r"<select id='mapping-0'.*?</select>", page.text, re.S)[0]
     used = code_select.split("label='Already mapped'", 1)[1]

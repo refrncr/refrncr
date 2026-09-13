@@ -6,7 +6,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .table-scroll tbody tr:not(.interactive-row):hover { background: var(--color-row-hover); }
 .management-table { position: relative; box-shadow: var(--shadow-sm); }
 .management-table th, .management-table td { padding-block: .75rem; }
-.management-table td { vertical-align: middle; }
+.management-table td, .management-table th[scope="row"] { vertical-align: middle; }
 .record-row.is-selected, .record-row.is-selected:hover { background: var(--color-row-selected); box-shadow: inset 3px 0 0 var(--color-action-primary); }
 .numeric-column { text-align: right; font-variant-numeric: tabular-nums; }
 /* The identifier key carries the accent colour, like the Identifier badge. */
@@ -67,6 +67,16 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-table .record-tombstone td { background-color: var(--color-surface-subtle); color: var(--color-text-secondary); }
 .record-toolbar form { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
 .record-toolbar .search-field { flex: 1 1 12rem; max-width: 22rem; }
+.record-status-filter .record-status-options { left: 0; right: auto; width: min(17rem, calc(100vw - 4rem)); padding: var(--space-sm); }
+.record-status-options > a { display: flex; align-items: center; justify-content: space-between; }
+.record-status-options > a[aria-current] { background: var(--color-surface-subtle); font-weight: var(--font-weight-semibold); }
+.record-status-options fieldset { min-width: 0; margin: var(--space-sm) 0 0; padding: var(--space-sm); border: 0; border-top: 1px solid var(--color-border-subtle); }
+.record-status-options legend { padding: var(--space-xs); font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.record-status-options label { align-items: center; margin: 0; padding: var(--space-sm) 0; font-size: var(--font-size-body-sm); }
+.record-status-options label:hover { background: var(--color-surface-subtle); }
+.record-status-options input[type="checkbox"] { margin: 0; }
+.record-status-count { margin-left: auto; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.record-status-options .help-text { margin: 0; padding: var(--space-sm); white-space: normal; }
 
 /* Toolbar and table read as one bordered object. */
 .record-toolbar:has(+ .table-scroll) { margin-bottom: 0; border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }

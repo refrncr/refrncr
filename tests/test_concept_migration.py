@@ -15,7 +15,7 @@ def predecessor(c):
     with c.engine.connect() as connection:
         connection.execute(delete(DatasetConcept))
         connection.commit()
-        command.stamp(config_for(connection), "0017_ref_154")
+        command.stamp(config_for(connection), "0018_ref_160")
         command.downgrade(config_for(connection), "0015_ref_83")
 
 
@@ -37,13 +37,21 @@ def test_lossless_migration_and_retry(context, state):  # noqa: F811
             "dataset_versions",
             "audit_events",
         )
-        before = {name: connection.execute(text(f"SELECT * FROM {name}")).all() for name in tables}
+        columns = {
+            name: ", ".join(column["name"] for column in inspect(connection).get_columns(name))
+            for name in tables
+        }
+        before = {
+            name: connection.execute(text(f"SELECT {columns[name]} FROM {name}")).all()
+            for name in tables
+        }
         connection.rollback()
         assert concept_preflight(connection) == ()
         connection.rollback()
         command.upgrade(config_for(connection), "head")
         assert {
-            name: connection.execute(text(f"SELECT * FROM {name}")).all() for name in tables
+            name: connection.execute(text(f"SELECT {columns[name]} FROM {name}")).all()
+            for name in tables
         } == before
         rows = connection.execute(select(DatasetConcept.__table__)).mappings().all()
         assert len(rows) == (0 if state == "equal" else 1)

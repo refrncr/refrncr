@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import os
 import re
@@ -24,6 +25,7 @@ from refrncr.audit import record_audit
 from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
+    MAX_RECORD_REVISION,
     DatasetFieldService,
     DatasetRecordService,
     NotFoundError,
@@ -167,6 +169,9 @@ class ImportPreview:
     row_report_truncated: bool
     sample: tuple[tuple[str, ...], ...]
     schema_fingerprint: tuple
+    counts: dict | None = None
+    differences: tuple = ()
+    difference_digest: str = ""
 
     @property
     def valid(self) -> bool:
@@ -204,6 +209,9 @@ class StagedImport:
     imported_count: int | None = None
     source_formats: Mapping[str, Mapping[str, str]] | None = None
     concept_id: str = ""
+    mode: str = "create"
+    difference_digest: str = ""
+    confirmation: str = ""
 
 
 class TransientImportStore:
@@ -235,6 +243,7 @@ class TransientImportStore:
         previous=None,
         *,
         concept_id="",
+        mode="create",
     ) -> StagedImport:
         with self._lock:
             self._cleanup()
@@ -274,6 +283,7 @@ class TransientImportStore:
                 None,
                 self.clock() + self.ttl,
                 concept_id=concept_id,
+                mode=mode,
             )
             if previous is not None:
                 self._states.pop(previous.token)
@@ -813,6 +823,40 @@ class DatasetRecordImportService:
         with self.uow() as uow:
             return _require_concept(uow, dataset_id)
 
+    @staticmethod
+    def _eligibility(concept):
+        if concept.import_result is not None:
+            return (
+                "Import already completed",
+                "A new version has already been imported into this Concept. "
+                "Review and publish or discard this Concept before starting another import.",
+            )
+        if concept.records_mutated is None:
+            return (
+                "Import unavailable",
+                "This Concept was created before new-version imports were introduced, "
+                "so REFRNCR cannot reliably verify that its Records are unchanged. "
+                "Publish or discard this Concept, then create a new Concept "
+                "to import a new version.",
+            )
+        if concept.records_mutated:
+            return (
+                "Import unavailable",
+                "Records in this Concept have already been changed. "
+                "Importing a file could overwrite or mix with those changes. Publish or discard "
+                "this Concept, then create a new Concept to import a new version.",
+            )
+        return None
+
+    def eligibility(self, actor_id, dataset_key):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        return self._eligibility(self._concept(dataset.id))
+
+    def _require_eligible(self, concept):
+        reason = self._eligibility(concept)
+        if reason:
+            raise ImportValidationError(". ".join(reason))
+
     def _bound_state(self, token, actor_id, session_id, dataset_id):
         state = self.store.get(token, actor_id, session_id, dataset_id)
         with self.uow() as uow:
@@ -820,6 +864,8 @@ class DatasetRecordImportService:
         if concept is None or state.concept_id != concept.id:
             self.store.revoke_concept(state.concept_id)
             raise NotFoundError("Import not found")
+        if state.mode == "new_version" and state.imported_count is None:
+            self._require_eligible(concept)
         return state
 
     def active(self, actor_id, session_id, dataset_key):
@@ -837,10 +883,18 @@ class DatasetRecordImportService:
             raise NotFoundError("Import not found")
         return state
 
-    def begin(self, actor_id, session_id, dataset_key, filename, content):
+    def begin(self, actor_id, session_id, dataset_key, filename, content, *, mode="create"):
+        if mode not in {"create", "new_version"}:
+            raise ImportValidationError("Choose a valid import mode")
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         concept = self._concept(dataset.id)
+        if mode == "new_version":
+            self._require_eligible(concept)
         previous = self.active(actor_id, session_id, dataset_key)
+        if previous and previous.mode != mode:
+            raise ImportValidationError(
+                "Cancel the active import before choosing another import mode"
+            )
         safe_name = _safe_filename(filename)
         source = parse_source(safe_name, content)
         if source.kind == "xlsx":
@@ -885,6 +939,7 @@ class DatasetRecordImportService:
             source.kind,
             previous,
             concept_id=concept.id,
+            mode=mode,
         )
         state = self.store.update(
             state, worksheet=source.worksheet, mapping=mapping, step=3 if source.headers else 2
@@ -1122,36 +1177,82 @@ class DatasetRecordImportService:
                 schema_fingerprint=None,
                 step=3,
             )
-        preview = self._validate(dataset.id, state.filename, source, mapping, choices)
+        preview = self._validate(
+            dataset.id,
+            state.filename,
+            source,
+            mapping,
+            choices,
+            mode=state.mode,
+            actor_id=actor_id,
+            concept_id=state.concept_id,
+        )
         self.store.update(
             state,
             mapping=preview.mapping,
             schema_fingerprint=preview.schema_fingerprint,
+            difference_digest=preview.difference_digest,
+            confirmation=secrets.token_urlsafe(32),
             mapping_ready=not preview.non_row_errors,
             validation_valid=preview.valid,
             step=3 if preview.non_row_errors else 4,
         )
         return preview
 
-    def saved_preview(self, actor_id, session_id, dataset_key, token):
+    def saved_preview(
+        self, actor_id, session_id, dataset_key, token, *, page=1, statuses=(), search=""
+    ):
+        if (
+            type(page) is not int
+            or page < 1
+            or set(statuses) - {"Added", "Changed", "Deleted"}
+            or not isinstance(search, str)
+            or len(search) > 200
+        ):
+            raise ImportValidationError("Choose valid difference filters")
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self._bound_state(token, actor_id, session_id, dataset.id)
         if not state.mapping_ready or state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
         preview = self._validate(
-            dataset.id, state.filename, source, state.mapping, state.source_formats
+            dataset.id,
+            state.filename,
+            source,
+            state.mapping,
+            state.source_formats,
+            mode=state.mode,
+            actor_id=actor_id,
+            concept_id=state.concept_id,
+            page=page,
+            statuses=statuses,
+            search=search,
         )
         self.store.update(
             state,
             validation_valid=preview.valid,
             mapping_ready=not preview.non_row_errors,
             schema_fingerprint=preview.schema_fingerprint,
+            difference_digest=preview.difference_digest,
+            confirmation=(
+                state.confirmation
+                if state.schema_fingerprint == preview.schema_fingerprint
+                and state.difference_digest == preview.difference_digest
+                else secrets.token_urlsafe(32)
+            ),
         )
         return preview
 
     def confirm(
-        self, actor_id, session_id, dataset_key, token, *, require_confirmation=False
+        self,
+        actor_id,
+        session_id,
+        dataset_key,
+        token,
+        *,
+        require_confirmation=False,
+        confirmation=None,
+        acknowledge_deletions=False,
     ) -> int:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow() as read_uow:
@@ -1178,12 +1279,20 @@ class DatasetRecordImportService:
                 concept = uow.concepts.get(dataset.id)
                 if concept is None or concept.id != state.concept_id:
                     raise NotFoundError("Import not found")
+                if state.mode == "new_version":
+                    self._require_eligible(concept)
                 source = parse_source(state.filename, state.content, state.worksheet)
                 preview, validated = self._validate_in_uow(
-                    uow, dataset.id, state.filename, source, state.mapping, state.source_formats
+                    uow,
+                    dataset.id,
+                    state.filename,
+                    source,
+                    state.mapping,
+                    state.source_formats,
+                    mode=state.mode,
                 )
                 if preview.schema_fingerprint != state.schema_fingerprint:
-                    if preview.schema_fingerprint[1:] == state.schema_fingerprint[1:]:
+                    if preview.schema_fingerprint[1:3] == state.schema_fingerprint[1:3]:
                         raise ImportValidationError(
                             "The import is no longer valid; the Dataset changed. Validate again."
                         )
@@ -1192,14 +1301,65 @@ class DatasetRecordImportService:
                     )
                 if not preview.valid:
                     raise ImportValidationError("The import is no longer valid; validate it again")
-                try:
-                    for values, identifier in validated:
-                        record = uow.dataset_records.create(
-                            dataset_id=dataset.id, identifier_key=identifier
+                if state.mode == "new_version":
+                    if (
+                        not confirmation
+                        or confirmation != state.confirmation
+                        or preview.difference_digest != state.difference_digest
+                    ):
+                        raise ImportValidationError(
+                            "Review the current difference and confirm again."
                         )
-                        uow.flush()
-                        uow.dataset_records.add_values(record, values)
-                        uow.flush()
+                    if preview.counts["Deleted"] and acknowledge_deletions is not True:
+                        raise ImportValidationError(
+                            "Confirm the exact number of Records marked as deleted."
+                        )
+                try:
+                    if state.mode == "new_version":
+                        # Release all affected unique values before writing the replacement set.
+                        # Unchanged rows are never updated, including their revision.
+                        changed = {}
+                        imported_states = {}
+                        existing_ids = uow.dataset_records.existing_identifier_keys(
+                            dataset.id, tuple(encoded for _values, encoded in validated)
+                        )
+                        for status, record, _values, encoded in self._differences(
+                            uow, dataset.id, validated
+                        ):
+                            if status == "Deleted":
+                                imported_states[record.id] = "Deleted"
+                                if not uow.dataset_records.delete_if_revision(
+                                    dataset.id, record.id, record.revision
+                                ):
+                                    raise ImportValidationError("Record changed. Review again.")
+                            elif status == "Changed":
+                                changed[encoded] = record
+                                imported_states[record.id] = "Changed"
+                        for record in changed.values():
+                            uow.dataset_records.replace_values(record, ())
+                        for values, identifier in validated:
+                            record = changed.get(identifier)
+                            if record:
+                                if not uow.dataset_records.update_if_revision(
+                                    dataset.id, record.id, record.revision, identifier
+                                ):
+                                    raise ImportValidationError("Record changed. Review again.")
+                                uow.dataset_records.add_values(record, values)
+                            elif identifier not in existing_ids:
+                                record = uow.dataset_records.create(
+                                    dataset_id=dataset.id, identifier_key=identifier
+                                )
+                                uow.flush()
+                                imported_states[record.id] = "Added"
+                                uow.dataset_records.add_values(record, values)
+                    else:
+                        for values, identifier in validated:
+                            record = uow.dataset_records.create(
+                                dataset_id=dataset.id, identifier_key=identifier
+                            )
+                            uow.flush()
+                            uow.dataset_records.add_values(record, values)
+                    uow.flush()
                 except PersistenceConflictError as error:
                     DatasetRecordService._raise_record_conflict(error)
                 if validated:
@@ -1208,20 +1368,49 @@ class DatasetRecordImportService:
                     )
                     from refrncr.services import _advance_concept
 
+                    result = (
+                        {
+                            k: preview.counts[k]
+                            for k in ("Added", "Changed", "Unchanged", "Deleted", "Error")
+                        }
+                        if state.mode == "new_version"
+                        else None
+                    )
+                    if result is not None:
+                        result["records"] = imported_states
+                    uow.concepts.record_mutation(dataset.id, import_result=result)
                     _advance_concept(uow, dataset)
                     dataset.content_updated_at = datetime.now(UTC)
-                    record_audit(
-                        uow,
-                        actor_user_id=actor_id,
-                        object_type="dataset",
-                        object_id=dataset.id,
-                        action="dataset.records_imported",
-                        details={
-                            "format": source.kind,
-                            "record_count": len(validated),
-                            "rejected_row_count": preview.invalid_rows,
-                        },
-                    )
+                    if state.mode == "new_version":
+                        record_audit(
+                            uow,
+                            actor_user_id=actor_id,
+                            object_type="dataset",
+                            object_id=dataset.id,
+                            action="dataset.new_version_imported",
+                            details={
+                                "mode": "new_version",
+                                "format": source.kind,
+                                "added": result["Added"],
+                                "changed": result["Changed"],
+                                "unchanged": result["Unchanged"],
+                                "deleted": result["Deleted"],
+                                "total_processed": len(validated) + result["Deleted"],
+                            },
+                        )
+                    else:
+                        record_audit(
+                            uow,
+                            actor_user_id=actor_id,
+                            object_type="dataset",
+                            object_id=dataset.id,
+                            action="dataset.records_imported",
+                            details={
+                                "format": source.kind,
+                                "record_count": len(validated),
+                                "rejected_row_count": preview.invalid_rows,
+                            },
+                        )
 
         except (ValidationError, RecordConflictError):
             self.store.finish(claimed, validation_valid=False, step=4)
@@ -1253,14 +1442,59 @@ class DatasetRecordImportService:
             identifier = uow.dataset_business_keys.get(dataset_id)
         return build_mapping_assistance(source, fields, identifier, selected_mapping)
 
-    def _validate(self, dataset_id, filename, source, mapping, source_formats=None):
+    def _validate(
+        self,
+        dataset_id,
+        filename,
+        source,
+        mapping,
+        source_formats=None,
+        *,
+        actor_id,
+        concept_id,
+        mode="create",
+        page=1,
+        statuses=(),
+        search="",
+    ):
         with self.uow() as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.get(dataset_id)
+            self.records._require_access(actor_id, dataset, "editor", uow=uow)
+            concept = uow.concepts.get(dataset_id)
+            if concept is None or concept.id != concept_id:
+                raise NotFoundError("Import not found")
             preview, _ = self._validate_in_uow(
-                uow, dataset_id, filename, source, mapping, source_formats
+                uow,
+                dataset_id,
+                filename,
+                source,
+                mapping,
+                source_formats,
+                mode=mode,
+                page=page,
+                statuses=statuses,
+                search=search,
             )
             return preview
 
-    def _validate_in_uow(self, uow, dataset_id, filename, source, mapping, source_formats=None):
+    def _validate_in_uow(
+        self,
+        uow,
+        dataset_id,
+        filename,
+        source,
+        mapping,
+        source_formats=None,
+        *,
+        mode="create",
+        page=1,
+        statuses=(),
+        search="",
+    ):
+        concept = uow.concepts.get(dataset_id)
+        if mode == "new_version":
+            self._require_eligible(concept)
         fields = uow.dataset_fields.list_for_dataset(dataset_id)
         identifier = uow.dataset_business_keys.get(dataset_id)
         field_by_key = {field.key: field for field in fields}
@@ -1295,10 +1529,19 @@ class DatasetRecordImportService:
                 ImportError(None, None, None, "A Dataset field may be mapped only once")
             )
         required = {field.key for field in fields if field.is_required} | set(identifier.field_keys)
+        if mode == "new_version":
+            required.update(field.key for field in fields)
         missing = sorted(required - {value for value in mapping if value})
         if missing:
             mapping_errors.append(
-                ImportError(None, None, None, "Map every required and identifier field")
+                ImportError(
+                    None,
+                    None,
+                    None,
+                    "Map every active Field exactly once"
+                    if mode == "new_version"
+                    else "Map every required and identifier field",
+                )
             )
         fingerprint = (
             uow.datasets.get(dataset_id).revision,
@@ -1314,6 +1557,7 @@ class DatasetRecordImportService:
                 for field in fields
             ),
             identifier.field_keys,
+            (concept.id, concept.start_revision, concept.updated_at.isoformat()),
         )
         source_formats = source_formats or {}
         for index, key in enumerate(mapping):
@@ -1419,8 +1663,12 @@ class DatasetRecordImportService:
             if row_errors:
                 invalid_rows.add(row.number)
                 errors.extend(row_errors)
-        existing_identifiers = uow.dataset_records.existing_identifier_keys(
-            dataset_id, tuple(encoded for _row, _values, encoded in validated)
+        existing_identifiers = (
+            set()
+            if mode == "new_version"
+            else uow.dataset_records.existing_identifier_keys(
+                dataset_id, tuple(encoded for _row, _values, encoded in validated)
+            )
         )
         unique_candidates = tuple(
             (value.field_id, value.canonical_key)
@@ -1428,8 +1676,10 @@ class DatasetRecordImportService:
             for value in values
             if value.is_unique
         )
-        existing_unique = uow.dataset_records.existing_unique_value_keys(
-            dataset_id, unique_candidates
+        existing_unique = (
+            set()
+            if mode == "new_version"
+            else uow.dataset_records.existing_unique_value_keys(dataset_id, unique_candidates)
         )
         accepted = []
         for row, values, encoded in validated:
@@ -1500,4 +1750,103 @@ class DatasetRecordImportService:
             sample,
             fingerprint,
         )
+        if mode == "new_version":
+            counts = dict.fromkeys(("Added", "Changed", "Unchanged", "Deleted", "Error"), 0)
+            counts["Error"] = preview.invalid_rows + len(preview.non_row_errors)
+            digest = hashlib.sha256()
+            differences, matched = [], 0
+            term = unicodedata.normalize("NFC", search).casefold()
+            for status, record, values, encoded in self._differences(uow, dataset_id, accepted):
+                counts[status] += 1
+                for part in (
+                    status.encode(),
+                    (record.id if record else "").encode(),
+                    encoded,
+                    str(record.revision if record else 0).encode(),
+                ):
+                    digest.update(len(part).to_bytes(8, "big") + part)
+                for collection in (record.values if record else (), values):
+                    digest.update(len(collection).to_bytes(8, "big"))
+                    for value in sorted(collection, key=lambda v: v.field_id):
+                        for part in (value.field_id.encode(), value.canonical_key):
+                            digest.update(len(part).to_bytes(8, "big") + part)
+                if status == "Unchanged":
+                    continue
+                shown = values if status != "Deleted" else record.values
+                by_key = {v.field_key: v for v in shown}
+                label = " · ".join(
+                    get_datatype(by_key[k].data_type).text(by_key[k].value)
+                    for k in identifier.field_keys
+                )
+                if (
+                    statuses
+                    and status not in statuses
+                    or term not in unicodedata.normalize("NFC", label).casefold()
+                ):
+                    continue
+                matched += 1
+                if (page - 1) * 50 <= matched - 1 < page * 50:
+                    before = {v.field_id: v for v in record.values} if record else {}
+                    after = {v.field_id: v for v in values}
+                    changes = []
+                    for field in fields:
+                        old, new = before.get(field.id), after.get(field.id)
+                        if status == "Changed" and (old.canonical_key if old else None) == (
+                            new.canonical_key if new else None
+                        ):
+                            continue
+                        changes.append(
+                            (
+                                field.name,
+                                get_datatype(old.data_type).text(old.value) if old else None,
+                                get_datatype(new.data_type).text(new.value) if new else None,
+                            )
+                        )
+                    differences.append(
+                        dict(status=status, identifier=label, changes=tuple(changes))
+                    )
+            counts["matching"] = matched
+            preview = replace(
+                preview,
+                counts=counts,
+                differences=tuple(differences),
+                difference_digest=digest.hexdigest(),
+            )
         return preview, accepted
+
+    def _differences(self, uow, dataset_id, accepted):
+        proposed = {encoded: values for values, encoded in accepted}
+        identifier = uow.dataset_business_keys.get(dataset_id)
+        stored_keys = uow.dataset_records.identifier_keys(dataset_id)
+        seen = set()
+        for record in uow.dataset_records.iterate_all(dataset_id):
+            by_key = {v.field_key: v for v in record.values}
+            try:
+                parts = [by_key[key].canonical_key for key in identifier.field_keys]
+            except KeyError:
+                raise ImportValidationError(
+                    "A stored Record has an incomplete identifier."
+                ) from None
+            encoded = b"".join(len(part).to_bytes(4, "big") + part for part in parts)
+            if encoded in seen or stored_keys.get(record.id) != encoded:
+                raise ImportValidationError(
+                    "Stored Record identifiers are inconsistent. Import unavailable."
+                )
+            seen.add(encoded)
+            values = proposed.get(encoded)
+            status = (
+                "Deleted"
+                if values is None
+                else "Unchanged"
+                if {v.field_id: v.canonical_key for v in record.values}
+                == {v.field_id: v.canonical_key for v in values}
+                else "Changed"
+            )
+            if status != "Unchanged" and record.revision >= MAX_RECORD_REVISION:
+                raise ImportValidationError(
+                    "A Record reached its revision limit. Import unavailable."
+                )
+            yield status, record, values or (), encoded
+        for encoded, values in proposed.items():
+            if encoded not in seen:
+                yield "Added", None, values, encoded

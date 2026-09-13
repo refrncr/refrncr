@@ -203,10 +203,10 @@ async function closedWithFocus(page, opener) {
     await importer.locator('[data-import-mapping]').waitFor();
     await importer.getByRole('button', {name: 'Continue to preview', exact: true}).click();
     await importer.getByRole('link', {name: 'Continue', exact: true}).click();
+    await importer.getByRole('checkbox', {name: 'I understand that 1 Records will be marked as deleted.'}).check();
     await importer.getByRole('button', {name: 'Import records', exact: true}).click();
-    await importer.getByRole('link', {name: 'View records', exact: true}).waitFor();
-    assert.match(await importer.locator('main').innerText(), /1 records imported successfully/);
-    await importer.getByRole('link', {name: 'View records', exact: true}).click();
+    await importer.waitForURL(/import_results=1/);
+    assert.match(await importer.locator('main').innerText(), /Added: 1.*Deleted: 1/s);
     assert.match(await importer.locator('main').innerText(), /Concept import only/);
     await importer.getByRole('link', {name: 'Versions', exact: true}).click();
     await importer.getByRole('link', {name: 'Version 1', exact: true}).click();

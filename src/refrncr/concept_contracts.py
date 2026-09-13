@@ -38,6 +38,8 @@ class ActiveConcept:
     created_at: datetime
     updated_at: datetime
     start_revision: int
+    records_mutated: bool | None = False
+    import_result: dict | None = None
 
     def __post_init__(self):
         for name in ("created_at", "updated_at"):

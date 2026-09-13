@@ -853,6 +853,8 @@ def test_second_conflicting_import_is_fully_rejected(import_context):
 
 def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     _, services, admin, dataset = import_context
+    for key in ("active", "day"):
+        services.dataset_fields.delete_field(admin.id, dataset.key, key)
     app = create_flask_app(
         services.users,
         services.authentication,
@@ -957,10 +959,24 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         f"/datasets/{dataset.key}/records/import/{token}/confirm",
         base_url="https://localhost",
         follow_redirects=True,
-        data={"csrf_token": csrf},
+        data={
+            "csrf_token": csrf,
+            "confirmation": re.search("name='confirmation' value='([^']+)'", final.text)[1],
+        },
     )
     assert confirmed.status_code == 200
-    assert "1 records imported successfully" in confirmed.get_data(as_text=True)
+    assert "Added: 1" in confirmed.get_data(as_text=True)
+
+    from datetime import UTC, datetime
+
+    services.dataset_versions.publish(
+        admin.id,
+        dataset.id,
+        datetime.now(UTC).date(),
+        "Initial import",
+        services.datasets.get_dataset_for_edit(admin.id, dataset.key).revision,
+    )
+    services.dataset_versions.create_concept(admin.id, dataset.id)
 
     error_rows = b"code,amount\n" + b"not-a-code,not-a-number\n" * 101
     mapping = client.post(

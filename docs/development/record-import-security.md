@@ -1,5 +1,11 @@
 # Record import security
 
+The REF-160 section below defines current product behavior: one complete-file Import flow
+for empty and populated tables. Earlier REF-81/134/149 descriptions document the retained
+create-only service contract where they differ (ten-row preview, append persistence,
+success-page navigation and `dataset.records_imported` audit). Product imports now use
+the paged difference preview, results redirect and `dataset.new_version_imported` summary.
+
 Community Record imports stage at most 10 MiB in a bounded, process-local transient store. An
 opaque token binds the bytes, mapping, worksheet, actor, login session, and Dataset for 15 minutes.
 Logout removes session-bound imports; confirmation claims the token before reparsing and uses one
@@ -284,3 +290,58 @@ Their values are not versioned/restored from historical snapshots. It creates no
 import success audit. A winning import commits all Records/proposals and its audit
 first and makes the discard confirmation stale; a winning discard prevents import
 persistence. See [REF-155 implementation notes](ref-155-report.md).
+
+## Complete new-version imports (REF-160)
+
+The Concept has one **Import** action. The file defines the complete desired set: empty
+tables receive additions, while populated tables use the same full comparison for additions,
+changes, unchanged Records and retained deletions. Both the original `/records/import`
+address and `/concept/records/import-new-version` start the `new_version` engine; neither
+offers append-only behavior. The existing Python create-only mode remains compatible for
+programmatic callers. Staging never creates a Concept or silently converts an active
+legacy staged import; cancel that upload first. All active Fields must be mapped exactly
+once; identifiers must be complete and non-null. Extra columns require explicit Ignore.
+An empty file cannot mark every Record Deleted. Existing source formats, Date/Time
+composition, archive limits, TTL and full-file validation apply unchanged.
+
+One server-side eligibility rule guards the action, upload, preview and confirmation.
+Record mutations (including edit/revert, Undo and create-only import) and a completed
+new-version import block further attempts. Field-only changes preserve eligibility.
+Every migrated Concept has unknown mutation history and is deliberately ineligible:
+
+> **Import unavailable**
+> This Concept was created before new-version imports were introduced, so REFRNCR cannot
+> reliably verify that its Records are unchanged. Publish or discard this Concept, then
+> create a new Concept to import a new version.
+
+This is a one-time compatibility boundary, not an error. See [ADR-016](../architecture/adr-016-complete-record-import.md).
+
+Matching uses the complete configured identifier and existing canonical typed keys.
+Changed identifier means Deleted plus Added. Canonically identical values are Unchanged;
+those Records receive no writes or revision increments. A complete comparison yields
+Added/Changed/Unchanged/Deleted/Error counts. Preview is read-only, with 50 differences
+per page, full-identifier search, status filters and old/new changed Field values.
+Unchanged is count-only. Display filtering never selects a subset for confirmation.
+
+The existing staged actor/session/Dataset/Concept binding is extended with mode,
+Dataset revision, Concept identity/start revision/update timestamp, schema, identifier,
+canonical difference digest and a fresh opaque confirmation value. Source bytes,
+worksheet, mapping and source formats remain part of the staged state. An explicit
+preview submission renews confirmation; re-reading an unchanged preview does not.
+Changes invalidate it. Preview uses a coherent read snapshot and rechecks authority and
+Concept identity; confirmation repeats authority, eligibility and validation under the
+Dataset write lock. Deletions require an initially unchecked checkbox showing the exact
+full count. Neither missing nor duplicate/forged confirmation fields can bypass it.
+
+Confirmation applies the entire difference atomically and stores the one-use result on
+the Concept. Competing tokens serialize on the Dataset row; at most one can succeed.
+A process-local token claim also prevents same-token replay. Rollback includes content,
+revisions, the result marker and audit. Unique values can move between changed/new rows;
+deleted values remain retained but do not reserve active unique values. Current and
+historical snapshots never change. The success redirect opens the Concept Records table
+with Added/Changed/Deleted filtering, totals, identifier search and a clear-filter link.
+
+Exactly one `dataset:dataset.new_version_imported` summary records `mode`, `format`,
+`added`, `changed`, `unchanged`, `deleted`, and `total_processed` (source Records plus
+Deleted Records). No per-row import events, values, identifiers, filenames or source
+examples are audited. Manual Undo emits `dataset_record:restored` transactionally.

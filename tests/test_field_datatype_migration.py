@@ -56,6 +56,7 @@ def contents(engine):
                         column
                         for column in model.__table__.columns
                         if not (model is Dataset and column.name == "revision")
+                        and not (model is DatasetRecord and column.name == "deleted_content")
                     )
                 )
             ).all()

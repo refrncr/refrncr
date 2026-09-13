@@ -143,11 +143,16 @@ def test_import_choice_grants_no_additional_authority(audit_db):
 def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
     engine, _, _ = audit_db
     Base.metadata.drop_all(engine)
-    migrate(engine, "0016_ref_84")
-    # Populate through current services: source-format operations are not called pre-upgrade.
+    migrate(engine, "head")
+    # Populate at the current schema, then construct the historical migration fixture.
     engine, factory, s, a, d = setup(audit_db)
     s.dataset_records.create_record(a.id, d.key, {"code": "kept", "amount": "123.45"})
+    migrate(engine, "0016_ref_84", downgrade=True)
     with engine.connect() as c:
+        columns = {
+            t: ", ".join(v["name"] for v in inspect(engine).get_columns(t))
+            for t in inspect(engine).get_table_names()
+        }
         before = {
             t: c.execute(text("SELECT * FROM " + t)).all()
             for t in inspect(engine).get_table_names()
@@ -157,7 +162,7 @@ def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
     assert "dataset_field_source_formats" in inspect(engine).get_table_names()
     with engine.connect() as c:
         for table, rows in before.items():
-            assert c.execute(text("SELECT * FROM " + table)).all() == rows
+            assert c.execute(text("SELECT " + columns[table] + " FROM " + table)).all() == rows
     state = stage(s, a, d, "after", "new", "1.234,56", "v1-eu")
     s.record_imports.confirm(a.id, "after", d.key, state.token)
     with factory() as session:
@@ -165,11 +170,11 @@ def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
     migrate(engine, "0016_ref_84", downgrade=True)
     assert "dataset_field_source_formats" not in inspect(engine).get_table_names()
     with factory() as session:
-        assert len(list(session.scalars(select(DatasetRecord)))) == 2
+        assert session.scalar(text("SELECT count(*) FROM dataset_records")) == 2
     migrate(engine, "head")
     with factory() as session:
         assert list(session.scalars(select(DatasetFieldSourceFormat))) == []
-        assert len(list(session.scalars(select(DatasetRecord)))) == 2
+        assert session.scalar(text("SELECT count(*) FROM dataset_records")) == 2
 
 
 def test_new_concept_preserves_proposal_for_same_field_identity(audit_db):

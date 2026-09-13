@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% from 'components.html' import feedback %}
+{% block content %}
+<h1>Import unavailable</h1>
+{{ feedback(error, id='import-error', focus=true) }}
+{% endblock %}

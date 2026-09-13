@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 from types import SimpleNamespace
 
 import pytest
+from test_import_wizard import optional_field
 from test_source_format_components import Controls
 from test_source_format_import import import_context as import_context
 from test_source_format_import import wizard as wizard
@@ -135,6 +136,7 @@ class Elements(HTMLParser):
 
 
 def ambiguous_page(wizard):
+    optional_field(wizard, "day")
     return wizard.upload(b"code;amount;day\nA;1.234;01/02/2026\n")
 
 
@@ -156,12 +158,12 @@ def test_radio_envelope_keeps_one_empty_key_until_explicit_choice(wizard):
     assert set(data) == expected
     assert all(len(data.getlist(key)) == 1 for key in expected)
     assert wizard.post(wizard.path + "/formats", data).status_code == 200
-    assert "Validation successful" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     data["source_1"], data["source_2"] = "v1-eu", "v1-date-dmy-slash"
-    assert "Validation successful" in wizard.post(wizard.path + "/preview", data).text
+    assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
     data["source_2"] = "v1-date-ymd-dash"
-    assert "Validation successful" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert wizard.count() == 0
 

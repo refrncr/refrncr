@@ -1,0 +1,25 @@
+<p>Identifier: {% for field in fields if field.key in identifier_keys %}{{ field.name }}{% if not loop.last %} + {% endif %}{% endfor %}</p>
+<p>{{ source.rows|length }} source Records. No Records have been imported.</p>
+<dl class='import-summary'>
+{% for status in ('Added', 'Changed', 'Unchanged', 'Deleted', 'Error') %}<dt>{{ status }}</dt><dd>{{ preview.counts[status] }}</dd>{% endfor %}
+</dl>
+{% if preview.counts.Deleted %}<p class='alert alert-warning'>{{ preview.counts.Deleted }} Records are absent from the file and will be marked as deleted.</p>{% endif %}
+{% if step == 4 %}
+<form method='get' class='form' aria-label='Filter import differences'>
+  <label for='difference-search'>Search complete identifier</label>
+  <input id='difference-search' type='search' name='q' value='{{ difference_search }}' maxlength='200'>
+  <fieldset><legend>Change status</legend>{% for status in ('Added', 'Changed', 'Deleted') %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in difference_statuses %} checked{% endif %}>{{ status }}</label>{% endfor %}</fieldset>
+  <button class='button button-secondary' type='submit'>Apply filters</button>
+</form>
+<div class='table-scroll' tabindex='0' role='region' aria-label='Import differences'>
+<table><caption>Proposed Record differences</caption><thead><tr><th scope='col'>Identifier</th><th scope='col'>Status</th><th scope='col'>Field values</th></tr></thead><tbody>
+{% for item in preview.differences %}<tr><th scope='row'>{{ item.identifier }}</th><td>{{ item.status }}</td><td><dl class='record-details'>
+{% for name, old, new in item.changes %}<div><dt>{{ name }}</dt><dd>{% if item.status != 'Added' %}<p>Old value: {{ old if old is not none else '— (No value)' }}</p>{% endif %}{% if item.status != 'Deleted' %}<p>New value: {{ new if new is not none else '— (No value)' }}</p>{% endif %}</dd></div>{% endfor %}
+</dl></td></tr>{% else %}<tr><td colspan='3'>No matching differences.</td></tr>{% endfor %}
+</tbody></table></div>
+<nav class='pagination' aria-label='Difference pages'>
+{% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search, status=difference_statuses) }}'>Previous</a>{% endif %}
+<span>Page {{ difference_page }} · {{ preview.counts.matching }} differences</span>
+{% if difference_page * 50 < preview.counts.matching %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
+</nav>
+{% endif %}

@@ -6,6 +6,9 @@
 {% macro versions_action(key) -%}
 <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>
 {%- endmacro %}
+{% macro current_version_action(key) -%}
+<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
+{%- endmacro %}
 {% macro discard_action(key, ui, panel_id='concept-discard-panel') -%}
 {% if ui.discard_unavailable %}
 <div class='disabled-action-help'>
@@ -22,7 +25,18 @@
 <div class='side-panel-view' data-panel-host></div>
 {% endcall %}
 {%- endmacro %}
-{% macro banner(key, ui, actions=true, publication_panel=false) -%}
+{% macro concept_actions(key, ui, can_review=false, can_discard=true) -%}
+{% if can_review or can_discard %}
+<details class='export-menu concept-actions' data-concept-actions>
+  <summary class='button button-secondary'>Concept actions</summary>
+  <div class='export-menu-options'>
+    {% if can_review %}<a href='{{ url_for("dataset_version_review", key=key) }}'>Review changes</a>{% endif %}
+    {% if can_discard %}{{ discard_action(key, ui) }}{% endif %}
+  </div>
+</details>
+{% endif %}
+{%- endmacro %}
+{% macro banner(key, ui, actions=true, publication_panel=false, show_current=true) -%}
 {% if ui %}
 <section class='concept-banner' aria-label='Concept context'>
 <div class='concept-banner-text'>
@@ -31,10 +45,10 @@
 <p class='concept-banner-note'>Changes are not visible in the current published version until you publish them.</p>
 </div>
 <div class='page-actions'>
-<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
-{% if actions and ui.can_review %}<a class='button button-secondary' href='{{ url_for("dataset_version_review", key=key) }}'>Review changes</a>{% endif %}
+{% if show_current %}{{ current_version_action(key) }}{% endif %}
+{% if caller is defined %}{{ caller() }}{% endif %}
 {% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_publish", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Publish version</a>{% endif %}
-{% if actions and publication_panel %}<details class='export-menu concept-actions'><summary class='button button-secondary'>Concept actions</summary><div class='export-menu-options'>{{ discard_action(key, ui) }}</div></details>{% endif %}
+{% if actions %}{{ concept_actions(key, ui, ui.can_review, publication_panel) }}{% endif %}
 </div></section>
 {% if actions and publication_panel %}{{ discard_panel() }}{% endif %}
 {% if actions and ui.may_publish and publication_panel %}{{ form_side_panel('concept-publication-panel') }}{% endif %}

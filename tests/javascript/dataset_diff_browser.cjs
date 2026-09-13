@@ -42,6 +42,7 @@ async function capture(page, name) {
       await login(page,'owner@example.com');
       const versions = `${base}/datasets/diff-${width}/versions`;
       await page.goto(versions);
+      await page.locator('[data-concept-actions] summary').click();
       const reviewEntry=page.getByRole('link',{name:'Review changes',exact:true});
       await reviewEntry.focus(); await reviewEntry.press('Enter');
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();

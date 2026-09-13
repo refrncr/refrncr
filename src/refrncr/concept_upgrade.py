@@ -1,6 +1,6 @@
 """Stopped-writer preflight and lossless conversion of implicit working copies."""
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
@@ -27,7 +27,11 @@ def _decisions(connection):
     invalid, active = [], []
     with Session(bind=connection) as session:
         versions = SqlAlchemyVersionOperations(session)
-        diff = SqlAlchemyDiffOperations(session)
+        diff = SqlAlchemyDiffOperations(
+            session,
+            legacy_schema="deleted_content"
+            not in {c["name"] for c in inspect(connection).get_columns("dataset_records")},
+        )
         for dataset in session.scalars(select(Dataset).order_by(Dataset.id)):
             try:
                 latest = versions.latest_non_cancelled(dataset.id)
@@ -82,7 +86,7 @@ def migrate_concepts(connection):
         raise ConceptUpgradeError(invalid)
     now = utc_now()
     with Session(bind=connection) as session:
-        concepts = SqlAlchemyConceptOperations(session)
+        concepts = SqlAlchemyConceptOperations(session, legacy_schema=True)
         for dataset_id, baseline_id, revision in active:
             concepts.create(dataset_id, baseline_id, None, now, revision)
         session.flush()
