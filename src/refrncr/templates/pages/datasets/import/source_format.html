@@ -1,16 +1,41 @@
-<div class='source-formats' data-source-formats='{{ index }}'>
-{# A String column has no source format to choose, so the summary would only repeat
-   the example values already shown next to the column header. #}
+<div class='source-formats' data-source-formats='{{ index }}'{% if column and column.applicable %} data-state='{{ column.state }}'{% endif %}>
 {% if column and column.applicable %}
-  <p class='source-format-summary'><strong>{{ column.datatype }}</strong><span class='source-format-static'> · {{ column.label }}</span>{% if column.examples %} · <code>{{ column.examples[0].source }}</code> → <code>{{ column.examples[0].stored }}</code>{% endif %}</p>
-{% endif %}
-{% if column and column.applicable %}
-  <details id='source-details-{{ index }}' class='source-format-details' data-format-details{% if column.error %} open{% endif %}>
+  {% set has_readings = column.state == 'undecided' and column.readings %}
+  {% if column.verdict %}
+  <p class='format-verdict'>
+    <span class='format-verdict-icon' aria-hidden='true'>{{ '!' if column.state == 'failing' else '✓' }}</span>
+    <span>{{ column.verdict }}</span>
+    <button type='button' class='format-verdict-change' data-format-toggle aria-expanded='{{ "true" if column.state == "failing" else "false" }}' aria-controls='source-details-{{ index }}' hidden>{{ 'Done' if column.state == 'failing' else 'Change' }}</button>
+  </p>
+  {% endif %}
+  <details id='source-details-{{ index }}' class='source-format-details' data-format-details{% if column.state in ("undecided", "failing") %} open{% endif %}>
     <summary>Change format<span class='visually-hidden'> for {{ column.key }}</span></summary>
     <fieldset class='source-format-controls'>
       <legend>Source format for {{ column.key }}</legend>
       {% set error_description = 'source-error-' ~ index if column.error else 'effective-format-' ~ index %}
-      {% if column.temporal %}
+      {% if column.state == 'undecided' %}
+      <div class='format-decision' role='group' aria-labelledby='decide-{{ index }}' aria-describedby='source-error-{{ index }}'>
+        <p class='format-decision-head' id='decide-{{ index }}'><span aria-hidden='true'>⚠</span> Choose how this column is interpreted.</p>
+        {% if column.readings %}
+        <p class='format-decision-body' id='source-error-{{ index }}'>{{ column.readings|length }} readings fit every non-empty value. Choose one to continue to Preview.</p>
+        {# The checked empty radio preserves source_N until a real reading is chosen.
+           Native radio exclusivity guarantees exactly one successful value, also without JS. #}
+        <input type='radio' name='source_{{ index }}' value='' checked hidden>
+        <div class='format-decision-options'>
+          {% for reading in column.readings %}
+          <label class='format-reading'>
+            <input type='radio' id='source-{{ index }}-{{ loop.index0 }}' name='source_{{ index }}' value='{{ reading.id }}' aria-describedby='source-error-{{ index }}' aria-invalid='true'{% if loop.first %} data-format-error{% endif %}>
+            <span class='format-reading-label'>{{ reading.label }}</span>
+            <span class='format-reading-example'><code>{{ reading.example_source }}</code> → <code>{{ reading.example_stored }}</code></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if column.readings %}
+        {# Canonical radio submissions have no date/time components (REF-158 contract). #}
+      {% elif column.temporal %}
         {% set temporal = column.temporal %}
         {% set components = temporal.components %}
         <div data-source-type-field>
@@ -55,9 +80,9 @@
         </div>
       {% else %}<input type='hidden' name='timezone_{{ index }}' value=''><input type='hidden' name='fold_{{ index }}' value=''>{% endif %}
     </fieldset>
-    <p id='effective-format-{{ index }}' data-effective-format tabindex='-1' role='status' aria-live='polite' aria-atomic='true'>{{ column.label }}</p>
-    {% if column.error %}<p class='error-text' id='source-error-{{ index }}'{% if column.profiles|length == 1 %} tabindex='-1' data-format-error{% endif %}>{{ column.error }}</p>{% endif %}
-    {% if column.examples %}
+    <p id='effective-format-{{ index }}' data-effective-format tabindex='-1' role='status' aria-live='polite' aria-atomic='true'>{% if not has_readings %}{{ column.label }}{% endif %}</p>
+    {% if column.error and not has_readings %}<p class='error-text' id='source-error-{{ index }}'{% if column.profiles|length == 1 %} tabindex='-1' data-format-error{% endif %}>{{ column.error }}</p>{% endif %}
+    {% if column.examples and column.state != 'undecided' %}
     <div class='source-format-examples' data-format-examples aria-live='polite' aria-atomic='true'>
       <p class='source-format-example-heads' aria-hidden='true'><span>Examples from source</span><span>Stored as</span></p>
       <ol aria-label='Source and stored examples'>

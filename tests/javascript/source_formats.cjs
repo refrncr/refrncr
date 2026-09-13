@@ -29,17 +29,18 @@ const time=makeSelect('time_0','v1-time-hms',
 const parts=node({querySelectorAll:()=>[date,time]});
 const effective=node();
 const summary=node();
+const toggle=node();
 const row=node({dataset:{sourceFormats:'0'},querySelector(selector){
-  return {'[data-source-type]':source,'[data-text-formats]':parts,'[data-effective-format]':effective}[selector] || null;
+  return {'[data-source-type]':source,'[data-text-formats]':parts,'[data-effective-format]':effective,'[data-format-toggle]':toggle,'[data-format-details]':details}[selector] || null;
 }});
 const details=node({id:'source-details-0',open:false,closest:()=>row,querySelector(selector){
-  return {'summary':summary,'select:not([disabled])':source,'[data-effective-format]':effective}[selector] || null;
+  return {'summary':summary,'select:not([disabled])':source,'input:not([type="hidden"]):not([hidden]):not([disabled]), select:not([disabled])':source,'[data-effective-format]':effective,'[data-format-toggle]':toggle}[selector] || null;
 }});
 const advanced=node();
 const status=node();
 const form=node({dataset:{sourceFormatsUrl:'/formats'},elements:{namedItem:name=>({source_0:source,date_0:date,time_0:time})[name]},
   closest:()=>({querySelector:selector=>({'[data-advanced-formats]':advanced,'[data-mapping-status]':status}[selector] ?? status)}),
-  querySelectorAll:selector=>selector==='[data-format-details]'?[details]:[],
+  querySelectorAll:selector=>selector==='[data-format-details]'?[details]:selector==='[data-state="undecided"]' && row.dataset.state==='undecided'?[row]:[],
   querySelector(selector){return {'[data-advanced-formats]':advanced,'[data-source-formats="0"]':row}[selector] || null;},
 });
 document.querySelectorAll=selector=>selector==='[data-source-formats-url]'?[form]:[];
@@ -63,10 +64,16 @@ const emit=async(element,event,target=element)=>{
   window.refrncrSourceFormats();window.refrncrSourceFormats();
   assert.equal(form.handlers.change.length,1);
   assert.equal(summary.handlers.click.length,1);
+  assert.equal(toggle.handlers.click.length,1);
+  await emit(toggle,'click');assert.equal(details.open,true);assert.equal(toggle.textContent,'Done');
+  assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(document.activeElement,source);
+  await emit(toggle,'click');assert.equal(details.open,false);assert.equal(toggle.textContent,'Change');
+  assert.equal(toggle.getAttribute('aria-expanded'),'false');
   await emit(advanced,'click');assert.equal(details.open,true);
+  assert.equal(advanced.textContent,'Hide all formats');
   await emit(advanced,'click');assert.equal(details.open,false);
   await emit(summary,'click');assert.equal(details.open,true);assert.equal(document.activeElement,source);
-  await emit(details,'keydown');assert.equal(details.open,false);assert.equal(document.activeElement,summary);
+  await emit(details,'keydown');assert.equal(details.open,false);assert.equal(document.activeElement,toggle);
   time.value='v1-time-hm';await emit(form,'change',time);
   assert.equal(effective.textContent,'Day first · DD/MM/YYYY + 24-hour, minutes · HH:mm');
   assert.equal(requests.length,1);
@@ -81,6 +88,26 @@ const emit=async(element,event,target=element)=>{
   assert.equal(date.value,'v1-date-dmy-slash');assert.equal(time.value,'v1-time-hm');
   assert.equal(parts.hidden,false);assert.equal(time.disabled,false);
   assert.equal(requests.length,3);
+  for (const state of ['failing','undecided']) {
+    row.dataset.state=state; details.open=true;
+    await emit(advanced,'click');assert.equal(details.open,true);
+  }
+  row.dataset.state='undecided';source.value='';details.open=false;
+  let prevented=false;
+  for(const listener of form.handlers.submit) listener({preventDefault(){prevented=true;}});
+  assert.equal(prevented,true);assert.equal(details.open,true);assert.equal(document.activeElement,source);
+  for (const value of ['1','2']) {
+    prevented=false;
+    for(const listener of form.handlers.submit) listener({submitter:{name:'go_step',value},preventDefault(){prevented=true;}});
+    assert.equal(prevented,false,'Unresolved choices must not block Back');
+  }
+  source.value='text';prevented=false;
+  for(const listener of form.handlers.submit) listener({preventDefault(){prevented=true;}});
+  assert.equal(prevented,false);
+  row.dataset.state='clean';
+  const radio=node({name:'source_0',value:'v1-date-dmy-slash'});
+  const before=requests.length;await emit(form,'change',radio);assert.equal(requests.length,before+1);
+  delete row.dataset.state;await emit(advanced,'click');
   const replacement=node({...form,dataset:{sourceFormatsUrl:'/formats'},handlers:{}});
   window.refrncrSourceFormats({querySelectorAll:()=>[replacement]});
   window.refrncrSourceFormats({querySelectorAll:()=>[replacement]});

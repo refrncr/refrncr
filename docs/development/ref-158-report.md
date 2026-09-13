@@ -324,3 +324,15 @@ review fixes with `feat(import): simplify source format selection (REF-158)`.
 Push only this branch and open a focused PR to `main`, linked to REF-158. The PR
 and conversation record the final commit, CI and Jira status; do not add a
 self-referential commit hash to this committed report. Never merge automatically.
+
+
+## REF-159 follow-up: verdict-first presentation
+
+REF-159 supersedes the resting summary/examples and Advanced options labels above.
+Clean and transformed columns lead with a concise verdict and Change/Done;
+undecided/failing columns expose the required decision/correction. Two to four
+candidate readings reuse the original canonical submission contract; other cases
+retain these Date/Time controls. The catalogue, component composition, remembered
+choices, canonical storage and security/transaction boundaries remain unchanged.
+Historical results in this report are retained; current behavior and new evidence
+are in [the REF-159 report](ref-159-report.md).

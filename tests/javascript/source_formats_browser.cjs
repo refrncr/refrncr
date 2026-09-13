@@ -42,13 +42,13 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       };
       await upload('code;unused\nA;12.50\n');
       assert.equal(await page.locator('[data-format-details]').count(),0);
-      assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false,'No inert Advanced options button');
+      assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false,'No inert Show all formats button');
       const mappedReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
       await page.getByLabel('Target field for unused',{exact:true}).selectOption('amount');
       await mappedReview;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),true);
-      await page.getByRole('button',{name:'Advanced options',exact:true}).click();
+      await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
       assert.equal(await page.getByLabel('Choose source format for amount',{exact:true}).isVisible(),true);
       const ignoredReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
@@ -58,17 +58,17 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false);
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       await upload('code;amount;day\nA;1.234,56;2024-02-29\nB;2.345,67;2024-03-01\n');
-      // Advanced options is a disclosure action, not an import mode.
+      // The aggregate action controls the native format disclosures.
       const advanced=page.locator('[data-advanced-formats]');
       assert.equal(await page.locator('[data-format-details][open]').count(),0);
       await advanced.focus();
       await page.keyboard.press('Space');
       assert.equal(await page.locator('[data-format-details][open]').count(),2);
       assert.equal(await advanced.getAttribute('aria-expanded'),'true');
-      assert.equal(await advanced.textContent(),'Advanced options');
+      assert.equal(await advanced.textContent(),'Hide all formats');
       await advanced.click();
       assert.equal(await page.locator('[data-format-details][open]').count(),0);
-      const change=page.getByText('Change format',{exact:false}).filter({hasText:'amount'});
+      const change=page.locator('[data-source-formats="1"] [data-format-toggle]');
       await change.focus();
       await page.keyboard.press('Enter');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
@@ -92,13 +92,13 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       await upload('code;amount;day\nC;1.234;2024-02-29\nD;2.345;2024-03-01\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
-      assert.equal(await page.evaluate(()=>document.activeElement.id),'source-1');
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'source-1-0');
       const refresh=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
-      await page.getByLabel('Choose source format for amount',{exact:true}).selectOption('v1-eu');
+      await page.locator('input[name="source_1"][value="v1-eu"]').check();
       await refresh;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       assert.deepEqual(await page.locator('[data-source-formats="1"] .source-format-pair code').allTextContents(),['1.234','1234','2.345','2345']);
-      await page.screenshot({path:`/tmp/ref158-numeric-${width}.png`,fullPage:true});
+      await page.screenshot({path:`/tmp/ref159-regression-numeric-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').click();
       await page.waitForURL(/\/step\/4$/);
       await page.getByText('1234',{exact:true}).waitFor();
@@ -139,10 +139,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       };
       await upload('code;amount;moment;clock;measure\nF;12.5;2024-02-29T12:34:56;12:34:56;102.1059\nG;13.5;2024-03-01T12:34:56;12:34:56;6.7e+07\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),0);
-      await page.getByRole('button',{name:'Advanced options',exact:true}).click();
+      await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       assert.equal(await page.locator('[data-format-details][open]').count(),4);
-      // Its accessible name stays stable after opening every disclosure.
-      assert.equal(await page.locator('[data-advanced-formats]').textContent(),'Advanced options');
+      // Its accessible name describes the next aggregate action.
+      assert.equal(await page.locator('[data-advanced-formats]').textContent(),'Hide all formats');
       assert.equal(await page.getByLabel('Date format for moment',{exact:true}).locator('option').count(),8);
       assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('option').count(),4);
       assert.deepEqual(await page.locator('[data-source-formats="4"] .source-format-pair code').allTextContents(),['102.1059','102.1059','6.7e+07','67000000.0']);
@@ -194,7 +194,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
         assert.equal(await page.evaluate(()=>document.activeElement.name),'time_2');
       }
       assert.equal(await page.getByLabel('Time format for moment',{exact:true}).inputValue(),'v1-time-hms');
-      await page.screenshot({path:`/tmp/ref158-${width}.png`,fullPage:true});
+      await page.screenshot({path:`/tmp/ref159-regression-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').focus();
       await page.keyboard.press('Enter');
       await page.waitForURL(/\/step\/4$/);
@@ -209,10 +209,13 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       await upload('code;amount;moment\nH;1;01/02/2024 12:34:56\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
-      assert.equal(await page.evaluate(()=>document.activeElement.id),'source-2');
-      await changeControl('Source type for moment','text');
-      await changeControl('Date format for moment','v1-date-dmy-slash');
-      await changeControl('Time format for moment','v1-time-hms');
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'source-2-0');
+      const choiceReview = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await page.locator('input[name="source_2"][value="v1-datetime-dmy-slash-hms"]').check();
+      await choiceReview;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.equal(await page.getByLabel('Date format for moment',{exact:true}).inputValue(),'v1-date-dmy-slash');
+      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).inputValue(),'v1-time-hms');
       assert.match(await page.locator('[data-source-formats="2"] .source-format-pair').textContent(),/2024-02-01T12:34:56/);
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       assert.deepEqual(errors,[]);
@@ -220,7 +223,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByLabel('CSV or Excel file').setInputFiles({name:'native.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:nativeWorkbook.stdout});
       await page.getByRole('button',{name:'Continue',exact:true}).click();
       await page.waitForURL(/\/step\/3$/);
-      await page.getByRole('button',{name:'Advanced options',exact:true}).click();
+      await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       for(const key of ['day','clock','moment']) {
         assert.equal(await page.getByLabel('Source type for '+key,{exact:true}).inputValue(),'native');
         await changeControl('Source type for '+key,'text');
@@ -233,7 +236,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByText('2024-02-29T12:34:56',{exact:true}).waitFor();
       await page.getByRole('button',{name:'Cancel import',exact:true}).click();
       await upload('code;amount;stamp\nZ;1;2024-02-29T12:00:00Z\nOffset;1;2024-02-29T13:00:00+01:00\n');
-      await page.getByRole('button',{name:'Advanced options',exact:true}).click();
+      await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       assert.equal(await page.getByLabel('Source type for stamp',{exact:true}).inputValue(),'offset');
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).isVisible(),false);
       assert.deepEqual(await page.locator('[data-source-formats="2"] .source-format-pair code').allTextContents(),['2024-02-29T12:00:00Z','2024-02-29T12:00:00Z','2024-02-29T13:00:00+01:00','2024-02-29T12:00:00Z']);

@@ -241,3 +241,30 @@ always exposes its examples; Advanced options is only an all-Fields disclosure
 action, not a separate import mode. Without JavaScript, detected temporal choices
 can reach Preview; an explicit message explains how to enable corrections/live
 examples or replace the source file. See the REF-158 report for current evidence.
+
+
+### REF-159 presentation and form-envelope preservation
+
+REF-159 replaces the resting proposal/examples line with clean, transformed,
+undecided and failing verdicts. Full non-empty counts and failures come from the
+existing whole-column validation, excluding formula cells as before; formulas
+still fail authoritative import validation. Only bounded examples enter verdicts.
+Candidate readings reuse the existing detection scan and canonical parser output,
+with a hard presentation boundary of two through four matches. No second scan,
+new detection rule, persisted content, parser profile or preference is introduced.
+
+Canonical `source_N` radios replace the source-type selector for limited ambiguity;
+they have no accompanying Date/Time components. A checked hidden empty radio
+preserves the strict one-value envelope while no interpretation is selected.
+Selecting a real reading natively unchecks that placeholder. Timezone/fold and all
+other required controls continue to submit. Missing/duplicate/unknown/incompatible
+inputs keep the existing fail-closed handling and 250 KiB / 1,502-part limits.
+
+The JavaScript submit enhancement opens/focuses unresolved choices and blocks
+Preview locally; the server independently rejects unresolved interpretations.
+Live format review remains read-only. Accepted Preview submissions still invalidate
+previous Preview/Confirm state through the existing secured staging service.
+Show/Hide all formats keeps undecided/failing disclosures open on a global close;
+individual Done/Escape may close them. Native summaries and selected radio
+submission work without JavaScript. See [REF-159](ref-159-report.md) for evidence.
+No migration, schema, audit, authorization, token, TTL or transaction change.

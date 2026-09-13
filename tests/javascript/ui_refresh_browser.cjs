@@ -43,6 +43,7 @@ async function restored(page,opener) {
         await page.getByRole('button',{name:'Continue',exact:true}).click();
         await page.locator('[data-import-mapping]').waitFor();
         await page.getByRole('button',{name:'Continue to preview',exact:true}).click();
+        await page.waitForURL(/\/step\/4$/);
         const opener=page.getByRole('button',{name:'View error report',exact:true});
         await opener.focus();await opener.press('Enter');
         const dialog=page.getByRole('dialog',{name:'Import error report',exact:true});await dialog.waitFor();

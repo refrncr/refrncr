@@ -105,7 +105,12 @@ class Controls(HTMLParser):
             self.in_form = "data-import-mapping" in attrs
         if not self.in_form:
             return
-        if tag == "input" and attrs.get("name") and "disabled" not in attrs:
+        if (
+            tag == "input"
+            and attrs.get("name")
+            and "disabled" not in attrs
+            and (attrs.get("type") not in {"radio", "checkbox"} or "checked" in attrs)
+        ):
             self.data.add(attrs["name"], attrs.get("value", ""))
         if tag == "select":
             self.current = attrs.get("name") if "disabled" not in attrs else None
@@ -347,7 +352,8 @@ def test_ref154_catalogue_is_preserved_exactly():
     assert [p.id for p in formats_for("string")] == ["v1-text"]
 
 
-def test_maximum_width_component_form_preserves_upload_column_limit(wizard):
+@pytest.mark.parametrize("ambiguous", [False, True])
+def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambiguous):
     from refrncr.record_import import MAX_COLUMNS
 
     for index in range(MAX_COLUMNS - 2):
@@ -361,7 +367,8 @@ def test_maximum_width_component_form_preserves_upload_column_limit(wizard):
             False,
         )
     headers = ["code", "amount"] + [f"moment_{index}" for index in range(MAX_COLUMNS - 2)]
-    values = ["A", "1"] + ["2024-02-29T12:34:56"] * (MAX_COLUMNS - 2)
+    value = "01/02/2024 12:34:56" if ambiguous else "2024-02-29T12:34:56"
+    values = ["A", "1"] + [value] * (MAX_COLUMNS - 2)
     data = Controls(
         wizard.upload((";".join(headers) + "\n" + ";".join(values) + "\n").encode()).text
     ).data
@@ -375,7 +382,13 @@ def test_maximum_width_component_form_preserves_upload_column_limit(wizard):
     assert response.status_code == 200
     # Count the select itself: the wrapper's data-source-type-field attribute also
     # contains "data-source-type" as a substring.
-    assert response.text.count("data-source-type ") == MAX_COLUMNS - 2
+    assert response.text.count("data-source-type ") == (0 if ambiguous else MAX_COLUMNS - 2)
+    if ambiguous:
+        assert response.text.count("class='format-reading'") == 2 * (MAX_COLUMNS - 2)
+        for index in range(2, MAX_COLUMNS):
+            assert data[f"source_{index}"] == ""
+            data[f"source_{index}"] = "v1-datetime-dmy-slash-hms"
+    assert all(len(data.getlist(key)) == 1 for key in data)
     assert "Validation successful" in wizard.post(wizard.path + "/preview", data).text
     assert wizard.count() == 0
 
