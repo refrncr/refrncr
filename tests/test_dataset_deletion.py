@@ -623,11 +623,22 @@ def test_committed_mutation_makes_waiting_delete_stale(context, monkeypatch):  #
     assert not any(e.action == "dataset.deleted" for e in audits(c))
 
 
-def test_export_in_progress_retains_coherent_snapshot_during_delete(context, monkeypatch):  # noqa: F811
+def test_current_export_in_progress_retains_coherent_snapshot_during_delete(context, monkeypatch):  # noqa: F811
     from refrncr import dataset_export
 
     c = context
     populate(c)
+    # REF-155 invalidates pending Concept exports. Published exports keep ADR-012's
+    # snapshot contract even when the Dataset is deleted during preparation.
+    from refrncr.models import utc_now
+
+    c.s.dataset_versions.publish(
+        c.a.id,
+        c.d.id,
+        utc_now().date(),
+        "Release",
+        c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).revision,
+    )
     target = deletion(c)
     reading, release, started = Event(), Event(), Event()
     original = dataset_export.generate_export
@@ -644,9 +655,7 @@ def test_export_in_progress_retains_coherent_snapshot_during_delete(context, mon
         return remove(c, target)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        exporting = pool.submit(
-            c.s.dataset_records.export_dataset, c.a.id, c.d.key, "csv", prefer_concept=True
-        )
+        exporting = pool.submit(c.s.dataset_records.export_dataset, c.a.id, c.d.key, "csv")
         assert reading.wait(timeout=10)
         deleting = pool.submit(delete)
         try:

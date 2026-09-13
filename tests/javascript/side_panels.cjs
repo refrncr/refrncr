@@ -104,11 +104,19 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   await c.fire('click'); assert.equal(second.open,false,'another modal cannot open over this panel');
   await first.closeButton.fire('click'); assert.equal(first.open,false); assert.equal(document.activeElement,a);
   await b.fire('click');
+  const actionMenu = new Element();
+  b.closest = selector => selector === 'details' ? actionMenu : null;
   // Native Escape still closes a panel without a parent confirmation view.
   let escapePrevented = false;
   await first.fire('cancel', {preventDefault(){escapePrevented = true;}});
   assert.equal(escapePrevented,false); assert.equal(first.listeners.keydown,undefined);
   await first.close(); assert.equal(document.activeElement,b,'restores the particular opener');
+  assert.equal(actionMenu.hasAttribute('open'),true,'restored menu action must be visible');
+  const discardWarning = new Element({'data-initial-focus':''});
+  first.candidates = [discardWarning];
+  await b.fire('click');
+  assert.equal(document.activeElement,discardWarning,'discard focuses its warning before any destructive action');
+  await first.close();
   first.candidates=[]; await a.fire('click'); assert.equal(document.activeElement,first.closeButton); await first.close();
   await c.fire('click'); assert.equal(document.activeElement,second.input); await second.close(); assert.equal(document.activeElement,c);
   const field = new Element(); const content = {dataset:{panelTitle:'Edit field'},candidates:[field]};

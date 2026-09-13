@@ -1769,6 +1769,12 @@ class DatasetRecordService:
                 _dataset, selected, _maintain = _version_reads(self)._selection(
                     uow, actor_id, validated_key, version_id, prefer_concept=prefer_concept
                 )
+                concept_identity = None
+                if prefer_concept:
+                    concept = uow.concepts.get(dataset_id)
+                    if selected is not None or concept is None:
+                        raise NotFoundError("Dataset not found")
+                    concept_identity = concept.id
                 if selected is None:
                     fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
                     identifier = uow.dataset_business_keys.get(dataset_id)
@@ -1792,7 +1798,14 @@ class DatasetRecordService:
                 verify_artifact_readable(artifact)
             # Authorization and content were pinned to the completed snapshot.
             # Close it before acquiring the audit writer (including SQLite).
-            with self.uow(write=True, translate_errors=True) as uow:
+            with self.uow(
+                write=True, serialized=concept_identity is not None, translate_errors=True
+            ) as uow:
+                if concept_identity is not None:
+                    _version_reads(self)._target(uow, actor_id, dataset_id, write=True)
+                    concept = uow.concepts.get(dataset_id)
+                    if concept is None or concept.id != concept_identity:
+                        raise NotFoundError("Dataset not found")
                 record_audit(
                     uow,
                     actor_user_id=actor_id,

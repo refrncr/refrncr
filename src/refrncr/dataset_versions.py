@@ -1,13 +1,14 @@
 """Authoritative synchronous Dataset publication and cancellation use cases."""
 
 from contextlib import nullcontext
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import date
 from itertools import chain
 from types import MappingProxyType
 from unicodedata import normalize
 
 from refrncr.audit import record_audit
+from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.models import utc_now
@@ -140,6 +141,69 @@ class DatasetVersionService:
         self.uow = uow
         self.authorization = authorization
         self.clock = clock
+
+    def _discard_review(self, uow, actor_id, dataset):
+        from refrncr.services import _require_concept
+
+        concept = _require_concept(uow, dataset.id)
+        current = uow.versions.current_for_datasets((dataset.id,), self._today().date()).get(
+            dataset.id
+        )
+        if current is None:
+            raise ConflictError(DISCARD_UNAVAILABLE)
+        summary = self._concept_context(uow, actor_id, dataset).summary
+        identity = DiscardIdentity(
+            dataset.id,
+            concept.id,
+            dataset.revision,
+            concept.start_revision,
+            concept.updated_at.isoformat(),
+            actor_id,
+            dataset.owner_team_id,
+            current.id,
+        )
+        return DiscardReview(identity, dataset.name, summary.counts, len(summary.metadata)), current
+
+    def review_discard(self, actor_id, dataset_id):
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset = self._target(uow, actor_id, dataset_id)
+            return self._discard_review(uow, actor_id, dataset)[0]
+
+    def discard_concept(self, actor_id, dataset_id, expected):
+        try:
+            with self.uow(write=True, serialized=True, translate_errors=True) as uow:
+                dataset = self._target(uow, actor_id, dataset_id, write=True)
+                review, current = self._discard_review(uow, actor_id, dataset)
+                if not isinstance(expected, DiscardIdentity) or expected != review.identity:
+                    raise ConflictError(
+                        "This Concept changed. Review the current changes "
+                        "and confirm discard again."
+                    )
+                # Calendar activation has no writer/revision bump. Recheck after
+                # computing counts, immediately before the destructive statements.
+                current_now = uow.versions.current_for_datasets(
+                    (dataset.id,), self._today().date()
+                ).get(dataset.id)
+                if current_now is None or current_now.id != expected.current_id:
+                    raise ConflictError("Current changed. Review and confirm discard again.")
+                uow.concepts.discard(dataset, current)
+                dataset.revision += 1
+                record_audit(
+                    uow,
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset.id,
+                    action="dataset.concept_discarded",
+                    details={
+                        "concept_id": expected.concept_id,
+                        "metadata_changes": review.metadata_changes,
+                        **asdict(review.counts),
+                    },
+                )
+            return review
+        except PersistenceConflictError:
+            raise ConflictError("Discard could not be completed. Review and try again.") from None
 
     def create_concept(self, actor_id, dataset_id, *, uow=None):
         """The single concept-create operation, also used by Dataset creation."""
@@ -378,6 +442,7 @@ class DatasetVersionService:
             names.get(concept.creator_id, "Deleted user")
             if concept.creator_id
             else "System (migration)",
+            dataset.id in uow.versions.current_for_datasets((dataset.id,), self._today().date()),
         )
 
     def concept_context(self, actor_id, key):

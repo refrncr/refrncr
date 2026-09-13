@@ -81,3 +81,14 @@ external sorting, spool cleanup and audit-only prepared-request commit remain in
 Persistence exceptions are translated through the Unit of Work; unexpected browser failures
 return neutral 503 responses without SQL or exception details. Export audit retains its existing
 format-only payload and does not store the file, release note or Record contents.
+
+## Concept discard (REF-155)
+
+Concept exports now pin the active Concept UUID and check that identity plus current
+maintenance authority under the Dataset lock in the existing pre-return audit UoW.
+An absent/replacement Concept rejects the request, closes the prepared spool and
+writes no export event. This deliberate Concept-only exception invalidates pending
+preparations when discard wins. A prepared, audited response already accepted for
+streaming retains its truthful event and cannot be recalled. Current and historical
+exports retain ADR-012 snapshot semantics. No export jobs or download tokens exist.
+See [REF-155 report](ref-155-report.md).

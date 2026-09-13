@@ -201,7 +201,7 @@ async function closedWithFocus(page, opener) {
     await importer.locator('#import-file').setInputFiles({name: 'records.csv', mimeType: 'text/csv', buffer: Buffer.from('code,label\nIMPORTED,Concept import only\n')});
     await importer.getByRole('button', {name: 'Continue', exact: true}).click();
     await importer.locator('[data-import-mapping]').waitFor();
-    await importer.getByRole('button', {name: 'Continue', exact: true}).click();
+    await importer.getByRole('button', {name: 'Continue to preview', exact: true}).click();
     await importer.getByRole('link', {name: 'Continue', exact: true}).click();
     await importer.getByRole('button', {name: 'Import records', exact: true}).click();
     await importer.getByRole('link', {name: 'View records', exact: true}).waitFor();

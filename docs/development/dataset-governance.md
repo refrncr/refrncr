@@ -165,3 +165,12 @@ existing cancellation marker. Administrators retain access to every edit, while 
 users see only eligible snapshots. No rebase/discard/recovery permission is invented.
 The stale concept cannot be published or replaced in this scope; data remains preserved
 for REF-155 or a separate recovery story.
+
+## REF-155 discard authority
+
+Discard uses the same owning-team/Community-admin maintenance capability, rechecked
+under the Dataset lock. Legacy Viewer/Editor grants and export access are insufficient.
+It additionally requires an active Concept and a Current version. Ownership changes
+invalidate the signed confirmation even for a Community admin; membership removal
+revokes discard authority. Discard preserves ownership, grants, memberships and export
+access. See [REF-155 report](ref-155-report.md).

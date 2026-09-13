@@ -63,6 +63,21 @@ class SqlAlchemyConceptOperations:
     def close(self, dataset_id):
         self.session.execute(delete(DatasetConcept).where(DatasetConcept.dataset_id == dataset_id))
 
+    def discard(self, dataset, current):
+        # Explicit child-first deletion; snapshot UUIDs do not reference working rows.
+        self.session.execute(
+            delete(DatasetFieldSourceFormat).where(
+                DatasetFieldSourceFormat.field_id.in_(
+                    select(DatasetField.id).where(DatasetField.dataset_id == dataset.id)
+                )
+            )
+        )
+        for model in (DatasetRecordValue, DatasetRecord, DatasetBusinessKeyField, DatasetField):
+            self.session.execute(delete(model).where(model.dataset_id == dataset.id))
+        self.close(dataset.id)
+        dataset.name, dataset.description = current.name, current.description
+        dataset.content_updated_at = current.published_at
+
     def initialize(self, dataset, version, now):
         # Caller owns the Dataset lock and has established there is no active concept.
         # Import proposals are installation metadata, not versioned Field configuration.

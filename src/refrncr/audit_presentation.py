@@ -38,6 +38,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset", "dataset.concept_created"): ActionPresentation(
             "Dataset concept created", False
         ),
+        ("dataset", "dataset.concept_discarded"): ActionPresentation(
+            "Dataset concept discarded", False
+        ),
         ("dataset", "created"): ActionPresentation("Dataset created", False),
         ("dataset", "dataset.version_diff_viewed"): ActionPresentation(
             "Dataset changes reviewed", False
@@ -107,6 +110,8 @@ CONTEXT_LABELS = MappingProxyType(
         "version_number": "Version number",
         "baseline_version_number": "Baseline version",
         "concept_revision": "Concept revision",
+        "concept_id": "Concept ID",
+        "metadata_changes": "Dataset properties changed",
         "fields_added": "Fields added",
         "fields_changed": "Fields changed",
         "fields_removed": "Fields removed",

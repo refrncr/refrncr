@@ -87,7 +87,7 @@ def test_historical_action_names_and_object_types_are_stable():
             "business_key_updated field_order_updated dataset.records_imported "
             "dataset.export_requested dataset.deleted "
             "dataset.version_published dataset.version_cancelled "
-            "dataset.version_diff_viewed dataset.concept_created"
+            "dataset.version_diff_viewed dataset.concept_created dataset.concept_discarded"
         ),
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted",
@@ -224,6 +224,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.services.DatasetRecordService.export_dataset",
             "refrncr.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
+            "refrncr.dataset_versions.DatasetVersionService.discard_concept",
         }
     )
     assert behaviors == {

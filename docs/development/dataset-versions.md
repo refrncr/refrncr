@@ -234,3 +234,19 @@ uses the old identifier. Typed sort uses each row's source identifier fields, da
 and stable UUID ties. Page links preserve search. Metadata counts stay dataset-wide even
 when searching. Current reads remain separate, and no navigation/search/detail audit event
 is added; only explicitly opening a new valid detailed review retains the REF-149 exception.
+
+## Discard concept (REF-155)
+
+An owning-team member or Community admin can discard an active Concept only when
+a Current version exists, including unchanged Concepts and Concepts whose Scheduled
+baseline was cancelled. Without Current, the action stays visibly disabled with
+the approved explanation; name and description are never replaced with a fallback.
+This supersedes the earlier statement that stale Concepts have no discard workflow.
+
+The signed confirmation binds the Concept, revisions, actor/session, owning team
+and Current. Discard atomically deletes working children and the active Concept,
+restores Current metadata and writes one bounded audit; published snapshots and
+governance remain intact. It creates no new Concept. The existing explicit creation
+policy remains unchanged: Scheduled when applicable, otherwise Current. This also
+applies to Create concept after discard, as explicitly confirmed for REF-155. See
+[architecture and validation report](ref-155-report.md).

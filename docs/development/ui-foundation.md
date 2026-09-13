@@ -963,3 +963,24 @@ needed” in the same sentence. Examples use target-aware ISO rendering: a nativ
 midnight datetime mapped to Date shows only the date; DateTime retains its time.
 Workbook number-format masks are not presented as the user's Excel display,
 since Excel's locale can render them differently. Text examples remain verbatim.
+
+## REF-155 Concept discard
+
+Classification: product functionality using the shared Concept component and existing
+native-dialog sidepanel. Concept actions includes a destructive Discard concept action.
+Without Current it is an inert focusable `aria-disabled` control with an associated,
+always-visible explanation; this works for hover, keyboard and screen readers without
+custom tooltip code or JavaScript. The Concept menu variant bounds width and wraps help.
+No design tokens or dependencies change.
+
+The shared dialog supplies accessible title/description, warning-first focus, Cancel,
+Escape, focus trap, error focus and duplicate-submit prevention. Focus restoration
+reopens a details menu containing the opener before focusing it. The discard form also
+works as a full-page confirmation. Success returns to the Current overview and offers
+Create concept. Real Chrome keyboard/layout verification covers 320, 768 and 1440 px; see
+[REF-155 implementation notes](ref-155-report.md).
+
+The `detail-list-counts` variant gives labels the available width and counts an auto-sized
+column, including in narrow sidepanels. Labels wrap without clipping. No tokens change.
+Screen-reader software was not exercised; accessible names, descriptions, alerts and
+focus behavior were checked through semantic DOM assertions and real Chrome.

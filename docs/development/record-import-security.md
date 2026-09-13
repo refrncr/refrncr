@@ -268,3 +268,19 @@ Show/Hide all formats keeps undecided/failing disclosures open on a global close
 individual Done/Escape may close them. Native summaries and selected radio
 submission work without JavaScript. See [REF-159](ref-159-report.md) for evidence.
 No migration, schema, audit, authorization, token, TTL or transaction change.
+
+## Concept discard (REF-155)
+
+Staged uploads, wizard state, previews, confirmations and completion receipts now
+bind the original Concept UUID. Checks at staged reads and inside Confirm's locked
+transaction reject an absent or replacement Concept. Discard HTTP success purges
+local Concept-bound state, including busy claims; finishing an old claim cannot
+restore it. Other service callers/processes have immediate logical invalidation;
+physical memory cleanup follows obsolete-state lookup, resume, session revocation
+and the existing lazy 15-minute TTL. There are no staged upload files.
+
+Discard removes source-format proposals with their working Fields explicitly.
+Their values are not versioned/restored from historical snapshots. It creates no
+import success audit. A winning import commits all Records/proposals and its audit
+first and makes the discard confirmation stale; a winning discard prevents import
+persistence. See [REF-155 implementation notes](ref-155-report.md).
