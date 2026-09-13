@@ -153,6 +153,7 @@ class VersionRead:
     baseline_fields: tuple[SnapshotField, ...] = ()
     record_labels: Mapping[str, str] | None = None
     search: str = ""
+    deleted_fields: Mapping[str, tuple[SnapshotField, ...]] | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -304,6 +304,7 @@ def create_flask_app(
         "create_dataset_record",
         "edit_dataset_record",
         "delete_dataset_record",
+        "restore_dataset_record",
         "import_dataset_records",
         "dataset_import_step",
         "select_import_worksheet",
@@ -1114,6 +1115,12 @@ def create_flask_app(
     def dataset_records_view(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
+        selected_statuses = tuple(filter(None, request.args.getlist("status")))
+        import_results = (
+            concept
+            and request.args.get("import_results") == "1"
+            and (request.args.get("status_selection") != "1" or bool(selected_statuses))
+        )
         try:
             view = dataset_versions.read(
                 actor.id,
@@ -1122,6 +1129,9 @@ def create_flask_app(
                 parse_page_parameter(),
                 prefer_concept=concept,
                 search=request.args.get("q", ""),
+                statuses=(selected_statuses or ("Added", "Changed", "Deleted"))
+                if import_results
+                else (),
             )
         except NotFoundError:
             if version_id is not None or concept:
@@ -1181,6 +1191,10 @@ def create_flask_app(
             identifier=identifier,
             rows=rows,
             page=page,
+            import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
+            import_results=import_results,
+            import_totals=view.concept.import_result if view.concept and concept else None,
+            result_statuses=request.args.getlist("status"),
             may_edit=may_edit,
             may_export=view.may_export,
             version_state=view.state,
@@ -1192,7 +1206,7 @@ def create_flask_app(
                 record.id: tuple(
                     (field, next((v.value for v in record.values if v.field_id == field.id), None))
                     for field in (
-                        view.baseline_fields
+                        view.deleted_fields.get(record.id, view.baseline_fields)
                         if view.record_states.get(record.id) == "Deleted"
                         else fields
                     )
@@ -1254,24 +1268,28 @@ def create_flask_app(
 
     def import_route(rule, **options):
         def decorate(function):
+            if getattr(function, "_secured_import", False):
+                return dataset_route(rule, **options)(function)
+
             @wraps(function)
             def secured_import(*args, **kwargs):
                 try:
                     return function(*args, **kwargs)
                 except (NotFoundError, AuthorizationError):
                     return "The import has expired or is unavailable. Upload the file again.", 404
-                except ImportValidationError:
-                    return (
-                        "The import is unavailable. No records have been imported. Upload the file again.",
-                        400,
-                    )
+                except ImportValidationError as error:
+                    return render_authenticated_template(
+                        "pages/datasets/import/unavailable.html", error=str(error)
+                    ), 400
 
+            secured_import._secured_import = True
             return dataset_route(rule, **options)(secured_import)
 
         return decorate
 
     def render_import_wizard(dataset, login_session, state=None, *, step=1, error=None, status=200):
         actor, _session = require_authenticated()
+        mode = state.mode if state else "new_version"
         fields = dataset_fields.list_fields(actor.id, dataset.key)
         source = assistance = preview = None
         required_keys = ()
@@ -1289,9 +1307,15 @@ def create_flask_app(
             if step >= 4:
                 try:
                     preview = record_imports.saved_preview(
-                        actor.id, login_session.id, dataset.key, state.token
+                        actor.id,
+                        login_session.id,
+                        dataset.key,
+                        state.token,
+                        page=parse_page_parameter(),
+                        statuses=tuple(request.args.getlist("status")),
+                        search=request.args.get("q", ""),
                     )
-                except NotFoundError:
+                except (NotFoundError, ImportValidationError):
                     raise
                 except Exception:
                     return (
@@ -1314,7 +1338,11 @@ def create_flask_app(
                 identifier_keys = identifier.field_keys
                 required_keys = tuple(
                     dict.fromkeys(
-                        [field.key for field in fields if field.is_required]
+                        [
+                            field.key
+                            for field in fields
+                            if field.is_required or mode == "new_version"
+                        ]
                         + list(identifier.field_keys)
                     )
                 )
@@ -1389,6 +1417,10 @@ def create_flask_app(
         back_step = 3 if step == 4 else 4 if step == 5 else 1 if automatic else step - 1
         return render_authenticated_template(
             "pages/datasets/import/wizard.html",
+            mode=mode,
+            difference_page=parse_page_parameter(),
+            difference_search=request.args.get("q", ""),
+            difference_statuses=request.args.getlist("status"),
             dataset=dataset,
             state=state,
             step=step,
@@ -1417,12 +1449,24 @@ def create_flask_app(
             url_for("dataset_import_step", key=key, token=state.token, step=state.step), code=303
         )
 
+    @import_route(
+        "/datasets/<key>/concept/records/import-new-version",
+        methods=["GET", "POST"],
+    )
     @import_route("/datasets/<key>/records/import", methods=["GET", "POST"])
     def import_dataset_records(key: str):
+        mode = "new_version"
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        reason = record_imports.eligibility(actor.id, key)
+        if reason:
+            raise ImportValidationError(". ".join(reason))
         state = record_imports.active(actor.id, login_session.id, key)
+        if state and state.mode != mode:
+            raise ImportValidationError(
+                "Cancel the older staged import, then upload the complete file again."
+            )
         if request.method == "GET":
             if state:
                 state = record_imports.navigate(
@@ -1451,6 +1495,7 @@ def create_flask_app(
                 key,
                 uploaded.filename or "",
                 uploaded.stream.read(MAX_UPLOAD_BYTES + 1),
+                mode=mode,
             )
         except ImportValidationError as error:
             return render_import_wizard(dataset, login_session, state, error=str(error), status=400)
@@ -1660,12 +1705,24 @@ def create_flask_app(
     def confirm_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
-        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
+        state = record_imports.state(actor.id, login_session.id, key, token)
+        expected = {"csrf_token", "confirmation"} if state.mode == "new_version" else {"csrf_token"}
+        if "acknowledge_deletions" in request.form and state.mode == "new_version":
+            expected.add("acknowledge_deletions")
+        if set(request.form) != expected or any(
+            len(request.form.getlist(k)) != 1 for k in expected
+        ):
             abort(400)
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
         try:
             record_imports.confirm(
-                actor.id, login_session.id, key, token, require_confirmation=True
+                actor.id,
+                login_session.id,
+                key,
+                token,
+                require_confirmation=True,
+                confirmation=request.form.get("confirmation"),
+                acknowledge_deletions=request.form.get("acknowledge_deletions") == "yes",
             )
         except NotFoundError:
             raise
@@ -1688,6 +1745,10 @@ def create_flask_app(
                 step=5,
                 error="The import could not be completed. No records have been imported. Try again.",
                 status=503,
+            )
+        if state.mode == "new_version":
+            return redirect(
+                url_for("dataset_records_view", key=key, concept=True, import_results=1), code=303
             )
         return import_redirect(key, record_imports.state(actor.id, login_session.id, key, token))
 
@@ -1902,6 +1963,31 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         return redirect(url_for("dataset_records_view", key=key, concept=True))
+
+    @dataset_route("/datasets/<key>/concept/records/<record_id>/restore", methods=["POST"])
+    def restore_dataset_record(key: str, record_id: str):
+        actor, login_session = require_authenticated()
+        require_csrf(login_session.csrf_token)
+        expected = {"csrf_token", "expected_revision", "concept_id"}
+        if set(request.form) != expected or any(
+            len(request.form.getlist(k)) != 1 for k in expected
+        ):
+            abort(400)
+        try:
+            dataset_records.restore_record(
+                actor.id,
+                key,
+                record_id,
+                exact_expected_revision(),
+                concept_id=request.form["concept_id"],
+            )
+        except (ValidationError, RecordConflictError, StaleRecordError) as error:
+            return render_authenticated_template(
+                "pages/datasets/records/restore_error.html", error=str(error), key=key
+            ), 409
+        except NotFoundError:
+            abort(404)
+        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @dataset_route("/datasets/<key>/records/<record_id>/delete", methods=["GET", "POST"])
     def delete_dataset_record(key: str, record_id: str):

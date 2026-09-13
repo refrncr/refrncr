@@ -185,8 +185,9 @@ These are explicit limits, not a claim of constant-time or unlimited-size perfor
 Normal links and breadcrumbs select Current. **Versions** is a header action with the
 existing history icon; no standalone tab remains. Versions exposes **+ New version**
 (the authoritative concept-create operation) only to administrators with no active concept.
-Its aligned **Concept** row appears beneath the pinned baseline, or above the list for a
-first concept, using the same columns as published versions. Draft/Stale is shown in Status;
+Its aligned **Concept** row always appears first, followed by published versions in
+descending version-number order, including Scheduled and Cancelled entries. The Concept's
+pinned baseline does not affect row placement. All rows use the same columns. Draft/Stale is shown in Status;
 unavailable publication metadata is an em dash. The row opens the concept. Review changes
 is available on Versions and concept pages; Publish version remains on concept and review
 pages. The Publish panel also offers optional review before the first publication.
@@ -250,3 +251,22 @@ governance remain intact. It creates no new Concept. The existing explicit creat
 policy remains unchanged: Scheduled when applicable, otherwise Current. This also
 applies to Create concept after discard, as explicitly confirmed for REF-155. See
 [architecture and validation report](ref-155-report.md).
+
+## REF-160 retained deletions and import eligibility
+
+Deleted Concept Records now retain their own last canonical values and Field definitions
+on the existing Record row. Their detail panel provides **Undo delete**, for manual and
+imported deletions alike, including Records added and then deleted within this Concept.
+Undo uses the active Concept identity and Record revision and repeats maintenance
+authorization. Stale, reused-identifier, unique-value and incompatible-schema restoration
+fails without changing content. Current/history remain immutable. Publication excludes
+Deleted Records; discard and later Concept initialization retain their existing semantics.
+
+Migration 0018 establishes an explicitly approved one-time compatibility boundary: every
+existing Concept is excluded from complete new-version import; publish/discard and create
+a new Concept to use it. No historical audit attribution is guessed. Physically missing
+baseline Records are restored as Deleted using their published baseline values; their
+old Concept edits were already lost. New deletions preserve actual last Concept values.
+Field-only changes leave a newly created Concept importable. See
+[ADR-016](../architecture/adr-016-complete-record-import.md) and
+[import security](record-import-security.md#complete-new-version-imports-ref-160).

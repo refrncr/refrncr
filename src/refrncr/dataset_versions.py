@@ -242,6 +242,7 @@ class DatasetVersionService:
                     changes = classify_fields(current_fields, baseline_fields)
                     if (
                         changes
+                        or next(work.dataset_records.deleted_records(dataset.id), None) is not None
                         or dataset.name != baseline.name
                         or dataset.description != baseline.description
                         or any(work.version_diff.counts(dataset.id, baseline.id))
@@ -451,11 +452,23 @@ class DatasetVersionService:
             dataset, _state, _maintain = self._selection(uow, actor_id, key, prefer_concept=True)
             return self._concept_context(uow, actor_id, dataset)
 
-    def read(self, actor_id, key, version_id=None, page=1, *, prefer_concept=False, search=""):
+    def read(
+        self,
+        actor_id,
+        key,
+        version_id=None,
+        page=1,
+        *,
+        prefer_concept=False,
+        search="",
+        statuses=(),
+    ):
         if page is not None and (type(page) is not int or page < 1):
             raise ValidationError("Page must be a positive integer")
         if not isinstance(search, str) or len(search) > 200:
             raise ValidationError("Identifier search must not exceed 200 characters")
+        if set(statuses) - {"Added", "Changed", "Deleted"}:
+            raise ValidationError("Choose a valid Record status")
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             dataset, state, maintain = self._selection(
@@ -474,16 +487,20 @@ class DatasetVersionService:
                 records = uow.versions.iterate_records(state.version) if page is not None else ()
             concept = uow.concepts.get(dataset.id) if maintain else None
             baseline_fields, removed = (), ()
-            if state is None and concept.base_version_id and page is not None:
-                baseline = uow.versions.get(dataset.id, concept.base_version_id)
-                baseline_fields = uow.versions.fields(baseline)
-                removed = tuple(uow.version_diff.removed_records(dataset.id, baseline))
+            deleted_fields = {}
+            if state is None and page is not None:
+                pairs = tuple(uow.dataset_records.deleted_records(dataset.id))
+                removed = tuple(record for record, _fields in pairs)
+                deleted_fields = {record.id: field_set for record, field_set in pairs}
             deleted_ids = {record.id for record in removed}
-            old_keys = tuple(sorted(field.key for field in baseline_fields if field.is_identifier))
             labels = {}
 
             def sort_key(record):
-                keys = old_keys if record.id in deleted_ids else identifier.field_keys
+                keys = (
+                    tuple(sorted(f.key for f in deleted_fields[record.id] if f.is_identifier))
+                    if record.id in deleted_ids
+                    else identifier.field_keys
+                )
                 values = {value.field_key: value for value in record.values}
                 labels[record.id] = " · ".join(
                     get_datatype(values[key].data_type).text(values[key].value)
@@ -507,6 +524,29 @@ class DatasetVersionService:
             term = normalize("NFC", search).casefold()
             if term:
                 ordered = [r for r in ordered if term in normalize("NFC", labels[r.id]).casefold()]
+            if statuses and state is None:
+                projected = {}
+                for offset in range(0, len(ordered), 500):
+                    projected.update(
+                        uow.version_diff.record_states(
+                            dataset.id,
+                            concept.base_version_id,
+                            tuple(r.id for r in ordered[offset : offset + 500]),
+                        )
+                    )
+                imported = (concept.import_result or {}).get("records", {})
+                ordered = [
+                    r
+                    for r in ordered
+                    if (
+                        "Deleted"
+                        if r.id in deleted_ids
+                        else projected.get(
+                            r.id, imported.get(r.id) if imported.get(r.id) != "Deleted" else None
+                        )
+                    )
+                    in statuses
+                ]
             page_size = DatasetRecordService.PAGE_SIZE
             start = ((page or 1) - 1) * page_size
             record_page = RecordPage(
@@ -522,6 +562,10 @@ class DatasetVersionService:
                 if state is None
                 else {}
             )
+            if statuses and state is None and concept.import_result:
+                for record_id, imported_status in concept.import_result.get("records", {}).items():
+                    if imported_status != "Deleted":
+                        states.setdefault(record_id, imported_status)
             statuses = {"Changed": "Edited", "Added": "Added", "Removed": "Deleted"}
             export = self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
             return VersionRead(
@@ -534,12 +578,20 @@ class DatasetVersionService:
                 export and (state is None or state.status in {"Current", "Expired"}),
                 concept,
                 MappingProxyType(
-                    {r.id: statuses.get(states.get(r.id), "Published") for r in record_page.records}
+                    {
+                        r.id: (
+                            "Deleted"
+                            if r.id in deleted_ids
+                            else statuses.get(states.get(r.id), "Published")
+                        )
+                        for r in record_page.records
+                    }
                 ),
                 len(removed),
                 baseline_fields,
                 MappingProxyType({r.id: labels[r.id] for r in record_page.records}),
                 search,
+                MappingProxyType(deleted_fields),
             )
 
     def review(self, actor_id, dataset_id):

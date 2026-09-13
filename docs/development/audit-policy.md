@@ -334,3 +334,17 @@ Opening the confirmation is an ordinary authorized read, with no diff-viewed eve
 Transient Concept cleanup is explicitly excluded from domain audit. Pending Concept
 export now rechecks Concept existence and maintenance under its audit transaction
 lock; see [REF-155 report](ref-155-report.md).
+
+## REF-160 complete-version import and Undo
+
+Successful complete-version confirmation emits one `dataset:dataset.new_version_imported`
+event with `mode=new_version`, CSV/XLSX format and Added/Changed/Unchanged/Deleted/total
+counts. Total includes absent Records marked Deleted. The same transaction applies the
+complete difference, sets the one-use Concept result and advances Concept revision.
+Unchanged Records receive neither writes nor per-row events. Rollback emits no successful
+import event. Existing create-only import retains `dataset.records_imported`.
+
+Undo delete emits one `dataset_record:restored` event for the existing UUID; no retained
+Field values or identifiers enter audit. Historic delete events retain their meaning as
+the deletion at that time. Eligibility and preview remain unaudited reads. The inventory,
+coverage matrix and event presentation catalog include both operations and browser routes.

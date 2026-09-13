@@ -139,6 +139,11 @@ Reusable classes include:
 - `card`, `badge-*`, `table-scroll`, `pagination`, and `empty-state`;
 - `dialog` and its open/close data attributes for confirmations.
 
+Management-table row headers share the vertical centring of data cells. The
+`button-table-action` variant uses existing spacing and typography tokens for compact,
+single-line actions such as scheduled-version cancellation, retaining a minimum 24 px
+target height. Confirmation-panel buttons keep their standard sizing.
+
 Component names use lowercase kebab-case. State classes use the `is-` prefix, and JavaScript
 hooks use `data-*` attributes rather than presentation classes. Documentation must only list a
 Jinja component after a page actually consumes it.
@@ -984,3 +989,37 @@ The `detail-list-counts` variant gives labels the available width and counts an 
 column, including in narrow sidepanels. Labels wrap without clipping. No tokens change.
 Screen-reader software was not exercised; accessible names, descriptions, alerts and
 focus behavior were checked through semantic DOM assertions and real Chrome.
+
+## REF-160 complete-version import
+
+Classification: product functionality using the shared import wizard, a reusable import
+action macro and page-specific difference/results controls. No design tokens or global
+button/table/form styles change. The Concept Record page header holds View current
+version, Versions and Export; the Concept banner holds editing, publication and lifecycle actions. Review changes
+is inside the shared Concept actions menu, including on Versions and in Record panels.
+The banner's action slot groups Configure, Import and Add record together inside the
+yellow Concept surface. Import is one action opening full-file comparison; there is no
+append/replace choice. Upload explains the complete-set semantics, including that missing
+Records become Deleted. The same flow shows only additions for an empty table. The
+unavailable Import action remains keyboard-focusable with `aria-disabled` and an
+`aria-describedby` explanation using the existing rationale tooltip. Escape dismisses
+the explanation; the native disclosure fallback works without JavaScript. The action
+group wraps inside the Concept banner on mobile.
+
+The Record toolbar's status-filter component reuses the native disclosure menu beside
+identifier search. Added, Changed and Deleted are independent checkboxes, all selected
+for All changes, with counts from the original import receipt. Search applies their
+combination. All records inside the menu clears the filter while retaining identifier
+search; submitting no selected statuses also shows all records. The menu remains available
+after clearing when the Concept has an import receipt. Its summary names the selection;
+JavaScript updates that caption as choices change and Escape restores summary focus.
+Native form submission works without JavaScript. Existing spacing, focus and menu styles
+are reused; no design tokens change.
+
+The mode appears in the page heading and final action. Differences use semantic table
+captions/headers, text statuses and labelled old/new values inside the existing scroll
+region. The deletion checkbox has the exact full count and starts unchecked. Filtering,
+search, pagination, acknowledgement and confirmation are native server-rendered forms
+and links. The existing JS dialog contract governs Record detail/Undo; the import wizard
+works without JavaScript. No screenreader-user test or automated accessibility audit is
+implied by the semantic and keyboard checks in the REF-160 report.

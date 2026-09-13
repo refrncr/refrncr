@@ -1,0 +1,11 @@
+{% from "components/icons.html" import upload_icon %}
+{% macro record_import_action(key, reason) %}
+{% if reason %}
+<details class='import-action-help mapping-rationale' data-mapping-tooltip>
+  <summary class='button button-secondary' role='button' tabindex='0' aria-disabled='true' aria-describedby='record-import-reason'>{{ upload_icon() }}Import</summary>
+  <div class='mapping-tooltip' role='tooltip' id='record-import-reason'><strong>{{ reason[0] }}</strong><p>{{ reason[1] }}</p></div>
+</details>
+{% else %}
+<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=key) }}'>{{ upload_icon() }}Import</a>
+{% endif %}
+{% endmacro %}

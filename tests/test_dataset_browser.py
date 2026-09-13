@@ -363,6 +363,8 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "Export</summary>" in page
     assert "format=csv" in page and "format=xlsx" in page and "format=json" in page
     assert "class='button button-secondary'" in page and "Import</a>" in page
+    assert "Add records from file" not in page
+    assert "aria-label='Edit Concept Records'" in page
     assert "href='/datasets/button-actions/concept'>" in page and "Configure</a>" in page
     assert "data-dialog-open='add-record-panel'" in page
     assert "<dialog class='side-panel' id='add-record-panel' data-side-panel" in page
@@ -407,7 +409,7 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     assert "data-panel-mode='edit'" in page
     assert "data-panel-view='edit' hidden" in page
     assert "value='1'" in page
-    assert "This deletion cannot be undone." in page
+    assert "You can Undo delete while this Concept remains active." in page
     assert "name='confirm' value='yes'" in page
 
 
@@ -745,7 +747,9 @@ def test_viewer_keeps_record_view_button_without_mutation_actions(dataset_browse
     assert f"aria-label='View record VISIBLE ({visible_record.id})'" in page
     assert "Export</summary>" not in page
     assert "Configure</a>" not in page
+    assert "Import</summary>" not in page
     assert "Import</a>" not in page
+    assert "aria-label='Edit Concept Records'" not in page
     assert "Add record</button>" not in page
     assert "data-panel-mode='edit'" not in page
     assert "data-panel-mode='delete'" not in page

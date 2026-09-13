@@ -40,6 +40,7 @@ class EventContract:
                 "count",
                 "subject",
                 "import_format",
+                "import_mode",
                 "export_format",
                 "dataset_name",
                 "version_count",
@@ -100,11 +101,23 @@ _EVENTS = (
         EventContract("dataset_field", action)
         for action in ("created", "definition_updated", "deleted")
     ),
-    *(EventContract("dataset_record", action) for action in ("created", "updated", "deleted")),
+    *(
+        EventContract("dataset_record", action)
+        for action in ("created", "updated", "deleted", "restored")
+    ),
     EventContract(
         "dataset",
         "dataset.records_imported",
         (("format", "import_format"), ("record_count", "count"), ("rejected_row_count", "count")),
+    ),
+    EventContract(
+        "dataset",
+        "dataset.new_version_imported",
+        (("mode", "import_mode"), ("format", "import_format"))
+        + tuple(
+            (key, "version_count")
+            for key in ("added", "changed", "unchanged", "deleted", "total_processed")
+        ),
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
     EventContract(
@@ -212,6 +225,7 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
             value = normalize("NFC", value.strip()).casefold()
             allowed = {
                 "subject": {"user": "user", "team": "team"},
+                "import_mode": {"new_version": "new_version"},
                 "import_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel"},
                 "export_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel", "json": "JSON"},
             }[kind]
@@ -371,6 +385,7 @@ for _method, _action in (
     ("create_record", "created"),
     ("update_record", "updated"),
     ("delete_record", "deleted"),
+    ("restore_record", "restored"),
 ):
     _audited("DatasetRecordService", _method, ("dataset_record", _action))
 _audited("DatasetRecordService", "export_dataset", ("dataset", "dataset.export_requested"))
@@ -379,11 +394,12 @@ _audited(
     "DatasetRecordImportService",
     "confirm",
     ("dataset", "dataset.records_imported"),
+    ("dataset", "dataset.new_version_imported"),
     module="record_import",
 )
 _register(
     "DatasetRecordImportService",
-    "active state begin navigate select_worksheet "
+    "eligibility active state begin navigate select_worksheet "
     "mapping_assistance format_assistance preview saved_preview cancel revoke_session",
     "intentionally excluded",
     module="record_import",

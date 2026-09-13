@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% from 'components.html' import feedback %}
+{% block content %}<h1>Undo delete unavailable</h1>
+{{ feedback(error, id='restore-error', focus=true) }}
+<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key, concept=true) }}'>Return to Concept Records</a>
+{% endblock %}

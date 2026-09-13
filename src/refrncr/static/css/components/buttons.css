@@ -6,6 +6,7 @@
 .button-secondary:hover { border-color: var(--color-text-muted); background: var(--color-surface-subtle); color: var(--color-text); }
 .button-danger { background: var(--color-action-danger); color: var(--color-action-on-strong); }
 .button-danger:hover { background: var(--color-action-danger-hover); color: var(--color-action-on-strong); }
+.button-table-action { min-height: var(--space-lg); padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-xs); white-space: nowrap; }
 .button-link { min-height: auto; padding: var(--space-sm) 0; background: transparent; color: var(--color-action-primary-hover); text-decoration: underline; }
 .button:active { transform: translateY(1px); }
 .button:disabled, .button[aria-disabled="true"] { cursor: not-allowed; opacity: var(--color-action-disabled-opacity); }

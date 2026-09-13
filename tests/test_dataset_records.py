@@ -274,7 +274,7 @@ def test_delete_is_conditional_cascades_and_leaves_audit(record_services):
     with pytest.raises(NotFoundError):
         services.dataset_records.delete_record(admin.id, dataset.key, record.id, 2)
     with factory() as session:
-        assert session.get(DatasetRecord, record.id) is None
+        assert session.get(DatasetRecord, record.id).deleted_content is not None
         assert (
             session.scalar(
                 select(func.count(DatasetRecordValue.record_id)).where(

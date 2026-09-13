@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 from datetime import timedelta
 from uuid import uuid4
 
@@ -45,6 +46,36 @@ def client(c, actor=None):
 
 def request(browser, method, path, **kwargs):
     return getattr(browser, method)(path, base_url=HTTPS, **kwargs)
+
+
+@pytest.mark.parametrize("baseline_index", [0, 1])
+def test_history_places_concept_before_scheduled_and_current_versions(context, baseline_index):  # noqa: F811
+    from refrncr.models import DatasetConcept
+
+    c = context
+    configured(c)
+    c.service.clock = lambda: NOW - timedelta(days=2)
+    publish(c, day=NOW.date() - timedelta(days=2))
+    for number, day in ((2, NOW.date() - timedelta(days=1)), (3, NOW.date() + timedelta(days=1))):
+        c.service.clock = (lambda: NOW - timedelta(days=1)) if number == 2 else (lambda: NOW)
+        c.service.create_concept(c.a.id, c.d.id)
+        record = c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, c.record.id)
+        c.s.dataset_records.update_record(
+            c.a.id, c.d.key, record.id, record.revision, {"code": "a", "label": f"Version {number}"}
+        )
+        publish(c, day=day)
+    c.service.create_concept(c.a.id, c.d.id)
+    history = c.service.history(c.a.id, c.d.key)
+    # Include an existing Concept pinned to Current beneath a newer Scheduled version.
+    with c.sessions() as session:
+        concept = session.get(DatasetConcept, c.d.id)
+        concept.base_version_id = history.entries[baseline_index].version.id
+        session.commit()
+    browser, _ = client(c)
+    response = request(browser, "get", f"/datasets/{c.d.key}/versions")
+    assert response.status_code == 200
+    names = re.findall(r"<th scope='row'><a[^>]*>([^<]+)</a></th>", response.text)
+    assert names == ["Concept", "Version 3", "Version 2", "Version 1"]
 
 
 def payload(c, csrf, *, day=None, note="Release"):

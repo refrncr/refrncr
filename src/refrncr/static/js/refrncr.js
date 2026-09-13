@@ -630,6 +630,23 @@
   });
 
   const exportMenus = [...document.querySelectorAll(".export-menu")];
+  document.querySelectorAll('[data-concept-actions]').forEach((menu) => {
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.open) menu.querySelector('summary').focus();
+    });
+  });
+  document.querySelectorAll('.record-status-filter').forEach((menu) => {
+    const summary = menu.querySelector('summary');
+    menu.addEventListener('change', () => {
+      const selected = [...menu.querySelectorAll('input:checked')].map(input => input.value);
+      const caption = selected.length === 0 ? 'All records' : selected.length === 3 ? 'All changes' : selected.length === 1 ? selected[0] : `${selected.length} statuses`;
+      summary.textContent = caption;
+      summary.setAttribute('aria-label', `Change status: ${caption}`);
+    });
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && menu.open) summary.focus();
+    });
+  });
   document.querySelectorAll(".export-menu-options a").forEach((option) => {
     option.addEventListener("click", () => option.closest(".export-menu")?.removeAttribute("open"));
   });

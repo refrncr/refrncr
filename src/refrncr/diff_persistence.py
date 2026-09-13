@@ -15,8 +15,9 @@ from refrncr.models import (
 
 
 class SqlAlchemyDiffOperations:
-    def __init__(self, session):
+    def __init__(self, session, *, legacy_schema=False):
         self.session = session
+        self._active_records = True if legacy_schema else DatasetRecord.deleted_content.is_(None)
 
     @staticmethod
     def _changes(dataset_id, version_id):
@@ -79,11 +80,10 @@ class SqlAlchemyDiffOperations:
             .subquery()
         )
 
-    @classmethod
-    def _records(cls, dataset_id, version_id):
+    def _records(self, dataset_id, version_id):
         new = (
             select(DatasetRecord.id, DatasetRecord.identifier_key)
-            .where(DatasetRecord.dataset_id == dataset_id)
+            .where(DatasetRecord.dataset_id == dataset_id, self._active_records)
             .subquery()
         )
         old = (
@@ -91,7 +91,7 @@ class SqlAlchemyDiffOperations:
             .where(DatasetVersionRecord.version_id == version_id)
             .subquery()
         )
-        changes = cls._changes(dataset_id, version_id)
+        changes = self._changes(dataset_id, version_id)
         current = (
             select(
                 new.c.id,
@@ -221,7 +221,7 @@ class SqlAlchemyDiffOperations:
                     DatasetField.id == DatasetRecordValue.field_id,
                 ),
             )
-            .where(DatasetRecord.dataset_id == dataset_id)
+            .where(DatasetRecord.dataset_id == dataset_id, self._active_records)
             .order_by(DatasetRecord.id, DatasetField.key)
         )
         return self._validate_rows(statement, identifier_fields)

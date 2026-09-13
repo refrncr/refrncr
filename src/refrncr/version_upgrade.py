@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from refrncr.dataset_versions import validated_snapshot
@@ -48,7 +48,13 @@ def _work(session):
     return SimpleNamespace(
         dataset_fields=SqlAlchemyDatasetFieldOperations(session),
         dataset_business_keys=SqlAlchemyDatasetBusinessKeyOperations(session),
-        dataset_records=SqlAlchemyDatasetRecordOperations(session),
+        dataset_records=SqlAlchemyDatasetRecordOperations(
+            session,
+            legacy_schema="deleted_content"
+            not in {
+                c["name"] for c in inspect(session.connection()).get_columns("dataset_records")
+            },
+        ),
     )
 
 

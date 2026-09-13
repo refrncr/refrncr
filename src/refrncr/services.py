@@ -1590,6 +1590,7 @@ class DatasetRecordService:
                 if error.constraint == "uq_dataset_record_values_unique_value":
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
+            uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
@@ -1649,6 +1650,7 @@ class DatasetRecordService:
                 uow.flush()
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
+            uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
@@ -1665,7 +1667,7 @@ class DatasetRecordService:
     ) -> None:
         if not isinstance(expected_revision, int) or isinstance(expected_revision, bool):
             raise ValidationError("Expected revision must be a positive integer")
-        if not 1 <= expected_revision <= MAX_RECORD_REVISION:
+        if not 1 <= expected_revision < MAX_RECORD_REVISION:
             raise ValidationError("Expected revision is out of range")
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1673,6 +1675,7 @@ class DatasetRecordService:
             self._require_access(actor_id, dataset, "editor", uow=uow)
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
+            uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             record_audit(
@@ -1682,6 +1685,65 @@ class DatasetRecordService:
                 object_id=record_id,
                 action="deleted",
             )
+
+    def restore_record(self, actor_id, dataset_key, record_id, expected_revision, *, concept_id):
+        if type(expected_revision) is not int or not 1 <= expected_revision < MAX_RECORD_REVISION:
+            raise ValidationError("Expected revision is out of range")
+        key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        with self.uow(write=True, serialized=True) as uow:
+            dataset = uow.datasets.find_by_key(key, for_update=True)
+            self._require_access(actor_id, dataset, "editor", uow=uow)
+            if _require_concept(uow, dataset.id).id != concept_id:
+                raise NotFoundError("Record not found")
+            deleted = next(
+                (
+                    r
+                    for r, _fields in uow.dataset_records.deleted_records(dataset.id)
+                    if r.id == record_id
+                ),
+                None,
+            )
+            if deleted is None:
+                raise NotFoundError("Record not found")
+            if deleted.revision != expected_revision:
+                raise StaleRecordError("Record changed since this form was opened")
+            fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            by_id = {f.id: f for f in fields}
+            if any(
+                v.field_id not in by_id or by_id[v.field_id].data_type != v.data_type
+                for v in deleted.values
+            ):
+                raise ValidationError(
+                    "The Field schema changed. This Record cannot be restored without changing its "
+                    "retained values. Review its values before publishing or discarding "
+                    "this Concept."
+                )
+            submitted = {
+                v.field_key: get_datatype(v.data_type).text(v.value) for v in deleted.values
+            }
+            values, encoded = self._validated_values(
+                fields, uow.dataset_business_keys.get(dataset.id), submitted
+            )
+            try:
+                if not uow.dataset_records.restore_if_revision(
+                    dataset.id, record_id, expected_revision, encoded
+                ):
+                    raise StaleRecordError("Record changed since this form was opened")
+                uow.dataset_records.add_values(deleted, values)
+                uow.flush()
+            except PersistenceConflictError as error:
+                self._raise_record_conflict(error)
+            uow.concepts.record_mutation(dataset.id)
+            _advance_concept(uow, dataset)
+            dataset.content_updated_at = _now()
+            record_audit(
+                uow,
+                actor_user_id=actor_id,
+                object_type="dataset_record",
+                object_id=record_id,
+                action="restored",
+            )
+            return StoredRecord(record_id, dataset.id, values, expected_revision + 1)
 
     @staticmethod
     def _raise_missing_or_stale(uow: UnitOfWork, dataset_id: str, record_id: str) -> None:

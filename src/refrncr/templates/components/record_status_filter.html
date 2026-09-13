@@ -1,0 +1,19 @@
+{% macro record_status_filter(key, search, active, statuses, totals) %}
+{% set selected = (statuses|reject('equalto', '')|list or ['Added', 'Changed', 'Deleted']) if active else [] %}
+{% set caption = 'All records' if not selected else ('All changes' if selected|length == 3 else (selected[0] if selected|length == 1 else selected|length ~ ' statuses')) %}
+<input type='hidden' name='import_results' value='1'>
+<input type='hidden' name='status_selection' value='1'>
+<details class='export-menu record-status-filter'>
+  <summary class='button button-secondary' aria-label='Change status: {{ caption }}'>{{ caption }}</summary>
+  <div class='export-menu-options record-status-options'>
+    <a href='{{ url_for("dataset_records_view", key=key, concept=true, q=search or none) }}'{% if not active %} aria-current='true'{% endif %}>All records{% if not active %}<b aria-hidden='true'>✓</b>{% endif %}</a>
+    <fieldset>
+      <legend>Imported changes</legend>
+      {% for status in ('Added', 'Changed', 'Deleted') %}
+      <label><input type='checkbox' name='status' value='{{ status }}'{% if status in selected %} checked{% endif %}>{{ status }}{% if totals %}<bdi class='record-status-count' aria-hidden='true'>{{ totals[status] }}</bdi>{% endif %}</label>
+      {% endfor %}
+    </fieldset>
+    <p class='help-text'>Choose statuses, then Search. None selected shows all records.</p>
+  </div>
+</details>
+{% endmacro %}

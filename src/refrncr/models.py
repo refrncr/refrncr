@@ -23,6 +23,7 @@ from sqlalchemy import (
     false,
     inspect,
     select,
+    text,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, column_property, mapped_column
@@ -291,8 +292,13 @@ class DatasetRecord(Base):
     __tablename__ = "dataset_records"
     __table_args__ = (
         UniqueConstraint("id", "dataset_id", name="uq_dataset_records_id_dataset"),
-        UniqueConstraint(
-            "dataset_id", "identifier_key", name="uq_dataset_records_dataset_identifier"
+        Index(
+            "uq_dataset_records_dataset_identifier",
+            "dataset_id",
+            "identifier_key",
+            unique=True,
+            sqlite_where=text("deleted_content IS NULL"),
+            postgresql_where=text("deleted_content IS NULL"),
         ),
         CheckConstraint("revision >= 1", name="ck_dataset_records_revision_positive"),
     )
@@ -300,6 +306,7 @@ class DatasetRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+    deleted_content: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     revision: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
@@ -519,3 +526,7 @@ class DatasetConcept(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     start_revision: Mapped[int] = mapped_column(Integer)
+    records_mutated: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True, default=False, server_default=false()
+    )
+    import_result: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)

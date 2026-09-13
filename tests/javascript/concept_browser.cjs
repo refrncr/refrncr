@@ -105,7 +105,7 @@ async function login(page,email) {
       assert.equal(await page.getByRole('button',{name:'+ New version',exact:true}).count(),0);
       await page.goto(base+'/datasets');await shot(page,`list-active-${width}`);
       assert.match(await page.locator('table').innerText(),/Concept in progress/);
-      await page.goto(versions);await page.getByRole('link',{name:'Concept',exact:true}).click();await page.getByRole('link',{name:'Review changes',exact:true}).click();
+      await page.goto(versions);await page.getByRole('link',{name:'Concept',exact:true}).click();await page.locator('.concept-banner:visible [data-concept-actions] summary').click();await page.getByRole('link',{name:'Review changes',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();await shot(page,`review-${width}`);
       const publish=page.getByRole('link',{name:'Publish version',exact:true});await publish.focus();await publish.press('Enter');
       await page.locator('#publication-date').waitFor();

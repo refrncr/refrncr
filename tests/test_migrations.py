@@ -210,7 +210,7 @@ def assert_community_schema(engine, *, dataset_revision=True):
     assert business_key_foreign_key["referred_columns"] == ["dataset_id", "key"]
     assert business_key_foreign_key["options"].get("ondelete") == "CASCADE"
     record_columns = {column["name"] for column in inspector.get_columns("dataset_records")}
-    assert record_columns == {
+    assert record_columns == ({"deleted_content"} if dataset_revision else set()) | {
         "id",
         "dataset_id",
         "identifier_key",
@@ -233,7 +233,21 @@ def assert_community_schema(engine, *, dataset_revision=True):
         tuple(constraint["column_names"])
         for constraint in inspector.get_unique_constraints("dataset_records")
     }
-    assert {("id", "dataset_id"), ("dataset_id", "identifier_key")} <= record_uniques
+    assert ("id", "dataset_id") in record_uniques
+    if dataset_revision:
+        identifier_index = next(
+            index
+            for index in inspector.get_indexes("dataset_records")
+            if index["name"] == "uq_dataset_records_dataset_identifier"
+        )
+        assert identifier_index["unique"]
+        assert identifier_index["column_names"] == ["dataset_id", "identifier_key"]
+        assert any(
+            "deleted_content IS NULL" in str(v)
+            for v in identifier_index["dialect_options"].values()
+        )
+    else:
+        assert ("dataset_id", "identifier_key") in record_uniques
     value_columns = {column["name"] for column in inspector.get_columns("dataset_record_values")}
     assert value_columns == {
         "record_id",
@@ -424,7 +438,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0017_ref_154"
+                "0018_ref_160"
             )
     finally:
         upgraded.dispose()
@@ -983,7 +997,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0017_ref_154"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0018_ref_160"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

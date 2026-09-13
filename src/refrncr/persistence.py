@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from dataclasses import asdict
 from functools import wraps
 from types import SimpleNamespace, TracebackType
 
@@ -353,7 +354,7 @@ class SqlAlchemyDatasetOperations:
         # must preserve this boundary, never union historical/published rows here.
         current_counts = select(
             DatasetRecord.dataset_id, func.count(DatasetRecord.id).label("record_count")
-        )
+        ).where(DatasetRecord.deleted_content.is_(None))
         if dataset_ids is not None:
             current_counts = current_counts.where(DatasetRecord.dataset_id.in_(dataset_ids))
         current_counts = current_counts.group_by(DatasetRecord.dataset_id).subquery()
@@ -577,8 +578,10 @@ class SqlAlchemyDatasetBusinessKeyOperations:
 
 
 class SqlAlchemyDatasetRecordOperations:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, legacy_schema=False) -> None:
         self.session = session
+        self._legacy_schema = legacy_schema
+        self._active_records = True if legacy_schema else DatasetRecord.deleted_content.is_(None)
 
     def _available(self) -> bool:
         return inspect(self.session.get_bind()).has_table("dataset_records")
@@ -587,7 +590,7 @@ class SqlAlchemyDatasetRecordOperations:
         return dict(
             self.session.execute(
                 select(DatasetRecord.id, DatasetRecord.identifier_key).where(
-                    DatasetRecord.dataset_id == dataset_id
+                    DatasetRecord.dataset_id == dataset_id, self._active_records
                 )
             ).all()
         )
@@ -600,7 +603,9 @@ class SqlAlchemyDatasetRecordOperations:
     def get(self, dataset_id: str, record_id: str) -> StoredRecord | None:
         record = self.session.scalar(
             select(DatasetRecord).where(
-                DatasetRecord.dataset_id == dataset_id, DatasetRecord.id == record_id
+                DatasetRecord.dataset_id == dataset_id,
+                self._active_records,
+                DatasetRecord.id == record_id,
             )
         )
         if record is None:
@@ -621,6 +626,7 @@ class SqlAlchemyDatasetRecordOperations:
                 update(DatasetRecord)
                 .where(
                     DatasetRecord.dataset_id == dataset_id,
+                    self._active_records,
                     DatasetRecord.id == record_id,
                     DatasetRecord.revision == expected_revision,
                 )
@@ -644,19 +650,108 @@ class SqlAlchemyDatasetRecordOperations:
         self.add_values(record, values)
 
     def delete_if_revision(self, dataset_id: str, record_id: str, expected_revision: int) -> bool:
+        from refrncr.version_contracts import SnapshotField
+
+        record = self.get(dataset_id, record_id)
+        if record is None or record.revision != expected_revision:
+            return False
+        keys = SqlAlchemyDatasetBusinessKeyOperations(self.session).get(dataset_id).field_keys
+        fields = SqlAlchemyDatasetFieldOperations(self.session).list_for_dataset(dataset_id)
+        payload = {
+            "fields": [
+                asdict(
+                    SnapshotField(
+                        f.id,
+                        dataset_id,
+                        f.key,
+                        f.name,
+                        f.data_type,
+                        f.is_required,
+                        f.is_unique,
+                        f.display_position,
+                        f.key in keys,
+                    )
+                )
+                for f in fields
+            ],
+            "values": {v.field_id: v.canonical_key.hex() for v in record.values},
+        }
         result = self.session.execute(
-            delete(DatasetRecord).where(
+            update(DatasetRecord)
+            .where(
                 DatasetRecord.dataset_id == dataset_id,
                 DatasetRecord.id == record_id,
                 DatasetRecord.revision == expected_revision,
+                self._active_records,
             )
+            .values(deleted_content=payload, revision=expected_revision + 1, updated_at=utc_now())
         )
+        if result.rowcount:
+            self.session.execute(
+                delete(DatasetRecordValue).where(
+                    DatasetRecordValue.dataset_id == dataset_id,
+                    DatasetRecordValue.record_id == record_id,
+                )
+            )
+        return result.rowcount == 1
+
+    def deleted_records(self, dataset_id):
+        from refrncr.version_contracts import SnapshotField
+
+        statement = (
+            select(DatasetRecord)
+            .where(
+                DatasetRecord.dataset_id == dataset_id, DatasetRecord.deleted_content.is_not(None)
+            )
+            .order_by(DatasetRecord.id)
+            .execution_options(yield_per=100)
+        )
+        for row in self.session.scalars(statement):
+            fields = tuple(SnapshotField(**f) for f in row.deleted_content["fields"])
+            values = []
+            for field in fields:
+                encoded = row.deleted_content["values"].get(field.id)
+                if encoded is not None:
+                    key = bytes.fromhex(encoded)
+                    values.append(
+                        RecordValue(
+                            field.id,
+                            field.key,
+                            field.data_type,
+                            get_datatype(field.data_type).from_key(key),
+                            key,
+                            field.is_unique,
+                        )
+                    )
+            yield StoredRecord(row.id, dataset_id, tuple(values), row.revision), fields
+
+    def restore_if_revision(self, dataset_id, record_id, expected_revision, identifier_key):
+        try:
+            result = self.session.execute(
+                update(DatasetRecord)
+                .where(
+                    DatasetRecord.dataset_id == dataset_id,
+                    DatasetRecord.id == record_id,
+                    DatasetRecord.revision == expected_revision,
+                    DatasetRecord.deleted_content.is_not(None),
+                )
+                .values(
+                    deleted_content=None,
+                    identifier_key=identifier_key,
+                    revision=expected_revision + 1,
+                    updated_at=utc_now(),
+                )
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
         return result.rowcount == 1
 
     def current_revision(self, dataset_id: str, record_id: str) -> int | None:
         return self.session.scalar(
             select(DatasetRecord.revision).where(
-                DatasetRecord.dataset_id == dataset_id, DatasetRecord.id == record_id
+                DatasetRecord.dataset_id == dataset_id,
+                self._active_records,
+                DatasetRecord.id == record_id,
             )
         )
 
@@ -693,7 +788,7 @@ class SqlAlchemyDatasetRecordOperations:
         records = list(
             self.session.scalars(
                 select(DatasetRecord)
-                .where(DatasetRecord.dataset_id == dataset_id)
+                .where(DatasetRecord.dataset_id == dataset_id, self._active_records)
                 .order_by(DatasetRecord.id)
             )
         )
@@ -727,10 +822,14 @@ class SqlAlchemyDatasetRecordOperations:
                 (DatasetField.id == DatasetRecordValue.field_id)
                 & (DatasetField.dataset_id == DatasetRecordValue.dataset_id),
             )
-            .where(DatasetRecord.dataset_id == dataset_id)
+            .where(DatasetRecord.dataset_id == dataset_id, self._active_records)
             .order_by(DatasetRecord.id, DatasetRecordValue.field_id)
             .execution_options(yield_per=1000)
         )
+        if self._legacy_schema:
+            from sqlalchemy.orm import defer
+
+            statement = statement.options(defer(DatasetRecord.deleted_content))
         current = None
         values: list[RecordValue] = []
         for record, row, field in self.session.execute(statement):
@@ -779,6 +878,7 @@ class SqlAlchemyDatasetRecordOperations:
                 self.session.scalars(
                     select(DatasetRecord.identifier_key).where(
                         DatasetRecord.dataset_id == dataset_id,
+                        self._active_records,
                         DatasetRecord.identifier_key.in_(chunk),
                     )
                 )
@@ -833,7 +933,9 @@ class SqlAlchemyDatasetRecordOperations:
             return 0
         return (
             self.session.scalar(
-                select(func.count(DatasetRecord.id)).where(DatasetRecord.dataset_id == dataset_id)
+                select(func.count(DatasetRecord.id)).where(
+                    DatasetRecord.dataset_id == dataset_id, self._active_records
+                )
             )
             or 0
         )
@@ -865,6 +967,7 @@ class SqlAlchemyDatasetRecordOperations:
                 select(DatasetRecord.id)
                 .where(
                     DatasetRecord.dataset_id == dataset_id,
+                    self._active_records,
                     DatasetRecord.id.not_in(value_records),
                 )
                 .limit(1)
