@@ -147,7 +147,7 @@
     update();
   });
   const initializeSourceFormats = (root = document) => root.querySelectorAll("[data-source-formats-url]").forEach((form) => {
-    if (form.dataset.sourceFormatsReady) return;
+    if (form.dataset.sourceFormatsReady) { form.refrncrBindFormats?.(); return; }
     form.dataset.sourceFormatsReady = "true";
     const textChoices = new Map();
     const panel = form.closest(".import-wizard") || document;
@@ -156,19 +156,31 @@
     let generation = 0;
     let pending = null;
     const details = () => [...form.querySelectorAll("[data-format-details]")];
+    const needsAttention = (item) => ["undecided", "failing"].includes(item.closest("[data-source-formats]")?.dataset?.state);
+    const focusControl = (item) => (item.querySelector('input:not([type="hidden"]):not([hidden]):not([disabled]), select:not([disabled])') || item.querySelector("[data-effective-format]"))?.focus();
     const sync = () => {
       const items = details();
+      items.forEach((item) => {
+        const button = item.closest("[data-source-formats]")?.querySelector("[data-format-toggle]");
+        if (button) {
+          button.hidden = false;
+          button.setAttribute("aria-expanded", String(item.open));
+          button.textContent = item.open ? "Done" : "Change";
+        }
+      });
       const expanded = items.length > 0 && items.every((item) => item.open);
       advanced.setAttribute("aria-expanded", String(expanded));
       advanced.setAttribute("aria-controls", items.map((item) => item.id).join(" "));
       advanced.hidden = items.length === 0;
+      advanced.textContent = expanded ? "Hide all formats" : "Show all formats";
     };
     const focusError = () => form.querySelector("[data-format-error]")?.focus();
     const updateComponents = (row) => {
-      const source = row.querySelector("[data-source-type]");
+      const source = row?.querySelector("[data-source-type]");
       if (!source) return;
       const index = row.dataset.sourceFormats;
       const parts = row.querySelector("[data-text-formats]");
+      if (!parts) return;
       const controls = [...parts.querySelectorAll("select")];
       if (source.value === "text") {
         const saved = textChoices.get(index);
@@ -183,6 +195,7 @@
         if (zone.hidden) zone.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
       }
       const summary = row.querySelector("[data-effective-format]");
+      if (!summary) return;
       summary.textContent = source.value === "text"
         ? controls.map((control) => control.selectedOptions[0]?.textContent || "").join(" + ")
         : source.selectedOptions[0]?.textContent || "Choose source type";
@@ -193,26 +206,35 @@
         if (item.dataset.sourceDetailsReady) return;
         item.dataset.sourceDetailsReady = "true";
         item.addEventListener("toggle", sync);
-        item.querySelector("summary").addEventListener("click", (event) => {
+        const row = item.closest("[data-source-formats]");
+        const button = row.querySelector("[data-format-toggle]");
+        const toggle = (event) => {
           event.preventDefault();
           item.open = !item.open;
-          if (item.open) (item.querySelector("select:not([disabled])") || item.querySelector("[data-effective-format]"))?.focus();
+          if (item.open) focusControl(item);
           sync();
-        });
+        };
+        if (button) {
+          row.dataset.formatEnhanced = "true";
+          button.addEventListener("click", toggle);
+        }
+        item.querySelector("summary").addEventListener("click", toggle);
         item.addEventListener("keydown", (event) => {
           if (event.key === "Escape" && item.open) {
             event.preventDefault();
             item.open = false;
-            item.querySelector("summary").focus();
+            (button || item.querySelector("summary")).focus();
+            sync();
           }
         });
       });
       sync();
     };
+    form.refrncrBindFormats = bind;
     advanced.addEventListener("click", () => {
       const open = advanced.getAttribute("aria-expanded") !== "true";
       advanced.setAttribute("aria-expanded", String(open));
-      details().forEach((item) => { item.open = open; });
+      details().forEach((item) => { item.open = open || needsAttention(item); });
       sync();
     });
     form.addEventListener("input", (event) => {
@@ -259,7 +281,7 @@
         const announcement = form.querySelector("[data-format-status]");
         if (announcement) announcement.textContent = `${row.querySelector("legend")?.textContent || "Source format"}: ${row.querySelector("[data-effective-format]")?.textContent || "Updated"}. Examples from source and Stored as updated. ${row.querySelector(".error-text")?.textContent || ""}`;
         if (affected && focusName?.startsWith("mapping_")) affected.focus();
-        else if (previousFocus && !previousFocus.disabled && !previousFocus.closest("[hidden]")) previousFocus.focus();
+        else if (previousFocus?.focus && !previousFocus.disabled && !previousFocus.closest("[hidden]")) previousFocus.focus();
         else if (affected) affected.focus();
       } catch (error) {
         if (error.name !== "AbortError" && current === generation) {
@@ -270,7 +292,20 @@
         if (current === generation) form.removeAttribute("aria-busy");
       }
     });
-    form.addEventListener("submit", () => { ++generation; pending?.abort(); });
+    form.addEventListener("submit", (event) => {
+      ++generation;
+      pending?.abort();
+      // Earlier steps remain reachable even while a source interpretation is unresolved.
+      if (event.submitter?.name === "go_step" && ["1", "2"].includes(event.submitter.value)) return;
+      const undecided = [...form.querySelectorAll('[data-state="undecided"]')].find((row) =>
+        !form.elements.namedItem(`source_${row.dataset.sourceFormats}`)?.value);
+      if (undecided) {
+        event.preventDefault();
+        const disclosure = undecided.querySelector("[data-format-details]");
+        if (disclosure) { disclosure.open = true; focusControl(disclosure); }
+        sync();
+      }
+    });
     bind();
     focusError();
   });

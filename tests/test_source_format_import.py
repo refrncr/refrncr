@@ -187,10 +187,12 @@ def form_data(wizard, profile="v1-eu"):
 
 def test_mapping_progressive_disclosure_and_live_examples(wizard):
     page = wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
-    assert "Advanced options" in page.text
+    assert "Show all formats" in page.text
     assert page.text.count("data-format-details open") == 1
-    assert "Choose source format" in page.text
-    assert "for='source-1'" in page.text
+    assert "Choose how this column is interpreted." in page.text
+    assert "Ambiguous source format;" not in page.text
+    assert "id='source-1-0'" in page.text
+    assert "value='v1-eu'" in page.text
     assert "data-format-error" in page.text
     response = wizard.post(wizard.path + "/formats", form_data(wizard))
     assert response.status_code == 200

@@ -904,3 +904,62 @@ The all-Fields action keeps its **Advanced options** name and is hidden when no
 format disclosures apply; there is no Simple/Advanced mode. Opening a single
 Field always exposes its examples. Stacked mobile pairs show individual visible
 source/stored labels. See [REF-158 validation](ref-158-report.md).
+
+
+## Verdict-first import mapping (REF-159)
+
+The shared import source-format partial now leads with a server-composed verdict.
+`clean` reports the selected format and full non-empty column count; it says
+“stored exactly as written” only when all bounded source/stored examples match.
+`transformed` uses exactly one changed pair in the verdict. Their controls and
+optional detailed examples stay inside the initially closed disclosure.
+`undecided` uses an amber, initially open choice group; `failing` opens correction
+controls and reports the exact full-column failure count. String has no block.
+
+Two to four complete-column matches appear as labelled native radio readings with
+one worked example each. Unknown, singleton and more-than-four results retain the
+REF-158 controls. The existing detection scan supplies these matches, using the
+same canonical IDs and results. A hidden checked empty radio keeps `source_N`
+present until a visible reading is selected; no candidate is preselected. Radios
+replace the source select and do not submit Date/Time components. All other
+required envelope fields remain successful, even inside closed disclosures.
+
+**Change** opens one disclosure and focuses its first enabled control; **Done**
+closes it. Escape closes and returns focus to Change (or the native summary).
+**Show all formats / Hide all formats** controls all disclosures; the latter keeps
+undecided and failing columns open. Individual Done/Escape remain available; a
+blocked Preview reopens and focuses the unresolved choice. The aggregate action
+is hidden when no disclosures apply. Labels and `aria-expanded` stay synchronized
+with native toggle events and live replacements; repeated initialization is safe.
+
+Native summaries remain visible without JavaScript; enhanced verdicts replace
+them with the Change/Done button only after binding. No essential behavior depends
+on `:has()`. Native radio checked state and a visible focus outline communicate
+selection. Error descriptions and the mapping examples' `aria-describedby` targets
+remain accessible. A stable polite live region announces interpreted formats after
+refresh. Without JavaScript, detected choices and candidate radios can be submitted
+to Preview; dynamic source-type switching still has the documented REF-158 limits.
+
+Classification: shared import component and deliberate mapping-page layout rules.
+Existing semantic colors, spacing, type and focus tokens are reused. No design
+token, global component or new component variant changes. Controls and radio cards
+stack on narrow screens; verdict text wraps while Change/Done remains available.
+The [REF-159 report](ref-159-report.md) records exact browser and regression evidence.
+This section supersedes the REF-154/158 resting presentation and button labels above.
+
+
+REF-159 presentation review: selected candidate cards retain the primary-colored
+border and inset ring after focus leaves; `:focus-within` remains a separate focus
+signal. Native radios remain usable without `:has()` support. Temporal reading
+labels share `source_format_label` with the Date/Time dropdowns. With candidate
+readings present, the amber guidance owns the existing error-description ID and
+the effective-format live region stays present but empty. Unknown/mixed fallback
+columns retain their effective placeholder and error text. Change follows its
+verdict sentence at the normal gap and may wrap below it on narrow screens.
+
+Native Excel date/datetime verdicts spell out the first example's month and show
+its canonical stored value. Clean native columns add “no day/month guessing
+needed” in the same sentence. Examples use target-aware ISO rendering: a native
+midnight datetime mapped to Date shows only the date; DateTime retains its time.
+Workbook number-format masks are not presented as the user's Excel display,
+since Excel's locale can render them differently. Text examples remain verbatim.

@@ -36,6 +36,7 @@ from refrncr.source_formats import (
     canonical_source,
     formats_for,
     propose_format,
+    source_format_label,
     temporal_controls,
 )
 
@@ -369,10 +370,53 @@ def normalize_mapping_name(value: str) -> str:
     return " ".join(re.sub(r"[^\w]+", " ", without_marks).split())
 
 
+def _format_verdict(state, label, examples, total, failures):
+    """Describe the existing full-column validation with bounded display examples."""
+    if state == "undecided":
+        return None
+    if state == "failing":
+        return f"{failures} of {total} values do not fit {label}."
+    if state == "transformed":
+        example = next(item for item in examples if item["source"] != item["stored"])
+        return f"Read as {label} — {example['source']} is stored as {example['stored']}."
+    return f"Read as {label} — all {total} values parsed, stored exactly as written."
+
+
 def _safe_sample(value: str) -> str:
     if len(value) <= DISPLAY_SAMPLE_CHARS:
         return value
     return value[: DISPLAY_SAMPLE_CHARS - 1] + "…"
+
+
+def _temporal_example(value, data_type):
+    """Render typed Excel dates for the target without changing the parser input."""
+    if isinstance(value, datetime) and data_type in {"date", "datetime", "timestamp"}:
+        if data_type == "date" and value.time() == datetime_time():
+            return value.date().isoformat()
+        return value.isoformat()
+    return str(value)
+
+
+def _native_date_verdict(value, stored, data_type, state):
+    months = (
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    )
+    written = f"{value.day} {months[value.month - 1]} {value.year}"
+    if isinstance(value, datetime) and data_type != "date":
+        written += f" at {value.time().isoformat()}"
+    reason = "; no day/month guessing needed" if state == "clean" else ""
+    return f"Read as a real Excel date cell — {written}, stored as {stored}{reason}."
 
 
 def distinct_samples(values, limit=DISPLAY_SAMPLE_VALUES):
@@ -901,9 +945,13 @@ class DatasetRecordImportService:
                 choice.pop("timezone", None)
                 choice.pop("fold", None)
             error = None
+            matches = []
             if not choice.get("profile_id"):
-                choice, error = propose_format(field.data_type, values, remembered.get(key))
+                choice, error = propose_format(
+                    field.data_type, values, remembered.get(key), readings=matches
+                )
             examples = []
+            first_example_value = None
             seen_examples = set()
             failures = 0
             for row in source.rows:
@@ -922,29 +970,67 @@ class DatasetRecordImportService:
                 # Distinct values only: three identical examples say nothing.
                 if len(examples) == DISPLAY_SAMPLE_VALUES:
                     continue
+                display_value = _temporal_example(value, field.data_type)
                 example = {
-                    "source": _safe_sample(str(value)),
-                    "full_source": str(value)[:4096],
+                    "source": _safe_sample(display_value),
+                    "full_source": display_value[:4096],
                     "stored": _safe_sample(canonical) if canonical is not None else "—",
                     "full_stored": canonical,
                 }
                 if str(value) in seen_examples:
                     continue
                 seen_examples.add(str(value))
+                if not examples:
+                    first_example_value = value
                 examples.append(example)
             if failures:
                 error = f"{failures} non-empty values do not fit. {error}"
             profiles = formats_for(field.data_type)
             selected_profile = next((p for p in profiles if p.id == choice.get("profile_id")), None)
+            label = selected_profile.label if selected_profile else "Choose source format"
+            total = sum(value is not None and value != "" for value in values)
+            if not choice.get("profile_id"):
+                presentation_state = "undecided"
+            elif failures:
+                presentation_state = "failing"
+            elif error:
+                presentation_state = "undecided"
+            elif any(example["source"] != example["stored"] for example in examples):
+                presentation_state = "transformed"
+            else:
+                presentation_state = "clean"
+            verdict = _format_verdict(presentation_state, label, examples, total, failures)
+            if (
+                selected_profile
+                and selected_profile.kind == "native"
+                and field.data_type in {"date", "datetime", "timestamp"}
+                and presentation_state in {"clean", "transformed"}
+                and isinstance(first_example_value, date)
+            ):
+                verdict = _native_date_verdict(
+                    first_example_value, examples[0]["stored"], field.data_type, presentation_state
+                )
             columns.append(
                 {
+                    "state": presentation_state,
+                    "verdict": verdict,
+                    "total_values": total,
+                    "readings": [
+                        {
+                            "id": profile.id,
+                            "label": source_format_label(profile),
+                            "example_source": examples[0]["source"],
+                            "example_stored": _safe_sample(canonical),
+                        }
+                        for profile, canonical in matches
+                    ],
                     "key": key,
                     "datatype": get_datatype(field.data_type).label,
                     "choice": choice,
                     "error": error,
                     "examples": examples,
                     "profiles": profiles,
-                    "label": selected_profile.label if selected_profile else "Choose source format",
+                    "label": label,
                     "applicable": field.data_type != "string",
                     "timestamp": field.data_type == "timestamp",
                     "temporal": temporal_controls(

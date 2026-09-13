@@ -151,10 +151,8 @@ def compose_format(data_type, components):
     raise SourceFormatError("Choose a valid source type and its required format components.")
 
 
-def temporal_controls(data_type, profile_id):
-    if data_type not in {"date", "time", "datetime", "timestamp"}:
-        return None
-    components = format_components(data_type, profile_id) if profile_id else {"source": ""}
+def source_format_label(profile):
+    """Use the same descriptive temporal labels in controls and candidate readings."""
     labels = {
         "hm": "24-hour, minutes",
         "hms": "24-hour, seconds",
@@ -166,12 +164,28 @@ def temporal_controls(data_type, profile_id):
         "dmy": "Day first",
         "mdy": "Month first",
     }
+    if profile.kind == "date":
+        return date_labels[profile.date_order] + " · " + profile.label
+    if profile.kind == "time":
+        return labels[profile.time_style] + " · " + profile.label
+    if profile.kind == "datetime":
+        parts = format_components(profile.types[0], profile.id)
+        return " + ".join(
+            source_format_label(SOURCE_FORMATS[parts[part]]) for part in ("date", "time")
+        )
+    return profile.label
+
+
+def temporal_controls(data_type, profile_id):
+    if data_type not in {"date", "time", "datetime", "timestamp"}:
+        return None
+    components = format_components(data_type, profile_id) if profile_id else {"source": ""}
     return {
         "components": components,
         "dates": tuple(
             {
                 "id": p.id,
-                "label": date_labels[p.date_order] + " · " + p.label,
+                "label": source_format_label(p),
                 "pattern": p.label,
             }
             for p in formats_for("date")
@@ -182,7 +196,7 @@ def temporal_controls(data_type, profile_id):
         "times": tuple(
             {
                 "id": p.id,
-                "label": labels[p.time_style] + " · " + p.label,
+                "label": source_format_label(p),
                 "pattern": p.label,
             }
             for p in formats_for("time")
@@ -363,8 +377,14 @@ def canonical_source(data_type, value, profile_id, *, timezone="", fold=""):
         ) from None
 
 
-def propose_format(data_type, values, remembered=None):
-    """Full-column detection. Equivalent interpretations use catalogue order, never locale."""
+def propose_format(data_type, values, remembered=None, *, readings=None):
+    """Full-column detection; optionally expose 2–4 undecided matches from this scan.
+
+    Readings contain a profile and its first canonical value, never whole columns.
+    Equivalent interpretations still use catalogue order, never locale.
+    """
+    if readings is not None:
+        readings.clear()
     values = tuple(value for value in values if value is not None and value != "")
     if remembered:
         try:
@@ -397,6 +417,8 @@ def propose_format(data_type, values, remembered=None):
             isinstance(v, str) and re.fullmatch(r"-?[0-9]{1,3}[.,][0-9]{3}", v) for v in values
         ):
             return {"profile_id": matches[0][0].id}, None
+    if readings is not None and 2 <= len(matches) <= 4:
+        readings.extend((profile, canonical[0]) for profile, canonical in matches)
     return {}, (
         "Ambiguous source format; choose how this column is interpreted."
         if matches
