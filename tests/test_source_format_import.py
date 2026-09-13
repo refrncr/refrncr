@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from sqlalchemy import func, select
 
 from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
-from refrncr.record_import import TransientImportStore, parse_source
+from refrncr.record_import import ImportValidationError, TransientImportStore, parse_source
 from refrncr.services import NotFoundError
 
 
@@ -209,7 +209,8 @@ def test_example_escaping_bounds_and_format_endpoint_csrf_binding(wizard):
     assert "&lt;script&gt;" in page.text
     data = form_data(wizard)
     response = wizard.post(wizard.path + "/formats", data)
-    assert response.text.count("class='source-format-pair'") == 3
+    # The fixture repeats one row five times, so the distinct-value rule shows it once.
+    assert response.text.count("class='source-format-pair'") == 1
     assert "<script>" not in response.text
     bad = dict(data, csrf_token="forged")
     assert wizard.post(wizard.path + "/formats", bad).status_code == 403
@@ -244,13 +245,13 @@ def test_timezone_and_fold_decisions_remain_in_mapping(import_context):
 
 def test_nonlocal_choices_cannot_persist_arbitrary_timezone_content(import_context):
     state = start(import_context)
-    assert preview(
-        import_context,
-        state,
-        {"profile_id": "v1-eu", "timezone": "arbitrary text", "fold": "ignored"},
-    ).valid
-    confirm(import_context, state)
-    assert all(set(choice) == {"profile_id"} for choice in saved(import_context).values())
+    with pytest.raises(ImportValidationError, match="local Timestamp"):
+        preview(
+            import_context,
+            state,
+            {"profile_id": "v1-eu", "timezone": "arbitrary text", "fold": "ignored"},
+        )
+    assert saved(import_context) == {}
 
 
 def test_previewed_format_choices_are_immutable(import_context):

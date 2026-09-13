@@ -12,6 +12,9 @@ for key, datatype, required in (
     ("amount", "number", True),
     ("day", "date", False),
     ("stamp", "timestamp", False),
+    ("moment", "datetime", False),
+    ("clock", "time", False),
+    ("measure", "float", False),
 ):
     services.dataset_fields.create_field(
         admin.id, dataset.key, key, key.title(), datatype, required, False

@@ -72,7 +72,7 @@ def _catalogue():
         SourceFormat(
             "v1-space-dot", "Space grouping · 1 234.56", ("integer", "number"), "number", group=" "
         ),
-        SourceFormat("v1-float", "Finite number / scientific notation", ("float",), "canonical"),
+        SourceFormat("v1-float", "Finite decimal or scientific number", ("float",), "canonical"),
         SourceFormat(
             "v1-boolean", "true/false · yes/no · y/n · 1/0 · ja/nee", ("boolean",), "boolean"
         ),
@@ -117,6 +117,87 @@ BOOLEAN_TOKENS = MappingProxyType(
 
 def formats_for(data_type):
     return tuple(profile for profile in SOURCE_FORMATS.values() if data_type in profile.types)
+
+
+def format_components(data_type, profile_id):
+    """Losslessly expose an existing profile as compact temporal choices."""
+    profile = SOURCE_FORMATS.get(profile_id)
+    if profile is None or data_type not in profile.types:
+        raise SourceFormatError("Choose an accepted source format for this datatype.")
+    if profile.kind == "native":
+        return {"source": "native"}
+    if profile.id == "v1-offset":
+        return {"source": "offset"}
+    if profile.kind not in {"date", "time", "datetime"}:
+        return {"source": profile.id}
+    result = {"source": "text"}
+    if profile.kind in {"date", "datetime"}:
+        result["date"] = next(
+            p.id
+            for p in formats_for("date")
+            if p.kind == "date"
+            and (p.date_order, p.date_separator) == (profile.date_order, profile.date_separator)
+        )
+    if profile.kind in {"time", "datetime"}:
+        result["time"] = "v1-time-" + profile.time_style
+    return result
+
+
+def compose_format(data_type, components):
+    """Accept only the exact components belonging to one catalogue entry."""
+    for profile in formats_for(data_type):
+        if format_components(data_type, profile.id) == components:
+            return profile.id
+    raise SourceFormatError("Choose a valid source type and its required format components.")
+
+
+def temporal_controls(data_type, profile_id):
+    if data_type not in {"date", "time", "datetime", "timestamp"}:
+        return None
+    components = format_components(data_type, profile_id) if profile_id else {"source": ""}
+    labels = {
+        "hm": "24-hour, minutes",
+        "hms": "24-hour, seconds",
+        "hm12": "12-hour, minutes",
+        "hms12": "12-hour, seconds",
+    }
+    date_labels = {
+        "ymd": "Year first",
+        "dmy": "Day first",
+        "mdy": "Month first",
+    }
+    return {
+        "components": components,
+        "dates": tuple(
+            {
+                "id": p.id,
+                "label": date_labels[p.date_order] + " · " + p.label,
+                "pattern": p.label,
+            }
+            for p in formats_for("date")
+            if p.kind == "date"
+        )
+        if data_type != "time"
+        else (),
+        "times": tuple(
+            {
+                "id": p.id,
+                "label": labels[p.time_style] + " · " + p.label,
+                "pattern": p.label,
+            }
+            for p in formats_for("time")
+            if p.kind == "time"
+        )
+        if data_type != "date"
+        else (),
+        "native_label": "Native Excel " + ("datetime" if data_type == "timestamp" else data_type),
+        "plain_noun": {
+            "date": "date",
+            "time": "time",
+            "datetime": "date and time",
+            "timestamp": "date and time",
+        }[data_type],
+    }
 
 
 def _date(value, profile):

@@ -36,6 +36,7 @@ from refrncr.source_formats import (
     canonical_source,
     formats_for,
     propose_format,
+    temporal_controls,
 )
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -374,6 +375,24 @@ def _safe_sample(value: str) -> str:
     return value[: DISPLAY_SAMPLE_CHARS - 1] + "…"
 
 
+def distinct_samples(values, limit=DISPLAY_SAMPLE_VALUES):
+    """Show a column's distinct values, so examples say something about its content.
+
+    A column whose rows repeat ("candidate, candidate, candidate") tells the reader
+    nothing. A column that really holds one value shows that one value once, which is
+    itself the useful fact.
+    """
+    seen, distinct = set(), []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        distinct.append(value)
+        if len(distinct) == limit:
+            break
+    return tuple(distinct)
+
+
 def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...]:
     """Profile at most 100 rows and 25 non-empty, non-formula values per column."""
     sampled: list[list[object]] = [[] for _header in source.headers]
@@ -393,7 +412,7 @@ def profile_source_columns(source: ParsedSource) -> tuple[ColumnTypeProfile, ...
         profiles.append(
             ColumnTypeProfile(
                 tuple(values),
-                tuple(_safe_sample(str(value)) for value in values[:DISPLAY_SAMPLE_VALUES]),
+                tuple(_safe_sample(str(value)) for value in distinct_samples(values)),
                 frozenset(compatible),
             )
         )
@@ -875,12 +894,17 @@ class DatasetRecordImportService:
                 raise ImportValidationError("Submit a valid bounded source-format choice.")
             choice = dict(raw_choice)
             if field.data_type != "timestamp" or choice.get("profile_id") == "v1-offset":
+                if choice.get("timezone") or choice.get("fold"):
+                    raise ImportValidationError(
+                        "Timezone and repeated-time choices require a local Timestamp format."
+                    )
                 choice.pop("timezone", None)
                 choice.pop("fold", None)
             error = None
             if not choice.get("profile_id"):
                 choice, error = propose_format(field.data_type, values, remembered.get(key))
             examples = []
+            seen_examples = set()
             failures = 0
             for row in source.rows:
                 if index in row.formulas:
@@ -893,15 +917,21 @@ class DatasetRecordImportService:
                     except SourceFormatError as exc:
                         failures += value is not None and value != ""
                         error = str(exc)
-                if value != "" and value is not None and len(examples) < DISPLAY_SAMPLE_VALUES:
-                    examples.append(
-                        {
-                            "source": _safe_sample(str(value)),
-                            "full_source": str(value)[:4096],
-                            "stored": _safe_sample(canonical) if canonical is not None else "—",
-                            "full_stored": canonical,
-                        }
-                    )
+                if value == "" or value is None:
+                    continue
+                # Distinct values only: three identical examples say nothing.
+                if len(examples) == DISPLAY_SAMPLE_VALUES:
+                    continue
+                example = {
+                    "source": _safe_sample(str(value)),
+                    "full_source": str(value)[:4096],
+                    "stored": _safe_sample(canonical) if canonical is not None else "—",
+                    "full_stored": canonical,
+                }
+                if str(value) in seen_examples:
+                    continue
+                seen_examples.add(str(value))
+                examples.append(example)
             if failures:
                 error = f"{failures} non-empty values do not fit. {error}"
             profiles = formats_for(field.data_type)
@@ -915,8 +945,11 @@ class DatasetRecordImportService:
                     "examples": examples,
                     "profiles": profiles,
                     "label": selected_profile.label if selected_profile else "Choose source format",
-                    "applicable": len(profiles) > 1,
+                    "applicable": field.data_type != "string",
                     "timestamp": field.data_type == "timestamp",
+                    "temporal": temporal_controls(
+                        field.data_type, selected_profile.id if selected_profile else ""
+                    ),
                 }
             )
         return columns

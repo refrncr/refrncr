@@ -585,3 +585,19 @@ commit, push or changes to application data were performed. The final staging li
 contains 26 modified tracked files and the same ten untracked files. No design tokens,
 component variants or format functionality changed; the shared button component now
 honors hidden state. There is no known remaining defect in the reproduced case.
+
+
+## REF-158 follow-up: compact temporal selection
+
+REF-158 replaces the long temporal dropdown with composable Date/Time controls
+and an explicit Native Excel alternative. The REF-154 catalogue, canonical
+identifiers, parsing/detection, successful-confirmation preferences and migration
+0017 are retained. Float ordinary/scientific notation already worked and remains
+one profile. Irrelevant timezone/fold submissions now fail closed rather than being
+silently removed. Historical test results above are unchanged; current UX and
+new validation evidence are recorded in [the REF-158 report](ref-158-report.md).
+
+The REF-158 completion review also restores the stable Advanced options disclosure
+contract, verifies all four ordinary/scientific Float examples in persisted rows,
+and reruns the inherited security, migration and transaction regressions. The
+linked report supersedes earlier REF-158 local-only Git-status statements.

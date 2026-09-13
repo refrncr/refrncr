@@ -29,7 +29,7 @@ async function login(page) {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await login(page);
-    await page.goto(base + '/datasets/types');
+    await page.goto(base + '/datasets/types/concept');
     for (const [id, label] of types) {
       await page.getByRole('link', {name: 'Add field', exact: true}).click();
       const panel = page.locator('dialog[open]');
@@ -48,14 +48,14 @@ async function login(page) {
       }
       assert.equal(await panel.getByLabel('Output format', {exact: true}).count(), 0);
       await panel.getByRole('button', {name: 'Add field', exact: true}).click();
-      await page.waitForURL(base + '/datasets/types');
+      await page.waitForURL(base + '/datasets/types/concept');
       await page.locator(`a[href='/datasets/types/fields/${id}/edit']`).waitFor();
       await page.locator(`a[href='/datasets/types/fields/${id}/edit']`).click();
       await page.locator('dialog[open] select[name=data_type]').waitFor();
       assert.equal(await page.locator('dialog[open] select[name=data_type]').inputValue(), id);
       await page.locator('dialog[open]').getByLabel('Name', {exact: true}).fill(label + ' reviewed');
       await page.getByRole('button', {name: 'Save field', exact: true}).click();
-      await page.waitForURL(base + '/datasets/types');
+      await page.waitForURL(base + '/datasets/types/concept');
       await page.getByText(label + ' reviewed', {exact: true}).waitFor();
       console.log('PASS create/edit ' + label);
     }
@@ -85,7 +85,7 @@ async function login(page) {
       assert(await page.locator('dialog[open]').evaluate(d => d.scrollWidth <= d.clientWidth));
       await page.screenshot({path: path.join(process.env.REFRNCR_SCREENSHOT_DIR || os.tmpdir(), `ref145-field-${width}.png`)});
     }
-    await page.goto(base + '/datasets/types/records');
+    await page.goto(base + '/datasets/types/concept/records');
     await page.getByRole('button', {name: 'Add record', exact: true}).click();
     await page.locator('dialog[open] input[name=id]').waitFor();
     const inputs = {id: 'browser-record', string: 'Cafe\u0301', integer: '0009007199254740993', number: '0.000000000000000001', float: '1.25e2', boolean: 'false', date: '2024-02-29', time: '12:00:00.120000', datetime: '2024-02-29T12:00:00.123400', timestamp: '2024-02-29T13:00:00.123400+01:00'};
@@ -118,7 +118,7 @@ async function login(page) {
       assert.equal(await nojs.locator('select[name=data_type]').inputValue(), id);
       await nojs.getByLabel('Name', {exact: true}).fill(label + ' nojs');
       await nojs.getByRole('button', {name: 'Save field', exact: true}).click();
-      await nojs.waitForURL(base + '/datasets/types');
+      await nojs.waitForURL(base + '/datasets/types/concept');
       await nojs.getByText(label + ' nojs', {exact: true}).waitFor();
     }
     await plain.close();

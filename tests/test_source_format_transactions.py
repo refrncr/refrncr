@@ -243,3 +243,33 @@ def test_migrated_proposal_constraints_and_field_deletion(audit_db):
     s.dataset_fields.delete_field(a.id, d.key, "amount")
     with factory() as session:
         assert session.get(DatasetFieldSourceFormat, field_id) is None
+
+
+@pytest.mark.parametrize("ending", ["cancel", "expiry", "validation"])
+def test_unsuccessful_attempt_retains_previous_confirmed_proposal(audit_db, ending):
+    from refrncr.record_import import TransientImportStore
+
+    engine, factory, s, a, d = setup(audit_db)
+    clock = [0.0]
+    s.record_imports.store = TransientImportStore(clock=lambda: clock[0])
+    first = stage(s, a, d, "first", "saved", "1.234,56", "v1-eu")
+    assert s.record_imports.confirm(a.id, "first", d.key, first.token) == 1
+    before = snapshot(engine)
+    second = stage(s, a, d, "second", "new", "1,234.56", "v1-us")
+    if ending == "cancel":
+        s.record_imports.cancel(a.id, "second", d.key, second.token)
+    elif ending == "expiry":
+        clock[0] = 901
+        with pytest.raises(NotFoundError):
+            s.record_imports.confirm(a.id, "second", d.key, second.token)
+    else:
+        result = s.record_imports.preview(
+            a.id,
+            "second",
+            d.key,
+            second.token,
+            ("code", "amount"),
+            {"amount": {"profile_id": "v1-eu"}},
+        )
+        assert not result.valid
+    assert snapshot(engine) == before

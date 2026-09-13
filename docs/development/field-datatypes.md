@@ -235,7 +235,7 @@ There is no locale inference or Field precision/scale configuration.
 | Catalogue family | Accepted source representations |
 | --- | --- |
 | `v1-plain`, `v1-eu`, `v1-us`, `v1-space-comma`, `v1-space-dot` | Integer/Decimal: ungrouped, `1.234,56`, `1,234.56`, `1 234,56`, `1 234.56`; grouping consists of complete groups of three, with a nonzero first group of at most three digits. Integer rejects fractions. |
-| `v1-float` | Finite ordinary/scientific numbers, including `1.25e6` and `6.02E-4`; existing Float digit/exponent, overflow and underflow bounds apply. |
+| `v1-float` | Finite ordinary/scientific numbers, including `102.1059`, `6.7e+07`, `1.25e6` and `6.02E-4`; existing Float digit/exponent, overflow and underflow bounds apply. |
 | `v1-boolean` | Case-insensitive true/false, yes/no, y/n, 1/0 and ja/nee. All token pairs may coexist in one column. |
 | `v1-date-*` | YYYY-MM-DD, YYYY/MM/DD, YYYYMMDD, DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY, MM-DD-YYYY, MM/DD/YYYY. |
 | `v1-time-*` | HH:mm; HH:mm:ss with optional 1–6 fractional digits; h:mm AM/PM; h:mm:ss AM/PM. AM/PM is uppercase and uses a 1–12 hour. |
@@ -273,3 +273,21 @@ occurrence**. That choice applies column-wide. Missing/invalid timezone or fold
 decisions return to Map columns. Unix time and month names remain unsupported.
 See [Record import security](record-import-security.md) for progressive
 disclosure, transaction boundaries and migration/rollback.
+
+
+### Compact source selection (REF-158)
+
+Temporal choices are a presentation of the unchanged catalogue: eight Date patterns
+and four Time families compose all 32 textual DateTime identifiers. The seconds
+choice includes optional fractions only where the existing parser allows them.
+`format_components` and `compose_format` round-trip each existing identifier;
+there is no new persisted identifier or interpretation. Date and Time use only
+their own components. Native Excel is a separate source type. Timestamp adds the
+existing Z/offset alternative and explicit IANA/fold controls for local sources.
+
+Detected and successfully remembered proposals initialize the same components.
+Float's one fixed `v1-float` profile accepts ordinary and scientific notation in
+one column; its parser and canonical finite-double representation are unchanged.
+Decimal remains exact and rejects exponent notation. See
+[the REF-158 report](ref-158-report.md) for validation evidence and
+[import security](record-import-security.md) for form validation.

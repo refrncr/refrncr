@@ -146,20 +146,59 @@
     form.addEventListener("change", update);
     update();
   });
-  document.querySelectorAll("[data-source-formats-url]").forEach((form) => {
-    const advanced = form.querySelector("[data-advanced-formats]");
+  const initializeSourceFormats = (root = document) => root.querySelectorAll("[data-source-formats-url]").forEach((form) => {
+    if (form.dataset.sourceFormatsReady) return;
+    form.dataset.sourceFormatsReady = "true";
+    const textChoices = new Map();
+    const panel = form.closest(".import-wizard") || document;
+    const advanced = panel.querySelector("[data-advanced-formats]");
+    if (!advanced) return;
     let generation = 0;
     let pending = null;
     const details = () => [...form.querySelectorAll("[data-format-details]")];
     const sync = () => {
-      advanced.setAttribute("aria-expanded", String(details().length > 0 && details().every((item) => item.open)));
-      advanced.setAttribute("aria-controls", details().map((item) => item.id).join(" "));
-      advanced.hidden = details().length === 0;
+      const items = details();
+      const expanded = items.length > 0 && items.every((item) => item.open);
+      advanced.setAttribute("aria-expanded", String(expanded));
+      advanced.setAttribute("aria-controls", items.map((item) => item.id).join(" "));
+      advanced.hidden = items.length === 0;
     };
     const focusError = () => form.querySelector("[data-format-error]")?.focus();
+    const updateComponents = (row) => {
+      const source = row.querySelector("[data-source-type]");
+      if (!source) return;
+      const index = row.dataset.sourceFormats;
+      const parts = row.querySelector("[data-text-formats]");
+      const controls = [...parts.querySelectorAll("select")];
+      if (source.value === "text") {
+        const saved = textChoices.get(index);
+        controls.forEach((control) => { if (control.disabled && saved?.[control.name]) control.value = saved[control.name]; });
+        textChoices.set(index, Object.fromEntries(controls.map((control) => [control.name, control.value])));
+      }
+      parts.hidden = source.value !== "text";
+      controls.forEach((control) => { control.disabled = parts.hidden; });
+      const zone = row.querySelector("[data-source-timezone]");
+      if (zone) {
+        zone.hidden = !["text", "native"].includes(source.value);
+        if (zone.hidden) zone.querySelectorAll("input, select").forEach((control) => { control.value = ""; });
+      }
+      const summary = row.querySelector("[data-effective-format]");
+      summary.textContent = source.value === "text"
+        ? controls.map((control) => control.selectedOptions[0]?.textContent || "").join(" + ")
+        : source.selectedOptions[0]?.textContent || "Choose source type";
+    };
     const bind = () => {
       details().forEach((item) => {
+        updateComponents(item.closest("[data-source-formats]"));
+        if (item.dataset.sourceDetailsReady) return;
+        item.dataset.sourceDetailsReady = "true";
         item.addEventListener("toggle", sync);
+        item.querySelector("summary").addEventListener("click", (event) => {
+          event.preventDefault();
+          item.open = !item.open;
+          if (item.open) (item.querySelector("select:not([disabled])") || item.querySelector("[data-effective-format]"))?.focus();
+          sync();
+        });
         item.addEventListener("keydown", (event) => {
           if (event.key === "Escape" && item.open) {
             event.preventDefault();
@@ -172,6 +211,7 @@
     };
     advanced.addEventListener("click", () => {
       const open = advanced.getAttribute("aria-expanded") !== "true";
+      advanced.setAttribute("aria-expanded", String(open));
       details().forEach((item) => { item.open = open; });
       sync();
     });
@@ -183,14 +223,20 @@
       form.removeAttribute("aria-busy");
     });
     form.addEventListener("change", async (event) => {
-      const index = event.target.name?.match(/^(?:mapping|source|timezone|fold)_(\d+)$/)?.[1];
+      const index = event.target.name?.match(/^(?:mapping|source|date|time|timezone|fold)_(\d+)$/)?.[1];
       if (index === undefined) return;
       if (event.target.name.startsWith("mapping_")) {
+        textChoices.delete(index);
         ["source", "timezone", "fold"].forEach((prefix) => { form.elements.namedItem(`${prefix}_${index}`).value = ""; });
+        form.querySelector(`[data-source-formats="${index}"] [data-text-formats]`)?.querySelectorAll("select").forEach((control) => { control.disabled = true; });
+      } else {
+        updateComponents(form.querySelector(`[data-source-formats="${index}"]`));
       }
       const current = ++generation;
       const open = new Set(details().filter((item) => item.open).map((item) => item.closest("[data-source-formats]").dataset.sourceFormats));
-      const data = new FormData(form);
+      // These forms contain only text. URL encoding avoids multipart framing
+      // and preserves every control in wide imports.
+      const data = new URLSearchParams(new FormData(form));
       pending?.abort();
       pending = new AbortController();
       form.setAttribute("aria-busy", "true");
@@ -208,8 +254,13 @@
         });
         bind();
         const affected = form.querySelector(`[data-source-formats="${index}"] [data-format-error]`);
-        if (affected) affected.focus();
-        else if (focusName && !focusName.startsWith("mapping_")) form.elements.namedItem(focusName)?.focus();
+        const previousFocus = focusName && form.elements.namedItem(focusName);
+        const row = form.querySelector(`[data-source-formats="${index}"]`);
+        const announcement = form.querySelector("[data-format-status]");
+        if (announcement) announcement.textContent = `${row.querySelector("legend")?.textContent || "Source format"}: ${row.querySelector("[data-effective-format]")?.textContent || "Updated"}. Examples from source and Stored as updated. ${row.querySelector(".error-text")?.textContent || ""}`;
+        if (affected && focusName?.startsWith("mapping_")) affected.focus();
+        else if (previousFocus && !previousFocus.disabled && !previousFocus.closest("[hidden]")) previousFocus.focus();
+        else if (affected) affected.focus();
       } catch (error) {
         if (error.name !== "AbortError" && current === generation) {
           const status = form.closest(".import-wizard").querySelector("[data-mapping-status]");
@@ -223,6 +274,8 @@
     bind();
     focusError();
   });
+  if (typeof window !== "undefined") window.refrncrSourceFormats = initializeSourceFormats;
+  initializeSourceFormats();
 
   const setSubmitBusy = (form, busy) => {
     if (busy) form.setAttribute("aria-busy", "true");
@@ -280,6 +333,7 @@
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     initializeDatatypeControls(host);
+    initializeSourceFormats(host);
     initializeConfirmations(host);
     host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
       const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";

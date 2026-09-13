@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 
-def test_import_wizard_javascript():
+@pytest.mark.parametrize("script", ["import_wizard", "source_formats"])
+def test_import_wizard_javascript(script):
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node is unavailable; use the documented manual browser checks")
@@ -15,7 +16,7 @@ def test_import_wizard_javascript():
     result = subprocess.run(
         [
             node,
-            str(root / "tests/javascript/import_wizard.cjs"),
+            str(root / f"tests/javascript/{script}.cjs"),
             str(root / "src/refrncr/static/js/refrncr.js"),
         ],
         capture_output=True,

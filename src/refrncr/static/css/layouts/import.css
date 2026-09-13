@@ -1,4 +1,4 @@
-.import-wizard { display: flex; flex-direction: column; min-height: min(38rem, 75dvh); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.import-wizard { display: flex; flex-direction: column; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .import-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg) var(--space-lg) 0; list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .import-steps li > a, .import-steps li > span, .import-steps li > button { display: flex; gap: var(--space-sm); align-items: flex-start; height: 100%; padding: var(--space-sm) var(--space-sm) var(--space-md); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-muted); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
 .import-steps small { display: block; margin-top: var(--space-xs); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
@@ -11,7 +11,7 @@
 .import-content { flex: 1; min-width: 0; padding: var(--space-lg); overflow-wrap: anywhere; }
 .import-content h2 { margin-top: 0; }
 .import-content .form { max-width: none; }
-.import-actions { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.import-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .import-actions-forward { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
 .import-actions form { margin: 0; }
 .import-upload-zone { padding: var(--space-xl); border: 2px dashed var(--color-control-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
@@ -68,18 +68,10 @@
 
 .import-step-link { width: 100%; border: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
 
-@media (min-width: 768px) {
-  .app-main:has(> .import-wizard) { display: flex; flex-direction: column; }
-  .app-main:has(> .import-wizard) > .page-header { flex-shrink: 0; }
-  .import-wizard { flex: 1; min-height: 0; overflow: hidden; }
-  .import-wizard > nav, .import-actions { flex-shrink: 0; }
-  .import-content { min-height: 0; overflow-y: auto; }
-  .import-actions { position: static; }
-}
-@media (max-width: 767px) {
-  .app-main:has(> .import-wizard) { overflow-x: clip; }
-  .import-actions { z-index: var(--layer-menu); }
-}
+/* The wizard grows with its content and the page keeps the single scrollbar: a nested
+   scroll container inside the already-scrolling .app-main squeezed short steps such as
+   Upload file and clipped the drop zone. The action bar follows the content. */
+.app-main:has(> .import-wizard) { overflow-x: clip; }
 
 .import-mapping optgroup[data-option-group="used"] { color: var(--color-text-muted); font-weight: var(--font-weight-regular); }
 
@@ -95,6 +87,7 @@
 
 .mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
 .mapping-heading h2 { margin: 0; }
+.mapping-format-toggle { margin-inline-start: auto; }
 .mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); color: var(--color-text-muted); }
 .mapping-info summary .button-icon { width: 1.125rem; height: 1.125rem; margin: 0; }
 .mapping-info summary:hover { color: var(--color-text); }
@@ -108,12 +101,27 @@
 
 .source-formats { grid-column: 1 / -1; min-width: 0; }
 .source-format-summary { overflow-wrap: anywhere; }
+/* The header format text is server-rendered and goes stale while the disclosure
+   is open; the live effective-format line inside the disclosure replaces it. */
+.source-formats:has(.source-format-details[open]) .source-format-static { display: none; }
+.source-format-controls { min-width: 0; margin: var(--space-md) 0; padding: 0; border: 0; }
+.source-format-controls label { display: block; margin-block: var(--space-sm) var(--space-xs); }
+.source-format-controls select, .source-format-controls input { width: 100%; min-width: 0; max-width: 100%; }
+.source-format-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); }
+.source-format-parts > div { min-width: 0; }
+.source-format-controls [hidden] { display: none; }
+@media (max-width: 767px) {
+  .source-format-parts { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+}
 .source-format-details > label { display: block; margin-block-start: var(--space-md); }
 .source-format-details > select, .source-format-details > input { width: 100%; max-width: 100%; }
-.source-format-examples { list-style: none; padding: 0; }
+.source-format-examples ol { list-style: none; margin: 0; padding: 0; }
+.source-format-example-heads { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin: 0 0 var(--space-xs); color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .source-format-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); margin-block: var(--space-md); }
 .source-format-pair > div { min-width: 0; }
 .source-format-pair span, .source-format-pair code { display: block; overflow-wrap: anywhere; white-space: normal; }
 @media (max-width: 40rem) {
   .source-format-pair { grid-template-columns: minmax(0, 1fr); }
+  .source-format-example-heads { display: none; }
+  .source-format-pair .visually-hidden { position: static; width: auto; height: auto; margin: 0; padding: 0; overflow: visible; clip: auto; white-space: normal; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 }
