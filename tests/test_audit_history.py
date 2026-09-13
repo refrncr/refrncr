@@ -272,7 +272,7 @@ def test_dataset_and_team_grants_do_not_authorize(history, permission):
 def test_all_contracts_have_safe_presentations(history):
     h = history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 34
+    assert len(EVENTS) == len(ACTION_LABELS) == 35
     assert ACTION_LABELS[("dataset", "dataset.version_diff_viewed")] == "Dataset changes reviewed"
     assert set(OBJECTS) == {kind for kind, _ in EVENTS}
     assert not SYSTEM_ACTORS and {c.actor for c in EVENTS.values()} == {"required"}

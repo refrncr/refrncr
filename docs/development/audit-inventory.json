@@ -95,7 +95,9 @@
     "refrncr.dataset_diff.DatasetDiffService.record_detail",
     "refrncr.dataset_versions.DatasetVersionService.concept_context",
     "refrncr.dataset_versions.DatasetVersionService.create_concept",
-    "refrncr.record_import.DatasetRecordImportService.format_assistance"
+    "refrncr.record_import.DatasetRecordImportService.format_assistance",
+    "refrncr.dataset_versions.DatasetVersionService.review_discard",
+    "refrncr.dataset_versions.DatasetVersionService.discard_concept"
   ],
   "routes": [
     {
@@ -1023,6 +1025,20 @@
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_concept_discard",
+      "path": "/datasets/<key>/concept/discard",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.review_discard",
+        "refrncr.dataset_versions.DatasetVersionService.discard_concept",
+        "refrncr.services.DatasetService.get_dataset_for_edit",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
     }
   ],
   "cli_commands": [
@@ -1126,7 +1142,8 @@
     "refrncr.record_import.TransientImportStore.update",
     "refrncr.services.DatasetResourceResolver.__call__",
     "refrncr.services.ResourceTypeRegistry.register",
-    "refrncr.services.ResourceTypeRegistry.require_existing"
+    "refrncr.services.ResourceTypeRegistry.require_existing",
+    "refrncr.record_import.TransientImportStore.revoke_concept"
   ],
   "administrative_operations": [
     "refrncr.app.health",

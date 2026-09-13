@@ -1277,7 +1277,8 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2558,7 +2559,8 @@
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -5108,6 +5110,119 @@
       ],
       "implementation_status": "REF-154 local implementation; source-format examples are transient, no domain event.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "review_discard",
+      "service": "refrncr.dataset_versions.DatasetVersionService.review_discard",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {},
+      "success": "Authorized coherent counts and exact confirmation identity; no mutation or event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Every eligible read returns the current review; missing Current or Concept is rejected.",
+      "rollback": "Read-only; no persistent state to roll back.",
+      "duplicate_retry": "Repeated review remains an authorized read with no success event.",
+      "tests": [
+        "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
+        "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
+      ],
+      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
+      "persistence_scope": "Read-only Concept identity, Dataset metadata and snapshot/diff aggregates."
+    },
+    {
+      "capability": "Explicit Dataset concept lifecycle",
+      "operation": "discard_concept",
+      "service": "refrncr.dataset_versions.DatasetVersionService.discard_concept",
+      "interface_entrypoints": [
+        "Trusted programmatic caller",
+        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [
+        [
+          "dataset",
+          "dataset.concept_discarded"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Trusted caller principal, reloaded and authorized with DatasetAuthorizationService.",
+      "allowed_context": {
+        "dataset:dataset.concept_discarded": {
+          "concept_id": "uuid",
+          "metadata_changes": "version_count",
+          "fields_added": "version_count",
+          "fields_changed": "version_count",
+          "fields_removed": "version_count",
+          "records_added": "version_count",
+          "records_changed": "version_count",
+          "records_removed": "version_count"
+        }
+      },
+      "success": "Deletes Concept-owned working state, restores Current metadata and emits one audit in one transaction.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Non-disclosing authorization precedes revision and baseline checks; stale yields no result/event.",
+      "no_op": "Unchanged eligible Concept is deleted; absent Concept and no Current fail without an event.",
+      "rollback": "Concept, working data and event roll back together.",
+      "duplicate_retry": "At most one successful discard; signed actor/session/identity/revision-bound confirmation fails on replay.",
+      "tests": [
+        "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
+        "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
+      ],
+      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "exclusion_reason": "",
+      "persistence_scope": "Working values, Records, identifiers, source-format proposals, Fields and Concept; Dataset metadata restored from Current. Snapshots and governance retained."
+    },
+    {
+      "capability": "TransientImportStore",
+      "operation": "revoke_concept",
+      "service": "refrncr.record_import.TransientImportStore.revoke_concept",
+      "interface_entrypoints": [
+        "Internal transient cleanup after discard or obsolete Concept lookup"
+      ],
+      "kind": "mutation",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: import attempt/outcome, unauthorized maintenance, malformed/oversized/unsupported upload, unsafe workbook, schema/uniqueness conflict, cross-Dataset/session claim, expired/replayed/busy token and suspicious mapping tampering. Never include token, session ID, path, filename, headers or row values. Preview/cancel success is not a successful import.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_concept_discard.py::test_import_tokens_cannot_attach_to_replacement_concept"
+      ],
+      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     }
   ]

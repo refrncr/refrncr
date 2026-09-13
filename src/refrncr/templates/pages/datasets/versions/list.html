@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "components/concept.html" import new_concept with context %}
+{% from "components/concept.html" import new_concept, discard_action, discard_panel with context %}
 {% from "components.html" import feedback %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "layouts/page.html" import page_context %}
@@ -13,6 +13,7 @@
       {% if review_available %}<a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key) }}'>Review changes</a>{% endif %}
       <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
       {% if history.may_maintain and not history.concept %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if history.concept %}<details class='export-menu concept-actions'><summary class='button button-secondary'>Concept actions</summary><div class='export-menu-options'>{{ discard_action(dataset.key, history.concept_summary) }}</div></details>{% endif %}
     </div>
   </div>
   {{ feedback(notice, kind='success') }}
@@ -39,5 +40,6 @@
     </div>
   {% else %}<div class='empty-state'><h2>No published versions yet</h2><p>Prepare the concept and publish its first version.</p></div>{% endif %}
   {% if history.may_maintain %}{{ form_side_panel('version-panel') }}{% endif %}
+  {% if history.concept %}{{ discard_panel() }}{% endif %}
 {% endblock %}
 {% block scripts %}<script src='{{ url_for("static", filename="js/audit-time.js") }}' defer></script>{% endblock %}

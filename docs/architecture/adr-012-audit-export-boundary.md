@@ -67,3 +67,12 @@ REF-31 owns structured security logging; REF-39 owns history presentation. See t
   required pre-response durability is lost; full client receipt still cannot be established.
 - Retry/rebuild snapshots after write conflicts: more work and altered authorization/snapshot timing
   without improving the approved prepared-request semantics.
+
+## REF-155 Concept lifecycle exception
+
+Pending Concept exports pin their Concept UUID and recheck identity and current
+maintenance authority under the Dataset lock immediately before their prepared-request
+audit. Discard winning this boundary returns no artifact or success export event.
+This implements REF-155's explicit invalidation requirement using the existing second
+UoW, without changing coherent preparation, Current/historical export or already accepted
+streaming semantics. See [implementation notes](../development/ref-155-report.md).

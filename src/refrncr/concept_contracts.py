@@ -3,6 +3,31 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+DISCARD_UNAVAILABLE = (
+    "This Concept contains the Dataset’s first unpublished version. "
+    "There is no Current version to return to. Publish it first or delete the Dataset."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DiscardIdentity:
+    dataset_id: str
+    concept_id: str
+    revision: int
+    start_revision: int
+    concept_updated_at: str
+    actor_id: str
+    owner_team_id: str
+    current_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class DiscardReview:
+    identity: DiscardIdentity
+    dataset_name: str
+    counts: object
+    metadata_changes: int
+
 
 @dataclass(frozen=True, slots=True)
 class ActiveConcept:
@@ -31,6 +56,11 @@ class ConceptContext:
     summary: object
     field_changes: tuple
     creator_name: str
+    has_current: bool = False
+
+    @property
+    def discard_unavailable(self):
+        return None if self.has_current else DISCARD_UNAVAILABLE
 
     @property
     def stale(self):

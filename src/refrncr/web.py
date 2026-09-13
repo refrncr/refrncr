@@ -53,7 +53,7 @@ from refrncr.record_import import (
     distinct_samples,
     parse_source,
 )
-from refrncr.review_tokens import decode_review, encode_review
+from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -316,6 +316,7 @@ def create_flask_app(
         "dataset_version_record_diff",
         "dataset_version_field_diff",
         "dataset_version_publish",
+        "dataset_concept_discard",
     }
 
     @app.before_request
@@ -668,6 +669,46 @@ def create_flask_app(
                 already_active=True,
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+
+    @dataset_route("/datasets/<key>/concept/discard", methods=["GET", "POST"])
+    @version_errors
+    def dataset_concept_discard(key):
+        actor, session = require_authenticated()
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        error, status = None, 200
+        if request.method == "POST":
+            require_csrf(session.csrf_token)
+            if set(request.form) != {"csrf_token", "confirmation", "confirmed"} or any(
+                len(request.form.getlist(key)) != 1 for key in request.form
+            ):
+                return "Review the discard form again.", 400
+            try:
+                identity = decode_discard(request.form["confirmation"], session.id, review_secret)
+            except ValueError:
+                raise NotFoundError("Concept not found") from None
+            if identity.actor_id != actor.id or identity.dataset_id != dataset.id:
+                raise NotFoundError("Concept not found")
+            try:
+                if request.form["confirmed"] != "yes":
+                    raise ValidationError("Confirm discard of this Concept.")
+                result = dataset_versions.discard_concept(actor.id, dataset.id, identity)
+                record_imports.store.revoke_concept(result.identity.concept_id)
+                return redirect(url_for("dataset_detail", key=key, notice="discarded"), code=303)
+            except (ConflictError, ValidationError) as failure:
+                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
+        review, token = None, None
+        try:
+            review = dataset_versions.review_discard(actor.id, dataset.id)
+            token = encode_discard(review.identity, session.id, review_secret)
+        except ConflictError as failure:
+            error, status = error or str(failure), 409
+        return render_authenticated_template(
+            "pages/datasets/concepts/discard.html",
+            dataset=dataset,
+            review=review,
+            confirmation=token,
+            error=error,
+        ), status
 
     @dataset_route("/datasets/<key>/versions", methods=["GET"])
     @version_errors

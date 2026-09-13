@@ -318,3 +318,19 @@ source-format metadata in the same Unit of Work as Records and the existing
 single `dataset.records_imported` summary. There is no event per Record or per
 preference, no source-value audit context and no change to REF-73 privileges.
 Rollback/stale/concurrent failures preserve previous proposals and audit exactly.
+
+## REF-155 transactional Concept discard
+
+`DatasetVersionService.discard_concept` writes exactly one `dataset.concept_discarded`
+event on the Dataset UUID, using the trusted actor. Context consists of Concept UUID,
+metadata-change count and the existing six Field/Record Added/Changed/Removed counts.
+All counts use the bounded `version_count` contract; there are no names, descriptions,
+Record values or source data. Working-state deletion, metadata restoration and this
+event commit or roll back together. Denied, no-Current, stale, duplicate and failed
+requests have no successful discard audit. An unchanged eligible Concept is still a
+real lifecycle deletion. The event does not mark the Dataset itself as deleted.
+
+Opening the confirmation is an ordinary authorized read, with no diff-viewed event.
+Transient Concept cleanup is explicitly excluded from domain audit. Pending Concept
+export now rechecks Concept existence and maintenance under its audit transaction
+lock; see [REF-155 report](ref-155-report.md).

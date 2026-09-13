@@ -6,13 +6,16 @@
 {% from "layouts/page.html" import page_context %}
 
 {% block content %}
+  {% if request.args.get('notice') == 'discarded' %}
+  {{ feedback('Concept discarded. Current was not changed.', kind='success') }}
+  {% endif %}
   <div class='page-header page-header-actions-end'>
     {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
       {{ versions_action(dataset.key) }}
-      {% if may_start_concept %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if may_start_concept %}{{ new_concept(dataset.key, 'Create concept' if request.args.get('notice') == 'discarded' else '+ New version') }}{% endif %}
       <a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none) }}'>View records</a>
       {% if editable %}<a class='button button-secondary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset", key=dataset.key) }}'>Edit dataset</a>{% endif %}
       {% if may_govern %}<a class='button button-secondary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("dataset_export_access", key=dataset.key) }}'>Access management</a>{% endif %}

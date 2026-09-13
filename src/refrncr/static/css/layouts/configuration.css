@@ -40,3 +40,6 @@
 
 /* The Identifier constraint (always listed last) carries the accent, like the key icon. */
 .configuration-table tr:has(.key-icon) .constraint-list .badge:last-child { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
+
+.detail-list.detail-list-counts > div { grid-template-columns: minmax(0, 1fr) auto; }
+.detail-list-counts dt { overflow-wrap: anywhere; }

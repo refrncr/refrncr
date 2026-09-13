@@ -203,6 +203,7 @@ class StagedImport:
     busy: bool = False
     imported_count: int | None = None
     source_formats: Mapping[str, Mapping[str, str]] | None = None
+    concept_id: str = ""
 
 
 class TransientImportStore:
@@ -224,7 +225,16 @@ class TransientImportStore:
         self._lock = threading.Lock()
 
     def create(
-        self, actor_id, session_id, dataset_id, filename, content, kind, previous=None
+        self,
+        actor_id,
+        session_id,
+        dataset_id,
+        filename,
+        content,
+        kind,
+        previous=None,
+        *,
+        concept_id="",
     ) -> StagedImport:
         with self._lock:
             self._cleanup()
@@ -263,6 +273,7 @@ class TransientImportStore:
                 None,
                 None,
                 self.clock() + self.ttl,
+                concept_id=concept_id,
             )
             if previous is not None:
                 self._states.pop(previous.token)
@@ -344,6 +355,11 @@ class TransientImportStore:
             for token in [
                 key for key, value in self._states.items() if value.session_id == session_id
             ]:
+                self._states.pop(token, None)
+
+    def revoke_concept(self, concept_id):
+        with self._lock:
+            for token in [k for k, state in self._states.items() if state.concept_id == concept_id]:
                 self._states.pop(token, None)
 
     def _cleanup(self):
@@ -791,20 +807,40 @@ class DatasetRecordImportService:
         self.authorization = records.authorization
         self.store = store or TransientImportStore()
 
+    def _concept(self, dataset_id):
+        from refrncr.services import _require_concept
+
+        with self.uow() as uow:
+            return _require_concept(uow, dataset_id)
+
+    def _bound_state(self, token, actor_id, session_id, dataset_id):
+        state = self.store.get(token, actor_id, session_id, dataset_id)
+        with self.uow() as uow:
+            concept = uow.concepts.get(dataset_id)
+        if concept is None or state.concept_id != concept.id:
+            self.store.revoke_concept(state.concept_id)
+            raise NotFoundError("Import not found")
+        return state
+
     def active(self, actor_id, session_id, dataset_key):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        return self.store.active(actor_id, session_id, dataset.id)
+        state = self.store.active(actor_id, session_id, dataset.id)
+        if state and state.concept_id != self._concept(dataset.id).id:
+            self.store.revoke_concept(state.concept_id)
+            return None
+        return state
 
     def state(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        state = self.store.get(token, actor_id, session_id, dataset.id)
+        state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.busy:
             raise NotFoundError("Import not found")
         return state
 
     def begin(self, actor_id, session_id, dataset_key, filename, content):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        previous = self.store.active(actor_id, session_id, dataset.id)
+        concept = self._concept(dataset.id)
+        previous = self.active(actor_id, session_id, dataset_key)
         safe_name = _safe_filename(filename)
         source = parse_source(safe_name, content)
         if source.kind == "xlsx":
@@ -841,7 +877,14 @@ class DatasetRecordImportService:
                 )
                 assistance = self._assistance(dataset.id, source, mapping)
         state = self.store.create(
-            actor_id, session_id, dataset.id, safe_name, content, source.kind, previous
+            actor_id,
+            session_id,
+            dataset.id,
+            safe_name,
+            content,
+            source.kind,
+            previous,
+            concept_id=concept.id,
         )
         state = self.store.update(
             state, worksheet=source.worksheet, mapping=mapping, step=3 if source.headers else 2
@@ -894,7 +937,7 @@ class DatasetRecordImportService:
 
     def mapping_assistance(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        state = self.store.get(token, actor_id, session_id, dataset.id)
+        state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
@@ -1042,7 +1085,7 @@ class DatasetRecordImportService:
 
     def preview(self, actor_id, session_id, dataset_key, token, mapping, source_formats=None):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        state = self.store.get(token, actor_id, session_id, dataset.id)
+        state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
@@ -1092,7 +1135,7 @@ class DatasetRecordImportService:
 
     def saved_preview(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        state = self.store.get(token, actor_id, session_id, dataset.id)
+        state = self._bound_state(token, actor_id, session_id, dataset.id)
         if not state.mapping_ready or state.imported_count is not None or state.busy:
             raise NotFoundError("Import not found")
         source = parse_source(state.filename, state.content, state.worksheet)
@@ -1116,7 +1159,7 @@ class DatasetRecordImportService:
         if target is None:
             raise NotFoundError("Dataset not found")
         self.records._require_access(actor_id, target, "editor")
-        state = self.store.get(token, actor_id, session_id, target.id)
+        state = self._bound_state(token, actor_id, session_id, target.id)
         if (
             state.busy
             or state.imported_count is not None
@@ -1131,6 +1174,9 @@ class DatasetRecordImportService:
                 dataset = uow.datasets.find_by_key(validated_key, for_update=True)
                 self.records._require_access(actor_id, dataset, "editor", uow=uow)
                 if dataset.id != state.dataset_id:
+                    raise NotFoundError("Import not found")
+                concept = uow.concepts.get(dataset.id)
+                if concept is None or concept.id != state.concept_id:
                     raise NotFoundError("Import not found")
                 source = parse_source(state.filename, state.content, state.worksheet)
                 preview, validated = self._validate_in_uow(

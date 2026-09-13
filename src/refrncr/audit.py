@@ -51,6 +51,23 @@ class EventContract:
 
 
 _EVENTS = (
+    EventContract(
+        "dataset",
+        "dataset.concept_discarded",
+        (("concept_id", "uuid"),)
+        + tuple(
+            (name, "version_count")
+            for name in (
+                "metadata_changes",
+                "fields_added",
+                "fields_changed",
+                "fields_removed",
+                "records_added",
+                "records_changed",
+                "records_removed",
+            )
+        ),
+    ),
     *(
         EventContract("user", action)
         for action in ("created", "email_changed", "disabled", "enabled", "deleted")
@@ -411,7 +428,7 @@ for _module, _service, _methods, _classification, _reason in (
     (
         "record_import",
         "TransientImportStore",
-        "create get update active claim finish consume cancel revoke_session",
+        "create get update active claim finish consume cancel revoke_session revoke_concept",
         "intentionally excluded",
         "Process-local staged import lifecycle; no durable business change. "
         "Confirmation owns the summary.",
@@ -576,7 +593,7 @@ _register(
     rationale="Authorized publication review; no persisted content or event.",
 )
 
-for _name in ("overview", "context", "history", "read", "concept_context"):
+for _name in ("overview", "context", "history", "read", "concept_context", "review_discard"):
     _register(
         "DatasetVersionService",
         _name,
@@ -614,6 +631,13 @@ _audited(
     "DatasetVersionService",
     "create_concept",
     ("dataset", "dataset.concept_created"),
+    module="dataset_versions",
+)
+
+_audited(
+    "DatasetVersionService",
+    "discard_concept",
+    ("dataset", "dataset.concept_discarded"),
     module="dataset_versions",
 )
 

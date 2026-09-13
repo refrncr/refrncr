@@ -426,6 +426,8 @@
     const opener = sidePanelOpeners.get(dialog);
     sidePanelOpeners.delete(dialog);
     if (opener?.isConnected && !opener.matches(":disabled, [hidden], [tabindex='-1']")) {
+      // Menu actions must be visible again before Cancel/Escape restores focus.
+      opener.closest("details")?.setAttribute("open", "");
       opener.focus();
     } else {
       document.getElementById("content")?.focus();
