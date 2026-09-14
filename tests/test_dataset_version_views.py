@@ -91,7 +91,9 @@ def payload(c, csrf, *, day=None, note="Release"):
 
 def mutate_concept(c):
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Private draft", "Private description")
+    c.s.datasets.update_dataset(
+        c.a.id, c.d.key, "Current dataset name", "Current dataset description"
+    )
     c.s.dataset_fields.update_field(
         c.a.id, c.d.key, "label", "Private field", "string", False, False
     )
@@ -135,7 +137,7 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
     mutate_concept(c)
     browser, _csrf = client(c, c.u)
     before = snapshot(c)
-    assert c.s.datasets.get_dataset(c.u.id, c.d.key).name == c.d.name
+    assert c.s.datasets.get_dataset(c.u.id, c.d.key).name == "Current dataset name"
     assert [field.name for field in c.s.dataset_fields.list_fields(c.u.id, c.d.key)] == [
         "Code",
         "Label",
@@ -152,10 +154,10 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
         if suffix.endswith("records"):
             assert "Café" in response.text
         else:
-            assert c.d.description in response.text
+            assert "Current dataset description" in response.text
         assert f"/datasets/{c.d.key}/versions" in response.text
     listing = request(browser, "get", "/datasets")
-    assert c.d.name in listing.text and "Private" not in listing.text
+    assert "Current dataset name" in listing.text and "Private" not in listing.text
     assert snapshot(c) == before
     owner_browser, _ = client(c)
     concept = request(owner_browser, "get", f"/datasets/{c.d.key}/concept/records")
@@ -216,7 +218,9 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):  # noqa: F81
     configured(c)
     first = publish(c)
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Secret future", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Secret future", "string", False, False
+    )
     future = NOW.date() + timedelta(days=1)
     scheduled = publish(c, day=future)
     ordinary, _ = client(c, c.u)
@@ -226,7 +230,7 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):  # noqa: F81
     assert "Version 2" not in listing.text and future.isoformat() not in listing.text
     assert "Secret future" not in listing.text
     assert "Scheduled" in request(owner, "get", f"/datasets/{c.d.key}/versions").text
-    assert c.service.read(c.a.id, c.d.key, scheduled.id).context.dataset.name == "Secret future"
+    assert c.service.read(c.a.id, c.d.key, scheduled.id).fields[1].name == "Secret future"
     for actor in (c.a, c.u):
         with pytest.raises(NotFoundError):
             c.s.dataset_records.export_dataset(actor.id, c.d.key, "json", version_id=scheduled.id)
@@ -258,6 +262,9 @@ def test_publish_form_csrf_confirmation_stale_revision_and_escaping(context):  #
     assert request(browser, "post", path, data=body | {"confirmed": "no"}).status_code == 400
     assert snapshot(c) == before
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed concept", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Changed field", "string", False, False
+    )
     stale = request(browser, "post", path, data=body)
     assert stale.status_code == 409 and "Review the current content again" in stale.text
     assert "data-error-focus" in stale.text and "Changed concept" in stale.text

@@ -67,6 +67,8 @@ def classify_fields(current, previous):
     labels = {
         "key": "Field key",
         "name": "Name",
+        "definition": "Definition",
+        "unit": "Unit",
         "data_type": "Datatype",
         "is_required": "Required",
         "is_unique": "Unique",
@@ -77,6 +79,8 @@ def classify_fields(current, previous):
         if field is None:
             return None
         value = getattr(field, name)
+        if value is None:
+            return None
         if name == "data_type":
             return get_datatype(value).label
         return ("Yes" if value else "No") if isinstance(value, bool) else str(value)

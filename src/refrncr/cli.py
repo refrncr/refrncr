@@ -243,6 +243,8 @@ def _validate_ref_121_schema(connection) -> None:
         "0016_ref_84",
         "0017_ref_154",
         "0018_ref_160",
+        "0019_ref_162",
+        "0020_ref_162",
     }:
         return
     inspector = inspect(connection)
@@ -402,7 +404,14 @@ def main(
                 with engine.connect() as connection:
                     revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
                     allowed = (
-                        {"0015_ref_83", "0016_ref_84", "0017_ref_154", "0018_ref_160"}
+                        {
+                            "0015_ref_83",
+                            "0016_ref_84",
+                            "0017_ref_154",
+                            "0018_ref_160",
+                            "0019_ref_162",
+                            "0020_ref_162",
+                        }
                         if args.command == "dataset-concept-preflight"
                         else {
                             "0014_ref_145",
@@ -410,6 +419,8 @@ def main(
                             "0016_ref_84",
                             "0017_ref_154",
                             "0018_ref_160",
+                            "0019_ref_162",
+                            "0020_ref_162",
                         }
                     )
                     if revision not in allowed:

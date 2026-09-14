@@ -14,7 +14,6 @@ from refrncr.diff_contracts import (
     DiffCriteria,
     DiffPage,
     DiffSummary,
-    PropertyChange,
     RecordChange,
     RecordDetail,
     ReviewIdentity,
@@ -72,6 +71,8 @@ class DatasetDiffService:
                 f.is_unique,
                 f.display_position,
                 f.key in identifier.field_keys,
+                getattr(f, "definition", None),
+                getattr(f, "unit", None),
             )
             for f in uow.dataset_fields.list_for_dataset(dataset_id)
         )
@@ -91,13 +92,8 @@ class DatasetDiffService:
 
     @staticmethod
     def _summary(uow, dataset, identity, state, changes):
-        metadata = tuple(
-            PropertyChange(
-                label, getattr(state.version, name) if state else None, getattr(dataset, name)
-            )
-            for name, label in (("name", "Dataset name"), ("description", "Description"))
-            if state is not None and getattr(state.version, name) != getattr(dataset, name)
-        )
+        # Dataset metadata is current configuration, not versioned content.
+        metadata = ()
         counts = summary_counts(changes, uow.version_diff.counts(dataset.id, identity.baseline_id))
         return DiffSummary(identity, dataset.key, dataset.name, metadata, counts)
 

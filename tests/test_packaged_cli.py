@@ -166,7 +166,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/templates/pages/auth/setup.html",
         "refrncr/templates/pages/datasets/create.html",
         "refrncr/templates/pages/datasets/detail.html",
-        "refrncr/templates/pages/datasets/edit.html",
+        "refrncr/templates/pages/datasets/_edit_form.html",
         "refrncr/templates/pages/datasets/list.html",
         "refrncr/templates/pages/datasets/_record_table.html",
         "refrncr/templates/pages/datasets/_record_form_fields.html",

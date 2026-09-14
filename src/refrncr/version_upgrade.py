@@ -46,7 +46,11 @@ def _datasets(session):
 
 def _work(session):
     return SimpleNamespace(
-        dataset_fields=SqlAlchemyDatasetFieldOperations(session),
+        dataset_fields=SqlAlchemyDatasetFieldOperations(
+            session,
+            legacy_metadata="definition"
+            not in {c["name"] for c in inspect(session.connection()).get_columns("dataset_fields")},
+        ),
         dataset_business_keys=SqlAlchemyDatasetBusinessKeyOperations(session),
         dataset_records=SqlAlchemyDatasetRecordOperations(
             session,
@@ -74,7 +78,11 @@ def create_initial_versions(connection):
     """Run only inside the migration's transaction after complete successful preflight."""
     now = utc_now().astimezone(APPLICATION_TIMEZONE)
     with Session(bind=connection) as session:
-        versions = SqlAlchemyVersionOperations(session)
+        versions = SqlAlchemyVersionOperations(
+            session,
+            legacy_metadata="definition"
+            not in {c["name"] for c in inspect(connection).get_columns("dataset_version_fields")},
+        )
         for dataset in _datasets(session):
             content = validated_snapshot(_work(session), dataset)
             summary = SummaryCounts(

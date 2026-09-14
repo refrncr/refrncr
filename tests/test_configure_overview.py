@@ -17,7 +17,9 @@ from test_dataset_browser import (  # noqa: F401
 
 
 def section(page, heading):
-    return page.split(f"<section aria-labelledby='{heading}'>", 1)[1].split("</section>", 1)[0]
+    return re.search(
+        rf"<section[^>]*aria-labelledby='{heading}'[^>]*>(.*?)</section>", page, re.S
+    ).group(1)
 
 
 @pytest.mark.parametrize("permission", ["viewer", "member", "community_admin"])
@@ -51,11 +53,14 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         return
     assert response.status_code == 200
     page = body(response)
-    assert re.findall(r"<h1[^>]*>(.*?)</h1>", page) == ["Configure Reference data"]
+    headings = re.findall(r"<h1[^>]*>(.*?)</h1>", page, re.DOTALL)
+    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == ["Configure Reference data"]
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
-    assert page.count("<section ") == (2 if permission == "viewer" else 3)
+    assert page.count("<section ") == (
+        7 if permission == "community_admin" else 2 if permission == "viewer" else 4
+    )
     header = page.split("<div class='configuration-overview'>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
@@ -65,17 +70,18 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         else "/datasets/overview/concept/records"
     )
     assert f"class='button button-primary' href='{records_url}'>View records" in actions
-    assert ("Edit dataset" in actions) == (permission != "viewer")
-    if permission != "viewer":
-        assert "class='button button-secondary' data-panel-url" in actions
+    assert "Edit dataset" not in actions
     details = section(page, "dataset-details-heading")
+    assert ("Edit dataset" in details) == (permission != "viewer")
     for label in ("Name", "Description", "Owning team", "Key"):
         assert f"<dt>{label}</dt>" in details
     assert "<dd>Test data domain</dd>" in details
     assert "No description provided" in details
     assert "<dd><code>overview</code></dd>" in details
-    # UUIDs remain legal only in functional hidden ordering inputs.
-    presentation = re.sub(r"<input[^>]*type='hidden'[^>]*>", "", page)
+    # UUIDs remain legal in functional hidden inputs and access subject values.
+    presentation = re.sub(
+        r"<input[^>]*type='hidden'[^>]*>| value='[^']*'| href='/datasets/id/[^']*'", "", page
+    )
     for internal_id in (dataset.id, admin.id, *(field.id for field in fields)):
         assert internal_id not in presentation
     field_section = section(page, "fields-heading")
@@ -171,7 +177,7 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F8
     assert name not in page and description not in page and field_name not in page
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
-    assert page.count("<section ") == 3
+    assert page.count("<section ") == 7
     assert page.count("<table>") == 1
     assert "aria-label='Edit field &lt;img" in page
 

@@ -7,7 +7,7 @@
 {% from "components/import_action.html" import record_import_action %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none)) %}
+    {% call page_context(dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none), icon=dataset.icon or 'table') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>

@@ -1,7 +1,7 @@
 """Stopped-writer preflight and lossless conversion of implicit working copies."""
 
 from sqlalchemy import inspect, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
 from refrncr.datatypes import DatatypeError, get_datatype
@@ -26,13 +26,18 @@ class ConceptUpgradeError(RuntimeError):
 def _decisions(connection):
     invalid, active = [], []
     with Session(bind=connection) as session:
-        versions = SqlAlchemyVersionOperations(session)
+        legacy_metadata = "definition" not in {
+            c["name"] for c in inspect(connection).get_columns("dataset_fields")
+        }
+        versions = SqlAlchemyVersionOperations(session, legacy_metadata=legacy_metadata)
         diff = SqlAlchemyDiffOperations(
             session,
             legacy_schema="deleted_content"
             not in {c["name"] for c in inspect(connection).get_columns("dataset_records")},
         )
-        for dataset in session.scalars(select(Dataset).order_by(Dataset.id)):
+        for dataset in session.scalars(
+            select(Dataset).options(defer(Dataset.icon)).order_by(Dataset.id)
+        ):
             try:
                 latest = versions.latest_non_cancelled(dataset.id)
                 identifier = SqlAlchemyDatasetBusinessKeyOperations(session).get(dataset.id)
@@ -47,8 +52,12 @@ def _decisions(connection):
                         f.is_unique,
                         f.display_position,
                         f.key in identifier.field_keys,
+                        f.definition,
+                        f.unit,
                     )
-                    for f in SqlAlchemyDatasetFieldOperations(session).list_for_dataset(dataset.id)
+                    for f in SqlAlchemyDatasetFieldOperations(
+                        session, legacy_metadata=legacy_metadata
+                    ).list_for_dataset(dataset.id)
                 )
                 if not set(identifier.field_keys) <= {f.key for f in current} or any(
                     f.is_identifier

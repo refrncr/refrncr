@@ -103,10 +103,10 @@ until the successor activates. They then see the preceding calendar day as its e
 Published timestamps use the existing REF-39 local display helper; effective/end dates remain
 UTC calendar dates even when the browser timezone differs.
 
-Explicit version URLs keep snapshot names, descriptions, ordered Fields, identifier, Records,
+Explicit version URLs combine current Dataset names/descriptions with snapshot ordered Fields, identifier, Records,
 values and pagination together. Deleting/reusing a concept Field key or deleting concept
-Records cannot redirect a historical read to new objects. Version pages contain no edit or
-import controls. Their export menu requires current export authority and only permits Current
+Records cannot redirect a historical read to new objects. Version Record pages contain no content edit or
+import controls. Configure can edit current Dataset metadata independently. Their export menu requires current export authority and only permits Current
 or Expired versions. CSV, Excel and JSON retain REF-82 serializers and streaming semantics;
 filenames include the Dataset key and version number. Existing administrator concept export
 remains available from the concept Records page.
@@ -246,7 +246,7 @@ This supersedes the earlier statement that stale Concepts have no discard workfl
 
 The signed confirmation binds the Concept, revisions, actor/session, owning team
 and Current. Discard atomically deletes working children and the active Concept,
-restores Current metadata and writes one bounded audit; published snapshots and
+preserves current Dataset metadata and writes one bounded audit; published snapshots and
 governance remain intact. It creates no new Concept. The existing explicit creation
 policy remains unchanged: Scheduled when applicable, otherwise Current. This also
 applies to Create concept after discard, as explicitly confirmed for REF-155. See
@@ -270,3 +270,34 @@ old Concept edits were already lost. New deletions preserve actual last Concept 
 Field-only changes leave a newly created Concept importable. See
 [ADR-016](../architecture/adr-016-complete-record-import.md) and
 [import security](record-import-security.md#complete-new-version-imports-ref-160).
+
+## Presentation metadata (REF-162)
+
+Migration `0019_ref_162`, following `0018_ref_160`, adds nullable Dataset `icon`
+(String 32), and nullable `definition` (String 4000) / `unit` (String 64) to both
+working and snapshot Field tables. Field length constraints apply in both engines.
+No historical values are inferred or backfilled. Older retained-deletion JSON
+payloads deserialize with null metadata defaults. Historical upgrade helpers
+explicitly read the old schema before the new columns exist.
+
+Definition and Unit follow Field copy, Concept initialization, publication,
+Scheduled/Current/history and retained deletion. Review identifies these as Field
+metadata changes without Record changes. Published metadata stays immutable.
+The Dataset icon is current presentation metadata: it is shared by Dataset contexts
+and does not advance content revision or alter published Record snapshots.
+
+Upgrade through the existing Alembic process. Downgrade to 0018 removes the new
+metadata columns and therefore loses their values; back up before rolling back.
+The existing populated/lifecycle downgrade safeguards remain in force.
+
+
+Migration `0020_ref_162` widens Dataset `icon` to String 64 for manual names from the
+full pinned Lucide sprite; two supported identifiers exceed the former 32-character
+limit. It follows the existing 0019 migration without modifying it. Upgrade preserves
+values on SQLite and PostgreSQL. Downgrade refuses names longer than 32 characters
+instead of truncating them. This is presentation metadata and does not alter snapshots.
+
+REF-162: Dataset name and description now follow the current icon semantics. They
+are editable without a Concept, do not advance content revisions, and cannot by
+themselves make a version publishable. Concept creation/discard preserves them;
+stored snapshot metadata stays immutable. See [ADR-017](../architecture/adr-017-current-dataset-metadata.md).

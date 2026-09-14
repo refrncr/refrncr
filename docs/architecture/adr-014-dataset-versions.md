@@ -102,3 +102,9 @@ returning its result. This is the explicitly approved REF-149 ordinary-read exce
 child reads have no additional events, and audit failure returns no result. Implementation,
 query/memory limits and validation are in `docs/development/ref-84-report.md`. These choices extend this decision's snapshot/read boundary. ADR-015 records the
 subsequent persistent concept lifecycle approved in the manual UI review.
+
+## REF-162 metadata decision
+
+[ADR-017](adr-017-current-dataset-metadata.md) supersedes Dataset name/description
+version comparison and restoration. Current metadata is maintained independently;
+stored historical snapshots remain unchanged.

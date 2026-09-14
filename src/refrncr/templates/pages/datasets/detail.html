@@ -1,3 +1,6 @@
+{% from 'components/section_tabs.html' import section_tabs %}
+{% from 'components/export_access.html' import export_access %}
+{% from 'components/field_metadata.html' import field_metadata %}
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
@@ -5,38 +8,48 @@
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
+{% block title %}Configure {{ dataset.name }} · REFRNCR{% endblock %}
+
 {% block content %}
   {% if request.args.get('notice') == 'discarded' %}
   {{ feedback('Concept discarded. Current was not changed.', kind='success') }}
   {% endif %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none)) %}
+    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=dataset.icon or 'table') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
       {{ versions_action(dataset.key) }}
       {% if may_start_concept %}{{ new_concept(dataset.key, 'Create concept' if request.args.get('notice') == 'discarded' else '+ New version') }}{% endif %}
-      <a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none) }}'>View records</a>
-      {% if editable %}<a class='button button-secondary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset", key=dataset.key) }}'>Edit dataset</a>{% endif %}
-      {% if may_govern %}<a class='button button-secondary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("dataset_export_access", key=dataset.key) }}'>Access management</a>{% endif %}
+      <a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state and not standalone_configuration else none) }}'>View records</a>
     </div>
   </div>
-  {% include 'pages/datasets/versions/_navigation.html' %}
+  {% if not standalone_configuration %}{% include 'pages/datasets/versions/_navigation.html' %}{% endif %}
+  {% set tabs = [('dataset-details', 'Dataset details'), ('fields', 'Fields')] %}
+  {% if may_govern %}{% set tabs = tabs + [('access-management', 'Access management')] %}{% endif %}
+  {% if editable %}{% set tabs = tabs + [('danger-zone', 'Danger zone')] %}{% endif %}
+  {{ section_tabs(tabs, 'Configure dataset sections') }}
   <div class='configuration-overview'>
-    <section aria-labelledby='dataset-details-heading'>
-      <h2 id='dataset-details-heading'>Dataset details</h2>
+    <section id='dataset-details' aria-labelledby='dataset-details-heading'>
+      <div class='page-header section-header'><h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>{% if editable and not edit_mode %}<a href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>Edit dataset</a>{% endif %}</div>
+      {% if edit_mode %}
+        {% include 'pages/datasets/_edit_form.html' %}
+      {% else %}
       <dl class='detail-list'>
         <div><dt>Name</dt><dd>{{ dataset.name }}</dd></div>
         <div><dt>Description</dt><dd>{{ dataset.description or 'No description provided' }}</dd></div>
+        <div><dt>Dataset icon</dt><dd>{{ dataset.icon or 'Default dataset icon' }}</dd></div>
         <div><dt>Owning team</dt><dd>{{ dataset.owner_team_name }}</dd></div>
         <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
       </dl>
+      {% endif %}
       <p class='help-text'>The key is permanent and used in exports and the API.</p>
     </section>
+    <section id='fields' aria-labelledby='fields-heading'>
+    {% if field_context_label %}<p class='section-description'>{{ field_context_label }}</p>{% endif %}
     {% if fields and not business_key.field_keys %}
       {{ feedback("No record identifier configured. Choose one or more fields to uniquely identify each record.", kind="warning") }}
     {% endif %}
-    <section aria-labelledby='fields-heading'>
       <div class='page-header section-header'>
         <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p>{% if fields %}<p class='section-description'>The order here is the column order in tables and exports.</p>{% endif %}</div>
         {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}
@@ -59,7 +72,7 @@
                     </form>
                   {% endif %}
                 </td>
-                <td><span class='field-name'>{{ field.name }}</span>{% if field.key in business_key.field_keys %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
+                <td><span class='field-name'>{{ field.name }}</span>{{ field_metadata(field) }}{% if field.key in business_key.field_keys %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
                 <td><code class='field-key'>{{ field.key }}</code></td>
                 <td>{{ field.data_type|datatype_label }}</td>
                 <td>
@@ -85,6 +98,18 @@
         <div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset. Fields describe the values each record can contain.</p></div>
       {% endif %}
     </section>
+    {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><h2 id='access-management-heading'>Access management</h2>
+      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, inline=true, concept=not version_state and not standalone_configuration, standalone=standalone_configuration) }}
+    </section>{% endif %}
+    {% if editable %}
+    <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>
+      <h2 id='dataset-danger-heading'>Danger zone</h2>
+      <p>Permanently delete this dataset and its records, fields and access settings.</p>
+      <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+    </section>
+    {% endif %}
   </div>
   {% if editable or schema_admin or may_govern %}{{ form_side_panel() }}{% endif %}
 {% endblock %}
+
+{% block scripts %}<script src='{{ url_for("static", filename="js/section-tabs.js") }}' defer></script>{% endblock %}

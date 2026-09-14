@@ -7,8 +7,8 @@
       "operation": "create_initial_admin",
       "service": "refrncr.services.UserService.create_initial_admin",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr user create-admin"
+        "refrncr user create-admin",
+        "refrncr.web.setup GET,POST /setup"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -262,8 +262,8 @@
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr user create-admin"
+        "refrncr user create-admin",
+        "refrncr.web.setup GET,POST /setup"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1053,8 +1053,14 @@
       "operation": "export_access_context",
       "service": "refrncr.services.DatasetService.export_access_context",
       "interface_entrypoints": [
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2585,7 +2591,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -2812,9 +2819,7 @@
       "service": "refrncr.services.DatasetAuthorizationService.creation_teams",
       "interface_entrypoints": [
         "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>"
+        "refrncr.web.create_dataset POST /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3011,7 +3016,8 @@
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>"
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3779,7 +3785,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4066,8 +4073,8 @@
       "operation": "health",
       "service": "refrncr.app.health",
       "interface_entrypoints": [
-        "refrncr.app.health GET /api/health",
-        "FastAPI /docs /redoc /docs/oauth2-redirect /openapi.json"
+        "FastAPI /docs /redoc /docs/oauth2-redirect /openapi.json",
+        "refrncr.app.health GET /api/health"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4098,9 +4105,9 @@
       "operation": "index",
       "service": "refrncr.web.index",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "Flask GET /static/<path:filename>",
-        "Flask HEAD for GET and OPTIONS"
+        "Flask HEAD for GET and OPTIONS",
+        "refrncr.web.index GET /"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4131,6 +4138,7 @@
       "operation": "require_csrf",
       "service": "refrncr.web.require_csrf",
       "interface_entrypoints": [
+        "Browser transport, CSRF, request-size and exception hooks",
         "refrncr.web.create_dataset POST /datasets",
         "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
         "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
@@ -4162,8 +4170,7 @@
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "Browser transport, CSRF, request-size and exception hooks"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4194,9 +4201,9 @@
       "operation": "require_cookie_settings",
       "service": "refrncr.web.require_cookie_settings",
       "interface_entrypoints": [
+        "Browser transport, CSRF, request-size and exception hooks",
         "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
-        "Browser transport, CSRF, request-size and exception hooks"
+        "refrncr.web.login GET,POST /login"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4705,7 +4712,10 @@
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4742,7 +4752,10 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4954,8 +4967,6 @@
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
@@ -5312,6 +5323,75 @@
       "implementation_status": "Implemented for REF-160; covered by SQLite/PostgreSQL lifecycle and authorization tests.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
+    },
+    {
+      "capability": "MembershipService",
+      "operation": "list_relationships",
+      "service": "refrncr.services.MembershipService.list_relationships",
+      "interface_entrypoints": [
+        "refrncr.web.user_list GET /users",
+        "refrncr.web.team_list GET /teams"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: denied protected read or suspicious malformed/cross-resource lookup. Keep non-disclosing responses; ordinary successful reads produce neither domain history nor mandatory per-read security logs.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_ui_polish.py::test_relationship_queries_and_authorization"
+      ],
+      "implementation_status": "REF-162 part 1: implemented; focused validation pending.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "get_dataset_configuration",
+      "service": "refrncr.services.DatasetService.get_dataset_configuration",
+      "interface_entrypoints": [
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: denied protected read or suspicious malformed/cross-resource lookup. Keep non-disclosing responses; ordinary successful reads produce neither domain history nor mandatory per-read security logs.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_ui_polish.py::test_standalone_configuration_without_concept"
+      ],
+      "implementation_status": "REF-162 locally verified by full SQLite/PostgreSQL 16.15 regression and Chrome checks; independent GitHub CI pending.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     }
   ]
 }

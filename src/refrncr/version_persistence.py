@@ -22,8 +22,9 @@ from refrncr.version_contracts import (
 
 
 class SqlAlchemyVersionOperations:
-    def __init__(self, session):
+    def __init__(self, session, *, legacy_metadata=False):
         self.session = session
+        self.legacy_metadata = legacy_metadata
 
     @staticmethod
     def _version(row):
@@ -120,10 +121,21 @@ class SqlAlchemyVersionOperations:
         )
         self.session.add(row)
         self.session.flush()
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            legacy_fields = Table(
+                "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
+            )
         for field in content.fields:
             values = asdict(field)
             values.pop("dataset_id")
-            self.session.add(DatasetVersionField(version_id=row.id, **values))
+            if self.legacy_metadata:
+                values.pop("definition")
+                values.pop("unit")
+                self.session.execute(legacy_fields.insert().values(version_id=row.id, **values))
+            else:
+                self.session.add(DatasetVersionField(version_id=row.id, **values))
         self.session.flush()
         for record in content.records:
             by_key = {v.field_key: v.canonical_key for v in record.values}
@@ -167,6 +179,23 @@ class SqlAlchemyVersionOperations:
             raise PersistenceConflictError()
 
     def fields(self, version):
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            table = Table(
+                "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
+            )
+            return tuple(
+                SnapshotField(
+                    dataset_id=version.dataset_id,
+                    **{key: value for key, value in row.items() if key != "version_id"},
+                )
+                for row in self.session.execute(
+                    select(table)
+                    .where(table.c.version_id == version.id)
+                    .order_by(table.c.display_position)
+                ).mappings()
+            )
         return tuple(
             SnapshotField(
                 f.id,
@@ -178,6 +207,8 @@ class SqlAlchemyVersionOperations:
                 f.is_unique,
                 f.display_position,
                 f.is_identifier,
+                f.definition,
+                f.unit,
             )
             for f in self.session.scalars(
                 select(DatasetVersionField)

@@ -6,9 +6,13 @@ components.
 
 ## Assets and typography
 
-The canonical logo is the rounded 2×2 grid with the filled top-left square. Use
-`logo-horizontal.svg` in application chrome and `logo-mark.svg` where only a compact mark
-fits. Do not recolour, distort, rotate, or add effects to either asset.
+The canonical logo uses the supplied green concentric rings. Use
+`07-static-logo-256px.svg` for static branding, `02-animated-grow-shrink.svg` on
+login and `06-favicon-16px.svg` for the favicon. A responsive picture selects the
+static source for reduced motion, including when the preference changes at runtime.
+The SVG source bytes, geometry and green color are preserved. Branding containers
+reserve dimensions and pair a decorative mark with visible REFRNCR text.
+See the asset inventory for provenance and licensing.
 
 The typography contract is:
 
@@ -299,8 +303,9 @@ Use `.side-panel-body` for scrolling content and `.side-panel-footer` for separa
 The header stays fixed; shared form actions remain available while scrolling. Existing width,
 spacing, focus and responsive tokens apply, including full-width panels below 768 px.
 
-Dataset creation uses a single `form_side_panel()` on the dataset list. Dataset settings,
-field creation and field editing share one instance on dataset detail. Each trigger retains
+Dataset creation uses a single `form_side_panel()` on the dataset list. Field
+creation, Field editing and deletion confirmation share one instance on Configure.
+Dataset details editing is inline (REF-162). Each trigger retains
 its existing authorized route as its `href`:
 
 ```jinja
@@ -1023,3 +1028,79 @@ search, pagination, acknowledgement and confirmation are native server-rendered 
 and links. The existing JS dialog contract governs Record detail/Undo; the import wizard
 works without JavaScript. No screenreader-user test or automated accessibility audit is
 implied by the semantic and keyboard checks in the REF-160 report.
+
+## REF-162 shared UI additions
+
+- Global components: generated keys for opt-in create forms; progressive Dataset
+  icon picker; Field metadata disclosure; relationship list; shared export access.
+- Component variants: responsive relationship tables reuse the Users card rules;
+  Dataset badge-link alignment; inline export access with distinct IDs/headings.
+- Page rules: Configure's small Edit link and access placement, Versions action
+  removal, and the authorized no-Current Dataset list destination.
+- Tokens: no new design tokens; new rules reuse existing spacing, colour and font
+  tokens. Product branding uses the supplied concentric-ring assets.
+
+Key generation uses equivalent Python/JavaScript NFKD, lowercase, explicit whitespace,
+slash/backslash/dot/dash separators to underscores, ASCII filtering, underscore
+collapse and trim. It does not truncate or append suffixes. Manual key edits stop
+synchronization; server validation, uniqueness and reserved keys remain authoritative.
+Without JavaScript both fields remain normal inputs. Edit pages never opt in.
+
+The Dataset icon picker enhances a text input with a searchable combobox/listbox,
+visible icon names, active-descendant navigation, selection, clear and Escape/Tab
+handling. Initialization is repeat-safe, including side-panel fragment replacement.
+Manual icon-name entry is available without JavaScript. Definition and Unit use plain
+escaped text and keyboard-accessible disclosure at Record column headers.
+See [asset provenance and licences](../../src/refrncr/static/licenses/ASSET-SOURCES.md)
+and [the part-1 implementation notes](ref-162-part-1-notes.md).
+
+
+### Manual Dataset icon names
+
+The user-approved REF-162 follow-up expands the eight suggestions to manual names
+from the full pinned Lucide 0.468.0 sprite. The input contains the canonical name;
+Tab, blur and form submission retain typed text without requiring selection from
+the suggestions. Enter chooses a highlighted suggestion or accepts the typed name;
+Escape restores the value from before editing. The same text input works without
+JavaScript. Unknown names save as the default selection. Names are bounded to 64
+characters before normalization, stripped and lowercased. Malformed, oversized,
+unknown and unavailable names save as null and render the default; they never cause
+an icon validation error. Raw input is not persisted or interpreted.
+
+
+### Configure inline editing
+
+Edit dataset opens the general `/datasets/<key>/configure` route in inline edit mode. Name,
+Description, Dataset icon and Owning team are stacked inside Dataset details;
+Save dataset and Cancel sit below them. The key stays read only. Danger zone is a separate tab and uses the existing confirmed-delete
+panel. Cancelling that panel preserves unsaved inline values and restores focus.
+
+One `_edit_form.html` include supplies the edit controls; the old Dataset edit
+panel template is removed. The legacy `/edit` entry point renders the same page.
+Validation errors render Configure with submitted values and focused feedback.
+Owning-team changes retain their existing expected-owner check; authorization,
+CSRF, immutable keys and publication boundaries remain server-side. The normal
+link and form navigation work without JavaScript. Edit targets the Name input's
+fragment; Cancel returns to the Dataset details heading.
+
+
+### Configure section tabs
+
+Configure groups its existing content into Dataset details, Fields, Access
+management and Danger zone. Permission checks determine which sections and tabs
+are rendered. The shared `section_tabs.html` component reuses section-tab styling;
+`section-tabs.js` progressively enhances same-page anchors to a tablist with
+roving focus, arrow/Home/End navigation, labelled panels and selected state.
+Tab switches hide panels without replacing their DOM, preserving inline drafts.
+
+The hash restores a selected section after reload. Field write redirects include
+`tab=fields#fields`: the query survives fetch-based panel redirects and the hash
+provides the native no-JavaScript scroll destination. Switching tabs updates the
+hash and removes that transient query. Unsupported section names select Dataset
+details and never expose unauthorized content. Without JavaScript all authorized
+sections remain visible and the navigation works as ordinary anchor links.
+
+REF-162 general configuration uses the shared section-tabs component with an enabled, read-only Fields tab. Keyboard and hash navigation select Fields
+normally; the view contains no Field mutation controls. The Dataset overview uses a separate gear
+link with a `configuration` tooltip and Dataset-specific accessible name. Other
+row actions retain their existing chevron. No design tokens change.

@@ -1,5 +1,6 @@
 .app-shell { min-height: 100vh; display: grid; grid-template: auto 1fr / var(--sidebar-width) minmax(0, 1fr); }
-.brand { display: inline-flex; }
+.brand { display: inline-flex; align-items: center; gap: var(--space-sm); text-decoration: none; }
+.brand-name { font-family: var(--font-display); font-weight: var(--font-weight-bold); color: var(--color-text); }
 .brand img { display: block; height: 2.625rem; width: auto; }
 .app-sidebar, .settings-sidebar { display: flex; flex-direction: column; min-width: 0; padding: var(--space-lg); background: var(--color-surface-subtle); border-right: 1px solid var(--color-border); }
 .primary-navigation { display: flex; flex: 1; flex-direction: column; gap: var(--space-sm); }
@@ -31,7 +32,7 @@
 .app-shell > .app-main { grid-column: 2; }
 .navigation-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-shrink: 0; min-height: calc(var(--control-height) + var(--space-md)); margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-sm)) var(--space-lg); padding-block: var(--space-sm); }
 .navigation-heading .brand { min-width: 0; }
-.navigation-heading .brand img { width: 148px; height: auto; }
+.navigation-heading .brand img { width: 42px; height: 42px; flex-shrink: 0; }
 .navigation-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: var(--control-height); min-height: var(--control-height); padding: var(--space-sm); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
 .navigation-button:hover { background: var(--color-action-secondary); color: var(--color-text); }
 .navigation-button:active { background: var(--color-action-secondary-hover); }
@@ -78,7 +79,7 @@
 @media (max-width: 1023px) {
   .mobile-bar { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; margin: calc(-1 * var(--app-main-padding)) calc(-1 * var(--app-main-padding)) var(--app-main-padding); padding: var(--space-sm) var(--app-main-padding); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
   .mobile-bar > [data-nav-open] { flex-shrink: 0; margin: 0 0 0 calc(-1 * var(--space-sm)); }
-  .mobile-bar-brand { display: flex; flex-shrink: 0; }
+  .mobile-bar-brand { display: flex; flex-shrink: 0; align-items: center; gap: var(--space-xs); text-decoration: none; }
   .mobile-bar-brand img { display: block; width: auto; height: 1.75rem; }
   .mobile-bar-title { display: block; min-width: 0; margin-left: var(--space-xs); padding-left: var(--space-md); border-left: 1px solid var(--color-border); overflow: hidden; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
 }

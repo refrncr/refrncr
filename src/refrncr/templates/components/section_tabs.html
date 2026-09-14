@@ -1,0 +1,5 @@
+{% macro section_tabs(items, label, disabled=()) -%}
+<nav class='section-tabs' aria-label='{{ label }}' data-section-tabs>
+  {% for id, name in items %}{% if id in disabled %}<button type='button' class='section-tab' id='tab-{{ id }}' data-tab-target='{{ id }}' aria-disabled='true' disabled>{{ name }}</button>{% else %}<a class='section-tab' id='tab-{{ id }}' data-tab-target='{{ id }}' href='#{{ id }}'>{{ name }}</a>{% endif %}{% endfor %}
+</nav>
+{%- endmacro %}

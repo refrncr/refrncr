@@ -1,0 +1,34 @@
+{% from 'components/dataset_icon.html' import icon_picker %}
+{% from 'components.html' import feedback, form_field, readonly_field %}
+{% from 'pages/datasets/_team_choice.html' import team_choice %}
+  {{ readonly_field("Key", dataset.key, technical=true) }}
+  {{ feedback(error, id="dataset-edit-error", focus=true) }}
+  <form id='dataset-edit-form' class='form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+    {{ form_field(
+      "Name",
+      "name",
+      "dataset-name",
+      value=name,
+      error_id="dataset-edit-error" if error_field == "name" else none
+    ) }}
+    {{ form_field(
+      "Description",
+      "description",
+      "dataset-description",
+      value=description,
+      error_id="dataset-edit-error" if error_field == "description" else none,
+      control="textarea"
+    ) }}
+    {{ icon_picker(dataset_icon_choices, selected_icon) }}
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    {% if may_govern %}
+      {{ team_choice(teams, selected_team_id) }}
+      <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>
+    {% else %}
+      {{ readonly_field("Owning team", dataset.owner_team_name) }}
+    {% endif %}
+    <div class='form-actions'>
+      <button class='button button-primary' type='submit'>Save dataset</button>
+      <a class='button button-secondary' href='{{ configuration_url }}#dataset-details-heading'>Cancel</a>
+    </div>
+  </form>

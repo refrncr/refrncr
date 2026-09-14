@@ -48,11 +48,11 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
   .record-toolbar .search-field { max-width: none; }
   .record-toolbar span { width: 100%; margin-left: 0; }
   th, td { padding-inline: var(--space-sm); }
-  .user-management-table, .user-management-table tbody { display: block; }
-  .user-management-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .user-management-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs) var(--space-sm); padding: var(--space-md) var(--space-xxl) var(--space-md) var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
-  .user-management-table tbody tr:last-child { border-bottom: 0; }
-  .user-management-table td { min-width: 0; padding: 0; border: 0; }
+  :is(.user-management-table, .relationship-table), :is(.user-management-table, .relationship-table) tbody { display: block; }
+  :is(.user-management-table, .relationship-table) thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  :is(.user-management-table, .relationship-table) tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs) var(--space-sm); padding: var(--space-md) var(--space-xxl) var(--space-md) var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
+  :is(.user-management-table, .relationship-table) tbody tr:last-child { border-bottom: 0; }
+  :is(.user-management-table, .relationship-table) td { min-width: 0; padding: 0; border: 0; }
   .user-management-table td[headers="user-column-name"] { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-sm); align-items: center; }
   .user-management-table .table-avatar { margin-right: 0; }
   .user-management-table .table-avatar + .row-action { width: 100%; overflow-wrap: anywhere; }
@@ -107,3 +107,26 @@ tbody th[scope="row"] { background: transparent; color: var(--color-text); font-
 .table-scroll tbody tr.table-day-row:hover { background: transparent; }
 tbody + tbody .table-day-row th { border-top: 1px solid var(--color-border); }
 table time[title] { cursor: help; text-decoration: underline dotted var(--color-control-border); text-underline-offset: .2em; }
+
+.relationship-list { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); list-style: none; padding: 0; margin: 0; }
+.relationship-list li { min-width: 0; overflow-wrap: anywhere; }
+.relationship-cell { max-width: 24rem; }
+.mobile-cell-label { display: none; }
+.dataset-table .badge-link { vertical-align: middle; }
+@media (max-width: 767px) {
+  .mobile-cell-label { display: block; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+  .relationship-cell { max-width: none; }
+  .relationship-table td { overflow-wrap: anywhere; }
+}
+
+/* Dataset identity: center the icon beside the name and technical key together. */
+.dataset-identity { display: flex; align-items: center; gap: var(--space-sm); }
+.dataset-identity > .dataset-icon { margin-inline-end: 0; }
+.dataset-identity-text { min-width: 0; }
+
+/* Dataset rows have an independent configuration action in place of the chevron. */
+.dataset-row > td:last-child { padding-inline-end: calc(var(--space-xxl) + var(--space-sm)); }
+.dataset-configuration-link { position: absolute; inset-inline-end: var(--space-sm); top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; color: var(--color-text-muted); border-radius: var(--radius-sm); }
+.dataset-configuration-link:hover { color: var(--color-action-primary); background: var(--color-surface-subtle); }
+.dataset-configuration-link:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.dataset-configuration-link svg { width: 1rem; height: 1rem; }

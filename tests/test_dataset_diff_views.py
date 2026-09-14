@@ -63,7 +63,8 @@ def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F81
     c = context
     browser, csrf, base, token = prepared(c)
     versions = request(browser, "get", f"/datasets/{c.d.key}/versions")
-    assert "Review changes" in versions.text
+    assert "Review changes" not in versions.text
+    assert f"href='/datasets/{c.d.key}/versions/review'>Review</a>" in versions.text
     url = f"/datasets/{c.d.key}/versions/publish"
     assert "Review changes" in request(browser, "get", url).text
     panel = request(browser, "get", path(url, token))
@@ -89,7 +90,8 @@ def test_versions_review_entry_does_not_materialize_publication(context, monkeyp
 
     monkeypatch.setattr(c.service, "review", forbidden)
     response = request(browser, "get", f"/datasets/{c.d.key}/versions")
-    assert response.status_code == 200 and "Review changes" in response.text
+    assert response.status_code == 200 and "Review changes" not in response.text
+    assert f"href='/datasets/{c.d.key}/versions/review'>Review</a>" in response.text
     assert snapshot(c) == before
 
 
@@ -114,7 +116,7 @@ def test_first_publication_panel_offers_optional_review(context):  # noqa: F811
 def test_stale_routes_clear_content_and_reload_review(context):  # noqa: F811
     c = context
     browser, csrf, base, token = prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Later", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Later", "string", False, False)
     before = snapshot(c)
     urls = [path(base, token, section=section) for section in ("Summary", "Fields", "Records")]
     urls += [
@@ -210,7 +212,9 @@ def test_review_signature_shared_workers_and_key_rotation(context):  # noqa: F81
     configured(c)
     publish(c)
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     session_token, _session = c.s.sessions.create(c.a)
     shared_key = secrets.token_bytes(32)
 

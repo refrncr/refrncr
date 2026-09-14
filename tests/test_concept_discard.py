@@ -146,8 +146,12 @@ def test_discard_removes_working_state_preserves_snapshots_and_governance(contex
             assert after[table] == before[table], table
     assert active(c) is None
     current = c.service.read(c.a.id, c.d.key)
-    assert current.context.dataset.name == "Business name"
-    assert current.context.dataset.description == "Secret description"
+    assert current.context.dataset.name == (
+        "Unpublished" if change in {"metadata", "mixed"} else "Business name"
+    )
+    assert current.context.dataset.description == (
+        "Private description" if change in {"metadata", "mixed"} else "Secret description"
+    )
     assert current.page.records[0].id == c.record.id
     events = [a for a in audits(c) if a.action == "dataset.concept_discarded"]
     assert len(events) == 1
@@ -211,7 +215,9 @@ def test_stale_identity_never_deletes(context, state):  # noqa: F811
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
     if state == "mutation":
-        c.s.datasets.update_dataset(c.a.id, c.d.key, "New changes", "")
+        c.s.dataset_fields.update_field(
+            c.a.id, c.d.key, "label", "New changes", "string", False, False
+        )
     else:
         values = {
             "revision": {"revision": identity.revision + 1},
@@ -336,7 +342,7 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):  # noqa: F811
         request(other, "post", path, data={**payload, "csrf_token": other_csrf}).status_code == 404
     )
     assert snapshot(c) == before
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "New changes", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "New changes", "string", False, False)
     before = snapshot(c)
     stale = request(browser, "post", path, data=payload)
     assert stale.status_code == 409 and "confirm discard again" in stale.text
@@ -360,6 +366,9 @@ def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(cont
     c = context
     current = prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled name", "Scheduled description")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Scheduled name", "string", False, False
+    )
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
     previous = c.service.create_concept(c.a.id, c.d.id)
     if cancelled:
@@ -370,7 +379,7 @@ def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(cont
     for name in before:
         if name.startswith("dataset_version"):
             assert before[name] == after[name]
-    assert c.service.read(c.a.id, c.d.key).context.dataset.name == "Business name"
+    assert c.service.read(c.a.id, c.d.key).context.dataset.name == "Scheduled name"
 
     assert active(c) is None
     created = c.service.create_concept(c.a.id, c.d.id)
@@ -379,7 +388,7 @@ def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(cont
     assert created.base_version_id == expected_base.id
     concept = c.service.concept_context(c.a.id, c.d.key)
     assert not concept.has_changes
-    assert c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).name == expected_base.name
+    assert c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).name == "Scheduled name"
     recreated = snapshot(c)
     for name in before:
         if name.startswith("dataset_version"):
@@ -390,6 +399,7 @@ def test_current_activation_requires_new_confirmation(context):  # noqa: F811
     c = context
     prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
@@ -407,6 +417,9 @@ def test_concurrent_operation_and_discard_are_atomic(context, operation):  # noq
     c = context
     prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Publication candidate", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Publication candidate", "string", False, False
+    )
     imports = c.s.record_imports
     staged, _, _ = imports.begin(c.a.id, "session", c.d.key, "rows.csv", b"code,label\nb,Import\n")
     imports.preview(c.a.id, "session", c.d.key, staged.token, ("code", "label"))
@@ -577,7 +590,7 @@ def test_empty_and_large_mixed_discard_is_set_based(context, size, record_proper
             review.counts.records_removed,
             review.counts.fields_added,
         ) == (1, 1, 1, 1)
-        assert review.metadata_changes == 2
+        assert review.metadata_changes == 0
     else:
         assert review.counts.records_added == review.counts.records_removed == 0
     after = snapshot(c)
@@ -648,9 +661,9 @@ def test_each_mutation_invalidates_open_discard(context, mutation):  # noqa: F81
         imports.preview(c.a.id, "s", c.d.key, state.token, ("code", "unused"))
         imports.confirm(c.a.id, "s", c.d.key, state.token)
     else:
-        # Remove the unused Field before publishing the metadata-only candidate.
+        # Publish a genuine Field change.
         fields.delete_field(c.a.id, c.d.key, "unused")
-        c.s.datasets.update_dataset(c.a.id, c.d.key, "Published", "")
+        fields.update_field(c.a.id, c.d.key, "label", "Published", "string", False, False)
         publish(c)
     before = snapshot(c)
     with pytest.raises(ConflictError):
@@ -668,7 +681,6 @@ def test_old_urls_and_posts_do_not_create_concept(context):  # noqa: F811
         "concept",
         "concept/records",
         "concept/discard",
-        "edit",
         "fields/new",
         "records/new",
         "records/import",
@@ -687,8 +699,11 @@ def test_old_urls_and_posts_do_not_create_concept(context):  # noqa: F811
             "description": "Old source",
         },
     )
-    assert response.status_code == 409
-    assert snapshot(c) == before
+    assert response.status_code == 302
+    assert response.location.endswith("/configure")
+    assert active(c) is None
+    assert snapshot(c)["dataset_versions"] == before["dataset_versions"]
+    assert request(browser, "get", f"/datasets/{c.d.key}/edit").status_code == 200
 
 
 def test_discard_preserves_another_datasets_active_work(context):  # noqa: F811

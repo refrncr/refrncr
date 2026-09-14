@@ -43,3 +43,6 @@
 
 .detail-list.detail-list-counts > div { grid-template-columns: minmax(0, 1fr) auto; }
 .detail-list-counts dt { overflow-wrap: anywhere; }
+
+/* Inline Dataset editing separates save/cancel from the final form field. */
+.configuration-overview .form-actions { margin-top: var(--space-lg); }

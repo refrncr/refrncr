@@ -117,7 +117,7 @@ def assert_community_schema(engine, *, dataset_revision=True):
     grant_checks = {constraint["name"] for constraint in inspector.get_check_constraints("grants")}
     assert {"ck_grants_subject_type", "ck_grants_permission"} <= grant_checks
     dataset_columns = {column["name"] for column in inspector.get_columns("datasets")}
-    assert dataset_columns == ({"revision"} if dataset_revision else set()) | {
+    assert dataset_columns == ({"revision", "icon"} if dataset_revision else set()) | {
         "id",
         "key",
         "name",
@@ -151,7 +151,7 @@ def assert_community_schema(engine, *, dataset_revision=True):
     assert owner_foreign_key["referred_table"] == "users"
     assert owner_foreign_key["options"].get("ondelete") in {None, "RESTRICT"}
     field_columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}
-    assert set(field_columns) == {
+    assert set(field_columns) == ({"definition", "unit"} if dataset_revision else set()) | {
         "id",
         "dataset_id",
         "key",
@@ -438,7 +438,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0018_ref_160"
+                "0020_ref_162"
             )
     finally:
         upgraded.dispose()
@@ -778,7 +778,11 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
                     Dataset.id == dataset.id
                 )
             ).one()
-            persisted_field = session.get(DatasetField, field.id)
+            persisted_field = session.execute(
+                select(DatasetField.key, DatasetField.is_required).where(
+                    DatasetField.id == field.id
+                )
+            ).one()
             assert (persisted_dataset.key, persisted_dataset.description) == (
                 "existing",
                 "Preserved",
@@ -997,7 +1001,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0018_ref_160"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0020_ref_162"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

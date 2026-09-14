@@ -172,7 +172,7 @@ def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(c
     config = Config("alembic.ini")
     with c.engine.connect() as connection:
         config.attributes["connection"] = connection
-        command.stamp(config, "0018_ref_160")
+        command.stamp(config, "0020_ref_162")
         # stamp owns a transaction on PostgreSQL; commit before the migration boundary.
         connection.commit()
         command.downgrade(config, "0017_ref_154")
@@ -636,7 +636,7 @@ def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, m
     config = Config("alembic.ini")
     with c.engine.connect() as connection:
         config.attributes["connection"] = connection
-        command.stamp(config, "0018_ref_160")
+        command.stamp(config, "0020_ref_162")
         connection.commit()
         command.downgrade(config, "0017_ref_154")
         connection.commit()
@@ -729,7 +729,9 @@ def test_empty_xlsx_and_no_active_concept_are_blocked(context):  # noqa: F811
         c.s.record_imports.begin(
             c.a.id, "empty", c.d.key, "empty.xlsx", stream.getvalue(), mode="new_version"
         )
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed metadata", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Changed label", "string", False, False
+    )
     publish(c)
     with pytest.raises(ConflictError):
         preview(c)
@@ -751,7 +753,9 @@ def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(conte
     with pytest.raises(NotFoundError):
         confirm(c, state)
     state, _ = preview(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed metadata", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Changed label", "string", False, False
+    )
     publish(c)
     c.service.create_concept(c.a.id, c.d.id)
     with pytest.raises(NotFoundError):

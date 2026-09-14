@@ -6,9 +6,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}REFRNCR{% endblock %}</title>
-    <link rel="icon" href="{{ url_for('static', filename='images/logo-mark.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ url_for('static', filename='images/06-favicon-16px.svg') }}" type="image/svg+xml">
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
+    <script src="{{ url_for('static', filename='js/key-generation.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/icon-picker.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/refrncr.js') }}" defer></script>
   </head>
   <body>
@@ -19,7 +21,7 @@
         <aside class="app-sidebar" data-navigation id="application-navigation">
           <div class="navigation-heading">
             <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-              <img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="REFRNCR" width="148" height="42">
+              <img src="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}" alt="" width="42" height="42"><span class="brand-name">REFRNCR</span>
             </a>
             {{ navigation_button('application-navigation') }}
           </div>
@@ -48,7 +50,7 @@
         {% if current_actor %}{% set mobile_title = self.title().split(' · ')[0] %}
         <div class="mobile-bar">
           {{ navigation_button('application-navigation', expand=true) }}
-          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="" width="99" height="28"></a>
+          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}" alt="" width="28" height="28"><span class="brand-name">REFRNCR</span></a>
           {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
         </div>{% endif %}
         {% include "components/flash_messages.html" %}

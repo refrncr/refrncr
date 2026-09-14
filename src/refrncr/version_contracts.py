@@ -28,6 +28,8 @@ class SnapshotField:
     is_unique: bool
     display_position: int
     is_identifier: bool
+    definition: str | None = None
+    unit: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +138,7 @@ class PublishedDataset:
     version_id: str
     version_number: int
     owner_user_id: str = ""
+    icon: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

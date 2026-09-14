@@ -1,3 +1,4 @@
+{% from 'components/dataset_icon.html' import dataset_icon %}
 {% macro page_header(title, description='') -%}
   <header class="page-header">
     <div>
@@ -7,10 +8,10 @@
   </header>
 {%- endmacro %}
 
-{% macro page_context(title, metadata) -%}
+{% macro page_context(title, metadata, icon=none) -%}
   <div class="page-context">
     {{ caller() }}
-    <h1 class="page-title">{{ title }}</h1>
+    <h1 class="page-title">{% if icon is not none %}{{ dataset_icon(icon) }}{% endif %}{{ title }}</h1>
     {{ metadata }}
   </div>
 {%- endmacro %}

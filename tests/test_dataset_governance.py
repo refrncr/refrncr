@@ -472,7 +472,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert get(f"/datasets/{d.key}/owner").status_code == 404
     csrf = sign_in(a)
     detail = get(f"/datasets/{d.key}").text
-    assert ">Access management</a>" in detail
+    assert "id='access-management-heading'>Access management</h2>" in detail
     assert "Change owning team</a>" not in detail
     assert "All active Community users can view this dataset." not in detail
     s.dataset_versions.create_concept(a.id, d.id)

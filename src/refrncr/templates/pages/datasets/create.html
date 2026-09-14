@@ -3,6 +3,8 @@
 {% from "layouts/page.html" import page_header %}
 {% from "pages/datasets/_team_choice.html" import team_choice %}
 
+{% from 'components/dataset_icon.html' import icon_picker %}
+
 {% block title %}New dataset · REFRNCR{% endblock %}
 
 {% block content %}
@@ -14,7 +16,7 @@
     <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>
     <a class='button button-secondary' href='{{ url_for("team_list") }}'>Go to Teams</a>
   {% else %}
-  <form class='form' novalidate method='post' action='{{ url_for("create_dataset") }}'>
+  <form class='form' data-generate-key novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Name",
       "name",
@@ -29,7 +31,7 @@
       "dataset-key",
       required=true,
       value=key,
-      help_text="A permanent technical identifier.",
+      help_text="Generated from the name until you edit it. A permanent technical identifier.",
       error=error if error_field == "key" else none
     ) }}
     {{ form_field(
@@ -40,6 +42,7 @@
       error=error if error_field == "description" else none,
       control="textarea"
     ) }}
+    {{ icon_picker(dataset_icon_choices, selected_icon) }}
     {{ team_choice(teams, owner_team_id) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>

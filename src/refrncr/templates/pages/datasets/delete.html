@@ -17,7 +17,7 @@
       </form>
     </div>
     {% call panel_form_actions() %}
-      <a class='button button-secondary' href='{{ url_for("edit_dataset", key=deletion.key) }}' data-panel-cancel>Cancel</a>
+      <a class='button button-secondary' href='{{ url_for("dataset_configuration", key=deletion.key) }}' data-panel-cancel>Cancel</a>
       <button class='button button-danger' type='submit' form='dataset-delete-form'>Delete dataset</button>
     {% endcall %}
   </div>

@@ -699,8 +699,9 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
         r"<table class='user-management-table' role='table'>(.*?)</table>", body, re.S
     ).group(1)
     headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", table, re.S)
-    assert len(headers) == 4
+    assert len(headers) == 5
     expected_classes = [
+        "table-cell-wrap",
         "table-cell-wrap",
         "table-cell-wrap",
         "table-column-secondary",
@@ -709,17 +710,19 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert [re.search(r"class='([^']+)'", attrs).group(1) for attrs, _ in headers] == (
         expected_classes
     )
-    assert [text for _, text in headers[:4]] == ["Name", "Email address", "Role", "Status"]
+    assert [text for _, text in headers] == ["Name", "Email address", "Teams", "Role", "Status"]
     header_ids = [re.search(r"id='([^']+)'", attrs).group(1) for attrs, _ in headers]
     assert all("role='columnheader'" in attrs and "scope='col'" in attrs for attrs, _ in headers)
     assert "<caption class='visually-hidden'>Users</caption>" in table
     assert "<thead role='rowgroup'><tr role='row'>" in table
     rows = re.findall(r"<tbody role='rowgroup'>(.*?)</tbody>", table, re.S)[0]
     assert rows.count("role='row'") == rows.count("<tr ")
+    expected_cell_classes = expected_classes.copy()
+    expected_cell_classes[2] = "table-cell-wrap relationship-cell"
     for row in re.findall(r"<tr[^>]*>(.*?)</tr>", rows, re.S):
         cells = re.findall(r"<td([^>]*)>(.*?)</td>", row, re.S)
         assert [re.search(r"class='([^']+)'", attrs).group(1) for attrs, _ in cells] == (
-            expected_classes
+            expected_cell_classes
         )
         assert [re.search(r"headers='([^']+)'", attrs).group(1) for attrs, _ in cells] == header_ids
         assert all("role='cell'" in attrs for attrs, _ in cells)
@@ -736,7 +739,8 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
 
     css = response_text(request(client, "get", "/static/css/components/tables.css"))
     breakpoint = "@media (max-width: 767px)"
-    desktop, mobile = css.split(breakpoint)
+    desktop, mobile = css.split(breakpoint, 1)
+    mobile = mobile.split("\n}", 1)[0]
     assert "user-management-table" not in desktop
     rules = {
         selector.strip(): declarations
@@ -744,12 +748,12 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     }
     hidden = [selector for selector, rule in rules.items() if "display: none" in rule]
     assert hidden == [".user-management-table .table-column-secondary"]
-    row_rule = rules[".user-management-table tbody tr"]
+    row_rule = rules[":is(.user-management-table, .relationship-table) tbody tr"]
     assert "display: grid;" in row_rule
     assert "grid-template-columns: minmax(0, 1fr);" in row_rule
     assert "border-bottom: 1px solid var(--color-border-subtle);" in row_rule
     assert "grid-column: 1;" in rules[".user-management-table .table-cell-wrap"]
-    header_rule = rules[".user-management-table thead"]
+    header_rule = rules[":is(.user-management-table, .relationship-table) thead"]
     assert "position: absolute;" in header_rule
     assert "clip: rect(0 0 0 0);" in header_rule
     assert "display: none" not in header_rule
@@ -951,7 +955,9 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", body)
     assert "aria-label='Team filters'" not in body
     assert "data-dialog-open='add-team-panel'" in body
-    table = re.search(r"<table>(.*?)</table>", body, re.S).group(1)
+    table = re.search(
+        r"<table class='relationship-table' role='table'>(.*?)</table>", body, re.S
+    ).group(1)
     assert table.count("data-row-primary") == 1
     assert "data-row-action" in table
     assert "Actions" not in table
@@ -1410,7 +1416,9 @@ def test_login_password_toggle_is_named_and_cannot_submit(interface):
     assert toggle["type"] == "button"
     assert toggle["aria-controls"] == "login-password"
     assert "Show password</button>" in page
-    assert "images/logo-horizontal.svg" in page
-    assert 'alt="REFRNCR"' in page
+    assert "images/07-static-logo-256px.svg" in page
+    assert 'alt="" width="80" height="80"' in page
+    assert '<span class="brand-name">REFRNCR</span>' in page
+    assert 'aria-label="REFRNCR home"' in page
     assert "Sign in to your account" in page
     assert "Sign up" not in page and "Forgot password" not in page

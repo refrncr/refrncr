@@ -138,7 +138,9 @@ def test_field_properties_and_corrupt_order():
 def test_authorization_every_operation(context, kind):  # noqa: F811
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     review = opened(c)
     actor = c.a if kind == "admin" else c.u
     if kind in {"owner", "inactive", "deleted"}:
@@ -179,10 +181,12 @@ def test_stale_baseline_and_revision(context, change):  # noqa: F811
     c = context
     prepared(c)
     if change in {"cancel", "activate"}:
-        c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed", "")
+        c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Changed", "string", False, False)
         scheduled = publish(c, day=NOW.date() + timedelta(days=1))
         c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     review = opened(c)
     if change == "activate":
         c.service.clock = lambda: NOW + timedelta(days=1)
@@ -192,7 +196,7 @@ def test_stale_baseline_and_revision(context, change):  # noqa: F811
         target = c.s.datasets.get_dataset_for_deletion(c.a.id, c.d.id)
         c.s.datasets.delete_dataset(c.a.id, c.d.id, target.name, target.expected_updated_at)
     else:
-        c.s.datasets.update_dataset(c.a.id, c.d.key, "Updated", "")
+        c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Updated", "string", False, False)
         if change == "publish":
             publish(c)
     before = snapshot(c)
@@ -211,7 +215,9 @@ def test_audit_once_no_noise_and_no_change(context):  # noqa: F811
     with pytest.raises(ConflictError, match="No changes yet"):
         opened(c)
     assert len(audits(c)) == before
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     before = len(audits(c))
     review = opened(c)
     assert review.has_changes
@@ -238,7 +244,9 @@ def test_audit_once_no_noise_and_no_change(context):  # noqa: F811
 def test_open_audit_failure_rolls_back(context, monkeypatch, failure):  # noqa: F811
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     before = snapshot(c)
 
     def fail(*args, **kwargs):
@@ -263,10 +271,12 @@ def test_first_publication_and_cancelled_exclusion(context):  # noqa: F811
     assert first_review.counts.fields_added == 2 and first_review.counts.records_added == 1
     first = publish(c)
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Changed", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Changed", "string", False, False)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Preserved draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Preserved draft", "string", False, False
+    )
     assert opened(c).identity.baseline_id == scheduled.id
     c.service.cancel(c.a.id, c.d.id, scheduled.id)
     before = snapshot(c)
@@ -585,9 +595,11 @@ def test_large_projection_has_constant_queries_and_bounded_memory(context):  # n
 def test_stale_open_and_publish_have_no_success_event(context):  # noqa: F811
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     review = opened(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Later", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Later", "string", False, False)
     before = snapshot(c)
     with pytest.raises(ConflictError):
         c.diff.open_review(c.a.id, c.d.id, review.identity)
@@ -607,10 +619,10 @@ def test_stale_open_and_publish_have_no_success_event(context):  # noqa: F811
 def test_scheduled_activation_blocks_review_publication(context):  # noqa: F811
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Next", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Next", "string", False, False)
     review = opened(c)
     c.service.clock = lambda: NOW + timedelta(days=1)
     before = snapshot(c)
@@ -660,10 +672,12 @@ def test_calendar_change_during_open_rolls_back(context, monkeypatch):  # noqa: 
 
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Future", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Future", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Reviewable draft", "")
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
+    )
     original = SqlAlchemyDiffOperations.counts
 
     def cross_boundary(*args):
@@ -681,10 +695,10 @@ def test_calendar_change_during_open_rolls_back(context, monkeypatch):  # noqa: 
 def test_scheduled_activation_during_review_publication_rolls_back(context):  # noqa: F811
     c = context
     prepared(c)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
-    c.s.datasets.update_dataset(c.a.id, c.d.key, "Next", "")
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Next", "string", False, False)
     review = opened(c)
     calls = iter([NOW, NOW + timedelta(days=1), NOW + timedelta(days=1)])
     c.service.clock = lambda: next(calls)

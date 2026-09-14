@@ -344,7 +344,7 @@ for _service, _object, _methods in (
         _audited(_service, _method, (_object, _action))
 _audited("TeamService", "delete_team", ("team", "deleted"), ("grant", "deleted"))
 _read("TeamService", "list_teams")
-_read("MembershipService", "list_team_members list_eligible_users")
+_read("MembershipService", "list_team_members list_eligible_users list_relationships")
 _audited(
     "DatasetService",
     "create_dataset",
@@ -352,7 +352,7 @@ _audited(
     ("dataset", "dataset.concept_created"),
 )
 _audited("DatasetService", "delete_dataset", ("dataset", "dataset.deleted"))
-_read("DatasetService", "get_dataset_for_deletion")
+_read("DatasetService", "get_dataset_for_deletion get_dataset_configuration")
 _audited("DatasetService", "change_owner", ("dataset", "owner_changed"))
 _audited(
     "DatasetService",

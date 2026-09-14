@@ -44,3 +44,18 @@ label > input:not([type="checkbox"], [type="radio"]), label > select, label > te
 .form-field:has(> [data-password-toggle]:not([hidden])) > input { grid-column: 1 / -1; grid-row: 2; padding-right: 7.5rem; }
 .form-field > [data-password-toggle]:not([hidden]) { grid-column: 2; grid-row: 2; z-index: 1; margin: var(--space-xs) .375rem 0 0; min-height: 2rem; padding: 0 .625rem; border-color: transparent; background: transparent; color: var(--color-link); }
 .form-field > [data-password-toggle]:not([hidden]):hover { background: var(--color-surface-subtle); }
+
+/* Shared searchable icon input; manual names also work without JavaScript. */
+[data-icon-picker] { min-width: 0; }
+[data-icon-options] { list-style: none; padding: var(--space-xs); margin: var(--space-xs) 0; max-height: 14rem; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+[data-icon-options] [role="option"] { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm); cursor: pointer; overflow-wrap: anywhere; }
+[data-icon-options] [role="option"][hidden] { display: none; }
+[data-icon-options] [aria-selected="true"] { font-weight: var(--font-weight-bold); background: var(--color-surface-subtle); }
+[data-icon-options] .is-active { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
+.dataset-icon { display: inline-flex; align-items: center; vertical-align: middle; margin-inline-end: var(--space-xs); flex-shrink: 0; }
+.dataset-icon svg { width: 1.125rem; height: 1.125rem; }
+.field-metadata { max-width: 28rem; min-width: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); text-transform: none; letter-spacing: normal; text-align: start; overflow-wrap: anywhere; white-space: normal; }
+.field-metadata p { margin: var(--space-xs) 0; white-space: pre-wrap; }
+.field-metadata-label { font-weight: var(--font-weight-semibold); }
+.field-metadata summary { cursor: pointer; color: var(--color-action-primary); }
+.field-metadata summary:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
