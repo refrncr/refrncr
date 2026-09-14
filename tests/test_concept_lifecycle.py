@@ -31,9 +31,9 @@ def test_first_concept_review_publication_and_closed_mutations(context):  # noqa
     assert (summary.counts.fields_added, summary.counts.records_added) == (2, 1)
     first = publish(c)
     assert first.number == 1 and active(c) is None
+    c.s.datasets.update_dataset(c.a.id, c.d.key, "Live name", "")
+    assert active(c) is None
     before = snapshot(c)
-    with pytest.raises(ConflictError):
-        c.s.datasets.update_dataset(c.a.id, c.d.key, "Forbidden", "")
     with pytest.raises(ConflictError):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b"})
     assert snapshot(c) == before
@@ -232,7 +232,6 @@ def test_closed_concept_guards_all_content_writers_and_old_urls(context):  # noq
     publish(c)
     before = snapshot(c)
     operations = (
-        lambda: c.s.datasets.update_dataset(c.a.id, c.d.key, c.d.name, c.d.description),
         lambda: c.s.dataset_fields.create_field(c.a.id, c.d.key, "extra", "Extra", "string"),
         lambda: c.s.dataset_fields.update_field(
             c.a.id, c.d.key, "label", "Label", "string", False, False
@@ -254,7 +253,6 @@ def test_closed_concept_guards_all_content_writers_and_old_urls(context):  # noq
     browser, csrf = client(c)
     before = snapshot(c)
     for suffix in (
-        "/edit",
         "/fields/new",
         "/fields/label/edit",
         "/records/new",

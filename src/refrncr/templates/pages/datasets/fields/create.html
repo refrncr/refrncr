@@ -3,6 +3,6 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Add field</h1>
   <div class='side-panel-body' data-side-panel-content data-panel-title='Add field' data-panel-eyebrow='Configure · {{ dataset.name }}'>{% include 'pages/datasets/concepts/_banner.html' %}{% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-  <form class='form' novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true) }}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
+  <form class='form' data-generate-key novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true, definition, unit) }}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
   </div>
 {% endblock %}

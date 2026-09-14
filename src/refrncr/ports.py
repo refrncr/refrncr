@@ -113,6 +113,14 @@ class TeamRecord(Protocol):
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class MembershipRelationship:
+    user_id: str
+    user_name: str
+    team_id: str
+    team_name: str
+
+
 class MembershipRecord(Protocol):
     id: str
     user_id: str
@@ -130,6 +138,7 @@ class GrantRecord(Protocol):
 
 
 class DatasetRecord(Protocol):
+    icon: str | None
     id: str
     key: str
     name: str
@@ -141,6 +150,13 @@ class DatasetRecord(Protocol):
     updated_at: datetime
     content_updated_at: datetime | None
     revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetConfiguration:
+    dataset: DatasetRecord
+    may_maintain: bool
+    may_govern: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +176,8 @@ class DatasetOverview:
 
 
 class DatasetFieldRecord(Protocol):
+    definition: str | None
+    unit: str | None
     id: str
     dataset_id: str
     key: str
@@ -250,6 +268,8 @@ class TeamOperations(Protocol):
 
 
 class MembershipOperations(Protocol):
+    def list_relationships(self) -> tuple[MembershipRelationship, ...]: ...
+
     def team_ids_for_user(self, user_id: str) -> tuple[str, ...]: ...
 
     def get(self, membership_id: str, *, for_update: bool = False) -> MembershipRecord | None: ...
@@ -316,6 +336,7 @@ class DatasetOperations(Protocol):
         description: str,
         owner_user_id: str,
         owner_team_id: str,
+        icon: str | None = None,
     ) -> DatasetRecord: ...
 
 
@@ -344,6 +365,8 @@ class DatasetFieldOperations(Protocol):
         is_required: bool,
         is_unique: bool,
         display_position: int,
+        definition: str | None = None,
+        unit: str | None = None,
     ) -> DatasetFieldRecord: ...
 
     def delete(self, field: DatasetFieldRecord) -> None: ...

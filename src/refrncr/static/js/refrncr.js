@@ -28,6 +28,48 @@
   };
   initializeSelectionForms(document);
 
+  const inlinePending = new WeakSet();
+  document.addEventListener("submit", async (event) => {
+    const form = event.target.closest("form[data-inline-refresh]");
+    if (!form) return;
+    event.preventDefault();
+    const host = form.closest("[data-export-access]");
+    if (inlinePending.has(host)) return;
+    inlinePending.add(host);
+    form.setAttribute("aria-busy", "true");
+    const submitted = new FormData(form);
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    try {
+      const response = await fetch(form.action, {method: "POST", body: submitted, credentials: "same-origin"});
+      const page = new DOMParser().parseFromString(await response.text(), "text/html");
+      const replacement = page.querySelector("[data-export-access]");
+      if (!replacement) {
+        window.location.assign(response.redirected ? response.url : form.dataset.inlineRefresh);
+        return;
+      }
+      const content = document.importNode(replacement, true);
+      host.replaceWith(content);
+      initializeSelectionForms(content);
+      const error = content.querySelector("[data-error-focus]");
+      if (error) error.focus();
+      else {
+        const status = content.querySelector("[data-panel-status]");
+        status.hidden = false;
+        status.setAttribute("role", "status");
+        status.textContent = form.dataset.panelSuccess;
+        status.focus();
+      }
+    } catch {
+      // Do not replay an uncertain POST. A safe GET shows the authoritative state.
+      window.location.assign(form.dataset.inlineRefresh);
+    } finally {
+      inlinePending.delete(host);
+      form.removeAttribute("aria-busy");
+      if (submit) submit.disabled = false;
+    }
+  });
+
   const datatypeControls = new WeakSet();
   const initializeDatatypeControls = (root) => {
     root.querySelectorAll("[data-field-datatype]").forEach((select) => {
@@ -370,6 +412,8 @@
     initializeDatatypeControls(host);
     initializeSourceFormats(host);
     initializeConfirmations(host);
+    window.refrncrKeyGeneration?.(host);
+    window.refrncrIconPickers?.(host);
     host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
       const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
       const nested = document.createElement(marker === "data-panel-section-heading" ? "h3" : "h4");

@@ -1,3 +1,4 @@
+{% from 'components/relationships.html' import relationships %}
 {% extends "layouts/settings.html" %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/search_field.html" import search_field %}
@@ -10,6 +11,6 @@
 {% endblock %}
 
 {% block settings_content %}
-  {% if teams %}<div class='table-scroll management-table'><table><caption class='visually-hidden'>Teams</caption><thead><tr><th scope='col'>Name</th><th scope='col'>Last updated</th></tr></thead><tbody>{% for team in teams %}{% set team_url = url_for("team_list", open_team=team.id) %}{% call table_row('record-row', search_text=team.name) %}<td>{{ row_action(team.name, href=team_url, accessible_name="View team " ~ team.name ~ " (" ~ team.id ~ ")") }}</td><td><time datetime='{{ team.updated_at.isoformat() }}'>{{ team.updated_at|absolute_utc }}</time></td>{% endcall %}{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2><p>No teams are available.</p></div>{% endif %}
+  {% if teams %}<div class='table-scroll management-table'><table class='relationship-table' role='table'><caption class='visually-hidden'>Teams</caption><thead role='rowgroup'><tr role='row'><th scope='col'>Name</th><th scope='col'>Users</th><th scope='col'>Last updated</th></tr></thead><tbody role='rowgroup'>{% for team in teams %}{% set team_url = url_for("team_list", open_team=team.id) %}{% call table_row('record-row', search_text=team.name, explicit_role=true) %}<td role='cell'>{{ row_action(team.name, href=team_url, accessible_name="View team " ~ team.name ~ " (" ~ team.id ~ ")") }}</td><td role='cell' class='relationship-cell'>{{ relationships(team_users.get(team.id), 'user') }}</td><td role='cell'><time datetime='{{ team.updated_at.isoformat() }}'>{{ team.updated_at|absolute_utc }}</time></td>{% endcall %}{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No teams yet</h2><p>No teams are available.</p></div>{% endif %}
   {% include "pages/teams/_team_panels.html" %}
 {% endblock %}

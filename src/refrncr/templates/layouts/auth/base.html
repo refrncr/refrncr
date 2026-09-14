@@ -4,7 +4,8 @@
   <main id="content" class="auth-layout" tabindex="-1">
     <div class="auth-container">
       <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-        <img src="{{ url_for('static', filename='images/logo-horizontal.svg') }}" alt="REFRNCR" width="148" height="42">
+        {% block auth_logo %}<img src="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}" alt="" width="80" height="80">{% endblock %}
+        <span class="brand-name">REFRNCR</span>
       </a>
       <section class='card' aria-labelledby='auth-title'>
         {% block auth_content %}{% endblock %}

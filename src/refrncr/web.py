@@ -44,6 +44,7 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
+from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered_dataset_icon
 from refrncr.record_import import (
     MAX_COLUMNS,
     MAX_UPLOAD_BYTES,
@@ -133,6 +134,7 @@ def create_flask_app(
     )
     audit_history = audit_history or AuditHistoryService(users.uow)
 
+    app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
 
     @app.template_filter("record_value_text")
@@ -292,8 +294,6 @@ def create_flask_app(
         return ""
 
     concept_endpoints = {
-        "edit_dataset",
-        "update_dataset",
         "move_dataset_field",
         "new_dataset_field",
         "create_dataset_field",
@@ -556,11 +556,13 @@ def create_flask_app(
         eligible_teams = _auth.datasets.creation_teams(actor.id)
         return render_template(
             "pages/datasets/create.html",
+            dataset_icon_choices=DATASET_ICONS,
+            selected_icon=request.form.get("icon", ""),
             teams=eligible_teams,
             owner_team_id=request.form.get(
                 "owner_team_id", eligible_teams[0].id if len(eligible_teams) == 1 else ""
             ),
-            key=key,
+            key=key or (key_from_name(name) if not error else ""),
             name=name,
             description=description,
             error=error,
@@ -591,7 +593,12 @@ def create_flask_app(
             if len(submitted_teams) != 1 or not submitted_teams[0]:
                 raise ValidationError("Choose an owning team.")
             dataset = dataset_service.create_dataset(
-                actor.id, key, name, description, submitted_teams[0]
+                actor.id,
+                key,
+                name,
+                description,
+                submitted_teams[0],
+                icon=request.form.get("icon", ""),
             )
         except (ValidationError, ConflictError) as error:
             message = str(error)
@@ -620,38 +627,115 @@ def create_flask_app(
     )
     @version_errors
     def dataset_detail(key: str, version_id=None, concept=False):
+        return render_dataset_configuration(
+            key, version_id=version_id, concept=concept, edit_mode=request.args.get("edit") == "1"
+        )
+
+    @dataset_route("/datasets/<key>/configure", methods=["GET"])
+    @version_errors
+    def dataset_configuration(key):
+        return render_dataset_configuration(
+            key, standalone=True, edit_mode=request.args.get("edit") == "1"
+        )
+
+    def render_dataset_configuration(
+        key,
+        *,
+        version_id=None,
+        concept=False,
+        standalone=False,
+        edit_mode=False,
+        name=None,
+        description=None,
+        error=None,
+        error_field=None,
+    ):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
-        try:
-            view = dataset_versions.read(
-                actor.id, key, version_id, page=None, prefer_concept=concept
+        field_context_label = None
+        if standalone:
+            configuration = datasets.get_dataset_configuration(actor.id, key)
+            dataset = configuration.dataset
+            editable = configuration.may_maintain
+            may_govern = configuration.may_govern
+            context, state, identifier = None, None, None
+            fields, field_states = (), {}
+            try:
+                field_view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
+            except NotFoundError:
+                field_context_label = "No Current version or active Concept available."
+            else:
+                fields, identifier = field_view.fields, field_view.identifier
+                field_context_label = (
+                    f"Current · Version {field_view.state.version.number} · Read only"
+                    if field_view.state
+                    else "Concept · Read only"
+                )
+            schema_admin, may_start_concept = False, False
+        else:
+            try:
+                view = dataset_versions.read(
+                    actor.id, key, version_id, page=None, prefer_concept=concept
+                )
+            except NotFoundError:
+                if version_id is not None or concept:
+                    raise
+                history = dataset_versions.history(actor.id, key)
+                return render_authenticated_template(
+                    "pages/datasets/no_current.html",
+                    dataset=history.context.dataset,
+                    history=history,
+                )
+            dataset = view.context.dataset
+            editable = view.may_maintain
+            schema_admin = view.state is None and view.may_maintain
+            may_govern = editable and authorization.datasets.can_change_dataset_owner(
+                actor.id, dataset.id
             )
-        except NotFoundError:
-            if version_id is not None or concept:
-                raise
-            history = dataset_versions.history(actor.id, key)
-            return render_authenticated_template(
-                "pages/datasets/no_current.html", dataset=history.context.dataset, history=history
+            context, state, identifier = view.context, view.state, view.identifier
+            fields = view.fields
+            field_states = {
+                change.id: "Edited" if change.status == "Changed" else change.status
+                for change in (g.concept_ui.field_changes if concept else ())
+            }
+            may_start_concept = view.may_maintain and view.concept is None
+        if edit_mode and not editable:
+            abort(404)
+        access_teams, access_users, access_entries = [], [], []
+        if may_govern:
+            _, access_teams, access_users, access_entries = datasets.export_access_context(
+                actor.id, key
             )
-
-        dataset = view.context.dataset
-        editable = view.state is None and view.may_maintain
         return render_authenticated_template(
             "pages/datasets/detail.html",
             dataset=dataset,
-            context=view.context,
+            context=context,
+            standalone_configuration=standalone,
+            configuration_url=url_for("dataset_configuration", key=dataset.key),
             editable=editable,
-            schema_admin=editable,
-            may_start_concept=view.may_maintain and view.concept is None,
-            may_govern=view.may_maintain
-            and authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
-            fields=view.fields,
-            field_states={
-                change.id: "Edited" if change.status == "Changed" else change.status
-                for change in (g.concept_ui.field_changes if concept else ())
-            },
-            business_key=view.identifier,
-            version_state=view.state,
+            edit_mode=edit_mode,
+            name=dataset.name if name is None else name,
+            description=dataset.description if description is None else description,
+            error=error,
+            error_field=error_field,
+            dataset_icon_choices=DATASET_ICONS,
+            selected_icon=request.form.get("icon", dataset.icon),
+            teams=access_teams,
+            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
+            expected_owner_team_id=request.form.get(
+                "expected_owner_team_id", dataset.owner_team_id
+            ),
+            schema_admin=schema_admin,
+            may_start_concept=may_start_concept,
+            may_govern=may_govern,
+            access_teams=access_teams,
+            access_users=access_users,
+            access_entries=access_entries,
+            fields=fields,
+            field_states=field_states,
+            field_context_label=field_context_label,
+            business_key=identifier,
+            version_state=state,
         )
 
     @dataset_route("/datasets/<key>/concept/new", methods=["POST"])
@@ -1061,6 +1145,21 @@ def create_flask_app(
                 return render_dataset_governance(key, "export", str(error)), 409 if isinstance(
                     error, ConflictError
                 ) else 400
+            if request.args.get("inline") == "1":
+                return redirect(
+                    url_for(
+                        "dataset_configuration"
+                        if request.args.get("standalone") == "1"
+                        else "dataset_detail",
+                        key=key,
+                        **(
+                            {}
+                            if request.args.get("standalone") == "1"
+                            else {"concept": request.args.get("concept") == "1"}
+                        ),
+                        _anchor="access-management",
+                    )
+                )
             return redirect(url_for("dataset_export_access", key=key))
         return render_dataset_governance(key, "export")
 
@@ -1070,6 +1169,21 @@ def create_flask_app(
         _auth, service, *_rest = require_dataset_dependencies()
         require_csrf(login_session.csrf_token)
         service.revoke_export_access(actor.id, key, access_id)
+        if request.args.get("inline") == "1":
+            return redirect(
+                url_for(
+                    "dataset_configuration"
+                    if request.args.get("standalone") == "1"
+                    else "dataset_detail",
+                    key=key,
+                    **(
+                        {}
+                        if request.args.get("standalone") == "1"
+                        else {"concept": request.args.get("concept") == "1"}
+                    ),
+                    _anchor="access-management",
+                )
+            )
         return redirect(url_for("dataset_export_access", key=key))
 
     @dataset_route("/datasets/<key>/fields/order", methods=["POST"])
@@ -1094,7 +1208,9 @@ def create_flask_app(
             abort(400, description=str(error))
         except StaleFieldOrderError as error:
             abort(409, description=str(error))
-        return redirect(url_for("dataset_detail", key=key, concept=True))
+        return redirect(
+            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
+        )
 
     def parse_page_parameter() -> int:
         values = request.args.getlist("page")
@@ -2038,37 +2154,6 @@ def create_flask_app(
         )
         return (response, status) if status != 200 else response
 
-    def render_dataset_edit_form(
-        dataset,
-        *,
-        actor,
-        name: str,
-        description: str,
-        csrf: str,
-        error=None,
-        error_field=None,
-    ):
-        auth, service, *_rest = require_dataset_dependencies()
-        may_govern = auth.datasets.can_change_dataset_owner(actor.id, dataset.id)
-        return render_template(
-            "pages/datasets/edit.html",
-            may_govern=may_govern,
-            teams=auth.datasets.creation_teams(actor.id) if may_govern else [],
-            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
-            expected_owner_team_id=request.form.get(
-                "expected_owner_team_id", dataset.owner_team_id
-            ),
-            dataset=dataset,
-            name=name,
-            description=description,
-            error=error,
-            error_field=error_field,
-            current_actor=actor,
-            current_csrf=csrf,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        )
-
     @dataset_route("/datasets/<key>/edit", methods=["GET"])
     def edit_dataset(key: str):
         actor, login_session = require_authenticated()
@@ -2079,13 +2164,7 @@ def create_flask_app(
             dataset = dataset_service.get_dataset_for_edit(actor.id, key)
         except NotFoundError:
             abort(404)
-        return render_dataset_edit_form(
-            dataset,
-            actor=actor,
-            name=dataset.name,
-            description=dataset.description,
-            csrf=login_session.csrf_token,
-        )
+        return render_dataset_configuration(dataset.key, standalone=True, edit_mode=True)
 
     @dataset_route("/datasets/<key>", methods=["POST"])
     def update_dataset(key: str):
@@ -2111,7 +2190,12 @@ def create_flask_app(
                     request.form["owner_team_id"],
                 )
             dataset = dataset_service.update_dataset(
-                actor.id, key, name, description, owner_change=owner_change
+                actor.id,
+                key,
+                name,
+                description,
+                owner_change=owner_change,
+                icon=request.form.get("icon"),
             )
         except NotFoundError:
             abort(404)
@@ -2128,18 +2212,18 @@ def create_flask_app(
             else:
                 error_field = None
             return (
-                render_dataset_edit_form(
-                    dataset,
-                    actor=actor,
+                render_dataset_configuration(
+                    dataset.key,
+                    standalone=True,
+                    edit_mode=True,
                     name=name,
                     description=description,
-                    csrf=login_session.csrf_token,
                     error=message,
                     error_field=error_field,
                 ),
                 409 if isinstance(error, ConflictError) else 400,
             )
-        return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
+        return redirect(url_for("dataset_configuration", key=dataset.key))
 
     @dataset_route("/datasets/id/<dataset_id>/delete", methods=["GET", "POST"])
     def dataset_delete(dataset_id: str):
@@ -2212,6 +2296,8 @@ def create_flask_app(
     ):
         return render_authenticated_template(
             "pages/datasets/fields/create.html",
+            definition=request.form.get("definition", ""),
+            unit=request.form.get("unit", ""),
             dataset=dataset,
             key=key,
             name=name,
@@ -2253,6 +2339,8 @@ def create_flask_app(
                 is_required,
                 is_unique,
                 is_business_key_component,
+                definition=request.form.get("definition", ""),
+                unit=request.form.get("unit", ""),
             )
         except NotFoundError:
             abort(404)
@@ -2270,7 +2358,9 @@ def create_flask_app(
                 error=str(error),
             )
             return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(url_for("dataset_detail", key=key, concept=True))
+        return redirect(
+            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
+        )
 
     def render_dataset_field_edit_form(
         dataset,
@@ -2286,6 +2376,8 @@ def create_flask_app(
     ):
         return render_authenticated_template(
             "pages/datasets/fields/edit.html",
+            definition=request.form.get("definition", field.definition),
+            unit=request.form.get("unit", field.unit),
             dataset=dataset,
             field=field,
             name=name,
@@ -2343,6 +2435,8 @@ def create_flask_app(
                 is_required,
                 is_unique,
                 is_business_key_component,
+                definition=request.form.get("definition", ""),
+                unit=request.form.get("unit", ""),
             )
         except NotFoundError:
             abort(404)
@@ -2366,7 +2460,9 @@ def create_flask_app(
                 ),
                 400,
             )
-        return redirect(url_for("dataset_detail", key=key, concept=True))
+        return redirect(
+            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
+        )
 
     @dataset_route("/datasets/<key>/fields/<field_key>/delete", methods=["POST"])
     def delete_dataset_field(key: str, field_key: str):
@@ -2400,7 +2496,9 @@ def create_flask_app(
                 ),
                 400,
             )
-        return redirect(url_for("dataset_detail", key=key, concept=True))
+        return redirect(
+            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
+        )
 
     @app.route("/setup", methods=["GET", "POST"])
     def setup():
@@ -2552,9 +2650,14 @@ def create_flask_app(
     def user_list():
         actor, login_session = require_admin()
         managed_users = users.list_users(actor.id)
+        user_teams = {}
+        for relationship in memberships.list_relationships(actor.id):
+            user_teams.setdefault(relationship.user_id, []).append(relationship)
         return render_template(
             "pages/users/list.html",
             users=managed_users,
+            user_teams=user_teams,
+            open_user=request.args.get("open_user"),
             current_actor=actor,
             current_csrf=login_session.csrf_token,
             active_navigation=active_navigation(),
@@ -2609,6 +2712,9 @@ def create_flask_app(
                 dataset_ui_enabled=dataset_ui_enabled,
             )
         managed_teams = teams.list_teams(actor.id)
+        team_users = {}
+        for relationship in memberships.list_relationships(actor.id):
+            team_users.setdefault(relationship.team_id, []).append(relationship)
         open_team = request.args.get("open_team")
         selected_team = next((team for team in managed_teams if team.id == open_team), None)
         selected_team_members = (
@@ -2620,6 +2726,7 @@ def create_flask_app(
         return render_template(
             "pages/teams/list.html",
             teams=managed_teams,
+            team_users=team_users,
             selected_team=selected_team,
             selected_team_members=selected_team_members,
             selected_eligible_users=selected_eligible_users,

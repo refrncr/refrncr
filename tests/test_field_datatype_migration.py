@@ -55,7 +55,8 @@ def contents(engine):
                     *(
                         column
                         for column in model.__table__.columns
-                        if not (model is Dataset and column.name == "revision")
+                        if not (model is Dataset and column.name in {"revision", "icon"})
+                        and not (model is DatasetField and column.name in {"definition", "unit"})
                         and not (model is DatasetRecord and column.name == "deleted_content")
                     )
                 )

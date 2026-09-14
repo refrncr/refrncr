@@ -3,6 +3,13 @@
 
 {% block title %}Sign in · REFRNCR{% endblock %}
 
+{% block auth_logo %}
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}">
+    <img src="{{ url_for('static', filename='images/02-animated-grow-shrink.svg') }}" alt="" width="80" height="80">
+  </picture>
+{% endblock %}
+
 {% block auth_content %}
   <h1 id='auth-title'>Sign in to your account</h1>
   {{ feedback(error, id="login-error", focus=true) }}

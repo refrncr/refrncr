@@ -82,6 +82,9 @@ def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
     with pytest.raises(ConflictError, match="matches"):
         publish(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Updated", "new description")
+    with pytest.raises(ConflictError, match="matches"):
+        publish(c)
+    c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Updated", "string", False, False)
     second = publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
@@ -440,16 +443,23 @@ def test_publication_serializes_with_working_mutations(context, monkeypatch, mut
         finally:
             release.set()
         winning.result(timeout=20)
-        with pytest.raises((ConflictError, NotFoundError, ValidationError)):
+        if mutation == "metadata":
             losing.result(timeout=20)
-    if first == "publish":
+        else:
+            with pytest.raises((ConflictError, NotFoundError, ValidationError)):
+                losing.result(timeout=20)
+    if mutation == "metadata":
+        assert len(versions(c)) == 1
+        assert content(c, versions(c)[0]).name == (c.d.name if first == "publish" else "Changed")
+        assert c.s.datasets.get_dataset_configuration(c.a.id, c.d.key).dataset.name == "Changed"
+    elif first == "publish":
         assert len(versions(c)) == 1
         assert content(c, versions(c)[0]).name == c.d.name
         assert len(content(c, versions(c)[0]).records) == 1
     else:
         assert len(versions(c)) == 0
     assert len([e for e in audits(c) if e.action == "dataset.version_published"]) == (
-        first == "publish"
+        first == "publish" or mutation == "metadata"
     )
 
 

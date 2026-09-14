@@ -2,7 +2,7 @@
 
 Dataset overview and detail context are authorized service reads. REF-83 now delegates
 content selection to `DatasetVersionService`. Normal browser routes use Current snapshot
-metadata/counts for every user. Administrators
+content/counts with current Dataset name, description and icon for every user. Administrators
 select active concept content through explicit concept routes.
 No Current means no visible Dataset for ordinary users. Selection and current authority share
 one coherent read transaction. Current snapshots use a batched window query and active
@@ -108,8 +108,10 @@ and assistive technology. The isolated snapshot checks do not replace interactiv
 ## REF-84 explicit selection
 
 Dataset list Records/Updated describe Current snapshot count/publication time, never the
-concept. Without Current these cells show an em dash. Only administrators see the secondary
-Concept in progress link, which opens Versions; the Dataset name always opens Current.
+concept. Without Current these cells show an em dash. Authorized maintainers see the secondary
+Concept in progress link, which opens Versions. With REF-162, the Dataset name opens
+the explicit Concept Records context when an authorized active Concept exists and
+there is no Current; otherwise it retains the Current route.
 No role-dependent or session-wide implicit mode is used. Explicit concept headers retain
 working content timestamps/counts, and their banner states the pinned baseline and change
 status. See [ADR-015](../architecture/adr-015-explicit-dataset-concepts.md).
@@ -128,3 +130,23 @@ Concept result pagination includes baseline tombstones, but `context.record_coun
 counts surviving working Records. `deleted_count` is separate and dataset-wide; `page.total`
 counts matching displayed rows, including tombstones. Record identifier search is explicit
 per request; there is no session-wide selection. Published pages show Published only.
+
+## REF-162 list and Configure presentation
+
+The list routing decision uses the server's authorized context projection, without
+an intermediate redirect. A visible Concept replaces the empty Version marker;
+Record count and Updated retain their meaningful no-Current placeholders. The
+shared Dataset-table badge link controls vertical alignment. Optional Dataset icons
+use the same trusted local catalog lookup in the list and shared Dataset context header, with
+Table as the empty-selection fallback and decorative SVG semantics.
+
+Configure places the Edit dataset text link in Dataset details. It opens inline
+edit mode on the same Configure page, with Save dataset and Cancel. The separate Access management tab renders the existing export
+access composition inline. Versions removes its page-level Review changes and Concept actions
+controls; the authorized row link and Record-page action order remain intact.
+
+REF-162: The overview gear has tooltip `configuration` and opens
+`/datasets/<key>/configure` without selecting a version. Fields is visible but
+read-only there; explicit Concept/version configuration retains its Fields view.
+The Dataset name link still opens the applicable Records context. Metadata editing,
+ownership, access and deletion use current Dataset permissions independently of versions.

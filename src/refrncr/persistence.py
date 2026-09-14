@@ -52,6 +52,7 @@ from refrncr.ports import (
     DatasetOverview,
     GrantRecord,
     MembershipRecord,
+    MembershipRelationship,
     PasswordHashReplacementError,
     PermissionContext,
     PersistenceConflictError,
@@ -204,6 +205,18 @@ class SqlAlchemyTeamOperations:
 
 
 class SqlAlchemyMembershipOperations:
+    def list_relationships(self):
+        return tuple(
+            MembershipRelationship(*row)
+            for row in self.session.execute(
+                select(User.id, User.display_name, Team.id, Team.name)
+                .select_from(Membership)
+                .join(User, User.id == Membership.user_id)
+                .join(Team, Team.id == Membership.team_id)
+                .where(User.is_deleted.is_(False))
+            )
+        )
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
@@ -407,8 +420,9 @@ class SqlAlchemyDatasetOperations:
 
 
 class SqlAlchemyDatasetFieldOperations:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, legacy_metadata=False) -> None:
         self.session = session
+        self.legacy_metadata = legacy_metadata
 
     def find_by_key(
         self, dataset_id: str, key: str, *, for_update: bool = False
@@ -443,6 +457,20 @@ class SqlAlchemyDatasetFieldOperations:
         return self.session.scalar(statement)
 
     def list_for_dataset(self, dataset_id: str) -> list[DatasetField]:
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            table = Table("dataset_fields", MetaData(), autoload_with=self.session.connection())
+            return [
+                SimpleNamespace(definition=None, unit=None, **row)
+                for row in self.session.execute(
+                    select(table)
+                    .where(table.c.dataset_id == dataset_id)
+                    .order_by(
+                        table.c.display_position if "display_position" in table.c else table.c.key
+                    )
+                ).mappings()
+            ]
         if not self._has_display_position():
             rows = self.session.execute(
                 select(
@@ -670,6 +698,8 @@ class SqlAlchemyDatasetRecordOperations:
                         f.is_unique,
                         f.display_position,
                         f.key in keys,
+                        f.definition,
+                        f.unit,
                     )
                 )
                 for f in fields
@@ -829,7 +859,11 @@ class SqlAlchemyDatasetRecordOperations:
         if self._legacy_schema:
             from sqlalchemy.orm import defer
 
-            statement = statement.options(defer(DatasetRecord.deleted_content))
+            statement = statement.options(
+                defer(DatasetRecord.deleted_content),
+                defer(DatasetField.definition),
+                defer(DatasetField.unit),
+            )
         current = None
         values: list[RecordValue] = []
         for record, row, field in self.session.execute(statement):

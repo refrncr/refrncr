@@ -105,7 +105,6 @@ class SqlAlchemyConceptOperations:
         for model in (DatasetRecordValue, DatasetRecord, DatasetBusinessKeyField, DatasetField):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         self.close(dataset.id)
-        dataset.name, dataset.description = current.name, current.description
         dataset.content_updated_at = current.published_at
 
     def initialize(self, dataset, version, now):
@@ -133,6 +132,8 @@ class SqlAlchemyConceptOperations:
                     "dataset_id",
                     "key",
                     "name",
+                    "definition",
+                    "unit",
                     "data_type",
                     "is_required",
                     "is_unique",
@@ -145,6 +146,8 @@ class SqlAlchemyConceptOperations:
                     literal(dataset.id),
                     field.key,
                     field.name,
+                    field.definition,
+                    field.unit,
                     field.data_type,
                     field.is_required,
                     field.is_unique,
@@ -199,5 +202,4 @@ class SqlAlchemyConceptOperations:
                 ).where(value.version_id == version.id),
             )
         )
-        dataset.name, dataset.description = version.name, version.description
         dataset.content_updated_at = now

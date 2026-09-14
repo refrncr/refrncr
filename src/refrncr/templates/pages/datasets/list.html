@@ -1,3 +1,5 @@
+{% from 'components/icons.html' import settings_icon %}
+{% from 'components/dataset_icon.html' import dataset_icon %}
 {% extends "base.html" %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/side_panel.html" import form_side_panel %}
@@ -15,9 +17,9 @@
   {% if datasets %}<div class='table-scroll management-table'><table class='dataset-table' aria-label='Datasets'><caption class='visually-hidden'>Datasets</caption><thead><tr>
     <th scope='col'>Dataset</th><th scope='col'>Owning team</th><th scope='col' class='numeric-column'>Records</th><th scope='col'>Updated</th><th scope='col'>Version</th></tr></thead><tbody>
     {% for context in datasets %}{% set dataset = context.dataset %}{% call table_row('dataset-row') %}
-      <td>{{ row_action(dataset.name, href=url_for("dataset_records_view", key=dataset.key)) }}<span class='row-secondary technical'>{{ dataset.key }}</span></td>
+      <td><div class='dataset-identity'>{{ dataset_icon(dataset.icon) }}<div class='dataset-identity-text'>{{ row_action(dataset.name, href=url_for("dataset_records_view", key=dataset.key, concept=true if context.no_current and context.concept_in_progress else none), chevron=false) }}<span class='row-secondary technical'>{{ dataset.key }}</span></div></div></td>
       <td>{{ context.owner_team_name }}</td><td class='numeric-column'>{{ '—' if context.no_current else context.record_count }}</td><td>{% if context.no_current %}—{% else %}<time datetime='{{ context.last_updated.isoformat() }}'>{{ context.last_updated|absolute_utc }}</time>{% endif %}</td>
-      <td>{% if not context.no_current %}<span class='version-tag'>Version {{ dataset.version_number }}</span>{% else %}—{% endif %}{% if context.concept_in_progress %} <a class='badge badge-draft badge-link' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Concept in progress</a>{% endif %}</td>
+      <td>{% if not context.no_current %}<span class='version-tag'>Version {{ dataset.version_number }}</span>{% elif not context.concept_in_progress %}—{% endif %}{% if context.concept_in_progress %} <a class='badge badge-draft badge-link' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Concept in progress</a>{% endif %}<a class='dataset-configuration-link' href='{{ url_for("dataset_configuration", key=dataset.key) }}' title='configuration' aria-label='configuration — {{ dataset.name }}'>{{ settings_icon() }}</a></td>
     {% endcall %}{% endfor %}</tbody></table></div>{% else %}<div class='empty-state'><h2>No datasets yet</h2>
     <p>No datasets are available.</p></div>{% endif %}
   {% if may_create %}{{ form_side_panel() }}{% endif %}

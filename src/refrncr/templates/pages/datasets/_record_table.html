@@ -1,3 +1,4 @@
+{% from 'components/field_metadata.html' import field_metadata %}
 {% from "components/icons.html" import key_icon, lock_icon %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/search_field.html" import search_field %}
@@ -27,6 +28,7 @@
           {% for field in fields %}
             <th scope='col'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
               {{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}{% endif %}
+              {{ field_metadata(field, disclosure=true) }}
             </th>
           {% endfor %}
           <th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>

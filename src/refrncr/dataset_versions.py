@@ -32,6 +32,7 @@ from refrncr.services import (
     validate_dataset_field_key,
     validate_dataset_field_type,
     validate_dataset_key,
+    validate_field_metadata,
 )
 from refrncr.version_contracts import (
     APPLICATION_TIMEZONE,
@@ -90,6 +91,7 @@ def _validated_snapshot(uow, dataset):
             validate_dataset_field_flag(f.is_unique, "Unique"),
             f.display_position,
             f.key in identifier.field_keys,
+            *validate_field_metadata(getattr(f, "definition", None), getattr(f, "unit", None)),
         )
         for f in fields
     )
@@ -236,6 +238,8 @@ class DatasetVersionService:
                             f.is_unique,
                             f.display_position,
                             f.key in identifier.field_keys,
+                            getattr(f, "definition", None),
+                            getattr(f, "unit", None),
                         )
                         for f in work.dataset_fields.list_for_dataset(dataset.id)
                     )
@@ -243,8 +247,6 @@ class DatasetVersionService:
                     if (
                         changes
                         or next(work.dataset_records.deleted_records(dataset.id), None) is not None
-                        or dataset.name != baseline.name
-                        or dataset.description != baseline.description
                         or any(work.version_diff.counts(dataset.id, baseline.id))
                     ):
                         work.concepts.initialize(dataset, baseline, now)
@@ -288,8 +290,8 @@ class DatasetVersionService:
         published = PublishedDataset(
             dataset.id,
             dataset.key,
-            version.name,
-            version.description,
+            dataset.name,
+            dataset.description,
             dataset.owner_team_id,
             owner_team_name,
             version.published_at,
@@ -298,6 +300,7 @@ class DatasetVersionService:
             version.number,
             version.id,
             version.number,
+            icon=dataset.icon,
         )
         return DatasetOverview(
             published, version.record_count, version.published_at, owner_team_name
@@ -632,11 +635,7 @@ class DatasetVersionService:
                 raise ValidationError("Invalid published snapshot")
             fields = classify_fields(content.fields, uow.versions.fields(latest))
             summary = summary_counts(fields, uow.version_diff.counts(dataset.id, latest.id))
-            changed = (
-                content.name != latest.name
-                or content.description != latest.description
-                or any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
-            )
+            changed = any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
         if not changed:
             raise ConflictError("Dataset content matches the latest published version")
         return content, summary, max((v.number for v in versions), default=0) + 1

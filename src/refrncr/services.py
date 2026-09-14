@@ -25,6 +25,7 @@ from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
     DatasetBusinessKey,
+    DatasetConfiguration,
     DatasetFieldRecord,
     DatasetOverview,
     DatasetRecord,
@@ -40,6 +41,12 @@ from refrncr.ports import (
     UnitOfWork,
     UnitOfWorkFactory,
     UserRecord,
+)
+from refrncr.presentation_metadata import (
+    MAX_FIELD_DEFINITION,
+    MAX_FIELD_UNIT,
+    dataset_icon,
+    optional_plain_text,
 )
 
 SUBJECT_TYPES = {"user", "team"}
@@ -254,6 +261,23 @@ def normalize_dataset_field_name(name: str) -> str:
     if not 1 <= len(normalized_name) <= 200:
         raise ValidationError("Field name must contain between 1 and 200 characters")
     return normalized_name
+
+
+def validate_field_metadata(definition, unit):
+    try:
+        return (
+            optional_plain_text(definition, MAX_FIELD_DEFINITION, "Definition"),
+            optional_plain_text(unit, MAX_FIELD_UNIT, "Unit"),
+        )
+    except ValueError as error:
+        raise ValidationError(str(error)) from None
+
+
+def validate_dataset_icon(value):
+    try:
+        return dataset_icon(value)
+    except ValueError as error:
+        raise ValidationError(str(error)) from None
 
 
 def validate_dataset_field_type(data_type: str) -> str:
@@ -813,7 +837,14 @@ class DatasetService:
         )
 
     def create_dataset(
-        self, actor_id: str, key: str, name: str, description: str, owner_team_id: str | None = None
+        self,
+        actor_id: str,
+        key: str,
+        name: str,
+        description: str,
+        owner_team_id: str | None = None,
+        *,
+        icon: str | None = None,
     ) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
             if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
@@ -835,6 +866,7 @@ class DatasetService:
                 description=validate_dataset_description(description),
                 owner_user_id=actor_id,
                 owner_team_id=owner_team_id,
+                icon=validate_dataset_icon(icon),
             )
             try:
                 uow.flush()
@@ -897,10 +929,14 @@ class DatasetService:
         uow.flush()
 
     def export_access_context(self, actor_id, key):
-        dataset = self.get_dataset(actor_id, key)
-        if not self.authorization.datasets.can_manage_export_access(actor_id, dataset.id):
-            raise NotFoundError("Dataset not found")
+        key = self._validated_lookup_key(key)
         with self.uow() as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(key)
+            if dataset is None or not self.authorization.datasets.can_manage_export_access(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
             teams = uow.teams.list_by_name()
             users = uow.users.list_by_email()
             names = {("team", team.id): team.name for team in teams}
@@ -1017,6 +1053,26 @@ class DatasetService:
             last_updated=context.last_updated,
         )
 
+    def get_dataset_configuration(self, actor_id: str, key: str) -> DatasetConfiguration:
+        """Current Dataset metadata; unpublished existence remains maintainer-only."""
+        key = self._validated_lookup_key(key)
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(key)
+            if dataset is None or not self.authorization.datasets.can_view_dataset(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            maintain = self.authorization.datasets.can_maintain_dataset(
+                actor_id, dataset.id, uow=uow
+            )
+            if not maintain and not uow.versions.current_for_datasets((dataset.id,), _now().date()):
+                raise NotFoundError("Dataset not found")
+            govern = self.authorization.datasets.can_change_dataset_owner(
+                actor_id, dataset.id, uow=uow
+            )
+            return DatasetConfiguration(dataset, maintain, govern)
+
     def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
         return self._get_dataset_with_access(actor_id, key, "editor")
 
@@ -1038,6 +1094,7 @@ class DatasetService:
         description: str,
         *,
         owner_change: tuple[str, str] | None = None,
+        icon: str | None = None,
     ) -> DatasetRecord:
         validated_key = self._validated_lookup_key(key)
         normalized_name = normalize_dataset_name(name)
@@ -1050,10 +1107,13 @@ class DatasetService:
                 actor_id, "dataset", dataset.id, "editor", uow=uow
             ):
                 raise NotFoundError("Dataset not found")
-            _require_concept(uow, dataset.id)
-            if dataset.name == normalized_name and dataset.description == validated_description:
+            validated_icon = dataset.icon if icon is None else validate_dataset_icon(icon)
+            metadata_changed = (
+                dataset.name != normalized_name or dataset.description != validated_description
+            )
+            if not metadata_changed and dataset.icon == validated_icon:
                 return dataset
-            _advance_concept(uow, dataset)
+            dataset.icon = validated_icon
             dataset.name = normalized_name
             dataset.description = validated_description
             dataset.updated_at = _now()
@@ -1110,6 +1170,9 @@ class DatasetFieldService:
         is_required: bool = False,
         is_unique: bool = False,
         is_business_key_component: bool = False,
+        *,
+        definition: str | None = None,
+        unit: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1127,10 +1190,13 @@ class DatasetFieldService:
                 validated_required or validated_component
             ):
                 raise ValidationError("Required fields cannot be added after records exist")
+            definition, unit = validate_field_metadata(definition, unit)
             field = uow.dataset_fields.create(
                 dataset_id=dataset.id,
                 key=validate_dataset_field_key(key),
                 name=normalize_dataset_field_name(name),
+                definition=definition,
+                unit=unit,
                 data_type=validate_dataset_field_type(data_type),
                 is_required=validated_required,
                 is_unique=validate_dataset_field_flag(is_unique, "is_unique"),
@@ -1185,6 +1251,9 @@ class DatasetFieldService:
         data_type: str,
         is_required: bool,
         is_unique: bool,
+        *,
+        definition: str | None = None,
+        unit: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1195,6 +1264,10 @@ class DatasetFieldService:
             if field is None:
                 raise NotFoundError("Dataset field not found")
 
+            definition, unit = validate_field_metadata(
+                field.definition if definition is None else definition,
+                field.unit if unit is None else unit,
+            )
             normalized_name = normalize_dataset_field_name(name)
             validated_type = validate_dataset_field_type(data_type)
             validated_required = validate_dataset_field_flag(is_required, "is_required")
@@ -1210,10 +1283,19 @@ class DatasetFieldService:
                 validated_type,
                 validated_required,
                 validated_unique,
+                definition,
+                unit,
             )
             if uow.dataset_business_keys.contains(dataset.id, field.key):
                 _require_identifier_type(validated_type)
-            current = (field.name, field.data_type, field.is_required, field.is_unique)
+            current = (
+                field.name,
+                field.data_type,
+                field.is_required,
+                field.is_unique,
+                field.definition,
+                field.unit,
+            )
             if replacement == current:
                 return field
 
@@ -1223,6 +1305,7 @@ class DatasetFieldService:
             if validated_unique != field.is_unique:
                 uow.dataset_records.set_field_unique_keys(dataset.id, field.id, validated_unique)
 
+            field.definition, field.unit = definition, unit
             field.name = normalized_name
             field.data_type = validated_type
             field.is_required = validated_required
@@ -1243,6 +1326,9 @@ class DatasetFieldService:
         is_required: bool,
         is_unique: bool,
         is_business_key_component: bool,
+        *,
+        definition: str | None = None,
+        unit: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1253,6 +1339,10 @@ class DatasetFieldService:
             if field is None:
                 raise NotFoundError("Dataset field not found")
 
+            definition, unit = validate_field_metadata(
+                field.definition if definition is None else definition,
+                field.unit if unit is None else unit,
+            )
             normalized_name = normalize_dataset_field_name(name)
             validated_type = validate_dataset_field_type(data_type)
             validated_required = validate_dataset_field_flag(is_required, "is_required")
@@ -1273,8 +1363,17 @@ class DatasetFieldService:
                 validated_type,
                 validated_required,
                 validated_unique,
+                definition,
+                unit,
             )
-            current_definition = (field.name, field.data_type, field.is_required, field.is_unique)
+            current_definition = (
+                field.name,
+                field.data_type,
+                field.is_required,
+                field.is_unique,
+                field.definition,
+                field.unit,
+            )
             definition_changed = replacement != current_definition
             if not membership_changed and not definition_changed:
                 return field
@@ -1312,6 +1411,7 @@ class DatasetFieldService:
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
             if definition_changed:
+                field.definition, field.unit = definition, unit
                 field.name = normalized_name
                 field.data_type = validated_type
                 field.is_required = validated_required
@@ -2097,6 +2197,22 @@ class AuthorizationService:
 
 class MembershipService:
     """Team membership operations within the one Community installation context."""
+
+    def list_relationships(self, actor_id):
+        """Administrator-only roster projection, loaded in one query."""
+        with self.uow() as uow:
+            require_admin(uow, actor_id)
+            return tuple(
+                sorted(
+                    uow.memberships.list_relationships(),
+                    key=lambda r: (
+                        r.team_name.casefold(),
+                        r.team_id,
+                        r.user_name.casefold(),
+                        r.user_id,
+                    ),
+                )
+            )
 
     def __init__(self, uow: UnitOfWorkFactory):
         self.uow = uow

@@ -1,4 +1,4 @@
-# Third-party UI assets
+# UI asset sources and licences
 
 All files in this inventory are served locally. The application makes no runtime request to
 their upstream projects.
@@ -47,3 +47,42 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 
 `key_icon` is tinted with the accent colour through the `.key-icon` rule. See
 `LICENSE-Lucide.txt` for the upstream ISC/MIT notices.
+
+## Dataset icon selection (REF-162)
+
+Dataset icons use the official `lucide-static` **0.468.0** sprite, copied unchanged
+from `https://registry.npmjs.org/lucide-static/-/lucide-static-0.468.0.tgz` to
+`static/images/lucide-0.468.0.svg`. Its 1,544 named symbols support manual icon-name
+entry; the full sprite is needed because users choose names at runtime. The
+371,613-byte file is local and cacheable; there is no runtime CDN or package dependency.
+
+Sprite SHA-256: `b3b7a00eff7743f34c13b57528b34aa9b1505a1abf5c89545afe5559cdf1ada3`.
+The package LICENSE is byte-identical to the existing `LICENSE-Lucide.txt`.
+See [Lucide static assets](https://lucide.dev/guide/static).
+
+The eight search suggestions remain `house`, `key-round`, `lock`, `scroll-text`,
+`settings-2`, `table`, `user` and `users`. Names outside those suggestions are
+accepted when present in the pinned sprite. The server reads the local symbol IDs
+once and stores only a matching canonical name. Input is bounded to 64 characters
+before trimming/lowercasing; unknown, malformed, unavailable, oversized or non-text
+input becomes null without a validation error. There is no truncation or raw-input storage.
+The render helper independently checks membership before composing a reference
+inside the one fixed sprite URL. No input becomes SVG, HTML or a file/template path.
+Empty or unavailable names render Table. Icons remain decorative alongside names.
+The interface icons in `components/icons.html` continue to use their existing macros.
+
+## Product branding (REF-162)
+
+The product owner supplied these normative SVG files with the implementation
+request. They are copied byte-for-byte into `static/images/`; colour and geometry
+are unchanged. They are product assets, not Lucide assets; no separate third-party
+licence was supplied with them.
+
+- `07-static-logo-256px.svg`: navigation, setup and reduced-motion login.
+- `02-animated-grow-shrink.svg`: login with no reduced-motion preference.
+- `06-favicon-16px.svg`: favicon; the duplicate `_1` file is excluded.
+
+Visible REFRNCR text supplies the product name; adjacent images use empty alt text.
+Explicit image dimensions reserve space. Login uses a picture source selected by
+`prefers-reduced-motion: reduce`. All resources are local. The old block-logo files
+were removed after checking consumers.

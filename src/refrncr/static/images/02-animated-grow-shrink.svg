@@ -1,0 +1,37 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+  <defs>
+    <style>
+      @keyframes grow-shrink-1 {
+        0% { r: 32px; }
+        50% { r: 40px; }
+        100% { r: 32px; }
+      }
+      @keyframes grow-shrink-2 {
+        0% { r: 22px; }
+        50% { r: 28px; }
+        100% { r: 22px; }
+      }
+      @keyframes grow-shrink-3 {
+        0% { r: 13px; }
+        50% { r: 16px; }
+        100% { r: 13px; }
+      }
+
+      .sync-ring-1 { animation: grow-shrink-1 3s ease-in-out infinite; }
+      .sync-ring-2 { animation: grow-shrink-2 3s ease-in-out infinite 0.3s; }
+      .sync-ring-3 { animation: grow-shrink-3 3s ease-in-out infinite 0.6s; }
+    </style>
+  </defs>
+
+  <!-- Outer ring - grows and shrinks -->
+  <circle class="sync-ring-1" cx="60" cy="60" fill="none" stroke="#0f7a4f" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Middle ring - grows and shrinks with delay -->
+  <circle class="sync-ring-2" cx="60" cy="60" fill="none" stroke="#0f7a4f" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Inner ring - grows and shrinks with longer delay -->
+  <circle class="sync-ring-3" cx="60" cy="60" fill="none" stroke="#0f7a4f" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Center dot - always solid -->
+  <circle cx="60" cy="60" r="4" fill="#0f7a4f"/>
+</svg>

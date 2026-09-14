@@ -4,3 +4,7 @@
 .auth-container { width: min(100%, 30rem); min-width: 0; }
 .auth-container > .brand { display: flex; justify-content: center; margin-bottom: var(--space-lg); }
 .auth-container > .card { margin-bottom: 0; }
+
+.auth-container > .brand { flex-direction: column; }
+.auth-container > .brand img { width: 80px; height: 80px; }
+.auth-container > .brand picture { display: block; width: 80px; height: 80px; }

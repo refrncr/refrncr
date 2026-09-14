@@ -291,3 +291,17 @@ one column; its parser and canonical finite-double representation are unchanged.
 Decimal remains exact and rejects exponent notation. See
 [the REF-158 report](ref-158-report.md) for validation evidence and
 [import security](record-import-security.md) for form validation.
+
+## Descriptive Field metadata (REF-162)
+
+Fields optionally store Definition (at most 4,000 characters) and Unit (at most
+64 characters). Both are escaped plain text; empty input stores null and embedded
+NUL characters are rejected consistently on SQLite and PostgreSQL. Units are
+labels such as EUR, kg, % or days, with no parsing, conversion or calculation
+semantics. Neither property affects Record validation or canonical values.
+
+Create/edit and the persistence ports carry both properties. A metadata-only edit
+participates in the existing Field revision/audit and review path. Omitted service
+update arguments preserve existing metadata; an empty string explicitly clears it.
+Configure shows both values; Record column headers expose them in keyboard-accessible
+`details` elements rather than hover-only tooltips.

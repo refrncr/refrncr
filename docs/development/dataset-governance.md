@@ -174,3 +174,18 @@ It additionally requires an active Concept and a Current version. Ownership chan
 invalidate the signed confirmation even for a Community admin; membership removal
 revokes discard authority. Discard preserves ownership, grants, memberships and export
 access. See [REF-155 report](ref-155-report.md).
+
+## REF-162 Configure access placement
+
+The product owner confirmed that ADR-011's current team ownership and independent
+export access supersede REF-162's obsolete Viewer/Editor wording. Configure shows
+the existing owner in Dataset details and user/team export-access controls in a
+separate Access management tab. It uses the
+same services, authorization, CSRF and revoke/grant transactions as the standalone
+access panel. Inline refresh replaces only its component; prefixed IDs avoid
+collisions with panel markup. No legacy grant is reactivated.
+
+Users and Teams show their relationship columns through one administrator-only
+membership projection (one joined SELECT after the actor authorization SELECT).
+Page query counts remain constant as memberships grow. Non-admin Teams keeps only
+the actor's existing visible teams and exposes no membership roster or admin links.

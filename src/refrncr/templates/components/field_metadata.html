@@ -1,0 +1,8 @@
+{% macro field_metadata(field, disclosure=false) -%}
+{% if field.definition or field.unit %}
+{% if disclosure %}<details class='field-metadata'><summary>About {{ field.name }}</summary>{% else %}<div class='field-metadata'>{% endif %}
+{% if field.definition %}<p><span class='field-metadata-label'>Definition:</span> {{ field.definition }}</p>{% endif %}
+{% if field.unit %}<p><span class='field-metadata-label'>Unit:</span> {{ field.unit }}</p>{% endif %}
+{% if disclosure %}</details>{% else %}</div>{% endif %}
+{% endif %}
+{%- endmacro %}

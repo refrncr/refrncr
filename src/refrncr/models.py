@@ -179,6 +179,7 @@ class Dataset(Base):
     _key: Mapped[str] = mapped_column("key", String(100))
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
+    icon: Mapped[str | None] = mapped_column(String(64))
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     # owner_user_id is retained as historical creator metadata, never authority.
     owner_team_id: Mapped[str] = mapped_column(
@@ -219,6 +220,8 @@ class ImmutableDatasetFieldKeyError(ValueError):
 class DatasetField(Base):
     __tablename__ = "dataset_fields"
     __table_args__ = (
+        CheckConstraint("length(definition) <= 4000", name="ck_dataset_fields_definition"),
+        CheckConstraint("length(unit) <= 64", name="ck_dataset_fields_unit"),
         CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_dataset_fields_key_length"),
         CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_dataset_fields_name_length"),
         CheckConstraint(
@@ -239,6 +242,8 @@ class DatasetField(Base):
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     _key: Mapped[str] = mapped_column("key", String(100))
     name: Mapped[str] = mapped_column(String(200))
+    definition: Mapped[str | None] = mapped_column(String(4000))
+    unit: Mapped[str | None] = mapped_column(String(64))
     data_type: Mapped[str] = mapped_column(String(20))
     is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     is_unique: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
@@ -426,6 +431,8 @@ class DatasetVersion(Base):
 class DatasetVersionField(Base):
     __tablename__ = "dataset_version_fields"
     __table_args__ = (
+        CheckConstraint("length(definition) <= 4000", name="ck_version_fields_definition"),
+        CheckConstraint("length(unit) <= 64", name="ck_version_fields_unit"),
         UniqueConstraint("version_id", "key", name="uq_version_fields_key"),
         UniqueConstraint("version_id", "display_position", name="uq_version_fields_position"),
         CheckConstraint("display_position >= 1", name="ck_version_fields_position"),
@@ -443,6 +450,8 @@ class DatasetVersionField(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     key: Mapped[str] = mapped_column(String(100))
     name: Mapped[str] = mapped_column(String(200))
+    definition: Mapped[str | None] = mapped_column(String(4000))
+    unit: Mapped[str | None] = mapped_column(String(64))
     data_type: Mapped[str] = mapped_column(String(20))
     is_required: Mapped[bool] = mapped_column(Boolean)
     is_unique: Mapped[bool] = mapped_column(Boolean)

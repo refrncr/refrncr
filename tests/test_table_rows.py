@@ -91,7 +91,7 @@ def test_shared_table_row_controller():
 
 
 @pytest.mark.parametrize(
-    "kind,columns", [("datasets", 5), ("teams", 2), ("users", 4), ("records", 3)]
+    "kind,columns", [("datasets", 5), ("teams", 3), ("users", 5), ("records", 3)]
 )
 def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
     _, services, admin, client = dataset_browser
@@ -122,7 +122,9 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         elements = Elements(contents).elements
         controls = [(tag, attrs) for tag, attrs in elements if tag in ("a", "button", "input")]
         if kind == "datasets":
-            assert len(controls) == 2
+            assert len(controls) == 3
+            assert controls[2][1]["href"] == "/datasets/row-contract/configure"
+            assert controls[2][1]["title"] == "configuration"
             assert controls[1][1]["href"] == "/datasets/row-contract/versions"
         else:
             assert len(controls) == 1
@@ -130,7 +132,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         assert "data-row-primary" in control
         assert tag == ("a" if kind in ("datasets", "teams") else "button")
         assert len([tag for tag, _ in elements if tag == "td"]) == columns
-        assert len([tag for tag, _ in elements if tag == "svg"]) == 1
+        assert len([tag for tag, _ in elements if tag == "svg"]) == (2 if kind == "datasets" else 1)
         assert all(
             a["aria-hidden"] == "true" and a["focusable"] == "false"
             for tag, a in elements
@@ -141,7 +143,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
     assert len(targets) == 1
     control = targets[0]
     if kind == "datasets":
-        assert control["href"] == "/datasets/row-contract/records"
+        assert control["href"] == "/datasets/row-contract/concept/records"
         assert name in unescape(table)
     elif kind == "teams":
         assert control["href"] == f"/teams?open_team={team.id}"

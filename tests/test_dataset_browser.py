@@ -196,7 +196,7 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "data-row-action" in row.group(1)
     assert "data-list-row" not in row.group(1)
     assert "data-search-text" not in row.group(1)
-    assert "data-row-primary href='/datasets/searchable/records'" in row.group(2)
+    assert "data-row-primary href='/datasets/searchable/concept/records'" in row.group(2)
     assert "<span class='row-action-label'>Name &lt;unsafe&gt;</span>" in row.group(2)
     assert "<th scope='col'>Version</th>" in page
     cells = re.findall(r"<td[^>]*>(.*?)</td>", row.group(2), re.DOTALL)
@@ -600,12 +600,15 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
     template_directory = repository / "src/refrncr/templates"
     template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
 
-    # Icons render inline so they take the colour of the text around them.
-    assert not list(image_directory.glob("lucide-*.svg"))
-    assert "images/lucide" not in template_source
+    # Dataset icons use the pinned local sprite; interface icons stay inline.
+    assert [p.name for p in image_directory.glob("lucide-*.svg")] == ["lucide-0.468.0.svg"]
+    assert "images/lucide-0.468.0.svg" in template_source
+    assert request(client, "get", "/static/images/lucide-0.468.0.svg").status_code == 200
     assert {path.name for path in image_directory.iterdir()} == {
-        "logo-horizontal.svg",
-        "logo-mark.svg",
+        "07-static-logo-256px.svg",
+        "lucide-0.468.0.svg",
+        "02-animated-grow-shrink.svg",
+        "06-favicon-16px.svg",
     }
     macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
     assert len(macros) == len(set(macros)) >= 20
@@ -844,11 +847,14 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert response.status_code == 200
     assert "<title>New dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
-    assert "<form class='form' novalidate method='post' action='/datasets'>" in page
+    assert (
+        "<form class='form' data-generate-key novalidate method='post' action='/datasets'>" in page
+    )
     assert "<label for='dataset-key'>Key</label>" in page
     assert "id='dataset-key' name='key' type='text' value='' required" in page
     assert "aria-describedby='dataset-key-help'" in page
-    assert "id='dataset-key-help'>A permanent technical identifier.</p>" in page
+    assert "id='dataset-key-help'>Generated from the name until you edit it. " in page
+    assert "A permanent technical identifier.</p>" in page
     assert "<label for='dataset-name'>Name</label>" in page
     assert "id='dataset-name' name='name' type='text' value='' required" in page
     assert "<label for='dataset-description'>Description</label>" in page
@@ -1007,7 +1013,7 @@ def test_detail_authorization_owner_display_edit_link_and_escaping(dataset_brows
     assert "Edit dataset" not in viewer_page
 
     login(client, "editor@example.com", "editor password")
-    assert "Edit dataset" not in body(request(client, "get", "/datasets/unsafe"))
+    assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe"))
     services.dataset_versions.create_concept(admin.id, dataset.id)
     assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe/concept"))
 
@@ -1063,7 +1069,7 @@ def test_owning_member_with_legacy_role_can_edit_with_prg_and_audit(dataset_brow
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/editable/concept")
+    assert response.headers["Location"].endswith("/datasets/editable/configure")
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
         audits = session.scalar(
@@ -1097,8 +1103,8 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     page = body(response)
 
     assert response.status_code == 200
-    assert "<title>Edit dataset · REFRNCR</title>" in page
-    assert '<header class="page-header">' in page
+    assert "<title>Configure Stored &lt;name&gt; · REFRNCR</title>" in page
+    assert "<div class='page-header page-header-actions-end'>" in page
     assert "<p><span class='form-label'>Key:</span> <code>edit-form</code></p>" in page
     assert "name='key'" not in page
     assert (
@@ -1109,9 +1115,10 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert "value='Stored &lt;name&gt;'" in page
     assert "<label for='dataset-description'>Description</label>" in page
     assert ">Stored &lt;description&gt;</textarea>" in page
-    assert "data-panel-cancel" not in page
-    assert "side-panel-footer-single" in page
-    assert "type='submit' form='dataset-edit-form'>Save dataset</button>" in page
+    assert "data-side-panel-content" not in page
+    assert "id='dataset-edit-form'" in page
+    assert "type='submit'>Save dataset</button>" in page
+    assert ">Cancel</a>" in page
     assert "aria-invalid='true'" not in page
     assert "Stored <name>" not in page
     assert "Stored <description>" not in page
@@ -1402,7 +1409,7 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
 
     assert moved.status_code == 302
     assert stale.status_code == 409
-    assert moved.location == "/datasets/ordered/concept"
+    assert moved.location == "/datasets/ordered/concept?tab=fields#fields"
     assert [
         field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)
     ] == expected_keys
@@ -1482,7 +1489,7 @@ def test_admin_create_field_browser_flow_accepts_supported_types(dataset_browser
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/create-field/concept")
+    assert response.headers["Location"].endswith("/datasets/create-field/concept?tab=fields#fields")
     field = services.dataset_fields.get_field(admin.id, dataset.key, data_type)
     assert field.data_type == data_type
     assert field.is_required is False
@@ -1694,7 +1701,7 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/edit-field/concept")
+    assert response.headers["Location"].endswith("/datasets/edit-field/concept?tab=fields#fields")
     with factory() as session:
         persisted = session.get(DatasetField, original_id)
         assert persisted.key == "stable_key"
@@ -1998,7 +2005,9 @@ def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_wi
         },
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}/concept")
+    assert response.headers["Location"].endswith(
+        f"/datasets/{dataset.key}/concept?tab=fields#fields"
+    )
     assert services.dataset_business_keys.get_business_key(manager.id, dataset.key).field_keys == (
         required.key,
     )
@@ -2234,7 +2243,9 @@ def test_dataset_admin_deletes_normal_field_with_prg_and_audit(dataset_browser):
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith(f"/datasets/{dataset.key}/concept")
+    assert response.headers["Location"].endswith(
+        f"/datasets/{dataset.key}/concept?tab=fields#fields"
+    )
     with factory() as session:
         assert session.get(DatasetField, field.id) is None
         assert (
@@ -2400,7 +2411,6 @@ def test_configuration_flows_load_one_shared_panel_and_keep_full_page_fallback(d
     assert "components/side_panel.html" in loaded
     for path, title in [
         ("/datasets/new", "New dataset"),
-        ("/datasets/panel-forms/edit", "Edit dataset"),
         ("/datasets/panel-forms/fields/new", "Add field"),
         ("/datasets/panel-forms/fields/field/edit", "Edit field"),
     ]:
@@ -2459,7 +2469,11 @@ def test_panel_validation_keeps_server_errors_values_and_csrf(dataset_browser, p
     response = request(client, "post", path, data={**data, "csrf_token": csrf})
     page = body(response)
     assert response.status_code == 400
-    assert "data-side-panel-content" in page
+    if path == "/datasets/panel-errors":
+        assert "id='dataset-edit-form'" in page and "fields-heading" in page
+        assert "data-side-panel-content" not in page
+    else:
+        assert "data-side-panel-content" in page
     assert "aria-invalid='true'" in page or "data-error-focus" in page
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page

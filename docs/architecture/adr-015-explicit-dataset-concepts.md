@@ -81,3 +81,9 @@ content into another concept snapshot would add storage without satisfying a req
 Persisting a separate stale flag would duplicate the pinned baseline's cancellation state.
 The operational stale lockout is deliberate until an authorized recovery workflow exists.
 No REST API, scheduler, Cloud feature, new role, dependency or discard operation is added.
+
+## REF-162 metadata decision
+
+[ADR-017](adr-017-current-dataset-metadata.md) supersedes Dataset name/description
+version comparison and restoration. Current metadata is maintained independently;
+stored historical snapshots remain unchanged.

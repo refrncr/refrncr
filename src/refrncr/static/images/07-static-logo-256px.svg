@@ -1,0 +1,13 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+  <!-- Outer ring - full opacity -->
+  <circle cx="128" cy="128" r="100" fill="none" stroke="#0f7a4f" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Middle ring - 70% opacity -->
+  <circle cx="128" cy="128" r="70" fill="none" stroke="#0f7a4f" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Inner ring - 40% opacity -->
+  <circle cx="128" cy="128" r="40" fill="none" stroke="#0f7a4f" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Center dot -->
+  <circle cx="128" cy="128" r="8" fill="#0f7a4f"/>
+</svg>
