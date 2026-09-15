@@ -1511,7 +1511,7 @@
       "operation": "replace_order",
       "service": "refrncr.services.DatasetFieldService.replace_order",
       "interface_entrypoints": [
-        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order"
       ],
       "kind": "mutation",
       "classification": "domain-audited",

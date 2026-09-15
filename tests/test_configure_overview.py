@@ -61,7 +61,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert page.count("<section ") == (
         7 if permission == "community_admin" else 2 if permission == "viewer" else 4
     )
-    header = page.split("<div class='configuration-overview'>")[0]
+    header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
     records_url = (
@@ -86,7 +86,8 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         assert internal_id not in presentation
     field_section = section(page, "fields-heading")
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
-    assert f"{count} {'field' if count == 1 else 'fields'}</p>" in field_section
+    count_label = "field" if count == 1 else "fields"
+    assert f"{count}<span class='visually-hidden'> {count_label}</span>" in field_section
     assert ("Add field" in field_section) == (permission != "viewer")
     assert ("configuration-panel" in page) == (permission != "viewer")
     assert "record-identifier-heading" not in page
@@ -100,30 +101,26 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "role='region' aria-label='Dataset fields' tabindex='0'" in field_section
     assert re.findall(
         r"<th scope='col'[^>]*>(?:<span[^>]*>)?(.*?)(?:</span>)?</th>", field_section
-    ) == [
-        "Field order",
-        "Field",
-        "Key",
-        "Type",
-        "Constraints",
-        "Actions",
-    ]
+    ) == ["Field order", "Field", "Description", "Type", "Constraints"] + (
+        [] if permission == "viewer" else ["Actions"]
+    )
     assert "<span class='badge'>Required</span>" in field_section
     assert "<span class='badge'>Unique</span>" in field_section
     identifier_count = 1 if count == 1 else 2
-    assert field_section.count("<span class='badge'>Identifier</span>") == identifier_count
+    identifier_badge = "<span class='badge badge-identifier'>Identifier</span>"
+    assert field_section.count(identifier_badge) == identifier_count
     assert field_section.count('<svg class="key-icon"') == identifier_count
-    rows = re.findall(r"<tr>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
+    rows = re.findall(r"<tr[^>]*>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
-        assert f"<td><span class='field-name'>{field.name}</span>" in row
-        assert f"<td><code class='field-key'>{field.key}</code></td>" in row
+        assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
+        assert f"<code class='field-key'>{field.key}</code></td>" in row
         order_cell, indicator = row.split("</td>")[:2]
         assert "key-icon" not in order_cell
         if index != 1:
             assert f"{field.name}</span> <svg" in indicator
             assert '<svg class="key-icon"' in indicator
-            assert "<span class='badge'>Identifier</span>" in row
+            assert identifier_badge in row
             assert f"{field.name} is part of the record identifier" in indicator
         else:
             assert "key-icon" not in indicator
@@ -141,8 +138,10 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
                 control = re.search(rf"<button[^>]*value='{direction}'([^>]*)>", row)
                 assert control is not None
                 assert ("disabled" in control[1]) == boundary
+            assert f"aria-label='Reorder {field.name}'" in order_cell
         else:
             assert "<form" not in row and "<button" not in row and "Edit field" not in row
+            assert f"<span class='field-position'>{index + 1}</span>" in order_cell
     if count == 3:
         assert "None" in rows[1] and "Identifier</span>" not in rows[1]
         assert field_section.index("First field") < field_section.index("Last field")
@@ -178,7 +177,7 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F8
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
     assert page.count("<section ") == 7
-    assert page.count("<table>") == 1
+    assert page.count("<table ") + page.count("<table>") == 1
     assert "aria-label='Edit field &lt;img" in page
 
     field_section = section(page, "fields-heading")

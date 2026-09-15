@@ -752,8 +752,14 @@ def test_configuration_fields_are_read_only(dataset_browser, published):  # noqa
     assert "<form" not in fields and "<button" not in fields
     assert "field-edit-action" not in fields and "Add field" not in fields
     if published:
+        current = body(request(client, "get", f"/datasets/{d.key}"))
+        current_fields = current.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
+        assert "Current · Version 1 · Read only" in current_fields
+        assert "Start a concept to change fields" in current_fields
+        assert "field-drag-handle" not in current_fields
         s.dataset_versions.create_concept(a.id, d.id)
     concept = body(request(client, "get", f"/datasets/{d.key}/concept"))
+    assert "field-drag-handle" in concept and "Start a concept" not in concept
     assert "Add field" in concept and "field-edit-action" in concept
 
 

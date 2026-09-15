@@ -63,6 +63,7 @@
       window.addEventListener('hashchange', fromLocation);
       window.addEventListener('pageshow', fromLocation);
       fromLocation();
+      panels[0].parentElement.setAttribute('data-tabs-ready', '');
     });
   };
   window.refrncrSectionTabs();

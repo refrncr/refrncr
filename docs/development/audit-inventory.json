@@ -395,6 +395,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.services.DatasetFieldService.move_field",
+        "refrncr.services.DatasetFieldService.replace_order",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"

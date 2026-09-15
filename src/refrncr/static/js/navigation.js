@@ -7,6 +7,12 @@
     // Storage can be unavailable in restricted browser contexts; keep in-page controls usable.
   }
   root.classList.toggle("navigation-collapsed", !desktopExpanded);
+  // Scripted pages can style their enhanced state before the first paint (section tabs).
+  root.classList.toggle("js", true);
+  const here = window.location;
+  if (here && (here.hash || new URLSearchParams(here.search).has("tab"))) {
+    root.setAttribute("data-tab-requested", "");
+  }
 
   // Record criteria (search, status) reload the page. Restore the scroll position of the
   // same page before its first paint, so the new page does not jump.

@@ -1258,7 +1258,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema/concept"))
-    assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
+    assert "<h2 id='fields-heading'>Fields <span class='section-count'>0<" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
 
@@ -1430,6 +1430,52 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
         ).all()
         assert [field.key for field in persisted] == expected_keys
         assert [field.display_position for field in persisted] == [1, 2, 3]
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 1
+        )
+
+
+def test_admin_saves_complete_field_order_and_stale_or_invalid_order_is_rejected(
+    dataset_browser,
+):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "dragged")
+    fields = [
+        create_field(services, admin, dataset, key, key.title())
+        for key in ("first", "second", "third")
+    ]
+    login(client)
+    expected = [field.id for field in fields]
+    proposed = [fields[2].id, fields[0].id, fields[1].id]
+    csrf = session_csrf(client, services)
+    data = {"csrf_token": csrf, "expected_field_id": expected, "ordered_field_id": proposed}
+    url = "/datasets/dragged/fields/order"
+
+    saved = request(client, "post", url, data=data)
+    stale = request(client, "post", url, data=data)
+    incomplete = request(
+        client,
+        "post",
+        url,
+        data={"csrf_token": csrf, "expected_field_id": proposed, "ordered_field_id": proposed[:2]},
+    )
+    mixed = request(client, "post", url, data=data | {"direction": "up"})
+    forged = request(client, "post", url, data=data | {"csrf_token": "wrong"})
+
+    assert saved.status_code == 204 and not saved.data
+    assert stale.status_code == 409
+    assert incomplete.status_code == 400
+    assert mixed.status_code == 400
+    assert forged.status_code in {400, 403}
+    assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        "third",
+        "first",
+        "second",
+    ]
+    with factory() as session:
         assert (
             session.scalar(
                 select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")

@@ -207,6 +207,24 @@ async function layout(page, label) {
       await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Add field', exact: true}).click()]);
       assert(await page.getByText('Plain <b>definition</b>', {exact: false}).isVisible());
       assert.equal(await page.locator('.field-metadata b').count(), 0);
+      // Fields reorder with the keyboard on the drag handle and save right away.
+      const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
+      const fieldOrder = await fieldNames();
+      assert(await page.locator('#fields .field-drag-handle').first().isVisible());
+      assert(!(await page.locator('#fields .button-stack').first().isVisible()));
+      const reorder = async (name, key) => {
+        await page.getByRole('button', {name: `Reorder ${name}`, exact: true}).focus();
+        await Promise.all([
+          page.waitForResponse(response => response.url().endsWith('/fields/order') && response.status() === 204),
+          page.keyboard.press(key),
+        ]);
+      };
+      await reorder(fieldOrder[0], 'ArrowDown');
+      await page.reload();
+      assert.deepEqual(await fieldNames(), [fieldOrder[1], fieldOrder[0], ...fieldOrder.slice(2)]);
+      await reorder(fieldOrder[0], 'ArrowUp');
+      await page.reload();
+      assert.deepEqual(await fieldNames(), fieldOrder);
       await page.getByRole('link', {name: 'Edit field Amount', exact: true}).click();
       panel = page.locator('dialog[open]');
       await panel.getByLabel('Name', {exact: true}).waitFor();

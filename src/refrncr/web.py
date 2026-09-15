@@ -708,6 +708,10 @@ def create_flask_app(
                 for change in (g.concept_ui.field_changes if concept else ())
             }
             may_start_concept = view.may_maintain and view.concept is None
+            if view.state is not None:
+                field_context_label = (
+                    f"{view.state.status} · Version {view.state.version.number} · Read only"
+                )
         if edit_mode and not editable:
             abort(404)
         access_teams, access_users, access_entries = [], [], []
@@ -1202,6 +1206,19 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
+        if set(request.form) == {"csrf_token", "expected_field_id", "ordered_field_id"}:
+            # Drag and keyboard reordering (field-order.js) submit the complete new order.
+            expected = tuple(request.form.getlist("expected_field_id"))
+            proposed = tuple(request.form.getlist("ordered_field_id"))
+            try:
+                field_service.replace_order(actor.id, key, expected, proposed)
+            except NotFoundError:
+                abort(404)
+            except ValidationError as error:
+                abort(400, description=str(error))
+            except StaleFieldOrderError as error:
+                abort(409, description=str(error))
+            return "", 204
         if set(request.form) != {"csrf_token", "expected_field_id", "field_id", "direction"}:
             abort(400, description="Invalid field order request")
         field_ids = request.form.getlist("field_id")

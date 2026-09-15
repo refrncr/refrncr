@@ -79,4 +79,8 @@
 .section-tab:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
 
 button.section-tab { font-family: inherit; background: transparent; border: 0; border-bottom: 2px solid transparent; }
+/* Until section-tabs.js has run, show only the first panel (or none when the URL asks for a
+   specific tab), so the page never flashes all sections. Without JavaScript all show. */
+.js [data-tab-panels]:not([data-tabs-ready]) > section:not(:first-child),
+.js[data-tab-requested] [data-tab-panels]:not([data-tabs-ready]) > section { display: none; }
 .section-tab[aria-disabled="true"] { color: var(--color-text-muted); cursor: not-allowed; opacity: .65; }
