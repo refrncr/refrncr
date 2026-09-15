@@ -1,7 +1,6 @@
 .app-shell { min-height: 100vh; display: grid; grid-template: auto 1fr / var(--sidebar-width) minmax(0, 1fr); }
 .brand { display: inline-flex; align-items: center; gap: var(--space-sm); text-decoration: none; }
-.brand-name { font-family: var(--font-display); font-weight: var(--font-weight-bold); color: var(--color-text); }
-.brand img { display: block; height: 2.625rem; width: auto; }
+.brand img { display: block; }
 .app-sidebar, .settings-sidebar { display: flex; flex-direction: column; min-width: 0; padding: var(--space-lg); background: var(--color-surface-subtle); border-right: 1px solid var(--color-border); }
 .primary-navigation { display: flex; flex: 1; flex-direction: column; gap: var(--space-sm); }
 .nav-label { margin: 0 0 var(--space-xs); padding-inline: .75rem; color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-eyebrow); text-transform: uppercase; }
@@ -32,7 +31,7 @@
 .app-shell > .app-main { grid-column: 2; }
 .navigation-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-shrink: 0; min-height: calc(var(--control-height) + var(--space-md)); margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-sm)) var(--space-lg); padding-block: var(--space-sm); }
 .navigation-heading .brand { min-width: 0; }
-.navigation-heading .brand img { width: 42px; height: 42px; flex-shrink: 0; }
+.navigation-heading .brand img { width: 125px; max-width: 100%; height: auto; }
 .navigation-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: var(--control-height); min-height: var(--control-height); padding: var(--space-sm); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
 .navigation-button:hover { background: var(--color-action-secondary); color: var(--color-text); }
 .navigation-button:active { background: var(--color-action-secondary-hover); }
@@ -82,4 +81,22 @@
   .mobile-bar-brand { display: flex; flex-shrink: 0; align-items: center; gap: var(--space-xs); text-decoration: none; }
   .mobile-bar-brand img { display: block; width: auto; height: 1.75rem; }
   .mobile-bar-title { display: block; min-width: 0; margin-left: var(--space-xs); padding-left: var(--space-md); border-left: 1px solid var(--color-border); overflow: hidden; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Desktop: collapse/expand controls are slim tabs on the sidebar edge, level with the logo.
+   Open: tab inside the sidebar against its border, arrow left. Collapsed: tab on the screen edge, arrow right. */
+@media (min-width: 1024px) {
+  .app-shell:not(.settings-shell) .navigation-heading { position: relative; }
+  .app-shell:not(.settings-shell) [data-nav-close],
+  .app-shell:not(.settings-shell) [data-nav-open] { width: 14px; height: 33px; min-height: 0; padding: 0; border: 1px solid var(--color-border); background: var(--color-surface-subtle); transform: translateY(-50%); }
+  .app-shell:not(.settings-shell) [data-nav-close] { position: absolute; top: 50%; right: calc(var(--space-sm) - var(--space-lg)); border-right: 0; border-radius: 6px 0 0 6px; }
+  .app-shell:not(.settings-shell) [data-nav-open] { position: fixed; z-index: 10; top: calc(var(--space-sm) + var(--control-height) / 2); left: 0; margin: 0; border-left: 0; border-radius: 0 6px 6px 0; }
+  .app-shell:not(.settings-shell) [data-nav-close] .button-icon,
+  .app-shell:not(.settings-shell) [data-nav-open] .button-icon { display: none; }
+  .app-shell:not(.settings-shell) [data-nav-close]::before,
+  .app-shell:not(.settings-shell) [data-nav-open]::before { content: ""; width: 0; height: 0; border-style: solid; }
+  .app-shell:not(.settings-shell) [data-nav-close]::before { border-width: 4px 5px 4px 0; border-color: transparent var(--color-text-muted) transparent transparent; }
+  .app-shell:not(.settings-shell) [data-nav-open]::before { border-width: 4px 0 4px 5px; border-color: transparent transparent transparent var(--color-text-muted); }
+  .app-shell:not(.settings-shell) [data-nav-close]:hover,
+  .app-shell:not(.settings-shell) [data-nav-open]:hover { background: var(--color-action-secondary); }
+  .navigation-collapsed .app-shell:not(.settings-shell) [data-nav-open] { display: flex; }
 }

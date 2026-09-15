@@ -605,10 +605,10 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
     assert "images/lucide-0.468.0.svg" in template_source
     assert request(client, "get", "/static/images/lucide-0.468.0.svg").status_code == 200
     assert {path.name for path in image_directory.iterdir()} == {
-        "07-static-logo-256px.svg",
+        "favicon.svg",
         "lucide-0.468.0.svg",
-        "02-animated-grow-shrink.svg",
-        "06-favicon-16px.svg",
+        "refrncr-loader.svg",
+        "refrncr-wordmark-primary.svg",
     }
     macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
     assert len(macros) == len(set(macros)) >= 20

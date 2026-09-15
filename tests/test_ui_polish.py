@@ -306,18 +306,19 @@ def test_dataset_list_selects_concept_without_current(dataset_browser):  # noqa:
 def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
     _, s, a, client = dataset_browser
     html = body(request(client, "get", "/login"))
-    assert 'media="(prefers-reduced-motion: reduce)"' in html
-    assert "02-animated-grow-shrink.svg" in html and "06-favicon-16px.svg" in html
+    assert 'class="auth-loader"' in html and "refrncr-loader.svg" in html
+    assert 'class="auth-wordmark"' in html and "refrncr-wordmark-primary.svg" in html
+    assert "images/favicon.svg" in html
     login(client)
     d = create_dataset(s, a, "polish", "Polish")
     assert "data-generate-key" in body(request(client, "get", "/datasets/new"))
     assert "data-generate-key" not in body(request(client, "get", f"/datasets/{d.key}/edit"))
     assets = ROOT / "src/refrncr/static/images"
     assert {p.name for p in assets.iterdir()} == {
-        "07-static-logo-256px.svg",
-        "02-animated-grow-shrink.svg",
-        "06-favicon-16px.svg",
+        "favicon.svg",
         "lucide-0.468.0.svg",
+        "refrncr-loader.svg",
+        "refrncr-wordmark-primary.svg",
     }
 
 

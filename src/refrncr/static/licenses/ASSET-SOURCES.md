@@ -78,11 +78,17 @@ request. They are copied byte-for-byte into `static/images/`; colour and geometr
 are unchanged. They are product assets, not Lucide assets; no separate third-party
 licence was supplied with them.
 
-- `07-static-logo-256px.svg`: navigation, setup and reduced-motion login.
-- `02-animated-grow-shrink.svg`: login with no reduced-motion preference.
-- `06-favicon-16px.svg`: favicon; the duplicate `_1` file is excluded.
+Source: `docs/refrncr-brand-kit`.
 
-Visible REFRNCR text supplies the product name; adjacent images use empty alt text.
-Explicit image dimensions reserve space. Login uses a picture source selected by
-`prefers-reduced-motion: reduce`. All resources are local. The old block-logo files
+- `refrncr-wordmark-primary.svg`: navigation, mobile bar, setup and login wordmark.
+- `refrncr-loader.svg`: animated mark above the login wordmark; hidden with
+  `prefers-reduced-motion: reduce`.
+- `favicon.svg`: favicon.
+
+The wordmark is decorative (`aria-hidden`, empty alt text); the brand links carry
+the accessible name "REFRNCR home". Explicit image dimensions reserve space.
+All resources are local.
+
+Earlier branding files (`07-static-logo-256px.svg`, `02-animated-grow-shrink.svg`,
+`06-favicon-16px.svg`) are no longer referenced by the application. The old block-logo files
 were removed after checking consumers.
