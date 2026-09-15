@@ -87,18 +87,19 @@ cleanup followed by an empty downgrade is only appropriate for disposable databa
 
 ## UI and validation
 
-Owning-team display names appear in overview, breadcrumbs and configuration. Creation and admin
-governance reuse the existing sidepanel, form, feedback and table components with full-page fallbacks.
+Owning-team display names appear in overview, breadcrumbs and configuration. Creation reuses the
+existing sidepanel, form and feedback components with a full-page fallback. Administrators change the
+owning team in the Dataset details edit form and manage export access on the Access management tab.
 Read-only users can open configuration; maintenance and export actions follow separate capabilities.
-No design tokens or separate JavaScript controller are added. The shared controller has opt-in selection and panel-refresh behavior. The shared `page-header-actions-end` variant
+No design tokens or separate JavaScript controller are added. The shared controller has opt-in selection behavior. The shared `page-header-actions-end` variant
 keeps the configuration header actions right-aligned, including after wrapping. The team-choice macro
-shares creation/reassignment markup; admin ownership/export panels are deliberate workflow templates.
+shares creation/reassignment markup.
 
 Tests in `test_dataset_governance.py` and `test_dataset_governance_migration.py` exercise both SQLite
 and PostgreSQL using `REFRNCR_TEST_POSTGRES_URL`. Existing Dataset and lifecycle regressions supply
 explicit owning-team fixtures; legacy migration tests construct historical fixtures separately from
-the production downgrade guard. Browser tests cover desktop/320px panels, error focus, Escape focus
-restoration and export grant/revoke. Local checks do not replace GitHub Actions. The part-2 review adds concrete service-boundary, after-flush rollback, concurrent revocation and bounded-query tests in `test_dataset_governance_review.py`.
+the production downgrade guard. Browser tests cover the Access management tab at desktop and
+320px widths: grant, duplicate error focus, revoke and the no-JavaScript fallback. Local checks do not replace GitHub Actions. The part-2 review adds concrete service-boundary, after-flush rollback, concurrent revocation and bounded-query tests in `test_dataset_governance_review.py`.
 
 See [ADR-011](../architecture/adr-011-dataset-team-governance.md) for architectural tradeoffs.
 
@@ -116,8 +117,8 @@ this is not sufficient PostgreSQL validation.
 
 The optional real-browser scripts use `tests/browser_table_rows_app.py` on loopback with disposable
 in-memory data. `dataset_creation_browser.cjs` covers zero/one/multiple-team users and maintenance
-controls; `dataset_governance_browser.cjs` covers combined ownership saves and stale forms;
-`export_access_browser.cjs` covers additional access and accessibility. Use a fresh fixture for each
+controls; `access_management_browser.cjs` covers the Access management tab (grant, duplicate,
+revoke, keyboard and no-JavaScript fallback). Use a fresh fixture for each
 creation run. They follow the external Playwright setup in the UI foundation guide and add no
 runtime dependency. Screenshots belong outside the repository.
 
@@ -180,10 +181,14 @@ access. See [REF-155 report](ref-155-report.md).
 The product owner confirmed that ADR-011's current team ownership and independent
 export access supersede REF-162's obsolete Viewer/Editor wording. Configure shows
 the existing owner in Dataset details and user/team export-access controls in a
-separate Access management tab. It uses the
-same services, authorization, CSRF and revoke/grant transactions as the standalone
-access panel. Inline refresh replaces only its component; prefixed IDs avoid
-collisions with panel markup. No legacy grant is reactivated.
+separate Access management tab. The tab shows who has access (owning team,
+Community administrators, additional export access), the export grant form and the
+additional grants with the date they were added. Grant and revoke post to
+`/datasets/<key>/export-access` and return to the configuration page they came from
+(`concept=1` or `standalone=1`); validation errors re-render that page. Inline refresh
+replaces only the component. The former standalone access and owner panels
+(`/datasets/<key>/export-access` GET, `/datasets/<key>/owner`) were removed (REF-165).
+No legacy grant is reactivated.
 
 Users and Teams show their relationship columns through one administrator-only
 membership projection (one joined SELECT after the actor authorization SELECT).

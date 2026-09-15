@@ -59,7 +59,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
     assert page.count("<section ") == (
-        7 if permission == "community_admin" else 2 if permission == "viewer" else 4
+        8 if permission == "community_admin" else 2 if permission == "viewer" else 4
     )
     header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
@@ -176,7 +176,7 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F8
     assert name not in page and description not in page and field_name not in page
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
-    assert page.count("<section ") == 7
+    assert page.count("<section ") == 8
     assert page.count("<table ") + page.count("<table>") == 1
     assert "aria-label='Edit field &lt;img" in page
 

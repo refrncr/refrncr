@@ -112,7 +112,7 @@
       {% endif %}
     </section>
     {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><h2 id='access-management-heading'>Access management</h2>
-      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, inline=true, concept=not version_state and not standalone_configuration, standalone=standalone_configuration) }}
+      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=not version_state and not standalone_configuration, standalone=standalone_configuration, change_owner_url=url_for("dataset_configuration", key=dataset.key, edit=1) ~ '#owner-team' if editable else none) }}
     </section>{% endif %}
     {% if editable %}
     <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>

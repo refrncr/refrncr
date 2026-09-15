@@ -66,3 +66,42 @@
 
 /* Inline Dataset editing separates save/cancel from the final form field. */
 .configuration-overview .form-actions { margin-top: var(--space-lg); }
+
+/* Access management tab: overview of who has access, export grant, additional access. */
+.access-management { display: grid; gap: var(--space-lg); min-width: 0; }
+.access-management > p { margin: 0; }
+.access-management > [data-panel-status] { color: var(--color-success-text); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); }
+.access-management section { min-width: 0; }
+.configuration-overview .access-management h3 { display: flex; align-items: baseline; margin: 0 0 var(--space-sm); font-size: var(--font-size-body); }
+.access-overview { margin: 0; padding: 0; list-style: none; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; }
+.access-overview > li { display: grid; grid-template-columns: minmax(0, 20rem) minmax(0, 1fr) auto; gap: var(--space-sm) var(--space-md); align-items: center; padding: .625rem var(--space-md); border-top: 1px solid var(--color-border); }
+.access-overview > li:first-child { border-top: 0; }
+.access-overview-subject { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); min-width: 0; font-weight: var(--font-weight-semibold); }
+.access-overview-subject > .button-icon, .access-subject > .button-icon { flex-shrink: 0; width: 1rem; height: 1rem; margin: 0; color: var(--color-text-muted); }
+.access-overview-subject .section-count { margin: 0; }
+.access-rights { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.access-overview-action { font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-decoration: none; white-space: nowrap; }
+.access-overview-action:hover { text-decoration: underline; }
+.access-grant { padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
+.access-grant .form-field { margin: 0; }
+.access-grant .inline-form-action { max-width: 36rem; margin-top: 0; }
+.configuration-overview .access-grant .help-text { margin: var(--space-xs) 0 0; }
+.access-table { position: relative; }
+.access-table table { min-width: 34rem; }
+.access-table td { vertical-align: middle; }
+.access-table th:nth-child(2) { width: 6rem; }
+.access-table th:nth-child(3) { width: 12rem; }
+.access-table th:last-child, .access-table td:last-child { width: 6rem; text-align: right; }
+.access-subject { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.access-subject-name { min-width: 0; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.access-subject-detail { display: block; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
+.access-added { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); white-space: nowrap; }
+.button-remove { color: var(--color-status-removed); }
+.button-remove:hover { border-color: var(--color-status-removed-border); background: var(--color-status-removed-surface); color: var(--color-status-removed); }
+.empty-state.access-empty { padding: var(--space-lg); border-color: var(--color-button-border); }
+.configuration-overview .access-empty :is(h4, p) { margin: 0; }
+.configuration-overview .access-empty h4 { margin-bottom: var(--space-xs); font-family: var(--font-display); font-size: var(--font-size-body); }
+.access-empty p { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+@media (max-width: 767px) {
+  .access-overview > li { grid-template-columns: minmax(0, 1fr); }
+}

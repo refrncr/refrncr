@@ -682,48 +682,38 @@ Dataset UI flags come from central service capabilities: read-only configuration
 every active user, maintenance follows owning-team membership, and export is independent.
 See [Dataset governance](dataset-governance.md) for workflow and migration contracts. No CSS tokens are changed. The existing controller receives the opt-in enhancements described below. The reusable `page-header-actions-end` variant keeps
 configuration actions right-aligned. Owning team is edited with metadata through Save dataset;
-the grey `Access management` action opens export management from the header.
+export access is managed on the Access management tab.
 
 ### Sectioned action panels and additional access lists
 
 Use one `side-panel-view` containing a scrolling `side-panel-body panel-sections` and a sibling
 `panel_form_actions` footer. The section stack uses shared spacing tokens and removes incidental
 paragraph margins. Do not nest padded panel bodies or alter the shared header to fix local spacing.
-Section headings use `data-panel-section-heading`; subordinate headings may use
-`data-panel-subheading`. Full-page sources retain h2/h3 below their h1. The existing controller
-imports them as native h3/h4 below the dialog's h2 title, preserving IDs and plain text.
+Section headings use `data-panel-section-heading`. Full-page sources retain h2 below their h1.
+The existing controller imports them as native h3 below the dialog's h2 title, preserving IDs and
+plain text.
 
 `inline-form-action` places a flexible selector and a naturally sized button on one row, with
-shared spacing. At the existing 767px breakpoint it stacks them. `form-label-sentence` is the
-explicit sentence-case label variant. Forms may opt into `data-requires-selection`: JavaScript
+shared spacing. At the existing 767px breakpoint it stacks them. Forms may opt into
+`data-requires-selection`: JavaScript
 initially disables the submit button until the required selector has a value. Without JavaScript,
 submission remains available and the same server validation reports errors. This enhancement
 never grants authority or replaces server validation. Retain field-associated errors and the
 shared error-summary focus contract.
 
-The `components/access_list.html` macros render semantic lists of explicit user/team access.
-Each row uses an existing decorative identity icon, wrapping display name, visible subject type
-and a secondary removal action with a descriptive accessible name. The list does not derive
-permissions or manufacture rows for automatic access. `empty-state-compact` provides a quiet,
-left-aligned use of the existing empty-state surface and tokens, without a nested card.
+The Access management tab (`components/export_access.html`) lists explicit user/team export
+access in a table with a decorative identity icon, name (and email for users), type badge, the
+date the access was added and a secondary Remove action with a descriptive accessible name. It
+does not derive permissions or manufacture rows for automatic access; the "Who has access"
+overview names the owning team and Community administrators as fixed rules. Grant and Remove
+forms use `data-inline-refresh`: the refreshed component replaces the current one and
+`data-panel-success` is announced and focused through `data-panel-status`.
 
-Immediately persisted actions can opt into `data-panel-refresh` containing their expected GET
-redirect URL. Only a successful redirect to that exact URL is imported into the open panel.
-Other forms keep their existing navigation behavior; authentication redirects remain navigation.
-`data-panel-success` supplies plain-text confirmation to the refreshed `data-panel-status` node,
-which is revealed, announced and focused. The status is only active for enhanced in-panel updates.
-Late responses cannot replace a closed or reopened panel, and pending requests are never retried
-or duplicated. Server services, POST payloads, CSRF checks, audits and transactions are unchanged.
-
-Use a secondary `Close` link with `data-panel-cancel` in the shared footer for these immediate-action
-panels. Both Close and the header cross restore the exact original trigger after refreshes; the
-full-page link retains its ordinary fallback destination. No additional Save/Done action is needed.
-
-`tests/javascript/export_access_browser.cjs` uses the existing external Playwright convention and
-`tests/browser_table_rows_app.py` fixture. It checks 1440/768/320px empty, user, team, long-name and
-validation states, native keyboard controls, dialog containment, Close/Escape focus restoration,
-200% viewport/text simulations and no-JavaScript server validation. Screenshots are written only
-when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the repository.
+`tests/javascript/access_management_browser.cjs` uses the existing external Playwright convention
+and `tests/browser_table_rows_app.py` fixture. It checks 1440/320px empty, user, team and duplicate
+states, keyboard submission, error focus and no-JavaScript server validation. Screenshots are
+written only when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the
+repository.
 
 ## Dataset deletion panels (REF-141)
 

@@ -1,46 +1,82 @@
 {% from 'components.html' import feedback %}
-{% from 'components/access_list.html' import access_list, access_list_item %}
-{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', inline=false, concept=false, standalone=false) -%}
-{% set prefix = 'inline-' if inline else '' %}
-    <div class='{{ "side-panel-body " if not inline else "" }}panel-sections' data-export-access>
-      <p>Members of {{ dataset.owner_team_name }} and Community administrators can already export this dataset. You can grant export-only access to additional users or teams.</p>
+{% from 'components/icons.html' import user_icon, team_icon, lock_icon, download_icon %}
+{# Access management tab: who has access, export-only grants and their removal.
+   Forms return to the configuration page they came from (concept, current or standalone). #}
+{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, standalone=false, change_owner_url=none) -%}
+{% set return_to = {'concept': 1 if concept else none, 'standalone': 1 if standalone else none} %}
+{% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
+    <div class='access-management' data-export-access>
+      <p class='section-description'>Who can work with this dataset. The owning team maintains it; you can add export-only access for other users and teams.</p>
       <p class='help-text' data-panel-status tabindex='-1' hidden></p>
-      <section aria-labelledby='{{ prefix }}grant-export-heading'>
-        <h{{ '3' if inline else '2' }} id='{{ prefix }}grant-export-heading' data-panel-section-heading>Grant export access</h{{ '3' if inline else '2' }}>
-        {{ feedback(error, id=prefix ~ 'governance-error', focus=true) }}
-        <form class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, inline=1 if inline else none, concept=1 if concept else none, standalone=1 if standalone else none) }}' data-requires-selection {{ 'data-inline-refresh' if inline else 'data-panel-refresh' }}='{{ url_for("dataset_export_access", key=dataset.key, inline=1 if inline else none, concept=1 if concept else none, standalone=1 if standalone else none) }}' data-panel-success='Export access granted.'>
+      <section aria-labelledby='access-overview-heading'>
+        <h3 id='access-overview-heading'>Who has access</h3>
+        <ul class='access-overview'>
+          <li>
+            <span class='access-overview-subject'>{{ team_icon() }}<span>{{ dataset.owner_team_name }}</span> <span class='badge badge-identifier'>Owning team</span></span>
+            <span class='access-rights' aria-label='Rights'><span class='badge'>View</span><span class='badge'>Edit</span><span class='badge'>Publish</span><span class='badge'>Export</span></span>
+            {% if change_owner_url %}<a class='access-overview-action' href='{{ change_owner_url }}'>Change owning team</a>{% else %}<span></span>{% endif %}
+          </li>
+          <li>
+            <span class='access-overview-subject'>{{ lock_icon() }}<span>Community administrators</span></span>
+            <span class='access-rights' aria-label='Rights'><span class='badge'>All rights</span></span>
+            <span></span>
+          </li>
+          <li>
+            <span class='access-overview-subject'>{{ download_icon() }}<span>Additional export access</span> <span class='section-count'>{{ entries|length }}</span></span>
+            <span class='access-rights' aria-label='Rights'><span class='badge'>View</span><span class='badge'>Export</span></span>
+            <span></span>
+          </li>
+        </ul>
+      </section>
+      <section class='access-grant' aria-labelledby='grant-export-heading'>
+        <h3 id='grant-export-heading'>Give export access</h3>
+        {{ feedback(error, id='governance-error', focus=true) }}
+        <form class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-panel-success='Export access granted.'>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <div class='form-field'>
-            <label class='form-label-sentence' for='{{ prefix }}export-subject'>User or team</label>
+            <label class='visually-hidden' for='export-subject'>User or team</label>
             <div class='inline-form-action'>
-              <select id='{{ prefix }}export-subject' name='subject' required{% if error %} aria-invalid='true' aria-describedby='{{ prefix }}export-subject-error'{% endif %}>
+              <select id='export-subject' name='subject' required aria-describedby='export-subject-help{% if error %} export-subject-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
                 <option value=''>Select a user or team</option>
                 <optgroup label='Users'>{% for user in users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
                 <optgroup label='Teams'>{% for team in teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
               </select>
               <button class='button button-primary' type='submit'>Grant access</button>
             </div>
-            {% if error %}<p class='error-text' id='{{ prefix }}export-subject-error'>{{ error }}</p>{% endif %}
+            {% if error %}<p class='error-text' id='export-subject-error'>{{ error }}</p>{% endif %}
+            <p class='help-text' id='export-subject-help'>Export only: they can view and download the records, not change them.</p>
           </div>
         </form>
       </section>
-      <section aria-labelledby='{{ prefix }}additional-export-heading'>
-        <h{{ '3' if inline else '2' }} id='{{ prefix }}additional-export-heading' data-panel-section-heading>Additional export access</h{{ '3' if inline else '2' }}>
+      <section aria-labelledby='additional-export-heading'>
+        <h3 id='additional-export-heading'>Additional export access <span class='section-count'>{{ entries|length }}</span></h3>
         {% if entries %}
-          {% call access_list() %}
-            {% for entry, display_name in entries %}
-              {% call access_list_item(display_name, entry.subject_type) %}
-                <form method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, inline=1 if inline else none, concept=1 if concept else none, standalone=1 if standalone else none) }}' {{ 'data-inline-refresh' if inline else 'data-panel-refresh' }}='{{ url_for("dataset_export_access", key=dataset.key, inline=1 if inline else none, concept=1 if concept else none, standalone=1 if standalone else none) }}' data-panel-success='Export access removed.'>
-                  <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-                  <button class='button button-secondary' type='submit' aria-label='Remove export access for {{ "Team " if entry.subject_type == "team" else "" }}{{ display_name }}'>Remove</button>
-                </form>
-              {% endcall %}
-            {% endfor %}
-          {% endcall %}
+          <div class='table-scroll access-table' role='region' aria-label='Additional export access' tabindex='0'>
+            <table>
+              <caption class='visually-hidden'>Additional export access</caption>
+              <thead><tr><th scope='col'>User or team</th><th scope='col'>Type</th><th scope='col'>Added</th><th scope='col'><span class='visually-hidden'>Actions</span></th></tr></thead>
+              <tbody>
+              {% for entry, display_name in entries %}
+                {% set is_team = entry.subject_type == 'team' %}
+                <tr>
+                  <td><div class='access-subject'>{{ team_icon() if is_team else user_icon() }}<span class='access-subject-name'>{{ display_name }}{% if not is_team and emails.get(entry.subject_id) %}<span class='access-subject-detail'>{{ emails[entry.subject_id] }}</span>{% endif %}</span></div></td>
+                  <td><span class='badge'>{{ 'Team' if is_team else 'User' }}</span></td>
+                  <td><time class='access-added' datetime='{{ entry.created_at.isoformat() }}'>{{ entry.created_at|absolute_utc }}</time></td>
+                  <td>
+                    <form method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-inline-refresh='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-panel-success='Export access removed.'>
+                      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+                      <button class='button button-secondary button-table-action button-remove' type='submit' aria-label='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}'>Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
         {% else %}
-          <div class='empty-state empty-state-compact'>
-            <h{{ '4' if inline else '3' }} data-panel-subheading>No additional access</h{{ '4' if inline else '3' }}>
-            <p>Only {{ dataset.owner_team_name }} members and Community administrators can currently export this dataset.</p>
+          <div class='empty-state access-empty'>
+            <h4>No additional access yet</h4>
+            <p>Only {{ dataset.owner_team_name }} members and Community administrators can export this dataset.</p>
           </div>
         {% endif %}
       </section>

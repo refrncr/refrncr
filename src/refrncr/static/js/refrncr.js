@@ -414,9 +414,9 @@
     initializeConfirmations(host);
     window.refrncrKeyGeneration?.(host);
     window.refrncrIconPickers?.(host);
-    host.querySelectorAll("[data-panel-section-heading], [data-panel-subheading]").forEach((heading) => {
-      const marker = heading.hasAttribute("data-panel-section-heading") ? "data-panel-section-heading" : "data-panel-subheading";
-      const nested = document.createElement(marker === "data-panel-section-heading" ? "h3" : "h4");
+    host.querySelectorAll("[data-panel-section-heading]").forEach((heading) => {
+      const marker = "data-panel-section-heading";
+      const nested = document.createElement("h3");
       nested.id = heading.id;
       nested.className = heading.className;
       nested.textContent = heading.textContent;
@@ -546,21 +546,7 @@
           method: "POST", body: data, credentials: "same-origin",
         });
         if (response.redirected) {
-          const refresh = form.getAttribute("data-panel-refresh");
-          if (refresh && panelLoads.get(dialog) !== load) return;
-          if (refresh && response.ok && response.url === new URL(refresh, form.action).href &&
-              await renderPanelResponse(dialog, response, load)) {
-            if (panelLoads.get(dialog) !== load) return;
-            const status = dialog.querySelector("[data-panel-host]").querySelector("[data-panel-status]");
-            if (status) {
-              status.hidden = false;
-              status.setAttribute("role", "status");
-              status.textContent = form.dataset.panelSuccess;
-              if (dialog.open) status.focus();
-            }
-          } else {
-            window.location.assign(response.url);
-          }
+          window.location.assign(response.url);
         } else if (panelLoads.get(dialog) !== load) {
           return;
         } else if (![400, 409].includes(response.status) || !await renderPanelResponse(dialog, response, load)) {
