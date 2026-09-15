@@ -80,6 +80,16 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):  # noqa: F811
     assert [r.id for r in (*page.records, *page2.records)] == [r.id for r in records[:-1]]
     assert read(c, search="AMS", record_status="deleted").total == 1
     assert read(c, search="AMS", record_status="all").total == 65
+    # Status toggle counts follow the search term, whatever status is selected.
+    for status in ("active", "deleted", "all"):
+        view = c.service.read(
+            c.a.id, c.d.key, None, prefer_concept=True, search="AMS", record_status=status
+        )
+        assert view.status_counts == (64, 1)
+    missing = c.service.read(c.a.id, c.d.key, None, prefer_concept=True, search="missing")
+    assert missing.status_counts == (0, 0)
+    single = c.service.read(c.a.id, c.d.key, None, prefer_concept=True, search="id-064")
+    assert single.status_counts == (0, 1)
     browser, _ = client(c)
     path = f"/datasets/{c.d.key}/concept/records"
     params = {"q": "AMS", "record_status": "active"}
@@ -101,7 +111,21 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):  # noqa: F811
         and "Clear all criteria" in zero.text
     )
     default = request(browser, "get", path)
-    assert "of 64" in default.text and "value='active' selected" in default.text
+    assert "of 64" in default.text
+    toggles = default.text.split("data-record-status-form>")[1].split("</form>")[0]
+    # Default: Active is on and cannot be switched off; Deleted adds the deleted Records.
+    assert (
+        "aria-pressed='true' type='button' aria-disabled='true' "
+        "title='At least one status stays selected'>\n    Active" in toggles
+    )
+    assert (
+        "aria-pressed='false' type='submit' name='record_status' value='all'>\n    Deleted"
+        in toggles
+    )
+    everything = request(browser, "get", path + "?record_status=all").text
+    toggles = everything.split("data-record-status-form>")[1].split("</form>")[0]
+    assert "name='record_status' value='deleted'>\n    Active" in toggles
+    assert "name='record_status' value='active'>\n    Deleted" in toggles
 
 
 BAD_QUERIES = (

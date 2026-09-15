@@ -25,6 +25,13 @@ fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px soli
 .search-field .button-icon { position: absolute; top: 50%; left: .625rem; width: 1rem; height: 1rem; margin: 0; color: var(--color-text-muted); transform: translateY(-50%); pointer-events: none; }
 .search-field input { width: 100%; min-height: var(--control-height-compact); margin-top: 0; padding: .375rem .75rem .375rem 2.125rem; font-size: var(--font-size-body-sm); }
 .search-field input::placeholder { color: var(--color-text-muted); opacity: 1; }
+/* One always-visible clear control replaces the browser's hover-only cancel button. */
+.search-field input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; appearance: none; }
+.search-field:has(.search-clear:not([hidden])) input { padding-right: 2.25rem; }
+.search-clear { position: absolute; top: 50%; right: .25rem; display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); cursor: pointer; transform: translateY(-50%); }
+.search-clear[hidden] { display: none; }
+.search-clear:hover { background: var(--color-action-secondary); color: var(--color-text); }
+.search-field .search-clear .button-icon { position: static; width: .875rem; height: .875rem; transform: none; pointer-events: none; }
 
 /* Checkbox and radio labels read as sentences beside their control, also inside side panels. */
 label:has(> input:is([type="checkbox"], [type="radio"])) { display: flex; align-items: flex-start; gap: var(--space-sm); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }

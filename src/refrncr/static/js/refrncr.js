@@ -727,6 +727,25 @@
     primary.click();
   });
 
+  // Search fields: the clear control follows the field's text. A clear link that resets
+  // applied criteria navigates; text that was typed but not applied is cleared in place.
+  document.querySelectorAll("[data-search-field]").forEach((field) => {
+    const input = field.querySelector("input[type=search]");
+    const clear = field.querySelector("[data-search-clear]");
+    if (!input || !clear) return;
+    const applied = clear.hasAttribute("data-search-applied");
+    const sync = () => { clear.hidden = !applied && input.value === ""; };
+    input.addEventListener("input", sync);
+    clear.addEventListener("click", (event) => {
+      if (applied) return;
+      event.preventDefault();
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+    sync();
+  });
+
   const listSearch = document.querySelector("[data-list-search]");
   if (listSearch) {
     listSearch.addEventListener("input", () => {

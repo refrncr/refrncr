@@ -96,7 +96,7 @@
 .import-upload-zone { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg); border-width: 1.5px; text-align: center; }
 .import-upload-zone > .button-icon { width: 1.75rem; height: 1.75rem; opacity: .7; }
 .import-upload-zone input[type="file"] { width: auto; max-width: 100%; min-height: 0; margin-top: 0; padding: 0; border: 0; background: transparent; font-size: var(--font-size-body-sm); }
-.import-upload-zone input[type="file"]::file-selector-button { margin-right: var(--space-sm); padding: .4375rem .75rem; border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: var(--font-weight-semibold) .8125rem/var(--line-height-control) var(--font-interface); cursor: pointer; }
+.import-upload-zone input[type="file"]::file-selector-button { margin-right: var(--space-sm); padding: .4375rem .75rem; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: var(--font-weight-semibold) .8125rem/var(--line-height-control) var(--font-interface); cursor: pointer; }
 .import-upload-zone .help-text { margin: 0; }
 
 .source-formats { grid-column: 1 / -1; min-width: 0; }

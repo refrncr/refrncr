@@ -1405,6 +1405,7 @@ def create_flask_app(
                 for record in page.records
             },
             deleted_count=view.deleted_count,
+            status_counts=view.status_counts,
             record_search=view.search,
             current_actor=actor,
             current_csrf=login_session.csrf_token,

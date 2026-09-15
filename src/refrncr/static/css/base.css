@@ -1,5 +1,9 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { color-scheme: light; font-size: 100%; }
+/* Same-origin page loads keep the old page on screen until the new one can paint, so
+   search, status and other criteria reloads do not flash. The swap itself is instant. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 body { margin: 0; background: var(--color-background); color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body); line-height: var(--line-height-body); }
 img, svg { max-width: 100%; }
 a { color: var(--color-link); text-underline-offset: .18em; }

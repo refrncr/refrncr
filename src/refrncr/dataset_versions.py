@@ -533,14 +533,14 @@ class DatasetVersionService:
 
             ordered = sorted(chain(records, removed), key=sort_key)
             term = normalize("NFC", search).casefold()
+            matching = [record for record in ordered if matches(record, fields, term)]
+            matching_deleted = sum(record.id in deleted_ids for record in matching)
+            status_counts = (len(matching) - matching_deleted, matching_deleted)
             ordered = [
                 record
-                for record in ordered
-                if (
-                    record_status == "all"
-                    or (record.id in deleted_ids) == (record_status == "deleted")
-                )
-                and matches(record, fields, term)
+                for record in matching
+                if record_status == "all"
+                or (record.id in deleted_ids) == (record_status == "deleted")
             ]
             if statuses and state is None:
                 projected = {}
@@ -610,6 +610,7 @@ class DatasetVersionService:
                 MappingProxyType({r.id: labels[r.id] for r in record_page.records}),
                 search,
                 MappingProxyType(deleted_fields),
+                status_counts,
             )
 
     def review(self, actor_id, dataset_id):

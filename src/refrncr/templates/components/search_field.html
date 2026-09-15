@@ -1,5 +1,10 @@
-{% from "components/icons.html" import search_icon %}
-{# Shared compact search control for record toolbars and management lists. #}
-{% macro search_field(id, label, placeholder, name=none, value='', maxlength=none, list_search=false) -%}
-<div class='search-field'><label class='visually-hidden' for='{{ id }}'>{{ label }}</label>{{ search_icon() }}<input id='{{ id }}' type='search'{% if name %} name='{{ name }}'{% endif %} value='{{ value }}'{% if maxlength %} maxlength='{{ maxlength }}'{% endif %} placeholder='{{ placeholder }}'{% if list_search %} data-list-search{% endif %}></div>
+{% from "components/icons.html" import search_icon, close_icon %}
+{# Shared compact search control for record toolbars and management lists.
+   The clear control shows whenever the field has text. With clear_url it is a link that
+   resets the applied criteria (and works without JavaScript); otherwise it only empties
+   the field and repeats the live list filter. #}
+{% macro search_field(id, label, placeholder, name=none, value='', maxlength=none, list_search=false, clear_url=none) -%}
+<div class='search-field' data-search-field><label class='visually-hidden' for='{{ id }}'>{{ label }}</label>{{ search_icon() }}<input id='{{ id }}' type='search'{% if name %} name='{{ name }}'{% endif %} value='{{ value }}'{% if maxlength %} maxlength='{{ maxlength }}'{% endif %} placeholder='{{ placeholder }}'{% if list_search %} data-list-search{% endif %}>
+{%- if clear_url %}<a class='search-clear' href='{{ clear_url }}' aria-label='Clear search' title='Clear search' data-search-clear{% if value %} data-search-applied{% else %} hidden{% endif %}>{{ close_icon() }}</a>
+{%- else %}<button class='search-clear' type='button' aria-label='Clear search' title='Clear search' data-search-clear hidden>{{ close_icon() }}</button>{% endif %}</div>
 {%- endmacro %}

@@ -86,6 +86,8 @@
    Open: tab inside the sidebar against its border, arrow left. Collapsed: tab on the screen edge, arrow right. */
 @media (min-width: 1024px) {
   .app-shell:not(.settings-shell) .navigation-heading { position: relative; }
+  /* The logo starts on the same line as the navigation items and their selection background. */
+  .app-shell:not(.settings-shell) .navigation-heading .brand { margin-left: var(--space-sm); }
   .app-shell:not(.settings-shell) [data-nav-close],
   .app-shell:not(.settings-shell) [data-nav-open] { width: 14px; height: 33px; min-height: 0; padding: 0; border: 1px solid var(--color-border); background: var(--color-surface-subtle); transform: translateY(-50%); }
   .app-shell:not(.settings-shell) [data-nav-close] { position: absolute; top: 50%; right: calc(var(--space-sm) - var(--space-lg)); border-right: 0; border-radius: 6px 0 0 6px; }
