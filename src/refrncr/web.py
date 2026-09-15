@@ -54,6 +54,11 @@ from refrncr.record_import import (
     distinct_samples,
     parse_source,
 )
+from refrncr.record_search import (
+    MAX_QUERY_BYTES,
+    RecordSearchError,
+    parse_parameters,
+)
 from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review
 from refrncr.services import (
     AuthenticationService,
@@ -370,6 +375,10 @@ def create_flask_app(
     @app.after_request
     def protect_audit_response(response):
         endpoint = request.endpoint or ""
+        if endpoint == "dataset_records_view":
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Referrer-Policy"] = "no-referrer"
+            return response
         if (
             endpoint.startswith("audit_")
             or endpoint in concept_endpoints
@@ -1231,24 +1240,65 @@ def create_flask_app(
     def dataset_records_view(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
-        selected_statuses = tuple(filter(None, request.args.getlist("status")))
-        import_results = (
-            concept
-            and request.args.get("import_results") == "1"
-            and (request.args.get("status_selection") != "1" or bool(selected_statuses))
-        )
         try:
+            if len(request.query_string) > MAX_QUERY_BYTES:
+                raise RecordSearchError(
+                    "Record criteria exceed the URL limit. Clear all to start again."
+                )
+            parameters, selected_statuses, record_status, requested_page = parse_parameters(
+                request.args.items(multi=True)
+            )
+            if not concept and any(
+                name in parameters for name in ("import_results", "status_selection")
+            ):
+                raise RecordSearchError("Import results require a Concept.")
+            if not concept and record_status != "active":
+                raise RecordSearchError("Deleted and All are available only in a Concept.")
+            import_results = (
+                concept
+                and parameters.get("import_results") == "1"
+                and (parameters.get("status_selection") != "1" or bool(selected_statuses))
+            )
+            action = parameters.get("action", "")
             view = dataset_versions.read(
                 actor.id,
                 key,
                 version_id,
-                parse_page_parameter(),
+                1 if action else requested_page,
                 prefer_concept=concept,
-                search=request.args.get("q", ""),
+                search=parameters.get("q", ""),
                 statuses=(selected_statuses or ("Added", "Changed", "Deleted"))
                 if import_results
                 else (),
+                record_status=record_status,
             )
+            criteria_parameters = {
+                "q": view.search or None,
+                "record_status": record_status if concept else None,
+            }
+            if import_results:
+                criteria_parameters.update(import_results=1, status=selected_statuses)
+            if action:
+                return redirect(
+                    url_for(
+                        "dataset_records_view",
+                        key=key,
+                        version_id=version_id,
+                        concept=concept or None,
+                        **criteria_parameters,
+                    ),
+                    code=303,
+                )
+        except RecordSearchError as error:
+            # Neutral errors neither include submitted values nor render results
+            # from a partially accepted query. The reset URL carries no criteria.
+            return render_authenticated_template(
+                "pages/datasets/search_error.html",
+                error=str(error),
+                clear_url=url_for(
+                    "dataset_records_view", key=key, version_id=version_id, concept=concept or None
+                ),
+            ), 400
         except NotFoundError:
             if version_id is not None or concept:
                 raise
@@ -1297,8 +1347,19 @@ def create_flask_app(
             return get_datatype(field.data_type).text(value) if value is not None else None
 
         record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
-        range_start = (page.page - 1) * page.page_size + 1 if page.total else 0
-        range_end = min(page.page * page.page_size, page.total)
+        range_start = (page.page - 1) * page.page_size + 1 if page.records else 0
+        range_end = min(page.page * page.page_size, page.total) if page.records else 0
+
+        def record_page_url(number):
+            return url_for(
+                "dataset_records_view",
+                key=key,
+                version_id=view.state.version.id if view.state else None,
+                concept=concept or None,
+                page=number,
+                **criteria_parameters,
+            )
+
         return render_template(
             "pages/datasets/records.html",
             dataset=dataset,
@@ -1307,6 +1368,20 @@ def create_flask_app(
             identifier=identifier,
             rows=rows,
             page=page,
+            criteria_parameters=criteria_parameters,
+            record_status=record_status,
+            record_page_url=record_page_url,
+            clear_url=url_for(
+                "dataset_records_view", key=key, version_id=version_id, concept=concept or None
+            ),
+            clear_import_url=url_for(
+                "dataset_records_view",
+                key=key,
+                concept=concept or None,
+                q=view.search or None,
+                record_status="all",
+            ),
+            has_criteria=bool(view.search or import_results or record_status != "active"),
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,

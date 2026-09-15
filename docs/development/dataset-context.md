@@ -12,6 +12,12 @@ owning-team names remain current administrative context. See [Dataset versions](
 There is no overview pagination; selected Record pages retain the existing canonical sort and
 50-row page size, with explicit version links keeping subsequent pages on the same snapshot.
 
+REF-136 keeps header counts/freshness version-wide. The separate Records result count is
+the exact count after String search and status selection, before
+pagination. The browser defaults to Active; a Concept offers Deleted and All. Criteria
+and page live in the GET URL, with no session search state. Every UI criteria change resets
+to page 1. Export actions retain their complete-version scope. See [REF-136](ref-136-report.md).
+
 `DatasetRecord` stores only the mutable current working set. Its revision is an optimistic
 concurrency counter, not another row/version. The explicitly named `current_overview` contract
 must continue to count only this working set when historical/publication storage is introduced.

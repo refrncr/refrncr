@@ -110,10 +110,11 @@ Typed Python values determine ascending ordering: numeric magnitude, Gregorian
 date/time order, UTC instant order, false before true and UTF-8 byte String order.
 The catalog places null last. Record pages and bounded-memory export continue
 ordering by identifier field keys; incomplete historical identifiers remain
-last, with stable Record-ID tie-breaking. There is currently no Record value
-filter endpoint or general per-column ordering UI. Future typed filters must
-use the same parsed values rather than casting stored text differently on each
-database. No filtering functionality was invented for this story.
+last, with stable Record-ID tie-breaking. REF-136 general search covers only String,
+including String identifiers, using NFC and Unicode casefold. Non-String values
+are not searched through their presentation text. Typed Field filters are deferred
+at the product owner's request. There is no per-column ordering UI.
+See [the search contract and evidence](ref-136-report.md).
 
 Field create/edit exposes all nine labels. A datatype change is allowed only
 when **that Field has no non-null stored value**, including when other Records

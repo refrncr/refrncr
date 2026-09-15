@@ -345,3 +345,13 @@ Exactly one `dataset:dataset.new_version_imported` summary records `mode`, `form
 `added`, `changed`, `unchanged`, `deleted`, and `total_processed` (source Records plus
 Deleted Records). No per-row import events, values, identifiers, filenames or source
 examples are audited. Manual Undo emits `dataset_record:restored` transactionally.
+
+### Search/filter interaction (REF-136)
+
+Import preview and complete-identifier matching are unchanged. The post-import Records
+page retains the original receipt totals and Added/Changed/Deleted selection. Its explicit
+`import_results=1` defaults Record status to All, preserving Deleted results. General String search combines with that selection using AND. Clearing
+the import-change selection preserves the other criteria; Clear all returns to the normal
+Active view. The general Records search now accepts String Fields only, including String
+identifiers. Non-text identifiers are excluded from general search. Neither searching nor
+clearing criteria changes eligibility, the receipt, revisions, stored data or audit.

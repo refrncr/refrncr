@@ -82,3 +82,13 @@ account lookup, and still consume failed-attempt limiter history. Credential/acc
 and throttled attempts continue to share the generic 401 response. Only the escaped submitted
 email (bounded to 320 code points) and request CSRF/return-path values may differ; passwords
 are never supplied to the rendering context.
+
+## Records query privacy (REF-136)
+
+Records responses, including invalid-criteria responses, use `no-store` and `no-referrer`.
+The normal CLI server redacts Records querystrings from its Uvicorn access handler before
+formatting; validation/errors never include submitted values. Configure any independent
+hosting access log or reverse proxy to omit these querystrings too. Criteria intentionally
+live in shared URLs and browser history; they confer no Dataset or version authorization.
+Concept routes retain server-side maintenance enforcement, while each service read resolves
+current permissions and the selected content within one existing coherent snapshot.

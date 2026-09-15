@@ -7,6 +7,7 @@ import os
 import sys
 import warnings
 from collections.abc import Callable, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
+from refrncr.record_search import RecordQueryLogFilter
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
 from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
 
@@ -318,11 +320,15 @@ def start(configuration: StartConfiguration) -> None:
         raise RuntimeError("database migration or bootstrap failed") from exc
     local_url = f"http://{configuration.host}:{configuration.port}"
     print(f"refrncr is starting at {local_url}", flush=True)
+    log_config = deepcopy(uvicorn.config.LOGGING_CONFIG)
+    log_config["filters"] = {"record_query_privacy": {"()": RecordQueryLogFilter}}
+    log_config["handlers"]["access"]["filters"] = ["record_query_privacy"]
     uvicorn.run(
         application,
         host=configuration.host,
         port=configuration.port,
         proxy_headers=False,
+        log_config=log_config,
     )
 
 

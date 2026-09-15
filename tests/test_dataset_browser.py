@@ -723,10 +723,15 @@ def test_record_table_pagination_keeps_range_and_links(dataset_browser):
     second = body(request(client, "get", f"/datasets/{dataset.key}/concept/records?page=2"))
 
     assert "Showing 1–50 of 51" in first
-    assert "href='/datasets/pages/concept/records?page=2'>Next</a>" in first
+    assert (
+        "href='/datasets/pages/concept/records?page=2&amp;record_status=active'>Next</a>" in first
+    )
     assert ">Previous</a>" not in first
     assert "Showing 51–51 of 51" in second
-    assert "href='/datasets/pages/concept/records?page=1'>Previous</a>" in second
+    assert (
+        "href='/datasets/pages/concept/records?page=1&amp;record_status=active'>Previous</a>"
+        in second
+    )
     assert ">Next</a>" not in second
 
 

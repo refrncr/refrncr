@@ -229,11 +229,16 @@ access this concept representation. Removed/recreated identifiers remain distinc
 Deleted data never re-enters working content or the next published snapshot.
 
 The header counts surviving concept Records separately, for example `24 records · 1 marked
-for deletion`. Result pagination counts all matching rows, including Deleted. Search is a
-literal, normalized case-insensitive identifier substring (maximum 200 characters); Deleted
-uses the old identifier. Typed sort uses each row's source identifier fields, datatype tags
-and stable UUID ties. Page links preserve search. Metadata counts stay dataset-wide even
-when searching. Current reads remain separate, and no navigation/search/detail audit event
+for deletion`. REF-136 defaults the Records page to Active; Deleted and All are explicit
+Concept selections. Pagination counts every match within the selected set. General search
+is a literal, NFC/casefold String substring (maximum 200 characters), including String
+identifiers. Non-String identifiers are not included in general search. Only the displayed
+version's Field identities/types participate; retained values from an incompatible or
+recreated Field do not acquire the replacement Field's meaning. Deleted details still
+show the original retained values.
+Typed sort continues using each row's source identifier fields, datatype tags and stable
+UUID ties. Page links preserve criteria. Metadata counts stay version-wide even when
+searching. Current reads remain separate, and no navigation/search/detail audit event
 is added; only explicitly opening a new valid detailed review retains the REF-149 exception.
 
 ## Discard concept (REF-155)
@@ -301,3 +306,18 @@ REF-162: Dataset name and description now follow the current icon semantics. The
 are editable without a Concept, do not advance content revisions, and cannot by
 themselves make a version publishable. Concept creation/discard preserves them;
 stored snapshot metadata stays immutable. See [ADR-017](../architecture/adr-017-current-dataset-metadata.md).
+
+## Record criteria (REF-136)
+
+General String search runs within the existing coherent
+authorized snapshot, before the existing 50-row pagination. Current and explicit immutable
+version routes never load Concept content; Scheduled access keeps the existing maintenance
+restriction. Active/Deleted/All operates independently of the retained REF-160 import-change
+selection. Its redirect defaults to All so Deleted import results remain included.
+
+The internal `DatasetVersionService.read` keeps its pre-existing All default for callers
+that consume the combined Record projection; the Records HTTP adapter explicitly supplies
+Active by default. No public Record mutation, import, export or audit contract changes.
+No schema/index migration is needed. Full-set canonical sorting remains in Python, with
+the existing joined/batched loading. See [REF-136](ref-136-report.md) for URL grammar,
+null/schema semantics, performance and validation evidence.

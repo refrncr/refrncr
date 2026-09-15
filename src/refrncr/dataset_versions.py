@@ -18,6 +18,7 @@ from refrncr.ports import (
     PersistenceConflictError,
     StoredRecord,
 )
+from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
     ConflictError,
     DatasetRecordService,
@@ -465,18 +466,25 @@ class DatasetVersionService:
         prefer_concept=False,
         search="",
         statuses=(),
+        record_status="all",
     ):
         if page is not None and (type(page) is not int or page < 1):
             raise ValidationError("Page must be a positive integer")
-        if not isinstance(search, str) or len(search) > 200:
-            raise ValidationError("Identifier search must not exceed 200 characters")
-        if set(statuses) - {"Added", "Changed", "Deleted"}:
-            raise ValidationError("Choose a valid Record status")
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             dataset, state, maintain = self._selection(
                 uow, actor_id, key, version_id, prefer_concept=prefer_concept
             )
+            search = search_term(search)
+            if record_status not in {"active", "deleted", "all"}:
+                raise RecordSearchError("Choose Active, Deleted or All.")
+            if (
+                not isinstance(statuses, tuple)
+                or any(status not in {"Added", "Changed", "Deleted"} for status in statuses)
+                or len(set(statuses)) != len(statuses)
+                or (state is not None and (statuses or record_status == "deleted"))
+            ):
+                raise RecordSearchError("Choose valid statuses for this Dataset version.")
             context = self._read_context(uow, dataset, state)
             if state is None:
                 fields = tuple(uow.dataset_fields.list_for_dataset(dataset.id))
@@ -525,8 +533,15 @@ class DatasetVersionService:
 
             ordered = sorted(chain(records, removed), key=sort_key)
             term = normalize("NFC", search).casefold()
-            if term:
-                ordered = [r for r in ordered if term in normalize("NFC", labels[r.id]).casefold()]
+            ordered = [
+                record
+                for record in ordered
+                if (
+                    record_status == "all"
+                    or (record.id in deleted_ids) == (record_status == "deleted")
+                )
+                and matches(record, fields, term)
+            ]
             if statuses and state is None:
                 projected = {}
                 for offset in range(0, len(ordered), 500):
