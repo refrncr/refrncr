@@ -1,0 +1,37 @@
+{% from "components/search_field.html" import search_field %}
+{% from "components/record_status_filter.html" import record_status_filter %}
+{% macro hidden_criteria(values, exclude=[]) %}
+{% for name, value in values.items() if name not in exclude and value is not none %}
+{% if value is iterable and value is not string %}
+{% for item in value %}<input type='hidden' name='{{ name }}' value='{{ item }}'>{% endfor %}
+{% else %}<input type='hidden' name='{{ name }}' value='{{ value }}'>{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% macro record_search_controls() %}
+<section class='record-criteria' aria-label='Search Records' data-record-criteria>
+  <div class='record-criteria-toolbar'>
+  <form id='record-search-form' method='get' role='search' aria-label='Search records' class='record-search-form'>
+    {{ hidden_criteria(criteria_parameters, ['q', 'import_results', 'status']) }}
+    {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=200) }}
+    {% if import_results or import_totals %}{{ record_status_filter(dataset.key, record_search, import_results, result_statuses, import_totals, clear_import_url) }}{% endif %}
+  </form>
+  <button class='button button-secondary' type='submit' form='record-search-form' name='action' value='search'>Search</button>
+  {% if has_criteria %}<a class='record-criteria-clear' href='{{ clear_url }}' aria-label='Clear all search and filter criteria'>Clear all</a>{% endif %}
+  </div>
+  {% if not version_state %}
+  <form id='record-status-form' method='get' data-record-status-form>
+    {{ hidden_criteria(criteria_parameters, ['record_status']) }}
+    <div class='record-filter-actions'>
+      <div class='form-field'>
+        <label for='record-status'>Record status</label>
+        <select id='record-status' name='record_status' data-filter-status>
+          {% for value, label in [('active', 'Active'), ('deleted', 'Deleted'), ('all', 'All')] %}<option value='{{ value }}'{% if record_status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <button class='button button-secondary' type='submit' name='action' value='apply' data-filter-apply>Apply status</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endmacro %}

@@ -40,3 +40,4 @@
   {% include "pages/datasets/_record_table.html" %}
   {% include "pages/datasets/_record_panels.html" %}
 {% endblock %}
+{% block scripts %}<script src='{{ url_for("static", filename="js/record-search.js") }}' defer></script>{% endblock %}

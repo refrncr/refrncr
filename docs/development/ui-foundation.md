@@ -1104,3 +1104,20 @@ REF-162 general configuration uses the shared section-tabs component with an ena
 normally; the view contains no Field mutation controls. The Dataset overview uses a separate gear
 link with a `configuration` tooltip and Dataset-specific accessible name. Other
 row actions retain their existing chevron. No design tokens change.
+
+## Records basic search (REF-136)
+
+The product owner reduced this implementation to basic search. There is no Add filter,
+Field/operator/value editor or typed-filter URL support. `components/record_search.html`
+composes the existing search field, Search action and conditional Clear all link
+inside the Record table toolbar, sharing its border directly above the column headings.
+No tokens or global controls change. Desktop keeps the toolbar on one line where space
+allows; mobile puts the input above the action row.
+
+Search/Enter explicitly submits a native GET form. Concept status has a separate GET
+form carrying only the last applied search term, with Apply status as its no-JavaScript
+fallback. `record-search.js` submits status changes and announces the result count.
+An unsubmitted search draft is not applied by a status change. All search/status changes
+reset pagination. Clear all returns to Active; the import-change selector retains its
+existing receipt and selection behavior. Browser history and shared URLs contain only
+applied criteria. No search state is persisted. See [REF-136](ref-136-report.md).

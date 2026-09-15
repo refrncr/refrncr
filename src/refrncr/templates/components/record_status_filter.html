@@ -1,4 +1,4 @@
-{% macro record_status_filter(key, search, active, statuses, totals) %}
+{% macro record_status_filter(key, search, active, statuses, totals, clear_url=none) %}
 {% set selected = (statuses|reject('equalto', '')|list or ['Added', 'Changed', 'Deleted']) if active else [] %}
 {% set caption = 'All records' if not selected else ('All changes' if selected|length == 3 else (selected[0] if selected|length == 1 else selected|length ~ ' statuses')) %}
 <input type='hidden' name='import_results' value='1'>
@@ -6,7 +6,7 @@
 <details class='export-menu record-status-filter'>
   <summary class='button button-secondary' aria-label='Change status: {{ caption }}'>{{ caption }}</summary>
   <div class='export-menu-options record-status-options'>
-    <a href='{{ url_for("dataset_records_view", key=key, concept=true, q=search or none) }}'{% if not active %} aria-current='true'{% endif %}>All records{% if not active %}<b aria-hidden='true'>✓</b>{% endif %}</a>
+    <a href='{{ clear_url or url_for("dataset_records_view", key=key, concept=true, q=search or none) }}'{% if not active %} aria-current='true'{% endif %}>All records{% if not active %}<b aria-hidden='true'>✓</b>{% endif %}</a>
     <fieldset>
       <legend>Imported changes</legend>
       {% for status in ('Added', 'Changed', 'Deleted') %}

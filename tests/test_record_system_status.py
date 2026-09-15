@@ -45,7 +45,9 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         untouched.id: "Published",
         added.id: "Added",
     }
-    concept_html = request(browser, "get", f"/datasets/{c.d.key}/concept/records").text
+    concept_html = request(
+        browser, "get", f"/datasets/{c.d.key}/concept/records?record_status=all"
+    ).text
     statuses = re.findall(
         r"<td class='record-system-status'><span class='badge ([^']+)'>([^<]+)</span></td>",
         concept_html,
@@ -59,7 +61,9 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         ]
     )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
-    response = request(browser, "get", f"/datasets/{c.d.key}/concept/records?q=old")
+    response = request(
+        browser, "get", f"/datasets/{c.d.key}/concept/records?q=old&record_status=deleted"
+    )
     assert response.status_code == 200
     html = response.text
     assert "3 records" in html and "1 marked for deletion" in html
@@ -142,7 +146,11 @@ def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):  #
         view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
         assert [r.id for r in view.page.records] == [new.id, old.id]
     browser, _ = client(c)
-    html = request(browser, "get", f"/datasets/{c.d.key}/concept/records?q=old").text
+    # The old identifier is now Integer in the displayed schema: REF-136 does
+    # not search the retained String as if it were the current Integer Field.
+    html = request(
+        browser, "get", f"/datasets/{c.d.key}/concept/records?record_status=deleted"
+    ).text
     panel = html.split(f"id='record-panel-{old.id}'", 1)[1].split("</dialog>", 1)[0]
     assert "Retained old value" in panel and "Replacement" not in panel
     assert "OLD" in panel
@@ -186,7 +194,9 @@ def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(co
     assert [r.id for r in (*first.page.records, *second.page.records)] == [r.id for r in records]
     assert set(first.record_states.values()) == {"Deleted"}
     browser, _ = client(c)
-    html = request(browser, "get", f"/datasets/{c.d.key}/concept/records?q=same").text
+    html = request(
+        browser, "get", f"/datasets/{c.d.key}/concept/records?q=same&record_status=all"
+    ).text
     assert "page=2" in html and "q=same" in html
     empty = c.service.read(c.a.id, c.d.key, prefer_concept=True, search="no-match")
     assert empty.page.total == 0 and empty.context.record_count == 0 and empty.deleted_count == 60

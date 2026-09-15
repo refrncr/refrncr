@@ -348,3 +348,18 @@ Undo delete emits one `dataset_record:restored` event for the existing UUID; no 
 Field values or identifiers enter audit. Historic delete events retain their meaning as
 the deletion at that time. Eligibility and preview remain unaudited reads. The inventory,
 coverage matrix and event presentation catalog include both operations and browser routes.
+
+## REF-136 Record search privacy
+
+General search, status selection, result counts and pagination
+remain ordinary `DatasetVersionService.read` operations: no event, mutation or revision.
+No new operation or audit contract is introduced. Invalid criteria return fixed messages
+without query content or partial results. Application errors retain fixed diagnostics.
+
+The supported `refrncr start` Uvicorn access handler removes querystrings from Dataset
+Records URLs (Current, Concept and explicit versions, including trailing-slash attempts).
+Method/path/status remain available; unrecognized access-event shapes fail closed.
+The filter configuration is copied rather than mutating Uvicorn's global defaults.
+Other hosting stacks/reverse proxies must likewise omit Records querystrings; browser
+history and intentionally shared URLs necessarily contain the user's valid criteria.
+Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.

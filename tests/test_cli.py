@@ -726,12 +726,13 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "build_application", build_application)
 
-    def run(application, *, host, port, proxy_headers):
+    def run(application, *, host, port, proxy_headers, log_config):
         received.update(
             application=application,
             host=host,
             port=port,
             proxy_headers=proxy_headers,
+            log_config=log_config,
         )
 
     monkeypatch.setattr(cli.uvicorn, "run", run)
@@ -746,6 +747,8 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     assert received["allow_loopback_http"] is True
     assert received["trusted_proxies"] == ()
     assert received["proxy_headers"] is False
+    assert received["log_config"]["handlers"]["access"]["filters"] == ["record_query_privacy"]
+    assert "filters" not in cli.uvicorn.config.LOGGING_CONFIG
     assert "http://127.0.0.2:8123" in capsys.readouterr().out
 
 
