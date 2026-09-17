@@ -1,17 +1,27 @@
 {% extends "base.html" %}
-{% from "components.html" import feedback, form_field, readonly_field %}
+{% from "components.html" import feedback %}
+{% from "components/icons.html" import alert_triangle_icon %}
 {% from "components/side_panel.html" import panel_form_actions %}
 {% block title %}Delete dataset · REFRNCR{% endblock %}
 {% block content %}
   <h1>Delete dataset</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Delete dataset' data-panel-eyebrow='{{ deletion.name }}'>
     <div class='side-panel-body panel-sections'>
-      {{ readonly_field("Dataset", deletion.name) }}
-      {{ feedback("Deletion is permanent. All records, fields, record identifiers and access settings will be removed. This cannot be undone.", kind="warning") }}
-      <p>{{ deletion.field_count }} fields and {{ deletion.record_count }} records will be deleted. Audit history will be retained.</p>
+      <p class='deletion-alert'>{{ alert_triangle_icon() }}<span>Deletion is permanent and cannot be undone.</span></p>
+      <dl class='deletion-counts'>
+        <div><dt>Versions</dt><dd>{{ deletion.version_count }}</dd></div>
+        <div><dt>Records</dt><dd>{{ deletion.record_count }}</dd></div>
+        <div><dt>Fields</dt><dd>{{ deletion.field_count }}</dd></div>
+        <div><dt>Export access</dt><dd>{{ deletion.export_access_count }}</dd></div>
+      </dl>
+      <p class='deletion-retained'>Record identifiers and access settings are removed with them. Audit history is retained.</p>
       {{ feedback(error, id="dataset-delete-error", focus=true) }}
       <form id='dataset-delete-form' class='form' method='post' action='{{ url_for("dataset_delete", dataset_id=deletion.id) }}' data-exact-confirmation='{{ deletion.name }}'>
-        {{ form_field("Dataset name", "confirmation_name", "dataset-delete-name", required=true, autocomplete="off", help_text="Enter the dataset name exactly, including capitalization, accents and spaces.", error_id="dataset-delete-error" if error else none) }}
+        <div class='form-field'>
+          <label for='dataset-delete-name'>Type <code>{{ deletion.name }}</code> to confirm</label>
+          <input id='dataset-delete-name' name='confirmation_name' type='text' autocomplete='off' required aria-describedby='dataset-delete-name-help{% if error %} dataset-delete-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
+          <p class='help-text' id='dataset-delete-name-help'>Enter the dataset name exactly, including capitalization, accents and spaces.</p>
+        </div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_updated_at' value='{{ deletion.expected_updated_at }}'>
       </form>

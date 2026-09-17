@@ -302,7 +302,9 @@ class GrantOperations(Protocol):
 
 
 class DatasetOperations(Protocol):
-    def deletion_counts(self, dataset_id: str) -> tuple[int, int]: ...
+    def deletion_counts(self, dataset_id: str) -> tuple[int, int, int, int]:
+        """Fields, records, versions and export access grants the deletion removes."""
+        ...
 
     def delete_with_dependents(self, dataset_id: str) -> None:
         """Delete the inventoried operational rows; never delete audit history or commit."""

@@ -14,6 +14,7 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.presentation_metadata import DATASET_ICONS
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
@@ -601,12 +602,12 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
     template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
 
     # Dataset icons use the pinned local sprite; interface icons stay inline.
-    assert [p.name for p in image_directory.glob("lucide-*.svg")] == ["lucide-0.468.0.svg"]
-    assert "images/lucide-0.468.0.svg" in template_source
-    assert request(client, "get", "/static/images/lucide-0.468.0.svg").status_code == 200
+    assert [p.name for p in image_directory.glob("lucide-*.svg")] == ["lucide-1.46.0.svg"]
+    assert "images/lucide-1.46.0.svg" in template_source
+    assert request(client, "get", "/static/images/lucide-1.46.0.svg").status_code == 200
     assert {path.name for path in image_directory.iterdir()} == {
         "favicon.svg",
-        "lucide-0.468.0.svg",
+        "lucide-1.46.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
     }
@@ -1110,10 +1111,18 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert response.status_code == 200
     assert "<title>Configure Stored &lt;name&gt; · REFRNCR</title>" in page
     assert "<div class='page-header page-header-actions-end'>" in page
-    assert "<p><span class='form-label'>Key:</span> <code>edit-form</code></p>" in page
+    assert "<p class='form-label'>Key</p>" in page
+    assert "<p class='readonly-value'><code>edit-form</code></p>" in page
+    assert "Permanent; used in exports and the API." in page
+    assert page.index("id='dataset-edit-form'") < page.index("<code>edit-form</code>")
+    # The icon picker shows a preview and suggestions once enhanced; the name field always works.
+    assert "data-icon-preview hidden" in page and "data-icon-suggestions hidden" in page
+    # The default tile plus one per suggestion.
+    assert page.count("data-icon-choice=") == len(DATASET_ICONS) + 1
+    assert "<code data-icon-preview-name>table</code>" in page
     assert "name='key'" not in page
     assert (
-        "<form id='dataset-edit-form' class='form' novalidate "
+        "<form id='dataset-edit-form' class='form dataset-edit-form' novalidate "
         "method='post' action='/datasets/edit-form'>" in page
     )
     assert "<label for='dataset-name'>Name</label>" in page

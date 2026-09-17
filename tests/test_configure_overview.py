@@ -73,11 +73,17 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "Edit dataset" not in actions
     details = section(page, "dataset-details-heading")
     assert ("Edit dataset" in details) == (permission != "viewer")
-    for label in ("Name", "Description", "Owning team", "Key"):
+    for label in ("Owning team", "Key", "Icon", "Version", "Fields", "Created"):
         assert f"<dt>{label}</dt>" in details
-    assert "<dd>Test data domain</dd>" in details
+    assert "<p class='dataset-identity-name'>Reference data</p>" in details
+    assert "</svg>Test data domain</span>" in details
     assert "No description provided" in details
-    assert "<dd><code>overview</code></dd>" in details
+    assert "<dd><code>overview</code> <span class='badge'>Permanent</span>" in details
+    assert f"<dt>Fields</dt><dd>{count}</dd>" in details
+    assert "<dt>Records</dt><dd>0</dd>" in details
+    version_label = "Version 1 · Current" if version else "Concept in progress"
+    assert f"<dt>Version</dt><dd>{version_label}</dd>" in details
+    assert "They are not part of a version." in details
     # UUIDs remain legal in functional hidden inputs and access subject values.
     presentation = re.sub(
         r"<input[^>]*type='hidden'[^>]*>| value='[^']*'| href='/datasets/id/[^']*'", "", page

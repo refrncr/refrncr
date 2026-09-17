@@ -12,7 +12,7 @@ MAX_FIELD_UNIT = 64
 # input is used in file paths or parsed as SVG. The UI offers a small suggestion set.
 LUCIDE_ICON_NAMES = frozenset(
     symbol.attrib["id"]
-    for symbol in ET.parse(Path(__file__).parent / "static/images/lucide-0.468.0.svg")
+    for symbol in ET.parse(Path(__file__).parent / "static/images/lucide-1.46.0.svg")
     .getroot()
     .findall(".//{http://www.w3.org/2000/svg}symbol")
 )
@@ -26,15 +26,43 @@ def rendered_dataset_icon(value):
     )
 
 
+# Product-owner selection (REF-165); every name resolves in the pinned 1.46.0 sprite.
 DATASET_ICONS = {
-    "house": "House",
-    "key-round": "Key round",
-    "lock": "Lock",
-    "scroll-text": "Scroll text",
-    "settings-2": "Settings",
-    "table": "Table",
-    "user": "User",
-    "users": "Users",
+    "landmark": "Landmark",
+    "banknote": "Banknote",
+    "languages": "Languages",
+    "earth": "Earth",
+    "atom": "Atom",
+    "flask-conical": "Flask conical",
+    "test-tube-diagonal": "Test tube",
+    "tag": "Tag",
+    "bookmark": "Bookmark",
+    "signpost-big": "Signpost",
+    "building": "Building",
+    "layers": "Layers",
+    "vector-polygon": "Vector polygon",
+    "paint-bucket": "Paint bucket",
+    "bot": "Bot",
+    "network": "Network",
+    "database": "Database",
+    "scale": "Scale",
+    "file-box": "File box",
+    "target": "Target",
+    "ruler-dimension-line": "Ruler dimension",
+    "gallery-vertical-end": "Gallery vertical",
+    "clock": "Clock",
+    "vector-square": "Vector square",
+    "settings": "Settings",
+    "file-sliders": "File sliders",
+    "hand-coins": "Hand coins",
+    "credit-card": "Credit card",
+    "building-complex": "Building complex",
+    "users-round": "Users round",
+    "user-round": "User round",
+    "wrench": "Wrench",
+    "refresh-ccw": "Refresh",
+    "zap": "Zap",
+    "cable": "Cable",
 }
 
 

@@ -4412,7 +4412,14 @@
       "operation": "get_dataset_for_deletion",
       "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
       "interface_entrypoints": [
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4434,7 +4441,8 @@
       "tests": [
         "tests/test_dataset_deletion.py::test_atomic_deletion_preserves_history",
         "tests/test_dataset_deletion.py::test_authorization_and_non_disclosing_targets",
-        "tests/test_dataset_deletion.py::test_web_denied_targets_are_uniform"
+        "tests/test_dataset_deletion.py::test_web_denied_targets_are_uniform",
+        "tests/test_ui_polish.py::test_danger_zone_shows_what_deletion_removes"
       ],
       "implementation_status": "REF-141 locally verified on SQLite 3.51.0 and PostgreSQL 16.15; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",

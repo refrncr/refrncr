@@ -1,9 +1,8 @@
 {% from 'components/dataset_icon.html' import icon_picker %}
-{% from 'components.html' import feedback, form_field, readonly_field %}
+{% from 'components.html' import feedback, form_field %}
 {% from 'pages/datasets/_team_choice.html' import team_choice %}
-  {{ readonly_field("Key", dataset.key, technical=true) }}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}
-  <form id='dataset-edit-form' class='form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <form id='dataset-edit-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
     {{ form_field(
       "Name",
       "name",
@@ -21,12 +20,25 @@
     ) }}
     {{ icon_picker(dataset_icon_choices, selected_icon) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-    {% if may_govern %}
-      {{ team_choice(teams, selected_team_id) }}
-      <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>
-    {% else %}
-      {{ readonly_field("Owning team", dataset.owner_team_name) }}
-    {% endif %}
+    <div class='dataset-edit-pair'>
+      {% if may_govern %}
+        <div>
+          {{ team_choice(teams, selected_team_id) }}
+          <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>
+          <p class='help-text'>Only Community administrators can change this.</p>
+        </div>
+      {% else %}
+        <div class='form-field'>
+          <p class='form-label'>Owning team</p>
+          <p class='readonly-value'>{{ dataset.owner_team_name }}</p>
+        </div>
+      {% endif %}
+      <div class='form-field dataset-edit-key'>
+        <p class='form-label'>Key</p>
+        <p class='readonly-value'><code>{{ dataset.key }}</code></p>
+        <p class='help-text'>Permanent; used in exports and the API.</p>
+      </div>
+    </div>
     <div class='form-actions'>
       <button class='button button-primary' type='submit'>Save dataset</button>
       <a class='button button-secondary' href='{{ configuration_url }}#dataset-details-heading'>Cancel</a>

@@ -67,7 +67,7 @@ def test_key_canonicalization_matches_javascript(name, expected):
 
 
 @pytest.mark.parametrize(
-    "icon", [*DATASET_ICONS, "database", "align-horizontal-distribute-center", "", None]
+    "icon", [*DATASET_ICONS, "table", "warehouse", "align-horizontal-distribute-center", "", None]
 )
 def test_icon_catalog_and_clear(context, icon):  # noqa: F811
     c = context
@@ -260,9 +260,11 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):  # noqa: 
     assert "id='access-management'" in html
     assert "href='#access-management'>Access management</a>" in html
     edit = re.search(
-        r"<a[^>]+href='/datasets/polish/configure\?edit=1#dataset-name'[^>]*>Edit dataset</a>", html
+        r"<a[^>]+href='/datasets/polish/configure\?edit=1#dataset-name'[^>]*>.*?Edit dataset</a>",
+        html,
+        re.DOTALL,
     ).group()
-    assert "button" not in edit and "data-panel-url" not in edit
+    assert "button-secondary" in edit and "data-panel-url" not in edit
     assert len(re.findall(r"id='configuration-panel'", html)) == 1
     target = s.users.create_user(a.id, "export@example.com", "Exporter", "valid password")
     csrf = session_csrf(client, s)
@@ -316,7 +318,7 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
     assets = ROOT / "src/refrncr/static/images"
     assert {p.name for p in assets.iterdir()} == {
         "favicon.svg",
-        "lucide-0.468.0.svg",
+        "lucide-1.46.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
     }
@@ -519,7 +521,7 @@ def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):  # noqa: F8
     d = create_dataset(s, a, "manual-icon", "Manual icon")
     s.datasets.update_dataset(a.id, d.key, d.name, d.description, icon="database")
     login(client)
-    assert "lucide-0.468.0.svg#database" in body(request(client, "get", "/datasets"))
+    assert "lucide-1.46.0.svg#database" in body(request(client, "get", "/datasets"))
     assert "value='database'" in body(request(client, "get", f"/datasets/{d.key}/edit"))
     assert rendered_dataset_icon("missing") == "table"
     assert rendered_dataset_icon("<svg>") == "table"
@@ -635,6 +637,28 @@ def test_dataset_metadata_is_independent_of_versions(context, with_concept):  # 
     with pytest.raises(ConflictError, match="matches"):
         publish(c)
     assert content(c, first) == original
+
+
+def test_danger_zone_shows_what_deletion_removes(dataset_browser):  # noqa: F811
+    """The tab states the destructive action and counts everything it takes with it."""
+    _, s, a, client = dataset_browser
+    d = create_dataset(s, a, "danger", "Danger")
+    s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
+    publish_dataset(s, a.id, d)
+    login(client)
+    html = body(request(client, "get", "/datasets/danger/configure"))
+    danger = html.split("<section id='danger-zone'", 1)[1]
+    assert "Delete this dataset" in danger and "cannot be undone" in danger
+    for label, count in [("Versions", 1), ("Records", 0), ("Fields", 1), ("Export access", 0)]:
+        assert f"{label} <b>{count}</b>" in danger
+    assert "The audit log keeps a record of the deletion" in danger
+
+    # The confirmation panel repeats the counts and asks for the exact name.
+    panel = body(request(client, "get", f"/datasets/id/{d.id}/delete"))
+    assert "<dt>Versions</dt><dd>1</dd>" in panel
+    assert "<dt>Export access</dt><dd>0</dd>" in panel
+    assert "Type <code>Danger</code> to confirm" in panel
+    assert "Audit history is retained." in panel
 
 
 def test_standalone_configuration_without_concept(dataset_browser):  # noqa: F811

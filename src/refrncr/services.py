@@ -748,6 +748,8 @@ class DatasetDeletion:
     name: str
     field_count: int
     record_count: int
+    version_count: int
+    export_access_count: int
     expected_updated_at: str
 
 
@@ -826,13 +828,15 @@ class DatasetService:
         return value.isoformat(timespec="microseconds")
 
     def _deletion_context(self, uow, dataset):
-        fields, records = uow.datasets.deletion_counts(dataset.id)
+        fields, records, versions, export_access = uow.datasets.deletion_counts(dataset.id)
         return DatasetDeletion(
             dataset.id,
             dataset.key,
             dataset.name,
             fields,
             records,
+            versions,
+            export_access,
             self._deletion_timestamp(dataset),
         )
 

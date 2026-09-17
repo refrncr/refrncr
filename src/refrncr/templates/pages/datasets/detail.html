@@ -3,7 +3,8 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon, lock_icon %}
+{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon %}
+{% from "components/dataset_icon.html" import dataset_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
@@ -30,19 +31,47 @@
   {{ section_tabs(tabs, 'Configure dataset sections') }}
   <div class='configuration-overview' data-tab-panels>
     <section id='dataset-details' aria-labelledby='dataset-details-heading'>
-      <div class='page-header section-header'><h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>{% if editable and not edit_mode %}<a href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>Edit dataset</a>{% endif %}</div>
+      <div class='page-header section-header'>
+        <div>
+          <h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>
+          {% if not edit_mode %}<p class='section-description'>How this dataset is named and shown across REFRNCR.</p>{% endif %}
+        </div>
+        {% if editable and not edit_mode %}<div class='page-actions'><a class='button button-secondary' href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>{{ file_pen_icon() }}Edit dataset</a></div>{% endif %}
+      </div>
       {% if edit_mode %}
         {% include 'pages/datasets/_edit_form.html' %}
       {% else %}
-      <dl class='detail-list'>
-        <div><dt>Name</dt><dd>{{ dataset.name }}</dd></div>
-        <div><dt>Description</dt><dd>{{ dataset.description or 'No description provided' }}</dd></div>
-        <div><dt>Dataset icon</dt><dd>{{ dataset.icon or 'Default dataset icon' }}</dd></div>
-        <div><dt>Owning team</dt><dd>{{ dataset.owner_team_name }}</dd></div>
-        <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
-      </dl>
+      <div class='dataset-details-layout'>
+        <div class='dataset-details-main'>
+          <div class='dataset-identity-card'>
+            <span class='dataset-icon-tile'>{{ dataset_icon(dataset.icon) }}</span>
+            <div>
+              <p class='dataset-identity-name'>{{ dataset.name }}</p>
+              {% if dataset.description %}<p class='dataset-identity-description'>{{ dataset.description }}</p>
+              {% else %}<p class='dataset-identity-description dataset-identity-empty'>No description provided</p>{% endif %}
+            </div>
+          </div>
+          <dl class='detail-list'>
+            <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
+            <div><dt>Key</dt><dd><code>{{ dataset.key }}</code> <span class='badge'>Permanent</span><span class='detail-hint'>Used in exports and the API. It cannot be changed.</span></dd></div>
+            <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
+          </dl>
+        </div>
+        <aside class='dataset-details-aside' aria-label='Dataset summary'>
+          <div class='dataset-facts'>
+            <h3 class='dataset-facts-heading'>At a glance</h3>
+            <dl>
+              <div><dt>Version</dt><dd>{{ dataset_facts.version }}</dd></div>
+              {% if dataset_facts.record_count is not none %}<div><dt>Records</dt><dd>{{ dataset_facts.record_count }}</dd></div>{% endif %}
+              <div><dt>Fields</dt><dd>{{ dataset_facts.field_count }}</dd></div>
+              <div><dt>Created</dt><dd><time datetime='{{ dataset_facts.created_at.isoformat() }}'>{{ dataset_facts.created_at|absolute_utc }}</time></dd></div>
+              {% if dataset_facts.last_updated %}<div><dt>Last updated</dt><dd><time datetime='{{ dataset_facts.last_updated.isoformat() }}'>{{ dataset_facts.last_updated|absolute_utc }}</time></dd></div>{% endif %}
+            </dl>
+          </div>
+          <p class='dataset-facts-note'>{{ lock_icon() }}<span>Changes to name, description and icon apply right away. They are not part of a version.</span></p>
+        </aside>
+      </div>
       {% endif %}
-      <p class='help-text'>The key is permanent and used in exports and the API.</p>
     </section>
     <section id='fields' aria-labelledby='fields-heading'>
     {% if fields and not business_key.field_keys %}
@@ -116,9 +145,31 @@
     </section>{% endif %}
     {% if editable %}
     <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>
-      <h2 id='dataset-danger-heading'>Danger zone</h2>
-      <p>Permanently delete this dataset and its records, fields and access settings.</p>
-      <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+      <div class='page-header section-header'>
+        <div>
+          <h2 id='dataset-danger-heading' tabindex='-1'>Danger zone</h2>
+          <p class='section-description'>Actions here cannot be undone.</p>
+        </div>
+      </div>
+      <div class='danger-card'>
+        <div class='danger-card-head'>
+          {{ alert_triangle_icon() }}
+          <div>
+            <h3>Delete this dataset</h3>
+            <p>Removes the dataset with all its versions, records, fields, record identifiers and export access. This cannot be undone.</p>
+          </div>
+        </div>
+        <div class='danger-card-body'>
+          <ul class='danger-counts'>
+            <li>Versions <b>{{ deletion.version_count }}</b></li>
+            <li>Records <b>{{ deletion.record_count }}</b></li>
+            <li>Fields <b>{{ deletion.field_count }}</b></li>
+            <li>Export access <b>{{ deletion.export_access_count }}</b></li>
+          </ul>
+          <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+        </div>
+      </div>
+      <p class='danger-note'>{{ history_icon() }}<span>The audit log keeps a record of the deletion, including who deleted the dataset and when.</span></p>
     </section>
     {% endif %}
   </div>

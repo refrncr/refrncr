@@ -717,10 +717,17 @@ repository.
 
 ## Dataset deletion panels (REF-141)
 
-The Dataset edit form has a separate danger zone using existing warning feedback and danger
-buttons. The shared `.danger-zone` component variant uses existing border/spacing tokens.
-No tokens change. The confirmation is a Dataset workflow template, with current name, Field/Record
-counts, permanent-deletion warning, required labelled name input, error summary and Cancel.
+The Danger zone tab states the destructive action in one framed card: a warning header on the
+error surface, the counts the deletion removes (Versions, Records, Fields, Export access) and the
+danger button, followed by a note that the audit log retains the deletion. The confirmation is a
+Dataset workflow template with the same counts, a permanent-deletion warning, a required
+"Type <name> to confirm" input, error summary and Cancel. The tab itself is marked with the error
+colour while selected. `.danger-card`, `.danger-counts` and `.deletion-counts` use existing
+error/border/spacing tokens; no tokens change.
+
+`DatasetService.get_dataset_for_deletion` supplies the counts on both surfaces, so Configure reads
+it whenever the actor may maintain the Dataset. It stays an ordinary authorized read: no audit
+event, and readers without maintain rights get no tab and no call.
 
 An opt-in `data-panel-next` link replaces the content of the current remote side panel with
 a dedicated confirmation view. Only one modal remains open. The controller retains the parent
@@ -1039,7 +1046,11 @@ Without JavaScript both fields remain normal inputs. Edit pages never opt in.
 The Dataset icon picker enhances a text input with a searchable combobox/listbox,
 visible icon names, active-descendant navigation, selection, clear and Escape/Tab
 handling. Initialization is repeat-safe, including side-panel fragment replacement.
-Manual icon-name entry is available without JavaScript. Definition and Unit use plain
+Manual icon-name entry is available without JavaScript. With JavaScript the picker also
+shows a preview of the selected icon (label and name; unknown names show the default)
+and the suggestions as always-visible toggle buttons (`aria-pressed`); the combobox list
+opens as an overlay so closing it never moves the form. The preview checks typed names
+against the symbol ids of the pinned sprite. Definition and Unit use plain
 escaped text and keyboard-accessible disclosure at Record column headers.
 See [asset provenance and licences](../../src/refrncr/static/licenses/ASSET-SOURCES.md)
 and [the part-1 implementation notes](ref-162-part-1-notes.md).
@@ -1047,8 +1058,8 @@ and [the part-1 implementation notes](ref-162-part-1-notes.md).
 
 ### Manual Dataset icon names
 
-The user-approved REF-162 follow-up expands the eight suggestions to manual names
-from the full pinned Lucide 0.468.0 sprite. The input contains the canonical name;
+The user-approved REF-162 follow-up expands the suggestions to manual names
+from the full pinned Lucide 1.46.0 sprite. The input contains the canonical name;
 Tab, blur and form submission retain typed text without requiring selection from
 the suggestions. Enter chooses a highlighted suggestion or accepts the typed name;
 Escape restores the value from before editing. The same text input works without
@@ -1060,10 +1071,15 @@ an icon validation error. Raw input is not persisted or interpreted.
 
 ### Configure inline editing
 
+The Dataset details tab shows an identity card (icon tile, name, description), a short
+list with owning team, permanent key and icon, and an "At a glance" summary (version,
+Records, Fields, created and last updated). A note states that name, description and icon
+apply immediately and are not versioned (REF-165).
+
 Edit dataset opens the general `/datasets/<key>/configure` route in inline edit mode. Name,
-Description, Dataset icon and Owning team are stacked inside Dataset details;
-Save dataset and Cancel sit below them. The key stays read only. Danger zone is a separate tab and uses the existing confirmed-delete
-panel. Cancelling that panel preserves unsaved inline values and restores focus.
+Description and Dataset icon are stacked inside Dataset details, followed by Owning team
+and the read-only key side by side; Save dataset and Cancel sit below a divider. Danger zone is a separate tab and uses the existing confirmed-delete
+panel (see "Dataset deletion panels"). Cancelling that panel preserves unsaved inline values and restores focus.
 
 One `_edit_form.html` include supplies the edit controls; the old Dataset edit
 panel template is removed. The legacy `/edit` entry point renders the same page.

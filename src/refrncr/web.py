@@ -664,6 +664,7 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         field_context_label = None
+        overview = None
         if standalone:
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
@@ -677,6 +678,7 @@ def create_flask_app(
                 field_context_label = "No Current version or active Concept available."
             else:
                 fields, identifier = field_view.fields, field_view.identifier
+                overview, state_for_facts = field_view.context, field_view.state
                 field_context_label = (
                     f"Current · Version {field_view.state.version.number} · Read only"
                     if field_view.state
@@ -704,6 +706,7 @@ def create_flask_app(
                 actor.id, dataset.id
             )
             context, state, identifier = view.context, view.state, view.identifier
+            overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
                 change.id: "Edited" if change.status == "Changed" else change.status
@@ -714,8 +717,24 @@ def create_flask_app(
                 field_context_label = (
                     f"{view.state.status} · Version {view.state.version.number} · Read only"
                 )
+        # "At a glance" facts for the Dataset details tab.
+        if overview is None:
+            version_label = "No version available"
+        elif state_for_facts is not None:
+            version_label = f"Version {state_for_facts.version.number} · {state_for_facts.status}"
+        else:
+            version_label = "Concept in progress"
+        dataset_facts = {
+            "version": version_label,
+            "record_count": overview.record_count if overview else None,
+            "field_count": len(fields),
+            "created_at": dataset.created_at,
+            "last_updated": overview.last_updated if overview else None,
+        }
         if edit_mode and not editable:
             abort(404)
+        # The Danger zone tab shows what a deletion would remove.
+        deletion = datasets.get_dataset_for_deletion(actor.id, dataset.id) if editable else None
         access_teams, access_users, access_entries = [], [], []
         if may_govern:
             _, access_teams, access_users, access_entries = datasets.export_access_context(
@@ -751,6 +770,12 @@ def create_flask_app(
             fields=fields,
             field_states=field_states,
             field_context_label=field_context_label,
+            dataset_facts=dataset_facts,
+            deletion=deletion,
+            dataset_icon_label=DATASET_ICONS.get(
+                rendered_dataset_icon(dataset.icon),
+                rendered_dataset_icon(dataset.icon).replace("-", " ").capitalize(),
+            ),
             business_key=identifier,
             version_state=state,
         )

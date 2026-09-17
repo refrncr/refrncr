@@ -294,18 +294,17 @@ class SqlAlchemyGrantOperations:
 
 
 class SqlAlchemyDatasetOperations:
-    def deletion_counts(self, dataset_id: str) -> tuple[int, int]:
+    def deletion_counts(self, dataset_id: str) -> tuple[int, int, int, int]:
+        def total(model):
+            return self.session.scalar(
+                select(func.count()).select_from(model).where(model.dataset_id == dataset_id)
+            )
+
         return (
-            self.session.scalar(
-                select(func.count())
-                .select_from(DatasetField)
-                .where(DatasetField.dataset_id == dataset_id)
-            ),
-            self.session.scalar(
-                select(func.count())
-                .select_from(DatasetRecord)
-                .where(DatasetRecord.dataset_id == dataset_id)
-            ),
+            total(DatasetField),
+            total(DatasetRecord),
+            total(DatasetVersion),
+            total(DatasetExportAccess),
         )
 
     def delete_with_dependents(self, dataset_id: str) -> None:

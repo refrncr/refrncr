@@ -20,7 +20,8 @@ Latin Extended subset, selected by `unicode-range`.
 ## Icons
 
 Every icon is an inline SVG macro in `templates/components/icons.html`, so it takes the colour of
-the text around it. They are the following icons from the official Lucide release `0.468.0`,
+the text around it. They are the following icons from the official Lucide release `0.468.0`
+(the inline macros stay on that release; only the Dataset icon sprite moved to `1.46.0`),
 unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attributes:
 
 | Macro | Lucide icon |
@@ -50,18 +51,24 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 
 ## Dataset icon selection (REF-162)
 
-Dataset icons use the official `lucide-static` **0.468.0** sprite, copied unchanged
-from `https://registry.npmjs.org/lucide-static/-/lucide-static-0.468.0.tgz` to
-`static/images/lucide-0.468.0.svg`. Its 1,544 named symbols support manual icon-name
+Dataset icons use the official `lucide-static` **1.46.0** sprite, copied unchanged
+from `https://registry.npmjs.org/lucide-static/-/lucide-static-1.46.0.tgz` to
+`static/images/lucide-1.46.0.svg`. Its 1,838 named symbols support manual icon-name
 entry; the full sprite is needed because users choose names at runtime. The
-371,613-byte file is local and cacheable; there is no runtime CDN or package dependency.
+511,302-byte file is local and cacheable; there is no runtime CDN or package dependency.
 
-Sprite SHA-256: `b3b7a00eff7743f34c13b57528b34aa9b1505a1abf5c89545afe5559cdf1ada3`.
-The package LICENSE is byte-identical to the existing `LICENSE-Lucide.txt`.
+Sprite SHA-256: `ff8f757982592b7103c82acbe0922fc530d296ede376fd7dfca38ceaf926ebcf`.
+`LICENSE-Lucide.txt` is the package LICENSE of that release, copied verbatim; it now
+also names the Feather-derived icons and their MIT terms explicitly.
 See [Lucide static assets](https://lucide.dev/guide/static).
 
-The eight search suggestions remain `house`, `key-round`, `lock`, `scroll-text`,
-`settings-2`, `table`, `user` and `users`. Names outside those suggestions are
+The suggestions (REF-165, product-owner selection) are `landmark`, `banknote`,
+`languages`, `earth`, `atom`, `flask-conical`, `test-tube-diagonal`, `tag`, `bookmark`,
+`signpost-big`, `building`, `layers`, `vector-polygon`, `paint-bucket`, `bot`, `network`,
+`database`, `scale`, `file-box`, `target`, `ruler-dimension-line`, `gallery-vertical-end`,
+`clock`, `vector-square`, `settings`, `file-sliders`, `hand-coins`, `credit-card`,
+`building-complex`, `users-round`, `user-round`, `wrench`, `refresh-ccw`, `zap` and
+`cable`, with `table` as the default. Names outside those suggestions are
 accepted when present in the pinned sprite. The server reads the local symbol IDs
 once and stores only a matching canonical name. Input is bounded to 64 characters
 before trimming/lowercasing; unknown, malformed, unavailable, oversized or non-text

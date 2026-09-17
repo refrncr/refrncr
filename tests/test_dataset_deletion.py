@@ -94,6 +94,11 @@ def test_atomic_deletion_preserves_history(context, records):  # noqa: F811
     before = snapshot(c)
     target = deletion(c)
     assert (target.field_count, target.record_count) == (0 if records is None else 2, records or 0)
+    # populate() grants export access to one user and one team; no version is published.
+    assert (target.version_count, target.export_access_count) == (
+        0,
+        0 if records is None else 2,
+    )
     assert snapshot(c) == before  # Reading confirmation never writes/audits.
     result = remove(c, target)
     assert result == target
