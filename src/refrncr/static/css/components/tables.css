@@ -28,14 +28,15 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .diff-table th, .diff-table td, .diff-value { overflow-wrap: anywhere; }
 .diff-value { white-space: pre-wrap; }
 /* Shared URL and side-panel row variants; no overlay covers selectable text. */
-.interactive-row { position: relative; }
+/* Safari/WebKit ignores position: relative on <tr>, so anything positioned against the
+   row falls back to the table and stacks on one spot. Anchor to the last cell, which is
+   a containing block in every engine. */
+.dataset-row > td:last-child { position: relative; }
 .interactive-row:has(.row-action:not(:disabled):not([aria-disabled="true"])) { cursor: pointer; }
-.interactive-row > td:last-child { padding-inline-end: var(--space-xxl); }
 .row-action { display: block; width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; text-decoration: none; overflow-wrap: break-word; cursor: pointer; user-select: text; }
 .management-table .row-action { font-weight: var(--font-weight-bold); }
 .row-action:hover { color: inherit; }
 .row-action-label { display: block; min-width: 0; }
-.row-chevron { position: absolute; inset-inline-end: var(--space-md); top: 50%; width: var(--space-md); height: var(--space-md); transform: translateY(-50%); color: var(--color-text-muted); }
 .interactive-row:has(.row-action:not(:disabled):not([aria-disabled="true"])):hover > td { background-image: linear-gradient(color-mix(in srgb, var(--color-row-hover) 35%, transparent), color-mix(in srgb, var(--color-row-hover) 35%, transparent)); }
 .interactive-row:hover .row-action-label, .interactive-row:has(.row-action:focus-visible) .row-action-label { text-decoration: underline; text-underline-offset: .18em; }
 .interactive-row:has(.row-action:focus-visible) { outline: 3px solid var(--color-focus-ring); outline-offset: -3px; }

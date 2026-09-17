@@ -169,7 +169,8 @@ async function layout(page, label) {
       const suggestions = panel.getByRole('group', {name: 'Suggested icons', exact: true});
       assert(await suggestions.isVisible());
       assert.equal(await suggestions.getByRole('button', {name: 'Banknote', exact: true}).getAttribute('aria-pressed'), 'true');
-      assert.equal(await suggestions.getByRole('button').count(), 20);
+      // The default tile plus one per suggestion in DATASET_ICONS.
+      assert.equal(await suggestions.getByRole('button').count(), 36);
       await suggestions.getByRole('button', {name: 'Landmark', exact: true}).click();
       assert.equal(await panel.locator('input[name=icon]').inputValue(), 'landmark');
       assert((await panel.locator('[data-icon-preview] use').getAttribute('href')).endsWith('#landmark'));

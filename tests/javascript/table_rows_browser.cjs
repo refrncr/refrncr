@@ -47,8 +47,9 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await page.getByRole('button',{name:'Sign in',exact:true}).click();
     await page.waitForURL(`${base}/`);
     const cases = [
-      {path:'/datasets',kind:'link',columns:4}, {path:'/teams',kind:'link',columns:2},
-      {path:'/users',kind:'button',columns:4}, {path:'/datasets/row-check/records',kind:'button',columns:3},
+      // Datasets gained a Version column (REF-165); rows no longer carry a chevron.
+      {path:'/datasets',kind:'link',columns:5}, {path:'/teams',kind:'link',columns:3},
+      {path:'/users',kind:'button',columns:5}, {path:'/datasets/row-check/records',kind:'button',columns:3},
     ];
     for (const item of cases) {
       for (const width of [1440,768,320]) {
@@ -58,19 +59,17 @@ if (output) fs.mkdirSync(output, {recursive:true});
         assert(await rows.count() > 1);
         assert.equal(await page.locator('thead th').count(),item.columns);
         assert.equal(await page.getByRole('columnheader',{name:'Actions',exact:true}).count(),0);
-        const layout = await rows.evaluateAll(nodes => nodes.map(row => {
-          const control = row.querySelector('[data-row-primary]'), icon=control.querySelector('.row-chevron');
-          const r=row.getBoundingClientRect(), c=icon.getBoundingClientRect();
-          return {tag:control.tagName, primary:row.querySelectorAll('[data-row-primary]').length,
-            tab:row.hasAttribute('tabindex'), role:row.getAttribute('role'),
-            iconHidden:icon.getAttribute('aria-hidden'), iconFocusable:icon.getAttribute('focusable'),
-            right:r.right-c.right, center:Math.abs(r.y+r.height/2-c.y-c.height/2)};
-        }));
+        // Rows carry no caret: hover, underline and focus convey that they are clickable.
+        const layout = await rows.evaluateAll(nodes => nodes.map(row => ({
+          tag: row.querySelector('[data-row-primary]').tagName,
+          primary: row.querySelectorAll('[data-row-primary]').length,
+          tab: row.hasAttribute('tabindex'), role: row.getAttribute('role'),
+          chevrons: row.querySelectorAll('.row-chevron').length,
+        })));
         for (const r of layout) {
           assert.equal(r.primary,1); assert.equal(r.tag,item.kind==='link'?'A':'BUTTON');
           assert.equal(r.tab,false); assert.notEqual(r.role,'button');
-          assert.equal(r.iconHidden,'true'); assert.equal(r.iconFocusable,'false');
-          assert(Math.abs(r.right-16)<1 && r.center<1,'chevrons align at the trailing edge and row center');
+          assert.equal(r.chevrons,0,'rows no longer render a chevron');
         }
         const primary=rows.first().locator('[data-row-primary]');
         await rows.first().hover();
@@ -79,10 +78,15 @@ if (output) fs.mkdirSync(output, {recursive:true});
         await page.mouse.move(activeCell.x+4,activeCell.y+4); await page.mouse.down();
         assert.equal(await rows.first().locator('.row-action-label').evaluate(e=>getComputedStyle(e).textDecorationStyle),'double','active state uses double underline');
         await page.mouse.move(0,0); await page.mouse.up(); await emptySelection();
-        await primary.focus(); await page.keyboard.press('Tab');
-        assert(await rows.nth(1).locator('[data-row-primary]').evaluate(e=>e===document.activeElement),'one primary tab stop per row');
-        await page.keyboard.press('Shift+Tab');
-        assert(await primary.evaluate(e=>e===document.activeElement));
+        // Datasets rows carry their own extra controls (Concept badge, configuration
+        // link); elsewhere the row's primary control is the only tab stop in the row.
+        if (item.path !== '/datasets') {
+          await primary.focus(); await page.keyboard.press('Tab');
+          assert(await rows.nth(1).locator('[data-row-primary]').evaluate(e=>e===document.activeElement),`one primary tab stop per row (${item.path} @${width})`);
+          await page.keyboard.press('Shift+Tab');
+          assert(await primary.evaluate(e=>e===document.activeElement));
+        }
+        await primary.focus();
         assert.equal(await rows.first().evaluate(e=>getComputedStyle(e).outlineWidth),'3px');
         await shot(`${item.path.replaceAll('/','-')}-${width}-focus`);
         if(item.kind==='button') {

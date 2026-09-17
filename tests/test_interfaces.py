@@ -962,7 +962,7 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert "data-row-action" in table
     assert "Actions" not in table
     assert ">View</a>" not in table
-    assert "class='row-chevron'" in table
+    assert "row-chevron" not in table  # Rows read as clickable without a caret.
     assert f"data-row-primary href='/teams?open_team={team.id}'" in table
     body = response_text(request(client, "get", f"/teams?open_team={team.id}"))
     assert f"id='team-panel-{team.id}'" in body
