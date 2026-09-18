@@ -4,6 +4,7 @@
    Forms return to the configuration page they came from (concept, current or standalone). #}
 {% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, standalone=false, change_owner_url=none) -%}
 {% set return_to = {'concept': 1 if concept else none, 'standalone': 1 if standalone else none} %}
+{% set fallback = url_for('dataset_configuration', key=dataset.key, _anchor='access-management') %}
 {% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
     <div class='access-management' data-export-access>
       <p class='section-description'>Who can work with this dataset. The owning team maintains it; you can add export-only access for other users and teams.</p>
@@ -31,7 +32,7 @@
       <section class='access-grant' aria-labelledby='grant-export-heading'>
         <h3 id='grant-export-heading'>Give export access</h3>
         {{ feedback(error, id='governance-error', focus=true) }}
-        <form class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-panel-success='Export access granted.'>
+        <form class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.'>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <div class='form-field'>
             <label class='visually-hidden' for='export-subject'>User or team</label>
@@ -63,7 +64,7 @@
                   <td><span class='badge'>{{ 'Team' if is_team else 'User' }}</span></td>
                   <td><time class='access-added' datetime='{{ entry.created_at.isoformat() }}'>{{ entry.created_at|absolute_utc }}</time></td>
                   <td>
-                    <form method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-inline-refresh='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-panel-success='Export access removed.'>
+                    <form method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-inline-refresh='{{ fallback }}' data-panel-success='Export access removed.'>
                       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
                       <button class='button button-secondary button-table-action button-remove' type='submit' aria-label='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}'>Remove</button>
                     </form>

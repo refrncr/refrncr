@@ -65,6 +65,7 @@ label > input:not([type="checkbox"], [type="radio"]), label > select, label > te
 .icon-picker-preview-text { display: grid; min-width: 0; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 .icon-picker-preview-text code { padding: 0; background: none; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
 .icon-picker-suggestions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.icon-picker-preview[hidden], .icon-picker-suggestions[hidden] { display: none; }
 .icon-choice { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; }
 .icon-choice .dataset-icon { margin: 0; }
 .icon-choice:hover { border-color: var(--color-control-border); color: var(--color-text); }

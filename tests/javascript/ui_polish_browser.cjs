@@ -235,7 +235,7 @@ async function layout(page, label) {
       const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
       const fieldOrder = await fieldNames();
       assert(await page.locator('#fields .field-drag-handle').first().isVisible());
-      assert(!(await page.locator('#fields .button-stack').first().isVisible()));
+      assert(await page.locator('#fields .button-stack').first().isVisible());
       const reorder = async (name, key) => {
         await page.getByRole('button', {name: `Reorder ${name}`, exact: true}).focus();
         await Promise.all([

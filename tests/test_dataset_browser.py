@@ -602,12 +602,16 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
     template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
 
     # Dataset icons use the pinned local sprite; interface icons stay inline.
-    assert [p.name for p in image_directory.glob("lucide-*.svg")] == ["lucide-1.46.0.svg"]
+    assert {p.name for p in image_directory.glob("lucide-*.svg")} == {
+        "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
+    }
     assert "images/lucide-1.46.0.svg" in template_source
     assert request(client, "get", "/static/images/lucide-1.46.0.svg").status_code == 200
     assert {path.name for path in image_directory.iterdir()} == {
         "favicon.svg",
         "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
     }

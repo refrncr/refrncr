@@ -319,6 +319,7 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
     assert {p.name for p in assets.iterdir()} == {
         "favicon.svg",
         "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
     }

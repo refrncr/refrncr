@@ -62,6 +62,23 @@ Sprite SHA-256: `ff8f757982592b7103c82acbe0922fc530d296ede376fd7dfca38ceaf926ebc
 also names the Feather-derived icons and their MIT terms explicitly.
 See [Lucide static assets](https://lucide.dev/guide/static).
 
+### Compatibility with previously saved icons (REF-165)
+
+`lucide-legacy-0.468.0.svg` retains the 74 symbols available in the previously
+shipped 0.468.0 sprite but absent from 1.46.0, including `history` and retired
+brand icons. The symbol markup and geometry are copied unchanged from that
+release; only the outer SVG wrapper and subset selection differ. The source is
+`https://registry.npmjs.org/lucide-static/-/lucide-static-0.468.0.tgz`.
+Its original notice is retained in `LICENSE-Lucide-0.468.0.txt`.
+
+Compatibility sprite SHA-256:
+`54279ae9585b7deb66c0813dcfb1d1735405a736d3f36b5d75a10b741389f554`.
+
+The server aliases each supported icon name to a symbol in one of these two
+fixed local sprites. Existing names remain unchanged in storage; reading or
+saving metadata does not clear them. There is no schema migration, user-supplied
+SVG, external request or approximate substitution of a retired brand icon.
+
 The suggestions (REF-165, product-owner selection) are `landmark`, `banknote`,
 `languages`, `earth`, `atom`, `flask-conical`, `test-tube-diagonal`, `tag`, `bookmark`,
 `signpost-big`, `building`, `layers`, `vector-polygon`, `paint-bucket`, `bot`, `network`,

@@ -46,7 +46,7 @@
 /* Drag to reorder (field-order.js). Without JavaScript the up/down buttons remain. */
 .field-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 2rem; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-control-border); font-size: 1rem; letter-spacing: -.2em; cursor: grab; touch-action: none; }
 .field-drag-handle:hover, .field-drag-handle:focus-visible { background: var(--color-action-secondary); color: var(--color-text); }
-[data-field-order-ready] .button-stack { display: none; }
+.field-drag-handle[hidden] { display: none; }
 [data-field-order-ready] tr.is-dragging > td { background: var(--color-status-published-surface); }
 [data-field-order-ready] tr.is-dragging .field-drag-handle { cursor: grabbing; }
 [data-field-order-ready].is-saving { cursor: progress; }

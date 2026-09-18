@@ -1,6 +1,6 @@
-/* Reorder Dataset Fields by dragging the handle or with the arrow keys on it.
+/* Reorder Dataset Fields with buttons, by dragging, or with arrow keys on the handle.
    Each change saves the complete new order; the server rejects it when the order
-   changed elsewhere in the meantime. Without JavaScript the up/down buttons remain. */
+   changed elsewhere in the meantime. The same buttons submit normally without JavaScript. */
 (() => {
   const table = document.querySelector('table[data-field-order]');
   if (!table) return;
@@ -9,7 +9,7 @@
   const csrf = table.querySelector('input[name="csrf_token"]')?.value;
   if (!body || !csrf) return;
   const rows = () => [...body.querySelectorAll('tr[data-field-row]')];
-  // Field ids live only in the hidden inputs of the no-script fallback forms.
+  // Field ids live in the hidden inputs of the progressively enhanced forms.
   const fieldId = row => row.querySelector('input[name="field_id"]')?.value;
   const order = () => rows().map(fieldId);
   let saved = order();
@@ -17,6 +17,13 @@
 
   const announce = message => { if (status) status.textContent = message; };
   const position = row => `${rows().indexOf(row) + 1} of ${rows().length}`;
+  const updateButtons = () => {
+    const list = rows();
+    list.forEach((row, i) => {
+      row.querySelector('button[value="up"]').disabled = i === 0;
+      row.querySelector('button[value="down"]').disabled = i === list.length - 1;
+    });
+  };
 
   const save = () => {
     const proposed = order();
@@ -52,10 +59,22 @@
     const list = rows();
     if (list.indexOf(target) < list.indexOf(row)) target.before(row);
     else target.after(row);
+    updateButtons();
     return true;
   };
 
   rows().forEach(row => {
+    row.querySelector('.button-stack').addEventListener('submit', event => {
+      const button = event.submitter;
+      if (!button || !['up', 'down'].includes(button.value)) return;
+      event.preventDefault();
+      const target = button.value === 'up' ? row.previousElementSibling : row.nextElementSibling;
+      if (!move(row, target)) return;
+      const focus = button.disabled ? row.querySelector('.button-stack button:not(:disabled)') : button;
+      focus?.focus({preventScroll: true});
+      announce(`${row.dataset.fieldName} moved to position ${position(row)}.`);
+      save();
+    });
     const handle = row.querySelector('.field-drag-handle');
     if (!handle) return;
     handle.hidden = false;
@@ -104,5 +123,6 @@
       document.addEventListener('pointercancel', onEnd);
     });
   });
+  updateButtons();
   table.setAttribute('data-field-order-ready', '');
 })();

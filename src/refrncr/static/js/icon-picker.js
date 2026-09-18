@@ -2,14 +2,14 @@
   if (window.refrncrIconPickers) return;
   const initialized = new WeakSet();
   // Symbol ids of the pinned local Lucide sprite, loaded once for the live preview.
-  let spriteNames = null;
+  const spriteNames = new Map();
   const loadSpriteNames = (url) => {
-    spriteNames ||= fetch(url, {credentials: "same-origin"})
+    if (!spriteNames.has(url)) spriteNames.set(url, fetch(url, {credentials: "same-origin"})
       .then((response) => (response.ok ? response.text() : ""))
       .then((text) => new Set([...new DOMParser().parseFromString(text, "image/svg+xml")
         .querySelectorAll("symbol[id]")].map((symbol) => symbol.id)))
-      .catch(() => null);
-    return spriteNames;
+      .catch(() => null));
+    return spriteNames.get(url);
   };
   window.refrncrIconPickers = (root = document) => {
     root.querySelectorAll("[data-icon-picker]").forEach((picker) => {
@@ -64,23 +64,31 @@
       const previewName = preview?.querySelector("[data-icon-preview-name]");
       const suggestions = picker.querySelector("[data-icon-suggestions]");
       const choices = suggestions ? [...suggestions.querySelectorAll("[data-icon-choice]")] : [];
-      const sprite = previewUse?.getAttribute("href").split("#")[0];
+      const sprite = picker.dataset.iconSprite;
+      const legacySprite = picker.dataset.iconLegacySprite;
       const labelFor = (name) => options.find((option) => option.dataset.iconValue === name)?.dataset.iconName;
       let syncRun = 0;
       const sync = async () => {
-        const name = search.value.trim();
+        const name = search.value.trim().toLowerCase();
         choices.forEach((choice) => choice.setAttribute("aria-pressed", String(choice.dataset.iconChoice === name)));
         if (!preview) return;
         const run = ++syncRun;
         const known = labelFor(name) !== undefined || name === "";
         let exists = known;
+        let source = sprite;
         if (!known) {
           const names = /^[a-z0-9-]{1,64}$/.test(name) ? await loadSpriteNames(sprite) : new Set();
           if (run !== syncRun) return;
           exists = names ? names.has(name) : true;
+          if (!exists && legacySprite && /^[a-z0-9-]{1,64}$/.test(name)) {
+            const legacyNames = await loadSpriteNames(legacySprite);
+            if (run !== syncRun) return;
+            exists = legacyNames?.has(name) || false;
+            if (exists) source = legacySprite;
+          }
         }
         const shown = name && exists ? name : "table";
-        previewUse.setAttribute("href", `${sprite}#${shown}`);
+        previewUse.setAttribute("href", `${source}#${shown}`);
         previewName.textContent = name || "table";
         previewLabel.textContent = !name ? "Default dataset icon"
           : !exists ? "Unknown name, default icon shown"

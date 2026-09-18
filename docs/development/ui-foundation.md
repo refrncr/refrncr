@@ -6,13 +6,15 @@ components.
 
 ## Assets and typography
 
-The canonical logo uses the supplied green concentric rings. Use
-`07-static-logo-256px.svg` for static branding, `02-animated-grow-shrink.svg` on
-login and `06-favicon-16px.svg` for the favicon. A responsive picture selects the
-static source for reduced motion, including when the preference changes at runtime.
-The SVG source bytes, geometry and green color are preserved. Branding containers
-reserve dimensions and pair a decorative mark with visible REFRNCR text.
-See the asset inventory for provenance and licensing.
+Use the supplied `refrncr-wordmark-primary.svg` for navigation, the mobile bar,
+setup and login, and `favicon.svg` for the favicon. Login additionally displays
+`refrncr-loader.svg` above the wordmark. With `prefers-reduced-motion: reduce`,
+CSS hides the loader while the wordmark remains visible, including when the
+preference changes at runtime. All three assets are served locally; their SVG
+geometry and colours are preserved. Images reserve dimensions and use empty alt
+text; their brand links provide the accessible name "REFRNCR home".
+See the [asset inventory](../../src/refrncr/static/licenses/ASSET-SOURCES.md) for
+provenance and licensing.
 
 The typography contract is:
 

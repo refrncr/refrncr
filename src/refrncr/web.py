@@ -44,7 +44,12 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
-from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered_dataset_icon
+from refrncr.presentation_metadata import (
+    DATASET_ICONS,
+    dataset_icon_sprite,
+    key_from_name,
+    rendered_dataset_icon,
+)
 from refrncr.record_import import (
     MAX_COLUMNS,
     MAX_UPLOAD_BYTES,
@@ -140,6 +145,7 @@ def create_flask_app(
     audit_history = audit_history or AuditHistoryService(users.uow)
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
+    app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
 
     @app.template_filter("record_value_text")
