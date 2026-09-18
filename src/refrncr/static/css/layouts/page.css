@@ -39,7 +39,7 @@
 }
 
 .page-header > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.breadcrumbs { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
+.breadcrumbs { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); line-height: normal; text-transform: uppercase; letter-spacing: var(--letter-spacing-label); margin-bottom: var(--space-md); }
 .breadcrumbs ol { display: flex; flex-wrap: wrap; gap: var(--space-sm); list-style: none; margin: 0; padding: 0; }
 .breadcrumbs li { min-width: 0; overflow-wrap: anywhere; }
 .breadcrumbs a { color: var(--color-breadcrumb-link); text-decoration: none; }
@@ -51,6 +51,9 @@
 .page-context { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
 .page-context > .breadcrumbs, .page-context > .page-title, .page-context > .metadata { margin: 0; }
 .page-context > .metadata { padding-block-start: var(--space-sm); }
+.page-context > .breadcrumbs { padding-block-end: var(--space-sm); }
+/* The dataset icon sits on the title baseline; 1px down offsets the icon's own inner margin. */
+.page-title .dataset-icon { vertical-align: -.0625rem; }
 
 /* Title block yields first; actions stay on the title row and wrap within their own column. */
 .page-header > .page-context, .page-header > div:first-child:not(.page-actions) { flex: 1 1 16rem; }
@@ -76,4 +79,5 @@
 .section-tab:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
 
 button.section-tab { font-family: inherit; background: transparent; border: 0; border-bottom: 2px solid transparent; }
+/* Panels stay visible until section-tabs.js successfully enhances the section links. */
 .section-tab[aria-disabled="true"] { color: var(--color-text-muted); cursor: not-allowed; opacity: .65; }

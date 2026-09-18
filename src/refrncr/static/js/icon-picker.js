@@ -1,6 +1,16 @@
 (() => {
   if (window.refrncrIconPickers) return;
   const initialized = new WeakSet();
+  // Symbol ids of the pinned local Lucide sprite, loaded once for the live preview.
+  const spriteNames = new Map();
+  const loadSpriteNames = (url) => {
+    if (!spriteNames.has(url)) spriteNames.set(url, fetch(url, {credentials: "same-origin"})
+      .then((response) => (response.ok ? response.text() : ""))
+      .then((text) => new Set([...new DOMParser().parseFromString(text, "image/svg+xml")
+        .querySelectorAll("symbol[id]")].map((symbol) => symbol.id)))
+      .catch(() => null));
+    return spriteNames.get(url);
+  };
   window.refrncrIconPickers = (root = document) => {
     root.querySelectorAll("[data-icon-picker]").forEach((picker) => {
       if (initialized.has(picker)) return;
@@ -47,6 +57,52 @@
         close();
         search.dispatchEvent(new Event("change", {bubbles: true}));
       };
+      // Preview and always-visible suggestions follow the name field.
+      const preview = picker.querySelector("[data-icon-preview]");
+      const previewUse = preview?.querySelector("use");
+      const previewLabel = preview?.querySelector("[data-icon-preview-label]");
+      const previewName = preview?.querySelector("[data-icon-preview-name]");
+      const suggestions = picker.querySelector("[data-icon-suggestions]");
+      const choices = suggestions ? [...suggestions.querySelectorAll("[data-icon-choice]")] : [];
+      const sprite = picker.dataset.iconSprite;
+      const legacySprite = picker.dataset.iconLegacySprite;
+      const labelFor = (name) => options.find((option) => option.dataset.iconValue === name)?.dataset.iconName;
+      let syncRun = 0;
+      const sync = async () => {
+        const name = search.value.trim().toLowerCase();
+        choices.forEach((choice) => choice.setAttribute("aria-pressed", String(choice.dataset.iconChoice === name)));
+        if (!preview) return;
+        const run = ++syncRun;
+        const known = labelFor(name) !== undefined || name === "";
+        let exists = known;
+        let source = sprite;
+        if (!known) {
+          const names = /^[a-z0-9-]{1,64}$/.test(name) ? await loadSpriteNames(sprite) : new Set();
+          if (run !== syncRun) return;
+          exists = names ? names.has(name) : true;
+          if (!exists && legacySprite && /^[a-z0-9-]{1,64}$/.test(name)) {
+            const legacyNames = await loadSpriteNames(legacySprite);
+            if (run !== syncRun) return;
+            exists = legacyNames?.has(name) || false;
+            if (exists) source = legacySprite;
+          }
+        }
+        const shown = name && exists ? name : "table";
+        previewUse.setAttribute("href", `${source}#${shown}`);
+        previewName.textContent = name || "table";
+        previewLabel.textContent = !name ? "Default dataset icon"
+          : !exists ? "Unknown name, default icon shown"
+          : labelFor(name) || name.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+      };
+      if (preview) preview.hidden = false;
+      if (suggestions) suggestions.hidden = false;
+      choices.forEach((choice) => choice.addEventListener("click", () => {
+        const option = options.find((item) => item.dataset.iconValue === choice.dataset.iconChoice);
+        if (option) choose(option);
+        choice.focus();
+      }));
+      search.addEventListener("input", sync);
+      search.addEventListener("change", sync);
       search.setAttribute("role", "combobox");
       search.setAttribute("aria-autocomplete", "list");
       search.setAttribute("aria-expanded", "false");

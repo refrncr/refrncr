@@ -83,15 +83,14 @@ async function restored(page,opener) {
       await page.goto(base+'/users');await settled(page);
       const row=page.locator('tbody tr').filter({hasText:'long@example.com'});
       const geometry=await row.evaluate(r=>{
-        const name=r.querySelector('.row-action-label'),chevron=r.querySelector('.row-chevron').getBoundingClientRect(),range=document.createRange();range.selectNodeContents(name);
+        const name=r.querySelector('.row-action-label'),range=document.createRange();range.selectNodeContents(name);
         const bounds=r.getBoundingClientRect(),scroll=r.closest('.table-scroll');
-        return {rowWidth:bounds.width,containerClient:scroll.clientWidth,containerScroll:scroll.scrollWidth,nameRects:[...range.getClientRects()].map(b=>({left:b.left,right:b.right,top:b.top,bottom:b.bottom})),chevron:{left:chevron.left,right:chevron.right,top:chevron.top,bottom:chevron.bottom}};
+        return {rowWidth:bounds.width,rowRight:bounds.right,containerClient:scroll.clientWidth,containerScroll:scroll.scrollWidth,nameRects:[...range.getClientRects()].map(b=>({left:b.left,right:b.right,top:b.top,bottom:b.bottom}))};
       });
       await shot(page,`users-${width}`);
       console.log(JSON.stringify({width,users:geometry}));
       if(width<768)assert(geometry.containerScroll<=geometry.containerClient,'Mobile Users table overflow');
-      assert(geometry.nameRects.every(r=>r.left>=0 && r.right<=geometry.chevron.right),'Name stays inside the row');
-      for(const r of geometry.nameRects){const c=geometry.chevron;assert(r.right<=c.left||r.left>=c.right||r.bottom<=c.top||r.top>=c.bottom,'Name overlaps chevron');}
+      assert(geometry.nameRects.every(r=>r.left>=0 && r.right<=geometry.rowRight),'Name stays inside the row');
       const normal=page.locator('tbody tr').filter({hasText:'row@example.com'});assert((await normal.boundingBox()).height<100,'Normal names stay compact');
       const primary=row.locator('[data-row-primary]');await primary.focus();await primary.press('Enter');
       await page.locator('dialog[open]').waitFor();assert.match(await page.locator('dialog[open]').innerText(),/LongLong/);

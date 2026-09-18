@@ -10,7 +10,6 @@ from dataset_helpers import publish_dataset
 from sqlalchemy import func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
-from werkzeug.datastructures import MultiDict
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
@@ -473,7 +472,10 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     csrf = sign_in(a)
     detail = get(f"/datasets/{d.key}").text
     assert "id='access-management-heading'>Access management</h2>" in detail
-    assert "Change owning team</a>" not in detail
+    assert (
+        f"<a class='access-overview-action' href='/datasets/{d.key}/configure?edit=1#owner-team'>"
+        "Change owning team</a>" in detail
+    )
     assert "All active Community users can view this dataset." not in detail
     s.dataset_versions.create_concept(a.id, d.id)
     edit = get(f"/datasets/{d.key}/edit").text
@@ -492,83 +494,73 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
         == 400
     )
     assert state(factory, d) == before
-    url = f"/datasets/{d.key}/owner"
-    assert f"name='expected_owner_team_id' value='{owner.id}'" in get(url).text
-    assert (
-        post(url, {"owner_team_id": other.id, "expected_owner_team_id": owner.id}).status_code
-        == 403
-    )
-    assert post(url, {"owner_team_id": other.id, "csrf_token": csrf}).status_code == 400
-    before = state(factory, d)
-    assert (
-        post(
-            url,
-            MultiDict(
-                [
-                    ("owner_team_id", other.id),
-                    ("csrf_token", csrf),
-                    ("expected_owner_team_id", owner.id),
-                    ("expected_owner_team_id", other.id),
-                ]
-            ),
-        ).status_code
-        == 400
-    )
-    assert state(factory, d) == before
-    assert (
-        post(
-            url, {"owner_team_id": other.id, "expected_owner_team_id": owner.id, "csrf_token": csrf}
-        ).status_code
-        == 302
-    )
-    before = state(factory, d)
-    response = post(
-        url, {"owner_team_id": owner.id, "expected_owner_team_id": owner.id, "csrf_token": csrf}
-    )
-    assert response.status_code == 409 and b"data-error-focus" in response.data
-    assert state(factory, d) == before
+    # The separate owner page is gone; the owning team changes through the edit form.
+    assert get(f"/datasets/{d.key}/owner").status_code == 404
+    owner_change = {"owner_team_id": other.id, "expected_owner_team_id": owner.id}
+    assert post(f"/datasets/{d.key}/owner", owner_change | {"csrf_token": csrf}).status_code == 404
+    s.datasets.change_owner(a.id, d.key, owner.id, other.id)
     s.teams.rename_team(a.id, other.id, '<img src=x onerror="alert(1)">')
     assert b"&lt;img" in get(f"/datasets/{d.key}").data
     assert b"<img src=x" not in get(f"/datasets/{d.key}").data
+    concept_url = f"/datasets/{d.key}/concept"
     access_url = f"/datasets/{d.key}/export-access"
-    empty = get(access_url).text
-    assert "data-panel-title='Access management'" in empty
+    assert get(access_url).status_code == 405
+
+    def access_section(html):
+        return html.split("<section id='access-management'", 1)[1].split(
+            "<section id='danger-zone'", 1
+        )[0]
+
+    empty = access_section(get(concept_url).text)
     for copy in (
-        "Grant export access",
+        "Who has access",
+        "Owning team",
+        "Community administrators",
+        "Give export access",
         "Additional export access",
         "User or team",
         "Select a user or team",
         "Grant access",
-        "No additional access",
-        "Community administrators can currently export this dataset.",
-        "Members of &lt;img",
+        "Export only: they can view and download the records, not change them.",
+        "No additional access yet",
         "Only &lt;img",
-        ">Close</a>",
+        "members and Community administrators can export this dataset.",
     ):
         assert copy in empty
+    for right in ("View", "Edit", "Publish", "Export", "All rights"):
+        assert f"<span class='badge'>{right}</span>" in empty
     assert "<img src=x" not in empty
-    assert "access-list-row" not in empty
-    assert ">Done</a>" not in empty
-    assert "side-panel-footer-single" in empty
-    assert "inline-form-action" in empty and "form-label-sentence" in empty
-    assert "data-requires-selection" in empty and "data-panel-refresh" in empty
-    invalid = post(access_url, {"subject": "", "csrf_token": csrf})
+    assert "<table" not in empty and "side-panel" not in empty
+    assert "data-requires-selection" in empty and "data-inline-refresh" in empty
+    assert "data-panel-refresh" not in empty
+    assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
+    invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400
-    assert "aria-invalid='true' aria-describedby='export-subject-error'" in invalid.text
+    assert "id='access-management-heading'" in invalid.text
+    assert "aria-describedby='export-subject-help export-subject-error' aria-invalid='true'" in (
+        invalid.text
+    )
     assert "data-error-focus" in invalid.text
     assert post(access_url, {"subject": f"user:{u.id}"}).status_code == 403
-    assert post(access_url, {"subject": f"user:{u.id}", "csrf_token": csrf}).status_code == 302
-    duplicate = post(access_url, {"subject": f"user:{u.id}", "csrf_token": csrf})
+    granted = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
+    assert granted.status_code == 302
+    assert granted.location == f"/datasets/{d.key}/concept#access-management"
+    duplicate = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert duplicate.status_code == 409
     assert f"value='user:{u.id}' selected" in duplicate.text
-    assert post(access_url, {"subject": f"team:{owner.id}", "csrf_token": csrf}).status_code == 302
-    populated = get(access_url).text
-    assert populated.count("class='access-list-row'") == 2
-    assert "class='access-list-type'>User</span>" in populated
-    assert "class='access-list-type'>Team</span>" in populated
+    team = post(f"{access_url}?standalone=1", {"subject": f"team:{owner.id}", "csrf_token": csrf})
+    assert team.status_code == 302
+    assert team.location == f"/datasets/{d.key}/configure#access-management"
+    populated = access_section(get(concept_url).text)
+    assert populated.count("<tr>") == 3
+    assert "<span class='badge'>User</span>" in populated
+    assert "<span class='badge'>Team</span>" in populated
+    assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
+    assert populated.count("<time class='access-added' datetime=") == 2
+    assert "<span class='section-count'>2</span>" in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
-    assert "button-danger" not in populated and "<table" not in populated
+    assert "button-danger" not in populated
     assert f"Remove export access for {a.id}" not in populated
     with factory() as session:
         access = session.scalar(
@@ -576,7 +568,9 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
         )
     revoke = f"{access_url}/{access.id}/revoke"
     assert post(revoke, {}).status_code == 403
-    assert post(revoke, {"csrf_token": csrf}).status_code == 302
+    revoked = post(f"{revoke}?concept=1", {"csrf_token": csrf})
+    assert revoked.status_code == 302
+    assert revoked.location == f"/datasets/{d.key}/concept#access-management"
     with factory() as session:
         assert session.get(DatasetExportAccess, access.id) is None
         assert {
@@ -586,7 +580,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
             )
         } == {"granted", "revoked"}
     csrf = sign_in(u)
-    assert get(access_url).status_code == 404
+    assert post(access_url, {"subject": f"team:{owner.id}", "csrf_token": csrf}).status_code == 404
     for fmt in ("csv", "xlsx", "json"):
         response = get(f"/datasets/{d.key}/records/export?format={fmt}")
         assert response.status_code == 200

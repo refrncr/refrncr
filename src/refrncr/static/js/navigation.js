@@ -7,6 +7,29 @@
     // Storage can be unavailable in restricted browser contexts; keep in-page controls usable.
   }
   root.classList.toggle("navigation-collapsed", !desktopExpanded);
+  // Scripted pages can style their enhanced state before the first paint (section tabs).
+  root.classList.toggle("js", true);
+  const here = window.location;
+  if (here && (here.hash || new URLSearchParams(here.search).has("tab"))) {
+    root.setAttribute("data-tab-requested", "");
+  }
+
+  // Record criteria (search, status) reload the page. Restore the scroll position of the
+  // same page before its first paint, so the new page does not jump.
+  const restoreScroll = (event) => {
+    let saved = null;
+    try {
+      saved = JSON.parse(window.sessionStorage.getItem("refrncr.criteria"));
+      // Deferred scripts have run by DOMContentLoaded; the saved state is used up then.
+      if (event.type === "DOMContentLoaded") window.sessionStorage.removeItem("refrncr.criteria");
+    } catch (_) {}
+    if (!saved || saved.path !== location.pathname) return;
+    const main = document.getElementById("content");
+    if (main) main.scrollTop = saved.y;
+    if (!main || main.scrollTop !== saved.y) document.scrollingElement.scrollTop = saved.y;
+  };
+  window.addEventListener("pagereveal", restoreScroll, {once: true});
+  document.addEventListener("DOMContentLoaded", restoreScroll, {once: true});
 
   document.addEventListener("DOMContentLoaded", () => {
     const shell = document.querySelector("[data-responsive-shell]");

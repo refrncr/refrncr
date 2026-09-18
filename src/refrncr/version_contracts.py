@@ -157,6 +157,8 @@ class VersionRead:
     record_labels: Mapping[str, str] | None = None
     search: str = ""
     deleted_fields: Mapping[str, tuple[SnapshotField, ...]] | None = None
+    # Active and deleted Records that match the search term, before the status filter.
+    status_counts: tuple[int, int] = (0, 0)
 
 
 @dataclass(frozen=True, slots=True)

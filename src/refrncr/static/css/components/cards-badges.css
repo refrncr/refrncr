@@ -8,20 +8,6 @@
 a.badge-link, a.badge-link:hover { text-decoration: none; }
 .empty-state { padding: var(--space-xxl) var(--space-lg); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); text-align: center; }
 .empty-state h2 { margin-top: 0; }
-.empty-state-compact { padding: var(--space-md); border: 0; background: var(--color-surface-subtle); text-align: left; }
-.empty-state-compact :is(h3, h4) { margin: 0 0 var(--space-sm); font-size: var(--font-size-body); }
-.empty-state-compact p { margin: 0; color: var(--color-text-secondary); }
-
-.access-list { padding: 0; margin: 0; list-style: none; }
-.access-list-row { display: flex; align-items: center; gap: var(--space-md); min-height: var(--record-row-min-height); padding-block: var(--space-md); border-bottom: 1px solid var(--color-border-subtle); }
-.access-list-row:first-child { padding-top: 0; }
-.access-list-subject { display: flex; align-items: flex-start; gap: var(--space-sm); flex: 1; min-width: 0; }
-.access-list-subject .button-icon { flex-shrink: 0; margin: var(--space-xs) 0 0; color: var(--color-text-secondary); }
-.access-list-identity { min-width: 0; overflow-wrap: anywhere; }
-.access-list-name { display: block; font-weight: var(--font-weight-semibold); }
-.access-list-type { display: block; font-size: var(--font-size-body-sm); color: var(--color-text-muted); }
-.access-list-row > form { flex-shrink: 0; }
-
 /* Status badges carry a dot plus text, so colour is never the only signal. */
 :is(.badge-success, .badge-warning, .badge-error, .badge-info, .badge-draft, .badge-published, .badge-removed)::before { content: ""; width: .3125rem; height: .3125rem; border-radius: var(--radius-full); background: currentColor; flex-shrink: 0; }
 .badge-draft { color: var(--color-status-draft); background: var(--color-status-draft-surface); border-color: var(--color-status-draft-border); }

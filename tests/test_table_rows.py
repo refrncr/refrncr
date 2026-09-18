@@ -63,10 +63,8 @@ def test_shared_row_has_one_primary_control_and_escapes_values(panel):
     assert all("tabindex" not in attrs and "role" not in attrs for attrs in rows)
     assert "data-row-action" not in rows[0]
     assert rows[1]["data-search-text"] == name
-    icons = [attrs for tag, attrs in elements if tag == "svg"]
-    assert len(icons) == 1
-    assert icons[0]["aria-hidden"] == "true"
-    assert icons[0]["focusable"] == "false"
+    assert not any(tag == "svg" for tag, _ in elements)
+    assert "row-chevron" not in html
     assert all(tag != "script" for tag, _ in elements)
     assert ">View<" not in html
     assert "<th scope='col'>Actions</th>" in html  # Other legitimate actions survive.
@@ -132,7 +130,8 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         assert "data-row-primary" in control
         assert tag == ("a" if kind in ("datasets", "teams") else "button")
         assert len([tag for tag, _ in elements if tag == "td"]) == columns
-        assert len([tag for tag, _ in elements if tag == "svg"]) == (2 if kind == "datasets" else 1)
+        assert "row-chevron" not in contents
+        assert len([tag for tag, _ in elements if tag == "svg"]) == (2 if kind == "datasets" else 0)
         assert all(
             a["aria-hidden"] == "true" and a["focusable"] == "false"
             for tag, a in elements

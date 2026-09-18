@@ -9,7 +9,18 @@
 .side-panel-view[hidden] { display: none; }
 .panel-sections { display: flex; flex-direction: column; gap: var(--space-lg); overflow-wrap: anywhere; }
 .panel-sections > * { flex-shrink: 0; margin: 0; min-width: 0; }
-.danger-zone { border-top: 1px solid var(--color-border); padding-top: var(--space-lg); overflow-wrap: anywhere; }
+/* Delete confirmation: warning, what is removed, exact-name field. */
+.deletion-alert { display: flex; gap: var(--space-sm); align-items: flex-start; padding: var(--space-md); border: 1px solid var(--color-status-removed-border); border-radius: var(--radius-lg); background: var(--color-error-surface); color: var(--color-error-text); font-size: var(--font-size-body-sm); }
+.deletion-alert .button-icon { flex-shrink: 0; width: 1.125rem; height: 1.125rem; margin: 0; }
+.deletion-counts { display: grid; gap: var(--space-xs); margin: 0; font-size: var(--font-size-body-sm); }
+.deletion-counts > div { display: flex; justify-content: space-between; gap: var(--space-md); padding-bottom: var(--space-xs); border-bottom: 1px solid var(--color-border); }
+.deletion-counts > div:last-child { border-bottom: 0; }
+.deletion-counts dt { color: var(--color-text-muted); }
+.deletion-counts dd { margin: 0; font-family: var(--font-technical); font-variant-numeric: tabular-nums; }
+.deletion-retained { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+/* The label carries the exact string to type, so it keeps the Dataset's own casing. */
+#dataset-delete-form label { font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
+#dataset-delete-form label code { font-family: var(--font-technical); font-size: var(--font-size-body-sm); }
 .panel-sections [data-panel-section-heading] { margin: 0 0 var(--space-md); font-size: var(--font-size-heading-sm); }
 .side-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--color-border); }
 .side-panel-header h2, .side-panel-header p { margin: 0; }

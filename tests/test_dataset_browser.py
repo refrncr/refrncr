@@ -14,6 +14,7 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.presentation_metadata import DATASET_ICONS
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
@@ -601,14 +602,18 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
     template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
 
     # Dataset icons use the pinned local sprite; interface icons stay inline.
-    assert [p.name for p in image_directory.glob("lucide-*.svg")] == ["lucide-0.468.0.svg"]
-    assert "images/lucide-0.468.0.svg" in template_source
-    assert request(client, "get", "/static/images/lucide-0.468.0.svg").status_code == 200
+    assert {p.name for p in image_directory.glob("lucide-*.svg")} == {
+        "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
+    }
+    assert "images/lucide-1.46.0.svg" in template_source
+    assert request(client, "get", "/static/images/lucide-1.46.0.svg").status_code == 200
     assert {path.name for path in image_directory.iterdir()} == {
-        "07-static-logo-256px.svg",
-        "lucide-0.468.0.svg",
-        "02-animated-grow-shrink.svg",
-        "06-favicon-16px.svg",
+        "favicon.svg",
+        "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
+        "refrncr-loader.svg",
+        "refrncr-wordmark-primary.svg",
     }
     macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
     assert len(macros) == len(set(macros)) >= 20
@@ -1110,10 +1115,18 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert response.status_code == 200
     assert "<title>Configure Stored &lt;name&gt; · REFRNCR</title>" in page
     assert "<div class='page-header page-header-actions-end'>" in page
-    assert "<p><span class='form-label'>Key:</span> <code>edit-form</code></p>" in page
+    assert "<p class='form-label'>Key</p>" in page
+    assert "<p class='readonly-value'><code>edit-form</code></p>" in page
+    assert "Permanent; used in exports and the API." in page
+    assert page.index("id='dataset-edit-form'") < page.index("<code>edit-form</code>")
+    # The icon picker shows a preview and suggestions once enhanced; the name field always works.
+    assert "data-icon-preview hidden" in page and "data-icon-suggestions hidden" in page
+    # The default tile plus one per suggestion.
+    assert page.count("data-icon-choice=") == len(DATASET_ICONS) + 1
+    assert "<code data-icon-preview-name>table</code>" in page
     assert "name='key'" not in page
     assert (
-        "<form id='dataset-edit-form' class='form' novalidate "
+        "<form id='dataset-edit-form' class='form dataset-edit-form' novalidate "
         "method='post' action='/datasets/edit-form'>" in page
     )
     assert "<label for='dataset-name'>Name</label>" in page
@@ -1258,7 +1271,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema/concept"))
-    assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
+    assert "<h2 id='fields-heading'>Fields <span class='section-count'>0<" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
 
@@ -1430,6 +1443,52 @@ def test_admin_moves_field_and_stale_form_is_rejected_without_second_audit(
         ).all()
         assert [field.key for field in persisted] == expected_keys
         assert [field.display_position for field in persisted] == [1, 2, 3]
+        assert (
+            session.scalar(
+                select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")
+            )
+            == 1
+        )
+
+
+def test_admin_saves_complete_field_order_and_stale_or_invalid_order_is_rejected(
+    dataset_browser,
+):
+    factory, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "dragged")
+    fields = [
+        create_field(services, admin, dataset, key, key.title())
+        for key in ("first", "second", "third")
+    ]
+    login(client)
+    expected = [field.id for field in fields]
+    proposed = [fields[2].id, fields[0].id, fields[1].id]
+    csrf = session_csrf(client, services)
+    data = {"csrf_token": csrf, "expected_field_id": expected, "ordered_field_id": proposed}
+    url = "/datasets/dragged/fields/order"
+
+    saved = request(client, "post", url, data=data)
+    stale = request(client, "post", url, data=data)
+    incomplete = request(
+        client,
+        "post",
+        url,
+        data={"csrf_token": csrf, "expected_field_id": proposed, "ordered_field_id": proposed[:2]},
+    )
+    mixed = request(client, "post", url, data=data | {"direction": "up"})
+    forged = request(client, "post", url, data=data | {"csrf_token": "wrong"})
+
+    assert saved.status_code == 204 and not saved.data
+    assert stale.status_code == 409
+    assert incomplete.status_code == 400
+    assert mixed.status_code == 400
+    assert forged.status_code in {400, 403}
+    assert [field.key for field in services.dataset_fields.list_fields(admin.id, dataset.key)] == [
+        "third",
+        "first",
+        "second",
+    ]
+    with factory() as session:
         assert (
             session.scalar(
                 select(func.count(AuditEvent.id)).where(AuditEvent.action == "field_order_updated")

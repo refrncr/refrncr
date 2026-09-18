@@ -6,5 +6,7 @@
 .auth-container > .card { margin-bottom: 0; }
 
 .auth-container > .brand { flex-direction: column; }
-.auth-container > .brand img { width: 80px; height: 80px; }
-.auth-container > .brand picture { display: block; width: 80px; height: 80px; }
+.auth-container > .brand .auth-loader { width: 100px; height: 100px; margin-bottom: var(--space-md); opacity: .8; }
+.auth-container > .brand .auth-wordmark { width: 200px; height: auto; }
+/* The loader only adds motion; without it the wordmark alone identifies the product. */
+@media (prefers-reduced-motion: reduce) { .auth-container > .brand .auth-loader { display: none; } }

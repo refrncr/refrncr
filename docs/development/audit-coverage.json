@@ -861,7 +861,7 @@
       "operation": "change_owner",
       "service": "refrncr.services.DatasetService.change_owner",
       "interface_entrypoints": [
-        "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner"
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -959,7 +959,7 @@
       "operation": "grant_export_access",
       "service": "refrncr.services.DatasetService.grant_export_access",
       "interface_entrypoints": [
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1056,8 +1056,7 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
@@ -1511,7 +1510,7 @@
       "operation": "replace_order",
       "service": "refrncr.services.DatasetFieldService.replace_order",
       "interface_entrypoints": [
-        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -2548,8 +2547,7 @@
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
@@ -3017,7 +3015,8 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3743,8 +3742,7 @@
         "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
@@ -4140,8 +4138,7 @@
       "interface_entrypoints": [
         "Browser transport, CSRF, request-size and exception hooks",
         "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.dataset_owner GET,POST /datasets/<key>/owner",
-        "refrncr.web.dataset_export_access GET,POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
@@ -4415,7 +4412,14 @@
       "operation": "get_dataset_for_deletion",
       "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
       "interface_entrypoints": [
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4437,7 +4441,8 @@
       "tests": [
         "tests/test_dataset_deletion.py::test_atomic_deletion_preserves_history",
         "tests/test_dataset_deletion.py::test_authorization_and_non_disclosing_targets",
-        "tests/test_dataset_deletion.py::test_web_denied_targets_are_uniform"
+        "tests/test_dataset_deletion.py::test_web_denied_targets_are_uniform",
+        "tests/test_ui_polish.py::test_danger_zone_shows_what_deletion_removes"
       ],
       "implementation_status": "REF-141 locally verified on SQLite 3.51.0 and PostgreSQL 16.15; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
@@ -4715,7 +4720,8 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4755,7 +4761,8 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4971,7 +4978,8 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5367,7 +5375,8 @@
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>"
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

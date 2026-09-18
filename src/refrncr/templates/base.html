@@ -6,8 +6,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}REFRNCR{% endblock %}</title>
-    <link rel="icon" href="{{ url_for('static', filename='images/06-favicon-16px.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
+    {# Preload the Latin fonts every page paints first, so a page load does not show a
+       fallback font and then shift when the web font arrives. #}
+    {% for font in ('instrument-sans/instrument-sans-latin-600-normal', 'instrument-sans/instrument-sans-latin-700-normal', 'ibm-plex-sans/ibm-plex-sans-latin-400-normal', 'ibm-plex-sans/ibm-plex-sans-latin-600-normal', 'ibm-plex-sans/ibm-plex-sans-latin-700-normal', 'ibm-plex-mono/ibm-plex-mono-latin-400-normal') %}
+    <link rel="preload" href="{{ url_for('static', filename='fonts/' ~ font ~ '.woff2') }}" as="font" type="font/woff2" crossorigin>
+    {% endfor %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
     <script src="{{ url_for('static', filename='js/key-generation.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/icon-picker.js') }}" defer></script>
@@ -21,12 +26,11 @@
         <aside class="app-sidebar" data-navigation id="application-navigation">
           <div class="navigation-heading">
             <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-              <img src="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}" alt="" width="42" height="42"><span class="brand-name">REFRNCR</span>
+              <img src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="120" height="45">
             </a>
             {{ navigation_button('application-navigation') }}
           </div>
           <nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation">
-            <p class="nav-label">Navigation</p>
             <a class="nav-item{{ ' is-active' if active_navigation == 'home' else '' }}" href="{{ url_for('index') }}"{% if active_navigation == 'home' %} aria-current="page"{% endif %}>{{ home_icon() }}Overview</a>
             {% if dataset_ui_enabled %}
               <a class="nav-item{{ ' is-active' if active_navigation == 'datasets' else '' }}" href="{{ url_for('dataset_list') }}"{% if active_navigation == 'datasets' %} aria-current="page"{% endif %}>{{ datasets_icon() }}Datasets</a>
@@ -50,7 +54,7 @@
         {% if current_actor %}{% set mobile_title = self.title().split(' · ')[0] %}
         <div class="mobile-bar">
           {{ navigation_button('application-navigation', expand=true) }}
-          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/07-static-logo-256px.svg') }}" alt="" width="28" height="28"><span class="brand-name">REFRNCR</span></a>
+          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="90" height="34"></a>
           {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
         </div>{% endif %}
         {% include "components/flash_messages.html" %}

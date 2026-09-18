@@ -1,10 +1,10 @@
 {% from 'components/section_tabs.html' import section_tabs %}
 {% from 'components/export_access.html' import export_access %}
-{% from 'components/field_metadata.html' import field_metadata %}
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon %}
+{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon %}
+{% from "components/dataset_icon.html" import dataset_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
@@ -29,40 +29,79 @@
   {% if may_govern %}{% set tabs = tabs + [('access-management', 'Access management')] %}{% endif %}
   {% if editable %}{% set tabs = tabs + [('danger-zone', 'Danger zone')] %}{% endif %}
   {{ section_tabs(tabs, 'Configure dataset sections') }}
-  <div class='configuration-overview'>
+  <div class='configuration-overview' data-tab-panels>
     <section id='dataset-details' aria-labelledby='dataset-details-heading'>
-      <div class='page-header section-header'><h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>{% if editable and not edit_mode %}<a href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>Edit dataset</a>{% endif %}</div>
+      <div class='page-header section-header'>
+        <div>
+          <h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>
+          {% if not edit_mode %}<p class='section-description'>How this dataset is named and shown across REFRNCR.</p>{% endif %}
+        </div>
+        {% if editable and not edit_mode %}<div class='page-actions'><a class='button button-secondary' href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>{{ file_pen_icon() }}Edit dataset</a></div>{% endif %}
+      </div>
       {% if edit_mode %}
         {% include 'pages/datasets/_edit_form.html' %}
       {% else %}
-      <dl class='detail-list'>
-        <div><dt>Name</dt><dd>{{ dataset.name }}</dd></div>
-        <div><dt>Description</dt><dd>{{ dataset.description or 'No description provided' }}</dd></div>
-        <div><dt>Dataset icon</dt><dd>{{ dataset.icon or 'Default dataset icon' }}</dd></div>
-        <div><dt>Owning team</dt><dd>{{ dataset.owner_team_name }}</dd></div>
-        <div><dt>Key</dt><dd><code>{{ dataset.key }}</code></dd></div>
-      </dl>
+      <div class='dataset-details-layout'>
+        <div class='dataset-details-main'>
+          <div class='dataset-identity-card'>
+            <span class='dataset-icon-tile'>{{ dataset_icon(dataset.icon) }}</span>
+            <div>
+              <p class='dataset-identity-name'>{{ dataset.name }}</p>
+              {% if dataset.description %}<p class='dataset-identity-description'>{{ dataset.description }}</p>
+              {% else %}<p class='dataset-identity-description dataset-identity-empty'>No description provided</p>{% endif %}
+            </div>
+          </div>
+          <dl class='detail-list'>
+            <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
+            <div><dt>Key</dt><dd><code>{{ dataset.key }}</code> <span class='badge'>Permanent</span><span class='detail-hint'>Used in exports and the API. It cannot be changed.</span></dd></div>
+            <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
+          </dl>
+        </div>
+        <aside class='dataset-details-aside' aria-label='Dataset summary'>
+          <div class='dataset-facts'>
+            <h3 class='dataset-facts-heading'>At a glance</h3>
+            <dl>
+              <div><dt>Version</dt><dd>{{ dataset_facts.version }}</dd></div>
+              {% if dataset_facts.record_count is not none %}<div><dt>Records</dt><dd>{{ dataset_facts.record_count }}</dd></div>{% endif %}
+              <div><dt>Fields</dt><dd>{{ dataset_facts.field_count }}</dd></div>
+              <div><dt>Created</dt><dd><time datetime='{{ dataset_facts.created_at.isoformat() }}'>{{ dataset_facts.created_at|absolute_utc }}</time></dd></div>
+              {% if dataset_facts.last_updated %}<div><dt>Last updated</dt><dd><time datetime='{{ dataset_facts.last_updated.isoformat() }}'>{{ dataset_facts.last_updated|absolute_utc }}</time></dd></div>{% endif %}
+            </dl>
+          </div>
+          <p class='dataset-facts-note'>{{ lock_icon() }}<span>Changes to name, description and icon apply right away. They are not part of a version.</span></p>
+        </aside>
+      </div>
       {% endif %}
-      <p class='help-text'>The key is permanent and used in exports and the API.</p>
     </section>
     <section id='fields' aria-labelledby='fields-heading'>
-    {% if field_context_label %}<p class='section-description'>{{ field_context_label }}</p>{% endif %}
     {% if fields and not business_key.field_keys %}
       {{ feedback("No record identifier configured. Choose one or more fields to uniquely identify each record.", kind="warning") }}
     {% endif %}
       <div class='page-header section-header'>
-        <div><h2 id='fields-heading'>Fields</h2><p class='section-description'>{{ fields|length }} {{ 'field' if fields|length == 1 else 'fields' }}</p>{% if fields %}<p class='section-description'>The order here is the column order in tables and exports.</p>{% endif %}</div>
+        <div>
+          <h2 id='fields-heading'>Fields <span class='section-count'>{{ fields|length }}<span class='visually-hidden'> {{ 'field' if fields|length == 1 else 'fields' }}</span></span></h2>
+          {% if fields %}<p class='section-description'>{{ 'Drag a field to change the column order in tables and exports.' if schema_admin else 'The order here is the column order in tables and exports.' }}</p>{% endif %}
+        </div>
         {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}
       </div>
+      {% if field_context_label %}
+      <div class='context-notice'>{{ lock_icon() }}<span>{{ field_context_label }}</span>
+        {%- if may_start_concept %}<form method='post' action='{{ url_for("dataset_concept_create", key=dataset.key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='context-notice-action' type='submit'>Start a concept to change fields</button></form>{% endif %}
+      </div>
+      {% endif %}
       {% if fields %}
-        <div class='table-scroll configuration-table' role='region' aria-label='Dataset fields' tabindex='0'>
-          <table>
+        {% if schema_admin %}<p id='field-order-help' class='visually-hidden'>Use the up and down arrow keys to move the field. The new order is saved right away.</p>
+        <div id='field-order-status' class='visually-hidden' role='status' aria-live='polite'></div>{% endif %}
+        <div class='table-scroll configuration-table{{ " configuration-table-editable" if schema_admin else "" }}' role='region' aria-label='Dataset fields' tabindex='0'>
+          <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("move_dataset_field", key=dataset.key) }}'{% endif %}>
             <caption class='visually-hidden'>Dataset fields</caption>
-            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col'>Field</th><th scope='col'><span class='visually-hidden'>Key</span></th><th scope='col'>Type</th><th scope='col'>Constraints</th><th scope='col'>Actions</th></tr></thead>
+            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col'>Field</th><th scope='col'>Description</th><th scope='col'>Type</th><th scope='col'>Constraints</th>{% if schema_admin %}<th scope='col'>Actions</th>{% endif %}</tr></thead>
             <tbody>{% for field in fields %}
-              <tr>
+              {% set is_identifier = field.key in business_key.field_keys %}
+              <tr{% if schema_admin %} data-field-row data-field-name='{{ field.name }}'{% endif %}>
                 <td class='field-order-column'>
                   {% if schema_admin %}
+                    <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
                     <form class='button-stack' method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
                       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
                       {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
@@ -70,26 +109,29 @@
                       <button class='button button-icon-only' aria-label='Move {{ field.name }} up' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}>{{ chevron_up_icon() }}</button>
                       <button class='button button-icon-only' aria-label='Move {{ field.name }} down' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}>{{ chevron_down_icon() }}</button>
                     </form>
-                  {% endif %}
+                  {% else %}<span class='field-position'>{{ loop.index }}</span>{% endif %}
                 </td>
-                <td><span class='field-name'>{{ field.name }}</span>{{ field_metadata(field) }}{% if field.key in business_key.field_keys %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge'>{{ field_states[field.id] }}</span>{% endif %}</td>
-                <td><code class='field-key'>{{ field.key }}</code></td>
-                <td>{{ field.data_type|datatype_label }}</td>
+                <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge badge-draft'>{{ field_states[field.id] }}</span>{% endif %}<code class='field-key'>{{ field.key }}</code></td>
+                <td class='field-description'>
+                  {%- if field.definition or field.unit %}<div class='field-metadata'>{% if field.definition %}<p>{{ field.definition }}</p>{% endif %}{% if field.unit %}<p class='field-unit'>Unit: {{ field.unit }}</p>{% endif %}</div>
+                  {%- else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No description</span>{% endif -%}
+                </td>
+                <td class='field-type'>{{ field.data_type|datatype_label }}</td>
                 <td>
                   <div class='constraint-list'>
+                    {% if is_identifier %}<span class='badge badge-identifier'>Identifier</span>{% endif %}
                     {% if field.is_required %}<span class='badge'>Required</span>{% endif %}
                     {% if field.is_unique %}<span class='badge'>Unique</span>{% endif %}
-                    {% if field.key in business_key.field_keys %}<span class='badge'>Identifier</span>{% endif %}
-                    {% if not field.is_required and not field.is_unique and field.key not in business_key.field_keys %}None{% endif %}
+                    {% if not field.is_required and not field.is_unique and not is_identifier %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>None</span>{% endif %}
                   </div>
                 </td>
+                {% if schema_admin %}
                 <td>
-                  {% if schema_admin %}
-                    <div class='field-actions'>
-                      <a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>
-                    </div>
-                  {% else %}<span class='section-description'>Read only</span>{% endif %}
+                  <div class='field-actions'>
+                    <a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>
+                  </div>
                 </td>
+                {% endif %}
               </tr>
             {% endfor %}</tbody>
           </table>
@@ -99,17 +141,40 @@
       {% endif %}
     </section>
     {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><h2 id='access-management-heading'>Access management</h2>
-      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, inline=true, concept=not version_state and not standalone_configuration, standalone=standalone_configuration) }}
+      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=not version_state and not standalone_configuration, standalone=standalone_configuration, change_owner_url=url_for("dataset_configuration", key=dataset.key, edit=1) ~ '#owner-team' if editable else none) }}
     </section>{% endif %}
     {% if editable %}
     <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>
-      <h2 id='dataset-danger-heading'>Danger zone</h2>
-      <p>Permanently delete this dataset and its records, fields and access settings.</p>
-      <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+      <div class='page-header section-header'>
+        <div>
+          <h2 id='dataset-danger-heading' tabindex='-1'>Danger zone</h2>
+          <p class='section-description'>Actions here cannot be undone.</p>
+        </div>
+      </div>
+      <div class='danger-card'>
+        <div class='danger-card-head'>
+          {{ alert_triangle_icon() }}
+          <div>
+            <h3>Delete this dataset</h3>
+            <p>Removes the dataset with all its versions, records, fields, record identifiers and export access. This cannot be undone.</p>
+          </div>
+        </div>
+        <div class='danger-card-body'>
+          <ul class='danger-counts'>
+            <li>Versions <b>{{ deletion.version_count }}</b></li>
+            <li>Records <b>{{ deletion.record_count }}</b></li>
+            <li>Fields <b>{{ deletion.field_count }}</b></li>
+            <li>Export access <b>{{ deletion.export_access_count }}</b></li>
+          </ul>
+          <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+        </div>
+      </div>
+      <p class='danger-note'>{{ history_icon() }}<span>The audit log keeps a record of the deletion, including who deleted the dataset and when.</span></p>
     </section>
     {% endif %}
   </div>
   {% if editable or schema_admin or may_govern %}{{ form_side_panel() }}{% endif %}
 {% endblock %}
 
-{% block scripts %}<script src='{{ url_for("static", filename="js/section-tabs.js") }}' defer></script>{% endblock %}
+{# Not deferred: the tabs are set up while the page is parsed, before it is first shown. #}
+{% block scripts %}<script src='{{ url_for("static", filename="js/section-tabs.js") }}'></script>{% if schema_admin %}<script src='{{ url_for("static", filename="js/field-order.js") }}' defer></script>{% endif %}{% endblock %}

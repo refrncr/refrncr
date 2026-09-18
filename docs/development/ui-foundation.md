@@ -6,13 +6,15 @@ components.
 
 ## Assets and typography
 
-The canonical logo uses the supplied green concentric rings. Use
-`07-static-logo-256px.svg` for static branding, `02-animated-grow-shrink.svg` on
-login and `06-favicon-16px.svg` for the favicon. A responsive picture selects the
-static source for reduced motion, including when the preference changes at runtime.
-The SVG source bytes, geometry and green color are preserved. Branding containers
-reserve dimensions and pair a decorative mark with visible REFRNCR text.
-See the asset inventory for provenance and licensing.
+Use the supplied `refrncr-wordmark-primary.svg` for navigation, the mobile bar,
+setup and login, and `favicon.svg` for the favicon. Login additionally displays
+`refrncr-loader.svg` above the wordmark. With `prefers-reduced-motion: reduce`,
+CSS hides the loader while the wordmark remains visible, including when the
+preference changes at runtime. All three assets are served locally; their SVG
+geometry and colours are preserved. Images reserve dimensions and use empty alt
+text; their brand links provide the accessible name "REFRNCR home".
+See the [asset inventory](../../src/refrncr/static/licenses/ASSET-SOURCES.md) for
+provenance and licensing.
 
 The typography contract is:
 
@@ -682,55 +684,52 @@ Dataset UI flags come from central service capabilities: read-only configuration
 every active user, maintenance follows owning-team membership, and export is independent.
 See [Dataset governance](dataset-governance.md) for workflow and migration contracts. No CSS tokens are changed. The existing controller receives the opt-in enhancements described below. The reusable `page-header-actions-end` variant keeps
 configuration actions right-aligned. Owning team is edited with metadata through Save dataset;
-the grey `Access management` action opens export management from the header.
+export access is managed on the Access management tab.
 
 ### Sectioned action panels and additional access lists
 
 Use one `side-panel-view` containing a scrolling `side-panel-body panel-sections` and a sibling
 `panel_form_actions` footer. The section stack uses shared spacing tokens and removes incidental
 paragraph margins. Do not nest padded panel bodies or alter the shared header to fix local spacing.
-Section headings use `data-panel-section-heading`; subordinate headings may use
-`data-panel-subheading`. Full-page sources retain h2/h3 below their h1. The existing controller
-imports them as native h3/h4 below the dialog's h2 title, preserving IDs and plain text.
+Section headings use `data-panel-section-heading`. Full-page sources retain h2 below their h1.
+The existing controller imports them as native h3 below the dialog's h2 title, preserving IDs and
+plain text.
 
 `inline-form-action` places a flexible selector and a naturally sized button on one row, with
-shared spacing. At the existing 767px breakpoint it stacks them. `form-label-sentence` is the
-explicit sentence-case label variant. Forms may opt into `data-requires-selection`: JavaScript
+shared spacing. At the existing 767px breakpoint it stacks them. Forms may opt into
+`data-requires-selection`: JavaScript
 initially disables the submit button until the required selector has a value. Without JavaScript,
 submission remains available and the same server validation reports errors. This enhancement
 never grants authority or replaces server validation. Retain field-associated errors and the
 shared error-summary focus contract.
 
-The `components/access_list.html` macros render semantic lists of explicit user/team access.
-Each row uses an existing decorative identity icon, wrapping display name, visible subject type
-and a secondary removal action with a descriptive accessible name. The list does not derive
-permissions or manufacture rows for automatic access. `empty-state-compact` provides a quiet,
-left-aligned use of the existing empty-state surface and tokens, without a nested card.
+The Access management tab (`components/export_access.html`) lists explicit user/team export
+access in a table with a decorative identity icon, name (and email for users), type badge, the
+date the access was added and a secondary Remove action with a descriptive accessible name. It
+does not derive permissions or manufacture rows for automatic access; the "Who has access"
+overview names the owning team and Community administrators as fixed rules. Grant and Remove
+forms use `data-inline-refresh`: the refreshed component replaces the current one and
+`data-panel-success` is announced and focused through `data-panel-status`.
 
-Immediately persisted actions can opt into `data-panel-refresh` containing their expected GET
-redirect URL. Only a successful redirect to that exact URL is imported into the open panel.
-Other forms keep their existing navigation behavior; authentication redirects remain navigation.
-`data-panel-success` supplies plain-text confirmation to the refreshed `data-panel-status` node,
-which is revealed, announced and focused. The status is only active for enhanced in-panel updates.
-Late responses cannot replace a closed or reopened panel, and pending requests are never retried
-or duplicated. Server services, POST payloads, CSRF checks, audits and transactions are unchanged.
-
-Use a secondary `Close` link with `data-panel-cancel` in the shared footer for these immediate-action
-panels. Both Close and the header cross restore the exact original trigger after refreshes; the
-full-page link retains its ordinary fallback destination. No additional Save/Done action is needed.
-
-`tests/javascript/export_access_browser.cjs` uses the existing external Playwright convention and
-`tests/browser_table_rows_app.py` fixture. It checks 1440/768/320px empty, user, team, long-name and
-validation states, native keyboard controls, dialog containment, Close/Escape focus restoration,
-200% viewport/text simulations and no-JavaScript server validation. Screenshots are written only
-when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the repository.
+`tests/javascript/access_management_browser.cjs` uses the existing external Playwright convention
+and `tests/browser_table_rows_app.py` fixture. It checks 1440/320px empty, user, team and duplicate
+states, keyboard submission, error focus and no-JavaScript server validation. Screenshots are
+written only when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the
+repository.
 
 ## Dataset deletion panels (REF-141)
 
-The Dataset edit form has a separate danger zone using existing warning feedback and danger
-buttons. The shared `.danger-zone` component variant uses existing border/spacing tokens.
-No tokens change. The confirmation is a Dataset workflow template, with current name, Field/Record
-counts, permanent-deletion warning, required labelled name input, error summary and Cancel.
+The Danger zone tab states the destructive action in one framed card: a warning header on the
+error surface, the counts the deletion removes (Versions, Records, Fields, Export access) and the
+danger button, followed by a note that the audit log retains the deletion. The confirmation is a
+Dataset workflow template with the same counts, a permanent-deletion warning, a required
+"Type <name> to confirm" input, error summary and Cancel. The tab itself is marked with the error
+colour while selected. `.danger-card`, `.danger-counts` and `.deletion-counts` use existing
+error/border/spacing tokens; no tokens change.
+
+`DatasetService.get_dataset_for_deletion` supplies the counts on both surfaces, so Configure reads
+it whenever the actor may maintain the Dataset. It stays an ordinary authorized read: no audit
+event, and readers without maintain rights get no tab and no call.
 
 An opt-in `data-panel-next` link replaces the content of the current remote side panel with
 a dedicated confirmation view. Only one modal remains open. The controller retains the parent
@@ -1049,7 +1048,11 @@ Without JavaScript both fields remain normal inputs. Edit pages never opt in.
 The Dataset icon picker enhances a text input with a searchable combobox/listbox,
 visible icon names, active-descendant navigation, selection, clear and Escape/Tab
 handling. Initialization is repeat-safe, including side-panel fragment replacement.
-Manual icon-name entry is available without JavaScript. Definition and Unit use plain
+Manual icon-name entry is available without JavaScript. With JavaScript the picker also
+shows a preview of the selected icon (label and name; unknown names show the default)
+and the suggestions as always-visible toggle buttons (`aria-pressed`); the combobox list
+opens as an overlay so closing it never moves the form. The preview checks typed names
+against the symbol ids of the pinned sprite. Definition and Unit use plain
 escaped text and keyboard-accessible disclosure at Record column headers.
 See [asset provenance and licences](../../src/refrncr/static/licenses/ASSET-SOURCES.md)
 and [the part-1 implementation notes](ref-162-part-1-notes.md).
@@ -1057,8 +1060,8 @@ and [the part-1 implementation notes](ref-162-part-1-notes.md).
 
 ### Manual Dataset icon names
 
-The user-approved REF-162 follow-up expands the eight suggestions to manual names
-from the full pinned Lucide 0.468.0 sprite. The input contains the canonical name;
+The user-approved REF-162 follow-up expands the suggestions to manual names
+from the full pinned Lucide 1.46.0 sprite. The input contains the canonical name;
 Tab, blur and form submission retain typed text without requiring selection from
 the suggestions. Enter chooses a highlighted suggestion or accepts the typed name;
 Escape restores the value from before editing. The same text input works without
@@ -1070,10 +1073,15 @@ an icon validation error. Raw input is not persisted or interpreted.
 
 ### Configure inline editing
 
+The Dataset details tab shows an identity card (icon tile, name, description), a short
+list with owning team, permanent key and icon, and an "At a glance" summary (version,
+Records, Fields, created and last updated). A note states that name, description and icon
+apply immediately and are not versioned (REF-165).
+
 Edit dataset opens the general `/datasets/<key>/configure` route in inline edit mode. Name,
-Description, Dataset icon and Owning team are stacked inside Dataset details;
-Save dataset and Cancel sit below them. The key stays read only. Danger zone is a separate tab and uses the existing confirmed-delete
-panel. Cancelling that panel preserves unsaved inline values and restores focus.
+Description and Dataset icon are stacked inside Dataset details, followed by Owning team
+and the read-only key side by side; Save dataset and Cancel sit below a divider. Danger zone is a separate tab and uses the existing confirmed-delete
+panel (see "Dataset deletion panels"). Cancelling that panel preserves unsaved inline values and restores focus.
 
 One `_edit_form.html` include supplies the edit controls; the old Dataset edit
 panel template is removed. The legacy `/edit` entry point renders the same page.

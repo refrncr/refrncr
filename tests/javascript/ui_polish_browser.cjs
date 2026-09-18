@@ -40,16 +40,18 @@ async function layout(page, label) {
       page.on('pageerror', error => errors.push(error.message));
       page.on('request', request => { if (!request.url().startsWith(base)) external.push(request.url()); });
       await page.goto(base + '/login');
-      await page.locator('.brand img').waitFor();
-      await page.waitForFunction(() => document.querySelector('.brand img').complete);
-      assert((await page.locator('.brand img').evaluate(e => e.currentSrc)).endsWith('07-static-logo-256px.svg'));
+      await page.locator('.brand .auth-wordmark').waitFor();
+      await page.waitForFunction(() => document.querySelector('.brand .auth-wordmark').complete);
+      assert((await page.locator('.brand .auth-wordmark').evaluate(e => e.currentSrc)).endsWith('refrncr-wordmark-primary.svg'));
+      assert(!(await page.locator('.brand .auth-loader').isVisible()), 'loader hidden with reduced motion');
       await layout(page, `login ${width}`);
       await page.screenshot({path: `${output}/login-${width}.png`});
       await page.emulateMedia({reducedMotion: 'no-preference'});
-      await page.waitForFunction(() => document.querySelector('.brand img').currentSrc.endsWith('02-animated-grow-shrink.svg'));
+      await page.locator('.brand .auth-loader').waitFor({state: 'visible'});
+      assert((await page.locator('.brand .auth-loader').getAttribute('src')).endsWith('refrncr-loader.svg'));
       await page.emulateMedia({reducedMotion: 'reduce'});
-      await page.waitForFunction(() => document.querySelector('.brand img').currentSrc.endsWith('07-static-logo-256px.svg'));
-      assert((await page.locator('link[rel=icon]').getAttribute('href')).endsWith('06-favicon-16px.svg'));
+      await page.locator('.brand .auth-loader').waitFor({state: 'hidden'});
+      assert((await page.locator('link[rel=icon]').getAttribute('href')).endsWith('favicon.svg'));
       await login(page);
       await page.goto(base + '/datasets');
       const row = page.locator('.dataset-row').filter({has: page.locator(`[data-row-primary][href='/datasets/polish-${width}/concept/records']`)});
@@ -107,7 +109,11 @@ async function layout(page, label) {
       await page.keyboard.press('Home');
       await page.getByRole('tabpanel', {name: 'Dataset details', exact: true}).waitFor();
       const edit = page.getByRole('link', {name: 'Edit dataset', exact: true});
-      assert(!(await edit.getAttribute('class') || '').includes('button'));
+      assert((await edit.getAttribute('class') || '').includes('button-secondary'));
+      const details = page.getByRole('tabpanel', {name: 'Dataset details', exact: true});
+      await details.getByRole('heading', {name: 'At a glance', exact: true}).waitFor();
+      assert.equal(await details.locator('.dataset-icon-tile use').count(), 1);
+      await layout(page, `dataset details ${width}`);
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
       let panel = page.locator('#dataset-edit-form');
@@ -134,9 +140,10 @@ async function layout(page, label) {
       assert.equal(await page.locator('#dataset-description').inputValue(), 'Draft retained after deletion cancel');
       await deletionTrigger.click();
       const deletion = page.locator('dialog[open]');
-      await deletion.getByLabel('Dataset name', {exact: true}).waitFor();
+      const confirmField = deletion.getByLabel(`Type Polish ${width} to confirm`, {exact: true});
+      await confirmField.waitFor();
       assert.equal(await deletion.getByRole('button', {name: 'Delete dataset', exact: true}).isDisabled(), true);
-      await deletion.getByLabel('Dataset name', {exact: true}).fill(`Polish ${width}`);
+      await confirmField.fill(`Polish ${width}`);
       assert.equal(await deletion.getByRole('button', {name: 'Delete dataset', exact: true}).isEnabled(), true);
       assert.equal(await page.locator('#dataset-description').inputValue(), 'Draft retained after deletion cancel');
       await deletion.getByRole('link', {name: 'Cancel', exact: true}).click();
@@ -154,13 +161,32 @@ async function layout(page, label) {
       await picker.press('Escape');
       assert.equal(await panel.count(), 1);
       assert.equal(await picker.getAttribute('aria-expanded'), 'false');
-      await picker.fill('key');
+      await picker.fill('bank');
       await picker.press('ArrowDown');
       await picker.press('Enter');
-      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'key-round');
+      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'banknote');
+      // Suggestions are visible tiles; the preview follows the chosen or typed name.
+      const suggestions = panel.getByRole('group', {name: 'Suggested icons', exact: true});
+      assert(await suggestions.isVisible());
+      assert.equal(await suggestions.getByRole('button', {name: 'Banknote', exact: true}).getAttribute('aria-pressed'), 'true');
+      // The default tile plus one per suggestion in DATASET_ICONS.
+      assert.equal(await suggestions.getByRole('button').count(), 36);
+      await suggestions.getByRole('button', {name: 'Landmark', exact: true}).click();
+      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'landmark');
+      assert((await panel.locator('[data-icon-preview] use').getAttribute('href')).endsWith('#landmark'));
+      assert.equal(await panel.locator('[data-icon-preview-label]').textContent(), 'Landmark');
+      await picker.fill('cloud');
+      await page.waitForFunction(() => document.querySelector('[data-icon-preview] use').getAttribute('href').endsWith('#cloud'));
+      assert.equal(await panel.locator('[data-icon-preview-label]').textContent(), 'Cloud');
+      assert.equal(await suggestions.locator('[aria-pressed=true]').count(), 0);
+      await picker.fill('not-a-real-icon');
+      await page.waitForFunction(() => document.querySelector('[data-icon-preview-label]').textContent === 'Unknown name, default icon shown');
+      assert((await panel.locator('[data-icon-preview] use').getAttribute('href')).endsWith('#table'));
+      await picker.press('Escape');
       await panel.getByRole('button', {name: 'Clear icon', exact: true}).click();
       assert.equal(await panel.locator('input[name=icon]').inputValue(), '');
-      await picker.fill('house');
+      assert.equal(await panel.locator('[data-icon-preview-label]').textContent(), 'Default dataset icon');
+      await picker.fill('earth');
       await picker.press('ArrowDown');
       await picker.press('Enter');
       await layout(page, `icon picker ${width}`);
@@ -168,18 +194,18 @@ async function layout(page, label) {
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
       panel = page.locator('#dataset-edit-form');
-      await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill('database');
+      await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill('warehouse');
       await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).press('Tab');
-      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'database');
+      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'warehouse');
       await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
       await page.goto(base + '/datasets');
-      assert.equal(await row.locator('use').getAttribute('href'), '/static/images/lucide-0.468.0.svg#database');
+      assert.equal(await row.locator('use').getAttribute('href'), '/static/images/lucide-1.46.0.svg#warehouse');
       await row.locator('[data-row-primary]').click();
       await page.getByRole('link', {name: 'Configure', exact: true}).click();
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
       panel = page.locator('#dataset-edit-form');
-      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'database');
+      assert.equal(await panel.locator('input[name=icon]').inputValue(), 'warehouse');
       await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill('not-a-real-icon');
       await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
       assert((await page.locator('.page-title use').getAttribute('href')).endsWith('#table'));
@@ -205,6 +231,24 @@ async function layout(page, label) {
       await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Add field', exact: true}).click()]);
       assert(await page.getByText('Plain <b>definition</b>', {exact: false}).isVisible());
       assert.equal(await page.locator('.field-metadata b').count(), 0);
+      // Fields reorder with the keyboard on the drag handle and save right away.
+      const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
+      const fieldOrder = await fieldNames();
+      assert(await page.locator('#fields .field-drag-handle').first().isVisible());
+      assert(await page.locator('#fields .button-stack').first().isVisible());
+      const reorder = async (name, key) => {
+        await page.getByRole('button', {name: `Reorder ${name}`, exact: true}).focus();
+        await Promise.all([
+          page.waitForResponse(response => response.url().endsWith('/fields/order') && response.status() === 204),
+          page.keyboard.press(key),
+        ]);
+      };
+      await reorder(fieldOrder[0], 'ArrowDown');
+      await page.reload();
+      assert.deepEqual(await fieldNames(), [fieldOrder[1], fieldOrder[0], ...fieldOrder.slice(2)]);
+      await reorder(fieldOrder[0], 'ArrowUp');
+      await page.reload();
+      assert.deepEqual(await fieldNames(), fieldOrder);
       await page.getByRole('link', {name: 'Edit field Amount', exact: true}).click();
       panel = page.locator('dialog[open]');
       await panel.getByLabel('Name', {exact: true}).waitFor();

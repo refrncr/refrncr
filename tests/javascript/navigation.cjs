@@ -38,6 +38,8 @@ function page(width = 1440, storage = new Map(), blocked = false) {
 const state = new Map();
 let p = page(1024, state);
 assert.equal(p.beforePaint, false);
+// The head script marks scripted pages before the first paint (section tabs rely on it).
+assert(p.root.classes.has('js'));
 assert.equal(p.close.attrs['aria-expanded'], 'true');
 assert.equal(p.close.attrs['aria-label'], 'Collapse navigation');
 assert.equal(p.nav.parentNode, p.shell);

@@ -193,6 +193,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]
@@ -210,6 +211,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -226,6 +228,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -343,30 +346,20 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_owner",
-      "path": "/datasets/<key>/owner",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.DatasetService.change_owner",
-        "refrncr.services.DatasetService.export_access_context",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.require_csrf"
-      ]
-    },
-    {
       "symbol": "refrncr.web.dataset_export_access",
       "path": "/datasets/<key>/export-access",
       "methods": [
-        "GET",
         "POST"
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.dataset_versions.DatasetVersionService.concept_context",
+        "refrncr.dataset_versions.DatasetVersionService.history",
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
+        "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.grant_export_access",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -395,6 +388,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.services.DatasetFieldService.move_field",
+        "refrncr.services.DatasetFieldService.replace_order",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -765,6 +759,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]
@@ -782,6 +777,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.update_dataset",
         "refrncr.services.SessionService.resolve_with_session",
@@ -1110,6 +1106,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.export_access_context",
         "refrncr.services.DatasetService.get_dataset_configuration",
+        "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     }

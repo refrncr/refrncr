@@ -55,8 +55,12 @@ const assert = require('node:assert/strict');
     await page.reload(); assert(!(await nav.isVisible()),'collapsed state retained across reload');
     await open.click(); await page.getByRole('link',{name:'Settings',exact:true}).click(); await page.waitForURL('**/users'); await page.waitForLoadState('load');
     assert(await nav.isVisible(),'expanded state retained in Settings');
-    await close.click(); await page.reload(); assert(!(await nav.isVisible()));
-    await open.click(); await page.getByRole('link',{name:'Back to app',exact:true}).click(); await page.waitForURL(`${base}/`); await page.waitForLoadState('load');
+    // Settings has no desktop collapse control; its sidebar stays visible even when the app navigation is collapsed.
+    assert(!(await close.isVisible()) && !(await open.isVisible()),'no desktop collapse control in Settings');
+    await page.goto(`${base}/`); await close.click(); await page.goto(`${base}/users`); await page.waitForLoadState('load');
+    assert(await nav.isVisible(),'Settings sidebar visible while app navigation is collapsed');
+    await page.getByRole('link',{name:'Back to app',exact:true}).click(); await page.waitForURL(`${base}/`); await page.waitForLoadState('load');
+    assert(!(await nav.isVisible()),'app navigation still collapsed after Settings'); await open.click();
     const resize = async size => { await page.setViewportSize(size); await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))); };
     for (const width of [320,767,768,1023,1024]) {
       await resize({width,height:900});

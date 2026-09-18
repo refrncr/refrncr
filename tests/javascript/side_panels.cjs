@@ -47,7 +47,7 @@ datatype.selectedOptions = [{dataset:{identifierEligible:'true'}}];
 datatype.closest = s => s === 'form' ? {querySelector:()=>identifier} : null;
 const selector = new Element(); selector.value = '';
 const grantButton = new Element(); grantButton.matches = () => true;
-const grantForm = new Element({'data-requires-selection':'', 'data-panel-refresh':'/export-access', 'data-panel-success':'Export access granted.'});
+const grantForm = new Element({'data-requires-selection':''});
 grantForm.action = 'https://localhost/export-access'; grantForm.elements = [grantButton];
 grantForm.querySelector = s => s === 'select[required]' ? selector : s === "button[type='submit']" ? grantButton : null;
 grantForm.prepend = e => { grantForm.error = e; };
@@ -166,35 +166,24 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   await remote.fire('click'); await settle();
   assert.equal(destinations.at(-1),remote.href,'GET failure falls back to the full page');
   await second.close();
-  fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
-  const status = new Element({'data-panel-status':''}); status.hidden=true;
-  second.host.querySelector = s => s === '[data-panel-status]' ? status : null;
+  // Section headings are nested below the dialog title when content loads.
   const heading = new Element({'data-panel-section-heading':''}); heading.tagName='H2';
   let nestedHeading; heading.replaceWith = e => { nestedHeading=e; };
   second.host.querySelectorAll = s => s.startsWith('[data-panel-section-heading]') ? [heading] : [];
-  selector.value='user:example'; await selector.fire('change');
-  const navigationCount = destinations.length;
-  fetchImpl=async()=>({...response(content),redirected:true,url:grantForm.action});
-  await second.host.fire('submit',{target:grantForm,submitter:grantButton});
-  assert.equal(destinations.length,navigationCount,'opt-in same-page success keeps dialog context');
-  assert.equal(second.open,true); assert.equal(status.hidden,false);
-  assert.equal(status.textContent,'Export access granted.'); assert.equal(status.getAttribute('role'),'status');
-  assert.equal(document.activeElement,status); assert.equal(nestedHeading.tagName,'H3');
-  await second.close(); assert.equal(document.activeElement,remote,'refresh preserves original opener');
   fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
-  fetchImpl=async()=>({...response(content),redirected:true,url:'https://localhost/login'});
-  await second.host.fire('submit',{target:grantForm,submitter:grantButton});
-  assert.equal(destinations.at(-1),'https://localhost/login','authentication redirects are never imported');
+  assert.equal(nestedHeading.tagName,'H3');
+  // A successful panel form follows the server redirect; one request per pending panel.
+  selector.value='user:example'; await selector.fire('change');
   let completeMutation;
   fetchImpl=()=>new Promise(resolve=>{completeMutation=resolve;});
   const pending=second.host.fire('submit',{target:grantForm,submitter:grantButton});
   const pendingRequests=requests.length;
   await second.host.fire('submit',{target:grantForm,submitter:grantButton});
   assert.equal(requests.length,pendingRequests,'one request per pending panel');
-  await second.close(); const closedDestinations=destinations.length;
-  completeMutation({...response(content),redirected:true,url:grantForm.action}); await pending;
-  assert.equal(destinations.length,closedDestinations,'closed opt-in panel ignores late success');
-  assert.equal(second.open,false);
+  completeMutation({...response(content),redirected:true,url:'https://localhost/datasets/example'}); await pending;
+  assert.equal(destinations.at(-1),'https://localhost/datasets/example','success follows the server redirect');
+  await second.close();
+  second.host.querySelectorAll = () => [];
   // A dedicated confirmation replaces content within one modal, retaining the
   // parent DOM (and unsaved input), then restores the exact initiating action.
   fetchImpl=async()=>response(content); await remote.fire('click'); await settle();

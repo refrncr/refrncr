@@ -44,7 +44,12 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
-from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered_dataset_icon
+from refrncr.presentation_metadata import (
+    DATASET_ICONS,
+    dataset_icon_sprite,
+    key_from_name,
+    rendered_dataset_icon,
+)
 from refrncr.record_import import (
     MAX_COLUMNS,
     MAX_UPLOAD_BYTES,
@@ -140,6 +145,7 @@ def create_flask_app(
     audit_history = audit_history or AuditHistoryService(users.uow)
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
+    app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
 
     @app.template_filter("record_value_text")
@@ -658,10 +664,13 @@ def create_flask_app(
         description=None,
         error=None,
         error_field=None,
+        access_error=None,
+        access_subject="",
     ):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         field_context_label = None
+        overview = None
         if standalone:
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
@@ -675,6 +684,7 @@ def create_flask_app(
                 field_context_label = "No Current version or active Concept available."
             else:
                 fields, identifier = field_view.fields, field_view.identifier
+                overview, state_for_facts = field_view.context, field_view.state
                 field_context_label = (
                     f"Current · Version {field_view.state.version.number} · Read only"
                     if field_view.state
@@ -702,14 +712,35 @@ def create_flask_app(
                 actor.id, dataset.id
             )
             context, state, identifier = view.context, view.state, view.identifier
+            overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
                 change.id: "Edited" if change.status == "Changed" else change.status
                 for change in (g.concept_ui.field_changes if concept else ())
             }
             may_start_concept = view.may_maintain and view.concept is None
+            if view.state is not None:
+                field_context_label = (
+                    f"{view.state.status} · Version {view.state.version.number} · Read only"
+                )
+        # "At a glance" facts for the Dataset details tab.
+        if overview is None:
+            version_label = "No version available"
+        elif state_for_facts is not None:
+            version_label = f"Version {state_for_facts.version.number} · {state_for_facts.status}"
+        else:
+            version_label = "Concept in progress"
+        dataset_facts = {
+            "version": version_label,
+            "record_count": overview.record_count if overview else None,
+            "field_count": len(fields),
+            "created_at": dataset.created_at,
+            "last_updated": overview.last_updated if overview else None,
+        }
         if edit_mode and not editable:
             abort(404)
+        # The Danger zone tab shows what a deletion would remove.
+        deletion = datasets.get_dataset_for_deletion(actor.id, dataset.id) if editable else None
         access_teams, access_users, access_entries = [], [], []
         if may_govern:
             _, access_teams, access_users, access_entries = datasets.export_access_context(
@@ -740,9 +771,17 @@ def create_flask_app(
             access_teams=access_teams,
             access_users=access_users,
             access_entries=access_entries,
+            access_error=access_error,
+            access_subject=access_subject,
             fields=fields,
             field_states=field_states,
             field_context_label=field_context_label,
+            dataset_facts=dataset_facts,
+            deletion=deletion,
+            dataset_icon_label=DATASET_ICONS.get(
+                rendered_dataset_icon(dataset.icon),
+                rendered_dataset_icon(dataset.icon).replace("-", " ").capitalize(),
+            ),
             business_key=identifier,
             version_state=state,
         )
@@ -1082,95 +1121,50 @@ def create_flask_app(
             can_cancel=selected.status == "Scheduled",
         ), status
 
-    def render_dataset_governance(key, mode, error=None):
-        actor, login_session = require_authenticated()
-        _auth, service, *_rest = require_dataset_dependencies()
-        dataset, available_teams, available_users, entries = service.export_access_context(
-            actor.id, key
-        )
-        return render_template(
-            "pages/datasets/governance.html",
-            dataset=dataset,
-            mode=mode,
-            teams=available_teams,
-            users=available_users,
-            entries=entries,
-            selected_subject=request.form.get("subject", ""),
-            error=error,
-            expected_owner_team_id=request.form.get(
-                "expected_owner_team_id", dataset.owner_team_id
-            ),
-            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
+    def access_management_target(key):
+        """Where export access changes return: the configuration page they came from."""
+        standalone = request.args.get("standalone") == "1"
+        concept = request.args.get("concept") == "1"
+        endpoint = "dataset_configuration" if standalone else "dataset_detail"
+        options = {} if standalone else {"concept": concept or None}
+        return (
+            standalone,
+            concept,
+            url_for(endpoint, key=key, _anchor="access-management", **options),
         )
 
-    @dataset_route("/datasets/<key>/owner", methods=["GET", "POST"])
-    def dataset_owner(key):
-        actor, login_session = require_authenticated()
-        _auth, service, *_rest = require_dataset_dependencies()
-        if request.method == "POST":
-            require_csrf(login_session.csrf_token)
-            try:
-                expected = {"csrf_token", "expected_owner_team_id", "owner_team_id"}
-                if set(request.form) != expected or any(
-                    len(request.form.getlist(item)) != 1 for item in expected
-                ):
-                    raise ValidationError(
-                        "Submit exactly one expected and new owning team. Reopen the form."
-                    )
-                service.change_owner(
-                    actor.id,
-                    key,
-                    request.form["expected_owner_team_id"],
-                    request.form["owner_team_id"],
-                )
-            except (ValidationError, ConflictError) as error:
-                return render_dataset_governance(key, "owner", str(error)), 409 if isinstance(
-                    error, ConflictError
-                ) else 400
-            return redirect(url_for("dataset_detail", key=key))
-        return render_dataset_governance(key, "owner")
-
-    @dataset_route("/datasets/<key>/export-access", methods=["GET", "POST"])
+    @dataset_route("/datasets/<key>/export-access", methods=["POST"])
     def dataset_export_access(key):
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
-        if request.method == "POST":
-            require_csrf(login_session.csrf_token)
-            try:
-                expected = {"csrf_token", "subject"}
-                if set(request.form) != expected or any(
-                    len(request.form.getlist(item)) != 1 for item in expected
-                ):
-                    raise ValidationError("Choose one user or team.")
-                subject_type, separator, subject_id = request.form["subject"].partition(":")
-                if not separator:
-                    raise ValidationError("Choose one user or team.")
-                service.grant_export_access(actor.id, key, subject_type, subject_id)
-            except (ValidationError, ConflictError) as error:
-                return render_dataset_governance(key, "export", str(error)), 409 if isinstance(
-                    error, ConflictError
-                ) else 400
-            if request.args.get("inline") == "1":
-                return redirect(
-                    url_for(
-                        "dataset_configuration"
-                        if request.args.get("standalone") == "1"
-                        else "dataset_detail",
-                        key=key,
-                        **(
-                            {}
-                            if request.args.get("standalone") == "1"
-                            else {"concept": request.args.get("concept") == "1"}
-                        ),
-                        _anchor="access-management",
-                    )
-                )
-            return redirect(url_for("dataset_export_access", key=key))
-        return render_dataset_governance(key, "export")
+        require_csrf(login_session.csrf_token)
+        standalone, concept, target = access_management_target(key)
+        try:
+            expected = {"csrf_token", "subject"}
+            if set(request.form) != expected or any(
+                len(request.form.getlist(item)) != 1 for item in expected
+            ):
+                raise ValidationError("Choose one user or team.")
+            subject_type, separator, subject_id = request.form["subject"].partition(":")
+            if not separator:
+                raise ValidationError("Choose one user or team.")
+            service.grant_export_access(actor.id, key, subject_type, subject_id)
+        except (ValidationError, ConflictError) as error:
+            # Show the error on the Access management tab the form came from.
+            if concept:
+                try:
+                    g.concept_ui = dataset_versions.concept_context(actor.id, key)
+                except (NotFoundError, ConflictError):
+                    concept = False
+            response = render_dataset_configuration(
+                key,
+                concept=concept,
+                standalone=standalone,
+                access_error=str(error),
+                access_subject=request.form.get("subject", ""),
+            )
+            return response, 409 if isinstance(error, ConflictError) else 400
+        return redirect(target)
 
     @dataset_route("/datasets/<key>/export-access/<access_id>/revoke", methods=["POST"])
     def revoke_dataset_export_access(key, access_id):
@@ -1178,22 +1172,7 @@ def create_flask_app(
         _auth, service, *_rest = require_dataset_dependencies()
         require_csrf(login_session.csrf_token)
         service.revoke_export_access(actor.id, key, access_id)
-        if request.args.get("inline") == "1":
-            return redirect(
-                url_for(
-                    "dataset_configuration"
-                    if request.args.get("standalone") == "1"
-                    else "dataset_detail",
-                    key=key,
-                    **(
-                        {}
-                        if request.args.get("standalone") == "1"
-                        else {"concept": request.args.get("concept") == "1"}
-                    ),
-                    _anchor="access-management",
-                )
-            )
-        return redirect(url_for("dataset_export_access", key=key))
+        return redirect(access_management_target(key)[2])
 
     @dataset_route("/datasets/<key>/fields/order", methods=["POST"])
     def move_dataset_field(key: str):
@@ -1202,6 +1181,19 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
+        if set(request.form) == {"csrf_token", "expected_field_id", "ordered_field_id"}:
+            # Drag and keyboard reordering (field-order.js) submit the complete new order.
+            expected = tuple(request.form.getlist("expected_field_id"))
+            proposed = tuple(request.form.getlist("ordered_field_id"))
+            try:
+                field_service.replace_order(actor.id, key, expected, proposed)
+            except NotFoundError:
+                abort(404)
+            except ValidationError as error:
+                abort(400, description=str(error))
+            except StaleFieldOrderError as error:
+                abort(409, description=str(error))
+            return "", 204
         if set(request.form) != {"csrf_token", "expected_field_id", "field_id", "direction"}:
             abort(400, description="Invalid field order request")
         field_ids = request.form.getlist("field_id")
@@ -1405,6 +1397,7 @@ def create_flask_app(
                 for record in page.records
             },
             deleted_count=view.deleted_count,
+            status_counts=view.status_counts,
             record_search=view.search,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -2865,7 +2858,6 @@ def create_flask_app(
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):
         if isinstance(error, NotFoundError) and request.endpoint in {
-            "dataset_owner",
             "dataset_export_access",
             "revoke_dataset_export_access",
         }:

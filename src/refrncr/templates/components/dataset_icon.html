@@ -1,19 +1,34 @@
 {% macro dataset_icon(name=none) -%}
-<span class='dataset-icon' aria-hidden='true'><svg aria-hidden='true' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' focusable='false'><use href='{{ url_for("static", filename="images/lucide-0.468.0.svg") }}#{{ rendered_dataset_icon(name) }}'></use></svg></span>
+<span class='dataset-icon' aria-hidden='true'><svg aria-hidden='true' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' focusable='false'><use href='{{ url_for("static", filename=dataset_icon_sprite(name)) }}#{{ rendered_dataset_icon(name) }}'></use></svg></span>
 {%- endmacro %}
 
+{# Icon picker: preview, always-visible suggestions and a Lucide name field (combobox).
+   Without JavaScript the name field alone submits the value. #}
 {% macro icon_picker(choices, selected=none, id='dataset-icon') -%}
-<div class='form-field' data-icon-picker>
+{% set current = rendered_dataset_icon(selected) %}
+<div class='form-field icon-picker' data-icon-picker data-icon-sprite='{{ url_for("static", filename="images/lucide-1.46.0.svg") }}' data-icon-legacy-sprite='{{ url_for("static", filename="images/lucide-legacy-0.468.0.svg") }}'>
   <label for='{{ id }}' data-icon-label>Dataset icon</label>
-  <p class='help-text' id='{{ id }}-help'>Optional. Enter a Lucide icon name or choose a suggestion. Unknown names use the default dataset icon.</p>
-  <div class='inline-form-action'>
-    <input type='text' id='{{ id }}' name='icon' value='{{ selected or "" }}' maxlength='64' aria-describedby='{{ id }}-help' autocomplete='off' spellcheck='false' data-icon-search>
-    <button type='button' class='button button-secondary' data-icon-clear hidden>Clear icon</button>
-  </div>
+  <p class='help-text' id='{{ id }}-help'>Choose a suggestion or enter any Lucide icon name. Unknown names use the default dataset icon.</p>
+  <div class='icon-picker-body'>
+    <div class='icon-picker-preview' data-icon-preview hidden>
+      <span class='dataset-icon-tile'>{{ dataset_icon(selected) }}</span>
+      <span class='icon-picker-preview-text'>{% if not selected %}{% set preview_label = 'Default dataset icon' %}{% elif current == 'table' and selected != 'table' %}{% set preview_label = 'Unknown name, default icon shown' %}{% else %}{% set preview_label = choices.get(current) or (current|replace('-', ' ')|capitalize) %}{% endif %}<span data-icon-preview-label>{{ preview_label }}</span><code data-icon-preview-name>{{ selected or 'table' }}</code></span>
+    </div>
+    <div class='icon-picker-suggestions' role='group' aria-label='Suggested icons' data-icon-suggestions hidden>
+      <button type='button' class='icon-choice' aria-pressed='{{ "false" if selected else "true" }}' data-icon-choice='' title='Default dataset icon (Table)'>{{ dataset_icon() }}<span class='visually-hidden'>Default dataset icon</span></button>
+      {% for name, label in choices.items() if name != 'table' %}<button type='button' class='icon-choice' aria-pressed='{{ "true" if selected == name else "false" }}' data-icon-choice='{{ name }}' title='{{ label }}'>{{ dataset_icon(name) }}<span class='visually-hidden'>{{ label }}</span></button>{% endfor %}
+    </div>
+    <div class='icon-picker-field'>
+    <div class='inline-form-action'>
+      <input type='text' id='{{ id }}' name='icon' value='{{ selected or "" }}' maxlength='64' placeholder='Lucide icon name, e.g. landmark' aria-describedby='{{ id }}-help' autocomplete='off' spellcheck='false' data-icon-search>
+      <button type='button' class='button button-secondary' data-icon-clear hidden>Clear icon</button>
+    </div>
     <ul id='{{ id }}-options' role='listbox' aria-label='Dataset icons' data-icon-options hidden>
       <li id='{{ id }}-default' role='option' aria-selected='{{ "false" if selected else "true" }}' data-icon-value='' data-icon-name='Default dataset icon'>{{ dataset_icon() }}<span>Default dataset icon</span></li>
       {% for name, label in choices.items() %}<li id='{{ id }}-{{ name }}' role='option' aria-selected='{{ "true" if selected == name else "false" }}' data-icon-value='{{ name }}' data-icon-name='{{ label }}'>{{ dataset_icon(name) }}<span>{{ label }}</span></li>{% endfor %}
     </ul>
-    <p class='help-text' role='status' data-icon-status></p>
+    </div>
+    <p class='visually-hidden' role='status' data-icon-status></p>
+  </div>
 </div>
 {%- endmacro %}

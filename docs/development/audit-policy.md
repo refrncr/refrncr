@@ -219,8 +219,8 @@ Runtime behavior tests provide evidence that the declared decisions are implemen
 Start a fresh disposable fixture with `.venv/bin/python tests/browser_table_rows_app.py`, then run
 `node tests/javascript/audit_export_browser.cjs` using the existing external Playwright convention
 (`REFRNCR_PLAYWRIGHT_MODULE` and `REFRNCR_BROWSER_EXECUTABLE`). It checks actual CSV/Excel/JSON downloads
-and denial of a direct export URL for an ordinary reader. The existing `export_access_browser.cjs`
-and `dataset_governance_browser.cjs` cover access changes, duplicates, revocation and stale forms;
+and denial of a direct export URL for an ordinary reader. The existing `access_management_browser.cjs`
+covers access changes, duplicates and revocation;
 use a fresh fixture for each script. These optional checks add no dependency or CI requirement.
 Persisted audit counts, rollback and safe context are asserted by the SQLite/PostgreSQL service and
 Flask tests, not inferred from a successful download.

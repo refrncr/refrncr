@@ -8,30 +8,40 @@
 {% endfor %}
 {% endmacro %}
 
+{# Active and Deleted are independent toggles; both on shows all Records. Counts follow the
+   applied search term. Each button submits
+   the status that results from pressing it, so the control works without JavaScript. The last
+   pressed toggle cannot be switched off. #}
+{% macro record_status_toggles() %}
+{% set shows_active = record_status in ('active', 'all') %}
+{% set shows_deleted = record_status in ('deleted', 'all') %}
+<form id='record-status-form' class='record-status-toggles' method='get' action='{{ request.path }}' role='group' aria-label='Record status' data-record-status-form>
+  {{ hidden_criteria(criteria_parameters, ['record_status']) }}
+  <input type='hidden' name='action' value='apply'>
+  {% for label, shown, count, other_shown, alone, both in [
+       ('Active', shows_active, status_counts[0], shows_deleted, 'deleted', 'active'),
+       ('Deleted', shows_deleted, status_counts[1], shows_active, 'active', 'deleted'),
+     ] %}
+  {% set last = shown and not other_shown %}
+  <button class='status-toggle{{ " status-toggle-deleted" if label == "Deleted" else "" }}' aria-pressed='{{ "true" if shown else "false" }}'
+    {%- if last %} type='button' aria-disabled='true' title='At least one status stays selected'
+    {%- else %} type='submit' name='record_status' value='{{ alone if shown else "all" }}'{% endif %}>
+    {{ label }} <span class='status-toggle-count'>{{ count }}</span>
+  </button>
+  {% endfor %}
+</form>
+{% endmacro %}
+
 {% macro record_search_controls() %}
 <section class='record-criteria' aria-label='Search Records' data-record-criteria>
   <div class='record-criteria-toolbar'>
   <form id='record-search-form' method='get' role='search' aria-label='Search records' class='record-search-form'>
     {{ hidden_criteria(criteria_parameters, ['q', 'import_results', 'status']) }}
-    {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=200) }}
+    {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=200, clear_url=clear_url) }}
     {% if import_results or import_totals %}{{ record_status_filter(dataset.key, record_search, import_results, result_statuses, import_totals, clear_import_url) }}{% endif %}
   </form>
   <button class='button button-secondary' type='submit' form='record-search-form' name='action' value='search'>Search</button>
-  {% if has_criteria %}<a class='record-criteria-clear' href='{{ clear_url }}' aria-label='Clear all search and filter criteria'>Clear all</a>{% endif %}
+  {% if not version_state %}{{ record_status_toggles() }}{% endif %}
   </div>
-  {% if not version_state %}
-  <form id='record-status-form' method='get' data-record-status-form>
-    {{ hidden_criteria(criteria_parameters, ['record_status']) }}
-    <div class='record-filter-actions'>
-      <div class='form-field'>
-        <label for='record-status'>Record status</label>
-        <select id='record-status' name='record_status' data-filter-status>
-          {% for value, label in [('active', 'Active'), ('deleted', 'Deleted'), ('all', 'All')] %}<option value='{{ value }}'{% if record_status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select>
-      </div>
-      <button class='button button-secondary' type='submit' name='action' value='apply' data-filter-apply>Apply status</button>
-    </div>
-  </form>
-  {% endif %}
 </section>
 {% endmacro %}

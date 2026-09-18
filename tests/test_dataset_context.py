@@ -388,6 +388,10 @@ def test_shared_page_context_spacing_keeps_outer_header_layout():
         declarations(".page-context > .metadata")["padding-block-start"].strip()
         == "var(--space-sm)"
     )
+    assert (
+        declarations(".page-context > .breadcrumbs")["padding-block-end"].strip()
+        == "var(--space-sm)"
+    )
     reset = declarations(
         ".page-context > .breadcrumbs, .page-context > .page-title, .page-context > .metadata"
     )
@@ -399,7 +403,7 @@ def test_shared_page_context_spacing_keeps_outer_header_layout():
     breadcrumb = declarations(".breadcrumbs")
     assert breadcrumb["text-transform"].strip() == "uppercase"
     assert breadcrumb["font-weight"].strip() == "var(--font-weight-regular)"
-    assert breadcrumb["font-size"].strip() == "var(--font-size-xs)"
+    assert breadcrumb["font-size"].strip() == "var(--font-size-label)"
     assert breadcrumb["letter-spacing"].strip() == "var(--letter-spacing-label)"
     assert breadcrumb["line-height"].strip() == "normal"
     assert breadcrumb["color"].strip() == "var(--color-text-muted)"

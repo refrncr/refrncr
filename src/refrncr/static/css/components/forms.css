@@ -17,7 +17,6 @@ fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px soli
 .inline-form-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); margin-top: var(--space-xs); align-items: stretch; }
 .inline-form-action > select { min-width: 0; margin-top: 0; }
 .inline-form-action > .button { white-space: nowrap; }
-.form-label-sentence, .side-panel-body .form-label-sentence { margin-top: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
 @media (max-width: 767px) { .inline-form-action { grid-template-columns: minmax(0, 1fr); } }
 
 /* Compact search control: same height and boundary as adjacent compact buttons, with a leading icon. */
@@ -25,6 +24,13 @@ fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px soli
 .search-field .button-icon { position: absolute; top: 50%; left: .625rem; width: 1rem; height: 1rem; margin: 0; color: var(--color-text-muted); transform: translateY(-50%); pointer-events: none; }
 .search-field input { width: 100%; min-height: var(--control-height-compact); margin-top: 0; padding: .375rem .75rem .375rem 2.125rem; font-size: var(--font-size-body-sm); }
 .search-field input::placeholder { color: var(--color-text-muted); opacity: 1; }
+/* One always-visible clear control replaces the browser's hover-only cancel button. */
+.search-field input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; appearance: none; }
+.search-field:has(.search-clear:not([hidden])) input { padding-right: 2.25rem; }
+.search-clear { position: absolute; top: 50%; right: .25rem; display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); cursor: pointer; transform: translateY(-50%); }
+.search-clear[hidden] { display: none; }
+.search-clear:hover { background: var(--color-action-secondary); color: var(--color-text); }
+.search-field .search-clear .button-icon { position: static; width: .875rem; height: .875rem; transform: none; pointer-events: none; }
 
 /* Checkbox and radio labels read as sentences beside their control, also inside side panels. */
 label:has(> input:is([type="checkbox"], [type="radio"])) { display: flex; align-items: flex-start; gap: var(--space-sm); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }
@@ -47,6 +53,23 @@ label > input:not([type="checkbox"], [type="radio"]), label > select, label > te
 
 /* Shared searchable icon input; manual names also work without JavaScript. */
 [data-icon-picker] { min-width: 0; }
+.icon-picker-body { display: grid; gap: var(--space-sm); margin-top: var(--space-xs); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
+.icon-picker-body .inline-form-action { margin-top: 0; }
+/* Suggestions open as an overlay so closing them never moves the form. */
+.icon-picker-field { position: relative; }
+.icon-picker-field [data-icon-options] { position: absolute; z-index: 5; top: 100%; right: 0; left: 0; margin: var(--space-xs) 0 0; background: var(--color-surface); box-shadow: var(--shadow-md); }
+.icon-picker-preview { display: flex; align-items: center; gap: .75rem; }
+.icon-picker-preview .dataset-icon-tile { display: inline-grid; flex-shrink: 0; place-items: center; width: 3rem; height: 3rem; border: 1px solid var(--color-status-published-border); border-radius: var(--radius-lg); background: var(--color-status-published-surface); color: var(--color-action-primary); }
+.icon-picker-preview .dataset-icon { margin: 0; }
+.icon-picker-preview .dataset-icon svg { width: 1.5rem; height: 1.5rem; }
+.icon-picker-preview-text { display: grid; min-width: 0; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.icon-picker-preview-text code { padding: 0; background: none; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
+.icon-picker-suggestions { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.icon-picker-preview[hidden], .icon-picker-suggestions[hidden] { display: none; }
+.icon-choice { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; }
+.icon-choice .dataset-icon { margin: 0; }
+.icon-choice:hover { border-color: var(--color-control-border); color: var(--color-text); }
+.icon-choice[aria-pressed="true"] { border-color: var(--color-action-primary); background: var(--color-status-published-surface); color: var(--color-action-primary); box-shadow: 0 0 0 1px var(--color-action-primary); }
 [data-icon-options] { list-style: none; padding: var(--space-xs); margin: var(--space-xs) 0; max-height: 14rem; overflow-y: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 [data-icon-options] [role="option"] { display: flex; align-items: center; gap: var(--space-sm); padding: var(--space-sm); cursor: pointer; overflow-wrap: anywhere; }
 [data-icon-options] [role="option"][hidden] { display: none; }

@@ -36,11 +36,17 @@ async function evidence(page, name) {
       await navigate(page, () => page.getByRole('button', {name: 'Sign in', exact: true}).click());
       const records = base + `/datasets/search-${width}/concept/records`;
       await page.goto(records);
-      assert.equal(await page.locator('#record-status').inputValue(), 'active');
+      const statusGroup = page.getByRole('group', {name: 'Record status', exact: true});
+      const toggle = name => statusGroup.getByRole('button', {name: new RegExp(`^${name} \\d+$`)});
+      assert.equal(await toggle('Active').getAttribute('aria-pressed'), 'true');
+      assert.equal(await toggle('Active').getAttribute('aria-disabled'), 'true');
+      assert.equal(await toggle('Deleted').getAttribute('aria-pressed'), 'false');
       assert.match(await page.locator('#record-result-count').textContent(), /of 65/);
       await page.getByRole('searchbox', {name: 'Search records', exact: true}).fill('AMS');
       await navigate(page, () => page.locator('#record-search').press('Enter'));
       assert.match(await page.locator('#record-result-count').textContent(), /of 59/);
+      // Toggle counts follow the applied search term.
+      assert.equal((await toggle('Active').textContent()).replace(/\s+/g, ' ').trim(), 'Active 59');
       assert.equal(await page.locator('.record-table tbody tr').count(), 50);
       await navigate(page, () => page.getByRole('link', {name: 'Next', exact: true}).click());
       const second = page.url();
@@ -52,12 +58,19 @@ async function evidence(page, name) {
       await page.goForward();
       assert.equal(page.url(), second);
       await page.locator('#record-search').fill('Rotterdam');
+      // Switching Deleted on while Active stays on shows all Records.
       if (width === 'nojs') {
-        await page.locator('#record-status').selectOption('all');
-        await navigate(page, () => page.getByRole('button', {name: 'Apply status', exact: true}).click());
+        await navigate(page, () => toggle('Deleted').click());
       } else {
-        await navigate(page, () => page.locator('#record-status').selectOption('all'));
-        assert.equal(await page.evaluate(() => document.activeElement.id), 'record-status');
+        await toggle('Deleted').focus();
+        await navigate(page, () => page.keyboard.press('Enter'));
+      }
+      assert.equal(new URL(page.url()).searchParams.get('record_status'), 'all');
+      assert.equal(await toggle('Active').getAttribute('aria-pressed'), 'true');
+      assert.equal(await toggle('Deleted').getAttribute('aria-pressed'), 'true');
+      assert.equal(await toggle('Active').getAttribute('aria-disabled'), null);
+      if (width !== 'nojs') {
+        assert.equal(await page.evaluate(() => !!document.activeElement.closest('[data-record-status-form]')), true);
       }
       assert.equal(new URL(page.url()).searchParams.get('q'), 'AMS');
       assert(!new URL(page.url()).searchParams.has('page'));
@@ -68,7 +81,26 @@ async function evidence(page, name) {
       await shared.close();
       assert.equal(await page.getByText('Add filter', {exact: true}).count(), 0);
       await evidence(page, width + '-search');
-      await navigate(page, () => page.getByRole('link', {name: 'Clear all search and filter criteria', exact: true}).click());
+      // The clear control is always visible for an applied term; it resets search and status.
+      const clearSearch = page.getByRole('link', {name: 'Clear search', exact: true});
+      assert(await clearSearch.isVisible());
+      assert.equal(await page.getByText('Clear all', {exact: true}).count(), 0);
+      await navigate(page, () => clearSearch.click());
+      assert.equal(new URL(page.url()).search, '');
+      assert.equal(await page.locator('#record-search').inputValue(), '');
+      assert(!(await clearSearch.isVisible()));
+      assert.match(await page.locator('#record-result-count').textContent(), /of 65/);
+      if (width !== 'nojs') {
+        // Typed but not applied text is cleared in place, without a page load.
+        await page.locator('#record-search').fill('draft');
+        assert(await clearSearch.isVisible());
+        const before = page.url();
+        await clearSearch.click();
+        assert.equal(page.url(), before);
+        assert.equal(await page.locator('#record-search').inputValue(), '');
+        assert(!(await clearSearch.isVisible()));
+        assert.equal(await page.evaluate(() => document.activeElement.id), 'record-search');
+      }
       if (width !== 'nojs') {
         await page.getByRole('button', {name: /View record id-000/}).focus();
         await page.keyboard.press('Enter');
@@ -78,7 +110,7 @@ async function evidence(page, name) {
       }
       await page.goto(base + `/datasets/search-${width}/records?q=AMS`);
       assert.match(await page.locator('#record-result-count').textContent(), /of 60/);
-      assert.equal(await page.locator('#record-status').count(), 0);
+      assert.equal(await page.locator('[data-record-status-form]').count(), 0);
       await evidence(page, width + '-current');
       const next = await page.getByRole('link', {name: 'Next', exact: true}).getAttribute('href');
       assert.match(next, /\/versions\/[^/]+\/records\?/);

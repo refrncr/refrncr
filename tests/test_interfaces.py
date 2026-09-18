@@ -962,7 +962,7 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     assert "data-row-action" in table
     assert "Actions" not in table
     assert ">View</a>" not in table
-    assert "class='row-chevron'" in table
+    assert "row-chevron" not in table  # Rows read as clickable without a caret.
     assert f"data-row-primary href='/teams?open_team={team.id}'" in table
     body = response_text(request(client, "get", f"/teams?open_team={team.id}"))
     assert f"id='team-panel-{team.id}'" in body
@@ -1416,9 +1416,9 @@ def test_login_password_toggle_is_named_and_cannot_submit(interface):
     assert toggle["type"] == "button"
     assert toggle["aria-controls"] == "login-password"
     assert "Show password</button>" in page
-    assert "images/07-static-logo-256px.svg" in page
-    assert 'alt="" width="80" height="80"' in page
-    assert '<span class="brand-name">REFRNCR</span>' in page
+    assert "images/refrncr-wordmark-primary.svg" in page
+    assert 'class="auth-wordmark"' in page and 'alt="" width="200" height="52"' in page
+    assert 'class="brand-name"' not in page
     assert 'aria-label="REFRNCR home"' in page
     assert "Sign in to your account" in page
     assert "Sign up" not in page and "Forgot password" not in page

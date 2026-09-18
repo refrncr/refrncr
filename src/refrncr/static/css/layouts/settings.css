@@ -33,3 +33,12 @@
 .audit-action[data-action-kind="addition"]::before { background: var(--color-success); }
 .audit-action[data-action-kind="removal"]::before { background: var(--color-error); }
 .audit-action[data-action-kind="review"]::before { background: var(--color-info); }
+/* Desktop settings: no collapse control; the settings sidebar is always shown,
+   also when the app navigation was collapsed elsewhere. */
+@media (min-width: 1024px) {
+  .settings-shell [data-nav-close], .settings-shell [data-nav-open] { display: none; }
+  .navigation-collapsed .app-shell.settings-shell { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+  .navigation-collapsed .app-shell.settings-shell > [data-navigation] { display: flex; }
+  .navigation-collapsed .app-shell.settings-shell > header, .navigation-collapsed .app-shell.settings-shell > .app-main { grid-column: 2; }
+  .navigation-collapsed .app-shell.settings-shell [data-nav-open] { display: none; }
+}

@@ -5,7 +5,7 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
         # Normative product-owner assets are kept byte-for-byte as supplied.
-        exclude: ^src/refrncr/static/images/(02-animated-grow-shrink|06-favicon-16px|07-static-logo-256px)\.svg$
+        exclude: ^src/refrncr/static/images/(favicon|refrncr-loader|refrncr-wordmark-primary)\.svg$
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
