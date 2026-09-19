@@ -4,6 +4,7 @@ from a2wsgi import WSGIMiddleware
 from fastapi import FastAPI
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.api.routes import create_api
 from refrncr.api_keys import ApiKeyService, configured_api_keys
 from refrncr.audit_history import AuditHistoryService
 from refrncr.dataset_versions import DatasetVersionService
@@ -99,7 +100,13 @@ def create_application(
     api_keys: ApiKeyService | None = None,
 ) -> FastAPI:
     users.bootstrap_organisation()
-    app = FastAPI(title="refrncr")
+    app = FastAPI(title="refrncr", openapi_url=None, docs_url=None, redoc_url=None)
+    versions = (
+        dataset_versions
+        or datasets.versions
+        or DatasetVersionService(datasets.uow, authorization.datasets)
+    )
+    app.mount("/api/v1", create_api(versions, api_keys))
 
     @app.get("/api/health", include_in_schema=False)
     def health() -> dict[str, str]:

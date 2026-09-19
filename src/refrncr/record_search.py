@@ -22,6 +22,11 @@ class RecordQueryLogFilter(Filter):
         if not isinstance(target, str):
             return False
         path = target.partition("?")[0]
+        from urllib.parse import unquote
+
+        if unquote(path).startswith("/api/"):
+            record.args = (client, method, "/api/[redacted]", version, status)
+            return True
         if path.startswith("/datasets/") and path.rstrip("/").endswith("/records"):
             record.args = (client, method, path, version, status)
         return True

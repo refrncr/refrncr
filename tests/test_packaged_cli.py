@@ -7,6 +7,7 @@ import sys
 import sysconfig
 import tarfile
 import time
+import urllib.error
 import urllib.request
 import venv
 import zipfile
@@ -274,6 +275,11 @@ def test_installed_console_help_and_http_startup(installed_artifact):
                 time.sleep(0.05)
         assert response.status == 200
         assert "refrncr" in body
+        with pytest.raises(urllib.error.HTTPError) as denied:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/datasets", timeout=1)
+        assert denied.value.code == 401
+        assert denied.value.read() == b'{"error":"invalid_api_credentials"}'
+        assert denied.value.headers["Vary"] == "Authorization, Accept-Encoding"
         for asset in (
             "static/css/components/dialog.css",
             "static/fonts/instrument-sans/instrument-sans-latin-600-normal.woff2",

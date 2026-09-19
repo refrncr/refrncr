@@ -28,8 +28,8 @@ Ordinary Dataset listing, viewing, page navigation, policy checks, preview, stag
 and cancellation create no successful domain event. Authorization/validation/stale/rollback failures
 never masquerade as successful changes. Retention cleanup, startup, singleton bootstrap and operator
 migration/preflight are technical operations with explicit exclusion reasons. The benchmark uses
-synthetic credentials and is technical only. No authenticated business API or background business
-worker exists; health, framework schema/docs, static assets, HEAD and OPTIONS are inventoried.
+synthetic credentials and is technical only. REF-107 adds authenticated Current data reads; no background business worker is added.
+Health, disabled framework schema/docs, static assets, HEAD and OPTIONS are inventoried.
 
 `security_logging: true` in the matrix means a security obligation, including the operation's denied
 or suspicious flows. It does **not** mean REF-149 implemented security logging or that each successful
@@ -370,3 +370,13 @@ Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
 ## REF-40 API keys
 
 REF-40 adds four payload-free API-key events. The product owner approved null actor solely for `api_key.authentication_failed`, enforced by contract and schema; it identifies an unauthenticated attempt, never a fabricated user. All other actor requirements remain. See [API-key audit and migration](api-keys.md) and [ADR-018](../architecture/adr-018-user-api-keys.md).
+
+## REF-107 Current reads
+
+`DatasetVersionService.read_current` and the existing authorization service's
+bulk view decision are ordinary authorized reads with no domain event. The four
+FastAPI data routes are traced through the inventory/coverage matrix. REF-40
+`authenticate` remains the only new-request audit producer, including conditional
+304 requests. It stores no HTTP target, identifier, Record values or headers.
+API errors suppress exception payloads and the supported CLI redacts API access-log
+targets; independent hosting/proxies require the same privacy boundary.

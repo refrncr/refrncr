@@ -139,3 +139,14 @@ retention purge is introduced. Key/audit history grows under existing retention
 policy. Rate limiting and the future HTTP adapter remain outside REF-40.
 See [ADR-018](../architecture/adr-018-user-api-keys.md) and the
 [validation report](ref-40-report.md).
+
+## REF-107 HTTP integration
+
+The [Current REST API](rest-api.md) now supplies exactly one Authorization value
+and calls the existing authentication service. It mounts before Flask at `/api/v1`;
+keys never authenticate browser routes. Data reads and conditional 304s recheck
+current Dataset authority. Missing/invalid keys use the existing 401 contract;
+operational authentication/audit failures return a fixed 503. CLI access logs redact
+the entire API target so business identifiers and query attempts are not recorded.
+This local implementation supersedes the future-adapter wording above; public
+OpenAPI/Swagger delivery remains REF-109.

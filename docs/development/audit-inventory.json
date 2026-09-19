@@ -106,7 +106,9 @@
     "refrncr.services.UserService.disable_user",
     "refrncr.services.UserService.enable_user",
     "refrncr.services.UserService.has_users",
-    "refrncr.services.UserService.list_users"
+    "refrncr.services.UserService.list_users",
+    "refrncr.dataset_versions.DatasetVersionService.read_current",
+    "refrncr.services.DatasetAuthorizationService.viewable_resources"
   ],
   "routes": [
     {
@@ -1152,6 +1154,54 @@
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
+    },
+    {
+      "symbol": "refrncr.api.routes.datasets",
+      "path": "/datasets",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+      ]
+    },
+    {
+      "symbol": "refrncr.api.routes.dataset",
+      "path": "/datasets/{dataset_key}",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+      ]
+    },
+    {
+      "symbol": "refrncr.api.routes.records",
+      "path": "/datasets/{dataset_key}/records",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+      ]
+    },
+    {
+      "symbol": "refrncr.api.routes.record",
+      "path": "/datasets/{dataset_key}/records/{identifier}",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+      ]
     }
   ],
   "cli_commands": [
@@ -1305,7 +1355,7 @@
       "operations": [
         "refrncr.app.health"
       ],
-      "reason": "Framework documentation/schema introspection; no authenticated business API exists."
+      "reason": "Framework documentation/schema delivery is disabled pending REF-109; generated schema is available programmatically. REF-107 data routes have explicit entries."
     },
     {
       "symbol": "Browser transport, CSRF, request-size and exception hooks",

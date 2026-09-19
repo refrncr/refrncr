@@ -18,6 +18,7 @@ from refrncr.ports import (
     PersistenceConflictError,
     StoredRecord,
 )
+from refrncr.published_contracts import CurrentPublication, CurrentRead, decode_identifier
 from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
     ConflictError,
@@ -144,6 +145,80 @@ class DatasetVersionService:
         self.uow = uow
         self.authorization = authorization
         self.clock = clock
+
+    def read_current(
+        self,
+        actor_id,
+        key=None,
+        *,
+        offset=0,
+        limit=50,
+        records=False,
+        identifier=None,
+        unchanged=None,
+    ):
+        """Bounded published reads within the existing authorization/read snapshot.
+
+        The optional predicate sees publication metadata after authorization/existence
+        checks. It can avoid loading immutable content; it confers no authority.
+        """
+        if type(offset) is not int or not 0 <= offset <= 2147483647:
+            raise ValidationError("Invalid pagination")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValidationError("Invalid pagination")
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            if key is None:
+                allowed = self.authorization.viewable_resources(actor_id, uow=uow)
+                pairs, total = uow.versions.current_page(
+                    self._today().date(),
+                    offset=offset,
+                    limit=limit,
+                    dataset_ids=None if allowed.all_resources else allowed.resource_ids,
+                )
+            else:
+                try:
+                    validate_dataset_key(key)
+                except ValidationError:
+                    raise NotFoundError("Dataset not found") from None
+                dataset = uow.datasets.find_by_key(key)
+                if dataset is None or not self.authorization.can_view_dataset(
+                    actor_id, dataset.id, uow=uow
+                ):
+                    raise NotFoundError("Dataset not found")
+                version = uow.versions.current_for_datasets(
+                    (dataset.id,), self._today().date()
+                ).get(dataset.id)
+                if version is None:
+                    raise NotFoundError("Dataset not found")
+                pairs, total = ((dataset, version),), version.record_count
+            result = CurrentRead(
+                tuple(
+                    CurrentPublication(d.key, d.name, d.description, d.icon, d.updated_at, v)
+                    for d, v in pairs
+                ),
+                total,
+            )
+            record_id = None
+            if identifier is not None:
+                try:
+                    encoded = decode_identifier(identifier)
+                except ValueError:
+                    raise NotFoundError("Record not found") from None
+                record_id = uow.versions.record_identity(version, encoded)
+                if record_id is None:
+                    raise NotFoundError("Record not found")
+            if unchanged is not None and unchanged(result):
+                return replace(result, not_modified=True)
+            if key is None:
+                return result
+            fields = uow.versions.fields(version)
+            rows = ()
+            if record_id is not None:
+                rows = tuple(uow.versions.iterate_records(version, record_ids=(record_id,)))
+            elif records:
+                rows = uow.versions.record_page(version, fields, offset=offset, limit=limit)
+            return replace(result, fields=fields, records=rows)
 
     def _discard_review(self, uow, actor_id, dataset):
         from refrncr.services import _require_concept

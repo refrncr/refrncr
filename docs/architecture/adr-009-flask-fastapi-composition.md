@@ -35,3 +35,11 @@ adapt or compose them externally rather than turning the core schema into a mult
 - Run independent Flask and FastAPI processes, which would duplicate deployment configuration.
 - Implement user-management rules in Flask views, which would prevent safe reuse by FastAPI.
 - Add a user-management API now, which would invent a contract not required by REF-33.
+
+## REF-107 implementation
+
+The product owner reconfirmed this composition on 2026-09-19. The existing Flask
+browser app, WSGI adapter and CLI startup remain. A dedicated FastAPI module mounts
+at `/api/v1` before the `/` Flask mount. Public documentation routes are disabled
+pending REF-109. [ADR-019](adr-019-current-rest-reads.md) records shared read ports,
+canonical pagination, credentials and private conditional-response choices.

@@ -144,4 +144,12 @@ Keep the generated value in protected installation configuration so every
 restart receives the same pepper. Do not commit or log it. Changing or losing
 it makes existing API keys unusable. See
 [configuration, troubleshooting, rotation and authentication](docs/development/api-keys.md).
-REF-40 supplies credentials; data API endpoints remain in REF-107.
+REF-40 supplies credentials for the Current published data REST API.
+
+## Current REST API
+
+The same application serves read-only Dataset metadata and Records under `/api/v1`.
+Use an API key in the Authorization Bearer header; browser sessions do not authenticate
+API requests. Collections use offset/limit pagination and private conditional reads
+support ETag/304 revalidation. See the [REST contract and operations guide](docs/development/rest-api.md).
+Public OpenAPI and Swagger delivery remains deferred to REF-109.
