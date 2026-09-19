@@ -1129,3 +1129,7 @@ An unsubmitted search draft is not applied by a status change. All search/status
 reset pagination. Clear all returns to Active; the import-change selector retains its
 existing receipt and selection behavior. Browser history and shared URLs contain only
 applied criteria. No search state is persisted. See [REF-136](ref-136-report.md).
+
+## REF-40 API keys
+
+Settings includes API keys for every active user. Creation, one-time display and confirmed revocation use full pages with shared fields, buttons, feedback and Settings navigation. No design tokens or global component variants changed. API-key pages deliberately disable cross-document view transitions and allow long heading wrapping; their metadata table uses the existing scrollable table pattern. No-JavaScript users can copy manually and finish the lifecycle. See [API-key accessibility](api-keys.md).

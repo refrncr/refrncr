@@ -17,6 +17,7 @@
     <script src="{{ url_for('static', filename='js/key-generation.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/icon-picker.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/refrncr.js') }}" defer></script>
+    {% block page_styles %}{% endblock %}
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
@@ -40,9 +41,7 @@
             <span class="account-avatar" aria-hidden="true">{{ (current_actor.display_name|trim)[:1]|upper }}</span>
             <p class="account-name">{{ current_actor.display_name }}</p>
             <p class="account-role">{{ 'Administrator' if current_actor.role == 'admin' else 'User' }}</p>
-            {% if current_actor.role == 'admin' %}
-              <a class="account-link" href="{{ url_for('user_list') }}"{% if active_navigation in ('users', 'teams') %} aria-current="page"{% endif %}>{{ settings_icon() }}Settings</a>
-            {% endif %}
+              <a class="account-link" href="{{ url_for('user_list') if current_actor.role == 'admin' else url_for('api_key_list') }}"{% if active_navigation in ('users', 'teams') %} aria-current="page"{% endif %}>{{ settings_icon() }}Settings</a>
             <form method="post" action="{{ url_for('logout') }}">
               <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
               <button class="account-link" type="submit">{{ logout_icon() }}Log out</button>
@@ -57,6 +56,7 @@
           <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="90" height="34"></a>
           {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
         </div>{% endif %}
+        {% if current_actor %}<noscript><p><a href="{{ url_for('api_key_list') }}">API keys</a></p></noscript>{% endif %}
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>

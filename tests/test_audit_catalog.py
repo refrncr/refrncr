@@ -78,6 +78,9 @@ def test_correctly_audited_registration_and_invalid_classification():
 
 def test_historical_action_names_and_object_types_are_stable():
     expected = {
+        "api_key": (
+            "api_key.created api_key.revoked api_key.authenticated api_key.authentication_failed"
+        ),
         "user": "created email_changed disabled enabled deleted",
         "team": "created renamed deleted",
         "membership": "created deleted",
@@ -97,7 +100,7 @@ def test_historical_action_names_and_object_types_are_stable():
     assert set(EVENTS) == {
         (kind, action) for kind, actions in expected.items() for action in actions.split()
     }
-    assert {event.actor for event in EVENTS.values()} == {"required"}
+    assert {event.actor for event in EVENTS.values()} == {"required", "unauthenticated"}
     assert set(EVENTS) == {event for operation in OPERATIONS.values() for event in operation.events}
 
 
@@ -221,6 +224,8 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.record_import.DatasetRecordImportService.confirm",
             "refrncr.dataset_versions.DatasetVersionService.publish",
             "refrncr.dataset_versions.DatasetVersionService.cancel",
+            "refrncr.api_keys.ApiKeyService.create_key",
+            "refrncr.api_keys.ApiKeyService.revoke_key",
             "refrncr.services.UserService.create_initial_admin",
             "refrncr.services.DatasetRecordService.export_dataset",
             "refrncr.dataset_diff.DatasetDiffService.open_review",
@@ -321,6 +326,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
     method names mutate. Dynamic user lifecycle dispatch is covered by behavior tests.
     """
     receivers = {
+        "api_keys": "ApiKeyService",
+        "api_key_service": "ApiKeyService",
         "users": "UserService",
         "authentication": "AuthenticationService",
         "sessions": "SessionService",
@@ -365,6 +372,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     and not function.attr.startswith("_")
                 ):
                     module = {
+                        "api_keys": "api_keys",
+                        "api_key_service": "api_keys",
                         "record_imports": "record_import",
                         "audit_history": "audit_history",
                         "dataset_versions": "dataset_versions",

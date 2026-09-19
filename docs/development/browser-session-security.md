@@ -92,3 +92,7 @@ hosting access log or reverse proxy to omit these querystrings too. Criteria int
 live in shared URLs and browser history; they confer no Dataset or version authorization.
 Concept routes retain server-side maintenance enforcement, while each service read resolves
 current permissions and the selected content within one existing coherent snapshot.
+
+## REF-40 API keys
+
+API keys do not establish browser sessions. Management requires the existing active session and CSRF checks. The one-time creation response is non-cacheable and carries no-referrer policy; signed form identity prevents secret redisplay on replay. See [one-time display and pepper configuration](api-keys.md).

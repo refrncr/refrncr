@@ -331,7 +331,8 @@ def test_metadata_upgrade_preserves_existing_content(context):  # noqa: F811
     publish(c)
     with c.engine.connect() as connection:
         config = config_for(connection)
-        command.stamp(config, "0019_ref_162")
+        command.stamp(config, "0021_ref_40")
+        command.downgrade(config, "0019_ref_162")
         command.downgrade(config, "0018_ref_160")
         old = connection.execute(text("SELECT id, name, description, revision FROM datasets")).all()
         fields = connection.execute(

@@ -92,6 +92,7 @@ def verify_inventory(root):
             "refrncr.web",
             "refrncr.dataset_versions",
             "refrncr.dataset_diff",
+            "refrncr.api_keys",
         }:
             for node in ast.walk(ast.parse(source)):
                 if isinstance(node, ast.Call) and (

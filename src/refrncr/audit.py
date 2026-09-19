@@ -31,7 +31,10 @@ class EventContract:
             for value in (self.object_type, self.action)
         ):
             raise AuditContractError("Audit names must be stable lower-case identifiers")
-        if self.actor != "required":
+        if self.actor != "required" and not (
+            self.actor == "unauthenticated"
+            and (self.object_type, self.action) == ("api_key", "api_key.authentication_failed")
+        ):
             raise AuditContractError("This installation has no anonymous/system audit actor")
         if len(dict(self.context)) != len(self.context) or any(
             kind
@@ -52,6 +55,11 @@ class EventContract:
 
 
 _EVENTS = (
+    *(
+        EventContract("api_key", action)
+        for action in ("api_key.created", "api_key.revoked", "api_key.authenticated")
+    ),
+    EventContract("api_key", "api_key.authentication_failed", actor="unauthenticated"),
     EventContract(
         "dataset",
         "dataset.concept_discarded",
@@ -182,7 +190,11 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
     contract = EVENTS.get((object_type, action))
     if contract is None:
         raise AuditContractError("Unsupported audit object type/action")
-    _identity(actor_user_id)
+    if contract.actor == "unauthenticated":
+        if actor_user_id is not None:
+            raise AuditContractError("Failed authentication has no trusted actor")
+    else:
+        _identity(actor_user_id)
     _identity(object_id)
     if details is not None and not isinstance(details, dict):
         raise AuditContractError("Audit context must be a mapping")
@@ -256,6 +268,7 @@ def record_audit(uow, *, actor_user_id, object_type, object_id, action, details=
 CLASSIFICATIONS = frozenset(
     {
         "domain-audited",
+        "security-audited",
         "security logging required",
         "technical logging only",
         "intentionally excluded",
@@ -272,7 +285,7 @@ class Operation:
     def __post_init__(self):
         if self.classification not in CLASSIFICATIONS:
             raise AuditContractError("Unclassified operation")
-        if self.classification == "domain-audited":
+        if self.classification in {"domain-audited", "security-audited"}:
             if not self.events or any(event not in EVENTS for event in self.events):
                 raise AuditContractError("Audited operation needs supported event contracts")
         elif not self.rationale.strip() or self.events:
@@ -662,5 +675,23 @@ for _name in ("concept_preflight", "migrate_concepts"):
         "technical logging only",
         rationale="Stopped-writer concept migration/preflight; no invented actor or domain event.",
     )
+
+_register(
+    "ApiKeyService",
+    "list_keys get_key",
+    "intentionally excluded",
+    module="api_keys",
+    rationale="Owner-only metadata read; no credential is returned.",
+)
+_audited("ApiKeyService", "create_key", ("api_key", "api_key.created"), module="api_keys")
+_audited("ApiKeyService", "revoke_key", ("api_key", "api_key.revoked"), module="api_keys")
+_register(
+    "ApiKeyService",
+    "authenticate",
+    "security-audited",
+    module="api_keys",
+    events=(("api_key", "api_key.authenticated"), ("api_key", "api_key.authentication_failed")),
+    rationale="REF-40 approved authentication security events, not successful domain mutations.",
+)
 
 OPERATIONS = MappingProxyType(OPERATIONS)

@@ -2590,7 +2590,10 @@
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.api_key_list GET /settings/api-keys",
+        "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4167,7 +4170,9 @@
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -5401,6 +5406,202 @@
       "implementation_status": "REF-162 locally verified by full SQLite/PostgreSQL 16.15 regression and Chrome checks; independent GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "API key lifecycle",
+      "operation": "list_keys",
+      "service": "refrncr.api_keys.ApiKeyService.list_keys",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_list GET /settings/api-keys"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-40 records authentication outcomes without credentials; REF-31 owns broader security logging.",
+      "technical_logging": "Fixed messages only, no input, verifier, header or exception payload.",
+      "events": [],
+      "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
+      "actor_source": "Validated active owner; only failed authentication has a null actor.",
+      "allowed_context": {},
+      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
+      "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
+      "stale_input": "Reject stale key revision without mutation or success event.",
+      "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
+      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "tests": [
+        "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
+        "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+      ],
+      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
+      "exclusion_reason": "Owner-only metadata read; no credential is returned."
+    },
+    {
+      "capability": "API key lifecycle",
+      "operation": "get_key",
+      "service": "refrncr.api_keys.ApiKeyService.get_key",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-40 records authentication outcomes without credentials; REF-31 owns broader security logging.",
+      "technical_logging": "Fixed messages only, no input, verifier, header or exception payload.",
+      "events": [],
+      "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
+      "actor_source": "Validated active owner; only failed authentication has a null actor.",
+      "allowed_context": {},
+      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
+      "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
+      "stale_input": "Reject stale key revision without mutation or success event.",
+      "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
+      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "tests": [
+        "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
+        "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+      ],
+      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
+      "exclusion_reason": "Owner-only metadata read; no credential is returned."
+    },
+    {
+      "capability": "API key lifecycle",
+      "operation": "create_key",
+      "service": "refrncr.api_keys.ApiKeyService.create_key",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_create GET,POST /settings/api-keys/new"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-40 records authentication outcomes without credentials; REF-31 owns broader security logging.",
+      "technical_logging": "Fixed messages only, no input, verifier, header or exception payload.",
+      "events": [
+        [
+          "api_key",
+          "api_key.created"
+        ]
+      ],
+      "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
+      "actor_source": "Validated active owner; only failed authentication has a null actor.",
+      "allowed_context": {
+        "api_key:api_key.created": {}
+      },
+      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
+      "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
+      "stale_input": "Reject stale key revision without mutation or success event.",
+      "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
+      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "tests": [
+        "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
+        "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+      ],
+      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
+      "exclusion_reason": ""
+    },
+    {
+      "capability": "API key lifecycle",
+      "operation": "revoke_key",
+      "service": "refrncr.api_keys.ApiKeyService.revoke_key",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-40 records authentication outcomes without credentials; REF-31 owns broader security logging.",
+      "technical_logging": "Fixed messages only, no input, verifier, header or exception payload.",
+      "events": [
+        [
+          "api_key",
+          "api_key.revoked"
+        ]
+      ],
+      "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
+      "actor_source": "Validated active owner; only failed authentication has a null actor.",
+      "allowed_context": {
+        "api_key:api_key.revoked": {}
+      },
+      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
+      "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
+      "stale_input": "Reject stale key revision without mutation or success event.",
+      "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
+      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "tests": [
+        "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
+        "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+      ],
+      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
+      "exclusion_reason": ""
+    },
+    {
+      "capability": "API key lifecycle",
+      "operation": "authenticate",
+      "service": "refrncr.api_keys.ApiKeyService.authenticate",
+      "interface_entrypoints": [
+        "Trusted programmatic caller"
+      ],
+      "kind": "mutation",
+      "classification": "security-audited",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-40 records authentication outcomes without credentials; REF-31 owns broader security logging.",
+      "technical_logging": "Fixed messages only, no input, verifier, header or exception payload.",
+      "events": [
+        [
+          "api_key",
+          "api_key.authenticated"
+        ],
+        [
+          "api_key",
+          "api_key.authentication_failed"
+        ]
+      ],
+      "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
+      "actor_source": "Validated active owner; only failed authentication has a null actor.",
+      "allowed_context": {
+        "api_key:api_key.authenticated": {},
+        "api_key:api_key.authentication_failed": {}
+      },
+      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
+      "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
+      "stale_input": "Reject stale key revision without mutation or success event.",
+      "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
+      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "tests": [
+        "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
+        "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back",
+        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+      ],
+      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
+      "exclusion_reason": "REF-40 approved authentication security events, not successful domain mutations."
     }
   ]
 }

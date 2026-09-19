@@ -247,6 +247,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0018_ref_160",
         "0019_ref_162",
         "0020_ref_162",
+        "0021_ref_40",
     }:
         return
     inspector = inspect(connection)
@@ -296,6 +297,7 @@ def build_application(
         services.memberships,
         authorization=services.authorization,
         audit_history=services.audit_history,
+        api_keys=services.api_keys,
         datasets=services.datasets,
         dataset_fields=services.dataset_fields,
         dataset_business_keys=services.dataset_business_keys,
@@ -417,6 +419,7 @@ def main(
                             "0018_ref_160",
                             "0019_ref_162",
                             "0020_ref_162",
+                            "0021_ref_40",
                         }
                         if args.command == "dataset-concept-preflight"
                         else {
@@ -427,6 +430,7 @@ def main(
                             "0018_ref_160",
                             "0019_ref_162",
                             "0020_ref_162",
+                            "0021_ref_40",
                         }
                     )
                     if revision not in allowed:
