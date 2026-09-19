@@ -2,10 +2,11 @@
 
 from dataclasses import asdict
 
-from sqlalchemy import func, select, update
+from sqlalchemy import Numeric, cast, func, select, update
 
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.models import (
+    Dataset,
     DatasetVersion,
     DatasetVersionField,
     DatasetVersionRecord,
@@ -93,6 +94,77 @@ class SqlAlchemyVersionOperations:
             .where(ranked.c.position == 1)
         )
         return {row.dataset_id: self._version(row) for row in rows}
+
+    def current_page(self, today, *, dataset_ids=None, offset, limit):
+        """Database page of Current publications; no concepts or historical fallback."""
+        ranked = (
+            select(
+                DatasetVersion.id,
+                func.row_number()
+                .over(
+                    partition_by=DatasetVersion.dataset_id,
+                    order_by=(DatasetVersion.effective_date.desc(), DatasetVersion.number.desc()),
+                )
+                .label("position"),
+            )
+            .where(DatasetVersion.cancelled_at.is_(None), DatasetVersion.effective_date <= today)
+            .subquery()
+        )
+        statement = (
+            select(Dataset, DatasetVersion)
+            .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
+            .join(ranked, ranked.c.id == DatasetVersion.id)
+            .where(ranked.c.position == 1)
+        )
+        if dataset_ids is not None:
+            statement = statement.where(Dataset.id.in_(dataset_ids))
+        total = self.session.scalar(select(func.count()).select_from(statement.subquery()))
+        rows = self.session.execute(statement.order_by(Dataset.key).offset(offset).limit(limit))
+        return tuple((dataset, self._version(version)) for dataset, version in rows), total
+
+    def record_identity(self, version, identifier_key):
+        return self.session.scalar(
+            select(DatasetVersionRecord.id).where(
+                DatasetVersionRecord.version_id == version.id,
+                DatasetVersionRecord.identifier_key == identifier_key,
+            )
+        )
+
+    def record_page(self, version, fields, *, offset, limit):
+        """Sort canonical identifier components in SQL, then load only page values."""
+        order = []
+        sqlite = self.session.bind.dialect.name == "sqlite"
+        for field in sorted((f for f in fields if f.is_identifier), key=lambda f: f.key):
+            value = (
+                select(DatasetVersionValue.canonical_text)
+                .where(
+                    DatasetVersionValue.version_id == version.id,
+                    DatasetVersionValue.record_id == DatasetVersionRecord.id,
+                    DatasetVersionValue.field_id == field.id,
+                )
+                .scalar_subquery()
+            )
+            if field.data_type in {"integer", "number"}:
+                value = value.collate("refrncr_number") if sqlite else cast(value, Numeric())
+            else:
+                # UTC Z is a suffix, not part of temporal ordering (fraction vs whole second).
+                if field.data_type == "timestamp":
+                    value = func.rtrim(value, "Z")
+                value = value.collate("BINARY" if sqlite else "C")
+            order.append(value.asc().nulls_last())
+        ids = tuple(
+            self.session.scalars(
+                select(DatasetVersionRecord.id)
+                .where(DatasetVersionRecord.version_id == version.id)
+                .order_by(*order, DatasetVersionRecord.id)
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        if not ids:
+            return ()
+        records = {r.id: r for r in self.iterate_records(version, record_ids=ids)}
+        return tuple(records[key] for key in ids)
 
     def append(
         self,

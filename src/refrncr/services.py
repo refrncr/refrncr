@@ -711,6 +711,13 @@ class DatasetAuthorizationService:
     def can_view_dataset(self, actor_id, dataset_id, *, uow=None):
         return self._decision(actor_id, dataset_id, "view", uow=uow)
 
+    def viewable_resources(self, actor_id, *, uow=None):
+        """Bulk form of the existing Community view decision, in the caller's snapshot."""
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            if not self.active(work.users.get(actor_id)):
+                raise NotFoundError("Dataset not found")
+            return AuthorizedResourceSet(True, ())
+
     def maintainable_resources(self, actor_id, *, uow=None):
         with nullcontext(uow) if uow is not None else self.uow() as work:
             actor = work.users.get(actor_id)

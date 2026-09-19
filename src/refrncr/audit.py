@@ -694,4 +694,19 @@ _register(
     rationale="REF-40 approved authentication security events, not successful domain mutations.",
 )
 
+
+_register(
+    "DatasetVersionService",
+    "read_current",
+    "intentionally excluded",
+    module="dataset_versions",
+    rationale="Authorized bounded Current read; API-key authentication owns its separate audit.",
+)
+_register(
+    "DatasetAuthorizationService",
+    "viewable_resources",
+    "intentionally excluded",
+    rationale="Bulk current Community Dataset view decision; no mutation or domain event.",
+)
+
 OPERATIONS = MappingProxyType(OPERATIONS)

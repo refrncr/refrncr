@@ -5562,7 +5562,11 @@
       "operation": "authenticate",
       "service": "refrncr.api_keys.ApiKeyService.authenticate",
       "interface_entrypoints": [
-        "Trusted programmatic caller"
+        "Trusted programmatic caller",
+        "refrncr.api.routes.datasets GET /datasets",
+        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
       ],
       "kind": "mutation",
       "classification": "security-audited",
@@ -5602,6 +5606,78 @@
       ],
       "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
       "exclusion_reason": "REF-40 approved authentication security events, not successful domain mutations."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "read_current",
+      "service": "refrncr.dataset_versions.DatasetVersionService.read_current",
+      "interface_entrypoints": [
+        "refrncr.api.routes.datasets GET /datasets",
+        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
+      "allowed_context": {},
+      "success": "Current-only bounded read; no domain event. Authentication has its own existing audit.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
+      "no_op": "Identical publication or repeated cancellation fails without event.",
+      "rollback": "Snapshot, revision and audit roll back together on persistence, audit or commit failure.",
+      "duplicate_retry": "Dataset lock and revision check allow at most one committed publication for a revision.",
+      "tests": [
+        "tests/test_rest_api.py::test_endpoints_and_contract",
+        "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
+        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
+      ],
+      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "exclusion_reason": "Authorized bounded Current read; API-key authentication owns its separate audit.",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "DatasetAuthorizationService",
+      "operation": "viewable_resources",
+      "service": "refrncr.services.DatasetAuthorizationService.viewable_resources",
+      "interface_entrypoints": [
+        "refrncr.api.routes.datasets GET /datasets",
+        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied, stale and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
+      "allowed_context": {},
+      "success": "Current-only bounded read; no domain event. Authentication has its own existing audit.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
+      "no_op": "Identical publication or repeated cancellation fails without event.",
+      "rollback": "Snapshot, revision and audit roll back together on persistence, audit or commit failure.",
+      "duplicate_retry": "Dataset lock and revision check allow at most one committed publication for a revision.",
+      "tests": [
+        "tests/test_rest_api.py::test_endpoints_and_contract",
+        "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
+        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
+      ],
+      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "exclusion_reason": "Bulk current Community Dataset view decision; no mutation or domain event.",
+      "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     }
   ]
 }
