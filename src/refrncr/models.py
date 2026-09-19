@@ -84,15 +84,41 @@ class LoginSession(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
-    __table_args__ = (Index("ix_audit_events_timestamp_id", "timestamp", "id"),)
+    __table_args__ = (
+        Index("ix_audit_events_timestamp_id", "timestamp", "id"),
+        CheckConstraint(
+            "actor_user_id IS NOT NULL OR "
+            "(object_type = 'api_key' AND action = 'api_key.authentication_failed')",
+            name="ck_audit_events_actor",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     details: Mapped[dict[str, str | int] | None] = mapped_column(JSON)
-    actor_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     object_type: Mapped[str] = mapped_column(String(100))
     object_id: Mapped[str] = mapped_column(String(100), index=True)
     action: Mapped[str] = mapped_column(String(100))
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        CheckConstraint("length(name) BETWEEN 1 AND 100", name="ck_api_keys_name"),
+        CheckConstraint("revision >= 1", name="ck_api_keys_revision"),
+        CheckConstraint("expires_at > created_at", name="ck_api_keys_expiry"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    verifier: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, default=1)
 
 
 class Team(Base):

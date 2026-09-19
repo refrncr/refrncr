@@ -46,7 +46,7 @@ class AuditPosition:
 class AuditEventRecord(Protocol):
     id: str
     timestamp: datetime
-    actor_user_id: str
+    actor_user_id: str | None
     object_type: str
     object_id: str
     action: str
@@ -434,8 +434,29 @@ class DatasetRecordOperations(Protocol):
     def set_field_unique_keys(self, dataset_id: str, field_id: str, enabled: bool) -> None: ...
 
 
+class ApiKeyRecord(Protocol):
+    id: str
+    owner_id: str
+    name: str
+    verifier: str
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    last_used_at: datetime | None
+    revision: int
+
+
+class ApiKeyOperations(Protocol):
+    def get(self, key_id: str, *, fresh: bool = False) -> ApiKeyRecord | None: ...
+    def get_owned(self, owner_id: str, key_id: str) -> ApiKeyRecord | None: ...
+    def list_owned(self, owner_id: str) -> tuple[ApiKeyRecord, ...]: ...
+    def active_owned(self, owner_id: str, now: datetime) -> tuple[ApiKeyRecord, ...]: ...
+    def create(self, **values) -> ApiKeyRecord: ...
+
+
 class UnitOfWork(Protocol):
     write: bool
+    api_keys: ApiKeyOperations
     concepts: ConceptOperations
     version_diff: VersionDiffOperations
     versions: VersionOperations
@@ -457,7 +478,7 @@ class UnitOfWork(Protocol):
     def add_audit(
         self,
         *,
-        actor_user_id: str,
+        actor_user_id: str | None,
         object_type: str,
         object_id: str,
         action: str,

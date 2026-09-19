@@ -1,0 +1,3 @@
+/* Credential pages must not participate in cross-document transition snapshots. */
+@view-transition { navigation: none; }
+.settings-content h2 { overflow-wrap: anywhere; }

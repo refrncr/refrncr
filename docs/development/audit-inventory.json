@@ -1,5 +1,10 @@
 {
   "service_operations": [
+    "refrncr.api_keys.ApiKeyService.authenticate",
+    "refrncr.api_keys.ApiKeyService.create_key",
+    "refrncr.api_keys.ApiKeyService.get_key",
+    "refrncr.api_keys.ApiKeyService.list_keys",
+    "refrncr.api_keys.ApiKeyService.revoke_key",
     "refrncr.audit_history.AuditHistoryService.get_event",
     "refrncr.audit_history.AuditHistoryService.list_history",
     "refrncr.dataset_diff.DatasetDiffService.field_detail",
@@ -1108,6 +1113,44 @@
         "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.api_key_list",
+      "path": "/settings/api-keys",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.list_keys",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.api_key_create",
+      "path": "/settings/api-keys/new",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.create_key",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.api_key_revoke",
+      "path": "/settings/api-keys/<key_id>/revoke",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.get_key",
+        "refrncr.api_keys.ApiKeyService.revoke_key",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
       ]
     }
   ],

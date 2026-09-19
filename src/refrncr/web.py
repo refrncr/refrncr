@@ -6,10 +6,11 @@ import hmac
 import logging
 import re
 import secrets
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
 from urllib.parse import unquote, urlsplit
+from uuid import uuid4
 
 from flask import (
     Flask,
@@ -24,6 +25,7 @@ from flask import (
 )
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
+from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
 from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
@@ -137,6 +139,7 @@ def create_flask_app(
     audit_history: AuditHistoryService | None = None,
     dataset_versions: DatasetVersionService | None = None,
     review_signing_key: bytes | None = None,
+    api_keys: ApiKeyService | None = None,
 ) -> Flask:
     app = Flask(__name__)
     review_secret = (
@@ -274,6 +277,8 @@ def create_flask_app(
 
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
+        if endpoint.startswith("api_key_"):
+            return "api_keys"
         if endpoint.startswith("audit_"):
             return "audit"
         if endpoint == "index":
@@ -381,7 +386,7 @@ def create_flask_app(
     @app.after_request
     def protect_audit_response(response):
         endpoint = request.endpoint or ""
-        if endpoint == "dataset_records_view":
+        if endpoint == "dataset_records_view" or endpoint.startswith("api_key_"):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = "no-referrer"
             return response
@@ -405,6 +410,107 @@ def create_flask_app(
 
     def audit_error(message, status=400):
         return render_authenticated_template("pages/audit/error.html", error=message), status
+
+    def api_key_page(template="list", **context):
+        return render_authenticated_template("pages/api_keys/" + template + ".html", **context)
+
+    def require_api_keys():
+        if api_keys is None:
+            abort(503, description="API keys require server configuration")
+        return api_keys
+
+    @app.get("/settings/api-keys")
+    def api_key_list():
+        actor, _session = require_authenticated()
+        if api_keys is None:
+            return api_key_page(keys=(), unavailable=True), 503
+        return api_key_page(
+            keys=api_keys.list_keys(actor.id), revoked=request.args.get("revoked") == "1"
+        )
+
+    def api_key_creation_form(actor, session, *, error=None, status=200):
+        identity = str(uuid4())
+        signature = hmac.digest(review_secret, (identity + session.id).encode(), "sha256").hex()
+        return api_key_page(
+            "create",
+            creation_token=identity + "." + signature,
+            default_expiry=(datetime.now(UTC) + LIFETIME).date().isoformat(),
+            error=error,
+        ), status
+
+    @app.route("/settings/api-keys/new", methods=["GET", "POST"])
+    def api_key_create():
+        actor, session = require_authenticated()
+        api_key_service = require_api_keys()
+        if request.method == "GET":
+            return api_key_creation_form(actor, session)
+        require_csrf(session.csrf_token)
+        try:
+            if any(
+                len(request.form.getlist(k)) != 1 for k in ("name", "expires_at", "creation_token")
+            ):
+                raise ValidationError("Complete each field once")
+            token = request.form["creation_token"]
+            if (
+                re.fullmatch(
+                    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[0-9a-f]{64}",
+                    token,
+                )
+                is None
+            ):
+                raise ValidationError("Invalid creation form. Reload and try again")
+            identity, signature = token.split(".", 1)
+            expected = hmac.digest(review_secret, (identity + session.id).encode(), "sha256").hex()
+            if not hmac.compare_digest(signature, expected):
+                raise ValidationError("Invalid creation form. Reload and try again")
+            value = request.form["expires_at"]
+            if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+                raise ValidationError("Choose a valid expiry date")
+            try:
+                expiry = datetime.combine(
+                    date.fromisoformat(value), datetime.min.time(), tzinfo=UTC
+                )
+            except ValueError:
+                raise ValidationError("Choose a valid expiry date") from None
+            # The displayed default date means exactly 90 days, not midnight.
+            if value == (datetime.now(UTC) + LIFETIME).date().isoformat():
+                expiry = None
+            created = api_key_service.create_key(
+                actor.id, request.form["name"], expiry, request_id=identity
+            )
+        except PersistenceConflictError:
+            return api_key_creation_form(
+                actor,
+                session,
+                error="The operation could not be completed. Reload and try again.",
+                status=409,
+            )
+        except (ValidationError, ConflictError) as error:
+            return api_key_creation_form(actor, session, error=str(error), status=400)
+        return api_key_page("secret", created=created), 201
+
+    @app.route("/settings/api-keys/<key_id>/revoke", methods=["GET", "POST"])
+    def api_key_revoke(key_id):
+        actor, session = require_authenticated()
+        api_key_service = require_api_keys()
+        key = api_key_service.get_key(actor.id, key_id)
+        error = None
+        if request.method == "POST":
+            require_csrf(session.csrf_token)
+            try:
+                revision = parse_expected_revision(request.form.get("revision"))
+                if len(request.form.getlist("revision")) != 1 or request.form.getlist(
+                    "confirm"
+                ) != ["yes"]:
+                    raise ValidationError("Confirm permanent revocation")
+                api_key_service.revoke_key(actor.id, key_id, revision, confirmed=True)
+            except (ValidationError, ConflictError) as failure:
+                error = str(failure)
+            except PersistenceConflictError:
+                error = "The operation could not be completed. Reload and try again."
+            else:
+                return redirect(url_for("api_key_list", revoked="1") + "#key-status", code=303)
+        return api_key_page("revoke", key=key, error=error), 400 if error else 200
 
     @app.get("/settings/audit-log")
     def audit_list():

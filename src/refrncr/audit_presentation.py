@@ -22,6 +22,14 @@ class ActionPresentation:
 # Event production, safe context and technical contracts remain solely in EVENTS.
 ACTION_PRESENTATIONS = MappingProxyType(
     {
+        ("api_key", "api_key.created"): ActionPresentation("API key created", False),
+        ("api_key", "api_key.revoked"): ActionPresentation("API key revoked", False),
+        ("api_key", "api_key.authenticated"): ActionPresentation(
+            "API key authentication succeeded", False
+        ),
+        ("api_key", "api_key.authentication_failed"): ActionPresentation(
+            "API key authentication failed", False
+        ),
         ("user", "created"): ActionPresentation("User created", False),
         ("user", "email_changed"): ActionPresentation("User email changed", False),
         ("user", "disabled"): ActionPresentation("User disabled", False),
@@ -96,6 +104,7 @@ class ObjectPresentation:
 
 OBJECTS = MappingProxyType(
     {
+        "api_key": ObjectPresentation("API key", None),
         "user": ObjectPresentation("User", "user"),
         "team": ObjectPresentation("Team", "team"),
         "membership": ObjectPresentation("Team membership", None),
@@ -208,7 +217,7 @@ def require_complete_presentation(
             raise AuditContractError(
                 f"Missing audit context presentation: {sorted(missing_context)}"
             )
-        if contract.actor != "required" or any(
+        if contract.actor not in {"required", "unauthenticated"} or any(
             kind not in FORMAT_KINDS for _, kind in contract.context
         ):
             raise AuditContractError("Missing safe audit actor/context formatter")
@@ -343,7 +352,9 @@ def present_event(event, actor_names, objects):
         event.id,
         timestamp.isoformat(timespec="microseconds"),
         event.actor_user_id if valid_id(event.actor_user_id) else "Unavailable",
-        safe_name(actor_names.get(event.actor_user_id), DELETED_ACTOR),
+        "Unauthenticated"
+        if pair == ("api_key", "api_key.authentication_failed") and event.actor_user_id is None
+        else safe_name(actor_names.get(event.actor_user_id), DELETED_ACTOR),
         technical(event.action) if known else "Unavailable",
         ACTION_LABELS[pair] if known else "Unavailable action",
         technical(event.object_type) if known else "Unavailable",

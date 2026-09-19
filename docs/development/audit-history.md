@@ -233,3 +233,7 @@ GitHub Actions is authoritative before merge.
 Out of scope: new events/payloads, auditor role, team/object audit pages, audit export/API, free text,
 context search, retention configuration, event mutation, before/after Record values, security logging,
 Cloud tenancy, SIEM, live updates and polling.
+
+## REF-40 API keys
+
+API-key lifecycle/authentication events display safe UUIDs and action labels, without names, credentials or verifiers. Failed authentication displays `Unauthenticated` without a user link. Revoked keys remain historical objects rather than deleted objects. See [API keys](api-keys.md).

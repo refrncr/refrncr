@@ -23,6 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.models import (
     AuditEvent,
@@ -1196,6 +1197,7 @@ class SqlAlchemyUnitOfWork:
                 raise PersistenceConflictError() from None
             raise
         self.users = SqlAlchemyUserOperations(self.session)
+        self.api_keys = SqlAlchemyApiKeyOperations(self.session)
         self.audit_history = SqlAlchemyAuditReadOperations(self.session)
         self.teams = SqlAlchemyTeamOperations(self.session)
         self.memberships = SqlAlchemyMembershipOperations(self.session)

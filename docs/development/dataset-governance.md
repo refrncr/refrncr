@@ -194,3 +194,7 @@ Users and Teams show their relationship columns through one administrator-only
 membership projection (one joined SELECT after the actor authorization SELECT).
 Page query counts remain constant as memberships grow. Non-admin Teams keeps only
 the actor's existing visible teams and exposes no membership roster or admin links.
+
+## REF-40 API keys
+
+API-key authentication returns the active owner ID without persisted permission scopes. Consumers resolve current Dataset rights through the existing authorization services, so membership and permission changes apply immediately. Administrator status does not grant management of another user’s keys. See [authentication boundary](api-keys.md).

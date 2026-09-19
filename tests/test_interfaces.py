@@ -794,11 +794,12 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert 'class="primary-navigation"' in secondary
     assert "Access management" in secondary
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
-    assert secondary.count("<a ") == 3
+    assert secondary.count("<a ") == 4
+    assert re.search(r'href="/settings/api-keys">.*?</svg>API keys</a>', secondary, re.S)
     assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
     assert secondary.count('aria-current="page"') == 1
-    assert secondary.count('aria-hidden="true"') == 3
+    assert secondary.count('aria-hidden="true"') == 4
     assert re.search(
         r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,
@@ -844,7 +845,8 @@ def test_settings_visibility_and_direct_access_follow_authenticated_role(interfa
     assert account.index(">Settings</a>") < account.index(">Log out</button>")
     login(client, regular.email, "valid password")
     body = response_text(request(client, "get", "/"))
-    assert ">Settings</a>" not in body
+    assert ">Settings</a>" in body
+    assert re.search(r'href="/settings/api-keys">.*?</svg>Settings</a>', body, re.S)
     assert ">Users</a>" not in body
     assert ">Teams</a>" not in body
     assert request(client, "get", "/teams").status_code == 200

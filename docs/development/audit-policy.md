@@ -16,12 +16,11 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 
 ## Decisions and scope
 
-The current inventory contains 96 public application-service operations and 40 security,
-transient, technical and administrative operations. Its 136 decisions are 36 domain-audited,
-19 security logging required, 15 technical logging only and 66 intentionally excluded.
-There are 61 explicitly declared HTTP route entries and seven CLI flows, plus documented
-implicit framework endpoints. The catalog supports 34 `(object_type, action)` contracts.
-The guard compares symbols rather than freezing these counts.
+The inventory explicitly declares public service operations, security/technical
+operations, HTTP routes and CLI flows. The catalog now supports 41
+`(object_type, action)` contracts, including four REF-40 API-key contracts.
+The guard compares symbols rather than freezing operation counts. REF-40 adds
+`security-audited` for authentication outcomes, distinct from domain mutations.
 
 Domain audit records committed business changes and prepared authorized Dataset export requests.
 REF-84 adds the explicitly approved successful review-opening exception described below.
@@ -34,7 +33,8 @@ worker exists; health, framework schema/docs, static assets, HEAD and OPTIONS ar
 
 `security_logging: true` in the matrix means a security obligation, including the operation's denied
 or suspicious flows. It does **not** mean REF-149 implemented security logging or that each successful
-ordinary read should be logged. REF-31 remains the owner. Technical errors remain diagnostics;
+ordinary read should be logged. REF-31 remains the owner of general security logging; REF-40 explicitly implements
+API-key authentication outcome events. Technical errors remain diagnostics;
 audit records never contain exceptions, raw SQL or traces.
 
 Community remains installation-scoped, with no tenant/organisation columns or Cloud composition.
@@ -65,11 +65,14 @@ Services authenticate/authorize their supplied actor using the established bound
 handlers supply `actor.id` from the resolved server-side session, never a form/query actor. Trusted
 programmatic callers must likewise establish a principal before invoking services. Initial setup
 is the explicit exception to pre-existing authentication: the newly created first administrator
-is its own actor under the serialized initial-setup contract. No anonymous or invented system actor
-is accepted; technical setup/migrations have no domain event.
+is its own actor under the serialized initial-setup contract. REF-40's approved
+`api_key.authentication_failed` exception requires a null actor because credentials
+have not established an identity. No other anonymous or invented system actor is
+accepted; technical setup/migrations have no domain event.
 
 `record_audit` validates before calling the persistence port, so alternate adapters receive the same
-contract. The catalog requires canonical UUID actor and object identifiers, a supported object/action
+contract. The catalog requires canonical UUID actor identifiers (except that explicit null-actor
+contract) and object identifiers, a supported object/action
 pair and exactly the declared context fields. It copies context and rejects additional/missing fields
 without including rejected values in errors. Existing minimal events need no details beyond their
 stable target and actor.
@@ -363,3 +366,7 @@ The filter configuration is copied rather than mutating Uvicorn's global default
 Other hosting stacks/reverse proxies must likewise omit Records querystrings; browser
 history and intentionally shared URLs necessarily contain the user's valid criteria.
 Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+
+## REF-40 API keys
+
+REF-40 adds four payload-free API-key events. The product owner approved null actor solely for `api_key.authentication_failed`, enforced by contract and schema; it identifies an unauthenticated attempt, never a fabricated user. All other actor requirements remain. See [API-key audit and migration](api-keys.md) and [ADR-018](../architecture/adr-018-user-api-keys.md).

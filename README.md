@@ -16,6 +16,31 @@ default. It uses a persistent embedded SQLite database, creates its parent direc
 all Community database migrations before accepting requests. Docker and PostgreSQL are not
 required for this quick start.
 
+### Create the first administrator
+
+On a new installation, open <http://127.0.0.1:8000/setup>. Enter the
+administrator's email address and display name, and choose a password of at
+least 12 characters. After creating the administrator, sign in at
+<http://127.0.0.1:8000/login>. The setup page is available only while the
+installation has no users; after the first administrator exists it redirects
+to the login page.
+
+The first administrator can instead be created from the command line before
+starting the server:
+
+```shell
+refrncr user create-admin \
+  --email admin@example.com \
+  --display-name "Administrator"
+```
+
+The command prompts for the password and confirmation so the password does not
+appear in command history. It uses the same default database as `refrncr start`.
+When starting with `--database-path` or `--database-url`, pass the same option to
+`user create-admin` so the administrator is created in the intended database.
+Only the first administrator can be bootstrapped this way; create later users
+from **Settings → Users** while signed in as an administrator.
+
 The default database is stored in the operating system's user application-data directory:
 
 - Linux: `$XDG_DATA_HOME/refrncr/refrncr.db`, or `~/.local/share/refrncr/refrncr.db` when
@@ -96,3 +121,27 @@ See [Dataset versions and upgrade preflight](docs/development/dataset-versions.m
 an existing installation: every Dataset must have valid Fields, an identifier and valid values.
 The controlled upgrade creates one System-published Version 1 per valid Dataset and fails closed
 if any Dataset is invalid. Back up the database and stop writers before the upgrade.
+
+## REF-40 API keys
+
+API keys are available under Settings for active users when the installation
+configures `REFRNCR_API_KEY_PEPPER`. Generate a 32-byte pepper as 64 hexadecimal
+characters before starting the server:
+
+```shell
+export REFRNCR_API_KEY_PEPPER="$(openssl rand -hex 32)"
+printf '%s' "$REFRNCR_API_KEY_PEPPER" | grep -Eq '^[0-9A-Fa-f]{64}$' && echo "pepper is valid"
+refrncr start
+```
+
+For a source checkout, replace the final command with
+`.venv/bin/refrncr start`. The variable must be set in the environment of the
+process that starts refrncr. Exporting it in another terminal, or after the
+server has started, does not update the running process. Stop and restart
+refrncr after adding the variable.
+
+Keep the generated value in protected installation configuration so every
+restart receives the same pepper. Do not commit or log it. Changing or losing
+it makes existing API keys unusable. See
+[configuration, troubleshooting, rotation and authentication](docs/development/api-keys.md).
+REF-40 supplies credentials; data API endpoints remain in REF-107.

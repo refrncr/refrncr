@@ -172,7 +172,7 @@ def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(c
     config = Config("alembic.ini")
     with c.engine.connect() as connection:
         config.attributes["connection"] = connection
-        command.stamp(config, "0020_ref_162")
+        command.stamp(config, "0021_ref_40")
         # stamp owns a transaction on PostgreSQL; commit before the migration boundary.
         connection.commit()
         command.downgrade(config, "0017_ref_154")
@@ -636,7 +636,7 @@ def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, m
     config = Config("alembic.ini")
     with c.engine.connect() as connection:
         config.attributes["connection"] = connection
-        command.stamp(config, "0020_ref_162")
+        command.stamp(config, "0021_ref_40")
         connection.commit()
         command.downgrade(config, "0017_ref_154")
         connection.commit()

@@ -15,7 +15,7 @@ def predecessor(c):
     with c.engine.connect() as connection:
         connection.execute(delete(DatasetConcept))
         connection.commit()
-        command.stamp(config_for(connection), "0020_ref_162")
+        command.stamp(config_for(connection), "0021_ref_40")
         command.downgrade(config_for(connection), "0015_ref_83")
 
 
