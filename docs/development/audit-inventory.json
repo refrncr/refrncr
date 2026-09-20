@@ -1202,6 +1202,26 @@
         "refrncr.dataset_versions.DatasetVersionService.read_current",
         "refrncr.services.DatasetAuthorizationService.viewable_resources"
       ]
+    },
+    {
+      "symbol": "refrncr.api.documentation.openapi_document",
+      "path": "/api/openapi.json",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api.documentation.openapi_document"
+      ]
+    },
+    {
+      "symbol": "refrncr.api.documentation.swagger_ui",
+      "path": "/api/docs",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api.documentation.swagger_ui"
+      ]
     }
   ],
   "cli_commands": [
@@ -1306,7 +1326,9 @@
     "refrncr.services.DatasetResourceResolver.__call__",
     "refrncr.services.ResourceTypeRegistry.register",
     "refrncr.services.ResourceTypeRegistry.require_existing",
-    "refrncr.record_import.TransientImportStore.revoke_concept"
+    "refrncr.record_import.TransientImportStore.revoke_concept",
+    "refrncr.api.documentation.openapi_document",
+    "refrncr.api.documentation.swagger_ui"
   ],
   "administrative_operations": [
     "refrncr.app.health",
@@ -1355,7 +1377,7 @@
       "operations": [
         "refrncr.app.health"
       ],
-      "reason": "Framework documentation/schema delivery is disabled pending REF-109; generated schema is available programmatically. REF-107 data routes have explicit entries."
+      "reason": "Default framework documentation routes remain disabled. REF-109 publishes only the explicitly inventoried /api documentation routes."
     },
     {
       "symbol": "Browser transport, CSRF, request-size and exception hooks",

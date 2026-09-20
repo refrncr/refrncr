@@ -29,7 +29,7 @@ and cancellation create no successful domain event. Authorization/validation/sta
 never masquerade as successful changes. Retention cleanup, startup, singleton bootstrap and operator
 migration/preflight are technical operations with explicit exclusion reasons. The benchmark uses
 synthetic credentials and is technical only. REF-107 adds authenticated Current data reads; no background business worker is added.
-Health, disabled framework schema/docs, static assets, HEAD and OPTIONS are inventoried.
+Health, public REF-109 documentation, disabled default framework docs, static assets, HEAD and OPTIONS are inventoried.
 
 `security_logging: true` in the matrix means a security obligation, including the operation's denied
 or suspicious flows. It does **not** mean REF-149 implemented security logging or that each successful
@@ -380,3 +380,12 @@ FastAPI data routes are traced through the inventory/coverage matrix. REF-40
 304 requests. It stores no HTTP target, identifier, Record values or headers.
 API errors suppress exception payloads and the supported CLI redacts API access-log
 targets; independent hosting/proxies require the same privacy boundary.
+
+
+## REF-109 public documentation
+
+The generated OpenAPI document and static Swagger page are explicitly excluded
+technical reads: they call no data/authentication service and emit no audit event.
+Try it out invokes the unchanged protected REF-107 routes and REF-40 payload-free
+authentication audits. The inventory guard resolves registered operations in nested
+Python modules as well as the existing top-level modules.

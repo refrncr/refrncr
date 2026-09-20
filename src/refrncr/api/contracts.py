@@ -20,8 +20,18 @@ class Contract(BaseModel):
 
 
 class PageQuery(Contract):
-    offset: int = Field(default=0, ge=0, le=2147483647)
-    limit: int = Field(default=50, ge=1, le=100)
+    offset: int = Field(
+        default=0,
+        ge=0,
+        le=2147483647,
+        description="Zero-based offset; canonical ASCII whole number.",
+    )
+    limit: int = Field(
+        default=50,
+        ge=1,
+        le=100,
+        description="Page size; canonical ASCII whole number, maximum 100.",
+    )
 
 
 class Pagination(PageQuery):
@@ -29,14 +39,18 @@ class Pagination(PageQuery):
 
 
 class Links(Contract):
+    """Application-relative pagination links; next/previous are null at boundaries."""
+
     self: str
     next: str | None
     previous: str | None
 
 
 class CurrentVersion(Contract):
+    """Current publication number and canonical UTC publication timestamp."""
+
     number: int = Field(ge=1)
-    published_at: str
+    published_at: str = Field(examples=["2000-01-01T00:00:00Z"])
 
 
 class Dataset(Contract):
@@ -48,6 +62,8 @@ class Dataset(Contract):
 
 
 class FieldMetadata(Contract):
+    """Published Field metadata, in display order; definition/unit are nullable plain text."""
+
     key: str
     name: str
     datatype: Literal[
@@ -70,6 +86,13 @@ CanonicalValue = StrictStr | StrictBool | StrictInt | StrictFloat | CanonicalDec
 
 
 class Record(Contract):
+    """Opaque business identifier and canonical values for every published Field key.
+
+    Single/composite identifiers share the same contract. Values use native JSON types;
+    temporal values are canonical strings, UTC Timestamp ends in Z, absent values are null.
+    Decimal numbers retain exact precision; consumers need an exact JSON number parser.
+    """
+
     identifier: str = Field(min_length=1, max_length=2667, pattern=r"^[A-Za-z0-9_-]+$")
     values: dict[str, CanonicalValue]
 

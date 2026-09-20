@@ -1,0 +1,44 @@
+/* Deliberately scoped to the standalone, public Swagger documentation page. */
+body { margin: 0; background: var(--color-surface); color: var(--color-text); font-family: var(--font-interface); }
+.docs-intro, #content { max-width: 90rem; margin: auto; padding: var(--space-md); box-sizing: border-box; }
+.docs-intro h1 { font-family: var(--font-display); font-size: var(--font-size-page-title); }
+a { color: var(--color-link); }
+:focus-visible, .swagger-ui :focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
+.swagger-ui .wrapper { padding: 0; }
+.swagger-ui .info { margin: var(--space-lg) 0; }
+.swagger-ui .info .title { font-size: var(--font-size-heading-md); }
+.swagger-ui .opblock-summary { flex-wrap: wrap; gap: var(--space-xs); }
+.swagger-ui .opblock-summary-control { min-width: 0; flex-wrap: wrap; }
+.swagger-ui .opblock-summary-path { min-width: 0; overflow-wrap: anywhere; }
+.swagger-ui .opblock-summary-description { flex-basis: 100%; padding: var(--space-sm); }
+.swagger-ui .opblock.opblock-get .opblock-summary-method { background: var(--color-info); }
+.swagger-ui .btn.authorize { color: var(--color-action-primary); border-color: var(--color-action-primary); }
+.swagger-ui .btn.execute { background: var(--color-info); border-color: var(--color-info); }
+.swagger-ui .parameter__name.required::after { color: var(--color-error); }
+.swagger-ui .parameter__type, .swagger-ui .parameter__in { color: var(--color-text-secondary); }
+.swagger-ui .dialog-ux .modal-ux { width: calc(100% - 2rem); max-width: 40rem; max-height: 90vh; overflow: auto; }
+.swagger-ui .dialog-ux .modal-ux-content { padding: var(--space-md); }
+.swagger-ui .auth-container input { width: 100%; box-sizing: border-box; }
+.swagger-ui .btn, .swagger-ui input, .swagger-ui select { min-height: var(--control-height-compact); }
+.swagger-ui .responses-wrapper, .swagger-ui .parameters-container { min-width: 0; overflow-x: auto; }
+.swagger-ui table { width: 100%; table-layout: auto; }
+.swagger-ui .parameters-col_name { width: 30%; min-width: 6rem; }
+.swagger-ui .response-col_status { min-width: 3rem; }
+.swagger-ui td, .swagger-ui th, .swagger-ui p, .swagger-ui .renderedMarkdown { overflow-wrap: anywhere; }
+.swagger-ui input, .swagger-ui select { max-width: 100%; }
+.swagger-ui pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .swagger-ui .opblock-body .opblock-section-header { flex-wrap: wrap; gap: var(--space-sm); }
+  .swagger-ui .parameters-col_name { width: 40%; }
+  .swagger-ui .parameters-col_description { width: 60%; }
+  .swagger-ui .response-col_status { width: 20%; }
+  .swagger-ui .response-col_links { display: none; }
+  .swagger-ui .opblock .opblock-summary-path { max-width: 100%; }
+}
+
+.swagger-ui .btn.cancel { color: var(--color-error); border-color: var(--color-error); }
+.swagger-ui .copy-to-clipboard { flex: 0 0 var(--control-height-compact); }
+.swagger-ui .copy-to-clipboard button { min-width: var(--control-height-compact); min-height: var(--control-height-compact); }
+
+.swagger-ui .headers .header-col:first-child { width: 35%; }
+.swagger-ui .headers .header-col:last-child { width: 3rem; min-width: 3rem; overflow-wrap: normal; }

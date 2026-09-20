@@ -15,7 +15,8 @@ and ADR-018 API-key authentication. REF-109 owns public documentation delivery.
 
 Mount the dedicated FastAPI HTTP module at `/api/v1` before the unchanged
 `a2wsgi.WSGIMiddleware` root mount. Pydantic models describe the additive v1 JSON
-contract; neither application publishes OpenAPI/Swagger routes yet. Existing CLI
+contract. REF-109 publishes its generated schema and local Swagger UI at
+`/api/openapi.json` and `/api/docs` on the ASGI root. Existing CLI
 startup continues to serve the same ASGI app.
 
 Extend `DatasetVersionService` and its existing version operations port/adapter.
@@ -82,3 +83,19 @@ revision or publication-time rewrite is introduced merely for cache efficiency.
 - Derive ETag solely from publication UUID: stale independently editable metadata.
 - Return 304 before authorization/existence: discloses/prolongs revoked access.
 - Use presentation labels or Record UUIDs: ambiguous composites or internal identity leak.
+
+
+## REF-109 documentation delivery
+
+The root composes the mounted API's actual generated schema with the two public
+FastAPI documentation operations, prefixing data paths by the existing `/api/v1`
+mount. No data/service calls enter schema generation. The exact Decimal serializer
+now derives from JSONResponse so FastAPI recognizes its media type and generates
+response-model references; its renderer and data contract are unchanged.
+
+Swagger assets are pinned, licensed and served by the existing Flask static route.
+A standalone packaged HTML document avoids a browser session dependency. Its scoped
+styles reuse tokens; its external initializer disables persistence, external
+validation, URL configuration and credential-bearing snippets. No CSP unsafe-inline
+or unsafe-eval exception is added. Raw JSON remains the accessible/no-JavaScript
+alternative. See the REF-109 report and REST guide for validation and limitations.

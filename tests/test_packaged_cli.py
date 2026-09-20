@@ -199,6 +199,12 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/templates/pages/datasets/records/form.html",
         "refrncr/templates/pages/datasets/records/delete.html",
         "refrncr/templates/pages/datasets/fields/_form_fields.html",
+        "refrncr/templates/pages/api/docs.html",
+        "refrncr/static/js/swagger-ui-bundle.js",
+        "refrncr/static/js/api-docs.js",
+        "refrncr/static/css/swagger-ui.css",
+        "refrncr/static/css/layouts/api-docs.css",
+        "refrncr/static/licenses/LICENSE-Swagger-UI.txt",
         "refrncr/templates/pages/datasets/fields/create.html",
         "refrncr/templates/pages/datasets/fields/edit.html",
     } <= files
@@ -281,6 +287,12 @@ def test_installed_console_help_and_http_startup(installed_artifact):
         assert denied.value.read() == b'{"error":"invalid_api_credentials"}'
         assert denied.value.headers["Vary"] == "Authorization, Accept-Encoding"
         for asset in (
+            "api/docs",
+            "api/openapi.json",
+            "static/js/swagger-ui-bundle.js",
+            "static/js/api-docs.js",
+            "static/css/swagger-ui.css",
+            "static/css/layouts/api-docs.css",
             "static/css/components/dialog.css",
             "static/fonts/instrument-sans/instrument-sans-latin-600-normal.woff2",
             "static/fonts/ibm-plex-sans/ibm-plex-sans-latin-400-normal.woff2",

@@ -8,7 +8,7 @@ from decimal import Decimal
 from email.utils import format_datetime, parsedate_to_datetime
 
 from pydantic import BaseModel
-from starlette.responses import Response
+from starlette.responses import JSONResponse
 
 from refrncr.datatypes import get_datatype
 
@@ -40,7 +40,7 @@ def json_bytes(value):
     )
 
 
-class CanonicalJSONResponse(Response):
+class CanonicalJSONResponse(JSONResponse):
     media_type = "application/json"
 
     def render(self, content):

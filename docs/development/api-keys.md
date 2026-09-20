@@ -149,4 +149,4 @@ current Dataset authority. Missing/invalid keys use the existing 401 contract;
 operational authentication/audit failures return a fixed 503. CLI access logs redact
 the entire API target so business identifiers and query attempts are not recorded.
 This local implementation supersedes the future-adapter wording above; public
-OpenAPI/Swagger delivery remains REF-109.
+OpenAPI/Swagger is public under REF-109; see [documentation security](rest-api.md#public-openapi-and-swagger-ref-109).

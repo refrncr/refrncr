@@ -153,3 +153,8 @@ Use an API key in the Authorization Bearer header; browser sessions do not authe
 API requests. Collections use offset/limit pagination and private conditional reads
 support ETag/304 revalidation. See the [REST contract and operations guide](docs/development/rest-api.md).
 Public OpenAPI and Swagger delivery remains deferred to REF-109.
+
+
+Public API documentation: open `/api/docs` for Swagger UI or `/api/openapi.json`
+for the generated contract. Data endpoints require a Bearer API key and expose
+Current published data only. See [REST API usage and documentation security](docs/development/rest-api.md).

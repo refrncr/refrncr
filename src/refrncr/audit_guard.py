@@ -139,14 +139,21 @@ def verify_inventory(root):
     for symbol, operation in OPERATIONS.items():
         # Remove a service/method only together with its registration and matrix row.
         parts = symbol.split(".")
-        path = root / "src" / parts[0] / (parts[1] + ".py")
+        module_length = len(parts) - 1
+        while module_length > 1:
+            path = (root / "src").joinpath(*parts[:module_length]).with_suffix(".py")
+            if path.is_file():
+                break
+            module_length -= 1
+        else:
+            raise AuditContractError("Registered operation module no longer exists: " + symbol)
         tree = ast.parse(path.read_text())
-        if len(parts) == 4:
+        if len(parts) - module_length == 2:
             cls = next(
                 (
                     node
                     for node in tree.body
-                    if isinstance(node, ast.ClassDef) and node.name == parts[2]
+                    if isinstance(node, ast.ClassDef) and node.name == parts[module_length]
                 ),
                 None,
             )
