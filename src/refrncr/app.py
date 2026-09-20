@@ -1,7 +1,10 @@
+import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from a2wsgi import WSGIMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.api.documentation import publish_documentation
@@ -10,6 +13,12 @@ from refrncr.api_keys import ApiKeyService, configured_api_keys
 from refrncr.audit_history import AuditHistoryService
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.login_security import SourceIdentityResolver
+from refrncr.operational import (
+    LOGGER_NAME,
+    OperationalMiddleware,
+    operational_response,
+    readiness_status,
+)
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
@@ -99,9 +108,28 @@ def create_application(
     audit_history: AuditHistoryService | None = None,
     dataset_versions: DatasetVersionService | None = None,
     api_keys: ApiKeyService | None = None,
+    readiness_engine: Engine | None = None,
 ) -> FastAPI:
     users.bootstrap_organisation()
-    app = FastAPI(title="refrncr", openapi_url=None, docs_url=None, redoc_url=None)
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        logging.getLogger(LOGGER_NAME).info(
+            "Application started", extra={"event": "application.started"}
+        )
+        yield
+        logging.getLogger(LOGGER_NAME).info(
+            "Application stopped", extra={"event": "application.stopped"}
+        )
+
+    app = FastAPI(
+        title="refrncr",
+        openapi_url=None,
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
+    app.add_middleware(OperationalMiddleware)
     versions = (
         dataset_versions
         or datasets.versions
@@ -111,9 +139,36 @@ def create_application(
     app.mount("/api/v1", api)
     publish_documentation(app, api)
 
+    @app.get("/healthz", include_in_schema=False)
+    def health(request: Request):
+        return operational_response("ok", request.scope["refrncr.request_id"])
+
     @app.get("/api/health", include_in_schema=False)
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
+    def legacy_health(request: Request):
+        return operational_response("ok", request.scope["refrncr.request_id"])
+
+    @app.get("/readyz", include_in_schema=False)
+    async def ready(request: Request):
+        try:
+            available = readiness_engine is not None and await readiness_status(readiness_engine)
+        except Exception:
+            available = False
+        if available:
+            return operational_response("ok", request.scope["refrncr.request_id"])
+        logging.getLogger(LOGGER_NAME).warning(
+            "Readiness unavailable",
+            extra={
+                "event": "health.readiness_failed",
+                "request_id": request.scope["refrncr.request_id"],
+                "http_method": "GET",
+                "route": "/readyz",
+                "status_code": 503,
+                "error_category": "database_unavailable",
+            },
+        )
+        return operational_response(
+            "unavailable", request.scope["refrncr.request_id"], status_code=503
+        )
 
     flask_app = create_flask_app(
         users,

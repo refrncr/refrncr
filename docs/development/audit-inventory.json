@@ -1092,7 +1092,27 @@
     },
     {
       "symbol": "refrncr.app.health",
+      "path": "/healthz",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.app.health"
+      ]
+    },
+    {
+      "symbol": "refrncr.app.legacy_health",
       "path": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.app.health"
+      ]
+    },
+    {
+      "symbol": "refrncr.app.ready",
+      "path": "/readyz",
       "methods": [
         "GET"
       ],

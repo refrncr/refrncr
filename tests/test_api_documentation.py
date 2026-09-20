@@ -29,6 +29,12 @@ DATA_PATHS = {
 }
 
 
+def test_public_readme_has_no_internal_issue_references():
+    readme = Path(__file__).resolve().parents[1] / "README.md"
+
+    assert "REF-" not in readme.read_text(encoding="utf-8")
+
+
 def test_public_documentation_has_no_data_or_audit(api):  # noqa: F811
     c = api
     with c.sessions() as session:
@@ -135,6 +141,8 @@ def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):  # noq
     assert '<html lang="en">' in html
     assert "<noscript>" in html
     assert 'href="/api/openapi.json"' in html
+    assert "docs/development/operations.md" in html
+    assert "/healthz" not in html and "/readyz" not in html
     assert "<title>REST API documentation" in html
     assert "https://" not in html and "<script>" not in html
     policy = response.headers["content-security-policy"]

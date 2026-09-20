@@ -43,3 +43,12 @@ browser app, WSGI adapter and CLI startup remain. A dedicated FastAPI module mou
 at `/api/v1` before the `/` Flask mount. REF-109 registers public `/api/openapi.json` and `/api/docs` routes on the ASGI root
 before the Flask mount, generated from the mounted API and documentation routes. [ADR-019](adr-019-current-rest-reads.md) records shared read ports,
 canonical pagination, credentials and private conditional-response choices.
+
+## REF-70 operational boundary
+
+The same FastAPI root owns `/healthz`, `/readyz` and request-correlation/
+operational logging middleware before every mounted boundary. Liveness is process
+only; runtime readiness uses the composition's existing SQLAlchemy engine and the
+packaged Alembic script head. Neither probe enters OpenAPI or durable domain audit.
+The Flask mount, API mount and CLI's automatic fail-closed migration/bootstrap
+sequence remain unchanged. REF-168 owns any future migration/start separation.
