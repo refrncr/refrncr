@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import logging
 import os
 import sys
 import warnings
 from collections.abc import Callable, Sequence
-from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,7 +23,7 @@ from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
-from refrncr.record_search import RecordQueryLogFilter
+from refrncr.operational import LOGGER_NAME, configure_operational_logging
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
 from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
 
@@ -303,6 +303,7 @@ def build_application(
         dataset_business_keys=services.dataset_business_keys,
         allow_loopback_http=allow_loopback_http,
         trusted_proxies=trusted_proxies,
+        readiness_engine=engine,
     )
 
 
@@ -320,17 +321,17 @@ def start(configuration: StartConfiguration) -> None:
         raise
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
-    local_url = f"http://{configuration.host}:{configuration.port}"
-    print(f"refrncr is starting at {local_url}", flush=True)
-    log_config = deepcopy(uvicorn.config.LOGGING_CONFIG)
-    log_config["filters"] = {"record_query_privacy": {"()": RecordQueryLogFilter}}
-    log_config["handlers"]["access"]["filters"] = ["record_query_privacy"]
+    configure_operational_logging()
+    logging.getLogger(LOGGER_NAME).info(
+        "Application server starting", extra={"event": "application.starting"}
+    )
     uvicorn.run(
         application,
         host=configuration.host,
         port=configuration.port,
         proxy_headers=False,
-        log_config=log_config,
+        access_log=False,
+        log_config=None,
     )
 
 

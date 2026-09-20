@@ -1,6 +1,8 @@
 # refrncr
 
-Reference data without the enterprise baggage.
+*Reference data without the enterprise baggage.*
+
+Refrncr is a lightweight application for managing reference data that is accurate, shared and easy to consume. Create datasets with defined fields and identifiers, organise ownership through teams, and control who may edit, export or access data through the API. Work safely in Concepts: review changes, import versions, restore deleted records, and publish only when ready. Built-in validation, audit history, versioning and import flows protect data quality without adding enterprise complexity. Teams can browse published data in the web interface, download it as Excel, CSV, JSON or retrieve it through a REST API with personal API keys. Run it locally with your database and deployment setup.
 
 ## Quick start
 
@@ -64,6 +66,20 @@ can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options or the co
 Configuring a trusted proxy disables plain-HTTP loopback cookies, so proxy deployments require
 HTTPS.
 
+### Health and operational logs
+
+After the existing automatic migration/bootstrap sequence succeeds, `GET /healthz`
+reports process liveness and `GET /readyz` reports runtime database and Alembic-head
+readiness. Probes are public, data-free and non-cacheable. `refrncr start` remains
+fail-closed when its pre-start migration or bootstrap fails. Run migrations and
+bootstrap successfully before relying on either probe.
+
+The CLI emits privacy-safe JSON operational logs to stdout and returns an
+`X-Request-ID` on every HTTP response. `REFRNCR_LOG_LEVEL` selects `DEBUG`, `INFO`,
+`WARNING`, `ERROR` or `CRITICAL` and defaults safely to `INFO`. See the
+[runtime operations guide](docs/development/operations.md) for probe usage, logging
+fields and redaction boundaries.
+
 ## Community user foundation
 
 The Community application owns exactly one Organisation and supports multiple local users. On
@@ -96,7 +112,7 @@ their teams. Administrators can create for any team and manage ownership and add
 export access. Read access alone does not permit export. Historical Dataset viewer/editor/admin
 Grants and creator metadata confer no Dataset rights.
 
-Existing installations must resolve ambiguous ownership before upgrading to REF-73. See
+Existing installations must resolve ambiguous ownership before upgrading. See
 [Dataset governance and operator preflight](docs/development/dataset-governance.md) for the
 authorization model, migration mapping, concurrency contract and backup/restore procedure.
 
@@ -114,7 +130,7 @@ transactional mutation events, import summaries and prepared export request sema
 
 ### Published Dataset versions
 
-REF-83 adds immutable complete publications with UTC effective dates. Ordinary users read the
+Published Dataset versions are immutable complete snapshots with UTC effective dates. Ordinary users read the
 Current snapshot; active owning-team members and Community administrators manage the concept,
 publish and cancel Scheduled versions. Historical Grants grant no editing or publication rights.
 See [Dataset versions and upgrade preflight](docs/development/dataset-versions.md) before upgrading
@@ -122,7 +138,7 @@ an existing installation: every Dataset must have valid Fields, an identifier an
 The controlled upgrade creates one System-published Version 1 per valid Dataset and fails closed
 if any Dataset is invalid. Back up the database and stop writers before the upgrade.
 
-## REF-40 API keys
+## API keys
 
 API keys are available under Settings for active users when the installation
 configures `REFRNCR_API_KEY_PEPPER`. Generate a 32-byte pepper as 64 hexadecimal
@@ -144,7 +160,7 @@ Keep the generated value in protected installation configuration so every
 restart receives the same pepper. Do not commit or log it. Changing or losing
 it makes existing API keys unusable. See
 [configuration, troubleshooting, rotation and authentication](docs/development/api-keys.md).
-REF-40 supplies credentials for the Current published data REST API.
+These API keys authenticate requests to the Current published data REST API.
 
 ## Current REST API
 
@@ -152,9 +168,6 @@ The same application serves read-only Dataset metadata and Records under `/api/v
 Use an API key in the Authorization Bearer header; browser sessions do not authenticate
 API requests. Collections use offset/limit pagination and private conditional reads
 support ETag/304 revalidation. See the [REST contract and operations guide](docs/development/rest-api.md).
-Public OpenAPI and Swagger delivery remains deferred to REF-109.
-
-
 Public API documentation: open `/api/docs` for Swagger UI or `/api/openapi.json`
 for the generated contract. Data endpoints require a Bearer API key and expose
 Current published data only. See [REST API usage and documentation security](docs/development/rest-api.md).

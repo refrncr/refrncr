@@ -84,9 +84,9 @@ include submitted input, Record identifiers/values, headers, SQL or exception tr
 Responses set `nosniff`, `no-referrer`, frame denial and restrictive JSON CSP; no
 CORS or browser session/CSRF bypass is added. Error responses are private/no-store.
 
-The normal CLI Uvicorn access handler replaces API targets with `/api/[redacted]`.
-Configure reverse proxies, independent ASGI hosting and observability to omit raw
-Authorization, API paths/querystrings, request/response content and SQL bind/results.
+The root ASGI operational middleware logs registered route templates rather than raw
+API paths or querystrings and never logs Authorization or request/response content.
+Configure reverse proxies and independent hosting to apply the same redaction boundary.
 The HTTP boundary consumes unexpected exceptions without exposing exception payloads.
 REF-40 authentication continues its existing payload-free audit and last-used write;
 ordinary data reads/304 add no domain event. No new rate limiter, telemetry or security
@@ -186,3 +186,6 @@ reuses shared tokens and wraps narrow content at 320/768/1440 px. Exact evidence
 and upstream accessibility limits are in [the REF-109 report](ref-109-report.md).
 
 Configuration follows the upstream [Swagger UI configuration reference](https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/).
+
+Health/readiness are operational deployment surfaces, not data-API operations, and
+remain outside OpenAPI. See the [runtime operations guide](operations.md).

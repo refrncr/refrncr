@@ -570,7 +570,7 @@ for _symbol, _classification, _reason in (
     (
         "refrncr.app.health",
         "intentionally excluded",
-        "Health response is static and reads no business state.",
+        "Operational probes read no business state and never create durable audit history.",
     ),
     (
         "refrncr.web.index",

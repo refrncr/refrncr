@@ -4075,7 +4075,9 @@
       "service": "refrncr.app.health",
       "interface_entrypoints": [
         "FastAPI /docs /redoc /docs/oauth2-redirect /openapi.json",
-        "refrncr.app.health GET /api/health"
+        "refrncr.app.health GET /healthz",
+        "refrncr.app.legacy_health GET /api/health",
+        "refrncr.app.ready GET /readyz"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4087,7 +4089,7 @@
       "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
       "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
       "allowed_context": {},
-      "success": "No domain event. Health response is static and reads no business state.",
+      "success": "No domain event. Liveness is static; runtime readiness reads only database connectivity and Alembic revision, never business state.",
       "validation_failure": "No domain event; retain the existing safe validation outcome.",
       "authorization_failure": "Not an authenticated business capability; no domain event.",
       "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
@@ -4098,7 +4100,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending.",
-      "exclusion_reason": "Health response is static and reads no business state.",
+      "exclusion_reason": "Operational probes read no business state and never create durable audit history.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
     {

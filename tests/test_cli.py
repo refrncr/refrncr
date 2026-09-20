@@ -719,6 +719,11 @@ def test_migration_failure_prevents_server_start(monkeypatch, capsys):
 def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     received = {}
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
+    monkeypatch.setattr(
+        cli,
+        "configure_operational_logging",
+        lambda: received.update(logging_configured=True),
+    )
 
     def build_application(_url, **kwargs):
         received.update(kwargs)
@@ -726,12 +731,13 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "build_application", build_application)
 
-    def run(application, *, host, port, proxy_headers, log_config):
+    def run(application, *, host, port, proxy_headers, access_log, log_config):
         received.update(
             application=application,
             host=host,
             port=port,
             proxy_headers=proxy_headers,
+            access_log=access_log,
             log_config=log_config,
         )
 
@@ -747,14 +753,16 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     assert received["allow_loopback_http"] is True
     assert received["trusted_proxies"] == ()
     assert received["proxy_headers"] is False
-    assert received["log_config"]["handlers"]["access"]["filters"] == ["record_query_privacy"]
-    assert "filters" not in cli.uvicorn.config.LOGGING_CONFIG
-    assert "http://127.0.0.2:8123" in capsys.readouterr().out
+    assert received["access_log"] is False
+    assert received["log_config"] is None
+    assert received["logging_configured"] is True
+    assert capsys.readouterr().err == ""
 
 
 def test_start_with_trusted_proxy_disables_loopback_http_cookie_mode(monkeypatch):
     received = {}
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
+    monkeypatch.setattr(cli, "configure_operational_logging", lambda: None)
 
     def build_application(_url, **kwargs):
         received.update(kwargs)
@@ -771,6 +779,7 @@ def test_start_with_trusted_proxy_disables_loopback_http_cookie_mode(monkeypatch
 def test_server_bind_failure_propagates_nonzero_exit(monkeypatch):
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
     monkeypatch.setattr(cli, "build_application", lambda _url, **_kwargs: object())
+    monkeypatch.setattr(cli, "configure_operational_logging", lambda: None)
 
     def fail_to_bind(*_args, **_kwargs):
         raise SystemExit(1)

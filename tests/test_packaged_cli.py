@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import signal
@@ -281,6 +282,15 @@ def test_installed_console_help_and_http_startup(installed_artifact):
                 time.sleep(0.05)
         assert response.status == 200
         assert "refrncr" in body
+        for probe in ("healthz", "readyz"):
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/{probe}", timeout=3
+            ) as probe_response:
+                assert probe_response.status == 200
+                assert probe_response.read() == b'{"status":"ok"}'
+                assert probe_response.headers["Content-Type"] == "application/json"
+                assert probe_response.headers["Cache-Control"] == "no-store"
+                assert probe_response.headers["X-Request-ID"]
         with pytest.raises(urllib.error.HTTPError) as denied:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/datasets", timeout=1)
         assert denied.value.code == 401
@@ -317,6 +327,20 @@ def test_installed_console_help_and_http_startup(installed_artifact):
             process.wait(timeout=5)
 
     assert process.returncode == 0
+    stdout, stderr = process.communicate()
+    log_lines = [json.loads(line) for line in stdout.splitlines() if line]
+    assert log_lines
+    assert all(set(line) >= {"timestamp", "severity", "event"} for line in log_lines)
+    assert any(
+        line.get("event") == "http.request_completed" and line.get("route") == "/healthz"
+        for line in log_lines
+    )
+    assert any(
+        line.get("event") == "http.request_completed" and line.get("route") == "/readyz"
+        for line in log_lines
+    )
+    assert "installed ? smoke.db" not in stdout
+    assert "installed ? smoke.db" not in stderr
     assert database.is_file()
     engine = create_engine(URL.create("sqlite", database=str(database)))
     try:
@@ -402,5 +426,10 @@ def test_real_port_conflict_exits_nonzero(installed_artifact):
         )
 
     assert result.returncode != 0
-    assert "address already in use" in result.stderr.lower()
+    lines = [json.loads(line) for line in result.stdout.splitlines() if line]
+    assert any(
+        line.get("event") == "runtime.failure" and line.get("error_category") == "address_in_use"
+        for line in lines
+    )
     assert "credential-secret" not in result.stderr
+    assert "credential-secret" not in result.stdout
