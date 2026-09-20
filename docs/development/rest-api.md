@@ -3,8 +3,8 @@
 This is a read-only Community/core interface at `/api/v1` in the existing
 FastAPI + Flask deployment. Enable REF-40 API-key configuration as described in
 [API keys](api-keys.md). Flask routes, sessions, CSRF and static assets keep their
-existing contracts. Public OpenAPI/Swagger delivery belongs to REF-109 and is disabled;
-`create_api(...).openapi()` generates the source schema for that follow-up.
+existing contracts. Public documentation is available at `/api/docs`; `/api/openapi.json` exposes the
+OpenAPI 3.1 contract generated from the registered FastAPI routes and Pydantic models.
 
 ## Endpoint matrix
 
@@ -147,4 +147,42 @@ HTTP validator precedence and weak comparison follow
 [RFC 9110 conditional requests](https://www.rfc-editor.org/rfc/rfc9110.html#name-conditional-requests).
 Composition uses FastAPI's supported
 [sub-application mount](https://fastapi.tiangolo.com/advanced/sub-applications/)
-with public documentation disabled until REF-109.
+with public documentation provided by REF-109.
+
+
+## Public OpenAPI and Swagger (REF-109)
+
+`GET /api/openapi.json` and `GET /api/docs` are anonymous read-only documentation
+routes. The document includes the four data operations above and these two
+public documentation operations; Flask, health, internal and unimplemented routes
+are excluded. OpenAPI is generated in memory from actual registered FastAPI routes
+and the existing Pydantic models, with public mount paths added. There is no stored
+or manually duplicated specification. Framework-generated 422 documentation is
+removed because the existing boundary translates validation failures to safe 400.
+
+Choose **Authorize**, enter the key alone, then use **Try it out** and **Execute**.
+Only the Authorization header carries the key. Swagger omits browser cookies,
+persists no authorization, disables URL-based configuration/deep links, and clears
+its in-memory authorization and UI on pagehide. Reload or leaving the page clears
+it; history restoration reloads a clean page. Curl/request-snippet components are
+removed because upstream includes the Authorization header in them. No raw key
+is embedded in generated HTML, examples, schema, URLs, browser storage or audit.
+The browser necessarily holds a user-entered key in memory while authorizing.
+Successful Try it out responses contain authorized data; clear them by leaving.
+
+Swagger UI 5.33.0 assets and licenses ship locally with the wheel, pinned and
+hash-recorded in [asset provenance](../../src/refrncr/static/licenses/ASSET-SOURCES.md).
+There is no CDN, online validator, telemetry integration or new Python/Node runtime
+dependency. The standalone page permits same-origin scripts/styles/fonts/connections
+under CSP without unsafe-inline or unsafe-eval; embedded Swagger SVG images need
+`img-src data:`. Existing JSON and Flask policies remain unchanged. Documentation
+responses use no-store, no-referrer, nosniff and frame denial. Deployment must
+continue redacting API targets and Authorization in external hosting/proxy logs.
+
+The raw JSON link is always available, including without JavaScript. Swagger has
+a page title, main landmark, skip link, visible focus, a labelled password input,
+authorization-dialog focus containment and Escape/focus restoration. Scoped CSS
+reuses shared tokens and wraps narrow content at 320/768/1440 px. Exact evidence
+and upstream accessibility limits are in [the REF-109 report](ref-109-report.md).
+
+Configuration follows the upstream [Swagger UI configuration reference](https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/).

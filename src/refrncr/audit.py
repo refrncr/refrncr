@@ -558,6 +558,16 @@ for _symbol, _classification, _reason in (
         "successful domain history.",
     ),
     (
+        "refrncr.api.documentation.openapi_document",
+        "intentionally excluded",
+        "Public API documentation; no business state or credential read and no mutation.",
+    ),
+    (
+        "refrncr.api.documentation.swagger_ui",
+        "intentionally excluded",
+        "Public API documentation; no business state or credential read and no mutation.",
+    ),
+    (
         "refrncr.app.health",
         "intentionally excluded",
         "Health response is static and reads no business state.",

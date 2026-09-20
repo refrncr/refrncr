@@ -367,14 +367,12 @@ def test_database_order_matches_existing_browser_order(api, kind, values):
     assert actual == expected
 
 
-def test_errors_audit_privacy_and_disabled_docs(api, monkeypatch, caplog):
+def test_errors_audit_privacy_and_disabled_default_docs(api, monkeypatch, caplog):
     c = api
     before = get(c, "/audit/records")
     for path in (
         "/api/v1/openapi.json",
         "/api/v1/docs",
-        "/api/openapi.json",
-        "/api/docs",
         "/openapi.json",
         "/docs",
     ):

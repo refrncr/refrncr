@@ -5678,6 +5678,68 @@
       "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
       "exclusion_reason": "Bulk current Community Dataset view decision; no mutation or domain event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "api_documentation",
+      "operation": "openapi_document",
+      "service": "refrncr.api.documentation.openapi_document",
+      "interface_entrypoints": [
+        "refrncr.api.documentation.openapi_document GET /api/openapi.json"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "No security event for an ordinary successful technical/read call; suspicious interface use is handled at the security boundary.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Public generated contract and static UI only.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Not an authenticated business capability; no domain event.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_api_documentation.py::test_public_documentation_has_no_data_or_audit"
+      ],
+      "implementation_status": "REF-109 local implementation; independent CI pending.",
+      "exclusion_reason": "Public API documentation; no business state or credential read and no mutation.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "api_documentation",
+      "operation": "swagger_ui",
+      "service": "refrncr.api.documentation.swagger_ui",
+      "interface_entrypoints": [
+        "refrncr.api.documentation.swagger_ui GET /api/docs"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "No security event for an ordinary successful technical/read call; suspicious interface use is handled at the security boundary.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Public generated contract and static UI only.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Not an authenticated business capability; no domain event.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_api_documentation.py::test_public_documentation_has_no_data_or_audit"
+      ],
+      "implementation_status": "REF-109 local implementation; independent CI pending.",
+      "exclusion_reason": "Public API documentation; no business state or credential read and no mutation.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     }
   ]
 }

@@ -116,3 +116,27 @@ All resources are local.
 Earlier branding files (`07-static-logo-256px.svg`, `02-animated-grow-shrink.svg`,
 `06-favicon-16px.svg`) are no longer referenced by the application. The old block-logo files
 were removed after checking consumers.
+
+## Swagger UI 5.33.0 (REF-109)
+
+Locally served, byte-for-byte files from the pinned npm `swagger-ui-dist` 5.33.0
+[distribution](https://registry.npmjs.org/swagger-ui-dist/-/swagger-ui-dist-5.33.0.tgz),
+[upstream project](https://github.com/swagger-api/swagger-ui). No CDN or online
+validator is contacted at runtime. Apache-2.0 LICENSE/NOTICE and bundled dependency
+notices are included as `LICENSE-Swagger-UI.txt`, `NOTICE-Swagger-UI.txt` and
+`LICENSE-Swagger-UI-bundle.txt`.
+
+The downloaded archive matched npm's SHA-512 integrity value:
+`sha512-wpdK+m6BU5yj6pmUdMskZVTSWYG4DLglAx3sIhylloY37i8O37IrH+YEpqdXNfpaTGxILRBFzUqLF2jKqbfI7A==`.
+
+| Local file | SHA-256 |
+| --- | --- |
+| `static/js/swagger-ui-bundle.js` | `62df541529080464a7660adc793eab7128c6193ce3be24ddc1e0e0a4a63edc2f` |
+| `static/css/swagger-ui.css` | `1ac324f7dcd27e4b9386b4bd6421271ec147e922a22c05ba24b11515e9aa6321` |
+
+The narrow pre-commit exclusions preserve these upstream bytes and permit the
+1.59 MB JavaScript distribution; first-party files retain all normal checks.
+Source maps and unused OAuth/standalone assets are not shipped. Future upgrades
+must refresh provenance/hashes/licenses and rerun schema, CSP, credential privacy,
+keyboard, responsive and package checks. Vendoring requires explicit maintenance;
+this is not an automated vulnerability-scanning or supply-chain-signature claim.

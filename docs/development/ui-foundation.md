@@ -1133,3 +1133,16 @@ applied criteria. No search state is persisted. See [REF-136](ref-136-report.md)
 ## REF-40 API keys
 
 Settings includes API keys for every active user. Creation, one-time display and confirmed revocation use full pages with shared fields, buttons, feedback and Settings navigation. No design tokens or global component variants changed. API-key pages deliberately disable cross-document view transitions and allow long heading wrapping; their metadata table uses the existing scrollable table pattern. No-JavaScript users can copy manually and finish the lifecycle. See [API-key accessibility](api-keys.md).
+
+
+## REF-109 public API documentation
+
+Classification: product functionality with deliberate Swagger-page rules in
+`layouts/api-docs.css` and the local `api-docs.js` initializer. No design tokens,
+global components or shared component variants change. The standalone page uses
+existing color/spacing/font/focus tokens, a skip link, title, main landmark and
+permanent raw OpenAPI link. The authorization dialog has a masked labelled input,
+keyboard containment, Escape dismissal and opener focus restoration. Leaving the
+page clears transient authorization; no browser storage is used. No-JavaScript
+users receive the JSON fallback. See the REF-109 report for browser evidence and
+upstream accessibility limitations; no screen-reader-user certification is implied.

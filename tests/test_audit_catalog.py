@@ -390,3 +390,19 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
         if name in functions:
             missing = service_calls(name, set()) - set(route["operations"])
             assert not missing, f"Missing service trace from {route['symbol']}: {sorted(missing)}"
+
+
+def test_guard_checks_nested_documentation_operation(monkeypatch):
+    original = Path.read_text
+
+    def missing(path, *args, **kwargs):
+        source = original(path, *args, **kwargs)
+        if path == ROOT / "src/refrncr/api/documentation.py":
+            return source.replace("def openapi_document():", "def removed_document():").replace(
+                "@app.get(", "@other.get("
+            )
+        return source
+
+    monkeypatch.setattr(Path, "read_text", missing)
+    with pytest.raises(AuditContractError):
+        verify_inventory(ROOT)

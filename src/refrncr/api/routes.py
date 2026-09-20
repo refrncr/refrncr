@@ -25,6 +25,7 @@ from refrncr.api.contracts import (
     RecordCollection,
     RecordDetail,
 )
+from refrncr.api.documentation import CONDITIONAL_PARAMETERS, DESCRIPTION, RESPONSE_HEADERS
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead, utc
 from refrncr.api_keys import ApiKeyAuthenticationError
 from refrncr.datatypes import get_datatype
@@ -95,13 +96,19 @@ def create_api(versions, api_keys):
     app = FastAPI(
         title="refrncr Current data API",
         version="1",
+        description=DESCRIPTION,
+        root_path_in_servers=False,
         openapi_url=None,
         docs_url=None,
         redoc_url=None,
         redirect_slashes=False,
         default_response_class=CanonicalJSONResponse,
     )
-    bearer = HTTPBearer(auto_error=False)
+    bearer = HTTPBearer(
+        auto_error=False,
+        description="API key in Authorization: Bearer <api-key>. Enter the key alone. "
+        "Cookies and browser sessions are not accepted.",
+    )
 
     def principal(
         request: Request,
@@ -200,10 +207,45 @@ def create_api(versions, api_keys):
             )
         return CanonicalJSONResponse(payload, headers=condition.headers)
 
-    errors = {status: {"model": Error} for status in (400, 401, 404, 405, 503)}
-    errors[304] = {"description": "Authorized representation is unchanged"}
+    errors = {
+        status: {"model": Error, "description": description}
+        for status, description in {
+            400: "Invalid request: unknown/duplicate query parameters or invalid pagination.",
+            401: "Missing, invalid, expired or revoked API key.",
+            404: "Resource absent, inaccessible, invalid, or without a Current publication.",
+            405: "Method not allowed; the API is read-only.",
+            503: "Temporarily unavailable. No internal error details are returned.",
+        }.items()
+    }
+    for status, code in {
+        400: "invalid_request",
+        401: "invalid_api_credentials",
+        404: "not_found",
+        405: "method_not_allowed",
+        503: "service_unavailable",
+    }.items():
+        errors[status]["content"] = {
+            "application/json": {"example": Error(error=code).model_dump()}
+        }
+    errors[401]["headers"] = {
+        "WWW-Authenticate": {"schema": {"type": "string"}, "description": "Bearer"}
+    }
+    errors[200] = {"description": "Current published representation", "headers": RESPONSE_HEADERS}
+    errors[304] = {
+        "description": "Authorized representation unchanged; no response body.",
+        "headers": RESPONSE_HEADERS,
+    }
+    conditional = {"parameters": CONDITIONAL_PARAMETERS}
 
-    @app.get("/datasets", response_model=Collection[Dataset], responses=errors)
+    @app.get(
+        "/datasets",
+        response_model=Collection[Dataset],
+        responses=errors,
+        summary="List Current Datasets",
+        tags=["Current data"],
+        openapi_extra=conditional,
+        description="Accessible Datasets with Current publications only, ordered by Dataset key.",
+    )
     def datasets(
         request: Request,
         actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
@@ -211,7 +253,15 @@ def create_api(versions, api_keys):
     ):
         return read(request, actor, "datasets")
 
-    @app.get("/datasets/{dataset_key}", response_model=Detail[DatasetDetail], responses=errors)
+    @app.get(
+        "/datasets/{dataset_key}",
+        response_model=Detail[DatasetDetail],
+        responses=errors,
+        summary="Read a Current Dataset",
+        tags=["Current data"],
+        openapi_extra=conditional,
+        description="Current Dataset metadata and ordered published Fields. No query parameters.",
+    )
     def dataset(
         request: Request,
         dataset_key: str,
@@ -219,7 +269,15 @@ def create_api(versions, api_keys):
     ):
         return read(request, actor, "dataset", dataset_key)
 
-    @app.get("/datasets/{dataset_key}/records", response_model=RecordCollection, responses=errors)
+    @app.get(
+        "/datasets/{dataset_key}/records",
+        response_model=RecordCollection,
+        responses=errors,
+        summary="List Current Records",
+        tags=["Current data"],
+        openapi_extra=conditional,
+        description="Current canonical values in typed identifier order; offset pagination.",
+    )
     def records(
         request: Request,
         dataset_key: str,
@@ -232,6 +290,11 @@ def create_api(versions, api_keys):
         "/datasets/{dataset_key}/records/{identifier}",
         response_model=RecordDetail,
         responses=errors,
+        summary="Read a Current Record",
+        tags=["Current data"],
+        openapi_extra=conditional,
+        description="Look up the entire opaque single/composite business identifier from a "
+        "Record response. URL encode it; never substitute an internal UUID. No query parameters.",
     )
     def record(
         request: Request,
@@ -241,4 +304,35 @@ def create_api(versions, api_keys):
     ):
         return read(request, actor, "record", dataset_key, identifier)
 
+    generated_openapi = app.openapi
+
+    def documented_openapi():
+        schema = generated_openapi()
+        # The existing boundary translates all FastAPI validation errors to safe 400s.
+        # Remove FastAPI's implicit 422, which is not part of the implemented contract.
+        for path in schema["paths"].values():
+            operation = path["get"]
+            operation["responses"].pop("422", None)
+            for parameter in operation.get("parameters", []):
+                if parameter["name"] in PageQuery.model_fields:
+                    parameter["description"] = PageQuery.model_fields[parameter["name"]].description
+                elif parameter["name"] == "dataset_key":
+                    parameter["description"] = (
+                        "Permanent Dataset key from the Dataset list: 1–100 lowercase ASCII "
+                        "letters/digits, underscore or hyphen; starts with a letter/digit. "
+                        "Invalid, missing and "
+                        "inaccessible keys return 404."
+                    )
+                elif parameter["name"] == "identifier":
+                    parameter["schema"] = Record.model_json_schema()["properties"]["identifier"]
+                    parameter["description"] = (
+                        "Entire opaque business identifier from a Record response, URL encoded. "
+                        "Single and composite identifiers use the same contract; invalid or "
+                        "missing identifiers return 404."
+                    )
+        for name in ("HTTPValidationError", "ValidationError"):
+            schema["components"]["schemas"].pop(name, None)
+        return schema
+
+    app.openapi = documented_openapi
     return app
