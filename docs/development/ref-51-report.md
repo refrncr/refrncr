@@ -63,8 +63,9 @@ field, invalid/reversed date, expiry, over-30-day duration, advisory/package/ver
 removal restoring the block. Development-only audit findings are deliberately visible/non-blocking.
 
 Gitleaks 8.30.1 scanned 72 commits / approximately 7.36 MB. CI installs that exact open-source CLI
-with SHA-pinned `actions/setup-go` and `go install`; the commercial action wrapper and a
-`GITLEAKS_LICENSE` secret are not used. The initial redacted scan found one
+with SHA-pinned `actions/setup-go` and its declared historical Go module ID,
+`github.com/zricethezav/gitleaks/v8`; the commercial action wrapper and a `GITLEAKS_LICENSE` secret
+are not used. The initial redacted scan found one
 false positive: generic-key interpreted the historical Python phrase `key,
 allow_unpublished=True` in `dataset_versions.py` as a key. The reviewed allowlist requires both
 that exact path and exact phrase. Two documentation occurrences of that phrase in committed REF-51

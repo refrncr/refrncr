@@ -199,7 +199,8 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     assert "fetch-depth: 0" in text
     assert text.count("actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e") == 2
     assert text.count('go-version: "1.24.11"') == 2
-    assert text.count("go install github.com/gitleaks/gitleaks/v8@v8.30.1") == 2
+    assert text.count("go install github.com/zricethezav/gitleaks/v8@v8.30.1") == 2
+    assert "go install github.com/gitleaks/gitleaks/v8" not in text
     assert "gitleaks/gitleaks-action@" not in text
     assert "GITLEAKS_LICENSE" not in text
     assert 'gitleaks" git . --log-opts="--all"' in text

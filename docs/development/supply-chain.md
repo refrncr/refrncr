@@ -37,8 +37,9 @@ commit SHA and readable version comment.
 blocking. The development-environment audit remains visible but non-blocking. Gitleaks scans full
 history with complete redaction. CI installs the open-source Gitleaks 8.30.1 CLI directly with Go
 1.24.11 using a SHA-pinned `actions/setup-go`; it does not use the commercial action wrapper and
-requires no `GITLEAKS_LICENSE` secret. The synthetic fixture is assembled only inside CI and must
-be detected. CodeQL uses `security-extended` Python queries. Pull requests
+requires no `GITLEAKS_LICENSE` secret. Installation uses that release's declared historical Go
+module ID, `github.com/zricethezav/gitleaks/v8`. The synthetic fixture is assembled only inside CI
+and must be detected. CodeQL uses `security-extended` Python queries. Pull requests
 invoke `analyze` with `upload: never`; both CodeQL jobs add metadata-only `actions: read` to
 `contents: read` and gate local SARIF. Trusted main/scheduled jobs only afterward publish SARIF from
 their separately permissioned upload step. Only that trusted job adds `security-events: write`.
