@@ -35,8 +35,10 @@ commit SHA and readable version comment.
 
 `security.yml` runs on pull requests, pushes to `main`, and daily. The locked runtime audit is
 blocking. The development-environment audit remains visible but non-blocking. Gitleaks scans full
-history with complete redaction and no report/comment upload; its synthetic fixture is assembled
-only inside CI and must be detected. CodeQL uses `security-extended` Python queries. Pull requests
+history with complete redaction. CI installs the open-source Gitleaks 8.30.1 CLI directly with Go
+1.24.11 using a SHA-pinned `actions/setup-go`; it does not use the commercial action wrapper and
+requires no `GITLEAKS_LICENSE` secret. The synthetic fixture is assembled only inside CI and must
+be detected. CodeQL uses `security-extended` Python queries. Pull requests
 invoke `analyze` with `upload: never`; both CodeQL jobs add metadata-only `actions: read` to
 `contents: read` and gate local SARIF. Trusted main/scheduled jobs only afterward publish SARIF from
 their separately permissioned upload step. Only that trusted job adds `security-events: write`.
@@ -48,11 +50,11 @@ secret findings into issues or the exception register.
 
 The synthetic Gitleaks job checks only exit code 1 and absence of the complete fixture value in
 captured output; it does not depend on presentation text, log level or locale. The actual
-repository/history scan remains independently blocking. The sole Gitleaks allowlist entry combines
-an exact `dataset_versions.py` path with the literal
-Python argument form `key, allow_unpublished=True`. Gitleaks' generic-key rule otherwise mistakes
-that historical code phrase for a credential. The allowlist cannot match another file or a token
-value and has a configuration regression test.
+repository/history scan remains independently blocking. One Gitleaks allowlist entry combines an
+exact `dataset_versions.py` path with the reviewed non-secret Python argument; a second covers the
+same literal when quoted by the two REF-51 development documents in committed history. Gitleaks'
+generic-key rule otherwise mistakes that phrase for a credential. Both entries require an exact
+path and exact phrase, cannot match a token value, and have configuration regression tests.
 
 ## Runtime vulnerability exceptions
 

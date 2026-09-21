@@ -197,18 +197,23 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     text = (ROOT / ".github/workflows/security.yml").read_text()
     assert "pull_request:" in text and "push:" in text and "schedule:" in text
     assert "fetch-depth: 0" in text
-    assert "GITLEAKS_ENABLE_SUMMARY: false" in text
-    assert "gitleaks_8.30.1_linux_x64.tar.gz" in text
-    assert "sha256sum -c -" in text
+    assert text.count("actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e") == 2
+    assert text.count('go-version: "1.24.11"') == 2
+    assert text.count("go install github.com/gitleaks/gitleaks/v8@v8.30.1") == 2
+    assert "gitleaks/gitleaks-action@" not in text
+    assert "GITLEAKS_LICENSE" not in text
+    assert 'gitleaks" git . --log-opts="--all"' in text
     assert "--redact=100" in text
     assert 'test "$status" -eq 1' in text
     assert '! grep -Fq "$(cat synthetic-secret.txt)"' in text
     assert "leaks found: 1" not in text
     gitleaks = (ROOT / ".gitleaks.toml").read_text()
     assert gitleaks.count("redact = 100") == 1
+    assert gitleaks.count("[[allowlists]]") == 2
     assert "^src/refrncr/dataset_versions\\.py$" in gitleaks
+    assert "^docs/development/(ref-51-report|supply-chain)\\.md$" in gitleaks
     assert "key,\\s+allow_unpublished=True" in gitleaks
-    assert 'condition = "AND"' in gitleaks
+    assert gitleaks.count('condition = "AND"') == 2
 
 
 def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():

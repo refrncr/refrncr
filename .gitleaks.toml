@@ -12,3 +12,10 @@ condition = "AND"
 regexTarget = "match"
 paths = ['''^src/refrncr/dataset_versions\.py$''']
 regexes = ['''key,\s+allow_unpublished=True''']
+
+[[allowlists]]
+description = "REF-51: documentation quotes the reviewed non-secret Python argument."
+condition = "AND"
+regexTarget = "match"
+paths = ['''^docs/development/(ref-51-report|supply-chain)\.md$''']
+regexes = ['''key,\s+allow_unpublished=True''']

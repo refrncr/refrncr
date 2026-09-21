@@ -16,7 +16,7 @@ contract and adds no runtime package dependency. Architecture impact is recorded
   runtime ranges plus the canonically generated Python 3.12 lock.
 * `tools/supply_chain.py` and `security/vulnerability-exceptions.json`: exact audit, exception,
   SARIF and action-pin policy gates.
-* `.gitleaks.toml`: full redaction and one exact path+code false-positive exception.
+* `.gitleaks.toml`: full redaction and exact path+phrase false-positive exceptions.
 * `.github/workflows/security.yml`, `codeql.yml`, `release.yml`: scheduled/PR/main security,
   CodeQL and controlled-release configuration; `ci.yml` is read-only and SHA-pinned.
 * `tests/test_supply_chain.py`: 18 lock, metadata, finding, exception, pin, permission, SBOM and
@@ -27,13 +27,13 @@ contract and adds no runtime package dependency. Architecture impact is recorded
 ## Exact versions and action pins
 
 Local tools: pip-tools 7.6.1, pip-audit 2.10.1, CycloneDX BOM 7.4.0, build 1.6.1, Twine 6.2.0,
-Gitleaks 8.30.1 (upstream archive checksum verified).
+Go 1.24.11 and the open-source Gitleaks CLI 8.30.1.
 
 | Action | Version comment | Immutable commit |
 | --- | --- | --- |
 | `actions/checkout` | v4.4.0 | `11d5960a326750d5838078e36cf38b85af677262` |
 | `actions/setup-python` | v6.3.0 | `ece7cb06caefa5fff74198d8649806c4678c61a1` |
-| `gitleaks/gitleaks-action` | v2.3.9 | `ff98106e4c7b2bc287b24eaf42907196329070c7` |
+| `actions/setup-go` | v7.0.0 | `b7ad1dad31e06c5925ef5d2fc7ad053ef454303e` |
 | `github/codeql-action` | v4.36.0 | `f52b05f4acaaa234e44466e66d29050e135ea9ef` |
 | `actions/upload-artifact` | v4.6.2 | `ea165f8d65b6e75b540449e92b4886f43607fa02` |
 | `actions/download-artifact` | v4.3.0 | `d3f86a106a0bac45b974a628896c90dbdf5c8093` |
@@ -62,10 +62,14 @@ no retained findings and the exception register is empty. Tests cover a valid ex
 field, invalid/reversed date, expiry, over-30-day duration, advisory/package/version mismatch and
 removal restoring the block. Development-only audit findings are deliberately visible/non-blocking.
 
-Gitleaks 8.30.1 scanned 72 commits / approximately 7.36 MB. The initial redacted scan found one
+Gitleaks 8.30.1 scanned 72 commits / approximately 7.36 MB. CI installs that exact open-source CLI
+with SHA-pinned `actions/setup-go` and `go install`; the commercial action wrapper and a
+`GITLEAKS_LICENSE` secret are not used. The initial redacted scan found one
 false positive: generic-key interpreted the historical Python phrase `key,
 allow_unpublished=True` in `dataset_versions.py` as a key. The reviewed allowlist requires both
-that exact path and exact phrase. The rerun reported `no leaks found`. A temporary synthetic AWS-key
+that exact path and exact phrase. Two documentation occurrences of that phrase in committed REF-51
+history are covered by a separate allowlist restricted to the two exact document paths and the same
+exact phrase. The rerun reported `no leaks found`. A temporary synthetic AWS-key
 shape was detected with exit 1 while the captured output contained no fixture value. The CI
 assertion depends only on those two facts, not on Gitleaks presentation wording.
 
@@ -97,7 +101,7 @@ uses the same distribution directory for PyPI. No real attestation/release/uploa
 | Focused REF-51 tests | 18 passed |
 | Canonical lock environment | GitHub `ubuntu-24.04`, Python 3.12; non-canonical generation rejected |
 | Runtime `pip-audit` | 0 known vulnerabilities |
-| Gitleaks repository/history | 72 commits, no findings after one exact documented false-positive rule |
+| Gitleaks repository/history | 75 commits, no findings after exact documented false-positive rules |
 | Gitleaks synthetic fixture | detected; value absent from captured output |
 | CycloneDX generation/JSON parse | valid; 32 components |
 | Hash-required clean install | passed |
