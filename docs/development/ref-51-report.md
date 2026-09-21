@@ -42,12 +42,16 @@ Gitleaks 8.30.1 (upstream archive checksum verified).
 
 ## Lock, scan and exception evidence
 
-The lock resolves 31 packages and records SHA-256 distribution hashes. Pip-tools is pinned exactly
-to 7.6.1. The sole local/CI generator ignores ambient configuration and fixes the resolver, hashes,
+The lock resolves 32 packages and records SHA-256 distribution hashes. Pip-tools is pinned exactly
+to 7.6.1. The generator runs only on GitHub `ubuntu-24.04` with Python 3.12, rejects other platforms
+and Python minor versions, ignores ambient configuration and fixes the resolver, hashes,
 `--strip-extras`, build isolation, no-upgrade, unsafe-package behavior, hash reuse, LF newline,
 header/colour behavior, annotations and emitted index/find-link options.
-Two consecutive canonical generations produced byte-identical output (31 packages, 524 hashes;
-SHA-256 `af54be00d3ef4699b0a2ed4dbd32a9c3b8a5f2605714dceef5a47b0e3ef34bed`).
+Local macOS development verifies installation and hashes without regenerating a competing lock.
+The Linux lock resolves 32 packages, including SQLAlchemy's Linux `greenlet` dependency, and
+records 603 hashes (SHA-256
+`49fb84ab65bebea0e7d3cf5309e9b50d6872dc369961d504eb25cda3262a99db`).
+Two consecutive Linux/Python 3.12 generations were byte-identical.
 A clean temporary environment installed it successfully with `pip --require-hashes`; the built
 wheel then installed with `--no-deps` and `pip check` reported no broken requirements. Public
 metadata still contains the original compatible ranges and the test enforces equality with the
@@ -65,21 +69,23 @@ that exact path and exact phrase. The rerun reported `no leaks found`. A tempora
 shape was detected with exit 1 while the captured output contained no fixture value. The CI
 assertion depends only on those two facts, not on Gitleaks presentation wording.
 
-CodeQL is configured for Python `security-extended`. PR jobs retain read-only permissions and pass
-the required v4 enum `upload: never` to `analyze`; they gate the resulting local SARIF and fail on
-warning/error results. Trusted main and daily runs use a separate job with `security-events: write`,
-run the same local gate, then explicitly upload SARIF. GitHub
+CodeQL is configured for Python `security-extended`. Both jobs have `contents: read` plus the
+`actions: read` required to inspect their own workflow/run metadata. Both pass the v4 enum
+`upload: never` to `analyze`, gate the resulting local SARIF and fail on warning/error results.
+Trusted main and daily runs use a separate job that additionally has `security-events: write` and
+explicitly uploads the gated SARIF. GitHub
 must still enable code scanning and make the checks required; this branch does not change settings.
 
 ## Permission, SBOM and provenance review
 
-CI, security and PR-CodeQL default to `contents: read`. Main/scheduled CodeQL alone adds
-`security-events: write`. Release build has `contents: read` plus `checks: read` to verify prior CI.
+CI and security default to `contents: read`; both CodeQL jobs add metadata-only `actions: read`.
+Main/scheduled CodeQL alone adds `security-events: write`. Release build has
+`contents: read` plus `checks: read` to verify prior CI.
 Only the protected `publish` job has `contents: write`, `id-token: write` and
 `attestations: write`; no PR path can enter it.
 
-A local CycloneDX JSON SBOM was generated and parsed successfully: `bomFormat=CycloneDX`, 31
-components matching the 31 locked packages. The release workflow builds into
+A local CycloneDX JSON SBOM was generated and parsed successfully: `bomFormat=CycloneDX`, 32
+components matching the 32 locked packages. The release workflow builds into
 `release-artifacts/distributions` exactly once, validates those files, generates checksums/SBOM,
 uploads one named artifact set, downloads that set, attests the exact `*.whl` and `*.tar.gz`, and
 uses the same distribution directory for PyPI. No real attestation/release/upload was attempted.
@@ -89,11 +95,11 @@ uses the same distribution directory for PyPI. No real attestation/release/uploa
 | Check | Result |
 | --- | --- |
 | Focused REF-51 tests | 18 passed |
-| Canonical lock regeneration | two runs byte-identical; CI invokes the same generator |
+| Canonical lock environment | GitHub `ubuntu-24.04`, Python 3.12; non-canonical generation rejected |
 | Runtime `pip-audit` | 0 known vulnerabilities |
 | Gitleaks repository/history | 72 commits, no findings after one exact documented false-positive rule |
 | Gitleaks synthetic fixture | detected; value absent from captured output |
-| CycloneDX generation/JSON parse | valid; 31 components |
+| CycloneDX generation/JSON parse | valid; 32 components |
 | Hash-required clean install | passed |
 | Wheel + sdist build / Twine | passed for both artifacts |
 | Exact wheel install / `pip check` / CLI help | passed |

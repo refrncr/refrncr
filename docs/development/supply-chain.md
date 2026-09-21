@@ -7,21 +7,25 @@
 SHA-256 hashes for every resolved distribution. It controls CI/release preparation; it does not
 promise identical transitive versions for a user's ordinary `pipx install refrncr`.
 
-Regenerate and review it from the repository virtual environment:
+The canonical lock is generated and checked only by the `dependency-and-policy` job on GitHub's
+`ubuntu-24.04` runner with Python 3.12. The generator rejects other operating systems and Python
+minor versions, so a macOS resolution cannot compete with the Linux release graph. To update the
+lock, run the generator in that environment and review the resulting pull-request diff.
+
+Developers verify—but do not regenerate—the committed lock locally:
 
 ```shell
 python -m pip install -e ".[dev]"
-python tools/compile_release_lock.py
 python -m pip install --require-hashes -r requirements/release.txt
 git diff -- requirements/release.in requirements/release.txt pyproject.toml
 ```
 
-The script requires exactly pip-tools 7.6.1 and is the only canonical generator used locally and in
-CI. It ignores ambient pip-tools configuration and explicitly fixes hash generation, resolver,
+The Linux generator requires exactly pip-tools 7.6.1. It ignores ambient pip-tools configuration
+and explicitly fixes hash generation, resolver,
 `--strip-extras`, build isolation, unsafe-package policy, no-upgrade behavior, hash reuse, LF
 newlines, header/colour behavior, annotations and index/find-links emission. `--no-upgrade` keeps
 the committed graph stable during verification; reviewed dependency updates deliberately change
-the affected pins before regenerating with this same command.
+the affected pins before regenerating in the same canonical GitHub environment.
 
 Review direct and transitive version changes, their hashes, upstream release notes and audit result.
 Dependabot proposes weekly pip and GitHub Actions updates; action updates must retain a full 40-byte
@@ -33,9 +37,9 @@ commit SHA and readable version comment.
 blocking. The development-environment audit remains visible but non-blocking. Gitleaks scans full
 history with complete redaction and no report/comment upload; its synthetic fixture is assembled
 only inside CI and must be detected. CodeQL uses `security-extended` Python queries. Pull requests
-invoke `analyze` with `upload: never`, then gate local SARIF with read-only permissions. Trusted
-main/scheduled jobs use the same local gate and only afterward publish SARIF from their separately
-permissioned upload step.
+invoke `analyze` with `upload: never`; both CodeQL jobs add metadata-only `actions: read` to
+`contents: read` and gate local SARIF. Trusted main/scheduled jobs only afterward publish SARIF from
+their separately permissioned upload step. Only that trusted job adds `security-events: write`.
 
 Never suppress or broadly exclude a result to make CI green. Confirm whether it is runtime,
 development-only, secret, or SAST exposure; update the dependency/code when possible; preserve

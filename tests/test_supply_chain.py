@@ -7,7 +7,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tools.compile_release_lock import COMPILE_FLAGS, PIP_TOOLS_VERSION
+from tools.compile_release_lock import (
+    CANONICAL_PLATFORM,
+    CANONICAL_PYTHON,
+    COMPILE_FLAGS,
+    PIP_TOOLS_VERSION,
+    is_canonical_environment,
+)
 from tools.supply_chain import gate_audit, gate_sarif, load_exceptions, validate_action_pins
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,6 +68,7 @@ def test_release_lock_is_hashed_and_fully_pinned():
     assert all("==" in line and line.endswith("\\") for line in requirements)
     assert lock.count("--hash=sha256:") >= len(requirements)
     assert "#    python tools/compile_release_lock.py" in lock
+    assert "greenlet==" in lock
 
 
 def test_release_lock_generator_pins_tool_and_all_relevant_flags():
@@ -89,6 +96,19 @@ def test_release_lock_generator_pins_tool_and_all_relevant_flags():
     security = (ROOT / ".github/workflows/security.yml").read_text()
     assert "python tools/compile_release_lock.py" in security
     assert "python -m piptools compile" not in security
+    workflow = load_workflow("security.yml")
+    dependency_job = workflow["jobs"]["dependency-and-policy"]
+    assert dependency_job["runs-on"] == "ubuntu-24.04"
+    assert CANONICAL_PLATFORM == "linux"
+    assert CANONICAL_PYTHON == (3, 12)
+    assert is_canonical_environment("linux", (3, 12), "true", "ubuntu24")
+    assert not is_canonical_environment("darwin", (3, 12), "true", "ubuntu24")
+    assert not is_canonical_environment("linux", (3, 13), "true", "ubuntu24")
+    assert not is_canonical_environment("linux", (3, 12), None, None)
+    setup_python = next(
+        step for step in dependency_job["steps"] if "setup-python@" in step.get("uses", "")
+    )
+    assert setup_python["with"]["python-version"] == "3.12"
 
 
 def test_exception_register_accepts_valid_exception(tmp_path):
@@ -161,9 +181,11 @@ def test_dependabot_covers_python_and_actions():
 
 
 def test_pr_workflows_are_read_only_and_release_permissions_are_job_scoped():
-    for name in ("ci.yml", "security.yml", "codeql.yml"):
+    for name in ("ci.yml", "security.yml"):
         workflow = load_workflow(name)
         assert workflow.get("permissions") == {"contents": "read"}
+    codeql = load_workflow("codeql.yml")
+    assert codeql.get("permissions") == {"contents": "read"}
     release = load_workflow("release.yml")
     assert release.get("permissions") == {"contents": "read"}
     privileged = release["jobs"]["publish"]["permissions"]
@@ -195,8 +217,13 @@ def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
     assert "languages: python" in text
     pull_request = workflow["jobs"]["analyze-pull-request"]
     trusted = workflow["jobs"]["analyze-and-publish"]
-    assert "permissions" not in pull_request
-    assert trusted["permissions"] == {"contents": "read", "security-events": "write"}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert pull_request["permissions"] == {"actions": "read", "contents": "read"}
+    assert trusted["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write",
+    }
     assert text.count("upload: never") == 2
     assert "upload: false" not in text
     assert "gate-sarif" in text

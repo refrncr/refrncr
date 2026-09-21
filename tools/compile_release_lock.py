@@ -10,6 +10,8 @@ from importlib.metadata import version
 from pathlib import Path
 
 PIP_TOOLS_VERSION = "7.6.1"
+CANONICAL_PLATFORM = "linux"
+CANONICAL_PYTHON = (3, 12)
 ROOT = Path(__file__).resolve().parents[1]
 INPUT = ROOT / "requirements" / "release.in"
 OUTPUT = ROOT / "requirements" / "release.txt"
@@ -35,7 +37,34 @@ COMPILE_FLAGS = (
 )
 
 
+def is_canonical_environment(
+    platform: str,
+    python_version: tuple[int, int],
+    github_actions: str | None,
+    image_os: str | None,
+) -> bool:
+    return (
+        platform == CANONICAL_PLATFORM
+        and python_version == CANONICAL_PYTHON
+        and github_actions == "true"
+        and image_os == "ubuntu24"
+    )
+
+
 def main() -> int:
+    if not is_canonical_environment(
+        sys.platform,
+        sys.version_info[:2],
+        os.environ.get("GITHUB_ACTIONS"),
+        os.environ.get("ImageOS"),
+    ):
+        print(
+            "release locks must be generated in the canonical GitHub "
+            "ubuntu-24.04/Python 3.12 environment",
+            file=sys.stderr,
+        )
+        return 2
+
     installed = version("pip-tools")
     if installed != PIP_TOOLS_VERSION:
         print(
