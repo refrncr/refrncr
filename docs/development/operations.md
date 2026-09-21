@@ -95,3 +95,11 @@ boundary to their independent logs.
 Operational logging is transient process diagnostics. It neither replaces nor
 duplicates the durable domain audit trail, whose contracts remain documented in
 [the audit policy](audit-policy.md).
+
+## Backup and recovery
+
+REFRNCR Community does not schedule, store, encrypt, transport or retain backups.
+Operators of SQLite and customer-managed PostgreSQL installations must follow the
+[operator backup and recovery guide](backup-recovery.md). It defines the complete
+database scope, transient-data exclusions, secret-free recovery manifest, supported
+backup commands, restore-to-new-target validation, controlled cut-over and rollback.
