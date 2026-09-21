@@ -85,6 +85,11 @@ The CLI emits privacy-safe JSON operational logs to stdout and returns an
 [runtime operations guide](docs/development/operations.md) for probe usage, logging
 fields and redaction boundaries.
 
+Community operators are responsible for database backup scheduling, protected
+storage, encryption, access and retention. See the
+[operator backup and recovery guide](docs/development/backup-recovery.md) for verified
+SQLite and PostgreSQL procedures; REFRNCR does not provide a backup service.
+
 ## Community user foundation
 
 The Community application owns exactly one Organisation and supports multiple local users. On
