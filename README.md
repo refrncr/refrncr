@@ -18,6 +18,11 @@ default. It uses a persistent embedded SQLite database, creates its parent direc
 all Community database migrations before accepting requests. Docker and PostgreSQL are not
 required for this quick start.
 
+Maintainers build releases from a committed, hash-verified runtime lock while the published package
+metadata retains compatible dependency ranges for ordinary consumers. See the
+[release supply-chain guide](docs/development/supply-chain.md); its configured release workflow is
+not evidence that PyPI or GitHub release prerequisites have already been activated.
+
 ### Create the first administrator
 
 On a new installation, open <http://127.0.0.1:8000/setup>. Enter the
