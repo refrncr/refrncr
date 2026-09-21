@@ -1,0 +1,176 @@
+import json
+import re
+import tomllib
+from datetime import date
+from pathlib import Path
+
+import pytest
+import yaml
+
+from tools.supply_chain import gate_audit, gate_sarif, load_exceptions, validate_action_pins
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def exception(**overrides):
+    value = {
+        "advisory_id": "GHSA-test-safe-fixture",
+        "package": "fixture-package",
+        "version": "1.2.3",
+        "risk_assessment": "Synthetic test finding has no production exposure.",
+        "mitigation": "The fixture cannot enter the runtime graph.",
+        "owner": "Security maintainer",
+        "approver": "Release maintainer",
+        "created_on": "2026-09-01",
+        "expires_on": "2026-09-30",
+        "remediation_plan": "Remove the fixture before expiry.",
+    }
+    value.update(overrides)
+    return value
+
+
+def write_register(tmp_path, entries):
+    path = tmp_path / "exceptions.json"
+    path.write_text(json.dumps({"schema_version": 1, "exceptions": entries}))
+    return path
+
+
+def audit_report(package="fixture-package", version="1.2.3", advisory="GHSA-test-safe-fixture"):
+    return {"dependencies": [{"name": package, "version": version, "vulns": [{"id": advisory}]}]}
+
+
+def test_release_input_matches_public_runtime_ranges():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    declared = set(metadata["project"]["dependencies"])
+    release_input = {
+        line
+        for line in (ROOT / "requirements/release.in").read_text().splitlines()
+        if line and not line.startswith("#")
+    }
+    assert release_input == declared
+    assert all("==" not in requirement for requirement in declared)
+
+
+def test_release_lock_is_hashed_and_fully_pinned():
+    lock = (ROOT / "requirements/release.txt").read_text()
+    assert "--hash=sha256:" in lock
+    requirements = [
+        line for line in lock.splitlines() if line and not line.startswith(("#", " ", "--"))
+    ]
+    assert requirements
+    assert all("==" in line and line.endswith("\\") for line in requirements)
+    assert lock.count("--hash=sha256:") >= len(requirements)
+
+
+def test_exception_register_accepts_valid_exception(tmp_path):
+    assert load_exceptions(write_register(tmp_path, [exception()]), today=date(2026, 9, 20))
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        ({"owner": None}, "empty or non-string"),
+        ({"expires_on": "2026-08-31"}, "expires before"),
+        ({"expires_on": "2026-10-02"}, "longer than 30"),
+    ],
+)
+def test_exception_register_rejects_invalid_entries(tmp_path, change, message):
+    with pytest.raises(ValueError, match=message):
+        load_exceptions(write_register(tmp_path, [exception(**change)]), today=date(2026, 9, 20))
+
+
+def test_exception_register_rejects_missing_field(tmp_path):
+    entry = exception()
+    del entry["approver"]
+    with pytest.raises(ValueError, match="missing fields: approver"):
+        load_exceptions(write_register(tmp_path, [entry]), today=date(2026, 9, 20))
+
+
+def test_exception_register_rejects_expired_entry(tmp_path):
+    with pytest.raises(ValueError, match="expired"):
+        load_exceptions(
+            write_register(tmp_path, [exception(expires_on="2026-09-19")]), today=date(2026, 9, 20)
+        )
+
+
+def test_audit_gate_requires_exact_advisory_package_and_version_match():
+    finding = audit_report()
+    assert gate_audit(finding, [exception()]) == []
+    for mismatch in ({"package": "other"}, {"version": "1.2.4"}, {"advisory_id": "GHSA-other"}):
+        assert gate_audit(finding, [exception(**mismatch)])
+    assert gate_audit(finding, [])
+
+
+def test_sarif_gate_blocks_actionable_results_only():
+    assert gate_sarif({"runs": [{"results": [{"ruleId": "safe", "level": "note"}]}]}) == []
+    assert gate_sarif({"runs": [{"results": [{"ruleId": "unsafe", "level": "error"}]}]}) == [
+        "unsafe"
+    ]
+
+
+def test_all_external_actions_use_full_commit_shas():
+    assert validate_action_pins(ROOT) == []
+
+
+def test_action_pin_validator_rejects_tags_branches_and_short_shas(tmp_path):
+    workflows = tmp_path / ".github/workflows"
+    workflows.mkdir(parents=True)
+    for index, reference in enumerate(("v4", "main", "abc1234")):
+        (workflows / f"bad-{index}.yml").write_text(
+            f"steps:\n  - uses: actions/checkout@{reference}\n"
+        )
+    assert len(validate_action_pins(tmp_path)) == 3
+
+
+def load_workflow(name):
+    return yaml.load((ROOT / ".github/workflows" / name).read_text(), Loader=yaml.BaseLoader)
+
+
+def test_dependabot_covers_python_and_actions():
+    config = yaml.safe_load((ROOT / ".github/dependabot.yml").read_text())
+    assert {item["package-ecosystem"] for item in config["updates"]} >= {"pip", "github-actions"}
+
+
+def test_pr_workflows_are_read_only_and_release_permissions_are_job_scoped():
+    for name in ("ci.yml", "security.yml", "codeql.yml"):
+        workflow = load_workflow(name)
+        assert workflow.get("permissions") == {"contents": "read"}
+    release = load_workflow("release.yml")
+    assert release.get("permissions") == {"contents": "read"}
+    privileged = release["jobs"]["publish"]["permissions"]
+    assert privileged == {"contents": "write", "id-token": "write", "attestations": "write"}
+    assert release["jobs"]["build"]["permissions"] == {"contents": "read", "checks": "read"}
+
+
+def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
+    text = (ROOT / ".github/workflows/security.yml").read_text()
+    assert "pull_request:" in text and "push:" in text and "schedule:" in text
+    assert "fetch-depth: 0" in text
+    assert "GITLEAKS_ENABLE_SUMMARY: false" in text
+    assert "gitleaks_8.30.1_linux_x64.tar.gz" in text
+    assert "sha256sum -c -" in text
+    assert "--redact=100" in text
+    gitleaks = (ROOT / ".gitleaks.toml").read_text()
+    assert gitleaks.count("redact = 100") == 1
+    assert "^src/refrncr/dataset_versions\\.py$" in gitleaks
+    assert "key,\\s+allow_unpublished=True" in gitleaks
+    assert 'condition = "AND"' in gitleaks
+
+
+def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
+    text = (ROOT / ".github/workflows/codeql.yml").read_text()
+    assert "languages: python" in text
+    assert "security-events: write" in text
+    assert "upload: false" in text
+    assert "gate-sarif" in text
+    assert "upload-sarif" in text
+
+
+def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
+    text = (ROOT / ".github/workflows/release.yml").read_text()
+    assert "cyclonedx-py requirements requirements/release.txt" in text
+    assert "subject-path: |" in text
+    assert "release-artifacts/distributions/*.whl" in text
+    assert "release-artifacts/distributions/*.tar.gz" in text
+    assert "dist/**" not in text
+    assert re.search(r"python -m build --outdir release-artifacts/distributions", text)

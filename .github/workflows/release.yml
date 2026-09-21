@@ -1,0 +1,95 @@
+name: Controlled release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Validate immutable release source and version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git fetch origin main --depth=1
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "$RELEASE_TAG" = "v$VERSION"
+      - name: Require successful CI for the released commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs" \
+            --jq '[.check_runs[] | select(.name == "test" and .conclusion == "success")] | length')" -ge 1
+      - name: Install locked runtime graph and release tools
+        run: |
+          python -m pip install --require-hashes -r requirements/release.txt
+          python -m pip install build==1.6.1 cyclonedx-bom==7.4.0 pip-audit==2.10.1 twine==6.2.0
+      - name: Gate runtime vulnerabilities
+        run: >-
+          python tools/supply_chain.py audit-runtime requirements/release.txt
+          security/vulnerability-exceptions.json runtime-audit.json
+      - name: Build wheel and source distribution once
+        run: python -m build --outdir release-artifacts/distributions
+      - name: Validate the exact artifacts
+        run: |
+          python -m twine check release-artifacts/distributions/*
+          python -m pip install --no-deps release-artifacts/distributions/*.whl
+          python -m pip check
+          refrncr --help
+          sha256sum release-artifacts/distributions/*.whl release-artifacts/distributions/*.tar.gz > release-artifacts/SHA256SUMS
+      - name: Generate CycloneDX JSON SBOM from locked graph
+        run: >-
+          cyclonedx-py requirements requirements/release.txt
+          --output-format JSON --output-file release-artifacts/refrncr.cdx.json
+      - name: Upload the single validated artifact set
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validated-release-artifacts
+          path: release-artifacts/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi-production
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download the validated artifact set
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: validated-release-artifacts
+          path: release-artifacts
+      - name: Attest exact wheel and source distribution
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-artifacts/distributions/*.whl
+            release-artifacts/distributions/*.tar.gz
+      - name: Attach the validated artifact set to the existing GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "${{ github.event.release.tag_name }}"
+          release-artifacts/SHA256SUMS release-artifacts/refrncr.cdx.json
+          release-artifacts/distributions/*
+      - name: Publish exact distributions through PyPI Trusted Publishing
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: release-artifacts/distributions/

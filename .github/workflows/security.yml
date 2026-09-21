@@ -1,0 +1,81 @@
+name: Supply-chain security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-and-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install security tooling
+        run: python -m pip install pip-audit==2.10.1 pip-tools==7.6.1
+      - name: Verify reproducible release lock
+        env:
+          CUSTOM_COMPILE_COMMAND: python -m piptools compile --generate-hashes --resolver=backtracking --output-file=requirements/release.txt requirements/release.in
+        run: |
+          python -m piptools compile --generate-hashes --resolver=backtracking \
+            --output-file=requirements/release.txt requirements/release.in
+          git diff --exit-code -- requirements/release.txt
+      - name: Prove hash-verified runtime installation
+        run: python -m pip install --require-hashes -r requirements/release.txt
+      - name: Validate exception register
+        run: python tools/supply_chain.py validate-exceptions security/vulnerability-exceptions.json
+      - name: Audit locked runtime dependencies (blocking)
+        run: >-
+          python tools/supply_chain.py audit-runtime requirements/release.txt
+          security/vulnerability-exceptions.json runtime-audit.json
+      - name: Audit development environment (visible, non-blocking)
+        continue-on-error: true
+        run: python -m pip_audit --local
+      - name: Validate immutable action pins
+        run: python tools/supply_chain.py validate-action-pins .
+      - name: Scan repository and history with redaction
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_SUMMARY: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+
+  gitleaks-safe-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Create synthetic committed fixture without printing it
+        run: |
+          python -c 'from pathlib import Path; Path("synthetic-secret.txt").write_text("AKIA" + "QWERTYUIOPASDFGH")'
+      - name: Download and verify Gitleaks 8.30.1
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          curl -fsSLO https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt
+          grep 'gitleaks_8.30.1_linux_x64.tar.gz' gitleaks_8.30.1_checksums.txt | sha256sum -c -
+          tar -xzf gitleaks_8.30.1_linux_x64.tar.gz gitleaks
+      - name: Confirm Gitleaks rejects the synthetic fixture with redaction
+        run: |
+          set +e
+          "${{ runner.temp }}/gitleaks" dir . --config .gitleaks.toml --redact=100 --no-banner \
+            > "${{ runner.temp }}/gitleaks-fixture.out" 2>&1
+          status=$?
+          set -e
+          test "$status" -eq 1
+          ! grep -Fq "$(cat synthetic-secret.txt)" "${{ runner.temp }}/gitleaks-fixture.out"
+          grep -q 'leaks found: 1' "${{ runner.temp }}/gitleaks-fixture.out"

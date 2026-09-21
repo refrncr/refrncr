@@ -1,0 +1,14 @@
+title = "refrncr secret scanning"
+
+[extend]
+useDefault = true
+
+# Never reveal a detected value in console, annotations, reports, or artifacts.
+redact = 100
+
+[[allowlists]]
+description = "REF-51: Python argument 'key, allow_unpublished=True' is not credential material."
+condition = "AND"
+regexTarget = "match"
+paths = ['''^src/refrncr/dataset_versions\.py$''']
+regexes = ['''key,\s+allow_unpublished=True''']
