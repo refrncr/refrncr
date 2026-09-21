@@ -11,12 +11,17 @@ Regenerate and review it from the repository virtual environment:
 
 ```shell
 python -m pip install -e ".[dev]"
-CUSTOM_COMPILE_COMMAND='python -m piptools compile --generate-hashes --resolver=backtracking --output-file=requirements/release.txt requirements/release.in' \
-  python -m piptools compile --generate-hashes --resolver=backtracking \
-  --output-file=requirements/release.txt requirements/release.in
+python tools/compile_release_lock.py
 python -m pip install --require-hashes -r requirements/release.txt
 git diff -- requirements/release.in requirements/release.txt pyproject.toml
 ```
+
+The script requires exactly pip-tools 7.6.1 and is the only canonical generator used locally and in
+CI. It ignores ambient pip-tools configuration and explicitly fixes hash generation, resolver,
+`--strip-extras`, build isolation, unsafe-package policy, no-upgrade behavior, hash reuse, LF
+newlines, header/colour behavior, annotations and index/find-links emission. `--no-upgrade` keeps
+the committed graph stable during verification; reviewed dependency updates deliberately change
+the affected pins before regenerating with this same command.
 
 Review direct and transitive version changes, their hashes, upstream release notes and audit result.
 Dependabot proposes weekly pip and GitHub Actions updates; action updates must retain a full 40-byte
@@ -28,14 +33,19 @@ commit SHA and readable version comment.
 blocking. The development-environment audit remains visible but non-blocking. Gitleaks scans full
 history with complete redaction and no report/comment upload; its synthetic fixture is assembled
 only inside CI and must be detected. CodeQL uses `security-extended` Python queries. Pull requests
-gate local SARIF with read-only permissions; trusted main/scheduled jobs publish the gated SARIF.
+invoke `analyze` with `upload: never`, then gate local SARIF with read-only permissions. Trusted
+main/scheduled jobs use the same local gate and only afterward publish SARIF from their separately
+permissioned upload step.
 
 Never suppress or broadly exclude a result to make CI green. Confirm whether it is runtime,
 development-only, secret, or SAST exposure; update the dependency/code when possible; preserve
 non-secret evidence in the PR. Do not paste credentials, customer data, exploit payloads or raw
 secret findings into issues or the exception register.
 
-The sole Gitleaks allowlist entry combines an exact `dataset_versions.py` path with the literal
+The synthetic Gitleaks job checks only exit code 1 and absence of the complete fixture value in
+captured output; it does not depend on presentation text, log level or locale. The actual
+repository/history scan remains independently blocking. The sole Gitleaks allowlist entry combines
+an exact `dataset_versions.py` path with the literal
 Python argument form `key, allow_unpublished=True`. Gitleaks' generic-key rule otherwise mistakes
 that historical code phrase for a credential. The allowlist cannot match another file or a token
 value and has a configuration regression test.

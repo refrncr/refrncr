@@ -24,7 +24,7 @@ jobs:
       - uses: github/codeql-action/analyze@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
         with:
           output: codeql-results
-          upload: false
+          upload: never
       - name: Block actionable CodeQL results
         run: python tools/supply_chain.py gate-sarif codeql-results/python.sarif
 
@@ -43,7 +43,7 @@ jobs:
       - uses: github/codeql-action/analyze@f52b05f4acaaa234e44466e66d29050e135ea9ef # v4.36.0
         with:
           output: codeql-results
-          upload: false
+          upload: never
       - name: Block actionable CodeQL results
         run: python tools/supply_chain.py gate-sarif codeql-results/python.sarif
       - name: Publish SARIF to code scanning

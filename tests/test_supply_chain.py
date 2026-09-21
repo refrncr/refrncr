@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tools.compile_release_lock import COMPILE_FLAGS, PIP_TOOLS_VERSION
 from tools.supply_chain import gate_audit, gate_sarif, load_exceptions, validate_action_pins
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +61,34 @@ def test_release_lock_is_hashed_and_fully_pinned():
     assert requirements
     assert all("==" in line and line.endswith("\\") for line in requirements)
     assert lock.count("--hash=sha256:") >= len(requirements)
+    assert "#    python tools/compile_release_lock.py" in lock
+
+
+def test_release_lock_generator_pins_tool_and_all_relevant_flags():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    dev = metadata["project"]["optional-dependencies"]["dev"]
+    assert f"pip-tools=={PIP_TOOLS_VERSION}" in dev
+    assert set(COMPILE_FLAGS) >= {
+        "--no-config",
+        "--generate-hashes",
+        "--resolver=backtracking",
+        "--strip-extras",
+        "--no-allow-unsafe",
+        "--no-upgrade",
+        "--reuse-hashes",
+        "--build-isolation",
+        "--newline=lf",
+        "--header",
+        "--no-color",
+        "--annotate",
+        "--annotation-style=line",
+        "--no-emit-index-url",
+        "--no-emit-trusted-host",
+        "--no-emit-find-links",
+    }
+    security = (ROOT / ".github/workflows/security.yml").read_text()
+    assert "python tools/compile_release_lock.py" in security
+    assert "python -m piptools compile" not in security
 
 
 def test_exception_register_accepts_valid_exception(tmp_path):
@@ -150,6 +179,9 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     assert "gitleaks_8.30.1_linux_x64.tar.gz" in text
     assert "sha256sum -c -" in text
     assert "--redact=100" in text
+    assert 'test "$status" -eq 1' in text
+    assert '! grep -Fq "$(cat synthetic-secret.txt)"' in text
+    assert "leaks found: 1" not in text
     gitleaks = (ROOT / ".gitleaks.toml").read_text()
     assert gitleaks.count("redact = 100") == 1
     assert "^src/refrncr/dataset_versions\\.py$" in gitleaks
@@ -158,12 +190,18 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
 
 
 def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
+    workflow = load_workflow("codeql.yml")
     text = (ROOT / ".github/workflows/codeql.yml").read_text()
     assert "languages: python" in text
-    assert "security-events: write" in text
-    assert "upload: false" in text
+    pull_request = workflow["jobs"]["analyze-pull-request"]
+    trusted = workflow["jobs"]["analyze-and-publish"]
+    assert "permissions" not in pull_request
+    assert trusted["permissions"] == {"contents": "read", "security-events": "write"}
+    assert text.count("upload: never") == 2
+    assert "upload: false" not in text
     assert "gate-sarif" in text
-    assert "upload-sarif" in text
+    assert all("upload-sarif@" not in step.get("uses", "") for step in pull_request["steps"])
+    assert any("upload-sarif@" in step.get("uses", "") for step in trusted["steps"])
 
 
 def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():

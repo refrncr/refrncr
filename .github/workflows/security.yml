@@ -26,11 +26,8 @@ jobs:
       - name: Install security tooling
         run: python -m pip install pip-audit==2.10.1 pip-tools==7.6.1
       - name: Verify reproducible release lock
-        env:
-          CUSTOM_COMPILE_COMMAND: python -m piptools compile --generate-hashes --resolver=backtracking --output-file=requirements/release.txt requirements/release.in
         run: |
-          python -m piptools compile --generate-hashes --resolver=backtracking \
-            --output-file=requirements/release.txt requirements/release.in
+          python tools/compile_release_lock.py
           git diff --exit-code -- requirements/release.txt
       - name: Prove hash-verified runtime installation
         run: python -m pip install --require-hashes -r requirements/release.txt
@@ -78,4 +75,3 @@ jobs:
           set -e
           test "$status" -eq 1
           ! grep -Fq "$(cat synthetic-secret.txt)" "${{ runner.temp }}/gitleaks-fixture.out"
-          grep -q 'leaks found: 1' "${{ runner.temp }}/gitleaks-fixture.out"

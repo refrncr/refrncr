@@ -1,6 +1,6 @@
 # REF-51 implementation report
 
-Date: 2026-09-20
+Date: 2026-09-21
 Branch: `feat/ref-51-supply-chain-security`
 Base: `e0fc7c9` (`origin/main` after fetch/fast-forward)
 
@@ -12,14 +12,14 @@ contract and adds no runtime package dependency. Architecture impact is recorded
 
 ## Implemented controls and files
 
-* `requirements/release.in` and `requirements/release.txt`: public runtime ranges plus the
-  pip-tools-generated Python 3.12 lock.
+* `requirements/release.in`, `requirements/release.txt` and `tools/compile_release_lock.py`: public
+  runtime ranges plus the canonically generated Python 3.12 lock.
 * `tools/supply_chain.py` and `security/vulnerability-exceptions.json`: exact audit, exception,
   SARIF and action-pin policy gates.
 * `.gitleaks.toml`: full redaction and one exact path+code false-positive exception.
 * `.github/workflows/security.yml`, `codeql.yml`, `release.yml`: scheduled/PR/main security,
   CodeQL and controlled-release configuration; `ci.yml` is read-only and SHA-pinned.
-* `tests/test_supply_chain.py`: 17 lock, metadata, finding, exception, pin, permission, SBOM and
+* `tests/test_supply_chain.py`: 18 lock, metadata, finding, exception, pin, permission, SBOM and
   provenance workflow-contract tests.
 * ADR-020, `docs/development/supply-chain.md`, README, CONTRIBUTING and SECURITY: architecture,
   maintainer process, triage, release boundary and manual prerequisites.
@@ -42,8 +42,12 @@ Gitleaks 8.30.1 (upstream archive checksum verified).
 
 ## Lock, scan and exception evidence
 
-The lock resolves 31 packages and records 524 SHA-256 distribution hashes. File SHA-256:
-`5f09f7f24786233b27fbd261b000f9009b5fbb911b374cc94d72bc67ef0fa02c`.
+The lock resolves 31 packages and records SHA-256 distribution hashes. Pip-tools is pinned exactly
+to 7.6.1. The sole local/CI generator ignores ambient configuration and fixes the resolver, hashes,
+`--strip-extras`, build isolation, no-upgrade, unsafe-package behavior, hash reuse, LF newline,
+header/colour behavior, annotations and emitted index/find-link options.
+Two consecutive canonical generations produced byte-identical output (31 packages, 524 hashes;
+SHA-256 `af54be00d3ef4699b0a2ed4dbd32a9c3b8a5f2605714dceef5a47b0e3ef34bed`).
 A clean temporary environment installed it successfully with `pip --require-hashes`; the built
 wheel then installed with `--no-deps` and `pip check` reported no broken requirements. Public
 metadata still contains the original compatible ranges and the test enforces equality with the
@@ -58,11 +62,13 @@ Gitleaks 8.30.1 scanned 72 commits / approximately 7.36 MB. The initial redacted
 false positive: generic-key interpreted the historical Python phrase `key,
 allow_unpublished=True` in `dataset_versions.py` as a key. The reviewed allowlist requires both
 that exact path and exact phrase. The rerun reported `no leaks found`. A temporary synthetic AWS-key
-shape was detected with exit 1 while the captured output contained no fixture value.
+shape was detected with exit 1 while the captured output contained no fixture value. The CI
+assertion depends only on those two facts, not on Gitleaks presentation wording.
 
-CodeQL is configured for Python `security-extended`. PR jobs retain read-only permissions, produce
-SARIF without upload, and the repository gate fails on warning/error results. Trusted main and daily
-runs use a separate job with `security-events: write`, run the same gate, then upload SARIF. GitHub
+CodeQL is configured for Python `security-extended`. PR jobs retain read-only permissions and pass
+the required v4 enum `upload: never` to `analyze`; they gate the resulting local SARIF and fail on
+warning/error results. Trusted main and daily runs use a separate job with `security-events: write`,
+run the same local gate, then explicitly upload SARIF. GitHub
 must still enable code scanning and make the checks required; this branch does not change settings.
 
 ## Permission, SBOM and provenance review
@@ -82,7 +88,8 @@ uses the same distribution directory for PyPI. No real attestation/release/uploa
 
 | Check | Result |
 | --- | --- |
-| Focused REF-51 tests | 17 passed |
+| Focused REF-51 tests | 18 passed |
+| Canonical lock regeneration | two runs byte-identical; CI invokes the same generator |
 | Runtime `pip-audit` | 0 known vulnerabilities |
 | Gitleaks repository/history | 72 commits, no findings after one exact documented false-positive rule |
 | Gitleaks synthetic fixture | detected; value absent from captured output |
