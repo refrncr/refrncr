@@ -96,3 +96,10 @@ current permissions and the selected content within one existing coherent snapsh
 ## REF-40 API keys
 
 API keys do not establish browser sessions. Management requires the existing active session and CSRF checks. The one-time creation response is non-cacheable and carries no-referrer policy; signed form identity prevents secret redisplay on replay. See [one-time display and pepper configuration](api-keys.md).
+# Security audit boundary
+
+Rejected persisted sessions, failed credential verification, denied authorization, failed CSRF
+checks and rejected signed review/import workflow identities are recorded in the existing
+administrator-only Audit history. Events contain no cookie, session ID, CSRF value, password,
+submitted account identifier, client IP, raw path or request data. Ordinary required-field and
+other non-security form validation remains outside the security audit.

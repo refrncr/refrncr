@@ -132,6 +132,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
     assert "refrncr/migrations/script.py.mako" in files
     assert {
         "refrncr/migrations/versions/0021_ref_40_api_keys.py",
+        "refrncr/migrations/versions/0022_ref_31_security_audit.py",
         "refrncr/api_keys.py",
         "refrncr/api_key_persistence.py",
         "refrncr/static/js/api-key-secret.js",

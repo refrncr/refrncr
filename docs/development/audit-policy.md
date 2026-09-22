@@ -17,8 +17,9 @@ The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matr
 ## Decisions and scope
 
 The inventory explicitly declares public service operations, security/technical
-operations, HTTP routes and CLI flows. The catalog now supports 41
-`(object_type, action)` contracts, including four REF-40 API-key contracts.
+operations, HTTP routes and CLI flows. The catalog now supports 46
+`(object_type, action)` contracts, including four REF-40 API-key contracts and five REF-31
+security-failure contracts.
 The guard compares symbols rather than freezing operation counts. REF-40 adds
 `security-audited` for authentication outcomes, distinct from domain mutations.
 
@@ -32,9 +33,9 @@ synthetic credentials and is technical only. REF-107 adds authenticated Current 
 Health, public REF-109 documentation, disabled default framework docs, static assets, HEAD and OPTIONS are inventoried.
 
 `security_logging: true` in the matrix means a security obligation, including the operation's denied
-or suspicious flows. It does **not** mean REF-149 implemented security logging or that each successful
-ordinary read should be logged. REF-31 remains the owner of general security logging; REF-40 explicitly implements
-API-key authentication outcome events. Technical errors remain diagnostics;
+or suspicious flows. It does **not** mean every successful ordinary read should be logged. REF-31
+implements the centralized durable security audit; REF-40 retains API-key authentication outcome
+events. Technical errors remain diagnostics;
 audit records never contain exceptions, raw SQL or traces.
 
 Community remains installation-scoped, with no tenant/organisation columns or Cloud composition.
@@ -164,10 +165,14 @@ explicit SQLite read transactions remain unchanged; no writer is held during art
 Flask HEAD executes the GET export handler, so a prepared authorized HEAD request has the same one-event
 semantics. Automatic OPTIONS only describes routing and creates no event.
 
-## REF-31 handoff
+## REF-31 security audit implementation
 
-[REF-31](https://cleverhorizons.atlassian.net/browse/REF-31) implements centralized structured security
-logging. Each relevant matrix row contains the required handoff. Required categories include:
+[REF-31](https://cleverhorizons.atlassian.net/browse/REF-31) implements centralized, durable security
+auditing in the existing `AuditEvent` history. Each relevant matrix row contains the disposition.
+Stable content-free events are `security.login_failed`, `security.session_rejected`,
+`security.authorization_denied`, `security.csrf_rejected` and
+`security.workflow_token_rejected`. Existing API-key outcome events remain under their established
+`api_key.*` names. Required categories include:
 
 - login failure (including unknown/inactive/deleted user), invalid/expired/revoked session,
   throttling/capacity rejection, malformed proxy input and insecure transport;
@@ -178,9 +183,11 @@ logging. Each relevant matrix row contains the required handoff. Required catego
 - suspicious stale/replayed/tampered import claims or revisions, without recording tokens, payloads
   or user-supplied filenames; ordinary concurrency is not automatically an attack.
 
-REF-31 must distinguish successful security-relevant outcomes from denials. Technical failure logs
+The implementation distinguishes successful security-relevant domain/API-key outcomes from denials. Technical failure logs
 must not copy audit context blindly or put exception data in domain audit. API-key and publication
-security categories remain future functionality; they have no current service implementation.
+success events retain their existing implementation. Security attempt object IDs are generated
+UUIDs, never submitted identifiers. No security event stores details, IP addresses, credentials,
+tokens, request bodies, uploads, search text, filenames or protected object names.
 
 ## Maintaining coverage and CI
 

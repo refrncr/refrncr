@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import date
 from types import MappingProxyType
 from unicodedata import category, normalize
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 class AuditContractError(ValueError):
@@ -31,9 +31,8 @@ class EventContract:
             for value in (self.object_type, self.action)
         ):
             raise AuditContractError("Audit names must be stable lower-case identifiers")
-        if self.actor != "required" and not (
-            self.actor == "unauthenticated"
-            and (self.object_type, self.action) == ("api_key", "api_key.authentication_failed")
+        if self.actor not in {"required", "unauthenticated", "optional"} or (
+            self.actor != "required" and self.object_type not in {"api_key", "security"}
         ):
             raise AuditContractError("This installation has no anonymous/system audit actor")
         if len(dict(self.context)) != len(self.context) or any(
@@ -60,6 +59,11 @@ _EVENTS = (
         for action in ("api_key.created", "api_key.revoked", "api_key.authenticated")
     ),
     EventContract("api_key", "api_key.authentication_failed", actor="unauthenticated"),
+    EventContract("security", "security.login_failed", actor="unauthenticated"),
+    EventContract("security", "security.session_rejected", actor="unauthenticated"),
+    EventContract("security", "security.authorization_denied", actor="optional"),
+    EventContract("security", "security.csrf_rejected", actor="required"),
+    EventContract("security", "security.workflow_token_rejected", actor="required"),
     EventContract(
         "dataset",
         "dataset.concept_discarded",
@@ -193,6 +197,9 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
     if contract.actor == "unauthenticated":
         if actor_user_id is not None:
             raise AuditContractError("Failed authentication has no trusted actor")
+    elif contract.actor == "optional":
+        if actor_user_id is not None:
+            _identity(actor_user_id)
     else:
         _identity(actor_user_id)
     _identity(object_id)
@@ -265,6 +272,18 @@ def record_audit(uow, *, actor_user_id, object_type, object_id, action, details=
     )
 
 
+def record_security_event(uow_factory, action, *, actor_user_id=None):
+    """Persist one content-free security outcome in the existing audit trail."""
+    with uow_factory(write=True, serialized=True, translate_errors=True) as work:
+        record_audit(
+            work,
+            actor_user_id=actor_user_id,
+            object_type="security",
+            object_id=str(uuid4()),
+            action=action,
+        )
+
+
 CLASSIFICATIONS = frozenset(
     {
         "domain-audited",
@@ -301,6 +320,20 @@ def require_classified(discovered, registered):
 # This is deliberately an explicit service registry, including ordinary reads.
 # CI discovers all public service methods independently, including new classes.
 OPERATIONS = {}
+
+OPERATIONS["refrncr.audit.record_security_event"] = Operation(
+    "security-audited",
+    tuple(
+        ("security", action)
+        for action in (
+            "security.login_failed",
+            "security.session_rejected",
+            "security.authorization_denied",
+            "security.csrf_rejected",
+            "security.workflow_token_rejected",
+        )
+    ),
+)
 
 
 def _register(service, names, classification, *, events=(), rationale="", module="services"):

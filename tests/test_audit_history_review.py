@@ -122,7 +122,9 @@ def test_demoted_admin_and_forged_session_cannot_reuse_any_read(history):
             browser.get(f"/settings/audit-log/{target}", base_url="https://localhost").status_code
             == 403
         )
-    assert state(h) == before
+    after = state(h)
+    assert after | {"audit_events": before["audit_events"]} == before
+    assert sum("security.authorization_denied" in row for row in after["audit_events"]) == 6
     browser.set_cookie(
         SESSION_COOKIE, json.dumps({"user_id": h.admin, "role": "admin"}), domain="localhost"
     )

@@ -82,10 +82,18 @@ def audits(c):
 
 
 def snapshot(c):
-    # Compare persisted business state, timestamps, values, sessions AND audits.
+    # Compare persisted business state and domain audits. REF-31 security attempts
+    # are independent evidence and are asserted by dedicated security tests.
     with c.sessions() as session:
         return {
-            table.name: sorted(repr(tuple(row)) for row in session.execute(select(table)))
+            table.name: sorted(
+                repr(tuple(row))
+                for row in session.execute(
+                    select(table).where(table.c.object_type != "security")
+                    if table.name == "audit_events"
+                    else select(table)
+                )
+            )
             for table in Base.metadata.sorted_tables
         }
 

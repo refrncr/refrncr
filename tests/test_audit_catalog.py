@@ -81,6 +81,10 @@ def test_historical_action_names_and_object_types_are_stable():
         "api_key": (
             "api_key.created api_key.revoked api_key.authenticated api_key.authentication_failed"
         ),
+        "security": (
+            "security.login_failed security.session_rejected security.authorization_denied "
+            "security.csrf_rejected security.workflow_token_rejected"
+        ),
         "user": "created email_changed disabled enabled deleted",
         "team": "created renamed deleted",
         "membership": "created deleted",
@@ -100,7 +104,11 @@ def test_historical_action_names_and_object_types_are_stable():
     assert set(EVENTS) == {
         (kind, action) for kind, actions in expected.items() for action in actions.split()
     }
-    assert {event.actor for event in EVENTS.values()} == {"required", "unauthenticated"}
+    assert {event.actor for event in EVENTS.values()} == {
+        "required",
+        "unauthenticated",
+        "optional",
+    }
     assert set(EVENTS) == {event for operation in OPERATIONS.values() for event in operation.events}
 
 
@@ -289,7 +297,12 @@ def test_guard_rejects_inconsistent_or_missing_matrix_decisions(monkeypatch, fie
         source = original(path, *args, **kwargs)
         if path == ROOT / "docs/development/audit-coverage.json":
             matrix = json.loads(source)
-            matrix["operations"][0][field] = value
+            row = next(
+                item
+                for item in matrix["operations"]
+                if item["service"] == "refrncr.services.UserService.create_initial_admin"
+            )
+            row[field] = value
             return json.dumps(matrix)
         return source
 

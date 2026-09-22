@@ -96,6 +96,11 @@ Operational logging is transient process diagnostics. It neither replaces nor
 duplicates the durable domain audit trail, whose contracts remain documented in
 [the audit policy](audit-policy.md).
 
+REF-31 security outcomes are likewise durable database audit events. REF-70 JSON logs may expose
+only their existing safe request-completion summary; they do not copy audit actors, targets or
+payloads. Client/network attribution remains exclusively an operator reverse-proxy or hosting-log
+responsibility.
+
 ## Backup and recovery
 
 REFRNCR Community does not schedule, store, encrypt, transport or retain backups.

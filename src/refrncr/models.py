@@ -88,7 +88,8 @@ class AuditEvent(Base):
         Index("ix_audit_events_timestamp_id", "timestamp", "id"),
         CheckConstraint(
             "actor_user_id IS NOT NULL OR "
-            "(object_type = 'api_key' AND action = 'api_key.authentication_failed')",
+            "(object_type = 'api_key' AND action = 'api_key.authentication_failed') OR "
+            "object_type = 'security'",
             name="ck_audit_events_actor",
         ),
     )
