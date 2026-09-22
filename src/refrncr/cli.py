@@ -37,6 +37,8 @@ class StartConfiguration:
     host: str
     port: int
     trusted_proxies: tuple[str, ...] = ()
+    log_level: str | None = None
+    interactive: bool = False
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,16 @@ class RefrncrArgumentParser(argparse.ArgumentParser):
                 self.exit(2, f"{self.prog}: error: invalid command-line arguments\n")
             self.error(f"unrecognized arguments: {' '.join(unrecognized)}")
         return parsed
+
+
+class SafeLogLevelAction(argparse.Action):
+    """Validate without reflecting a potentially sensitive supplied value."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        normalized = values.strip().lower()
+        if normalized not in {"debug", "info", "warning", "error", "critical"}:
+            parser.error("invalid --log-level value")
+        setattr(namespace, self.dest, normalized)
 
 
 def default_data_directory() -> Path:
@@ -116,6 +128,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Trusted reverse-proxy IP or CIDR for X-Forwarded-For source identity "
             "(repeatable; default: REFRNCR_TRUSTED_PROXIES or none)."
         ),
+    )
+    start.add_argument(
+        "--log-level",
+        action=SafeLogLevelAction,
+        help="Operational log level (overrides REFRNCR_LOG_LEVEL for this process).",
     )
 
     user = subparsers.add_parser("user", help="Manage Community user bootstrap.")
@@ -204,6 +221,8 @@ def resolve_start_configuration(args: argparse.Namespace) -> StartConfiguration:
         host=host,
         port=port,
         trusted_proxies=tuple(trusted_proxies),
+        log_level=args.log_level,
+        interactive=sys.stdout.isatty(),
     )
 
 
@@ -322,7 +341,12 @@ def start(configuration: StartConfiguration) -> None:
         raise
     except Exception as exc:
         raise RuntimeError("database migration or bootstrap failed") from exc
-    configure_operational_logging()
+    configure_operational_logging(
+        log_level=configuration.log_level,
+        interactive=configuration.interactive,
+        host=configuration.host,
+        port=configuration.port,
+    )
     logging.getLogger(LOGGER_NAME).info(
         "Application server starting", extra={"event": "application.starting"}
     )
@@ -523,7 +547,14 @@ def main(
             "start": "start",
             "dataset-ownership-preflight": "check Dataset ownership",
         }.get(args.command, "create administrator")
-        print(f"refrncr failed to {action}: {exc}", file=sys.stderr)
+        if args.command == "start" and str(exc) == "database migration or bootstrap failed":
+            print(
+                "refrncr failed to start: database preparation failed; "
+                "check database availability and configuration, then retry.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"refrncr failed to {action}: {exc}", file=sys.stderr)
         return 1
     return 0
 

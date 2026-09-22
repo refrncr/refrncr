@@ -665,6 +665,20 @@ def test_invalid_environment_port_fails_without_starting(monkeypatch, port, caps
     assert "port must" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("level", ["debug", "INFO", "Warning", "error", "CRITICAL"])
+def test_start_log_level_is_validated_and_normalized(level):
+    args = cli.build_parser().parse_args(["start", "--log-level", level])
+    assert args.log_level == level.lower()
+
+
+def test_invalid_start_log_level_fails_before_start(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "start", lambda _configuration: pytest.fail("must not start"))
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["start", "--log-level", "verbose-private-value"])
+    assert exit_info.value.code == 2
+    assert "verbose-private-value" not in capsys.readouterr().err
+
+
 def test_first_run_migrates_sqlite_and_restart_is_idempotent(tmp_path):
     database = tmp_path / "nested" / "community.db"
     database_url = cli.sqlite_url(database)
@@ -710,7 +724,8 @@ def test_migration_failure_prevents_server_start(monkeypatch, capsys):
     assert exit_code == 1
     assert not server_started
     error = capsys.readouterr().err
-    assert "database migration or bootstrap failed" in error
+    assert "database preparation failed" in error
+    assert "check database availability and configuration, then retry" in error
     assert "credential-secret" not in error
     assert "query-secret" not in error
     assert database_url not in error
@@ -722,7 +737,7 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     monkeypatch.setattr(
         cli,
         "configure_operational_logging",
-        lambda: received.update(logging_configured=True),
+        lambda **kwargs: received.update(logging_configured=True, logging_options=kwargs),
     )
 
     def build_application(_url, **kwargs):
@@ -756,13 +771,19 @@ def test_start_passes_resolved_host_and_port_to_server(monkeypatch, capsys):
     assert received["access_log"] is False
     assert received["log_config"] is None
     assert received["logging_configured"] is True
+    assert received["logging_options"] == {
+        "log_level": None,
+        "interactive": False,
+        "host": "127.0.0.2",
+        "port": 8123,
+    }
     assert capsys.readouterr().err == ""
 
 
 def test_start_with_trusted_proxy_disables_loopback_http_cookie_mode(monkeypatch):
     received = {}
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
-    monkeypatch.setattr(cli, "configure_operational_logging", lambda: None)
+    monkeypatch.setattr(cli, "configure_operational_logging", lambda **_kwargs: None)
 
     def build_application(_url, **kwargs):
         received.update(kwargs)
@@ -779,7 +800,7 @@ def test_start_with_trusted_proxy_disables_loopback_http_cookie_mode(monkeypatch
 def test_server_bind_failure_propagates_nonzero_exit(monkeypatch):
     monkeypatch.setattr(cli, "prepare_database", lambda _url: None)
     monkeypatch.setattr(cli, "build_application", lambda _url, **_kwargs: object())
-    monkeypatch.setattr(cli, "configure_operational_logging", lambda: None)
+    monkeypatch.setattr(cli, "configure_operational_logging", lambda **_kwargs: None)
 
     def fail_to_bind(*_args, **_kwargs):
         raise SystemExit(1)

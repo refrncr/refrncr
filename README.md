@@ -79,9 +79,14 @@ readiness. Probes are public, data-free and non-cacheable. `refrncr start` remai
 fail-closed when its pre-start migration or bootstrap fails. Run migrations and
 bootstrap successfully before relying on either probe.
 
-The CLI emits privacy-safe JSON operational logs to stdout and returns an
-`X-Request-ID` on every HTTP response. `REFRNCR_LOG_LEVEL` selects `DEBUG`, `INFO`,
-`WARNING`, `ERROR` or `CRITICAL` and defaults safely to `INFO`. See the
+At an interactive terminal the CLI prints a compact ready message with the browser URL;
+successful request noise stays hidden. When stdout is redirected or collected, it emits
+privacy-safe JSON lines instead. `--log-level` overrides `REFRNCR_LOG_LEVEL` for that
+process; both accept `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL`. Interactive debug
+uses only safe route categories, status, duration and request IDs and aggregates repeated
+requests. Set `NO_COLOR` to disable terminal accents. Binding `--host 0.0.0.0` displays
+`localhost` as the browser URL and states that every network interface is bound; no external
+address is discovered. Every HTTP response receives an `X-Request-ID`. See the
 [runtime operations guide](docs/development/operations.md) for probe usage, logging
 fields and redaction boundaries.
 
