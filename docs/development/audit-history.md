@@ -236,4 +236,8 @@ Cloud tenancy, SIEM, live updates and polling.
 
 ## REF-40 API keys
 
-API-key lifecycle/authentication events display safe UUIDs and action labels, without names, credentials or verifiers. Failed authentication displays `Unauthenticated` without a user link. Revoked keys remain historical objects rather than deleted objects. See [API keys](api-keys.md).
+API-key lifecycle and failed-authentication events display safe UUIDs and action labels,
+without names, credentials or verifiers. Failed authentication displays `Unauthenticated`
+without a user link. Historical `api_key.authenticated` rows remain readable and resolve
+their original owner correctly, although REF-169 no longer produces new rows. Revoked keys
+remain historical objects rather than deleted objects. See [API keys](api-keys.md).

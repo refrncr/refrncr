@@ -118,7 +118,9 @@ def create_api(versions, api_keys):
         if api_keys is None:
             raise ApiKeyAuthenticationError()
         # Malformed/duplicate headers use the same service failure audit as absent keys.
-        return api_keys.authenticate(values[0] if len(values) == 1 else None)
+        authenticated = api_keys.authenticate(values[0] if len(values) == 1 else None)
+        request.scope["refrncr.authentication"] = "api_key"
+        return authenticated
 
     @app.middleware("http")
     async def safety(request, call_next):

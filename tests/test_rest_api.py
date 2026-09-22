@@ -18,6 +18,7 @@ from refrncr.api.routes import create_api
 from refrncr.api_keys import ApiKeyService
 from refrncr.app import create_application
 from refrncr.models import AuditEvent, Dataset
+from refrncr.operational import LOGGER_NAME, OperationalJSONFormatter
 from refrncr.published_contracts import decode_identifier, encode_identifier
 from refrncr.record_search import RecordQueryLogFilter
 from refrncr.version_persistence import SqlAlchemyVersionOperations
@@ -98,6 +99,39 @@ def test_endpoints_and_contract(api):
     assert lookup.json()["data"] == row
     assert lookup.json()["current_version"]["number"] == 1
     assert get(c, "/audit/records/" + c.record.id).status_code == 404
+
+
+def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
+    c = api
+    caplog.set_level(logging.INFO, logger=LOGGER_NAME)
+    first = get(c, "/audit")
+    c.now[0] += timedelta(minutes=16)
+    caplog.clear()
+    cached = get(c, "/audit", headers={**c.headers, "If-None-Match": first.headers["etag"]})
+    assert cached.status_code == 304
+
+    record = next(record for record in caplog.records if record.event == "http.request_completed")
+    payload = json.loads(OperationalJSONFormatter().format(record))
+    assert payload["authentication"] == "api_key"
+    assert set(payload) == {
+        "timestamp",
+        "severity",
+        "event",
+        "request_id",
+        "http_method",
+        "route",
+        "status_code",
+        "duration_ms",
+        "authentication",
+    }
+    serialized = json.dumps(payload)
+    for prohibited in (c.key.secret, c.key.key.id, c.u.id, "Authorization", "Read integration"):
+        assert prohibited not in serialized
+    with c.sessions() as session:
+        assert c.keys.get_key(c.u.id, c.key.key.id).last_used_at == c.now[0]
+        assert not list(
+            session.scalars(select(AuditEvent).where(AuditEvent.action == "api_key.authenticated"))
+        )
 
 
 @pytest.mark.parametrize("suffix", ["", "/audit", "/audit/records", "/audit/records/invalid"])

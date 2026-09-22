@@ -733,8 +733,11 @@ _register(
     "authenticate",
     "security-audited",
     module="api_keys",
-    events=(("api_key", "api_key.authenticated"), ("api_key", "api_key.authentication_failed")),
-    rationale="REF-40 approved authentication security events, not successful domain mutations.",
+    events=(("api_key", "api_key.authentication_failed"),),
+    rationale=(
+        "REF-169 keeps durable failed-authentication coverage; successful requests use only "
+        "safe operational request completion metadata."
+    ),
 )
 
 
@@ -743,7 +746,7 @@ _register(
     "read_current",
     "intentionally excluded",
     module="dataset_versions",
-    rationale="Authorized bounded Current read; API-key authentication owns its separate audit.",
+    rationale="Authorized bounded Current read; no per-request durable success audit.",
 )
 _register(
     "DatasetAuthorizationService",

@@ -5468,12 +5468,12 @@
       "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
       "actor_source": "Validated active owner; only failed authentication has a null actor.",
       "allowed_context": {},
-      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "success": "The operation follows its declared lifecycle event contract; successful authentication creates no durable event.",
       "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
       "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
       "stale_input": "Reject stale key revision without mutation or success event.",
       "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
-      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "rollback": "Lifecycle audit failure rolls back creation or revocation; last-used failure rolls back authentication.",
       "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
       "tests": [
         "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
@@ -5502,12 +5502,12 @@
       "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
       "actor_source": "Validated active owner; only failed authentication has a null actor.",
       "allowed_context": {},
-      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "success": "The operation follows its declared lifecycle event contract; successful authentication creates no durable event.",
       "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
       "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
       "stale_input": "Reject stale key revision without mutation or success event.",
       "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
-      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "rollback": "Lifecycle audit failure rolls back creation or revocation; last-used failure rolls back authentication.",
       "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
       "tests": [
         "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
@@ -5543,12 +5543,12 @@
       "allowed_context": {
         "api_key:api_key.created": {}
       },
-      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "success": "The operation follows its declared lifecycle event contract; successful authentication creates no durable event.",
       "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
       "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
       "stale_input": "Reject stale key revision without mutation or success event.",
       "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
-      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "rollback": "Lifecycle audit failure rolls back creation or revocation; last-used failure rolls back authentication.",
       "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
       "tests": [
         "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
@@ -5584,12 +5584,12 @@
       "allowed_context": {
         "api_key:api_key.revoked": {}
       },
-      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "success": "The operation follows its declared lifecycle event contract; successful authentication creates no durable event.",
       "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
       "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
       "stale_input": "Reject stale key revision without mutation or success event.",
       "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
-      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
+      "rollback": "Lifecycle audit failure rolls back creation or revocation; last-used failure rolls back authentication.",
       "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
       "tests": [
         "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
@@ -5621,35 +5621,32 @@
       "events": [
         [
           "api_key",
-          "api_key.authenticated"
-        ],
-        [
-          "api_key",
           "api_key.authentication_failed"
         ]
       ],
       "object_identifier": "Key UUID; failed authentication uses an independently generated attempt UUID.",
       "actor_source": "Validated active owner; only failed authentication has a null actor.",
       "allowed_context": {
-        "api_key:api_key.authenticated": {},
         "api_key:api_key.authentication_failed": {}
       },
-      "success": "Lifecycle mutation and exactly one event commit together; authentication commits one security outcome.",
+      "success": "Successful authentication creates no durable audit row; last_used_at is conditionally refreshed at most once per 15 minutes.",
       "validation_failure": "No lifecycle event or mutation; credential failure emits the explicit failure event.",
       "authorization_failure": "Owner-only non-disclosing rejection; no lifecycle event.",
       "stale_input": "Reject stale key revision without mutation or success event.",
       "no_op": "No repeated revoke; replayed creation rejected without a second secret.",
-      "rollback": "Audit failure rolls back key creation, revocation or last-used update.",
-      "duplicate_retry": "Signed browser creation identity and locked owner reject creation replay; revision rejects revoke replay.",
+      "rollback": "A last-used database failure rolls back and fails authentication closed; failure-audit persistence remains transactional.",
+      "duplicate_retry": "A key-row lock plus one conditional update makes concurrent last-used refreshes safe without retry or owner-row locking.",
       "tests": [
         "tests/test_api_keys.py::test_lifecycle_and_secret_redaction",
         "tests/test_api_keys.py::test_owner_isolation_and_confirmation",
         "tests/test_api_keys.py::test_audit_failure_rolls_back",
-        "tests/test_api_keys.py::test_audit_failure_rolls_back_revoke_and_use",
+        "tests/test_api_keys.py::test_success_has_no_durable_audit_and_throttles_last_used",
+        "tests/test_api_keys.py::test_last_used_update_failure_rolls_back_and_fails_closed",
+        "tests/test_rest_api.py::test_success_log_is_safe_and_304_updates_last_used",
         "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
       ],
-      "implementation_status": "REF-40 verified locally: 2587 SQLite tests, full 3683-test PostgreSQL 16.15-enabled suite and six browser combinations passed; independent GitHub CI pending.",
-      "exclusion_reason": "REF-40 approved authentication security events, not successful domain mutations."
+      "implementation_status": "REF-169 implemented locally; validation is recorded in ref-169-report.md.",
+      "exclusion_reason": "REF-169 keeps durable failed-authentication coverage; successful requests use only safe operational request completion metadata."
     },
     {
       "capability": "DatasetVersionService",
@@ -5671,7 +5668,7 @@
       "object_identifier": "Stable Dataset UUID.",
       "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
       "allowed_context": {},
-      "success": "Current-only bounded read; no domain event. Authentication has its own existing audit.",
+      "success": "Current-only bounded read; no domain event or per-request successful-authentication audit.",
       "validation_failure": "No change or success event.",
       "authorization_failure": "Non-disclosing not found; no mutation or event.",
       "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
@@ -5684,7 +5681,7 @@
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
       ],
       "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
-      "exclusion_reason": "Authorized bounded Current read; API-key authentication owns its separate audit.",
+      "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
     {

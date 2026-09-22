@@ -99,6 +99,7 @@ events contain:
 | `route` | Registered route template or a fixed mounted-browser template, never the raw target. |
 | `status_code` | Final HTTP status. |
 | `duration_ms` | Monotonic elapsed duration in milliseconds. |
+| `authentication` | Present only as fixed `api_key` after successful API-key authentication. |
 
 Startup/shutdown use `application.starting`, `application.started` and
 `application.stopped`. Failed readiness emits `health.readiness_failed`. Normal
@@ -117,7 +118,8 @@ Whitespace around a valid value is ignored. An invalid value safely falls back t
 Operational logs never contain request/response bodies, cookies, Authorization or
 API-key headers, raw paths/query strings, search terms, imports, email addresses,
 Dataset/Record values, DSNs, secrets, raw exception messages or production
-tracebacks. Configure reverse proxies and hosting platforms to apply the same
+tracebacks. The authentication marker never includes a key ID, owner, user ID, verifier,
+hash or other identifying reference. Configure reverse proxies and hosting platforms to apply the same
 boundary to their independent logs.
 
 Operational logging is transient process diagnostics. It neither replaces nor

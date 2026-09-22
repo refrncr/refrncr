@@ -109,7 +109,8 @@ def test_historical_action_names_and_object_types_are_stable():
         "unauthenticated",
         "optional",
     }
-    assert set(EVENTS) == {event for operation in OPERATIONS.values() for event in operation.events}
+    produced = {event for operation in OPERATIONS.values() for event in operation.events}
+    assert set(EVENTS) - produced == {("api_key", "api_key.authenticated")}
 
 
 @pytest.mark.parametrize(

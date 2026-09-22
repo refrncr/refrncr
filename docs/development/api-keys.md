@@ -110,18 +110,22 @@ production because verifier data is persisted. REF-31 owns broader security logg
 
 `api_keys` stores UUID, owner FK, name, verifier, created/expiry/revoked/last-used
 timestamps and revision. Public service views contain no verifier. Owner-row locks
-serialize creation/revocation/authentication on PostgreSQL; SQLite uses the existing
-serialized-write UoW. Creation checks names and the five-key limit under that lock.
-Authentication refreshes the key after obtaining the lock. An authentication
-already committed before revocation may finish; later authentication is rejected.
+serialize creation/revocation on PostgreSQL; SQLite uses the existing serialized-write
+UoW. Authentication never locks the owner row. It locks the key for revocation ordering
+and uses one atomic conditional update: `last_used_at` changes only when absent or older
+than the 15-minute cutoff. It is an approximate recent-use indication, not a per-request
+timestamp. Concurrent requests require no retry; at most one refresh wins. Successful
+304 responses qualify, while every rejected credential leaves the value unchanged.
 
-Four explicit audit contracts have no detail payload: `api_key.created`,
-`api_key.revoked`, `api_key.authenticated`, `api_key.authentication_failed`.
-Successful events reference a real actor and key UUID. Failed authentication uses
+New requests durably audit `api_key.created`, `api_key.revoked` and
+`api_key.authentication_failed`, all without detail payload. Failed authentication uses
 a fresh attempt UUID and null actor, displayed as `Unauthenticated`. This is the
 product-owner-approved exception to REF-149, constrained to that exact action and
 object type in both code and schema. No guessed actor or claimed key is recorded.
-Audit failure rolls back creation, revocation or last-used updates. Failure-event
+Historical `api_key.authenticated` rows remain valid and present with their original owner;
+successful authentication no longer creates that per-request durable event. Audit failure
+rolls back creation or revocation. Last-used persistence failure fails authentication closed.
+Failure-event
 persistence commits before the generic credential exception is returned.
 
 ## Migration and operation

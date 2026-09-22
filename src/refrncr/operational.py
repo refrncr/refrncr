@@ -50,6 +50,7 @@ class OperationalJSONFormatter(logging.Formatter):
         "route",
         "status_code",
         "duration_ms",
+        "authentication",
         "error_category",
     )
 
@@ -306,6 +307,7 @@ class OperationalMiddleware:
                     "route": route_template,
                     "status_code": status_code,
                     "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                    "authentication": scope.get("refrncr.authentication"),
                     "error_category": error_category,
                 },
             )
