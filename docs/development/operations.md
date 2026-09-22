@@ -60,6 +60,30 @@ Absent, duplicate, empty, oversized, non-ASCII, whitespace-containing or
 control-character-containing values are replaced with a UUID. Request IDs belong
 in the header, never in query parameters.
 
+## Interactive terminal output
+
+When stdout is a terminal, `refrncr start` waits until database preparation, bootstrap
+and the ASGI lifespan have succeeded and then prints the ready URL once:
+
+```text
+✓ refrncr is starting at http://127.0.0.1:8000
+  Press Ctrl+C to stop.
+```
+
+Normal interactive output suppresses Uvicorn lifecycle duplication and successful HTTP,
+polling, static-asset and 304 noise. Warnings, errors and an optional compact shutdown line
+remain visible. Supported terminals use green, yellow and red accents without making colour
+the only carrier of meaning. Set `NO_COLOR` (to any value, including empty) to disable them.
+
+With `--host 0.0.0.0`, the ready URL uses `localhost` and a separate line says that refrncr
+is listening on all network interfaces. This is a binding statement, not an external-IP
+claim; refrncr never discovers or prints an external address.
+
+`--log-level debug` enables safe interactive request diagnostics: method, route template or
+coarse browser/static category, status, duration, request ID and, where applicable, a fixed
+error category. Consecutive equivalent events are aggregated. Warnings and errors are never
+aggregated away. No debug mode exposes raw targets, queries, bodies or exception text.
+
 ## JSON log contract
 
 The normal CLI process writes one JSON object per stdout line. Request completion
@@ -81,7 +105,11 @@ Startup/shutdown use `application.starting`, `application.started` and
 completed requests are `INFO`; rate limits and failed readiness are `WARNING`;
 unexpected failures and other 5xx responses are `ERROR` with only a safe category.
 
-Set the minimum severity with `REFRNCR_LOG_LEVEL`. Accepted case-insensitive values
+Non-interactive stdout, including redirects and log collectors, receives JSON lines rather
+than terminal prose. Each non-empty line is one valid JSON object.
+
+Set the minimum severity with `--log-level` or `REFRNCR_LOG_LEVEL`; the CLI option is a
+validated process-local override. Accepted case-insensitive values
 are `DEBUG`, `INFO`, `WARNING`, `ERROR` and `CRITICAL`; the default is `INFO`.
 Whitespace around a valid value is ignored. An invalid value safely falls back to
 `INFO` and emits `logging.configuration_invalid` without copying the supplied value.

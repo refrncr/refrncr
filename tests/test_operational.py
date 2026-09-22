@@ -18,12 +18,89 @@ from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent
 from refrncr.operational import (
     LOGGER_NAME,
+    InteractiveTerminalHandler,
     OperationalJSONFormatter,
     accepted_request_id,
     configure_operational_logging,
     resolve_log_level,
 )
 from refrncr.services import ResourceTypeRegistry
+
+
+def terminal_record(level, event, **fields):
+    record = logging.LogRecord(LOGGER_NAME, level, "", 0, "ignored", (), None)
+    record.event = event
+    for name, value in fields.items():
+        setattr(record, name, value)
+    return record
+
+
+@pytest.mark.parametrize(
+    ("host", "expected"),
+    [
+        ("127.0.0.1", "✓ refrncr is starting at http://127.0.0.1:8123\n  Press Ctrl+C to stop.\n"),
+        (
+            "0.0.0.0",
+            "✓ refrncr is starting at http://localhost:8123\n"
+            "  Listening on all network interfaces (0.0.0.0).\n"
+            "  Press Ctrl+C to stop.\n",
+        ),
+    ],
+)
+def test_interactive_ready_presentation_is_safe_and_once(host, expected):
+    import io
+
+    stream = io.StringIO()
+    handler = InteractiveTerminalHandler(stream, host=host, port=8123, color=False)
+    handler.emit(terminal_record(logging.INFO, "application.starting"))
+    handler.emit(terminal_record(logging.INFO, "application.started"))
+    assert stream.getvalue() == expected
+
+
+def test_interactive_debug_aggregates_equivalent_requests():
+    import io
+
+    stream = io.StringIO()
+    handler = InteractiveTerminalHandler(stream, host="127.0.0.1", port=8000, color=False)
+    fields = {
+        "http_method": "GET",
+        "route": "/static/{browser_path}",
+        "status_code": 200,
+        "duration_ms": 1.25,
+        "request_id": "safe-id",
+    }
+    handler.emit(terminal_record(logging.DEBUG, "http.request_completed", **fields))
+    handler.emit(terminal_record(logging.DEBUG, "http.request_completed", **fields))
+    handler.emit(terminal_record(logging.DEBUG, "http.request_completed", **fields))
+    handler.emit(terminal_record(logging.WARNING, "health.readiness_failed"))
+    output = stream.getvalue()
+    assert output.count("/static/{browser_path}") == 1
+    assert "2 equivalent debug requests suppressed" in output
+    assert "health.readiness_failed" in output
+
+
+def test_interactive_colors_are_semantic_and_no_color_is_respected(monkeypatch, capsys):
+    root = logging.getLogger()
+    previous_handlers = root.handlers[:]
+    previous_level = root.level
+    try:
+        monkeypatch.delenv("NO_COLOR", raising=False)
+        monkeypatch.setenv("TERM", "xterm-256color")
+        configure_operational_logging(interactive=True)
+        logging.getLogger(LOGGER_NAME).info("ignored", extra={"event": "application.started"})
+        assert "\033[32m" in capsys.readouterr().out
+
+        monkeypatch.setenv("NO_COLOR", "")
+        configure_operational_logging(interactive=True)
+        logging.getLogger(LOGGER_NAME).info("ignored", extra={"event": "application.started"})
+        assert "\033[" not in capsys.readouterr().out
+
+        configure_operational_logging(interactive=True, log_level="warning")
+        logging.getLogger(LOGGER_NAME).info("ignored", extra={"event": "application.started"})
+        assert "refrncr is starting" in capsys.readouterr().out
+    finally:
+        root.handlers[:] = previous_handlers
+        root.setLevel(previous_level)
 
 
 @pytest.fixture(params=["sqlite", "postgresql"])

@@ -249,6 +249,8 @@ def test_installed_console_help_and_http_startup(installed_artifact):
             assert "create-admin" in result.stdout or "first administrator" in result.stdout
         else:
             assert "start" in result.stdout
+        if arguments == ["start", "--help"]:
+            assert "--log-level" in result.stdout
 
     database = installed_artifact.working_directory / "installed ? smoke.db"
     port = free_loopback_port()

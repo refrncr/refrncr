@@ -13,7 +13,7 @@ import uuid
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -27,6 +27,8 @@ REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z", re.ASCII
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 LOGGER_NAME = "refrncr.operational"
 CURRENT_REQUEST_ID: ContextVar[str | None] = ContextVar("refrncr_current_request_id", default=None)
+INTERACTIVE_OUTPUT = False
+INTERACTIVE_DEBUG = False
 
 
 def resolve_log_level(value: str | None = None) -> tuple[int, bool]:
@@ -52,40 +54,154 @@ class OperationalJSONFormatter(logging.Formatter):
     )
 
     def format(self, record: logging.LogRecord) -> str:
-        event = getattr(record, "event", None)
-        fallback_error_category = None
-        if event is None and record.levelno >= logging.ERROR:
-            event = "runtime.failure"
-            message = record.getMessage().lower()
-            fallback_error_category = (
-                "address_in_use" if "address already in use" in message else "runtime_error"
-            )
-        payload: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, UTC)
-            .isoformat()
-            .replace("+00:00", "Z"),
-            "severity": record.levelname,
-            "event": event or "runtime.message",
-        }
-        for field in self.fields[1:]:
-            value = getattr(record, field, None)
-            if field == "request_id" and value is None:
-                value = CURRENT_REQUEST_ID.get()
-            if field == "error_category" and value is None:
-                value = fallback_error_category
-            if value is not None:
-                payload[field] = value
-        return json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
+        return json.dumps(operational_event(record), separators=(",", ":"), ensure_ascii=True)
 
 
-def configure_operational_logging() -> None:
-    """Configure process logging as one safe JSON object per stdout line."""
-    level, invalid = resolve_log_level()
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(OperationalJSONFormatter())
+def operational_event(record: logging.LogRecord) -> dict[str, Any]:
+    """Build the single allowlisted event representation used by every renderer."""
+    event = getattr(record, "event", None)
+    fallback_error_category = None
+    if event is None and record.levelno >= logging.ERROR:
+        event = "runtime.failure"
+        message = record.getMessage().lower()
+        fallback_error_category = (
+            "address_in_use" if "address already in use" in message else "runtime_error"
+        )
+    payload: dict[str, Any] = {
+        "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat().replace("+00:00", "Z"),
+        "severity": record.levelname,
+        "event": event or "runtime.message",
+    }
+    for field in OperationalJSONFormatter.fields[1:]:
+        value = getattr(record, field, None)
+        if field == "request_id" and value is None:
+            value = CURRENT_REQUEST_ID.get()
+        if field == "error_category" and value is None:
+            value = fallback_error_category
+        if value is not None:
+            payload[field] = value
+    return payload
+
+
+class InteractiveTerminalHandler(logging.Handler):
+    """Render compact, safe operational feedback for a human terminal."""
+
+    colors = {"ready": "\033[32m", "warning": "\033[33m", "error": "\033[31m"}
+
+    def __init__(
+        self,
+        stream: TextIO,
+        *,
+        host: str,
+        port: int,
+        color: bool,
+        minimum_level: int = logging.INFO,
+    ) -> None:
+        super().__init__()
+        self.stream = stream
+        self.host = host
+        self.port = port
+        self.color = color
+        self.minimum_level = minimum_level
+        self._last_debug_key: tuple[Any, ...] | None = None
+        self._repeated_debug_events = 0
+
+    def _accent(self, text: str, kind: str) -> str:
+        return f"{self.colors[kind]}{text}\033[0m" if self.color else text
+
+    def _write(self, text: str) -> None:
+        self.stream.write(text + "\n")
+        self.flush()
+
+    def _flush_debug_summary(self) -> None:
+        if self._repeated_debug_events:
+            self._write(f"  {self._repeated_debug_events} equivalent debug requests suppressed")
+        self._repeated_debug_events = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            payload = operational_event(record)
+            event = payload["event"]
+            if event == "application.started":
+                browser_host = "localhost" if self.host == "0.0.0.0" else self.host
+                self._write(
+                    self._accent(
+                        f"\N{CHECK MARK} refrncr is starting at http://{browser_host}:{self.port}",
+                        "ready",
+                    )
+                )
+                if self.host == "0.0.0.0":
+                    self._write("  Listening on all network interfaces (0.0.0.0).")
+                self._write("  Press Ctrl+C to stop.")
+            elif event == "application.stopped":
+                self._flush_debug_summary()
+                self._write("refrncr stopped.")
+            elif event == "http.request_completed" and record.levelno == logging.DEBUG:
+                key = (
+                    payload.get("route"),
+                    payload.get("status_code"),
+                    payload.get("error_category"),
+                )
+                if key == self._last_debug_key:
+                    self._repeated_debug_events += 1
+                    return
+                self._flush_debug_summary()
+                self._last_debug_key = key
+                detail = (
+                    f"DEBUG {payload.get('http_method', 'UNKNOWN')} "
+                    f"{payload.get('route', 'unmatched')} {payload.get('status_code', 500)} "
+                    f"{payload.get('duration_ms', 0)}ms request_id={payload.get('request_id', '-')}"
+                )
+                if payload.get("error_category"):
+                    detail += f" error={payload['error_category']}"
+                self._write(detail)
+            elif record.levelno >= logging.WARNING and record.levelno >= self.minimum_level:
+                self._flush_debug_summary()
+                category = payload.get("error_category")
+                if category == "address_in_use":
+                    message = (
+                        "refrncr could not start: the port is already in use; choose another port."
+                    )
+                elif record.levelno >= logging.ERROR:
+                    message = "refrncr encountered a runtime error; check configuration and retry."
+                else:
+                    message = f"refrncr warning: {event}"
+                kind = "error" if record.levelno >= logging.ERROR else "warning"
+                self._write(self._accent(message, kind))
+        except Exception:
+            self.handleError(record)
+
+    def close(self) -> None:
+        self._flush_debug_summary()
+        super().close()
+
+
+def configure_operational_logging(
+    *,
+    log_level: str | None = None,
+    interactive: bool = False,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+) -> None:
+    """Configure safe JSON collector output or compact interactive output."""
+    global INTERACTIVE_DEBUG, INTERACTIVE_OUTPUT
+    INTERACTIVE_OUTPUT = interactive
+    level, invalid = resolve_log_level(log_level)
+    INTERACTIVE_DEBUG = interactive and level <= logging.DEBUG
+    if interactive:
+        handler = InteractiveTerminalHandler(
+            sys.stdout,
+            host=host,
+            port=port,
+            color="NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb",
+            minimum_level=level,
+        )
+    else:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(OperationalJSONFormatter())
     root = logging.getLogger()
     root.handlers[:] = [handler]
-    root.setLevel(level)
+    root.setLevel(logging.DEBUG if interactive else level)
     for name in ("uvicorn", "uvicorn.error"):
         logger = logging.getLogger(name)
         logger.handlers.clear()
@@ -179,7 +295,7 @@ class OperationalMiddleware:
             elif status_code >= 500:
                 level = logging.ERROR
             else:
-                level = logging.INFO
+                level = logging.DEBUG if INTERACTIVE_OUTPUT and INTERACTIVE_DEBUG else logging.INFO
             self.logger.log(
                 level,
                 "Request completed",
