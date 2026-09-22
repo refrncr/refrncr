@@ -30,6 +30,17 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("api_key", "api_key.authentication_failed"): ActionPresentation(
             "API key authentication failed", False
         ),
+        ("security", "security.login_failed"): ActionPresentation("Login failed", False),
+        ("security", "security.session_rejected"): ActionPresentation("Session rejected", False),
+        ("security", "security.authorization_denied"): ActionPresentation(
+            "Authorization denied", False
+        ),
+        ("security", "security.csrf_rejected"): ActionPresentation(
+            "Protected form token rejected", False
+        ),
+        ("security", "security.workflow_token_rejected"): ActionPresentation(
+            "Protected workflow token rejected", False
+        ),
         ("user", "created"): ActionPresentation("User created", False),
         ("user", "email_changed"): ActionPresentation("User email changed", False),
         ("user", "disabled"): ActionPresentation("User disabled", False),
@@ -105,6 +116,7 @@ class ObjectPresentation:
 OBJECTS = MappingProxyType(
     {
         "api_key": ObjectPresentation("API key", None),
+        "security": ObjectPresentation("Security attempt", None),
         "user": ObjectPresentation("User", "user"),
         "team": ObjectPresentation("Team", "team"),
         "membership": ObjectPresentation("Team membership", None),
@@ -217,7 +229,7 @@ def require_complete_presentation(
             raise AuditContractError(
                 f"Missing audit context presentation: {sorted(missing_context)}"
             )
-        if contract.actor not in {"required", "unauthenticated"} or any(
+        if contract.actor not in {"required", "unauthenticated", "optional"} or any(
             kind not in FORMAT_KINDS for _, kind in contract.context
         ):
             raise AuditContractError("Missing safe audit actor/context formatter")
@@ -353,7 +365,7 @@ def present_event(event, actor_names, objects):
         timestamp.isoformat(timespec="microseconds"),
         event.actor_user_id if valid_id(event.actor_user_id) else "Unavailable",
         "Unauthenticated"
-        if pair == ("api_key", "api_key.authentication_failed") and event.actor_user_id is None
+        if event.actor_user_id is None and known
         else safe_name(actor_names.get(event.actor_user_id), DELETED_ACTOR),
         technical(event.action) if known else "Unavailable",
         ACTION_LABELS[pair] if known else "Unavailable action",

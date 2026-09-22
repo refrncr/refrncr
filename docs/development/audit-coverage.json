@@ -3,6 +3,48 @@
   "source_of_truth": "Authoritative current coverage matrix. audit.py validates event/operation contracts; audit-inventory.json traces interfaces. CI verifies agreement.",
   "operations": [
     {
+      "capability": "Security audit",
+      "operation": "record_security_event",
+      "service": "refrncr.audit.record_security_event",
+      "interface_entrypoints": ["Internal browser security boundary"],
+      "kind": "mutation",
+      "classification": "security-audited",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 implementation: browser security boundaries call this centralized helper with a stable allowlisted event and trusted actor only when established.",
+      "technical_logging": "REF-70 may record only a safe operational summary; it never copies the durable event payload.",
+      "events": [
+        ["security", "security.login_failed"],
+        ["security", "security.session_rejected"],
+        ["security", "security.authorization_denied"],
+        ["security", "security.csrf_rejected"],
+        ["security", "security.workflow_token_rejected"]
+      ],
+      "object_identifier": "Fresh UUID identifying the attempt, never a submitted account, object, key, session or token identifier.",
+      "actor_source": "Resolved server-side session actor when known; otherwise null only for catalog-approved unauthenticated outcomes.",
+      "allowed_context": {
+        "security:security.login_failed": {},
+        "security:security.session_rejected": {},
+        "security:security.authorization_denied": {},
+        "security:security.csrf_rejected": {},
+        "security:security.workflow_token_rejected": {}
+      },
+      "success": "Exactly one append-only event with no details is committed for the classified security outcome.",
+      "validation_failure": "Ordinary form validation creates no event; catalog validation rejects unknown names or context before persistence.",
+      "authorization_failure": "Denied access retains the existing non-disclosing response while recording only actor when established and a random attempt ID.",
+      "stale_input": "Only rejected protected session/review/import workflow identities are audited; ordinary stale business writes retain their existing behavior.",
+      "no_op": "No event is emitted for successful ordinary reads or validation-only outcomes.",
+      "rollback": "The security event is one existing audit-only write transaction; insertion or commit failure cannot leave a partial audit row.",
+      "duplicate_retry": "Each independently rejected request is one attempt and one event; request secrets are never used as idempotency keys.",
+      "tests": [
+        "tests/test_security_audit.py::test_security_event_catalog_is_content_free",
+        "tests/test_security_audit.py::test_failed_login_and_admin_denial_are_audited_without_secrets"
+      ],
+      "implementation_status": "Implemented by REF-31 for the current Community browser security boundaries.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing installation database / AuditEvent."
+    },
+    {
       "capability": "UserService",
       "operation": "create_initial_admin",
       "service": "refrncr.services.UserService.create_initial_admin",
@@ -38,7 +80,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_initial_admin_success_failure_and_duplicate"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -81,7 +123,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -124,7 +166,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -167,7 +209,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -210,7 +252,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -253,7 +295,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -318,7 +360,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -393,7 +435,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -436,7 +478,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -479,7 +521,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -522,7 +564,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -565,7 +607,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -608,7 +650,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -651,7 +693,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -700,7 +742,7 @@
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
         "tests/test_audit_coverage.py::test_composite_events_and_team_cascade_contract"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -732,7 +774,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -765,7 +807,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -798,7 +840,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -852,7 +894,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -898,7 +940,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -950,7 +992,7 @@
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
         "tests/test_audit_coverage.py::test_composite_events_and_team_cascade_contract"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -997,7 +1039,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1044,7 +1086,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1082,7 +1124,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1114,7 +1156,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1146,7 +1188,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1178,7 +1220,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1214,7 +1256,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1246,7 +1288,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1307,7 +1349,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1361,7 +1403,7 @@
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
         "tests/test_audit_coverage.py::test_composite_events_and_team_cascade_contract"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1404,7 +1446,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1458,7 +1500,7 @@
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
         "tests/test_audit_coverage.py::test_composite_events_and_team_cascade_contract"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1501,7 +1543,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1544,7 +1586,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1587,7 +1629,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1629,7 +1671,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1663,7 +1705,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1711,7 +1753,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1745,7 +1787,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1788,7 +1830,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1831,7 +1873,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1874,7 +1916,7 @@
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1922,7 +1964,7 @@
         "tests/test_audit_coverage.py::test_response_construction_failure_keeps_request_and_closes_artifact",
         "tests/test_audit_coverage.py::test_export_head_and_options_have_explicit_audit_semantics"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -1955,7 +1997,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -1987,7 +2029,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -2030,7 +2072,7 @@
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
         "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -2091,7 +2133,7 @@
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
         "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
       "persistence_scope": "Existing installation database / AuditEvent."
     },
@@ -2123,7 +2165,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2160,7 +2202,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2192,7 +2234,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2229,7 +2271,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2260,7 +2302,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2298,7 +2340,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2329,7 +2371,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2366,7 +2408,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2397,7 +2439,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2428,7 +2470,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -2459,7 +2501,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Credential verification and optional hash maintenance are authentication security events (REF-31), not successful business changes.",
       "persistence_scope": "Existing authentication/session persistence; no domain event."
     },
@@ -2490,7 +2532,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Session lifecycle and invalid credentials belong to REF-31; never log tokens.",
       "persistence_scope": "Existing authentication/session persistence; no domain event."
     },
@@ -2521,7 +2563,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Session lifecycle and invalid credentials belong to REF-31; never log tokens.",
       "persistence_scope": "Existing authentication/session persistence; no domain event."
     },
@@ -2615,7 +2657,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Session lifecycle and invalid credentials belong to REF-31; never log tokens.",
       "persistence_scope": "Existing authentication/session persistence; no domain event."
     },
@@ -2647,7 +2689,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Session lifecycle and invalid credentials belong to REF-31; never log tokens.",
       "persistence_scope": "Existing authentication/session persistence; no domain event."
     },
@@ -3105,7 +3147,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3136,7 +3178,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3167,7 +3209,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3198,7 +3240,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3229,7 +3271,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3260,7 +3302,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3291,7 +3333,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3322,7 +3364,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3353,7 +3395,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3446,7 +3488,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Trusted source/proxy resolution for REF-31; never trust unvalidated forwarded request data.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -3477,7 +3519,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Trusted source/proxy resolution for REF-31; never trust unvalidated forwarded request data.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -3508,7 +3550,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication attempt outcome belongs to REF-31; process-local reservation is not domain history.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3539,7 +3581,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication attempt outcome belongs to REF-31; process-local reservation is not domain history.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3570,7 +3612,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication attempt outcome belongs to REF-31; process-local reservation is not domain history.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3601,7 +3643,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication throttling belongs to REF-31; introspection never exposes tracked identifiers in domain audit.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3632,7 +3674,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication throttling belongs to REF-31; introspection never exposes tracked identifiers in domain audit.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3663,7 +3705,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication throttling belongs to REF-31; introspection never exposes tracked identifiers in domain audit.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3694,7 +3736,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication throttling belongs to REF-31; introspection never exposes tracked identifiers in domain audit.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3725,7 +3767,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Authentication capacity rejection belongs to REF-31, with bounded diagnostic counters only.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -3809,7 +3851,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Transport/session security decision belongs to REF-31; cookies and session values are excluded.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -4196,7 +4238,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Missing, duplicated or mismatched CSRF submissions are REF-31 security events; never store token values.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -4229,7 +4271,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Insecure browser transport is refused; REF-31 logs a safe reason without cookies or request payload.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -4260,7 +4302,7 @@
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
       ],
-      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security logging remains unimplemented.",
+      "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "Oversized login/import/form requests belong to REF-31; never store upload or request contents.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },

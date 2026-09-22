@@ -150,3 +150,10 @@ operational authentication/audit failures return a fixed 503. CLI access logs re
 the entire API target so business identifiers and query attempts are not recorded.
 This local implementation supersedes the future-adapter wording above; public
 OpenAPI/Swagger is public under REF-109; see [documentation security](rest-api.md#public-openapi-and-swagger-ref-109).
+# Security audit boundary
+
+Creation, revocation and successful authentication retain their existing transactional `api_key.*`
+events. Invalid, expired, revoked and otherwise unusable credentials retain the uniform
+`api_key.authentication_failed` event and public `invalid_api_credentials` response. Neither stored
+nor rendered audit data contains the bearer value, verifier, key name, claimed public key ID or
+request headers.

@@ -26,6 +26,7 @@ from flask import (
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
+from refrncr.audit import record_security_event
 from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
 from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
@@ -142,6 +143,14 @@ def create_flask_app(
     api_keys: ApiKeyService | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    security_uow = getattr(users, "uow", None)
+
+    def audit_security(action, *, actor_user_id=None):
+        # Small interface/unit doubles used by tests may not compose persistence.
+        # Production Community UserService always supplies the shared UoW factory.
+        if security_uow is not None:
+            record_security_event(security_uow, action, actor_user_id=actor_user_id)
+
     review_secret = (
         review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
     )
@@ -261,6 +270,7 @@ def create_flask_app(
             return None
         resolved = sessions.resolve_with_session(token)
         if resolved is None:
+            audit_security("security.session_rejected")
             g.stale_cookie_settings = settings
         g.authenticated_resolution = resolved
         return resolved
@@ -374,6 +384,10 @@ def create_flask_app(
     def require_admin():
         resolved = authenticated()
         if resolved is None or resolved[0].role != "admin":
+            audit_security(
+                "security.authorization_denied",
+                actor_user_id=resolved[0].id if resolved else None,
+            )
             abort(403)
         return resolved
 
@@ -583,7 +597,14 @@ def create_flask_app(
         def secured(*args, **kwargs):
             try:
                 return function(*args, **kwargs)
-            except (NotFoundError, AuthorizationError):
+            except AuthorizationError:
+                resolved = getattr(g, "authenticated_resolution", None)
+                audit_security(
+                    "security.authorization_denied",
+                    actor_user_id=resolved[0].id if resolved else None,
+                )
+                abort(404)
+            except NotFoundError:
                 abort(404)
             except HTTPException:
                 raise
@@ -604,6 +625,9 @@ def create_flask_app(
         except TypeError:
             matches = False
         if not matches:
+            resolved = getattr(g, "authenticated_resolution", None)
+            if resolved is not None:
+                audit_security("security.csrf_rejected", actor_user_id=resolved[0].id)
             abort(403)
 
     def render_anonymous_template(template_name: str, **context):
@@ -924,8 +948,10 @@ def create_flask_app(
             try:
                 identity = decode_discard(request.form["confirmation"], session.id, review_secret)
             except ValueError:
+                audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
                 raise NotFoundError("Concept not found") from None
             if identity.actor_id != actor.id or identity.dataset_id != dataset.id:
+                audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
                 raise NotFoundError("Concept not found")
             try:
                 if request.form["confirmed"] != "yes":
@@ -975,12 +1001,15 @@ def create_flask_app(
     def review_identity(actor, session, dataset):
         tokens = request.args.getlist("review")
         if len(tokens) != 1:
+            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
             raise NotFoundError("Review not found")
         try:
             identity = decode_review(tokens[0], session.id, review_secret)
         except ValueError:
+            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
             raise ConflictError("This review link is no longer valid. Reload the review.") from None
         if identity.dataset_id != dataset.id or identity.actor_id != actor.id:
+            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
             raise NotFoundError("Review not found")
         return identity, tokens[0]
 
@@ -1565,7 +1594,20 @@ def create_flask_app(
             def secured_import(*args, **kwargs):
                 try:
                     return function(*args, **kwargs)
-                except (NotFoundError, AuthorizationError):
+                except AuthorizationError:
+                    resolved = getattr(g, "authenticated_resolution", None)
+                    audit_security(
+                        "security.authorization_denied",
+                        actor_user_id=resolved[0].id if resolved else None,
+                    )
+                    return "The import has expired or is unavailable. Upload the file again.", 404
+                except NotFoundError:
+                    resolved = getattr(g, "authenticated_resolution", None)
+                    if resolved is not None:
+                        audit_security(
+                            "security.workflow_token_rejected",
+                            actor_user_id=resolved[0].id,
+                        )
                     return "The import has expired or is unavailable. Upload the file again.", 404
                 except ImportValidationError as error:
                     return render_authenticated_template(
@@ -2453,6 +2495,7 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         if not authorization_service.check_access(actor_id, "dataset", dataset.id, "admin"):
+            audit_security("security.authorization_denied", actor_user_id=actor_id)
             abort(404)
         return dataset
 
@@ -2758,9 +2801,11 @@ def create_flask_app(
             )
             attempt = login_limiter.reserve(source_key, account_key)
             if attempt is None:
+                audit_security("security.login_failed")
                 return invalid_credentials_response()
             if oversized_identifier:
                 attempt.failed()
+                audit_security("security.login_failed")
                 return invalid_credentials_response()
             if field_errors:
                 attempt.failed()
@@ -2775,6 +2820,7 @@ def create_flask_app(
             permit = authentication_admission.try_acquire()
             if permit is None:
                 attempt.cancel()
+                audit_security("security.login_failed")
                 return invalid_credentials_response()
             try:
                 with permit:
@@ -2798,6 +2844,7 @@ def create_flask_app(
                 response.delete_cookie(settings.anonymous_csrf_name, **settings.common_options)
                 return response
             attempt.failed()
+            audit_security("security.login_failed")
             return invalid_credentials_response()
         return anonymous_csrf_form_response(
             "pages/auth/login.html", next_target=return_target, field_errors={}, email=None
@@ -2968,6 +3015,12 @@ def create_flask_app(
             "revoke_dataset_export_access",
         }:
             return "Dataset not found", 404
+        if isinstance(error, AuthorizationError):
+            resolved = getattr(g, "authenticated_resolution", None)
+            audit_security(
+                "security.authorization_denied",
+                actor_user_id=resolved[0].id if resolved else None,
+            )
         status = 403 if isinstance(error, AuthorizationError) else 400
         return str(error), status
 

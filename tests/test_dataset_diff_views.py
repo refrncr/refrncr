@@ -162,7 +162,11 @@ def test_direct_diff_routes_never_disclose_to_denied_actor(context, kind):  # no
         assert response.status_code == (302 if kind in {"inactive", "deleted"} else 404)
         assert "new" not in response.text and "draft" not in response.text
         assert "Scheduled" not in response.text and "Changed values" not in response.text
-    assert len(audits(c)) == before
+    new_events = audits(c)[before:]
+    if kind in {"inactive", "deleted"}:
+        assert [event.action for event in new_events] == ["security.session_rejected"]
+    else:
+        assert new_events == []
 
 
 @pytest.mark.parametrize(

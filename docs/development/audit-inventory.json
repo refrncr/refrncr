@@ -1320,9 +1320,10 @@
     "move_field delegates to replace_order; Dataset context/details reads delegate to their existing read services. Composite writes are described in the matrix, not counted as independent bulk operations.",
     "GrantService has no current HTTP/CLI administration endpoint; it remains a supported programmatic service for legacy and non-Dataset resources.",
     "Pure validators, serializers, ORM CRUD ports/adapters and parser helpers are implementation mechanisms, not independent business entrypoints. Their owning service/administrative operation is classified.",
-    "No background business worker, API credentials, publication/versioning, Dataset deletion or authenticated business API exists. Alembic upgrade/downgrade is the operator migration capability, not user history."
+    "No background business worker exists. API credentials, publication/versioning, Dataset deletion and authenticated Current reads are inventoried. Alembic upgrade/downgrade is the operator migration capability, not user history."
   ],
   "support_operations": [
+    "refrncr.audit.record_security_event",
     "refrncr.browser_security.BrowserCookiePolicy.for_request",
     "refrncr.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
     "refrncr.login_security.LoginAttemptLimiter.allow",

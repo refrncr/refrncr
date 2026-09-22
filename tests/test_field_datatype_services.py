@@ -51,7 +51,13 @@ def snapshot(factory):
         return (
             list(session.execute(select(DatasetRecord.id, DatasetRecord.revision))),
             list(session.execute(select(Dataset.content_updated_at))),
-            list(session.execute(select(AuditEvent.id, AuditEvent.action, AuditEvent.details))),
+            list(
+                session.execute(
+                    select(AuditEvent.id, AuditEvent.action, AuditEvent.details).where(
+                        AuditEvent.object_type != "security"
+                    )
+                )
+            ),
         )
 
 
