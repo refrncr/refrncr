@@ -18,6 +18,7 @@ from refrncr.services import (
 )
 
 LIFETIME = timedelta(days=90)
+LAST_USED_INTERVAL = timedelta(minutes=15)
 TOKEN = re.compile(r"Bearer (rfr_([0-9a-f]{32})\.([A-Za-z0-9_-]{43}))", re.IGNORECASE | re.ASCII)
 
 
@@ -175,11 +176,9 @@ class ApiKeyService:
         key_id = str(UUID(match[2])) if match else None
         principal = None
         with self.uow(write=True, serialized=True, translate_errors=True) as work:
-            candidate = work.api_keys.get(key_id) if key_id else None
+            candidate = work.api_keys.get(key_id, for_update=True) if key_id else None
             if candidate is not None:
-                actor = work.users.get(candidate.owner_id, for_update=True)
-                # Reload after the owner lock: a concurrent revoke must be visible.
-                candidate = work.api_keys.get(key_id, fresh=True)
+                actor = work.users.get(candidate.owner_id)
             else:
                 actor = None
             digest = self._digest(match[1] if match else "invalid")
@@ -197,8 +196,11 @@ class ApiKeyService:
                 and actor.is_active
                 and not actor.is_deleted
             ):
-                candidate.last_used_at = now
-                self._audit(work, actor.id, candidate.id, "api_key.authenticated")
+                work.api_keys.update_last_used(
+                    candidate.id,
+                    used_at=now,
+                    cutoff=now - LAST_USED_INTERVAL,
+                )
                 principal = AuthenticatedPrincipal(actor.id)
             else:
                 # Untrusted input never supplies actor or object identity. This UUID

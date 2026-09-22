@@ -63,8 +63,9 @@ return 200. See the [HTTP contract](../development/rest-api.md).
 No migration, stored sort key, second persistence path, new domain event, browser
 rewrite or additional process. Pydantic becomes an explicit existing-transitive
 dependency; FastAPI/Pydantic are constrained to tested minor lines. The read API
-still incurs REF-40 authentication audit writes and owner-row locking per request,
-including a 304. A publication/access change after a read snapshot begins affects
+conditionally refreshes the REF-40 `last_used_at` indication at most once per 15 minutes,
+including a 304, without a durable success audit or owner-row lock. A
+publication/access change after a read snapshot begins affects
 subsequent reads; in-flight coherent reads may finish.
 
 Database sorting can scan/sort identifiers; Python memory holds schema and one page,

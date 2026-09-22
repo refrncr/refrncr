@@ -88,8 +88,10 @@ The root ASGI operational middleware logs registered route templates rather than
 API paths or querystrings and never logs Authorization or request/response content.
 Configure reverse proxies and independent hosting to apply the same redaction boundary.
 The HTTP boundary consumes unexpected exceptions without exposing exception payloads.
-REF-40 authentication continues its existing payload-free audit and last-used write;
-ordinary data reads/304 add no domain event. No new rate limiter, telemetry or security
+Successful API-key authentication creates no durable success-audit row. It marks only the
+existing safe request-completion event with `authentication: "api_key"` and conditionally
+refreshes `last_used_at` at most once per 15 minutes, including for 304 responses. Ordinary
+data reads/304 add no domain event. No new rate limiter, telemetry or security
 logging platform is claimed. Protect the existing pepper and use HTTPS externally.
 
 ## Conditional requests

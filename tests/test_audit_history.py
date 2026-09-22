@@ -313,6 +313,22 @@ def test_all_contracts_have_safe_presentations(history):
         assert len(view.context) == len(contract.context)
 
 
+def test_historical_api_key_success_keeps_owner_presentation(history):
+    h = history
+    event_id = seed(
+        h,
+        1,
+        actor=h.reader,
+        kind="api_key",
+        action="api_key.authenticated",
+        target=str(uuid4()),
+    )[0]
+    view = h.service.get_event(h.admin, event_id)
+    assert view.action_label == "API key authentication succeeded"
+    assert view.actor_label == "User"
+    assert view.actor_id == h.reader
+
+
 @pytest.mark.parametrize(
     "value",
     ["<script>alert(1)</script>", {"secret": "token"}, ["password"], True, None, "x" * 10000, -1],

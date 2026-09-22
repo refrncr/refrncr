@@ -1,6 +1,6 @@
 """Focused API-key operations participating in the caller's transaction."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 
 from refrncr.models import ApiKey
 
@@ -9,10 +9,11 @@ class SqlAlchemyApiKeyOperations:
     def __init__(self, session):
         self.session = session
 
-    def get(self, key_id, *, fresh=False):
-        return self.session.scalar(
-            select(ApiKey).where(ApiKey.id == key_id).execution_options(populate_existing=fresh)
-        )
+    def get(self, key_id, *, fresh=False, for_update=False):
+        statement = select(ApiKey).where(ApiKey.id == key_id)
+        if for_update:
+            statement = statement.with_for_update()
+        return self.session.scalar(statement.execution_options(populate_existing=fresh))
 
     def get_owned(self, owner_id, key_id):
         return self.session.scalar(
@@ -43,3 +44,16 @@ class SqlAlchemyApiKeyOperations:
         key = ApiKey(**values)
         self.session.add(key)
         return key
+
+    def update_last_used(self, key_id, *, used_at, cutoff):
+        """Record recent use only when the persisted indication is stale."""
+        result = self.session.execute(
+            update(ApiKey)
+            .where(
+                ApiKey.id == key_id,
+                or_(ApiKey.last_used_at.is_(None), ApiKey.last_used_at < cutoff),
+            )
+            .values(last_used_at=used_at)
+            .execution_options(synchronize_session=False)
+        )
+        return result.rowcount == 1

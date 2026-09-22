@@ -376,15 +376,19 @@ Responses use `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
 
 ## REF-40 API keys
 
-REF-40 adds four payload-free API-key events. The product owner approved null actor solely for `api_key.authentication_failed`, enforced by contract and schema; it identifies an unauthenticated attempt, never a fabricated user. All other actor requirements remain. See [API-key audit and migration](api-keys.md) and [ADR-018](../architecture/adr-018-user-api-keys.md).
+API-key creation, revocation and failed authentication remain payload-free durable events.
+The product owner approved null actor solely for `api_key.authentication_failed`, enforced
+by contract and schema; it identifies an unauthenticated attempt, never a fabricated user.
+REF-169 stops producing per-request `api_key.authenticated` rows, while retaining that
+contract and presentation for historical records. See [API-key audit and migration](api-keys.md).
 
 ## REF-107 Current reads
 
 `DatasetVersionService.read_current` and the existing authorization service's
 bulk view decision are ordinary authorized reads with no domain event. The four
-FastAPI data routes are traced through the inventory/coverage matrix. REF-40
-`authenticate` remains the only new-request audit producer, including conditional
-304 requests. It stores no HTTP target, identifier, Record values or headers.
+FastAPI data routes are traced through the inventory/coverage matrix. Successful
+authentication, including conditional 304 requests, produces no durable audit row and
+adds only the fixed `api_key` authentication marker to the safe request-completion log.
 API errors suppress exception payloads and the supported CLI redacts API access-log
 targets; independent hosting/proxies require the same privacy boundary.
 
@@ -393,6 +397,6 @@ targets; independent hosting/proxies require the same privacy boundary.
 
 The generated OpenAPI document and static Swagger page are explicitly excluded
 technical reads: they call no data/authentication service and emit no audit event.
-Try it out invokes the unchanged protected REF-107 routes and REF-40 payload-free
-authentication audits. The inventory guard resolves registered operations in nested
+Try it out invokes the unchanged protected REF-107 routes and their safe operational
+request-completion logging. The inventory guard resolves registered operations in nested
 Python modules as well as the existing top-level modules.

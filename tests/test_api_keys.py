@@ -10,7 +10,8 @@ import pytest
 from sqlalchemy import select
 from test_audit_coverage import audit_db  # noqa: F401
 
-from refrncr.api_keys import LIFETIME, ApiKeyAuthenticationError, ApiKeyService
+from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
+from refrncr.api_keys import LAST_USED_INTERVAL, LIFETIME, ApiKeyAuthenticationError, ApiKeyService
 from refrncr.audit import AuditContractError, validate_event
 from refrncr.audit_presentation import present_event
 from refrncr.models import ApiKey, AuditEvent
@@ -55,7 +56,7 @@ def test_lifecycle_and_secret_redaction(keys, caplog):
         events = list(
             session.scalars(select(AuditEvent).where(AuditEvent.object_type == "api_key"))
         )
-        assert {e.action for e in events} == {"api_key.created", "api_key.authenticated"}
+        assert {e.action for e in events} == {"api_key.created"}
         assert all(e.details is None for e in events)
         assert created.secret not in repr([e.__dict__ for e in events])
     service.revoke_key(admin.id, created.key.id, 1, confirmed=True)
@@ -325,6 +326,7 @@ def test_unknown_wrong_secret_and_unicode_fail_closed(keys):
             service.authenticate(value)
         assert failure.value.body == {"error": "invalid_api_credentials"}
         assert value not in str(failure.value)
+        assert service.get_key(user.id, key.key.id).last_used_at is None
 
 
 def test_corrupt_verifier_and_pepper_rotation_fail_closed(keys):
@@ -425,8 +427,7 @@ def test_secret_copy_controller():
     )
 
 
-@pytest.mark.parametrize("operation", ["revoke", "authenticate"])
-def test_audit_failure_rolls_back_revoke_and_use(keys, monkeypatch, operation):
+def test_audit_failure_rolls_back_revoke_and_use(keys, monkeypatch):
     _, sessions, _, _, user, service, _ = keys
     created = service.create_key(user.id, "Preserve")
     with sessions() as session:
@@ -440,15 +441,70 @@ def test_audit_failure_rolls_back_revoke_and_use(keys, monkeypatch, operation):
 
     monkeypatch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail)
     with pytest.raises(RuntimeError, match="test audit failure"):
-        if operation == "revoke":
-            service.revoke_key(user.id, created.key.id, 1, confirmed=True)
-        else:
-            service.authenticate("Bearer " + created.secret)
+        service.revoke_key(user.id, created.key.id, 1, confirmed=True)
     persisted = service.get_key(user.id, created.key.id)
     assert persisted.status == "Active" and persisted.revision == 1
     assert persisted.last_used_at is None
     with sessions() as session:
         assert list(session.execute(select(AuditEvent.id))) == before
+
+
+def test_success_has_no_durable_audit_and_throttles_last_used(keys):
+    _, sessions, _, _, user, service, now = keys
+    created = service.create_key(user.id, "Recent use")
+
+    assert service.authenticate("Bearer " + created.secret).id == user.id
+    first_use = now[0]
+    now[0] += LAST_USED_INTERVAL
+    service.authenticate("Bearer " + created.secret)
+    assert service.get_key(user.id, created.key.id).last_used_at == first_use
+
+    now[0] += timedelta(microseconds=1)
+    service.authenticate("Bearer " + created.secret)
+    assert service.get_key(user.id, created.key.id).last_used_at == now[0]
+    with sessions() as session:
+        assert not list(
+            session.scalars(select(AuditEvent).where(AuditEvent.action == "api_key.authenticated"))
+        )
+
+
+def test_last_used_update_failure_rolls_back_and_fails_closed(keys, monkeypatch):
+    _, _, _, _, user, service, _ = keys
+    created = service.create_key(user.id, "Rollback use")
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("test last-used failure")
+
+    monkeypatch.setattr(SqlAlchemyApiKeyOperations, "update_last_used", fail)
+    with pytest.raises(RuntimeError, match="test last-used failure"):
+        service.authenticate("Bearer " + created.secret)
+    assert service.get_key(user.id, created.key.id).last_used_at is None
+
+
+def test_concurrent_authentication_refreshes_last_used_once(keys, monkeypatch):
+    _, _, _, _, user, service, _ = keys
+    created = service.create_key(user.id, "Concurrent use")
+    barrier = Barrier(2)
+    outcomes = []
+    original = SqlAlchemyApiKeyOperations.update_last_used
+
+    def observe(operation, *args, **kwargs):
+        updated = original(operation, *args, **kwargs)
+        outcomes.append(updated)
+        return updated
+
+    monkeypatch.setattr(SqlAlchemyApiKeyOperations, "update_last_used", observe)
+
+    def authenticate(_):
+        barrier.wait(timeout=10)
+        return service.authenticate("Bearer " + created.secret)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert [principal.id for principal in executor.map(authenticate, range(2))] == [
+            user.id,
+            user.id,
+        ]
+    assert sorted(outcomes) == [False, True]
 
 
 def test_authentication_waits_for_committing_revoke(keys, monkeypatch):

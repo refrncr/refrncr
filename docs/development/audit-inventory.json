@@ -1,4 +1,7 @@
 {
+  "historical_event_contracts": [
+    ["api_key", "api_key.authenticated"]
+  ],
   "service_operations": [
     "refrncr.api_keys.ApiKeyService.authenticate",
     "refrncr.api_keys.ApiKeyService.create_key",
