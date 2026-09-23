@@ -1688,6 +1688,19 @@ class DatasetRecordService:
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             identifier = uow.dataset_business_keys.get(dataset.id)
             values, encoded_identifier = self._validated_values(fields, identifier, submitted)
+            unique_values = tuple(
+                (value.field_id, value.canonical_key) for value in values if value.is_unique
+            )
+            existing_unique = uow.dataset_records.existing_unique_value_keys(
+                dataset.id, unique_values
+            )
+            if existing_unique:
+                field_by_id = {field.id: field for field in fields}
+                conflicting_field = field_by_id[next(iter(existing_unique))[0]]
+                raise RecordConflictError(
+                    f"{conflicting_field.name} must be unique; this value already exists",
+                    conflicting_field.key,
+                )
             record = uow.dataset_records.create(
                 dataset_id=dataset.id, identifier_key=encoded_identifier
             )

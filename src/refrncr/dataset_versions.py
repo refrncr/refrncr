@@ -551,13 +551,19 @@ class DatasetVersionService:
                 uow, actor_id, key, version_id, prefer_concept=prefer_concept
             )
             search = search_term(search)
-            if record_status not in {"active", "deleted", "all"}:
-                raise RecordSearchError("Choose Active, Deleted or All.")
+            selected_changes = tuple(record_status.split(",")) if record_status != "all" else ()
+            change_order = ("added", "edited", "deleted")
+            if (
+                any(change not in change_order for change in selected_changes)
+                or tuple(change for change in change_order if change in selected_changes)
+                != selected_changes
+            ):
+                raise RecordSearchError("Choose Added, Edited or Deleted filters.")
             if (
                 not isinstance(statuses, tuple)
                 or any(status not in {"Added", "Changed", "Deleted"} for status in statuses)
                 or len(set(statuses)) != len(statuses)
-                or (state is not None and (statuses or record_status == "deleted"))
+                or (state is not None and (statuses or selected_changes))
             ):
                 raise RecordSearchError("Choose valid statuses for this Dataset version.")
             context = self._read_context(uow, dataset, state)
@@ -609,37 +615,42 @@ class DatasetVersionService:
             ordered = sorted(chain(records, removed), key=sort_key)
             term = normalize("NFC", search).casefold()
             matching = [record for record in ordered if matches(record, fields, term)]
-            matching_deleted = sum(record.id in deleted_ids for record in matching)
-            status_counts = (len(matching) - matching_deleted, matching_deleted)
-            ordered = [
-                record
-                for record in matching
-                if record_status == "all"
-                or (record.id in deleted_ids) == (record_status == "deleted")
-            ]
-            if statuses and state is None:
-                projected = {}
-                for offset in range(0, len(ordered), 500):
+            projected = {}
+            imported = {}
+            if state is None:
+                for offset in range(0, len(matching), 500):
                     projected.update(
                         uow.version_diff.record_states(
                             dataset.id,
                             concept.base_version_id,
-                            tuple(r.id for r in ordered[offset : offset + 500]),
+                            tuple(r.id for r in matching[offset : offset + 500]),
                         )
                     )
                 imported = (concept.import_result or {}).get("records", {})
-                ordered = [
-                    r
-                    for r in ordered
-                    if (
-                        "Deleted"
-                        if r.id in deleted_ids
-                        else projected.get(
-                            r.id, imported.get(r.id) if imported.get(r.id) != "Deleted" else None
-                        )
+            raw_states = {
+                record.id: (
+                    "Deleted"
+                    if record.id in deleted_ids
+                    else projected.get(
+                        record.id,
+                        imported.get(record.id) if imported.get(record.id) != "Deleted" else None,
                     )
-                    in statuses
-                ]
+                )
+                for record in matching
+            }
+            status_counts = tuple(
+                sum(raw_states[record.id] == raw for record in matching)
+                for raw in ("Added", "Changed", "Deleted")
+            )
+            ordered = matching
+            if selected_changes:
+                selected_raw = {
+                    {"added": "Added", "edited": "Changed", "deleted": "Deleted"}[change]
+                    for change in selected_changes
+                }
+                ordered = [record for record in ordered if raw_states[record.id] in selected_raw]
+            if statuses and state is None:
+                ordered = [record for record in ordered if raw_states[record.id] in statuses]
             page_size = DatasetRecordService.PAGE_SIZE
             start = ((page or 1) - 1) * page_size
             record_page = RecordPage(
@@ -648,17 +659,11 @@ class DatasetVersionService:
                 page_size,
                 len(ordered) if page is not None else context.record_count,
             )
-            states = (
-                uow.version_diff.record_states(
-                    dataset.id, concept.base_version_id, tuple(r.id for r in record_page.records)
-                )
-                if state is None
-                else {}
-            )
-            if statuses and state is None and concept.import_result:
-                for record_id, imported_status in concept.import_result.get("records", {}).items():
-                    if imported_status != "Deleted":
-                        states.setdefault(record_id, imported_status)
+            states = {
+                record.id: raw_states[record.id]
+                for record in record_page.records
+                if raw_states.get(record.id) is not None
+            }
             statuses = {"Changed": "Edited", "Added": "Added", "Removed": "Deleted"}
             export = self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
             return VersionRead(

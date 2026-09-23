@@ -148,7 +148,7 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
         assert response.status_code == 200
         assert "Private" not in response.text
         metadata = response.text.split('<p class="metadata">', 1)[1].split("</p>", 1)[0]
-        assert metadata.index("Version 1") < metadata.index("1 record") < metadata.index("Updated")
+        assert metadata.index("V1") < metadata.index("1 record") < metadata.index("Updated")
         assert "Current · Read only" not in response.text
         assert "Edit field" not in response.text and "Add record" not in response.text
         if suffix.endswith("records"):

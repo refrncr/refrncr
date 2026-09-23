@@ -297,7 +297,7 @@ def test_dataset_list_selects_concept_without_current(dataset_browser):  # noqa:
     html = body(request(client, "get", "/datasets"))
     assert "href='/datasets/polish/concept/records'" in html
     version_cell = re.search(r"<td>\s*<a class='badge badge-draft badge-link'.*?</td>", html)
-    assert version_cell and "Concept in progress</a>" in version_cell.group()
+    assert version_cell and "title='Concept in progress'>Concept</a>" in version_cell.group()
     assert "title='configuration'" in html
     assert "href='/datasets/polish/configure'" in html
     assert request(client, "get", "/datasets/polish/concept/records").status_code == 200

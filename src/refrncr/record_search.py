@@ -6,6 +6,7 @@ from unicodedata import normalize
 from refrncr.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
 
 MAX_QUERY_BYTES = 32 * 1024
+RECORD_CHANGE_FILTERS = ("added", "edited", "deleted")
 
 
 class RecordSearchError(ValueError):
@@ -87,9 +88,16 @@ def parse_parameters(items):
         raise RecordSearchError("Import statuses require import results.")
     if values.get("action", "") not in {"", "search", "apply"}:
         raise RecordSearchError("Invalid search action.")
-    status = values.get("record_status", "all" if values.get("import_results") else "active")
-    if status not in {"active", "deleted", "all"}:
-        raise RecordSearchError("Choose Active, Deleted or All.")
+    status = values.get("record_status", "all")
+    selected_changes = tuple(status.split(",")) if status != "all" else ()
+    if (
+        not selected_changes
+        and status != "all"
+        or any(change not in RECORD_CHANGE_FILTERS for change in selected_changes)
+        or tuple(change for change in RECORD_CHANGE_FILTERS if change in selected_changes)
+        != selected_changes
+    ):
+        raise RecordSearchError("Choose Added, Edited or Deleted filters.")
     page = values.get("page", "1")
     if not page.isascii() or not page.isdecimal() or page.startswith("0") or len(page) > 9:
         raise RecordSearchError("Page must be a canonical positive integer.")

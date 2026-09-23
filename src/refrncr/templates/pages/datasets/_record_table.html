@@ -26,7 +26,7 @@
               {{ field_metadata(field, disclosure=true) }}
             </th>
           {% endfor %}
-          <th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>
+          {% if not version_state %}<th scope='col' class='record-system-status' aria-label='Status (application metadata)'>Status <span class='system-column-label'>System</span></th>{% endif %}
         </tr>
       </thead>
       <tbody>
@@ -52,7 +52,7 @@
               </td>
             {% endfor %}
 
-            <td class='record-system-status'><span class='badge {{ "badge-published" if status == "Published" else "badge-removed" if status == "Deleted" else "badge-draft" }}'>{{ status }}</span></td>
+            {% if not version_state %}<td class='record-system-status'><span class='badge {{ "badge-published" if status == "Published" else "badge-removed" if status == "Deleted" else "badge-draft" }}'>{{ status }}</span></td>{% endif %}
           {% endcall %}
         {% endfor %}
       </tbody>

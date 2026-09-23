@@ -8,8 +8,6 @@
 a.badge-link, a.badge-link:hover { text-decoration: none; }
 .empty-state { padding: var(--space-xxl) var(--space-lg); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); text-align: center; }
 .empty-state h2 { margin-top: 0; }
-/* Status badges carry a dot plus text, so colour is never the only signal. */
-:is(.badge-success, .badge-warning, .badge-error, .badge-info, .badge-draft, .badge-published, .badge-removed)::before { content: ""; width: .3125rem; height: .3125rem; border-radius: var(--radius-full); background: currentColor; flex-shrink: 0; }
 .badge-draft { color: var(--color-status-draft); background: var(--color-status-draft-surface); border-color: var(--color-status-draft-border); }
 .badge-published { color: var(--color-status-published); background: var(--color-status-published-surface); border-color: var(--color-status-published-border); }
 .badge-removed { color: var(--color-status-removed); background: var(--color-status-removed-surface); border-color: var(--color-status-removed-border); }

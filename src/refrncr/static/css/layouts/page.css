@@ -46,6 +46,7 @@
 .breadcrumbs a:hover { color: var(--color-link-hover); }
 .metadata { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-sm); color: var(--color-text-muted); font-size: var(--font-size-body-sm); line-height: normal; font-variant-numeric: tabular-nums; }
 .metadata-item { display: inline-flex; align-items: baseline; gap: var(--space-sm); min-width: 0; }
+.metadata-version { display: inline-flex; align-items: baseline; gap: var(--space-xs); min-width: 0; }
 .metadata-item > span:last-child { min-width: 0; }
 
 .page-context { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }

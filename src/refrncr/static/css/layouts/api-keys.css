@@ -1,3 +1,6 @@
 /* Credential pages must not participate in cross-document transition snapshots. */
 @view-transition { navigation: none; }
 .settings-content h2 { overflow-wrap: anywhere; }
+.api-key-revoke-form .form-actions { margin-top: var(--space-xl); }
+.api-key-table .api-key-identifier { width: 7rem; max-width: 7rem; }
+.api-key-table .api-key-identifier code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
