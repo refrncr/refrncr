@@ -372,6 +372,11 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "New button-action record" in page
     assert "class='button button-primary' type='submit'>Create record</button>" in page
     assert "action='/datasets/button-actions/records'" in page
+    assert re.search(
+        r"id='add-record-panel'.*?data-panel-host>\s*<form class='side-panel-form'",
+        page,
+        re.DOTALL,
+    )
     assert "name='csrf_token'" in page
     assert "for='new-record-code'" in page
     assert "id='new-record-code' name='code' type='text' required autofocus" in page
@@ -380,6 +385,41 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "name='q'" in page
     assert ">Filter</button>" not in page and ">Sort</button>" not in page
     assert "Showing 0–0 of 0" in page
+
+
+def test_duplicate_unique_record_value_stays_in_panel_with_field_error(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "unique-records")
+    create_field(
+        services,
+        admin,
+        dataset,
+        "code",
+        "ISO code",
+        is_required=True,
+        is_unique=True,
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "NL"})
+    login(client)
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/records",
+        data={"code": "NL", "csrf_token": session_csrf(client, services)},
+    )
+    page = body(response)
+
+    assert response.status_code == 409
+    assert "class='side-panel-view' data-side-panel-content" in page
+    assert "data-panel-title='New unique-record record'" in page
+    assert "value='NL'" in page
+    assert "id='new-record-code'" in page
+    assert "aria-invalid='true' aria-describedby='new-record-code-error'" in page
+    assert "id='new-record-code-error' role='alert'" in page
+    assert "ISO code must be unique; this value already exists" in page
+    assert "A unique field value already exists" not in page
 
 
 def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
@@ -728,15 +768,10 @@ def test_record_table_pagination_keeps_range_and_links(dataset_browser):
     second = body(request(client, "get", f"/datasets/{dataset.key}/concept/records?page=2"))
 
     assert "Showing 1–50 of 51" in first
-    assert (
-        "href='/datasets/pages/concept/records?page=2&amp;record_status=active'>Next</a>" in first
-    )
+    assert "href='/datasets/pages/concept/records?page=2'>Next</a>" in first
     assert ">Previous</a>" not in first
     assert "Showing 51–51 of 51" in second
-    assert (
-        "href='/datasets/pages/concept/records?page=1&amp;record_status=active'>Previous</a>"
-        in second
-    )
+    assert "href='/datasets/pages/concept/records?page=1'>Previous</a>" in second
     assert ">Next</a>" not in second
 
 

@@ -14,6 +14,8 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .record-toolbar > span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }
+.table-scroll:has(> .record-table) { max-height: calc(100dvh - 2 * var(--app-main-padding)); overflow: auto; }
+.record-table thead th { position: sticky; z-index: 1; top: 0; box-shadow: var(--shadow-sm); }
 .record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }
 /* The cap limits how wide a column asks to be; once the table is laid out, the text fills its cell. */
 .record-table .cell-content { min-width: 100%; }
@@ -89,7 +91,7 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-toolbar-search .record-search-form .search-field { flex: 1 1 12rem; min-width: 0; max-width: none; }
 /* Record status: two independent toggles on the search row (Active, Deleted). */
 .record-toolbar form.record-status-toggles, .record-status-toggles { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: var(--space-sm); align-items: center; margin-inline-start: auto; }
-.status-toggle { display: inline-flex; align-items: baseline; gap: .375rem; min-height: 1.75rem; padding: .25rem .5rem; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); line-height: 1.5; letter-spacing: .02em; cursor: pointer; }
+.status-toggle { display: inline-flex; align-items: center; gap: .375rem; min-height: var(--control-height-compact); padding: .25rem .5rem; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); line-height: 1.5; letter-spacing: .02em; cursor: pointer; }
 .status-toggle:hover { border-color: var(--color-control-border); color: var(--color-text); }
 .status-toggle[aria-pressed="true"] { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
 .status-toggle[aria-disabled="true"] { cursor: default; }
@@ -134,9 +136,8 @@ table time[title] { cursor: help; text-decoration: underline dotted var(--color-
 .relationship-list li { min-width: 0; overflow-wrap: anywhere; }
 .relationship-cell { max-width: 24rem; }
 .mobile-cell-label { display: none; }
-/* The pill text shares its baseline with the version label beside it; the status dot stays centred. */
+/* Pill text shares its baseline with the version label beside it. */
 .dataset-table .badge-link { vertical-align: baseline; align-items: baseline; }
-.dataset-table .badge-link::before { align-self: center; }
 @media (max-width: 767px) {
   .mobile-cell-label { display: block; font-size: var(--font-size-xs); color: var(--color-text-muted); }
   .relationship-cell { max-width: none; }

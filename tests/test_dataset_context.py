@@ -250,7 +250,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
     assert "<th scope='col'>Updated</th>" in page
     assert "<td class='numeric-column'>—</td>" in page
     assert "<th scope='col'>Version</th>" in page
-    assert "href='/datasets/context/versions'>Concept in progress</a>" in page
+    assert "href='/datasets/context/versions' title='Concept in progress'>Concept</a>" in page
     assert "No current version" not in page
     assert "7 Sep 2026, 12:58 UTC" not in page
     for path in (

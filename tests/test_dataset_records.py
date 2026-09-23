@@ -344,10 +344,11 @@ def test_required_unknown_duplicate_identifier_and_unique_value(record_services)
         services.dataset_records.create_record(
             admin.id, dataset.key, {"code": "one", "amount": "1.00"}
         )
-    with pytest.raises(RecordConflictError, match="unique"):
+    with pytest.raises(RecordConflictError, match="Day must be unique") as unique:
         services.dataset_records.create_record(
             admin.id, dataset.key, {"code": "two", "amount": "2", "day": "2024-01-01"}
         )
+    assert unique.value.field_key == "day"
 
 
 def test_optional_absence_ordering_and_pagination(record_services):

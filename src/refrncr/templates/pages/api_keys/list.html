@@ -8,10 +8,10 @@
   <p>Keys use your current permissions. Keep at most five active keys. To rotate, create a replacement, update your integration, then revoke the old key.</p>
   {% if keys %}
   <div class="table-scroll" tabindex="0" role="region" aria-label="Your API keys">
-    <table><caption class="visually-hidden">Your API key history</caption>
-      <thead><tr><th scope="col">Name</th><th scope="col">Identifier</th><th scope="col">Created</th><th scope="col">Expires</th><th scope="col">Last used</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+    <table class="api-key-table"><caption class="visually-hidden">Your API key history</caption>
+      <thead><tr><th scope="col">Name</th><th class="api-key-identifier" scope="col">Identifier</th><th scope="col">Created</th><th scope="col">Expires</th><th scope="col">Last used</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
       <tbody>{% for key in keys %}<tr>
-        <th scope="row">{{ key.name }}</th><td><code>{{ key.prefix }}</code></td>
+        <th scope="row">{{ key.name }}</th><td class="api-key-identifier"><code tabindex="0" title="{{ key.prefix }}" aria-label="Identifier {{ key.prefix }}">{{ key.prefix }}</code></td>
         <td><time datetime="{{ key.created_at.isoformat() }}">{{ key.created_at|absolute_utc }}</time></td>
         <td><time datetime="{{ key.expires_at.isoformat() }}">{{ key.expires_at|absolute_utc }}</time></td>
         <td>{% if key.last_used_at %}<time datetime="{{ key.last_used_at.isoformat() }}">{{ key.last_used_at|absolute_utc }}</time>{% else %}Never{% endif %}</td>

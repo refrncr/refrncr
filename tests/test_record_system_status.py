@@ -109,11 +109,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         response = request(browser, "get", route)
         assert response.status_code == 200
         html = response.text
-        assert (
-            html.count("class='record-system-status'><span class='badge badge-published'>Published")
-            == 3
-        )
-        assert "Status (application metadata)" in html
+        assert "record-system-status" not in html
+        assert "Status (application metadata)" not in html
         content_headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
         assert [re.sub(r"<[^>]+>", "", h).strip() for h in content_headers[2:5]] == [
             "Status",

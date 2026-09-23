@@ -1379,8 +1379,8 @@ def create_flask_app(
                 name in parameters for name in ("import_results", "status_selection")
             ):
                 raise RecordSearchError("Import results require a Concept.")
-            if not concept and record_status != "active":
-                raise RecordSearchError("Deleted and All are available only in a Concept.")
+            if not concept and record_status != "all":
+                raise RecordSearchError("Change filters are available only in a Concept.")
             import_results = (
                 concept
                 and parameters.get("import_results") == "1"
@@ -1401,7 +1401,7 @@ def create_flask_app(
             )
             criteria_parameters = {
                 "q": view.search or None,
-                "record_status": record_status if concept else None,
+                "record_status": record_status if concept and record_status != "all" else None,
             }
             if import_results:
                 criteria_parameters.update(import_results=1, status=selected_statuses)
@@ -1487,6 +1487,21 @@ def create_flask_app(
                 **criteria_parameters,
             )
 
+        change_order = ("added", "edited", "deleted")
+        selected_changes = set() if record_status == "all" else set(record_status.split(","))
+        record_change_options = []
+        for label, value, count in zip(
+            ("Added", "Edited", "Deleted"),
+            change_order,
+            view.status_counts,
+            strict=True,
+        ):
+            target_changes = selected_changes ^ {value}
+            target = (
+                ",".join(change for change in change_order if change in target_changes) or "all"
+            )
+            record_change_options.append((label, count, value in selected_changes, target))
+
         return render_template(
             "pages/datasets/records.html",
             dataset=dataset,
@@ -1508,7 +1523,7 @@ def create_flask_app(
                 q=view.search or None,
                 record_status="all",
             ),
-            has_criteria=bool(view.search or import_results or record_status != "active"),
+            has_criteria=bool(view.search or import_results or record_status != "all"),
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,
@@ -1533,6 +1548,7 @@ def create_flask_app(
             },
             deleted_count=view.deleted_count,
             status_counts=view.status_counts,
+            record_change_options=tuple(record_change_options),
             record_search=view.search,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -2105,6 +2121,9 @@ def create_flask_app(
     ):
         submitted = submitted or {}
         errors = errors or {}
+        record_type = (
+            dataset.key[:-3] + "y" if dataset.key.endswith("ies") else dataset.key.removesuffix("s")
+        )
         response = render_authenticated_template(
             "pages/datasets/records/form.html",
             dataset=dataset,
@@ -2113,6 +2132,7 @@ def create_flask_app(
             submitted=submitted,
             errors=errors,
             record=record,
+            record_type=record_type,
         )
         return (response, status) if status != 200 else response
 
@@ -2189,7 +2209,7 @@ def create_flask_app(
                 fields,
                 csrf=login_session.csrf_token,
                 submitted=submitted,
-                errors={"_record": str(error)},
+                errors={error.field_key or "_record": str(error)},
                 status=409,
             )
         except NotFoundError:

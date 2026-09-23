@@ -15,10 +15,10 @@
         {{ navigation_button('settings-sidebar') }}
       </div>
       <nav id="settings-navigation" class="primary-navigation" aria-label="Settings navigation">
-        <a class="nav-item{{ ' is-active' if active_navigation == 'api_keys' else '' }}" href="{{ url_for('api_key_list') }}"{% if active_navigation == 'api_keys' %} aria-current="page"{% endif %}>{{ settings_icon() }}API keys</a>
         <p class="nav-label">Access management</p>
         {% if current_actor.role == "admin" %}<a class="nav-item{{ ' is-active' if active_navigation == 'users' else '' }}" href="{{ url_for('user_list') }}"{% if active_navigation == 'users' %} aria-current="page"{% endif %}>{{ user_icon() }}Users</a>{% endif %}
         <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>{{ team_icon() }}Teams</a>
+        <a class="nav-item{{ ' is-active' if active_navigation == 'api_keys' else '' }}" href="{{ url_for('api_key_list') }}"{% if active_navigation == 'api_keys' %} aria-current="page"{% endif %}>{{ settings_icon() }}API keys</a>
         {% if current_actor and current_actor.role == 'admin' %}
           <p class="nav-label">Activity</p>
           <a class="nav-item{{ ' is-active' if active_navigation == 'audit' else '' }}" href="{{ url_for('audit_list') }}"{% if active_navigation == 'audit' %} aria-current="page"{% endif %}>{{ audit_icon() }}Audit log</a>

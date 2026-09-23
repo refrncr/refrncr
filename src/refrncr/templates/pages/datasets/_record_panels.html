@@ -4,14 +4,16 @@
 
 {% if may_edit %}
   {% call side_panel("add-record-panel", "New " ~ record_type ~ " record", "add-record-title", "Add record", "add-record-description") %}
-    <form class='side-panel-form' method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
-      <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
-      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-      <footer class='side-panel-footer'>
-        <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
-        <button class='button button-primary' type='submit'>Create record</button>
-      </footer>
-    </form>
+    <div class='side-panel-view' data-panel-host>
+      <form class='side-panel-form' method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
+        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
+        <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+        <footer class='side-panel-footer'>
+          <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
+          <button class='button button-primary' type='submit'>Create record</button>
+        </footer>
+      </form>
+    </div>
   {% endcall %}
 {% endif %}
 
@@ -22,6 +24,7 @@
   {% set title_id = "record-panel-title-" ~ record.id %}
   {% set description_id = "record-panel-description-" ~ record.id %}
   {% call side_panel(panel_id, record_labels.get(record.id) or record.id, title_id, "View record", description_id, true, "record") %}
+    <div class='side-panel-view' data-panel-host>
     <section class='side-panel-view' data-panel-view='view'>
       <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
         {% if deleted %}<p class='record-deletion-notice'><span class='badge badge-removed'>Deleted</span><br>This Record will be removed when you publish. These are the retained values from deletion.</p>{% endif %}
@@ -69,5 +72,6 @@
         </footer>
       </form>
     {% endif %}
+    </div>
   {% endcall %}
 {% endfor %}

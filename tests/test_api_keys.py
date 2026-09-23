@@ -365,6 +365,8 @@ def test_browser_revoke_validation_idor_and_api_key_cannot_login(keys):
     other = service.create_key(admin.id, "Private")
     base = "https://localhost"
     path = "/settings/api-keys/" + own.key.id + "/revoke"
+    response = client.get(path, base_url=base)
+    assert 'class="api-key-revoke-form"' in response.get_data(as_text=True)
     assert client.post(path, data={"csrf_token": "wrong"}, base_url=base).status_code == 403
     response = client.post(path, data={"csrf_token": csrf, "revision": "1"}, base_url=base)
     assert response.status_code == 400
