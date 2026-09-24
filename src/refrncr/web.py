@@ -159,6 +159,7 @@ def create_flask_app(
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
+    app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -699,6 +700,11 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
         eligible_teams = _auth.datasets.creation_teams(actor.id)
+        available_reference_tables = tuple(
+            context.dataset
+            for context in service.list_dataset_overview(actor.id)
+            if context.dataset.kind == "reference"
+        )
         return render_template(
             "pages/datasets/create.html",
             dataset_icon_choices=DATASET_ICONS,
@@ -710,6 +716,13 @@ def create_flask_app(
             key=key or (key_from_name(name) if not error else ""),
             name=name,
             description=description,
+            table_kind=request.form.get("kind", "reference"),
+            mapping_mode=request.form.get("mapping_mode", "standalone"),
+            source_system=request.form.get("source_system", ""),
+            target_system=request.form.get("target_system", ""),
+            source_dataset_id=request.form.get("source_dataset_id", ""),
+            target_dataset_id=request.form.get("target_dataset_id", ""),
+            available_reference_tables=available_reference_tables,
             error=error,
             error_field=error_field,
             current_actor=actor,
@@ -744,6 +757,12 @@ def create_flask_app(
                 description,
                 submitted_teams[0],
                 icon=request.form.get("icon", ""),
+                kind=request.form.get("kind", "reference"),
+                mapping_mode=request.form.get("mapping_mode") or None,
+                source_system=request.form.get("source_system") or None,
+                target_system=request.form.get("target_system") or None,
+                source_dataset_id=request.form.get("source_dataset_id") or None,
+                target_dataset_id=request.form.get("target_dataset_id") or None,
             )
         except (ValidationError, ConflictError) as error:
             message = str(error)
@@ -806,6 +825,7 @@ def create_flask_app(
             dataset = configuration.dataset
             editable = configuration.may_maintain
             may_govern = configuration.may_govern
+            may_edit_key = configuration.may_edit_key
             context, state, identifier = None, None, None
             fields, field_states = (), {}
             try:
@@ -822,6 +842,7 @@ def create_flask_app(
                 )
             schema_admin, may_start_concept = False, False
         else:
+            may_edit_key = False
             try:
                 view = dataset_versions.read(
                     actor.id, key, version_id, page=None, prefer_concept=concept
@@ -849,6 +870,8 @@ def create_flask_app(
                 for change in (g.concept_ui.field_changes if concept else ())
             }
             may_start_concept = view.may_maintain and view.concept is None
+            if editable:
+                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             if view.state is not None:
                 field_context_label = (
                     f"{view.state.status} · Version {view.state.version.number} · Read only"
@@ -885,6 +908,8 @@ def create_flask_app(
             editable=editable,
             edit_mode=edit_mode,
             name=dataset.name if name is None else name,
+            technical_key=request.form.get("technical_key", dataset.key),
+            may_edit_key=may_edit_key,
             description=dataset.description if description is None else description,
             error=error,
             error_field=error_field,
@@ -2411,6 +2436,7 @@ def create_flask_app(
         require_csrf(login_session.csrf_token)
         name = request.form.get("name", "")
         description = request.form.get("description", "")
+        technical_key = request.form.get("technical_key")
         try:
             owner_change = None
             if {"owner_team_id", "expected_owner_team_id"} & set(request.form):
@@ -2432,6 +2458,7 @@ def create_flask_app(
                 description,
                 owner_change=owner_change,
                 icon=request.form.get("icon"),
+                new_key=technical_key,
             )
         except NotFoundError:
             abort(404)
@@ -2443,6 +2470,8 @@ def create_flask_app(
             message = str(error)
             if message.startswith("Dataset name"):
                 error_field = "name"
+            elif message.startswith("Dataset key"):
+                error_field = "technical_key"
             elif message.startswith("Dataset description"):
                 error_field = "description"
             else:

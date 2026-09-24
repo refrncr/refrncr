@@ -173,6 +173,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.DatasetAuthorizationService.creation_teams",
+        "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -186,6 +187,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.DatasetAuthorizationService.creation_teams",
         "refrncr.services.DatasetService.create_dataset",
+        "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]

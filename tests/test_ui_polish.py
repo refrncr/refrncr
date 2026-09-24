@@ -560,7 +560,8 @@ def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):  # 
     assert "id='dataset-edit-form'" in editing
     assert "Save dataset" in editing and ">Cancel</a>" in editing
     assert "data-side-panel-content" not in editing
-    assert "<dt>Key</dt>" not in editing and "<code>inline-edit</code>" in editing
+    assert "<dt>Technical name</dt>" not in editing
+    assert "name='technical_key'" in editing and "value='inline-edit'" in editing
     assert "name='key'" not in editing
     assert "name='owner_team_id'" in editing and "name='icon'" in editing
     csrf = session_csrf(client, s)

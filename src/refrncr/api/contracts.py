@@ -82,6 +82,7 @@ class Dataset(Contract):
     name: str
     description: str
     icon: str | None
+    kind: Literal["reference", "mapping"]
     version: VersionMetadata
 
 

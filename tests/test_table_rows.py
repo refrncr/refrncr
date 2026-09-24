@@ -89,7 +89,7 @@ def test_shared_table_row_controller():
 
 
 @pytest.mark.parametrize(
-    "kind,columns", [("datasets", 5), ("teams", 3), ("users", 5), ("records", 3)]
+    "kind,columns", [("datasets", 6), ("teams", 3), ("users", 5), ("records", 3)]
 )
 def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
     _, services, admin, client = dataset_browser

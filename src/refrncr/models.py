@@ -200,6 +200,17 @@ class Dataset(Base):
         CheckConstraint("length(description) <= 10000", name="ck_datasets_description_length"),
         UniqueConstraint("key", name="uq_datasets_key"),
         CheckConstraint("revision >= 1", name="ck_datasets_revision"),
+        CheckConstraint("kind IN ('reference', 'mapping')", name="ck_datasets_kind"),
+        CheckConstraint(
+            "(kind = 'reference' AND mapping_mode IS NULL) OR "
+            "(kind = 'mapping' AND mapping_mode IN ('standalone', 'linked'))",
+            name="ck_datasets_mapping_mode",
+        ),
+        CheckConstraint(
+            "kind = 'mapping' OR (source_system IS NULL AND target_system IS NULL "
+            "AND source_dataset_id IS NULL AND target_dataset_id IS NULL)",
+            name="ck_datasets_mapping_metadata",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -207,6 +218,20 @@ class Dataset(Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     icon: Mapped[str | None] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(16), default="reference", server_default="reference")
+    mapping_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    source_system: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    target_system: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    source_dataset_id: Mapped[str | None] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT", name="fk_datasets_mapping_source"),
+        nullable=True,
+        index=True,
+    )
+    target_dataset_id: Mapped[str | None] = mapped_column(
+        ForeignKey("datasets.id", ondelete="RESTRICT", name="fk_datasets_mapping_target"),
+        nullable=True,
+        index=True,
+    )
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     # owner_user_id is retained as historical creator metadata, never authority.
     owner_team_id: Mapped[str] = mapped_column(

@@ -73,12 +73,20 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "Edit dataset" not in actions
     details = section(page, "dataset-details-heading")
     assert ("Edit dataset" in details) == (permission != "viewer")
-    for label in ("Owning team", "Key", "Icon", "Version", "Fields", "Created"):
+    for label in (
+        "Owning team",
+        "Technical name",
+        "Icon",
+        "Version",
+        "Fields",
+        "Created",
+    ):
         assert f"<dt>{label}</dt>" in details
     assert "<p class='dataset-identity-name'>Reference data</p>" in details
     assert "</svg>Test data domain</span>" in details
     assert "No description provided" in details
-    assert "<dd><code>overview</code> <span class='badge'>Permanent</span>" in details
+    expected_key_status = "Permanent" if permission == "viewer" else "Editable until published"
+    assert expected_key_status in details
     assert f"<dt>Fields</dt><dd>{count}</dd>" in details
     assert "<dt>Records</dt><dd>0</dd>" in details
     version_label = "Version 1 · Current" if version else "Concept in progress"

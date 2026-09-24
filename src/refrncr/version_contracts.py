@@ -139,6 +139,7 @@ class PublishedDataset:
     version_number: int
     owner_user_id: str = ""
     icon: str | None = None
+    kind: str = "reference"
 
 
 @dataclass(frozen=True, slots=True)

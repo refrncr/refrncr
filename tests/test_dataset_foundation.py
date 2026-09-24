@@ -12,7 +12,15 @@ from sqlalchemy.engine import make_url
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Dataset, Grant, ImmutableDatasetKeyError, User
+from refrncr.models import (
+    AuditEvent,
+    Dataset,
+    DatasetBusinessKeyField,
+    DatasetField,
+    Grant,
+    ImmutableDatasetKeyError,
+    User,
+)
 from refrncr.persistence import (
     SqlAlchemyDatasetOperations,
     SqlAlchemyGrantOperations,
@@ -80,6 +88,94 @@ def test_create_dataset_persists_metadata_team_creator_and_audit(dataset_service
         ("dataset", dataset.id, "dataset.concept_created"),
     }
     assert {event.actor_user_id for event in events} == {admin.id}
+
+
+def test_create_standalone_mapping_table_with_import_ready_schema(dataset_services):
+    _, factory, _, services, admin = dataset_services
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "sap-salesforce",
+        "SAP to Salesforce",
+        "Cost-centre crosswalk",
+        kind="mapping",
+        mapping_mode="standalone",
+        source_system=" SAP ECC ",
+        target_system=" Salesforce ",
+    )
+
+    assert mapping.kind == "mapping"
+    assert mapping.mapping_mode == "standalone"
+    assert mapping.source_system == "SAP ECC"
+    assert mapping.target_system == "Salesforce"
+    with factory() as session:
+        fields = list(
+            session.scalars(
+                select(DatasetField)
+                .where(DatasetField.dataset_id == mapping.id)
+                .order_by(DatasetField.display_position)
+            )
+        )
+        keys = list(
+            session.scalars(
+                select(DatasetBusinessKeyField.field_key).where(
+                    DatasetBusinessKeyField.dataset_id == mapping.id
+                )
+            )
+        )
+    assert [field.key for field in fields] == [
+        "source_value",
+        "target_value",
+        "target_name",
+        "mapping_status",
+    ]
+    assert fields[0].is_required and fields[0].is_unique
+    assert keys == ["source_value"]
+
+
+def test_linked_mapping_requires_visible_reference_source(dataset_services):
+    _, _, _, services, admin = dataset_services
+    source = create_owned_dataset(services.datasets, admin.id, "source", "Source", "")
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "linked",
+        "Linked",
+        "",
+        kind="mapping",
+        mapping_mode="linked",
+        source_dataset_id=source.id,
+    )
+    assert mapping.source_dataset_id == source.id
+    assert mapping.target_dataset_id is None
+    with pytest.raises(ValidationError, match="source table"):
+        create_owned_dataset(
+            services.datasets,
+            admin.id,
+            "missing-source",
+            "Missing source",
+            "",
+            kind="mapping",
+            mapping_mode="linked",
+        )
+
+
+@pytest.mark.parametrize(
+    ("kind", "mode"),
+    [("unknown", None), ("mapping", None), ("mapping", "many-to-many")],
+)
+def test_invalid_mapping_type_configuration_is_rejected(dataset_services, kind, mode):
+    _, _, _, services, admin = dataset_services
+    with pytest.raises(ValidationError):
+        create_owned_dataset(
+            services.datasets,
+            admin.id,
+            f"invalid-{kind}-{mode}",
+            "Invalid",
+            "",
+            kind=kind,
+            mapping_mode=mode,
+        )
 
 
 @pytest.mark.parametrize("key", ["a", "a" * 100, "a_b-c9"])

@@ -360,6 +360,20 @@ class SqlAlchemyDatasetOperations:
             )
         return result.rowcount == 1
 
+    def rename_key(self, dataset_id: str, key: str) -> None:
+        """Controlled key correction; lifecycle authorization belongs to the service."""
+        try:
+            result = self.session.execute(
+                update(Dataset)
+                .where(Dataset.id == dataset_id)
+                .values(_key=key)
+                .execution_options(synchronize_session="fetch")
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+        if result.rowcount != 1:
+            raise PersistenceConflictError()
+
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         if dataset_ids == ():
             return []

@@ -1165,7 +1165,9 @@
       "operation": "list_dataset_overview",
       "service": "refrncr.services.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets"
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.new_dataset GET /datasets/new",
+        "refrncr.web.create_dataset POST /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

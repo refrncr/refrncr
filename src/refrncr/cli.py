@@ -269,6 +269,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0021_ref_40",
         "0022_ref_31",
         "0023_ref_176",
+        "0024_ref_177",
     }:
         return
     inspector = inspect(connection)
@@ -449,6 +450,7 @@ def main(
                             "0021_ref_40",
                             "0022_ref_31",
                             "0023_ref_176",
+                            "0024_ref_177",
                         }
                         if args.command == "dataset-concept-preflight"
                         else {
@@ -462,6 +464,7 @@ def main(
                             "0021_ref_40",
                             "0022_ref_31",
                             "0023_ref_176",
+                            "0024_ref_177",
                         }
                     )
                     if revision not in allowed:

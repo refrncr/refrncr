@@ -231,7 +231,9 @@ class DatasetVersionService:
                 pairs, total = ((dataset, version),), version.record_count
             result = CurrentRead(
                 tuple(
-                    CurrentPublication(d.key, d.name, d.description, d.icon, d.updated_at, v)
+                    CurrentPublication(
+                        d.key, d.name, d.description, d.icon, d.kind, d.updated_at, v
+                    )
                     for d, v in pairs
                 ),
                 total,
@@ -414,6 +416,7 @@ class DatasetVersionService:
             version.id,
             version.number,
             icon=dataset.icon,
+            kind=dataset.kind,
         )
         return DatasetOverview(
             published, version.record_count, version.published_at, owner_team_name

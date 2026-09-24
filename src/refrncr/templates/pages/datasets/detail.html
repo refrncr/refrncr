@@ -8,14 +8,14 @@
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
-{% block title %}Configure {{ dataset.name }} · REFRNCR{% endblock %}
+{% block title %}Configure {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 
 {% block content %}
   {% if request.args.get('notice') == 'discarded' %}
   {{ feedback('Concept discarded. Current was not changed.', kind='success') }}
   {% endif %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=dataset.icon or 'table') %}
+    {% call page_context("Configure " ~ (dataset.name|dataset_title), content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=dataset.icon or 'table') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -46,14 +46,19 @@
           <div class='dataset-identity-card'>
             <span class='dataset-icon-tile'>{{ dataset_icon(dataset.icon) }}</span>
             <div>
-              <p class='dataset-identity-name'>{{ dataset.name }}</p>
+              <p class='dataset-identity-name'>{{ dataset.name|dataset_title }}</p>
               {% if dataset.description %}<p class='dataset-identity-description'>{{ dataset.description }}</p>
               {% else %}<p class='dataset-identity-description dataset-identity-empty'>No description provided</p>{% endif %}
             </div>
           </div>
           <dl class='detail-list'>
             <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
-            <div><dt>Key</dt><dd><code>{{ dataset.key }}</code> <span class='badge'>Permanent</span><span class='detail-hint'>Used in exports and the API. It cannot be changed.</span></dd></div>
+            <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Concept is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
+            <div><dt>Table type</dt><dd>{{ 'Mapping table' if dataset.kind == 'mapping' else 'Reference table' }}</dd></div>
+            {% if dataset.kind == 'mapping' %}
+            <div><dt>Mapping mode</dt><dd>{{ dataset.mapping_mode|capitalize }}</dd></div>
+            <div><dt>Systems</dt><dd>{{ dataset.source_system or 'Unspecified' }} → {{ dataset.target_system or 'Unspecified' }}</dd></div>
+            {% endif %}
             <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
           </dl>
         </div>

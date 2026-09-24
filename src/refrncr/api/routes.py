@@ -51,6 +51,7 @@ def _dataset(publication):
         name=publication.name,
         description=publication.description,
         icon=publication.icon,
+        kind=publication.kind,
         version=_version(publication),
     )
 

@@ -61,6 +61,7 @@ class CurrentPublication:
     name: str
     description: str
     icon: str | None
+    kind: str
     metadata_updated_at: datetime
     version: PublishedVersion
 

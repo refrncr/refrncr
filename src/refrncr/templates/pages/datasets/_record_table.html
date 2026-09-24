@@ -21,8 +21,10 @@
       <thead>
         <tr>
           {% for field in fields %}
+            {% set mapping_system = dataset.source_system if dataset.kind == 'mapping' and field.key == 'source_value' else dataset.target_system if dataset.kind == 'mapping' and field.key == 'target_value' else none %}
+            {% if dataset.kind == 'mapping' and field.key == 'target_value' %}<th scope='col' class='mapping-direction-column'><span class='visually-hidden'>Mapping direction</span></th>{% endif %}
             <th scope='col'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
-              {{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}{% endif %}
+              {% if mapping_system %}<span class='mapping-field-heading'><span class='mapping-system-name' title='{{ mapping_system }}'>{{ mapping_system }}</span><span class='mapping-field-role'>{{ 'Source' if field.key == 'source_value' else 'Target' }}{% if field.key in identifier.field_keys %} {{ key_icon() }}{% endif %}</span></span>{% else %}{{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}{% endif %}{% endif %}
               {{ field_metadata(field, disclosure=true) }}
             </th>
           {% endfor %}
@@ -35,6 +37,7 @@
           {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
+              {% if dataset.kind == 'mapping' and field.key == 'target_value' %}<td class='mapping-direction-column'><span aria-hidden='true'>→</span><span class='visually-hidden'>maps to</span></td>{% endif %}
               <td{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
                 {% set value_content %}
                 {% if cell_value is none %}

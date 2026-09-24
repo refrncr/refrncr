@@ -856,6 +856,12 @@ class DatasetService:
         owner_team_id: str | None = None,
         *,
         icon: str | None = None,
+        kind: str = "reference",
+        mapping_mode: str | None = None,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        source_dataset_id: str | None = None,
+        target_dataset_id: str | None = None,
     ) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
             if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
@@ -871,6 +877,26 @@ class DatasetService:
                 raise ValidationError(
                     "Choose an available owning team you may create datasets for."
                 )
+            kind, mapping_mode, source_system, target_system = self._mapping_metadata(
+                kind, mapping_mode, source_system, target_system
+            )
+            if kind == "mapping" and mapping_mode == "linked":
+                if not source_dataset_id:
+                    raise ValidationError("Choose a source table for a linked mapping table.")
+                for label, linked_id in (
+                    ("source", source_dataset_id),
+                    ("target", target_dataset_id),
+                ):
+                    if not linked_id:
+                        continue
+                    linked = uow.datasets.get(linked_id)
+                    visible = linked is not None and self.authorization.check_access(
+                        actor_id, "dataset", linked.id, "viewer", uow=uow
+                    )
+                    if not visible or linked.kind != "reference":
+                        raise ValidationError(f"Choose an available reference {label} table.")
+            else:
+                source_dataset_id = target_dataset_id = None
             dataset = uow.datasets.create(
                 key=validate_dataset_key(key),
                 name=normalize_dataset_name(name),
@@ -878,6 +904,12 @@ class DatasetService:
                 owner_user_id=actor_id,
                 owner_team_id=owner_team_id,
                 icon=validate_dataset_icon(icon),
+                kind=kind,
+                mapping_mode=mapping_mode,
+                source_system=source_system,
+                target_system=target_system,
+                source_dataset_id=source_dataset_id,
+                target_dataset_id=target_dataset_id,
             )
             try:
                 uow.flush()
@@ -894,7 +926,50 @@ class DatasetService:
                 details={"owner_team_id": owner_team_id, "creator_user_id": actor_id},
             )
             _version_reads(self).create_concept(actor_id, dataset.id, uow=uow)
+            if kind == "mapping":
+                for position, (field_key, field_name, required, unique) in enumerate(
+                    (
+                        ("source_value", "Source value", True, True),
+                        ("target_value", "Target value", False, False),
+                        ("target_name", "Target name", False, False),
+                        ("mapping_status", "Status", False, False),
+                    ),
+                    1,
+                ):
+                    uow.dataset_fields.create(
+                        dataset_id=dataset.id,
+                        key=field_key,
+                        name=field_name,
+                        data_type="string",
+                        is_required=required,
+                        is_unique=unique,
+                        display_position=position,
+                    )
+                uow.dataset_business_keys.replace(dataset.id, ("source_value",))
+                uow.flush()
             return dataset
+
+    @staticmethod
+    def _mapping_metadata(kind, mapping_mode, source_system, target_system):
+        if kind not in {"reference", "mapping"}:
+            raise ValidationError("Choose a valid table type.")
+        if kind == "reference":
+            return kind, None, None, None
+        if mapping_mode not in {"standalone", "linked"}:
+            raise ValidationError("Choose standalone or linked mapping mode.")
+
+        def label(value, name):
+            value = value.strip() if isinstance(value, str) else ""
+            if len(value) > 200:
+                raise ValidationError(f"{name} must be 200 characters or fewer.")
+            return value or None
+
+        return (
+            kind,
+            mapping_mode,
+            label(source_system, "Source system"),
+            label(target_system, "Target system"),
+        )
 
     def change_owner(self, actor_id, key, expected_owner_team_id, owner_team_id):
         key = self._validated_lookup_key(key)
@@ -1082,7 +1157,12 @@ class DatasetService:
             govern = self.authorization.datasets.can_change_dataset_owner(
                 actor_id, dataset.id, uow=uow
             )
-            return DatasetConfiguration(dataset, maintain, govern)
+            may_edit_key = (
+                maintain
+                and uow.concepts.get(dataset.id) is not None
+                and not uow.versions.list_for_dataset(dataset.id)
+            )
+            return DatasetConfiguration(dataset, maintain, govern, may_edit_key)
 
     def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
         return self._get_dataset_with_access(actor_id, key, "editor")
@@ -1106,8 +1186,10 @@ class DatasetService:
         *,
         owner_change: tuple[str, str] | None = None,
         icon: str | None = None,
+        new_key: str | None = None,
     ) -> DatasetRecord:
         validated_key = self._validated_lookup_key(key)
+        validated_new_key = validated_key if new_key is None else validate_dataset_key(new_key)
         normalized_name = normalize_dataset_name(name)
         validated_description = validate_dataset_description(description)
         with self.uow(write=True, serialized=True) as uow:
@@ -1119,11 +1201,27 @@ class DatasetService:
             ):
                 raise NotFoundError("Dataset not found")
             validated_icon = dataset.icon if icon is None else validate_dataset_icon(icon)
+            key_changed = dataset.key != validated_new_key
+            if key_changed and (
+                uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
+            ):
+                raise ValidationError(
+                    "Dataset key can only be changed before the first version is published."
+                )
             metadata_changed = (
                 dataset.name != normalized_name or dataset.description != validated_description
             )
-            if not metadata_changed and dataset.icon == validated_icon:
+            if not key_changed and not metadata_changed and dataset.icon == validated_icon:
                 return dataset
+            if key_changed:
+                try:
+                    uow.datasets.rename_key(dataset.id, validated_new_key)
+                except PersistenceConflictError as exc:
+                    if exc.constraint == "uq_datasets_key":
+                        raise ConflictError(
+                            "Dataset key already exists in this installation"
+                        ) from exc
+                    raise
             dataset.icon = validated_icon
             dataset.name = normalized_name
             dataset.description = validated_description
@@ -1132,6 +1230,12 @@ class DatasetService:
                 uow,
                 self._audit(actor_id, "dataset", dataset.id, "metadata_updated"),
             )
+            try:
+                uow.flush()
+            except PersistenceConflictError as exc:
+                if exc.constraint == "uq_datasets_key":
+                    raise ConflictError("Dataset key already exists in this installation") from exc
+                raise
             return dataset
 
     def _find_by_key(self, key: str) -> DatasetRecord:

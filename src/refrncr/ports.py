@@ -143,6 +143,12 @@ class DatasetRecord(Protocol):
     key: str
     name: str
     description: str
+    kind: str
+    mapping_mode: str | None
+    source_system: str | None
+    target_system: str | None
+    source_dataset_id: str | None
+    target_dataset_id: str | None
     owner_user_id: str
     owner_team_id: str
     owner_team_name: str
@@ -157,6 +163,7 @@ class DatasetConfiguration:
     dataset: DatasetRecord
     may_maintain: bool
     may_govern: bool
+    may_edit_key: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,6 +322,8 @@ class DatasetOperations(Protocol):
     def change_owner_if_expected(
         self, dataset_id: str, expected_owner_team_id: str, owner_team_id: str
     ) -> bool: ...
+
+    def rename_key(self, dataset_id: str, key: str) -> None: ...
 
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         """Current working set only; None is reserved for authorized all-resource access."""

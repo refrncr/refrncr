@@ -188,6 +188,7 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "button-tab" not in page
     assert "<table class='dataset-table' aria-label='Datasets'>" in page
     assert "<th scope='col'>Dataset</th>" in page
+    assert "<th scope='col'>Type</th>" in page
     assert "<th scope='col' class='numeric-column'>Records</th>" in page
     assert "<th scope='col'>Updated</th>" in page
     row = re.search(r"<tr class='dataset-row interactive-row'([^>]*)>(.*?)</tr>", page, re.DOTALL)
@@ -201,8 +202,9 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "<span class='row-action-label'>Name &lt;unsafe&gt;</span>" in row.group(2)
     assert "<th scope='col'>Version</th>" in page
     cells = re.findall(r"<td[^>]*>(.*?)</td>", row.group(2), re.DOTALL)
-    assert len(cells) == 5
+    assert len(cells) == 6
     assert "Concept in progress" not in cells[0]
+    assert "Reference" in cells[1]
     assert "href='/datasets/searchable/versions'" in cells[-1]
     assert "Concept in progress" in cells[-1]
     assert "Current" not in row.group(2)
@@ -210,6 +212,79 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "Name <unsafe>" not in page
     assert "<markup>" not in page
     assert "+ New dataset" in page
+
+
+def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
+    _, services, admin, client = dataset_browser
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "system-map",
+        "SAP -> Salesforce",
+        "",
+        kind="mapping",
+        mapping_mode="standalone",
+        source_system="SAP ECC",
+        target_system="Salesforce & CRM",
+    )
+    services.dataset_records.create_record(
+        admin.id,
+        mapping.key,
+        {"source_value": "1001", "target_value": "EMEA-SALES"},
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{mapping.key}/concept/records"))
+
+    assert "SAP → Salesforce" in page
+    assert "SAP -&gt; Salesforce" not in page
+    assert re.search(
+        r"mapping-field-heading.*mapping-system-name[^>]*>SAP ECC</span>.*"
+        r"mapping-field-role[^>]*>Source",
+        page,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"mapping-system-name[^>]*>Salesforce &amp; CRM</span>.*"
+        r"mapping-field-role[^>]*>Target",
+        page,
+        re.DOTALL,
+    )
+    assert "<span class='visually-hidden'>Mapping direction</span>" in page
+    assert re.search(
+        r"<td class='mapping-direction-column'><span aria-hidden='true'>→</span>"
+        r"<span class='visually-hidden'>maps to</span></td>",
+        page,
+    )
+
+    configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
+    assert "<title>Configure SAP → Salesforce · REFRNCR</title>" in configuration
+    assert "Configure SAP → Salesforce" in configuration
+    assert "<p class='dataset-identity-name'>SAP → Salesforce</p>" in configuration
+    assert "SAP -&gt; Salesforce" not in configuration
+    assert "<dt>Technical name</dt>" in configuration
+    assert "Editable until published" in configuration
+    assert "It cannot be changed after the first publication." not in configuration
+
+    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/configure?edit=1"))
+    assert "name='technical_key'" in edit_page
+    assert "value='system-map'" in edit_page
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "name": mapping.name,
+            "description": mapping.description,
+            "technical_key": "corrected-system-map",
+            "icon": mapping.icon or "",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/datasets/corrected-system-map/configure")
+    assert request(client, "get", "/datasets/system-map/configure").status_code == 404
 
 
 def test_shared_shell_marks_active_navigation_and_exposes_account_context(dataset_browser):
@@ -1150,10 +1225,11 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert response.status_code == 200
     assert "<title>Configure Stored &lt;name&gt; · REFRNCR</title>" in page
     assert "<div class='page-header page-header-actions-end'>" in page
-    assert "<p class='form-label'>Key</p>" in page
-    assert "<p class='readonly-value'><code>edit-form</code></p>" in page
-    assert "Permanent; used in exports and the API." in page
-    assert page.index("id='dataset-edit-form'") < page.index("<code>edit-form</code>")
+    assert "<label for='dataset-technical-key'>Technical name</label>" in page
+    assert "name='technical_key'" in page
+    assert "value='edit-form'" in page
+    assert "Editable until the first version is published." in page
+    assert page.index("id='dataset-edit-form'") < page.index("id='dataset-technical-key'")
     # The icon picker shows a preview and suggestions once enhanced; the name field always works.
     assert "data-icon-preview hidden" in page and "data-icon-suggestions hidden" in page
     # The default tile plus one per suggestion.

@@ -42,6 +42,34 @@
       error=error if error_field == "description" else none,
       control="textarea"
     ) }}
+    <fieldset class='form-field'>
+      <legend>Table type</legend>
+      <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference table</label>
+      <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping table</label>
+      <p class='help-text'>Mapping tables are versioned 1:1 crosswalks and use the same Concept → review → publish lifecycle.</p>
+    </fieldset>
+    <fieldset class='form-field'>
+      <legend>Mapping setup</legend>
+      <label><input type='radio' name='mapping_mode' value='standalone'{% if mapping_mode == 'standalone' %} checked{% endif %}> Standalone</label>
+      <label><input type='radio' name='mapping_mode' value='linked'{% if mapping_mode == 'linked' %} checked{% endif %}> Linked to reference tables</label>
+      <p class='help-text'>Ignored for reference tables. A linked mapping requires a source table.</p>
+    </fieldset>
+    {{ form_field("Source system", "source_system", "mapping-source-system", value=source_system, max_length=200) }}
+    {{ form_field("Target system", "target_system", "mapping-target-system", value=target_system, max_length=200) }}
+    <div class='form-field'>
+      <label for='mapping-source-table'>Source table</label>
+      <select id='mapping-source-table' name='source_dataset_id'>
+        <option value=''>None</option>
+        {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == source_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class='form-field'>
+      <label for='mapping-target-table'>Target table</label>
+      <select id='mapping-target-table' name='target_dataset_id'>
+        <option value=''>New output attribute</option>
+        {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == target_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
+      </select>
+    </div>
     {{ icon_picker(dataset_icon_choices, selected_icon) }}
     {{ team_choice(teams, owner_team_id) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>

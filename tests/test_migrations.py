@@ -40,7 +40,7 @@ from refrncr.services import (
 )
 
 
-def assert_community_schema(engine, *, dataset_revision=True):
+def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=True):
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     assert {
@@ -117,7 +117,18 @@ def assert_community_schema(engine, *, dataset_revision=True):
     grant_checks = {constraint["name"] for constraint in inspector.get_check_constraints("grants")}
     assert {"ck_grants_subject_type", "ck_grants_permission"} <= grant_checks
     dataset_columns = {column["name"] for column in inspector.get_columns("datasets")}
-    assert dataset_columns == ({"revision", "icon"} if dataset_revision else set()) | {
+    assert dataset_columns == ({"revision", "icon"} if dataset_revision else set()) | (
+        {
+            "kind",
+            "mapping_mode",
+            "source_system",
+            "target_system",
+            "source_dataset_id",
+            "target_dataset_id",
+        }
+        if mapping_tables
+        else set()
+    ) | {
         "id",
         "key",
         "name",
@@ -138,11 +149,18 @@ def assert_community_schema(engine, *, dataset_revision=True):
     dataset_checks = {
         constraint["name"] for constraint in inspector.get_check_constraints("datasets")
     }
-    assert {
+    expected_dataset_checks = {
         "ck_datasets_key_length",
         "ck_datasets_name_length",
         "ck_datasets_description_length",
-    } <= dataset_checks
+    }
+    if mapping_tables:
+        expected_dataset_checks |= {
+            "ck_datasets_kind",
+            "ck_datasets_mapping_mode",
+            "ck_datasets_mapping_metadata",
+        }
+    assert expected_dataset_checks <= dataset_checks
     dataset_foreign_keys = {
         tuple(foreign_key["constrained_columns"]): foreign_key
         for foreign_key in inspector.get_foreign_keys("datasets")
@@ -438,7 +456,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0023_ref_176"
+                "0024_ref_177"
             )
     finally:
         upgraded.dispose()
@@ -727,7 +745,7 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     command.upgrade(config, "0014_ref_145")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
-        assert_community_schema(upgraded_engine, dataset_revision=False)
+        assert_community_schema(upgraded_engine, dataset_revision=False, mapping_tables=False)
         with create_session_factory(upgraded_engine)() as session:
             persisted = session.execute(
                 select(Dataset.key, Dataset.name, Dataset.description).where(
@@ -771,7 +789,7 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     command.upgrade(config, "0014_ref_145")
     upgraded_engine = create_database_engine(f"sqlite:///{database}")
     try:
-        assert_community_schema(upgraded_engine, dataset_revision=False)
+        assert_community_schema(upgraded_engine, dataset_revision=False, mapping_tables=False)
         with create_session_factory(upgraded_engine)() as session:
             persisted_dataset = session.execute(
                 select(Dataset.key, Dataset.name, Dataset.description).where(
@@ -1001,7 +1019,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0023_ref_176"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0024_ref_177"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
