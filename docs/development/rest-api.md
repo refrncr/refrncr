@@ -12,11 +12,12 @@ OpenAPI 3.1 contract generated from the registered FastAPI routes and Pydantic m
 | --- | --- | --- |
 | `/api/v1/datasets` | Array of Dataset summaries | `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}` | Dataset summary plus ordered `fields` | None |
-| `/api/v1/datasets/{dataset_key}/records` | Array of Records | `current_version`, `pagination`, `links` |
-| `/api/v1/datasets/{dataset_key}/records/{identifier}` | One Record | `current_version` |
+| `/api/v1/datasets/{dataset_key}/records` | Array of Records | `version`, `pagination`, `links` |
+| `/api/v1/datasets/{dataset_key}/records/{identifier}` | One Record | `version` |
 
 A Dataset summary has `key`, `name`, `description`, `icon` (nullable), and
-`current_version` (`number`, `published_at`, canonical UTC timestamp).
+`version` (`number`, `published_at`, canonical UTC timestamp, and `effective_from`,
+ISO calendar date) describes the selected immutable published version.
 Name/description/icon are current Dataset metadata per ADR-017. Fields and Records
 come exclusively from its immutable Current publication. No internal Dataset,
 Field or Record UUID, publisher identity, release note or Scheduled end boundary is returned.
@@ -42,10 +43,17 @@ Do not reconstruct it from display labels, truncate it, or substitute an interna
 
 ## Pagination and validation
 
-Collections accept only `offset` (default 0, 0..2147483647) and `limit` (default 50,
+All endpoints accept `effective_date=YYYY-MM-DD` and `version=<positive number>`.
+An effective date selects the latest non-cancelled publication whose `effective_from` is
+on or before that date. A version selects that immutable publication, including a Scheduled
+publication. When combined, the version must be effective on the date or the request returns
+safe 400. A date before the first publication and an absent/cancelled version return safe 404.
+Without either selector, Current selection is unchanged.
+
+Collections also accept `offset` (default 0, 0..2147483647) and `limit` (default 50,
 1..100). Values must be ASCII whole decimal numbers in canonical notation; signs,
 leading zeroes except `0`, fractions/exponents, duplicate and unknown parameters fail.
-Querystrings are bounded to 256 bytes. Detail/lookup endpoints accept no query fields.
+Querystrings are bounded to 256 bytes.
 `pagination` contains `offset`, `limit`, `total`; `links` contains `self`, `next`,
 `previous`, with nullable next/previous. Links are application-relative paths built
 from validated keys and integers, never Host, forwarded headers, credentials or
@@ -53,9 +61,8 @@ arbitrary supplied querystrings. Reverse proxies should preserve the `/api/v1` p
 
 Dataset order is key ascending. Records retain typed canonical identifier order and
 stable internal tie-breaking. Offset beyond the result set succeeds with an empty
-array and the correct total. Only Current content is available: no Concept,
-Scheduled, Expired, Cancelled or fallback working copy. Unsupported search, filters,
-sort, version/effective-date selection, writes/imports/exports/mappings/hierarchies
+array and the correct total. No Concept, Cancelled or fallback working copy is available.
+Unsupported search, filters, sort, writes/imports/exports/mappings/hierarchies
 are not part of v1. Incompatible future changes require a new API version.
 
 ## Authentication, authorization, errors and privacy
@@ -133,7 +140,7 @@ Record collections select at most `limit` internal identities in SQL, then load 
 those identities in one joined values/Fields query. Lookup uses the existing unique
 `(version_id, identifier_key)` index. Content/authorization share one repeatable read;
 concurrent publication returns entirely the old or new version. Separate pages across
-requests can cross publications; inspect `current_version` and restart when needed.
+requests can cross publications; inspect `version` and restart when needed.
 
 No schema/index migration is introduced. PostgreSQL exact NUMERIC/C ordering and
 SQLite's exact-number/BINARY collation reproduce existing Record order without full

@@ -156,6 +156,8 @@ class DatasetVersionService:
         records=False,
         identifier=None,
         unchanged=None,
+        effective_date=None,
+        version_number=None,
     ):
         """Bounded published reads within the existing authorization/read snapshot.
 
@@ -166,16 +168,39 @@ class DatasetVersionService:
             raise ValidationError("Invalid pagination")
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValidationError("Invalid pagination")
+        if effective_date is not None and type(effective_date) is not date:
+            raise ValidationError("Invalid effective date")
+        if version_number is not None and (
+            type(version_number) is not int or not 1 <= version_number <= 2147483647
+        ):
+            raise ValidationError("Invalid version")
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             if key is None:
                 allowed = self.authorization.viewable_resources(actor_id, uow=uow)
-                pairs, total = uow.versions.current_page(
-                    self._today().date(),
-                    offset=offset,
-                    limit=limit,
-                    dataset_ids=None if allowed.all_resources else allowed.resource_ids,
-                )
+                dataset_ids = None if allowed.all_resources else allowed.resource_ids
+                if effective_date is not None:
+                    pairs, total = uow.versions.selected_page(
+                        effective_date,
+                        version_number=version_number,
+                        offset=offset,
+                        limit=limit,
+                        dataset_ids=dataset_ids,
+                    )
+                elif version_number is not None:
+                    pairs, total = uow.versions.version_page(
+                        version_number,
+                        offset=offset,
+                        limit=limit,
+                        dataset_ids=dataset_ids,
+                    )
+                else:
+                    pairs, total = uow.versions.current_page(
+                        self._today().date(),
+                        offset=offset,
+                        limit=limit,
+                        dataset_ids=dataset_ids,
+                    )
             else:
                 try:
                     validate_dataset_key(key)
@@ -186,9 +211,21 @@ class DatasetVersionService:
                     actor_id, dataset.id, uow=uow
                 ):
                     raise NotFoundError("Dataset not found")
-                version = uow.versions.current_for_datasets(
-                    (dataset.id,), self._today().date()
-                ).get(dataset.id)
+                if effective_date is not None:
+                    version = uow.versions.selected_for_datasets((dataset.id,), effective_date).get(
+                        dataset.id
+                    )
+                    if version is not None and version_number is not None:
+                        if version.number != version_number:
+                            raise ValidationError("Version was not effective on that date")
+                elif version_number is not None:
+                    version = uow.versions.version_for_datasets((dataset.id,), version_number).get(
+                        dataset.id
+                    )
+                else:
+                    version = uow.versions.current_for_datasets(
+                        (dataset.id,), self._today().date()
+                    ).get(dataset.id)
                 if version is None:
                     raise NotFoundError("Dataset not found")
                 pairs, total = ((dataset, version),), version.record_count
@@ -764,6 +801,13 @@ class DatasetVersionService:
                 if not isinstance(release_note, str) or len(release_note) > MAX_RELEASE_NOTE:
                     raise ValidationError("Release note must not exceed 2000 characters")
                 content, summary, number = self._prepare(uow, dataset, now.date())
+                if any(
+                    version.cancelled_at is None and version.effective_date == effective_date
+                    for version in uow.versions.list_for_dataset(dataset.id)
+                ):
+                    raise ValidationError(
+                        "A published version already begins on that effective date"
+                    )
                 if expected_review is not None:
                     diff._calendar_check(review_state)
                 version = uow.versions.append(

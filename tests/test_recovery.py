@@ -116,7 +116,7 @@ def _validate_restored_database(database_url, expected: RecoveryFixture, monkeyp
     try:
         with engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0022_ref_31"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0023_ref_176"
             )
         current = services.dataset_versions.read_current(
             expected.outsider_id, expected.dataset_key, records=True

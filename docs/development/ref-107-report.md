@@ -25,8 +25,8 @@ Local ADR-019 records the implementation decisions without claiming deployment.
 | --- | --- | --- |
 | `/api/v1/datasets` | `data: Dataset[]`, `pagination`, `links` | offset/limit |
 | `/api/v1/datasets/{dataset_key}` | `data: DatasetDetail`, including ordered Fields | None |
-| `/api/v1/datasets/{dataset_key}/records` | `data: Record[]`, `current_version`, pagination/links | offset/limit |
-| `/api/v1/datasets/{dataset_key}/records/{identifier}` | `data: Record`, `current_version` | None |
+| `/api/v1/datasets/{dataset_key}/records` | `data: Record[]`, `version`, pagination/links | offset/limit |
+| `/api/v1/datasets/{dataset_key}/records/{identifier}` | `data: Record`, `version` | None |
 
 Pydantic models govern JSON. Dataset summaries include key/name/description/icon
 and Current number/publication timestamp. Fields include key/name/datatype,

@@ -421,6 +421,14 @@ class DatasetVersion(Base):
     __tablename__ = "dataset_versions"
     __table_args__ = (
         UniqueConstraint("dataset_id", "number", name="uq_dataset_versions_number"),
+        Index(
+            "uq_dataset_versions_effective_date",
+            "dataset_id",
+            "effective_date",
+            unique=True,
+            sqlite_where=text("cancelled_at IS NULL"),
+            postgresql_where=text("cancelled_at IS NULL"),
+        ),
         Index("uq_dataset_versions_dataset_id", "dataset_id", "id", unique=True),
         CheckConstraint("number >= 1", name="ck_dataset_versions_number"),
         CheckConstraint("length(release_note) <= 2000", name="ck_dataset_versions_note"),

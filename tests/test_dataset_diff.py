@@ -640,7 +640,7 @@ def test_scheduled_activation_blocks_review_publication(context):  # noqa: F811
     published = c.service.publish(
         c.a.id,
         c.d.id,
-        (NOW + timedelta(days=1)).date(),
+        (NOW + timedelta(days=2)).date(),
         "",
         fresh.identity.revision,
         expected_review=fresh.identity,
@@ -707,7 +707,7 @@ def test_scheduled_activation_during_review_publication_rolls_back(context):  # 
         c.service.publish(
             c.a.id,
             c.d.id,
-            (NOW + timedelta(days=1)).date(),
+            (NOW + timedelta(days=2)).date(),
             "",
             review.identity.revision,
             expected_review=review.identity,

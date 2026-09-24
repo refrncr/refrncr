@@ -1,5 +1,6 @@
 """Additive v1 JSON contracts; no ORM, authorization or datatype parsing."""
 
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -19,6 +20,24 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
 
+class SelectionQuery(Contract):
+    effective_date: date | None = Field(
+        default=None,
+        description=(
+            "Business date in ISO calendar-date format YYYY-MM-DD, with zero-padded month "
+            "and day (for example 2026-09-30). Selects the latest publication effective "
+            "on or before that date."
+        ),
+        examples=["2026-09-30"],
+    )
+    version: int | None = Field(
+        default=None,
+        ge=1,
+        le=2147483647,
+        description="Explicit immutable published version number.",
+    )
+
+
 class PageQuery(Contract):
     offset: int = Field(
         default=0,
@@ -34,6 +53,10 @@ class PageQuery(Contract):
     )
 
 
+class CollectionQuery(PageQuery, SelectionQuery):
+    pass
+
+
 class Pagination(PageQuery):
     total: int = Field(ge=0)
 
@@ -46,11 +69,12 @@ class Links(Contract):
     previous: str | None
 
 
-class CurrentVersion(Contract):
-    """Current publication number and canonical UTC publication timestamp."""
+class VersionMetadata(Contract):
+    """Selected immutable publication metadata."""
 
     number: int = Field(ge=1)
     published_at: str = Field(examples=["2000-01-01T00:00:00Z"])
+    effective_from: str = Field(examples=["2000-01-01"])
 
 
 class Dataset(Contract):
@@ -58,7 +82,7 @@ class Dataset(Contract):
     name: str
     description: str
     icon: str | None
-    current_version: CurrentVersion
+    version: VersionMetadata
 
 
 class FieldMetadata(Contract):
@@ -108,11 +132,11 @@ class Collection[T](Contract):
 
 
 class RecordDetail(Detail[Record]):
-    current_version: CurrentVersion
+    version: VersionMetadata
 
 
 class RecordCollection(Collection[Record]):
-    current_version: CurrentVersion
+    version: VersionMetadata
 
 
 class Error(Contract):

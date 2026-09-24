@@ -42,9 +42,9 @@ Validity uses UTC calendar dates, from the existing aware UTC clock, independent
 of browser display timezone. Cancellation alone is persisted as actor/timestamp.
 Other statuses and exclusive end boundaries derive from non-cancelled successors.
 No worker or scheduled state transition is required. Current resolution never falls
-back to a future or expired snapshot. Repeated effective dates are ordered by version
-number: an earlier same-date version has an empty validity interval and remains
-historical. It cannot be returned as effective on any calendar date.
+back to a future or expired snapshot. REF-176 supersedes the former same-date ordering:
+a partial unique index on Dataset and effective date rejects ambiguous non-cancelled
+publications. Cancelling a Scheduled version releases its date for a later publication.
 
 Validate complete contents through existing Dataset/Field validators and the same
 Record canonicalization/identifier rules used by manual editing and import.

@@ -122,6 +122,96 @@ class SqlAlchemyVersionOperations:
         rows = self.session.execute(statement.order_by(Dataset.key).offset(offset).limit(limit))
         return tuple((dataset, self._version(version)) for dataset, version in rows), total
 
+    def selected_for_datasets(self, dataset_ids, effective_date, version_number=None):
+        """Select one published version per Dataset for a business date or number."""
+        if dataset_ids == ():
+            return {}
+        ranked = select(
+            DatasetVersion.id,
+            func.row_number()
+            .over(
+                partition_by=DatasetVersion.dataset_id,
+                order_by=DatasetVersion.effective_date.desc(),
+            )
+            .label("position"),
+        ).where(
+            DatasetVersion.cancelled_at.is_(None),
+            DatasetVersion.effective_date <= effective_date,
+        )
+        if dataset_ids is not None:
+            ranked = ranked.where(DatasetVersion.dataset_id.in_(dataset_ids))
+        ranked = ranked.subquery()
+        statement = (
+            select(DatasetVersion)
+            .join(ranked, ranked.c.id == DatasetVersion.id)
+            .where(ranked.c.position == 1)
+        )
+        if version_number is not None:
+            statement = statement.where(DatasetVersion.number == version_number)
+        rows = self.session.scalars(statement)
+        return {row.dataset_id: self._version(row) for row in rows}
+
+    def selected_page(
+        self,
+        effective_date,
+        *,
+        version_number=None,
+        dataset_ids=None,
+        offset,
+        limit,
+    ):
+        ranked = select(
+            DatasetVersion.id,
+            func.row_number()
+            .over(
+                partition_by=DatasetVersion.dataset_id,
+                order_by=DatasetVersion.effective_date.desc(),
+            )
+            .label("position"),
+        ).where(
+            DatasetVersion.cancelled_at.is_(None),
+            DatasetVersion.effective_date <= effective_date,
+        )
+        if dataset_ids is not None:
+            ranked = ranked.where(DatasetVersion.dataset_id.in_(dataset_ids))
+        ranked = ranked.subquery()
+        statement = (
+            select(Dataset, DatasetVersion)
+            .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
+            .join(ranked, ranked.c.id == DatasetVersion.id)
+            .where(ranked.c.position == 1)
+        )
+        if version_number is not None:
+            statement = statement.where(DatasetVersion.number == version_number)
+        total = self.session.scalar(select(func.count()).select_from(statement.subquery()))
+        rows = self.session.execute(statement.order_by(Dataset.key).offset(offset).limit(limit))
+        return tuple((dataset, self._version(version)) for dataset, version in rows), total
+
+    def version_for_datasets(self, dataset_ids, version_number):
+        if dataset_ids == ():
+            return {}
+        statement = select(DatasetVersion).where(
+            DatasetVersion.cancelled_at.is_(None), DatasetVersion.number == version_number
+        )
+        if dataset_ids is not None:
+            statement = statement.where(DatasetVersion.dataset_id.in_(dataset_ids))
+        return {row.dataset_id: self._version(row) for row in self.session.scalars(statement)}
+
+    def version_page(self, version_number, *, dataset_ids=None, offset, limit):
+        statement = (
+            select(Dataset, DatasetVersion)
+            .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
+            .where(
+                DatasetVersion.cancelled_at.is_(None),
+                DatasetVersion.number == version_number,
+            )
+        )
+        if dataset_ids is not None:
+            statement = statement.where(Dataset.id.in_(dataset_ids))
+        total = self.session.scalar(select(func.count()).select_from(statement.subquery()))
+        rows = self.session.execute(statement.order_by(Dataset.key).offset(offset).limit(limit))
+        return tuple((dataset, self._version(version)) for dataset, version in rows), total
+
     def record_identity(self, version, identifier_key):
         return self.session.scalar(
             select(DatasetVersionRecord.id).where(

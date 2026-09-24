@@ -1,17 +1,19 @@
 """REF-84 browser contracts on SQLite and PostgreSQL; real Chrome is separate."""
 
+from datetime import timedelta
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 
 import pytest
 from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
 from test_dataset_version_views import client, configured, payload, request
-from test_dataset_versions import publish
+from test_dataset_versions import NOW, publish
 
 
 def prepared(c):
     configured(c)
     publish(c)
+    c.service.clock = lambda: NOW + timedelta(days=1)
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 1, {"code": "new", "label": "<b>draft</b>"}
@@ -70,7 +72,7 @@ def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F81
     panel = request(browser, "get", path(url, token))
     assert panel.status_code == 200 and "publication-form" in panel.text
     assert f"review={token}" in panel.text
-    data = payload(c, csrf)
+    data = payload(c, csrf, day=NOW.date() + timedelta(days=1))
     assert (
         request(browser, "post", path(url, token), data=data | {"csrf_token": "bad"}).status_code
         == 403

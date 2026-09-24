@@ -13,14 +13,26 @@
 </head>
 <body>
   <header class="docs-intro">
-    <h1>REFRNCR REST API documentation</h1>
-    <p>Read-only access to Current published data.</p>
-    <p><a href="/api/openapi.json">OpenAPI JSON — accessible alternative</a></p>
-    <p>Health and readiness probes are documented in the deployment operations guide
-      (<code>docs/development/operations.md</code>) and are intentionally excluded from
-      this data-API contract.</p>
-    <p>Authorize accepts an API key for this page only. Reload or leave to clear it.
-      Never enter a key in a URL or parameter field.</p>
+    <div class="docs-brand">
+      <img src="/static/images/refrncr-wordmark-primary.svg" alt="refrncr" width="184" height="48">
+      <span class="docs-badge">API docs</span>
+    </div>
+    <div class="docs-heading">
+      <div>
+        <p class="docs-eyebrow">Developer reference</p>
+        <h1>Published data API</h1>
+        <p class="docs-lead">Read and reproduce published Datasets and Records by current state,
+          business-effective date or immutable version.</p>
+      </div>
+      <a class="docs-schema-link" href="/api/openapi.json">View OpenAPI JSON</a>
+    </div>
+    <div class="docs-notice" role="note">
+      <strong>API key safety</strong>
+      <span>Authorize keeps the key in this page’s memory only. Reload or leave to clear it;
+        never put a key in a URL or parameter field.</span>
+    </div>
+    <p class="docs-meta">Health and readiness probes are documented in
+      <code>docs/development/operations.md</code> and excluded from this data-API contract.</p>
   </header>
   <div id="content">
     <noscript><main><p>Swagger UI requires JavaScript. The OpenAPI JSON link works without JavaScript.</p></main></noscript>

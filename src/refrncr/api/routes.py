@@ -1,6 +1,7 @@
 """Bearer-only Current JSON boundary, mounted before the unchanged Flask app."""
 
 import re
+from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request, Security
@@ -12,7 +13,7 @@ from starlette.responses import Response
 
 from refrncr.api.contracts import (
     Collection,
-    CurrentVersion,
+    CollectionQuery,
     Dataset,
     DatasetDetail,
     Detail,
@@ -24,6 +25,8 @@ from refrncr.api.contracts import (
     Record,
     RecordCollection,
     RecordDetail,
+    SelectionQuery,
+    VersionMetadata,
 )
 from refrncr.api.documentation import CONDITIONAL_PARAMETERS, DESCRIPTION, RESPONSE_HEADERS
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead, utc
@@ -35,9 +38,10 @@ from refrncr.services import AuthenticatedPrincipal, NotFoundError, ValidationEr
 
 def _version(publication):
     version = publication.version
-    return CurrentVersion(
+    return VersionMetadata(
         number=version.number,
         published_at=get_datatype("timestamp").text(utc(version.published_at)),
+        effective_from=version.effective_date.isoformat(),
     )
 
 
@@ -47,7 +51,7 @@ def _dataset(publication):
         name=publication.name,
         description=publication.description,
         icon=publication.icon,
-        current_version=_version(publication),
+        version=_version(publication),
     )
 
 
@@ -65,22 +69,47 @@ def _record(record, fields):
     return Record(identifier=record_identifier(record, fields), values=canonical)
 
 
-def _page(request, collection):
+def _query(request, collection):
     pairs = list(request.query_params.multi_items())
-    allowed = {"offset", "limit"} if collection else set()
+    allowed = {"effective_date", "version"}
+    if collection:
+        allowed |= {"offset", "limit"}
     values = {}
     if len(request.scope.get("query_string", b"")) > 256:
         raise ValidationError("Invalid request")
     for key, value in pairs:
-        if key not in allowed or key in values or re.fullmatch(r"0|[1-9][0-9]{0,9}", value) is None:
+        if key not in allowed or key in values:
             raise ValidationError("Invalid request")
-        values[key] = int(value)
-    return PageQuery(**values)
+        if key == "effective_date":
+            try:
+                parsed = date.fromisoformat(value)
+            except ValueError:
+                raise ValidationError("Invalid request") from None
+            if parsed.isoformat() != value:
+                raise ValidationError("Invalid request")
+            values[key] = parsed
+        else:
+            if re.fullmatch(r"0|[1-9][0-9]{0,9}", value) is None:
+                raise ValidationError("Invalid request")
+            values[key] = int(value)
+    if collection:
+        query = CollectionQuery(**values)
+        page = query
+    else:
+        query = SelectionQuery(**values)
+        page = PageQuery()
+    return page, query.effective_date, query.version
 
 
-def _pagination(page, total, path):
+def _pagination(page, total, path, effective_date=None, version_number=None):
     def link(offset):
-        return f"{path}?offset={offset}&limit={page.limit}"
+        pairs = []
+        if effective_date is not None:
+            pairs.append("effective_date=" + effective_date.isoformat())
+        if version_number is not None:
+            pairs.append("version=" + str(version_number))
+        pairs.extend((f"offset={offset}", f"limit={page.limit}"))
+        return f"{path}?" + "&".join(pairs)
 
     return dict(
         pagination=Pagination(offset=page.offset, limit=page.limit, total=total),
@@ -94,7 +123,7 @@ def _pagination(page, total, path):
 
 def create_api(versions, api_keys):
     app = FastAPI(
-        title="refrncr Current data API",
+        title="refrncr Published data API",
         version="1",
         description=DESCRIPTION,
         root_path_in_servers=False,
@@ -158,9 +187,16 @@ def create_api(versions, api_keys):
         return CanonicalJSONResponse(Error(error=code), status_code=error.status_code)
 
     def read(request, actor, kind, key=None, identifier=None):
-        page = _page(request, kind in {"datasets", "records"})
+        page, effective_date, version_number = _query(request, kind in {"datasets", "records"})
         condition = ConditionalRead(
-            request, actor_id=actor.id, kind=kind, key=key, identifier=identifier, page=page
+            request,
+            actor_id=actor.id,
+            kind=kind,
+            key=key,
+            identifier=identifier,
+            page=page,
+            effective_date=effective_date,
+            version_number=version_number,
         )
         result = versions.read_current(
             actor.id,
@@ -170,13 +206,17 @@ def create_api(versions, api_keys):
             records=kind == "records",
             identifier=identifier,
             unchanged=condition,
+            effective_date=effective_date,
+            version_number=version_number,
         )
         if result.not_modified:
             return Response(status_code=304, headers=condition.headers)
         if kind == "datasets":
             payload = Collection[Dataset](
                 data=tuple(_dataset(p) for p in result.publications),
-                **_pagination(page, result.total, "/api/v1/datasets"),
+                **_pagination(
+                    page, result.total, "/api/v1/datasets", effective_date, version_number
+                ),
             )
         elif kind == "dataset":
             fields = tuple(
@@ -199,13 +239,19 @@ def create_api(versions, api_keys):
         elif kind == "records":
             payload = RecordCollection(
                 data=tuple(_record(r, result.fields) for r in result.records),
-                current_version=_version(result.publications[0]),
-                **_pagination(page, result.total, f"/api/v1/datasets/{key}/records"),
+                version=_version(result.publications[0]),
+                **_pagination(
+                    page,
+                    result.total,
+                    f"/api/v1/datasets/{key}/records",
+                    effective_date,
+                    version_number,
+                ),
             )
         else:
             payload = RecordDetail(
                 data=_record(result.records[0], result.fields),
-                current_version=_version(result.publications[0]),
+                version=_version(result.publications[0]),
             )
         return CanonicalJSONResponse(payload, headers=condition.headers)
 
@@ -214,7 +260,7 @@ def create_api(versions, api_keys):
         for status, description in {
             400: "Invalid request: unknown/duplicate query parameters or invalid pagination.",
             401: "Missing, invalid, expired or revoked API key.",
-            404: "Resource absent, inaccessible, invalid, or without a Current publication.",
+            404: "Resource absent, inaccessible, invalid, or without a selected publication.",
             405: "Method not allowed; the API is read-only.",
             503: "Temporarily unavailable. No internal error details are returned.",
         }.items()
@@ -232,7 +278,7 @@ def create_api(versions, api_keys):
     errors[401]["headers"] = {
         "WWW-Authenticate": {"schema": {"type": "string"}, "description": "Bearer"}
     }
-    errors[200] = {"description": "Current published representation", "headers": RESPONSE_HEADERS}
+    errors[200] = {"description": "Selected published representation", "headers": RESPONSE_HEADERS}
     errors[304] = {
         "description": "Authorized representation unchanged; no response body.",
         "headers": RESPONSE_HEADERS,
@@ -243,15 +289,15 @@ def create_api(versions, api_keys):
         "/datasets",
         response_model=Collection[Dataset],
         responses=errors,
-        summary="List Current Datasets",
-        tags=["Current data"],
+        summary="List published Datasets",
+        tags=["Published data"],
         openapi_extra=conditional,
-        description="Accessible Datasets with Current publications only, ordered by Dataset key.",
+        description="Accessible Datasets with selected publications, ordered by Dataset key.",
     )
     def datasets(
         request: Request,
         actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
-        page: Annotated[PageQuery, Depends()] = None,
+        page: Annotated[CollectionQuery, Depends()] = None,
     ):
         return read(request, actor, "datasets")
 
@@ -259,15 +305,16 @@ def create_api(versions, api_keys):
         "/datasets/{dataset_key}",
         response_model=Detail[DatasetDetail],
         responses=errors,
-        summary="Read a Current Dataset",
-        tags=["Current data"],
+        summary="Read a published Dataset",
+        tags=["Published data"],
         openapi_extra=conditional,
-        description="Current Dataset metadata and ordered published Fields. No query parameters.",
+        description="Selected Dataset metadata and ordered published Fields.",
     )
     def dataset(
         request: Request,
         dataset_key: str,
         actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        selection: Annotated[SelectionQuery, Depends()] = None,
     ):
         return read(request, actor, "dataset", dataset_key)
 
@@ -275,16 +322,16 @@ def create_api(versions, api_keys):
         "/datasets/{dataset_key}/records",
         response_model=RecordCollection,
         responses=errors,
-        summary="List Current Records",
-        tags=["Current data"],
+        summary="List published Records",
+        tags=["Published data"],
         openapi_extra=conditional,
-        description="Current canonical values in typed identifier order; offset pagination.",
+        description="Selected canonical values in typed identifier order; offset pagination.",
     )
     def records(
         request: Request,
         dataset_key: str,
         actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
-        page: Annotated[PageQuery, Depends()] = None,
+        page: Annotated[CollectionQuery, Depends()] = None,
     ):
         return read(request, actor, "records", dataset_key)
 
@@ -292,8 +339,8 @@ def create_api(versions, api_keys):
         "/datasets/{dataset_key}/records/{identifier}",
         response_model=RecordDetail,
         responses=errors,
-        summary="Read a Current Record",
-        tags=["Current data"],
+        summary="Read a published Record",
+        tags=["Published data"],
         openapi_extra=conditional,
         description="Look up the entire opaque single/composite business identifier from a "
         "Record response. URL encode it; never substitute an internal UUID. No query parameters.",
@@ -303,6 +350,7 @@ def create_api(versions, api_keys):
         dataset_key: str,
         identifier: str,
         actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        selection: Annotated[SelectionQuery, Depends()] = None,
     ):
         return read(request, actor, "record", dataset_key, identifier)
 
@@ -316,8 +364,12 @@ def create_api(versions, api_keys):
             operation = path["get"]
             operation["responses"].pop("422", None)
             for parameter in operation.get("parameters", []):
-                if parameter["name"] in PageQuery.model_fields:
-                    parameter["description"] = PageQuery.model_fields[parameter["name"]].description
+                if parameter["name"] in CollectionQuery.model_fields:
+                    parameter["description"] = CollectionQuery.model_fields[
+                        parameter["name"]
+                    ].description
+                    if parameter["name"] == "effective_date":
+                        parameter["example"] = "2026-09-30"
                 elif parameter["name"] == "dataset_key":
                     parameter["description"] = (
                         "Permanent Dataset key from the Dataset list: 1–100 lowercase ASCII "

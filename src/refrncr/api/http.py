@@ -52,7 +52,9 @@ def utc(value):
 
 
 class ConditionalRead:
-    def __init__(self, request, *, actor_id, kind, key, identifier, page):
+    def __init__(
+        self, request, *, actor_id, kind, key, identifier, page, effective_date, version_number
+    ):
         self.request = request
         self.selection = (
             "refrncr-json-v1",
@@ -62,6 +64,8 @@ class ConditionalRead:
             identifier,
             page.offset,
             page.limit,
+            effective_date.isoformat() if effective_date is not None else None,
+            version_number,
         )
         self.headers = {}
 
@@ -76,6 +80,7 @@ class ConditionalRead:
                 p.version.id,
                 p.version.number,
                 utc(p.version.published_at).isoformat(),
+                p.version.effective_date.isoformat(),
             )
             for p in publications
         ]
