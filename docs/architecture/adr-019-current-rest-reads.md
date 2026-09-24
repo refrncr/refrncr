@@ -75,6 +75,16 @@ Date validators deliberately optimize less often than ETags, particularly becaus
 Dataset `updated_at` also changes during lifecycle operations. No narrower metadata
 revision or publication-time rewrite is introduced merely for cache efficiency.
 
+## REF-176 effective-date and explicit-version selection
+
+All four read operations accept an ISO `effective_date`, an explicit positive `version`,
+or both. Date selection uses the latest non-cancelled publication beginning on or before
+the requested business date. Explicit version selection remains immutable; a combined
+request is valid only when that version is the effective result for the date. Selectors
+are part of pagination links and the strong ETag identity, so cache entries cannot cross
+representations. REF-176 renames the formerly Current-only `current_version` property to
+`version`; it includes `effective_from` and accurately describes every selected publication.
+
 ## Alternatives considered
 
 - Replace Flask or add a second service: unnecessary and explicitly rejected.

@@ -71,7 +71,8 @@ def test_endpoints_and_contract(api):
     body = response.json()
     assert body["pagination"] == {"offset": 0, "limit": 50, "total": 1}
     assert body["data"][0]["key"] == c.d.key
-    assert body["data"][0]["current_version"]["number"] == 1
+    assert body["data"][0]["version"]["number"] == 1
+    assert body["data"][0]["version"]["effective_from"] == "2026-09-10"
     assert body["links"]["self"] == "/api/v1/datasets?offset=0&limit=50"
     response = get(c, "/audit")
     assert response.status_code == 200, response.text
@@ -97,7 +98,7 @@ def test_endpoints_and_contract(api):
     lookup = get(c, "/audit/records/" + quote(row["identifier"], safe=""))
     assert lookup.status_code == 200
     assert lookup.json()["data"] == row
-    assert lookup.json()["current_version"]["number"] == 1
+    assert lookup.json()["version"]["number"] == 1
     assert get(c, "/audit/records/" + c.record.id).status_code == 404
 
 
@@ -179,8 +180,6 @@ def test_duplicate_expired_revoked_inactive_keys(api):
         "limit=2&limit=3",
         "offset=0&offset=1",
         "q=secret",
-        "version=1",
-        "effective_date=2026-09-10",
         "sort=code",
         "api_key=secret",
     ],
@@ -210,7 +209,65 @@ def test_pagination_current_only_and_publication(api):
     assert get(c, "/audit/records?offset=2").json()["data"] == []
     assert get(c, "?offset=1").json()["data"] == []
     assert current.headers["etag"] != first.headers["etag"]
-    assert current.json()["current_version"]["number"] == scheduled.number
+    assert current.json()["version"]["number"] == scheduled.number
+
+
+def test_effective_date_version_validation_and_cache_isolation(api):
+    c = api
+    first = get(c, "/audit/records")
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "October"}
+    )
+    second = publish(c, day=NOW.date() + timedelta(days=21))
+
+    september = get(c, "/audit/records?effective_date=2026-09-30")
+    october = get(c, "/audit/records?effective_date=2026-10-01")
+    explicit = get(c, "/audit/records?version=2")
+    combined = get(c, "/audit/records?effective_date=2026-10-01&version=2")
+
+    assert first.json()["data"][0]["values"]["label"] == "Café"
+    assert september.json()["version"]["number"] == 1
+    assert september.json()["version"]["effective_from"] == "2026-09-10"
+    assert october.json()["data"][0]["values"]["label"] == "October"
+    assert explicit.json()["data"] == combined.json()["data"]
+    assert explicit.json()["version"] == combined.json()["version"]
+    assert explicit.json()["version"] == {
+        "number": 2,
+        "published_at": "2026-09-10T12:00:00Z",
+        "effective_from": "2026-10-01",
+    }
+    assert second.number == 2
+    assert len({first.headers["etag"], september.headers["etag"], october.headers["etag"]}) == 3
+    assert get(c, "/audit/records?effective_date=2026-10-01&version=1").status_code == 400
+    assert get(c, "/audit?effective_date=2026-09-09").status_code == 404
+    for query in (
+        "effective_date=2026-9-10",
+        "effective_date=invalid",
+        "effective_date=2026-09-10&effective_date=2026-09-11",
+        "version=0",
+        "version=01",
+        "version=x",
+        "version=1&version=2",
+    ):
+        assert get(c, "/audit?" + query).status_code == 400
+
+    assert (
+        get(
+            c,
+            "/audit/records?effective_date=2026-10-01",
+            headers={**c.headers, "If-None-Match": september.headers["etag"]},
+        ).status_code
+        == 200
+    )
+    assert (
+        get(
+            c,
+            "/audit/records?effective_date=2026-09-30",
+            headers={**c.headers, "If-None-Match": september.headers["etag"]},
+        ).status_code
+        == 304
+    )
 
 
 def test_missing_unpublished_cancelled_and_denied(api, monkeypatch):
@@ -292,7 +349,8 @@ def test_sql_pagination_no_n_plus_one(api, monkeypatch):
     c.service.create_concept(c.a.id, c.d.id)
     for i in range(110):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"z{i:03}", "label": "value"})
-    publish(c)
+    publish(c, day=NOW.date() + timedelta(days=1))
+    c.service.clock = lambda: NOW + timedelta(days=1)
     statements = []
 
     def capture(conn, cursor, statement, parameters, execution_context, executemany):

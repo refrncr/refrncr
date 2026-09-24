@@ -95,9 +95,18 @@ def test_schema_matches_registered_routes_and_contracts(api):  # noqa: F811
         params = {p["name"]: p for p in op["parameters"]}
         assert params["If-None-Match"]["in"] == params["If-Modified-Since"]["in"] == "header"
         collection = path.endswith(("datasets", "records"))
-        assert {n for n, p in params.items() if p["in"] == "query"} == (
-            {"offset", "limit"} if collection else set()
-        )
+        expected_query = {"effective_date", "version"}
+        if collection:
+            expected_query |= {"offset", "limit"}
+        assert {n for n, p in params.items() if p["in"] == "query"} == expected_query
+        effective_date = params["effective_date"]
+        assert "YYYY-MM-DD" in effective_date["description"]
+        assert "2026-09-30" in effective_date["description"]
+        assert effective_date["schema"]["anyOf"][0] == {
+            "type": "string",
+            "format": "date",
+        }
+        assert effective_date["example"] == "2026-09-30"
         if collection:
             for name, default, lower, upper in [
                 ("offset", 0, 0, 2147483647),
@@ -117,6 +126,14 @@ def test_schema_matches_registered_routes_and_contracts(api):  # noqa: F811
     )
     assert set(models["Record"]["properties"]) == {"identifier", "values"}
     assert "number" in json.dumps(models["Record"]["properties"]["values"])
+    assert set(models["VersionMetadata"]["properties"]) == {
+        "number",
+        "published_at",
+        "effective_from",
+    }
+    for response_model in ("Dataset", "RecordCollection", "RecordDetail"):
+        assert "version" in models[response_model]["properties"]
+        assert "current_version" not in models[response_model]["properties"]
     assert "HTTPValidationError" not in models
 
     # Every reference in the generated document resolves locally.
@@ -139,6 +156,9 @@ def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):  # noq
     response = api.client.get("/api/docs")
     html = response.text
     assert '<html lang="en">' in html
+    assert 'src="/static/images/refrncr-wordmark-primary.svg"' in html
+    assert 'alt="refrncr"' in html
+    assert "Published data API" in html
     assert "<noscript>" in html
     assert 'href="/api/openapi.json"' in html
     assert "docs/development/operations.md" in html
@@ -153,6 +173,7 @@ def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):  # noq
         "js/api-docs.js",
         "css/swagger-ui.css",
         "css/layouts/api-docs.css",
+        "images/refrncr-wordmark-primary.svg",
     ):
         assert api.client.get("/static/" + path).status_code == 200
 

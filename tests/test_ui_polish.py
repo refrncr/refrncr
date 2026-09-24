@@ -816,8 +816,9 @@ def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):  #
     second = publish(c)
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Third", "string", False, False)
-    third = publish(c, day=NOW.date() + timedelta(days=1))
-    assert {s.status for s in version_states((first, second, third), NOW.date())} == {
+    third = publish(c, day=NOW.date() + timedelta(days=2))
+    states = version_states((first, second, third), NOW.date() + timedelta(days=1))
+    assert {state.status for state in states} == {
         "Expired",
         "Current",
         "Scheduled",

@@ -9,18 +9,22 @@ from starlette.responses import HTMLResponse
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse
 
 DESCRIPTION = """
-Read-only access to **Current published data** using exactly one
+Read-only access to **published data** using exactly one
 `Authorization: Bearer <api-key>` header. Browser cookies and sessions do not authenticate
 this API. Use Authorize to enter the key alone; it is retained only in this page's memory.
 Missing, invalid, expired or revoked keys return 401. Missing and inaccessible resources
 both return 404. All data responses are JSON; 304 has no body.
 
-Collections accept only `offset` and `limit`, in canonical ASCII whole-number notation
+All operations accept optional `effective_date=YYYY-MM-DD` and `version=<number>` selectors.
+The former chooses the latest publication effective on or before that business date; the
+latter chooses an immutable published version. When combined, that version must be effective
+on the date. Collections additionally accept `offset` and `limit`, in canonical ASCII
+whole-number notation
 (no signs, leading zeroes except 0, fractions or exponents). Duplicate/unknown parameters
-and querystrings over 256 bytes return 400. Detail endpoints accept no query parameters.
+and querystrings over 256 bytes return 400.
 Dataset order is key ascending; Records use canonical typed business-identifier order.
 Links are application-relative; next/previous may be null. Separate pages are not a pinned
-snapshot: check Current-version metadata when traversing pages.
+snapshot: check selected-version metadata when traversing pages.
 
 Record values are canonical, keyed by Field key: String and Boolean are native JSON;
 Integer, Decimal (`number`) and Float are JSON numbers. Use an exact JSON number parser
@@ -38,8 +42,8 @@ If-Modified-Since. Date-only validation is conservative and may return 200 even 
 Last-Modified is unchanged. Dataset lists use the page's latest publication time, or Unix
 epoch for an empty page. Private caches must revalidate every use; shared caching is forbidden.
 
-**Excluded:** Concepts, Scheduled/Expired/Cancelled versions, history, effective-date or
-version selection, search/filtering/sorting, writes, import/export, mappings and hierarchies.
+**Excluded:** Concepts, Cancelled versions, history listing, search/filtering/sorting, writes,
+import/export, mappings and hierarchies.
 """.strip()
 
 CONDITIONAL_PARAMETERS = [
@@ -63,7 +67,7 @@ RESPONSE_HEADERS = {
     "ETag": {"schema": {"type": "string"}, "description": "Strong representation validator."},
     "Last-Modified": {
         "schema": {"type": "string"},
-        "description": "Current publication time as HTTP date (page maximum; epoch if empty).",
+        "description": "Selected publication time as HTTP date (page maximum; epoch if empty).",
     },
     "Cache-Control": {
         "schema": {"type": "string"},

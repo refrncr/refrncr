@@ -42,13 +42,20 @@ def revision(c):
 
 
 def publish(c, *, day=None, actor=None, expected=None):
-    return c.service.publish(
+    automatic_day = day is None
+    if automatic_day:
+        active_dates = [v.effective_date for v in versions(c) if v.cancelled_at is None]
+        day = max(active_dates) + timedelta(days=1) if active_dates else NOW.date()
+    result = c.service.publish(
         actor or c.a.id,
         c.d.id,
-        day or NOW.date(),
+        day,
         "Release",
         revision(c) if expected is None else expected,
     )
+    if automatic_day:
+        c.service.clock = lambda: NOW + timedelta(days=(day - NOW.date()).days)
+    return result
 
 
 def versions(c):
@@ -113,6 +120,19 @@ def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
     assert all(
         "Café" not in str(e.details) and c.d.description not in str(e.details) for e in events
     )
+
+
+def test_publication_rejects_duplicate_effective_date(context):  # noqa: F811
+    c = context
+    setup(c)
+    publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Changed"}
+    )
+    with pytest.raises(ValidationError, match="already begins"):
+        publish(c, day=NOW.date())
+    assert len(versions(c)) == 1
 
 
 @pytest.mark.parametrize(

@@ -143,12 +143,12 @@ def test_concurrent_publication_never_mixes_representations(api, monkeypatch):  
         first = get(c, "/audit/records")
         future.result()
     assert first.status_code == 200, first.text
-    assert first.json()["current_version"]["number"] == 1
+    assert first.json()["version"]["number"] == 1
     assert len(first.json()["data"]) == 1
     monkeypatch.setattr(SqlAlchemyVersionOperations, "record_page", original)
     second = get(c, "/audit/records", headers={**c.headers, "If-None-Match": first.headers["etag"]})
     assert second.status_code == 200
-    assert second.json()["current_version"]["number"] == 2
+    assert second.json()["version"]["number"] == 2
     assert len(second.json()["data"]) == 2
 
 
