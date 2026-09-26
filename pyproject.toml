@@ -37,7 +37,7 @@ dev = [
     "pyyaml>=6.0,<7",
     "ruff>=0.16,<0.17",
     "setuptools>=75",
-    "twine>=6.2,<7",
+    "twine>=6.2,<8",
 ]
 
 [tool.setuptools]
