@@ -121,6 +121,8 @@
               <tr{% if schema_admin %} data-field-row data-field-name='{{ field.name }}'{% endif %}>
                 <td class='field-order-column'>
                   {% if schema_admin %}
+                    {% if loop.first %}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'>{% endif %}
+                    <input type='hidden' name='field_id' value='{{ field.id }}'>
                     <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
                   {% else %}<span class='field-position'>{{ loop.index }}</span>{% endif %}
                 </td>

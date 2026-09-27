@@ -336,6 +336,9 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
     assert ">Add field</a>" in fields_section
     assert "Concept · Read only" not in fields_section
+    assert "data-field-order" in fields_section
+    assert "name='csrf_token'" in fields_section
+    assert "name='field_id'" in fields_section
     source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
     field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
     constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
