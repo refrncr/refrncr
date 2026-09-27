@@ -67,9 +67,21 @@ def contents(engine):
                                 "target_system",
                                 "source_dataset_id",
                                 "target_dataset_id",
+                                "source_field_key",
+                                "target_field_key",
                             }
                         )
-                        and not (model is DatasetField and column.name in {"definition", "unit"})
+                        and not (
+                            model is DatasetField
+                            and column.name
+                            in {
+                                "definition",
+                                "unit",
+                                "mapping_role",
+                                "source_field_id",
+                                "source_field_key",
+                            }
+                        )
                         and not (model is DatasetRecord and column.name == "deleted_content")
                     )
                 )

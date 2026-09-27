@@ -156,24 +156,22 @@ if any Dataset is invalid. Back up the database and stop writers before the upgr
 ## API keys
 
 API keys are available under Settings for active users when the installation
-configures `REFRNCR_API_KEY_PEPPER`. Generate a 32-byte pepper as 64 hexadecimal
-characters before starting the server:
+configures `REFRNCR_API_KEY_PEPPER`. For local development from a source checkout,
+create the ignored `.env` file once:
 
 ```shell
-export REFRNCR_API_KEY_PEPPER="$(openssl rand -hex 32)"
-printf '%s' "$REFRNCR_API_KEY_PEPPER" | grep -Eq '^[0-9A-Fa-f]{64}$' && echo "pepper is valid"
-refrncr start
+umask 077
+printf 'REFRNCR_API_KEY_PEPPER=%s\n' "$(openssl rand -hex 32)" > .env
+.venv/bin/refrncr start
 ```
 
-For a source checkout, replace the final command with
-`.venv/bin/refrncr start`. The variable must be set in the environment of the
-process that starts refrncr. Exporting it in another terminal, or after the
-server has started, does not update the running process. Stop and restart
-refrncr after adding the variable.
+The CLI loads `.env` from its current working directory and does not override
+variables already supplied by the launching environment. Stop and restart
+refrncr after changing configuration.
 
 Keep the generated value in protected installation configuration so every
-restart receives the same pepper. Do not commit or log it. Changing or losing
-it makes existing API keys unusable. See
+restart receives the same pepper. Do not commit or log `.env`. Changing or losing
+the pepper makes existing API keys unusable. See
 [configuration, troubleshooting, rotation and authentication](docs/development/api-keys.md).
 These API keys authenticate requests to the Current published data REST API.
 

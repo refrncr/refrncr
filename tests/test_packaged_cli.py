@@ -135,6 +135,8 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/migrations/versions/0022_ref_31_security_audit.py",
         "refrncr/migrations/versions/0023_ref_176_effective_dates.py",
         "refrncr/migrations/versions/0024_ref_177_mapping_tables.py",
+        "refrncr/migrations/versions/0025_ref_177_mapping_fields.py",
+        "refrncr/migrations/versions/0026_ref_177_mapping_field_roles.py",
         "refrncr/api_keys.py",
         "refrncr/api_key_persistence.py",
         "refrncr/static/js/api-key-secret.js",

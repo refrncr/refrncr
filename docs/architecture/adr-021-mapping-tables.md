@@ -13,22 +13,27 @@ semantics.
 ## Decision
 
 `Dataset.kind` distinguishes `reference` and `mapping`. Mapping-specific metadata is
-stored on the Dataset: mode, optional source and target system labels, and optional
-source and target reference-table identities. Database checks prevent mapping metadata
-on reference tables. Linked table references use `ON DELETE RESTRICT` so a dependency
-cannot be silently broken.
+stored on the Dataset: mode, source and target identifier descriptions, optional source
+and target reference-table identities, and the selected field keys for linked tables.
+Database checks prevent mapping metadata on reference tables. Linked table references
+use `ON DELETE RESTRICT` so a table dependency cannot be silently broken. The service
+validates field ownership when a linked mapping is created.
 
-Mapping content reuses Dataset Fields and Records. A new mapping starts with four Fields:
-`source_value`, `target_value`, `target_name` and `mapping_status`; `source_value` is the
-required, unique business key. This makes the existing guided import, Concept mutation,
-diff, review, publication, effective-date, export and audit paths apply without a second
-parallel persistence model. The first increment is 1:1 because the source business key
-is unique.
+Mapping content reuses Dataset Fields and Records. A standalone mapping starts without
+Fields so its schema does not assume generic Source value, Target value, Target name or
+Status columns. A maintainer defines exactly one Source identifier with a domain-specific
+name and one or more Mapping target Fields through the regular Field configuration. The
+Source identifier is automatically required, unique and the business key. This makes the
+existing guided import, Concept mutation, diff, review, publication, effective-date,
+export and audit paths apply without a second parallel persistence model. The first
+increment is 1:1 because the source business key is unique.
 
 The existing import workflow writes only to the active Mapping Concept and confirms the
 complete validated file atomically. Linked input and target tables are never mutated by
-mapping import. Source and target system labels remain independent of table links so
-standalone crosswalks are first-class.
+mapping import. Standalone identifier descriptions remain independent of table links so
+standalone crosswalks are first-class. A linked source requires a table and field. The
+target table is optional; choosing one makes its field selection mandatory, while an
+unlinked target retains a free-text identifier description.
 
 ## Consequences
 

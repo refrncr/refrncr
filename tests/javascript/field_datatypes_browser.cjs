@@ -96,17 +96,15 @@ async function login(page) {
       else await input.fill(value);
     }
     await page.getByRole('button', {name: 'Create record', exact: true}).click();
-    await page.getByRole('button', {name: /^View record browser-record/}).waitFor();
-    await page.getByRole('button', {name: /^View record browser-record/}).click();
-    await page.locator('dialog[open]').getByRole('button', {name: 'Edit', exact: true}).click();
+    await page.getByRole('button', {name: /^Edit record browser-record/}).waitFor();
+    await page.getByRole('button', {name: /^Edit record browser-record/}).click();
     for (const [id, value] of Object.entries(canonical)) {
       assert.equal(await page.locator(`dialog[open] [data-panel-view=edit] [name='${id}']`).inputValue(), value, id);
     }
     assert.equal(await page.locator('dialog[open] [data-panel-view=edit] [name=expected_revision]').inputValue(), '1');
     await page.getByRole('button', {name: 'Save record', exact: true}).click();
-    await page.getByRole('button', {name: /^View record browser-record/}).waitFor();
-    await page.getByRole('button', {name: /^View record browser-record/}).click();
-    await page.locator('dialog[open]').getByRole('button', {name: 'Edit', exact: true}).click();
+    await page.getByRole('button', {name: /^Edit record browser-record/}).waitFor();
+    await page.getByRole('button', {name: /^Edit record browser-record/}).click();
     assert.equal(await page.locator('dialog[open] [data-panel-view=edit] [name=expected_revision]').inputValue(), '1', 'canonical sidepanel save is a no-op');
     assert.deepEqual(errors, []);
     await context.close();

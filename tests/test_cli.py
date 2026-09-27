@@ -68,6 +68,40 @@ def test_start_defaults_to_loopback_and_persistent_platform_data(monkeypatch, tm
     assert configuration.database_url.database != ":memory:"
 
 
+def test_start_loads_local_dotenv_without_overriding_process_environment(monkeypatch, tmp_path):
+    pepper = "ab" * 32
+    (tmp_path / ".env").write_text(
+        "# Local configuration\n"
+        f"REFRNCR_API_KEY_PEPPER={pepper}\n"
+        "REFRNCR_PORT=8123\n"
+        'REFRNCR_HOST="127.0.0.2"\n'
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("REFRNCR_API_KEY_PEPPER", raising=False)
+    monkeypatch.setenv("REFRNCR_PORT", "9000")
+    captured = []
+    monkeypatch.setattr(cli, "start", captured.append)
+
+    assert cli.main(["start"]) == 0
+
+    assert os.environ["REFRNCR_API_KEY_PEPPER"] == pepper
+    assert captured[0].host == "127.0.0.2"
+    assert captured[0].port == 9000
+
+
+def test_invalid_local_dotenv_fails_without_exposing_value(monkeypatch, tmp_path, capsys):
+    secret = "private malformed value"
+    (tmp_path / ".env").write_text(f"REFRNCR_API_KEY_PEPPER={secret}\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "start", lambda _configuration: pytest.fail("must not start"))
+
+    assert cli.main(["start"]) == 1
+
+    error = capsys.readouterr().err
+    assert "local .env configuration is invalid on line 1" in error
+    assert secret not in error
+
+
 def _create_admin(database, email, display_name, passwords):
     answers = iter(passwords)
     return cli.main(

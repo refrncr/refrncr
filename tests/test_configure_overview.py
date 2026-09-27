@@ -145,13 +145,10 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert '<svg class="button-icon"' in edit[1]
             assert 'aria-hidden="true"' in edit[1]
             assert not re.sub(r"<[^>]+>", "", edit[1]).strip()
-            assert "class='button-stack'" in order_cell
+            assert "class='button-stack'" not in order_cell
             assert "<button" not in row.rsplit("<td>", 1)[1]
-            for direction, boundary in (("up", index == 0), ("down", index == count - 1)):
-                assert f"aria-label='Move {field.name} {direction}'" in row
-                control = re.search(rf"<button[^>]*value='{direction}'([^>]*)>", row)
-                assert control is not None
-                assert ("disabled" in control[1]) == boundary
+            assert f"aria-label='Move {field.name} up'" not in row
+            assert f"aria-label='Move {field.name} down'" not in row
             assert f"aria-label='Reorder {field.name}'" in order_cell
         else:
             assert "<form" not in row and "<button" not in row and "Edit field" not in row

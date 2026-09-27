@@ -16,7 +16,7 @@
     <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>
     <a class='button button-secondary' href='{{ url_for("team_list") }}'>Go to Teams</a>
   {% else %}
-  <form class='form' data-generate-key novalidate method='post' action='{{ url_for("create_dataset") }}'>
+  <form class='form' data-generate-key data-mapping-table-form novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Name",
       "name",
@@ -42,36 +42,37 @@
       error=error if error_field == "description" else none,
       control="textarea"
     ) }}
+    {{ team_choice(teams, owner_team_id) }}
     <fieldset class='form-field'>
       <legend>Table type</legend>
       <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference table</label>
       <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping table</label>
       <p class='help-text'>Mapping tables are versioned 1:1 crosswalks and use the same Concept → review → publish lifecycle.</p>
     </fieldset>
-    <fieldset class='form-field'>
-      <legend>Mapping setup</legend>
-      <label><input type='radio' name='mapping_mode' value='standalone'{% if mapping_mode == 'standalone' %} checked{% endif %}> Standalone</label>
-      <label><input type='radio' name='mapping_mode' value='linked'{% if mapping_mode == 'linked' %} checked{% endif %}> Linked to reference tables</label>
-      <p class='help-text'>Ignored for reference tables. A linked mapping requires a source table.</p>
-    </fieldset>
-    {{ form_field("Source system", "source_system", "mapping-source-system", value=source_system, max_length=200) }}
-    {{ form_field("Target system", "target_system", "mapping-target-system", value=target_system, max_length=200) }}
-    <div class='form-field'>
-      <label for='mapping-source-table'>Source table</label>
-      <select id='mapping-source-table' name='source_dataset_id'>
-        <option value=''>None</option>
-        {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == source_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class='form-field'>
-      <label for='mapping-target-table'>Target table</label>
-      <select id='mapping-target-table' name='target_dataset_id'>
-        <option value=''>New output attribute</option>
-        {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == target_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
-      </select>
+    <div data-mapping-setup{% if table_kind != 'mapping' %} hidden{% endif %}>
+      <fieldset class='form-field'>
+        <legend>Mapping setup</legend>
+        <label><input type='radio' name='mapping_mode' value='standalone'{% if mapping_mode == 'standalone' %} checked{% endif %}> Standalone</label>
+        <label><input type='radio' name='mapping_mode' value='linked'{% if mapping_mode == 'linked' %} checked{% endif %}> Linked to reference tables</label>
+      </fieldset>
+      <div data-linked-mapping{% if mapping_mode != 'linked' %} hidden{% endif %}>
+        <div class='form-field'>
+          <label for='mapping-source-table'>Source table</label>
+          <select id='mapping-source-table' name='source_dataset_id' required{% if table_kind != 'mapping' or mapping_mode != 'linked' %} disabled{% endif %}>
+            <option value=''>Choose a reference table</option>
+            {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == source_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class='form-field' data-source-identifier-select{% if not source_dataset_id %} hidden{% endif %}>
+          <label for='mapping-source-field'>Source identifier</label>
+          <select id='mapping-source-field' name='source_field_key' data-field-select data-selected='{{ source_field_key }}' required{% if table_kind != 'mapping' or mapping_mode != 'linked' or not source_dataset_id %} disabled{% endif %}>
+            <option value=''>Choose a source table first</option>
+            {% for table in available_reference_tables %}{% for field in reference_table_fields[table.id] %}<option value='{{ field.key }}' data-table-id='{{ table.id }}'{% if table.id == source_dataset_id and field.key == source_field_key %} selected{% endif %}>{{ field.name }}</option>{% endfor %}{% endfor %}
+          </select>
+        </div>
+      </div>
     </div>
     {{ icon_picker(dataset_icon_choices, selected_icon) }}
-    {{ team_choice(teams, owner_team_id) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
       <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>
@@ -81,3 +82,4 @@
   {% endif %}
   </div>
 {% endblock %}
+{% block scripts %}<script src='{{ url_for("static", filename="js/mapping-table-form.js") }}' defer></script>{% endblock %}

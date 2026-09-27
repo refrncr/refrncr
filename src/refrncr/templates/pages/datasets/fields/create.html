@@ -3,6 +3,26 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Add field</h1>
   <div class='side-panel-body' data-side-panel-content data-panel-title='Add field' data-panel-eyebrow='Configure · {{ dataset.name }}'>{% include 'pages/datasets/concepts/_banner.html' %}{% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-  <form class='form' data-generate-key novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true, definition, unit) }}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
+  <form class='form' data-generate-key{% if dataset.kind == 'mapping' %} data-mapping-field-form{% endif %} novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>
+    {% if dataset.kind == 'mapping' %}
+    <fieldset class='field-role-choices'><legend>Field role</legend>
+      {% if dataset.mapping_mode == 'linked' %}
+      <label class='field-role-choice'><input class='visually-hidden' type='radio' name='mapping_field_role' value='source_context'{% if mapping_field_role == 'source_context' %} checked{% endif %}><span>Source context field</span><small>Select an existing source field for more context while mapping. The field is read-only.</small></label>
+      {% else %}
+      <label class='field-role-choice{% if has_mapping_source_identifier %} is-disabled{% endif %}'><input class='visually-hidden' type='radio' name='mapping_field_role' value='source_identifier'{% if mapping_field_role == 'source_identifier' %} checked{% endif %}{% if has_mapping_source_identifier %} disabled{% endif %}><span>Source identifier</span><small>{% if has_mapping_source_identifier %}This mapping already has a source identifier.{% else %}Define the source value used to identify each mapping. It is automatically required and unique.{% endif %}</small></label>
+      {% endif %}
+      <label class='field-role-choice'><input class='visually-hidden' type='radio' name='mapping_field_role' value='mapping_target'{% if mapping_field_role == 'mapping_target' %} checked{% endif %}><span>Mapping target field</span><small>Define a new mapping target field using the regular field form.</small></label>
+    </fieldset>
+    {% if dataset.mapping_mode == 'linked' %}
+    <div data-mapping-field-panel='source_context'{% if mapping_field_role != 'source_context' %} hidden{% endif %}>
+      <label>Source field <select name='source_field_key'{% if mapping_field_role != 'source_context' %} disabled{% endif %} required><option value=''>Choose a source field</option>{% for field in mapping_source_fields %}<option value='{{ field.key }}'{% if field.key == mapping_source_field_key %} selected{% endif %}>{{ field.name }} · {{ field.data_type|datatype_label }}</option>{% endfor %}</select></label>
+      <p class='help-text'>Adds context while mapping. Values and field properties cannot be changed here.</p>
+    </div>
+    {% else %}
+    <div data-mapping-field-panel='source_identifier'{% if mapping_field_role != 'source_identifier' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, true, true, true, type_choices, true, definition, unit, true) }}<p class='help-text'>The source identifier is automatically required, unique and the record identifier.</p></div>
+    {% endif %}
+    <div data-mapping-field-panel='mapping_target'{% if mapping_field_role != 'mapping_target' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true) }}</div>
+    {% else %}{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true, definition, unit) }}{% endif %}
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
   </div>
 {% endblock %}

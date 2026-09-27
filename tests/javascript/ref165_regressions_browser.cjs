@@ -68,20 +68,14 @@ async function savedMove(page, action) {
 
       await page.goto(base+concept+'#fields');
       assert.deepEqual(await visiblePanels(page),['fields']);
-      assert(await page.getByRole('button',{name:'Move Code up',exact:true}).isDisabled());
-      assert(await page.getByRole('button',{name:'Move Code down',exact:true}).isVisible());
-      await savedMove(page,()=>page.getByRole('button',{name:'Move Code down',exact:true}).click());
-      assert.deepEqual(await names(page),['Label','Code']);
-      assert(await page.getByRole('button',{name:'Move Code down',exact:true}).isDisabled());
-      assert(await page.getByRole('button',{name:'Move Code up',exact:true}).isEnabled());
-      assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Move Code up');
-      await savedMove(page,()=>page.getByRole('button',{name:'Move Code up',exact:true}).click());
+      assert.equal(await page.getByRole('button',{name:/^Move Code (up|down)$/}).count(),0);
       await page.getByRole('button',{name:'Reorder Code',exact:true}).focus();
       await savedMove(page,()=>page.keyboard.press('ArrowDown'));
-      await page.reload(); assert.deepEqual(await names(page),['Label','Code']);
-      await page.getByRole('button',{name:'Move Code up',exact:true}).focus();
+      assert.deepEqual(await names(page),['Label','Code']);
+      await page.reload();
+      await page.getByRole('button',{name:'Reorder Code',exact:true}).focus();
       assert(await page.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle !== 'none'),'visible keyboard focus');
-      await savedMove(page,()=>page.keyboard.press('Enter'));
+      await savedMove(page,()=>page.keyboard.press('ArrowUp'));
       assert.deepEqual(await names(page),['Code','Label']);
       await layout(page);
 
@@ -136,13 +130,7 @@ async function savedMove(page, action) {
         await plain.goto(base+concept+'#fields');
         assert.deepEqual(await visiblePanels(plain),panels);
         if (mode!=='initialization-error') assert.equal(await plain.locator('.field-drag-handle:visible').count(),0);
-        assert(await plain.getByRole('button',{name:'Move Code down',exact:true}).isVisible());
-        if (mode==='nojs' || mode==='blocked') {
-          const [response] = await Promise.all([plain.waitForNavigation(),plain.getByRole('button',{name:'Move Code down',exact:true}).click()]);
-          assert.equal(response.status(),200); assert.deepEqual(await names(plain),['Label','Code']);
-          await Promise.all([plain.waitForNavigation(),plain.getByRole('button',{name:'Move Code up',exact:true}).click()]);
-          assert.deepEqual(await names(plain),['Code','Label']);
-        }
+        assert.equal(await plain.getByRole('button',{name:/^Move Code (up|down)$/}).count(),0);
         await fallback.close();
       }
       await context.close();

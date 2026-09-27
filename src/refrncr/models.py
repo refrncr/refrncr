@@ -208,7 +208,8 @@ class Dataset(Base):
         ),
         CheckConstraint(
             "kind = 'mapping' OR (source_system IS NULL AND target_system IS NULL "
-            "AND source_dataset_id IS NULL AND target_dataset_id IS NULL)",
+            "AND source_dataset_id IS NULL AND target_dataset_id IS NULL "
+            "AND source_field_key IS NULL AND target_field_key IS NULL)",
             name="ck_datasets_mapping_metadata",
         ),
     )
@@ -232,6 +233,8 @@ class Dataset(Base):
         nullable=True,
         index=True,
     )
+    source_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     # owner_user_id is retained as historical creator metadata, never authority.
     owner_team_id: Mapped[str] = mapped_column(
@@ -288,6 +291,21 @@ class DatasetField(Base):
         CheckConstraint(
             "display_position >= 1", name="ck_dataset_fields_display_position_positive"
         ),
+        CheckConstraint(
+            "mapping_role IS NULL OR mapping_role IN "
+            "('source_identifier', 'source_context', 'mapping_target')",
+            name="ck_dataset_fields_mapping_role",
+        ),
+        CheckConstraint(
+            "(mapping_role = 'source_context' "
+            "AND source_field_id IS NOT NULL AND source_field_key IS NOT NULL) OR "
+            "(mapping_role = 'source_identifier' AND "
+            "((source_field_id IS NULL AND source_field_key IS NULL) OR "
+            "(source_field_id IS NOT NULL AND source_field_key IS NOT NULL))) OR "
+            "(mapping_role IS NULL OR mapping_role = 'mapping_target') "
+            "AND source_field_id IS NULL AND source_field_key IS NULL",
+            name="ck_dataset_fields_mapping_source",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -300,6 +318,13 @@ class DatasetField(Base):
     is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     is_unique: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     display_position: Mapped[int] = mapped_column(Integer)
+    mapping_role: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    source_field_id: Mapped[str | None] = mapped_column(
+        ForeignKey("dataset_fields.id", ondelete="RESTRICT", name="fk_dataset_fields_source"),
+        nullable=True,
+        index=True,
+    )
+    source_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
@@ -503,6 +528,11 @@ class DatasetVersionField(Base):
             "data_type IN (" + ", ".join(repr(t) for t in DATASET_FIELD_TYPES) + ")",
             name="ck_version_fields_type",
         ),
+        CheckConstraint(
+            "mapping_role IS NULL OR mapping_role IN "
+            "('source_identifier', 'source_context', 'mapping_target')",
+            name="ck_version_fields_mapping_role",
+        ),
     )
     version_id: Mapped[str] = mapped_column(
         ForeignKey("dataset_versions.id", ondelete="CASCADE"), primary_key=True
@@ -517,6 +547,8 @@ class DatasetVersionField(Base):
     is_unique: Mapped[bool] = mapped_column(Boolean)
     display_position: Mapped[int] = mapped_column(Integer)
     is_identifier: Mapped[bool] = mapped_column(Boolean)
+    mapping_role: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    source_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
 class DatasetVersionRecord(Base):

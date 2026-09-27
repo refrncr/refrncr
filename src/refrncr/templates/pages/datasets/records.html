@@ -31,7 +31,7 @@
       {% if may_configure %}<a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>{{ configure_icon() }}Configure</a>{% endif %}
       {% if may_edit %}
       {{ record_import_action(dataset.key, import_unavailable) }}
-      <button class='button button-primary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>
+      {% if may_add_record %}<button class='button button-primary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
       {% endif %}
     </div>
     {% endif %}

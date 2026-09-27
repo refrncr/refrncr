@@ -45,6 +45,7 @@ from refrncr.version_contracts import (
     SummaryCounts,
     VersionHistory,
     VersionRead,
+    mapping_incomplete_message,
     version_states,
 )
 
@@ -67,6 +68,9 @@ def _validated_snapshot(uow, dataset):
         raise ValidationError("Publication requires at least one Field")
     if not identifier.field_keys:
         raise ValidationError("Configure a Record identifier before publication")
+    if getattr(dataset, "kind", "reference") == "mapping":
+        if message := mapping_incomplete_message(fields):
+            raise ValidationError(message)
     by_key = {f.key: f for f in fields}
     if len(by_key) != len(fields) or len({f.id for f in fields}) != len(fields):
         raise ValidationError("Invalid Field configuration")
@@ -94,6 +98,8 @@ def _validated_snapshot(uow, dataset):
             f.display_position,
             f.key in identifier.field_keys,
             *validate_field_metadata(getattr(f, "definition", None), getattr(f, "unit", None)),
+            getattr(f, "mapping_role", None),
+            getattr(f, "source_field_key", None),
         )
         for f in fields
     )

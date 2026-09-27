@@ -753,7 +753,7 @@ def test_standalone_access_redirect_and_revocation_without_concept(dataset_brows
 
 
 @pytest.mark.parametrize("published", [False, True])
-def test_configuration_fields_are_read_only(dataset_browser, published):  # noqa: F811
+def test_configuration_fields_follow_concept_lifecycle(dataset_browser, published):  # noqa: F811
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "read-fields", "Read fields")
     s.dataset_fields.create_field(
@@ -775,9 +775,15 @@ def test_configuration_fields_are_read_only(dataset_browser, published):  # noqa
     fields = html.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
     assert "Visible code" in fields and "Field explanation" in fields and "EUR" in fields
     assert "Identifier" in fields and "Required" in fields and "Unique" in fields
-    assert ("Current · Version 1" if published else "Concept") + " · Read only" in fields
-    assert "<form" not in fields and "<button" not in fields
-    assert "field-edit-action" not in fields and "Add field" not in fields
+    if published:
+        assert "Current · Version 1 · Read only" in fields
+        assert "Add field" not in fields
+        assert "Start a concept to change fields" in fields
+        assert "field-edit-action" not in fields
+    else:
+        assert "Concept · Read only" not in fields
+        assert ">Add field</a>" in fields
+        assert "field-edit-action" in fields
     if published:
         current = body(request(client, "get", f"/datasets/{d.key}"))
         current_fields = current.split("<section id='fields'", 1)[1].split("</section>", 1)[0]

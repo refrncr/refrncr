@@ -43,7 +43,7 @@
 .context-notice form { margin-inline-start: auto; }
 .context-notice-action { padding: 0; border: 0; background: none; color: var(--color-link); font: inherit; font-weight: var(--font-weight-semibold); cursor: pointer; }
 .context-notice-action:hover { color: var(--color-link-hover); text-decoration: underline; }
-/* Drag to reorder (field-order.js). Without JavaScript the up/down buttons remain. */
+/* Drag and keyboard reorder are progressively enhanced by field-order.js. */
 .field-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 2rem; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-control-border); font-size: 1rem; letter-spacing: -.2em; cursor: grab; touch-action: none; }
 .field-drag-handle:hover, .field-drag-handle:focus-visible { background: var(--color-action-secondary); color: var(--color-text); }
 .field-drag-handle[hidden] { display: none; }

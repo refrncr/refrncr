@@ -149,6 +149,8 @@ class DatasetRecord(Protocol):
     target_system: str | None
     source_dataset_id: str | None
     target_dataset_id: str | None
+    source_field_key: str | None
+    target_field_key: str | None
     owner_user_id: str
     owner_team_id: str
     owner_team_name: str
@@ -193,6 +195,9 @@ class DatasetFieldRecord(Protocol):
     is_required: bool
     is_unique: bool
     display_position: int
+    mapping_role: str | None
+    source_field_id: str | None
+    source_field_key: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -325,6 +330,8 @@ class DatasetOperations(Protocol):
 
     def rename_key(self, dataset_id: str, key: str) -> None: ...
 
+    def uses_linked_field(self, dataset_id: str, field_key: str) -> bool: ...
+
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         """Current working set only; None is reserved for authorized all-resource access."""
         ...
@@ -419,6 +426,10 @@ class DatasetRecordOperations(Protocol):
     def current_revision(self, dataset_id: str, record_id: str) -> int | None: ...
 
     def add_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
+
+    def add_values_by_id(
+        self, dataset_id: str, record_id: str, values: tuple[RecordValue, ...]
+    ) -> None: ...
 
     def list_all(self, dataset_id: str) -> list[StoredRecord]: ...
 

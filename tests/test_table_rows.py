@@ -171,7 +171,8 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     assert "data-row-action" not in html
     assert "<th scope='col'>Actions</th>" in html
     assert "aria-label='Edit field Code'" in html
-    assert "aria-label='Move Code up'" in html
+    assert "aria-label='Reorder Code'" in html
+    assert "aria-label='Move Code up'" not in html
     env = client.application.jinja_env
     preview = env.get_template("pages/datasets/import/preview.html").render(
         state={"filename": "example.csv"},

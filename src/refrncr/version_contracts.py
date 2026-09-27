@@ -17,6 +17,29 @@ APPLICATION_TIMEZONE = UTC
 MAX_RELEASE_NOTE = 2000
 
 
+def mapping_incomplete_message(fields) -> str | None:
+    """Return the shared completion guidance for a mapping schema."""
+    roles = {getattr(field, "mapping_role", None) for field in fields}
+    missing_source = "source_identifier" not in roles
+    missing_target = "mapping_target" not in roles
+    if missing_source and missing_target:
+        return (
+            "Mapping incomplete: add a source identifier and at least one mapping target "
+            "field before this mapping can be reviewed or published."
+        )
+    if missing_source:
+        return (
+            "Mapping incomplete: add a source identifier before this mapping can be "
+            "reviewed or published."
+        )
+    if missing_target:
+        return (
+            "Mapping incomplete: add at least one mapping target field before this mapping "
+            "can be reviewed or published."
+        )
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class SnapshotField:
     id: str
@@ -30,6 +53,8 @@ class SnapshotField:
     is_identifier: bool
     definition: str | None = None
     unit: str | None = None
+    mapping_role: str | None = None
+    source_field_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

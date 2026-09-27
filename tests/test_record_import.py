@@ -528,6 +528,20 @@ def test_mapping_table_uses_existing_preview_and_atomic_import_flow(import_conte
         source_system="SAP",
         target_system="Salesforce",
     )
+    for key, name, role in (
+        ("source_value", "Source value", "source_identifier"),
+        ("target_value", "Target value", "mapping_target"),
+        ("target_name", "Target name", "mapping_target"),
+        ("mapping_status", "Status", "mapping_target"),
+    ):
+        services.dataset_fields.create_field(
+            admin.id,
+            mapping.key,
+            key,
+            name,
+            "string",
+            mapping_role=role,
+        )
     content = (
         b"source_value,target_value,target_name,mapping_status\n"
         b"1001,EMEA-SALES,EMEA Sales,mapped\n"

@@ -52,11 +52,11 @@ async function login(page,email) {
       assert.match(await page.locator('.concept-banner').first().innerText(),/No changes yet/);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
       await page.getByRole('link',{name:'Concept',exact:true}).click();
-      const opener=page.getByRole('button',{name:/View record Betaling/});await opener.focus();await opener.press('Enter');
+      const opener=page.getByRole('button',{name:/Edit record Betaling/});await opener.focus();await opener.press('Enter');
       await page.locator('dialog[open]').waitFor();
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await opener.evaluate(el=>el===document.activeElement));
-      await opener.press('Enter');await page.locator('dialog[open]').getByRole('button',{name:'Edit',exact:true}).click();
+      await opener.press('Enter');
       await page.locator('dialog[open] [data-panel-view="edit"] input[name="label"]').fill('Edited concept value');
       await page.locator('dialog[open]').getByRole('button',{name:'Save record',exact:true}).click();
       await page.waitForURL(`${base}/datasets/${key}/concept/records`);
@@ -66,7 +66,7 @@ async function login(page,email) {
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
       assert.deepEqual(await page.locator('table .record-system-status .badge-published').allTextContents(),['Published','Published']);
-      const remove=page.getByRole('button',{name:/View record Verwijderen/});
+      const remove=page.getByRole('button',{name:/Edit record Verwijderen/});
       await remove.click();await page.locator('dialog[open]').getByRole('button',{name:'Delete',exact:true}).click();
       await page.locator('dialog[open] [data-panel-view="delete"]').getByRole('button',{name:'Delete record',exact:true}).click();
       await page.waitForURL(`${base}/datasets/${key}/concept/records`);

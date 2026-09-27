@@ -18,18 +18,19 @@ Do not commit it, print it in diagnostics or store it alongside database backups
 Absent configuration disables API-key management; malformed configuration fails
 startup. There is no generated, weak or unpeppered fallback.
 
-For a local shell, generate and validate the value before starting refrncr:
+For local development from a source checkout, create the ignored `.env` file once:
 
 ```shell
-export REFRNCR_API_KEY_PEPPER="$(openssl rand -hex 32)"
-printf '%s' "$REFRNCR_API_KEY_PEPPER" | grep -Eq '^[0-9A-Fa-f]{64}$' && echo "pepper is valid"
-refrncr start
+umask 077
+printf 'REFRNCR_API_KEY_PEPPER=%s\n' "$(openssl rand -hex 32)" > .env
+.venv/bin/refrncr start
 ```
 
-Use `.venv/bin/refrncr start` as the final command when running from a source
-checkout. Use the variable name exactly as shown, without shell-escape characters.
+The CLI loads `.env` from its current working directory. Values supplied by the
+launching environment take precedence. Use the variable name exactly as shown.
 The command substitution keeps the generated value out of the literal command,
-but the value remains a secret and must not be printed or pasted into logs.
+but the value remains a secret and must not be printed or pasted into logs. Reuse
+the same `.env` file across restarts.
 
 An environment variable belongs to the process that inherited it. A server that
 is already running cannot observe a later `export`, and a server started in a
@@ -51,8 +52,8 @@ If **Settings → API keys** still reports that server configuration is required
 
 Do not troubleshoot by printing the pepper or by inspecting a complete process
 environment in shared logs. Confirm only its presence, length and hexadecimal
-format. A local shell export lasts only for that shell; arrange protected,
-persistent injection for later restarts.
+format. Use the ignored `.env` file locally or arrange protected, persistent
+injection through the deployment platform.
 
 A credential is `rfr_` + 32 lowercase UUID hex characters + `.` + 43 URL-safe
 characters generated from 32 random bytes (256 bits of entropy): 80 characters

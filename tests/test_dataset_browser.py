@@ -146,13 +146,65 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
     _, _, _, client = dataset_browser
     login(client)
 
-    assert "Datasets" in body(request(client, "get", "/"))
+    overview = body(request(client, "get", "/"))
+    assert "<h1>Overview</h1>" in overview
+    assert '<p class="nav-label">Datasets</p>' in overview
+    assert "Reference datasets" in overview
+    assert "Mapping datasets" in overview
     response = request(client, "get", "/datasets")
 
     assert response.status_code == 200
     assert "No datasets are available." in body(response)
     assert "New dataset" in body(response)
     assert "<h1>Datasets</h1>" in body(response)
+
+
+def test_dataset_navigation_filters_reference_and_mapping_datasets(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "currencies", "Currencies")
+    create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "tradable-currencies",
+        "Tradable currencies",
+        "",
+        kind="mapping",
+        mapping_mode="standalone",
+        source_system="Currency",
+        target_system="Tradable",
+    )
+    login(client)
+
+    overview = body(request(client, "get", "/"))
+    reference_page = body(request(client, "get", "/datasets?kind=reference"))
+    mapping_page = body(request(client, "get", "/datasets?kind=mapping"))
+
+    assert "Currencies" in overview
+    assert "Tradable currencies" in overview
+    assert "<h1>Reference datasets</h1>" in reference_page
+    assert "Currencies" in reference_page
+    assert "Tradable currencies" not in reference_page
+    assert 'href="/datasets?kind=reference" aria-current="page"' in reference_page
+    assert "href='/datasets/new?kind=reference'" in reference_page
+    assert "<h1>Mapping datasets</h1>" in mapping_page
+    assert "Tradable currencies" in mapping_page
+    assert "Currencies" not in mapping_page
+    assert 'href="/datasets?kind=mapping" aria-current="page"' in mapping_page
+    assert "href='/datasets/new?kind=mapping'" in mapping_page
+
+    reference_form = body(request(client, "get", "/datasets/new?kind=reference"))
+    mapping_form = body(request(client, "get", "/datasets/new?kind=mapping"))
+    assert "name='kind' value='reference' checked" in reference_form
+    assert "name='kind' value='mapping' checked" in mapping_form
+    assert "data-mapping-setup hidden" in reference_form
+    assert "data-mapping-setup hidden" not in mapping_form
+
+
+def test_unknown_dataset_navigation_filter_is_not_found(dataset_browser):
+    _, _, _, client = dataset_browser
+    login(client)
+
+    assert request(client, "get", "/datasets?kind=unknown").status_code == 404
 
 
 def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_browser):
@@ -227,6 +279,22 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         source_system="SAP ECC",
         target_system="Salesforce & CRM",
     )
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "source_value",
+        "Source value",
+        "string",
+        mapping_role="source_identifier",
+    )
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "target_value",
+        "Target value",
+        "string",
+        mapping_role="mapping_target",
+    )
     services.dataset_records.create_record(
         admin.id,
         mapping.key,
@@ -265,6 +333,20 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     assert "<dt>Technical name</dt>" in configuration
     assert "Editable until published" in configuration
     assert "It cannot be changed after the first publication." not in configuration
+    fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
+    assert ">Add field</a>" in fields_section
+    assert "Concept · Read only" not in fields_section
+    source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
+    field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
+    constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
+    assert "Source identifier" not in field_cell
+    assert "Source identifier" in constraints
+
+    concept_configuration = body(request(client, "get", f"/datasets/{mapping.key}/concept#fields"))
+    concept_fields = concept_configuration.split("<section id='fields'", 1)[1].split(
+        "</section>", 1
+    )[0]
+    assert ">Added</span>" not in concept_fields
 
     edit_page = body(request(client, "get", f"/datasets/{mapping.key}/configure?edit=1"))
     assert "name='technical_key'" in edit_page
@@ -287,6 +369,103 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     assert request(client, "get", "/datasets/system-map/configure").status_code == 404
 
 
+def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_browser):
+    _, services, admin, client = dataset_browser
+    source = create_dataset(services, admin, "chemicals", "Chemicals")
+    symbol = create_field(
+        services,
+        admin,
+        source,
+        key="symbol",
+        name="Symbol",
+        is_required=True,
+    )
+    services.dataset_business_keys.set_business_key(admin.id, source.key, (symbol.key,))
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "dangerous-chemicals",
+        "Dangerous chemicals",
+        "",
+        kind="mapping",
+        mapping_mode="linked",
+        source_dataset_id=source.id,
+        source_field_key=symbol.key,
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{mapping.key}/concept/records"))
+
+    assert "Add record" not in page
+    assert "No source records yet" in page
+    assert "Records appear here when they are available in the linked source table." in page
+    assert request(client, "get", f"/datasets/{mapping.key}/records/new").status_code == 404
+
+
+def test_linked_mapping_shows_direction_before_first_target_field(dataset_browser):
+    _, services, admin, client = dataset_browser
+    source = create_dataset(services, admin, "elements", "Elements")
+    symbol = services.dataset_fields.create_field(
+        admin.id,
+        source.key,
+        "symbol",
+        "Symbol",
+        "string",
+        is_required=True,
+        is_business_key_component=True,
+    )
+    name = create_field(services, admin, source, key="name", name="Name")
+    services.dataset_records.create_record(
+        admin.id, source.key, {symbol.key: "Ac", name.key: "Actinium"}
+    )
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "dangerous-elements",
+        "Dangerous elements",
+        "",
+        kind="mapping",
+        mapping_mode="linked",
+        source_dataset_id=source.id,
+        source_field_key=symbol.key,
+    )
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "ignored",
+        "Ignored",
+        "string",
+        mapping_role="source_context",
+        source_field_key=name.key,
+    )
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "poisonous",
+        "Poisonous",
+        "boolean",
+        mapping_role="mapping_target",
+    )
+    mapping_record = services.dataset_records.list_records(admin.id, mapping.key).records[0]
+    services.dataset_records.update_record(
+        admin.id,
+        mapping.key,
+        mapping_record.id,
+        mapping_record.revision,
+        {"poisonous": "true"},
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{mapping.key}/concept/records"))
+    header = re.search(r"<thead>(.*?)</thead>", page, re.DOTALL)[1]
+    row = re.search(r"<tr class='record-row interactive-row'.*?</tr>", page, re.DOTALL)[0]
+
+    assert header.index("Name") < header.index("Mapping direction") < header.index("Poisonous")
+    assert row.index("Actinium") < row.index("maps to") < row.index(">true<")
+    assert header.count("Mapping direction") == 1
+    assert row.count("maps to") == 1
+
+
 def test_shared_shell_marks_active_navigation_and_exposes_account_context(dataset_browser):
     _, _, _, client = dataset_browser
     login(client)
@@ -297,7 +476,9 @@ def test_shared_shell_marks_active_navigation_and_exposes_account_context(datase
     assert '<html lang="en">' in page
     assert '<main id="content"' in page
     assert 'aria-label="Primary navigation"' in page
-    assert 'href="/datasets" aria-current="page"' in page
+    assert 'href="/datasets?kind=reference"' in page
+    assert 'href="/datasets?kind=mapping"' in page
+    assert 'href="/datasets" aria-current="page"' not in page
     assert "Administrator" in page
     assert "Administrator" in page
     assert 'action="/logout"' in page
@@ -343,7 +524,8 @@ def test_shared_shell_navigation_follows_effective_role(dataset_browser):
 
     page = body(request(client, "get", "/datasets"))
 
-    assert 'href="/datasets"' in page
+    assert 'href="/datasets?kind=reference"' in page
+    assert 'href="/datasets?kind=mapping"' in page
     assert 'href="/users"' not in page
     assert 'href="/teams"' not in page
     assert "New dataset" in page
@@ -497,7 +679,7 @@ def test_duplicate_unique_record_value_stays_in_panel_with_field_error(dataset_b
     assert "A unique field value already exists" not in page
 
 
-def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
+def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "currencies")
     create_field(services, admin, dataset, "code", "Code", is_required=True)
@@ -513,17 +695,20 @@ def test_record_rows_open_a_detail_panel_with_record_actions(dataset_browser):
     assert "<tr class='record-row interactive-row' data-row-action data-record-row" in page
     assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", page)
     assert f"type='button' data-dialog-open='record-panel-{record.id}'" in page
-    assert f"aria-label='View record EUR ({record.id})'" in page
+    assert f"aria-label='Edit record EUR ({record.id})'" in page
     assert ">View</button>" not in page
     assert f"id='record-panel-{record.id}'" in page
     assert ">EUR</h2>" in page
     assert f"aria-labelledby='record-panel-title-{record.id}'" in page
     assert f"aria-describedby='record-panel-description-{record.id}'" in page
-    assert "data-panel-subtitle data-default-text='View record'>View record</p>" in page
+    assert "data-default-mode='edit'" in page
+    assert "data-panel-subtitle data-default-text='Edit record'>Edit record</p>" in page
     assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
     assert "data-panel-mode='edit'" in page
-    assert "data-panel-view='edit' hidden" in page
+    assert "data-panel-view='view' hidden" in page
+    assert "data-panel-view='edit' method='post'" in page
+    assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     assert "value='1'" in page
     assert "You can Undo delete while this Concept remains active." in page
     assert "name='confirm' value='yes'" in page
@@ -968,7 +1153,8 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert "<title>New dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
     assert (
-        "<form class='form' data-generate-key novalidate method='post' action='/datasets'>" in page
+        "<form class='form' data-generate-key data-mapping-table-form novalidate "
+        "method='post' action='/datasets'>" in page
     )
     assert "<label for='dataset-key'>Key</label>" in page
     assert "id='dataset-key' name='key' type='text' value='' required" in page
@@ -984,6 +1170,38 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     )
     assert '<button class="button button-primary" type="submit">Create dataset</button>' in page
     assert "aria-invalid='true'" not in page
+    assert "data-mapping-setup hidden" in page
+    assert "Source identifier" in page
+    assert "Target identifier" not in page
+    assert "Target table" not in page
+    assert "Source system" not in page and "Target system" not in page
+
+
+def test_dataset_list_loads_mapping_form_behaviour_for_create_panel(dataset_browser):
+    _, _, _, client = dataset_browser
+    login(client)
+
+    page = body(request(client, "get", "/datasets"))
+
+    assert "static/js/mapping-table-form.js" in page
+
+
+def test_mapping_create_form_orders_linked_tables_before_field_choices(dataset_browser):
+    _, services, admin, client = dataset_browser
+    source = create_dataset(services, admin, "source-options", "Source options")
+    field = create_field(services, admin, source, "cost_code", "Cost code")
+    login(client)
+
+    page = body(request(client, "get", "/datasets/new"))
+
+    assert f"<option value='{source.id}'>Source options</option>" in page
+    assert f"data-table-id='{source.id}'" in page
+    assert f"value='{field.key}'" in page
+    assert page.index("for='mapping-source-table'") < page.index("for='mapping-source-field'")
+    assert "mapping-target-table" not in page
+    assert "mapping-target-field" not in page
+    assert "New output attribute" not in page
+    assert "static/js/mapping-table-form.js" in page
 
 
 @pytest.mark.parametrize(
@@ -1412,40 +1630,10 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert "Required" in page and "None" in page
     assert page.count("Edit field") == 2
     for name in ("Zeta", "&lt;script&gt;alert(1)&lt;/script&gt;"):
-        for direction in ("up", "down"):
-            assert f"aria-label='Move {name} {direction}'" in page
-    order_forms = re.findall(
-        r"<form class='button-stack' method='post' "
-        r"action='/datasets/schema/fields/order'>(.*?)</form>",
-        page,
-        re.DOTALL,
-    )
-    assert len(order_forms) == 2
-    expected_ids = [
-        field.id for field in services.dataset_fields.list_fields(admin.id, dataset.key)
-    ]
-    csrf = session_csrf(client, services)
-    for form, field_id in zip(order_forms, expected_ids, strict=True):
-        assert form.count(f"name='csrf_token' value='{csrf}'") == 1
-        assert re.findall(r"name='expected_field_id' value='([^']+)'", form) == expected_ids
-        assert f"name='field_id' value='{field_id}'" in form
-        assert "name='direction' value='up'" in form
-        assert "name='direction' value='down'" in form
-        controls = re.findall(r"<button([^>]*)>(.*?)</button>", form, re.DOTALL)
-        assert len(controls) == 2
-        for attributes, content in controls:
-            assert "type='submit'" in attributes
-            assert "button-icon-only" in attributes
-            assert '<svg class="button-icon"' in content
-            assert 'aria-hidden="true"' in content and 'focusable="false"' in content
-            assert not re.sub(r"<[^>]+>", "", content).strip()
-        assert '<path d="m18 15-6-6-6 6"' in controls[0][1]
-        assert '<path d="m6 9 6 6 6-6"' in controls[1][1]
-        assert not re.search(r"draggable|ondrag\w*|ondrop", form, re.IGNORECASE)
-    assert "name='direction' value='up' disabled" in order_forms[0]
-    assert "name='direction' value='down' disabled" not in order_forms[0]
-    assert "name='direction' value='up' disabled" not in order_forms[1]
-    assert "name='direction' value='down' disabled" in order_forms[1]
+        assert f"aria-label='Reorder {name}'" in page
+        assert f"aria-label='Move {name} up'" not in page
+        assert f"aria-label='Move {name} down'" not in page
+    assert "class='button-stack'" not in page
 
 
 def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):

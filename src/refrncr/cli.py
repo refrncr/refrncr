@@ -5,6 +5,8 @@ import getpass
 import json
 import logging
 import os
+import re
+import shlex
 import sys
 import warnings
 from collections.abc import Callable, Sequence
@@ -29,6 +31,7 @@ from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
+ENVIRONMENT_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,34 @@ class SafeLogLevelAction(argparse.Action):
         if normalized not in {"debug", "info", "warning", "error", "critical"}:
             parser.error("invalid --log-level value")
         setattr(namespace, self.dest, normalized)
+
+
+def load_local_environment(path: Path | None = None) -> None:
+    """Load a local .env file without overriding the launching environment."""
+    environment_file = path if path is not None else Path.cwd() / ".env"
+    if not environment_file.is_file():
+        return
+    try:
+        lines = environment_file.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise CliError("local .env configuration could not be read") from exc
+    for line_number, line in enumerate(lines, start=1):
+        candidate = line.strip()
+        if not candidate or candidate.startswith("#"):
+            continue
+        if candidate.startswith("export "):
+            candidate = candidate[7:].lstrip()
+        name, separator, raw_value = candidate.partition("=")
+        name = name.strip()
+        if not separator or ENVIRONMENT_NAME.fullmatch(name) is None:
+            raise CliError(f"local .env configuration is invalid on line {line_number}")
+        try:
+            values = shlex.split(raw_value, comments=True, posix=True)
+        except ValueError as exc:
+            raise CliError(f"local .env configuration is invalid on line {line_number}") from exc
+        if len(values) > 1:
+            raise CliError(f"local .env configuration is invalid on line {line_number}")
+        os.environ.setdefault(name, values[0] if values else "")
 
 
 def default_data_directory() -> Path:
@@ -270,6 +301,8 @@ def _validate_ref_121_schema(connection) -> None:
         "0022_ref_31",
         "0023_ref_176",
         "0024_ref_177",
+        "0025_ref_177",
+        "0026_ref_177",
     }:
         return
     inspector = inspect(connection)
@@ -433,6 +466,8 @@ def main(
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "start":
+            load_local_environment()
         if args.command in {"dataset-publication-preflight", "dataset-concept-preflight"}:
             database_url = resolve_database_url(args)
             engine = create_database_engine(database_url)
@@ -451,6 +486,8 @@ def main(
                             "0022_ref_31",
                             "0023_ref_176",
                             "0024_ref_177",
+                            "0025_ref_177",
+                            "0026_ref_177",
                         }
                         if args.command == "dataset-concept-preflight"
                         else {
@@ -465,6 +502,8 @@ def main(
                             "0022_ref_31",
                             "0023_ref_176",
                             "0024_ref_177",
+                            "0025_ref_177",
+                            "0026_ref_177",
                         }
                     )
                     if revision not in allowed:

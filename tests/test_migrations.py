@@ -125,6 +125,8 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
             "target_system",
             "source_dataset_id",
             "target_dataset_id",
+            "source_field_key",
+            "target_field_key",
         }
         if mapping_tables
         else set()
@@ -169,7 +171,9 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
     assert owner_foreign_key["referred_table"] == "users"
     assert owner_foreign_key["options"].get("ondelete") in {None, "RESTRICT"}
     field_columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}
-    assert set(field_columns) == ({"definition", "unit"} if dataset_revision else set()) | {
+    assert set(field_columns) == ({"definition", "unit"} if dataset_revision else set()) | (
+        {"mapping_role", "source_field_id", "source_field_key"} if mapping_tables else set()
+    ) | {
         "id",
         "dataset_id",
         "key",
@@ -212,6 +216,8 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
     dataset_foreign_key = field_foreign_keys[("dataset_id",)]
     assert dataset_foreign_key["referred_table"] == "datasets"
     assert dataset_foreign_key["options"].get("ondelete") == "CASCADE"
+    if mapping_tables:
+        assert field_foreign_keys[("source_field_id",)]["referred_table"] == "dataset_fields"
     business_key_columns = {
         column["name"] for column in inspector.get_columns("dataset_business_key_fields")
     }
@@ -456,7 +462,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0024_ref_177"
+                "0026_ref_177"
             )
     finally:
         upgraded.dispose()
@@ -1019,7 +1025,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0024_ref_177"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0026_ref_177"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
