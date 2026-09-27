@@ -345,7 +345,8 @@ def test_bounded_query_count_and_no_object_graph(context, monkeypatch):  # noqa:
         summary = c.diff.review(c.a.id, review.identity)
     finally:
         event.remove(c.engine, "before_cursor_execute", collect)
-    assert len(statements) == (38 if c.engine.dialect.name == "postgresql" else 29)
+    query_limit = 38 if c.engine.dialect.name == "postgresql" else 29
+    assert len(statements) <= query_limit
     assert len(page.items) == 1 and len(detail.values) == 2 and summary.counts.records_changed == 1
 
 

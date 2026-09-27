@@ -48,7 +48,7 @@ const assert = require('node:assert/strict');
     assert.equal(await close.getAttribute('aria-expanded'),'true');
     await shot('desktop-expanded');
     await close.click();
-    await page.getByRole('link',{name:'View datasets',exact:true}).click(); await page.waitForURL('**/datasets'); await page.waitForLoadState('load');
+    await page.getByRole('link',{name:'Reference datasets',exact:true}).click(); await page.waitForURL('**/datasets?kind=reference'); await page.waitForLoadState('load');
     assert(!(await nav.isVisible()),'collapsed state retained across link navigation');
     await page.waitForFunction(()=>window.navigationFrames.length === 10);
     assert((await page.evaluate(()=>window.navigationFrames)).every(x=>x===0), 'stored collapse has no expanded first frame or layout jump');

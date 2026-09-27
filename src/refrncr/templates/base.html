@@ -1,4 +1,4 @@
-{% from "components/icons.html" import settings_icon, home_icon, datasets_icon, logout_icon -%}
+{% from "components/icons.html" import settings_icon, home_icon, table_icon, arrow_big_right_dash_icon, logout_icon -%}
 {% from "components/navigation.html" import navigation_button, navigation_drawer -%}
 <!doctype html>
 <html lang="en">
@@ -34,7 +34,9 @@
           <nav id="primary-navigation" class="primary-navigation" aria-label="Primary navigation">
             <a class="nav-item{{ ' is-active' if active_navigation == 'home' else '' }}" href="{{ url_for('index') }}"{% if active_navigation == 'home' %} aria-current="page"{% endif %}>{{ home_icon() }}Overview</a>
             {% if dataset_ui_enabled %}
-              <a class="nav-item{{ ' is-active' if active_navigation == 'datasets' else '' }}" href="{{ url_for('dataset_list') }}"{% if active_navigation == 'datasets' %} aria-current="page"{% endif %}>{{ datasets_icon() }}Datasets</a>
+              <p class="nav-label">Datasets</p>
+              <a class="nav-item{{ ' is-active' if active_navigation == 'reference_datasets' else '' }}" href="{{ url_for('dataset_list', kind='reference') }}"{% if active_navigation == 'reference_datasets' %} aria-current="page"{% endif %}>{{ table_icon() }}Reference datasets</a>
+              <a class="nav-item{{ ' is-active' if active_navigation == 'mapping_datasets' else '' }}" href="{{ url_for('dataset_list', kind='mapping') }}"{% if active_navigation == 'mapping_datasets' %} aria-current="page"{% endif %}>{{ arrow_big_right_dash_icon() }}Mapping datasets</a>
             {% endif %}
           </nav>
           <div class="account-context">

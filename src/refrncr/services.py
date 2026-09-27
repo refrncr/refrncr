@@ -48,6 +48,7 @@ from refrncr.presentation_metadata import (
     dataset_icon,
     optional_plain_text,
 )
+from refrncr.version_contracts import mapping_incomplete_message
 
 SUBJECT_TYPES = {"user", "team"}
 
@@ -856,6 +857,14 @@ class DatasetService:
         owner_team_id: str | None = None,
         *,
         icon: str | None = None,
+        kind: str = "reference",
+        mapping_mode: str | None = None,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        source_dataset_id: str | None = None,
+        target_dataset_id: str | None = None,
+        source_field_key: str | None = None,
+        target_field_key: str | None = None,
     ) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
             if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
@@ -871,6 +880,29 @@ class DatasetService:
                 raise ValidationError(
                     "Choose an available owning team you may create datasets for."
                 )
+            kind, mapping_mode, source_system, target_system = self._mapping_metadata(
+                kind, mapping_mode, source_system, target_system
+            )
+            if kind == "mapping" and mapping_mode == "linked":
+                if not source_dataset_id:
+                    raise ValidationError("Choose a source table for a linked mapping table.")
+                linked = uow.datasets.get(source_dataset_id)
+                visible = linked is not None and self.authorization.check_access(
+                    actor_id, "dataset", linked.id, "viewer", uow=uow
+                )
+                if not visible or linked.kind != "reference":
+                    raise ValidationError("Choose an available reference source table.")
+                source_fields = {
+                    field.key: field for field in uow.dataset_fields.list_for_dataset(linked.id)
+                }
+                if not source_field_key or source_field_key not in source_fields:
+                    raise ValidationError("Choose an available source identifier.")
+                source_field = source_fields[source_field_key]
+                source_system = source_field.name
+                target_system = target_dataset_id = target_field_key = None
+            else:
+                source_dataset_id = target_dataset_id = None
+                source_field_key = target_field_key = None
             dataset = uow.datasets.create(
                 key=validate_dataset_key(key),
                 name=normalize_dataset_name(name),
@@ -878,6 +910,14 @@ class DatasetService:
                 owner_user_id=actor_id,
                 owner_team_id=owner_team_id,
                 icon=validate_dataset_icon(icon),
+                kind=kind,
+                mapping_mode=mapping_mode,
+                source_system=source_system,
+                target_system=target_system,
+                source_dataset_id=source_dataset_id,
+                target_dataset_id=target_dataset_id,
+                source_field_key=source_field_key,
+                target_field_key=target_field_key,
             )
             try:
                 uow.flush()
@@ -894,7 +934,80 @@ class DatasetService:
                 details={"owner_team_id": owner_team_id, "creator_user_id": actor_id},
             )
             _version_reads(self).create_concept(actor_id, dataset.id, uow=uow)
+            if kind == "mapping":
+                if mapping_mode == "linked":
+                    identifier_field = uow.dataset_fields.create(
+                        dataset_id=dataset.id,
+                        key=source_field.key,
+                        name=source_field.name,
+                        definition=source_field.definition,
+                        unit=source_field.unit,
+                        data_type=source_field.data_type,
+                        is_required=True,
+                        is_unique=True,
+                        display_position=1,
+                        mapping_role="source_identifier",
+                        source_field_id=source_field.id,
+                        source_field_key=source_field.key,
+                    )
+                    uow.dataset_business_keys.replace(dataset.id, (source_field.key,))
+                    uow.flush()
+                    for source_record in uow.dataset_records.iterate_all(source_dataset_id):
+                        source_value = next(
+                            (
+                                value
+                                for value in source_record.values
+                                if value.field_key == source_field.key
+                            ),
+                            None,
+                        )
+                        if source_value is None:
+                            continue
+                        encoded = (
+                            len(source_value.canonical_key).to_bytes(4, "big")
+                            + source_value.canonical_key
+                        )
+                        record = uow.dataset_records.create(
+                            dataset_id=dataset.id, identifier_key=encoded
+                        )
+                        uow.flush()
+                        uow.dataset_records.add_values(
+                            record,
+                            (
+                                RecordValue(
+                                    identifier_field.id,
+                                    identifier_field.key,
+                                    identifier_field.data_type,
+                                    source_value.value,
+                                    source_value.canonical_key,
+                                    True,
+                                ),
+                            ),
+                        )
+                uow.flush()
             return dataset
+
+    @staticmethod
+    def _mapping_metadata(kind, mapping_mode, source_system, target_system):
+        if kind not in {"reference", "mapping"}:
+            raise ValidationError("Choose a valid table type.")
+        if kind == "reference":
+            return kind, None, None, None
+        if mapping_mode not in {"standalone", "linked"}:
+            raise ValidationError("Choose standalone or linked mapping mode.")
+
+        def label(value, name):
+            value = value.strip() if isinstance(value, str) else ""
+            if len(value) > 200:
+                raise ValidationError(f"{name} must be 200 characters or fewer.")
+            return value or None
+
+        return (
+            kind,
+            mapping_mode,
+            label(source_system, "Source identifier"),
+            label(target_system, "Target identifier"),
+        )
 
     def change_owner(self, actor_id, key, expected_owner_team_id, owner_team_id):
         key = self._validated_lookup_key(key)
@@ -1082,7 +1195,12 @@ class DatasetService:
             govern = self.authorization.datasets.can_change_dataset_owner(
                 actor_id, dataset.id, uow=uow
             )
-            return DatasetConfiguration(dataset, maintain, govern)
+            may_edit_key = (
+                maintain
+                and uow.concepts.get(dataset.id) is not None
+                and not uow.versions.list_for_dataset(dataset.id)
+            )
+            return DatasetConfiguration(dataset, maintain, govern, may_edit_key)
 
     def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
         return self._get_dataset_with_access(actor_id, key, "editor")
@@ -1106,8 +1224,10 @@ class DatasetService:
         *,
         owner_change: tuple[str, str] | None = None,
         icon: str | None = None,
+        new_key: str | None = None,
     ) -> DatasetRecord:
         validated_key = self._validated_lookup_key(key)
+        validated_new_key = validated_key if new_key is None else validate_dataset_key(new_key)
         normalized_name = normalize_dataset_name(name)
         validated_description = validate_dataset_description(description)
         with self.uow(write=True, serialized=True) as uow:
@@ -1119,11 +1239,27 @@ class DatasetService:
             ):
                 raise NotFoundError("Dataset not found")
             validated_icon = dataset.icon if icon is None else validate_dataset_icon(icon)
+            key_changed = dataset.key != validated_new_key
+            if key_changed and (
+                uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
+            ):
+                raise ValidationError(
+                    "Dataset key can only be changed before the first version is published."
+                )
             metadata_changed = (
                 dataset.name != normalized_name or dataset.description != validated_description
             )
-            if not metadata_changed and dataset.icon == validated_icon:
+            if not key_changed and not metadata_changed and dataset.icon == validated_icon:
                 return dataset
+            if key_changed:
+                try:
+                    uow.datasets.rename_key(dataset.id, validated_new_key)
+                except PersistenceConflictError as exc:
+                    if exc.constraint == "uq_datasets_key":
+                        raise ConflictError(
+                            "Dataset key already exists in this installation"
+                        ) from exc
+                    raise
             dataset.icon = validated_icon
             dataset.name = normalized_name
             dataset.description = validated_description
@@ -1132,6 +1268,12 @@ class DatasetService:
                 uow,
                 self._audit(actor_id, "dataset", dataset.id, "metadata_updated"),
             )
+            try:
+                uow.flush()
+            except PersistenceConflictError as exc:
+                if exc.constraint == "uq_datasets_key":
+                    raise ConflictError("Dataset key already exists in this installation") from exc
+                raise
             return dataset
 
     def _find_by_key(self, key: str) -> DatasetRecord:
@@ -1184,11 +1326,66 @@ class DatasetFieldService:
         *,
         definition: str | None = None,
         unit: str | None = None,
+        mapping_role: str | None = None,
+        source_field_key: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            source_field = None
+            source_dataset = None
+            if dataset.kind == "mapping":
+                mapping_role = mapping_role or "mapping_target"
+                allowed_roles = (
+                    {"mapping_target", "source_context"}
+                    if dataset.mapping_mode == "linked"
+                    else {"mapping_target", "source_identifier", "source_context"}
+                )
+                if mapping_role not in allowed_roles:
+                    raise ValidationError("Choose a valid mapping field role")
+                if mapping_role == "source_context":
+                    if dataset.mapping_mode == "linked":
+                        if not dataset.source_dataset_id:
+                            raise ValidationError("Source context requires a linked mapping table")
+                        source_dataset = uow.datasets.get(dataset.source_dataset_id)
+                        if not source_field_key:
+                            raise ValidationError("Choose an available source field")
+                        source_field = uow.dataset_fields.find_by_key(
+                            dataset.source_dataset_id,
+                            self._validated_field_lookup_key(source_field_key),
+                        )
+                        if source_dataset is None or source_field is None:
+                            raise ValidationError("Choose an available source field")
+                        if any(
+                            field.source_field_id == source_field.id
+                            for field in uow.dataset_fields.list_for_dataset(dataset.id)
+                        ):
+                            raise ConflictError("Source field is already included in this mapping")
+                        key, name, data_type = (
+                            source_field.key,
+                            source_field.name,
+                            source_field.data_type,
+                        )
+                        definition, unit = source_field.definition, source_field.unit
+                    else:
+                        source_field_key = None
+                    is_business_key_component = False
+                else:
+                    source_field_key = None
+                    if mapping_role == "source_identifier":
+                        existing_fields = uow.dataset_fields.list_for_dataset(dataset.id)
+                        if any(
+                            field.mapping_role == "source_identifier" for field in existing_fields
+                        ):
+                            raise ConflictError(
+                                "A standalone mapping can have only one source identifier"
+                            )
+                        is_required = is_unique = is_business_key_component = True
+                    else:
+                        is_business_key_component = False
+            else:
+                mapping_role = source_field_key = None
             validated_required = validate_dataset_field_flag(is_required, "is_required")
             validated_component = validate_dataset_field_flag(
                 is_business_key_component, "is_business_key_component"
@@ -1212,6 +1409,9 @@ class DatasetFieldService:
                 is_required=validated_required,
                 is_unique=validate_dataset_field_flag(is_unique, "is_unique"),
                 display_position=len(uow.dataset_fields.list_for_dataset(dataset.id)) + 1,
+                mapping_role=mapping_role,
+                source_field_id=source_field.id if source_field else None,
+                source_field_key=source_field.key if source_field else None,
             )
             try:
                 uow.flush()
@@ -1237,6 +1437,53 @@ class DatasetFieldService:
                         else "business_key_updated"
                     ),
                 )
+            if source_field is not None:
+                mapping_records = {
+                    identifier: record_id
+                    for record_id, identifier in uow.dataset_records.identifier_keys(
+                        dataset.id
+                    ).items()
+                }
+                for source_record in uow.dataset_records.iterate_all(source_dataset.id):
+                    identifier_value = next(
+                        (
+                            value
+                            for value in source_record.values
+                            if value.field_key == dataset.source_field_key
+                        ),
+                        None,
+                    )
+                    context_value = next(
+                        (
+                            value
+                            for value in source_record.values
+                            if value.field_key == source_field.key
+                        ),
+                        None,
+                    )
+                    if identifier_value is None or context_value is None:
+                        continue
+                    encoded = (
+                        len(identifier_value.canonical_key).to_bytes(4, "big")
+                        + identifier_value.canonical_key
+                    )
+                    record_id = mapping_records.get(encoded)
+                    if record_id:
+                        uow.dataset_records.add_values_by_id(
+                            dataset.id,
+                            record_id,
+                            (
+                                RecordValue(
+                                    field.id,
+                                    field.key,
+                                    field.data_type,
+                                    context_value.value,
+                                    context_value.canonical_key,
+                                    False,
+                                ),
+                            ),
+                        )
+                uow.concepts.record_mutation(dataset.id)
             return field
 
     def list_fields(self, actor_id: str, dataset_key: str) -> list[DatasetFieldRecord]:
@@ -1274,6 +1521,8 @@ class DatasetFieldService:
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
                 raise NotFoundError("Dataset field not found")
+            if field.source_field_key:
+                raise ValidationError("Source mapping fields are read-only")
 
             definition, unit = validate_field_metadata(
                 field.definition if definition is None else definition,
@@ -1361,6 +1610,11 @@ class DatasetFieldService:
             validated_component = validate_dataset_field_flag(
                 is_business_key_component, "is_business_key_component"
             )
+            if dataset.kind == "mapping":
+                if field.mapping_role == "source_identifier":
+                    validated_required = validated_unique = validated_component = True
+                else:
+                    validated_component = False
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
@@ -1444,6 +1698,8 @@ class DatasetFieldService:
                 raise ValidationError(
                     "Remove this field from the Record identifier before deleting it"
                 )
+            if uow.datasets.uses_linked_field(dataset.id, field.key):
+                raise ValidationError("A field used by a linked mapping table cannot be deleted")
             if uow.dataset_records.field_has_values(dataset.id, field.id):
                 raise ValidationError("A field with stored values cannot be deleted")
             field_id = field.id
@@ -1685,7 +1941,12 @@ class DatasetRecordService:
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             self._require_access(actor_id, dataset, "editor", uow=uow)
+            if dataset.kind == "mapping" and dataset.mapping_mode == "linked":
+                raise ValidationError("Linked mapping records are populated from the source table")
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            if dataset.kind == "mapping":
+                if message := mapping_incomplete_message(fields):
+                    raise ValidationError(message)
             identifier = uow.dataset_business_keys.get(dataset.id)
             values, encoded_identifier = self._validated_values(fields, identifier, submitted)
             unique_values = tuple(
@@ -1754,6 +2015,14 @@ class DatasetRecordService:
             if existing is None:
                 raise NotFoundError("Record not found")
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
+            for field in fields:
+                if not field.source_field_key:
+                    continue
+                existing_value = next(
+                    (value for value in existing.values if value.field_id == field.id), None
+                )
+                if existing_value is not None:
+                    submitted[field.key] = get_datatype(field.data_type).text(existing_value.value)
             identifier = uow.dataset_business_keys.get(dataset.id)
             values, encoded_identifier = self._validated_values(fields, identifier, submitted)
             # Check stale input before accepting a normalized no-op. The Dataset

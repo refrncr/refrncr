@@ -295,6 +295,8 @@ class SqlAlchemyVersionOperations:
             if self.legacy_metadata:
                 values.pop("definition")
                 values.pop("unit")
+                values.pop("mapping_role")
+                values.pop("source_field_key")
                 self.session.execute(legacy_fields.insert().values(version_id=row.id, **values))
             else:
                 self.session.add(DatasetVersionField(version_id=row.id, **values))
@@ -371,6 +373,8 @@ class SqlAlchemyVersionOperations:
                 f.is_identifier,
                 f.definition,
                 f.unit,
+                f.mapping_role,
+                f.source_field_key,
             )
             for f in self.session.scalars(
                 select(DatasetVersionField)

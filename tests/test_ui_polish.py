@@ -560,7 +560,8 @@ def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):  # 
     assert "id='dataset-edit-form'" in editing
     assert "Save dataset" in editing and ">Cancel</a>" in editing
     assert "data-side-panel-content" not in editing
-    assert "<dt>Key</dt>" not in editing and "<code>inline-edit</code>" in editing
+    assert "<dt>Technical name</dt>" not in editing
+    assert "name='technical_key'" in editing and "value='inline-edit'" in editing
     assert "name='key'" not in editing
     assert "name='owner_team_id'" in editing and "name='icon'" in editing
     csrf = session_csrf(client, s)
@@ -752,7 +753,7 @@ def test_standalone_access_redirect_and_revocation_without_concept(dataset_brows
 
 
 @pytest.mark.parametrize("published", [False, True])
-def test_configuration_fields_are_read_only(dataset_browser, published):  # noqa: F811
+def test_configuration_fields_follow_concept_lifecycle(dataset_browser, published):  # noqa: F811
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "read-fields", "Read fields")
     s.dataset_fields.create_field(
@@ -772,11 +773,19 @@ def test_configuration_fields_are_read_only(dataset_browser, published):  # noqa
     login(client)
     html = body(request(client, "get", f"/datasets/{d.key}/configure"))
     fields = html.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
-    assert "Visible code" in fields and "Field explanation" in fields and "EUR" in fields
+    assert "Visible code" in fields
+    assert "Field explanation" not in fields and "EUR" not in fields
+    assert ">Description</th>" not in fields
     assert "Identifier" in fields and "Required" in fields and "Unique" in fields
-    assert ("Current · Version 1" if published else "Concept") + " · Read only" in fields
-    assert "<form" not in fields and "<button" not in fields
-    assert "field-edit-action" not in fields and "Add field" not in fields
+    if published:
+        assert "Current · Version 1 · Read only" in fields
+        assert "Add field" not in fields
+        assert "Start a concept to change fields" in fields
+        assert "field-edit-action" not in fields
+    else:
+        assert "Concept · Read only" not in fields
+        assert ">Add field</a>" in fields
+        assert "field-edit-action" in fields
     if published:
         current = body(request(client, "get", f"/datasets/{d.key}"))
         current_fields = current.split("<section id='fields'", 1)[1].split("</section>", 1)[0]

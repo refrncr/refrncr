@@ -1165,7 +1165,19 @@
       "operation": "list_dataset_overview",
       "service": "refrncr.services.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets"
+        "refrncr.web.index GET /",
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.new_dataset GET /datasets/new",
+        "refrncr.web.create_dataset POST /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1638,6 +1650,10 @@
       "operation": "list_fields",
       "service": "refrncr.services.DatasetFieldService.list_fields",
       "interface_entrypoints": [
+        "refrncr.web.new_dataset GET /datasets/new",
+        "refrncr.web.create_dataset POST /datasets",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
@@ -2895,6 +2911,7 @@
       "operation": "can_create_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_create_dataset",
       "interface_entrypoints": [
+        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets"
       ],
       "kind": "read",

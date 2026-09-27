@@ -73,6 +73,8 @@ def classify_fields(current, previous):
         "is_required": "Required",
         "is_unique": "Unique",
         "is_identifier": "Record identifier",
+        "mapping_role": "Mapping role",
+        "source_field_key": "Source field",
     }
 
     def text(field, name):

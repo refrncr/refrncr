@@ -284,6 +284,37 @@ def test_update_validation_reuses_creation_rules_without_writes(dataset_access):
         )
 
 
+def test_technical_name_is_editable_only_before_first_publication(dataset_access):
+    _, _, services, admin, _ = dataset_access
+    unpublished = create_owned_dataset(services.datasets, admin.id, "typo-key", "Unpublished", "")
+
+    renamed = services.datasets.update_dataset(
+        admin.id,
+        unpublished.key,
+        unpublished.name,
+        unpublished.description,
+        new_key="corrected-key",
+    )
+
+    assert renamed.key == "corrected-key"
+    assert services.datasets.get_dataset_for_edit(admin.id, "corrected-key").id == unpublished.id
+    with pytest.raises(NotFoundError):
+        services.datasets.get_dataset_for_edit(admin.id, "typo-key")
+    assert services.datasets.get_dataset_configuration(admin.id, "corrected-key").may_edit_key
+
+    publish_dataset(services, admin.id, renamed)
+    services.dataset_versions.create_concept(admin.id, renamed.id)
+    assert not services.datasets.get_dataset_configuration(admin.id, "corrected-key").may_edit_key
+    with pytest.raises(ValueError, match="before the first version"):
+        services.datasets.update_dataset(
+            admin.id,
+            "corrected-key",
+            renamed.name,
+            renamed.description,
+            new_key="too-late",
+        )
+
+
 def test_audit_failure_rolls_back_metadata_update(dataset_access, monkeypatch):
     _, factory, services, admin, _ = dataset_access
     dataset = create_dataset(services, admin, "rollback")

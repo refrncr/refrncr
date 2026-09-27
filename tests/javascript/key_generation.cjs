@@ -2,13 +2,15 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 class Control {
-  constructor(value = '') { this.value = value; this.events = {}; }
+  constructor(value = '') { this.value = value; this.events = {}; this.disabled = false; }
   addEventListener(event, fn) { (this.events[event] ||= []).push(fn); }
   fire(event) { for (const fn of this.events[event] || []) fn(); }
+  closest() { return null; }
 }
 function form(name = '', key = '') {
   const f = new Control(); f.name = new Control(name); f.key = new Control(key);
   f.querySelector = selector => selector === '[name="name"]' ? f.name : f.key;
+  f.querySelectorAll = selector => selector === '[name="name"]' ? [f.name] : [];
   return f;
 }
 const first = form();

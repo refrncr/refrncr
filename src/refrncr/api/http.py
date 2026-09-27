@@ -77,6 +77,7 @@ class ConditionalRead:
                 p.name,
                 p.description,
                 p.icon,
+                p.kind,
                 p.version.id,
                 p.version.number,
                 utc(p.version.published_at).isoformat(),

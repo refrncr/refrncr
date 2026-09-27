@@ -89,7 +89,7 @@ def test_shared_table_row_controller():
 
 
 @pytest.mark.parametrize(
-    "kind,columns", [("datasets", 5), ("teams", 3), ("users", 5), ("records", 3)]
+    "kind,columns", [("datasets", 6), ("teams", 3), ("users", 5), ("records", 3)]
 )
 def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
     _, services, admin, client = dataset_browser
@@ -169,9 +169,10 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     )
     html = body(request(client, "get", "/datasets/empty-rows/concept"))
     assert "data-row-action" not in html
-    assert "<th scope='col'>Actions</th>" in html
+    assert "<th scope='col' class='field-actions-column'>Actions</th>" in html
     assert "aria-label='Edit field Code'" in html
-    assert "aria-label='Move Code up'" in html
+    assert "aria-label='Reorder Code'" in html
+    assert "aria-label='Move Code up'" not in html
     env = client.application.jinja_env
     preview = env.get_template("pages/datasets/import/preview.html").render(
         state={"filename": "example.csv"},

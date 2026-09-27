@@ -34,9 +34,20 @@
         </div>
       {% endif %}
       <div class='form-field dataset-edit-key'>
-        <p class='form-label'>Key</p>
-        <p class='readonly-value'><code>{{ dataset.key }}</code></p>
-        <p class='help-text'>Permanent; used in exports and the API.</p>
+        {% if may_edit_key %}
+          {{ form_field(
+            "Technical name",
+            "technical_key",
+            "dataset-technical-key",
+            value=technical_key,
+            error_id="dataset-edit-error" if error_field == "technical_key" else none
+          ) }}
+          <p class='help-text'>Used in URLs, exports and the API. Editable until the first version is published.</p>
+        {% else %}
+          <p class='form-label'>Technical name</p>
+          <p class='readonly-value'><code>{{ dataset.key }}</code></p>
+          <p class='help-text'>Permanent after the first published version.</p>
+        {% endif %}
       </div>
     </div>
     <div class='form-actions'>

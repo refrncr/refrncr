@@ -79,7 +79,7 @@
       datatypeControls.add(select);
       const update = () => {
         const eligible = select.selectedOptions[0]?.dataset.identifierEligible === "true";
-        component.disabled = !eligible;
+        component.disabled = component.hasAttribute("data-role-locked") || !eligible;
         if (!eligible) component.checked = false;
       };
       select.addEventListener("change", update);
@@ -87,6 +87,29 @@
     });
   };
   initializeDatatypeControls(document);
+
+  const mappingFieldForms = new WeakSet();
+  const initializeMappingFieldForms = (root) => {
+    root.querySelectorAll("[data-mapping-field-form]").forEach((form) => {
+      if (mappingFieldForms.has(form)) return;
+      mappingFieldForms.add(form);
+      const sync = () => {
+        const role = form.querySelector("input[name='mapping_field_role']:checked")?.value;
+        form.querySelectorAll("[data-mapping-field-panel]").forEach((panel) => {
+          const active = panel.dataset.mappingFieldPanel === role;
+          panel.hidden = !active;
+          panel.querySelectorAll("input, select, textarea").forEach((control) => {
+            control.disabled = !active || control.hasAttribute("data-role-locked");
+          });
+        });
+      };
+      form.addEventListener("change", (event) => {
+        if (event.target.name === "mapping_field_role") sync();
+      });
+      sync();
+    });
+  };
+  initializeMappingFieldForms(document);
 
   const confirmationForms = new WeakSet();
   const initializeConfirmations = (root) => {
@@ -410,10 +433,12 @@
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     initializeDatatypeControls(host);
+    initializeMappingFieldForms(host);
     initializeSourceFormats(host);
     initializeConfirmations(host);
     window.refrncrKeyGeneration?.(host);
     window.refrncrIconPickers?.(host);
+    window.refrncrMappingTableForms?.(host);
     host.querySelectorAll("[data-panel-section-heading]").forEach((heading) => {
       const marker = "data-panel-section-heading";
       const nested = document.createElement("h3");
@@ -451,8 +476,9 @@
 
   const resetSidePanel = (dialog) => {
     if (dialog.hasAttribute("data-panel-modes")) {
+      const defaultMode = dialog.dataset.defaultMode || "view";
       dialog.querySelectorAll("[data-panel-view]").forEach((view) => {
-        view.hidden = view.dataset.panelView !== "view";
+        view.hidden = view.dataset.panelView !== defaultMode;
       });
       const subtitle = dialog.querySelector("[data-panel-subtitle]");
       if (subtitle) {

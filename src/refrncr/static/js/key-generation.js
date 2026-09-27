@@ -7,25 +7,40 @@
   const states = new WeakMap();
   const initialize = (root = document) => {
     root.querySelectorAll("form[data-generate-key]").forEach((form) => {
-      const name = form.querySelector('[name="name"]');
-      const key = form.querySelector('[name="key"]');
-      if (!name || !key) return;
+      const pairs = [...form.querySelectorAll('[name="name"]')].map((name) => {
+        const scope = name.closest("[data-mapping-field-panel]") || form;
+        return {name, key: scope.querySelector('[name="key"]')};
+      }).filter(({key}) => key);
+      if (!pairs.length) return;
       if (states.has(form)) { states.get(form)(); return; }
-      // A redisplayed nonempty key is authoritative, including a manual override.
-      let manual = key.value !== "";
-      let generated = key.value;
+      const pairStates = new WeakMap();
+      pairs.forEach(({name, key}) => {
+        // A redisplayed nonempty key is authoritative, including a manual override.
+        const state = {manual: key.value !== "", generated: key.value};
+        pairStates.set(key, state);
+        const update = () => {
+          // Also catch password-manager/autofill changes that do not emit input.
+          if (key.value !== state.generated) state.manual = true;
+          if (!state.manual) key.value = state.generated = canonical(name.value);
+        };
+        const override = () => { state.manual = true; };
+        key.addEventListener("input", override);
+        key.addEventListener("change", override);
+        name.addEventListener("input", update);
+        name.addEventListener("change", update);
+      });
       const update = () => {
-        // Also catch password-manager/autofill changes that do not emit input.
-        if (key.value !== generated) manual = true;
-        if (!manual) key.value = generated = canonical(name.value);
+        pairs.filter(({name, key}) => !name.disabled && !key.disabled).forEach(({name, key}) => {
+          const state = pairStates.get(key);
+          if (key.value !== state.generated) state.manual = true;
+          if (!state.manual) key.value = state.generated = canonical(name.value);
+        });
       };
-      const override = () => { manual = true; };
-      key.addEventListener("input", override);
-      key.addEventListener("change", override);
-      name.addEventListener("input", update);
-      name.addEventListener("change", update);
       form.addEventListener("focusin", update);
       form.addEventListener("submit", update);
+      form.addEventListener("change", (event) => {
+        if (event.target.name === "mapping_field_role") queueMicrotask(update);
+      });
       states.set(form, update);
       update();
     });

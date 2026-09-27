@@ -21,6 +21,10 @@ th { background: var(--color-table-heading); color: var(--color-text-muted); fon
 .record-table .cell-content { min-width: 100%; }
 /* Content-sized columns keep short headings (ISO code 3) readable; long headings still wrap. */
 .record-table thead th { min-width: 8rem; }
+.mapping-field-heading { display: flex; flex-direction: column; align-items: flex-start; gap: .2rem; }
+.record-table :is(th, td).mapping-direction-column { width: 2.5rem; min-width: 2.5rem; padding-inline: var(--space-xs); color: var(--color-action-primary); font-family: var(--font-interface); font-size: var(--font-size-body); font-weight: var(--font-weight-bold); text-align: center; vertical-align: middle; }
+.mapping-system-name { display: block; max-width: 14rem; overflow: hidden; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); letter-spacing: normal; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
+.mapping-field-role { color: var(--color-text-muted); font-family: var(--font-interface); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }
 .record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
 .record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text-data); font-family: var(--font-data); font-size: var(--font-size-xs); font-style: normal; font-weight: var(--font-weight-regular); vertical-align: middle; }
 .cell-content { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

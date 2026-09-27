@@ -24,7 +24,7 @@
       <button class="button button-secondary" type="button" aria-controls="{{ id }}" data-password-toggle hidden>Show password</button>
     {% endif %}
     {% if help_text %}<p class='help-text' id='{{ id }}-help'>{{ help_text }}</p>{% endif %}
-    {% if error %}<p class='error-text' id='{{ id }}-error'>{{ error }}</p>{% endif %}
+    {% if error %}<p class='error-text' id='{{ id }}-error' role='alert'>{{ error }}</p>{% endif %}
   </div>
 {%- endmacro %}
 

@@ -1,7 +1,7 @@
 """Stopped-writer preflight and lossless conversion of implicit working copies."""
 
 from sqlalchemy import inspect, select
-from sqlalchemy.orm import Session, defer
+from sqlalchemy.orm import Session
 
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
 from refrncr.datatypes import DatatypeError, get_datatype
@@ -35,8 +35,13 @@ def _decisions(connection):
             legacy_schema="deleted_content"
             not in {c["name"] for c in inspect(connection).get_columns("dataset_records")},
         )
-        for dataset in session.scalars(
-            select(Dataset).options(defer(Dataset.icon)).order_by(Dataset.id)
+        # Select only columns that existed when migration 0016 was introduced. Using
+        # the current Dataset mapper here makes historical upgrades depend on every
+        # column added by later migrations.
+        for dataset in session.execute(
+            select(Dataset.id, Dataset.name, Dataset.description, Dataset.revision).order_by(
+                Dataset.id
+            )
         ):
             try:
                 latest = versions.latest_non_cancelled(dataset.id)

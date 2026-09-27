@@ -3,29 +3,32 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, chevron_up_icon, chevron_down_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon %}
+{% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon %}
 {% from "components/dataset_icon.html" import dataset_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
-{% block title %}Configure {{ dataset.name }} · REFRNCR{% endblock %}
+{% block title %}Configure {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 
 {% block content %}
+  {% set records_url = url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state and not standalone_configuration else none) %}
   {% if request.args.get('notice') == 'discarded' %}
   {{ feedback('Concept discarded. Current was not changed.', kind='success') }}
   {% endif %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context("Configure " ~ dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=dataset.icon or 'table') %}
+    {% call page_context("Configure " ~ (dataset.name|dataset_title), content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=dataset.icon or 'table') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
       {{ versions_action(dataset.key) }}
       {% if may_start_concept %}{{ new_concept(dataset.key, 'Create concept' if request.args.get('notice') == 'discarded' else '+ New version') }}{% endif %}
-      <a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state and not standalone_configuration else none) }}'>View records</a>
+      <a class='button button-primary' href='{{ records_url }}'>View records</a>
     </div>
   </div>
   {% if not standalone_configuration %}{% include 'pages/datasets/versions/_navigation.html' %}{% endif %}
-  {% set tabs = [('dataset-details', 'Dataset details'), ('fields', 'Fields')] %}
+  {% set tabs = [('dataset-details', 'Dataset details')] %}
+  {% if dataset.kind == 'mapping' %}{% set tabs = tabs + [('mapping', 'Mapping')] %}{% endif %}
+  {% set tabs = tabs + [('fields', 'Fields')] %}
   {% if may_govern %}{% set tabs = tabs + [('access-management', 'Access management')] %}{% endif %}
   {% if editable %}{% set tabs = tabs + [('danger-zone', 'Danger zone')] %}{% endif %}
   {{ section_tabs(tabs, 'Configure dataset sections') }}
@@ -46,14 +49,15 @@
           <div class='dataset-identity-card'>
             <span class='dataset-icon-tile'>{{ dataset_icon(dataset.icon) }}</span>
             <div>
-              <p class='dataset-identity-name'>{{ dataset.name }}</p>
+              <p class='dataset-identity-name'>{{ dataset.name|dataset_title }}</p>
               {% if dataset.description %}<p class='dataset-identity-description'>{{ dataset.description }}</p>
               {% else %}<p class='dataset-identity-description dataset-identity-empty'>No description provided</p>{% endif %}
             </div>
           </div>
           <dl class='detail-list'>
             <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
-            <div><dt>Key</dt><dd><code>{{ dataset.key }}</code> <span class='badge'>Permanent</span><span class='detail-hint'>Used in exports and the API. It cannot be changed.</span></dd></div>
+            <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Concept is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
+            <div><dt>Table type</dt><dd>{{ 'Mapping table' if dataset.kind == 'mapping' else 'Reference table' }}</dd></div>
             <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
           </dl>
         </div>
@@ -73,7 +77,22 @@
       </div>
       {% endif %}
     </section>
+    {% if dataset.kind == 'mapping' %}
+    <section id='mapping' aria-labelledby='mapping-heading'>
+      <div class='page-header section-header'><div><h2 id='mapping-heading'>Mapping</h2><p class='section-description'>How source records populate this mapping table.</p></div></div>
+      {% if mapping_incomplete %}{{ feedback(mapping_incomplete_message, kind="warning") }}{% endif %}
+      <dl class='detail-list'>
+        <div><dt>Mapping setup</dt><dd>{{ dataset.mapping_mode|capitalize }}</dd></div>
+        {% if dataset.mapping_mode == 'linked' %}
+        <div><dt>Source table</dt><dd>{{ mapping_source_table.name if mapping_source_table else 'Unavailable' }}</dd></div>
+        <div><dt>Source identifier</dt><dd>{{ dataset.source_system or dataset.source_field_key }}</dd></div>
+        {% endif %}
+        <div><dt>Target table</dt><dd><span class='detail-hint-inline'>Not configured · future capability</span></dd></div>
+      </dl>
+    </section>
+    {% endif %}
     <section id='fields' aria-labelledby='fields-heading'>
+    {% if mapping_incomplete %}{{ feedback(mapping_incomplete_message, kind="warning") }}{% endif %}
     {% if fields and not business_key.field_keys %}
       {{ feedback("No record identifier configured. Choose one or more fields to uniquely identify each record.", kind="warning") }}
     {% endif %}
@@ -95,27 +114,20 @@
         <div class='table-scroll configuration-table{{ " configuration-table-editable" if schema_admin else "" }}' role='region' aria-label='Dataset fields' tabindex='0'>
           <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("move_dataset_field", key=dataset.key) }}'{% endif %}>
             <caption class='visually-hidden'>Dataset fields</caption>
-            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col'>Field</th><th scope='col'>Description</th><th scope='col'>Type</th><th scope='col'>Constraints</th>{% if schema_admin %}<th scope='col'>Actions</th>{% endif %}</tr></thead>
+            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col' class='field-identity-column'>Field</th>{% if dataset.kind == 'mapping' %}<th scope='col' class='field-mapping-column'>Mapping</th>{% endif %}<th scope='col' class='field-type-column'>Type</th><th scope='col' class='field-constraints-column'>Constraints</th>{% if schema_admin %}<th scope='col' class='field-actions-column'>Actions</th>{% endif %}</tr></thead>
             <tbody>{% for field in fields %}
               {% set is_identifier = field.key in business_key.field_keys %}
+              {% set inherited_mapping_field = field.source_field_key %}
               <tr{% if schema_admin %} data-field-row data-field-name='{{ field.name }}'{% endif %}>
                 <td class='field-order-column'>
                   {% if schema_admin %}
+                    {% if loop.first %}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'>{% endif %}
+                    <input type='hidden' name='field_id' value='{{ field.id }}'>
                     <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
-                    <form class='button-stack' method='post' action='{{ url_for("move_dataset_field", key=dataset.key) }}'>
-                      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-                      {% for ordered_field in fields %}<input type='hidden' name='expected_field_id' value='{{ ordered_field.id }}'>{% endfor %}
-                      <input type='hidden' name='field_id' value='{{ field.id }}'>
-                      <button class='button button-icon-only' aria-label='Move {{ field.name }} up' type='submit' name='direction' value='up'{% if loop.first %} disabled{% endif %}>{{ chevron_up_icon() }}</button>
-                      <button class='button button-icon-only' aria-label='Move {{ field.name }} down' type='submit' name='direction' value='down'{% if loop.last %} disabled{% endif %}>{{ chevron_down_icon() }}</button>
-                    </form>
                   {% else %}<span class='field-position'>{{ loop.index }}</span>{% endif %}
                 </td>
                 <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge badge-draft'>{{ field_states[field.id] }}</span>{% endif %}<code class='field-key'>{{ field.key }}</code></td>
-                <td class='field-description'>
-                  {%- if field.definition or field.unit %}<div class='field-metadata'>{% if field.definition %}<p>{{ field.definition }}</p>{% endif %}{% if field.unit %}<p class='field-unit'>Unit: {{ field.unit }}</p>{% endif %}</div>
-                  {%- else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No description</span>{% endif -%}
-                </td>
+                {% if dataset.kind == 'mapping' %}<td class='field-mapping'><div class='mapping-property-list'>{% if field.mapping_role == 'source_identifier' %}<span class='badge badge-identifier'>Source identifier</span>{% elif field.mapping_role == 'source_context' %}<span class='badge'>Source context</span>{% elif field.mapping_role == 'mapping_target' %}<span class='badge badge-draft'>Mapping target</span>{% else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No mapping role</span>{% endif %}</div></td>{% endif %}
                 <td class='field-type'>{{ field.data_type|datatype_label }}</td>
                 <td>
                   <div class='constraint-list'>
@@ -128,7 +140,7 @@
                 {% if schema_admin %}
                 <td>
                   <div class='field-actions'>
-                    <a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>
+                    {% if not inherited_mapping_field %}<a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>{% else %}<span class='field-empty'>Read only</span>{% endif %}
                   </div>
                 </td>
                 {% endif %}

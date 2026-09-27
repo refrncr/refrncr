@@ -7,7 +7,7 @@
 {% from "components/import_action.html" import record_import_action %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none), icon=dataset.icon or 'table') %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none), icon=dataset.icon or 'table') %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -31,7 +31,7 @@
       {% if may_configure %}<a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>{{ configure_icon() }}Configure</a>{% endif %}
       {% if may_edit %}
       {{ record_import_action(dataset.key, import_unavailable) }}
-      <button class='button button-primary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>
+      {% if may_add_record %}<button class='button button-primary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
       {% endif %}
     </div>
     {% endif %}

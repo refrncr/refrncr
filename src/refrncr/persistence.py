@@ -360,6 +360,35 @@ class SqlAlchemyDatasetOperations:
             )
         return result.rowcount == 1
 
+    def rename_key(self, dataset_id: str, key: str) -> None:
+        """Controlled key correction; lifecycle authorization belongs to the service."""
+        try:
+            result = self.session.execute(
+                update(Dataset)
+                .where(Dataset.id == dataset_id)
+                .values(_key=key)
+                .execution_options(synchronize_session="fetch")
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+        if result.rowcount != 1:
+            raise PersistenceConflictError()
+
+    def uses_linked_field(self, dataset_id: str, field_key: str) -> bool:
+        return (
+            self.session.scalar(
+                select(Dataset.id)
+                .where(
+                    (Dataset.source_dataset_id == dataset_id)
+                    & (Dataset.source_field_key == field_key)
+                    | (Dataset.target_dataset_id == dataset_id)
+                    & (Dataset.target_field_key == field_key)
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
     def current_overview(self, dataset_ids: tuple[str, ...] | None) -> list[DatasetOverview]:
         if dataset_ids == ():
             return []
@@ -814,6 +843,20 @@ class SqlAlchemyDatasetRecordOperations:
             )
         self.session.add_all(rows)
 
+    def add_values_by_id(
+        self, dataset_id: str, record_id: str, values: tuple[RecordValue, ...]
+    ) -> None:
+        record = self.session.scalar(
+            select(DatasetRecord).where(
+                DatasetRecord.dataset_id == dataset_id,
+                DatasetRecord.id == record_id,
+                self._active_records,
+            )
+        )
+        if record is None:
+            raise PersistenceConflictError()
+        self.add_values(record, values)
+
     def list_all(self, dataset_id: str) -> list[StoredRecord]:
         records = list(
             self.session.scalars(
@@ -863,6 +906,9 @@ class SqlAlchemyDatasetRecordOperations:
                 defer(DatasetRecord.deleted_content),
                 defer(DatasetField.definition),
                 defer(DatasetField.unit),
+                defer(DatasetField.mapping_role),
+                defer(DatasetField.source_field_id),
+                defer(DatasetField.source_field_key),
             )
         current = None
         values: list[RecordValue] = []

@@ -55,8 +55,33 @@ def contents(engine):
                     *(
                         column
                         for column in model.__table__.columns
-                        if not (model is Dataset and column.name in {"revision", "icon"})
-                        and not (model is DatasetField and column.name in {"definition", "unit"})
+                        if not (
+                            model is Dataset
+                            and column.name
+                            in {
+                                "revision",
+                                "icon",
+                                "kind",
+                                "mapping_mode",
+                                "source_system",
+                                "target_system",
+                                "source_dataset_id",
+                                "target_dataset_id",
+                                "source_field_key",
+                                "target_field_key",
+                            }
+                        )
+                        and not (
+                            model is DatasetField
+                            and column.name
+                            in {
+                                "definition",
+                                "unit",
+                                "mapping_role",
+                                "source_field_id",
+                                "source_field_key",
+                            }
+                        )
                         and not (model is DatasetRecord and column.name == "deleted_content")
                     )
                 )

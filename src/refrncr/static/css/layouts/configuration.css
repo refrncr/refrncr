@@ -15,12 +15,13 @@
 .section-header h2, .section-header p { margin: 0; }
 .configuration-table { position: relative; }
 .configuration-table table { min-width: 44rem; table-layout: fixed; }
-/* Fields: order | field (name + key) | description | type | constraints | actions */
+/* Fields: order | field (name + key) | optional mapping role | type | constraints | actions */
 .configuration-table .field-order-column { width: 2.5rem; padding-inline: var(--space-sm); text-align: center; }
 .configuration-table-editable .field-order-column { width: var(--space-xxl); }
-.configuration-table th:nth-child(2) { width: 26%; }
-.configuration-table th:nth-child(4) { width: 11%; }
-.configuration-table th:nth-child(5) { width: 24%; }
+.configuration-table .field-identity-column { width: 32%; }
+.configuration-table .field-mapping-column { width: 22%; }
+.configuration-table .field-type-column { width: 14%; }
+.configuration-table .field-constraints-column { width: 28%; }
 .configuration-table-editable th:last-child { width: 6.5rem; }
 .configuration-table td { vertical-align: middle; }
 .configuration-table-editable th:last-child, .configuration-table-editable td:last-child { text-align: right; }
@@ -28,10 +29,7 @@
 .configuration-table .field-actions .button-icon { margin: 0; }
 .field-identity .field-key { display: block; margin-top: .125rem; padding: 0; background: none; font-size: var(--font-size-xs); }
 .field-identity .badge { margin-inline-start: var(--space-xs); }
-.field-description { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
-.configuration-overview .field-description p { margin: 0; }
-.field-description .field-metadata { font-size: inherit; }
-.field-description .field-unit { font-family: var(--font-technical); font-size: var(--font-size-xs); }
+.mapping-property-list { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .field-type { color: var(--color-text-secondary); font-family: var(--font-technical); font-size: var(--font-size-xs); }
 .field-position { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .field-empty { color: var(--color-control-border); }
@@ -43,7 +41,7 @@
 .context-notice form { margin-inline-start: auto; }
 .context-notice-action { padding: 0; border: 0; background: none; color: var(--color-link); font: inherit; font-weight: var(--font-weight-semibold); cursor: pointer; }
 .context-notice-action:hover { color: var(--color-link-hover); text-decoration: underline; }
-/* Drag to reorder (field-order.js). Without JavaScript the up/down buttons remain. */
+/* Drag and keyboard reorder are progressively enhanced by field-order.js. */
 .field-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 2rem; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-control-border); font-size: 1rem; letter-spacing: -.2em; cursor: grab; touch-action: none; }
 .field-drag-handle:hover, .field-drag-handle:focus-visible { background: var(--color-action-secondary); color: var(--color-text); }
 .field-drag-handle[hidden] { display: none; }
