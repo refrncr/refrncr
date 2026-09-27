@@ -78,15 +78,22 @@ def test_start_loads_local_dotenv_without_overriding_process_environment(monkeyp
     )
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("REFRNCR_API_KEY_PEPPER", raising=False)
+    monkeypatch.delenv("REFRNCR_HOST", raising=False)
     monkeypatch.setenv("REFRNCR_PORT", "9000")
     captured = []
     monkeypatch.setattr(cli, "start", captured.append)
 
-    assert cli.main(["start"]) == 0
+    try:
+        assert cli.main(["start"]) == 0
 
-    assert os.environ["REFRNCR_API_KEY_PEPPER"] == pepper
-    assert captured[0].host == "127.0.0.2"
-    assert captured[0].port == 9000
+        assert os.environ["REFRNCR_API_KEY_PEPPER"] == pepper
+        assert captured[0].host == "127.0.0.2"
+        assert captured[0].port == 9000
+    finally:
+        # load_local_dotenv intentionally writes values to os.environ itself, so
+        # explicitly remove values that did not exist before this test.
+        os.environ.pop("REFRNCR_API_KEY_PEPPER", None)
+        os.environ.pop("REFRNCR_HOST", None)
 
 
 def test_invalid_local_dotenv_fails_without_exposing_value(monkeypatch, tmp_path, capsys):

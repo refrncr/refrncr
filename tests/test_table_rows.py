@@ -169,7 +169,7 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     )
     html = body(request(client, "get", "/datasets/empty-rows/concept"))
     assert "data-row-action" not in html
-    assert "<th scope='col'>Actions</th>" in html
+    assert "<th scope='col' class='field-actions-column'>Actions</th>" in html
     assert "aria-label='Edit field Code'" in html
     assert "aria-label='Reorder Code'" in html
     assert "aria-label='Move Code up'" not in html

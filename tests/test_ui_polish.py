@@ -773,7 +773,9 @@ def test_configuration_fields_follow_concept_lifecycle(dataset_browser, publishe
     login(client)
     html = body(request(client, "get", f"/datasets/{d.key}/configure"))
     fields = html.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
-    assert "Visible code" in fields and "Field explanation" in fields and "EUR" in fields
+    assert "Visible code" in fields
+    assert "Field explanation" not in fields and "EUR" not in fields
+    assert ">Description</th>" not in fields
     assert "Identifier" in fields and "Required" in fields and "Unique" in fields
     if published:
         assert "Current · Version 1 · Read only" in fields
