@@ -297,9 +297,7 @@ class DatasetField(Base):
             name="ck_dataset_fields_mapping_role",
         ),
         CheckConstraint(
-            "(mapping_role = 'source_context' "
-            "AND source_field_id IS NOT NULL AND source_field_key IS NOT NULL) OR "
-            "(mapping_role = 'source_identifier' AND "
+            "(mapping_role IN ('source_identifier', 'source_context') AND "
             "((source_field_id IS NULL AND source_field_key IS NULL) OR "
             "(source_field_id IS NOT NULL AND source_field_key IS NOT NULL))) OR "
             "(mapping_role IS NULL OR mapping_role = 'mapping_target') "

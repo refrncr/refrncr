@@ -1340,34 +1340,37 @@ class DatasetFieldService:
                 allowed_roles = (
                     {"mapping_target", "source_context"}
                     if dataset.mapping_mode == "linked"
-                    else {"mapping_target", "source_identifier"}
+                    else {"mapping_target", "source_identifier", "source_context"}
                 )
                 if mapping_role not in allowed_roles:
                     raise ValidationError("Choose a valid mapping field role")
                 if mapping_role == "source_context":
-                    if dataset.mapping_mode != "linked" or not dataset.source_dataset_id:
-                        raise ValidationError("Source context requires a linked mapping table")
-                    source_dataset = uow.datasets.get(dataset.source_dataset_id)
-                    if not source_field_key:
-                        raise ValidationError("Choose an available source field")
-                    source_field = uow.dataset_fields.find_by_key(
-                        dataset.source_dataset_id,
-                        self._validated_field_lookup_key(source_field_key),
-                    )
-                    if source_dataset is None or source_field is None:
-                        raise ValidationError("Choose an available source field")
-                    if any(
-                        field.source_field_id == source_field.id
-                        for field in uow.dataset_fields.list_for_dataset(dataset.id)
-                    ):
-                        raise ConflictError("Source field is already included in this mapping")
-                    key, name, data_type = (
-                        source_field.key,
-                        source_field.name,
-                        source_field.data_type,
-                    )
-                    definition, unit = source_field.definition, source_field.unit
-                    is_required = is_unique = is_business_key_component = False
+                    if dataset.mapping_mode == "linked":
+                        if not dataset.source_dataset_id:
+                            raise ValidationError("Source context requires a linked mapping table")
+                        source_dataset = uow.datasets.get(dataset.source_dataset_id)
+                        if not source_field_key:
+                            raise ValidationError("Choose an available source field")
+                        source_field = uow.dataset_fields.find_by_key(
+                            dataset.source_dataset_id,
+                            self._validated_field_lookup_key(source_field_key),
+                        )
+                        if source_dataset is None or source_field is None:
+                            raise ValidationError("Choose an available source field")
+                        if any(
+                            field.source_field_id == source_field.id
+                            for field in uow.dataset_fields.list_for_dataset(dataset.id)
+                        ):
+                            raise ConflictError("Source field is already included in this mapping")
+                        key, name, data_type = (
+                            source_field.key,
+                            source_field.name,
+                            source_field.data_type,
+                        )
+                        definition, unit = source_field.definition, source_field.unit
+                    else:
+                        source_field_key = None
+                    is_business_key_component = False
                 else:
                     source_field_key = None
                     if mapping_role == "source_identifier":
@@ -1518,7 +1521,7 @@ class DatasetFieldService:
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
                 raise NotFoundError("Dataset field not found")
-            if field.mapping_role in {"source_identifier", "source_context"}:
+            if field.source_field_key:
                 raise ValidationError("Source mapping fields are read-only")
 
             definition, unit = validate_field_metadata(
@@ -2013,7 +2016,7 @@ class DatasetRecordService:
                 raise NotFoundError("Record not found")
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             for field in fields:
-                if field.mapping_role not in {"source_identifier", "source_context"}:
+                if not field.source_field_key:
                     continue
                 existing_value = next(
                     (value for value in existing.values if value.field_id == field.id), None

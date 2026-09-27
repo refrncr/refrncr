@@ -1,7 +1,7 @@
 {% macro record_form_fields(fields, prefix, values=none, errors=none, initial_focus=false, raw_values=false) -%}
   {% set errors = errors or {} %}
   {% for field in fields %}
-    {% set read_only_mapping_field = field.mapping_role in ('source_identifier', 'source_context') %}
+    {% set read_only_mapping_field = field.source_field_key %}
     <div class='form-field'>
       <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} <span class='required-mark' aria-hidden='true'>*</span>{% endif %}</label>
       {% if field.data_type == 'boolean' %}

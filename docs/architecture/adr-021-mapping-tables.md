@@ -28,6 +28,9 @@ existing guided import, Concept mutation, diff, review, publication, effective-d
 export and audit paths apply without a second parallel persistence model. The first
 increment is 1:1 because the source business key is unique.
 
+Standalone Source context Fields are ordinary editable mapping content. Context Fields
+selected from a linked source table retain their source-field identity and are read-only.
+
 The existing import workflow writes only to the active Mapping Concept and confirms the
 complete validated file atomically. Linked input and target tables are never mutated by
 mapping import. Standalone identifier descriptions remain independent of table links so

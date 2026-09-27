@@ -114,10 +114,10 @@
         <div class='table-scroll configuration-table{{ " configuration-table-editable" if schema_admin else "" }}' role='region' aria-label='Dataset fields' tabindex='0'>
           <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("move_dataset_field", key=dataset.key) }}'{% endif %}>
             <caption class='visually-hidden'>Dataset fields</caption>
-            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col'>Field</th><th scope='col'>Description</th><th scope='col'>Type</th><th scope='col'>Constraints</th>{% if schema_admin %}<th scope='col'>Actions</th>{% endif %}</tr></thead>
+            <thead><tr><th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th><th scope='col' class='field-identity-column'>Field</th>{% if dataset.kind == 'mapping' %}<th scope='col' class='field-mapping-column'>Mapping</th>{% endif %}<th scope='col' class='field-type-column'>Type</th><th scope='col' class='field-constraints-column'>Constraints</th>{% if schema_admin %}<th scope='col' class='field-actions-column'>Actions</th>{% endif %}</tr></thead>
             <tbody>{% for field in fields %}
               {% set is_identifier = field.key in business_key.field_keys %}
-              {% set inherited_mapping_field = field.mapping_role in ('source_identifier', 'source_context') %}
+              {% set inherited_mapping_field = field.source_field_key %}
               <tr{% if schema_admin %} data-field-row data-field-name='{{ field.name }}'{% endif %}>
                 <td class='field-order-column'>
                   {% if schema_admin %}
@@ -126,19 +126,15 @@
                     <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
                   {% else %}<span class='field-position'>{{ loop.index }}</span>{% endif %}
                 </td>
-                <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field.mapping_role == 'source_context' %} <span class='badge'>Source context</span>{% elif field.mapping_role == 'mapping_target' %} <span class='badge badge-draft'>Mapping target</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge badge-draft'>{{ field_states[field.id] }}</span>{% endif %}<code class='field-key'>{{ field.key }}</code></td>
-                <td class='field-description'>
-                  {%- if field.definition or field.unit %}<div class='field-metadata'>{% if field.definition %}<p>{{ field.definition }}</p>{% endif %}{% if field.unit %}<p class='field-unit'>Unit: {{ field.unit }}</p>{% endif %}</div>
-                  {%- else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No description</span>{% endif -%}
-                </td>
+                <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge badge-draft'>{{ field_states[field.id] }}</span>{% endif %}<code class='field-key'>{{ field.key }}</code></td>
+                {% if dataset.kind == 'mapping' %}<td class='field-mapping'><div class='mapping-property-list'>{% if field.mapping_role == 'source_identifier' %}<span class='badge badge-identifier'>Source identifier</span>{% elif field.mapping_role == 'source_context' %}<span class='badge'>Source context</span>{% elif field.mapping_role == 'mapping_target' %}<span class='badge badge-draft'>Mapping target</span>{% else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No mapping role</span>{% endif %}</div></td>{% endif %}
                 <td class='field-type'>{{ field.data_type|datatype_label }}</td>
                 <td>
                   <div class='constraint-list'>
-                    {% if field.mapping_role == 'source_identifier' %}<span class='badge badge-identifier'>Source identifier</span>{% endif %}
                     {% if is_identifier %}<span class='badge badge-identifier'>Identifier</span>{% endif %}
                     {% if field.is_required %}<span class='badge'>Required</span>{% endif %}
                     {% if field.is_unique %}<span class='badge'>Unique</span>{% endif %}
-                    {% if not field.is_required and not field.is_unique and not is_identifier and not field.mapping_role %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>None</span>{% endif %}
+                    {% if not field.is_required and not field.is_unique and not is_identifier %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>None</span>{% endif %}
                   </div>
                 </td>
                 {% if schema_admin %}

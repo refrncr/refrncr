@@ -115,7 +115,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "role='region' aria-label='Dataset fields' tabindex='0'" in field_section
     assert re.findall(
         r"<th scope='col'[^>]*>(?:<span[^>]*>)?(.*?)(?:</span>)?</th>", field_section
-    ) == ["Field order", "Field", "Description", "Type", "Constraints"] + (
+    ) == ["Field order", "Field", "Type", "Constraints"] + (
         [] if permission == "viewer" else ["Actions"]
     )
     assert "<span class='badge'>Required</span>" in field_section

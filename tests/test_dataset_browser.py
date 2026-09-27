@@ -339,11 +339,17 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     assert "data-field-order" in fields_section
     assert "name='csrf_token'" in fields_section
     assert "name='field_id'" in fields_section
+    assert ">Description</th>" not in fields_section
+    assert ">Mapping</th>" in fields_section
     source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
     field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
+    mapping_properties = re.search(r"<td class='field-mapping'>(.*?)</td>", source_row, re.DOTALL)[
+        1
+    ]
     constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
     assert "Source identifier" not in field_cell
-    assert "Source identifier" in constraints
+    assert "Source identifier" in mapping_properties
+    assert "Source identifier" not in constraints
 
     concept_configuration = body(request(client, "get", f"/datasets/{mapping.key}/concept#fields"))
     concept_fields = concept_configuration.split("<section id='fields'", 1)[1].split(
@@ -892,6 +898,9 @@ def test_component_css_uses_explicit_contract_selectors(dataset_browser):
     assert ".button {" in buttons
     assert "\nform {" not in forms
     assert ".form {" in forms
+    assert 'input:not([type="hidden"])[aria-invalid="true"]' in forms
+    assert '[aria-invalid="true"]:is(:hover, :focus)' in forms
+    assert ".field-error {" in forms
     assert "\ntbody tr:hover" not in tables
     assert ".table-scroll tbody tr:not(.interactive-row):hover" in tables
 

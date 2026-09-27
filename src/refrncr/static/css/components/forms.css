@@ -7,7 +7,9 @@ input[type="file"] { padding: var(--space-sm); }
 input:hover, select:hover, textarea:hover { border-color: var(--color-text-secondary); }
 input:focus, select:focus, textarea:focus { border-color: var(--color-action-primary-hover); box-shadow: 0 0 0 3px var(--color-focus-shadow); outline: 0; }
 input:disabled, select:disabled, textarea:disabled { background: var(--color-action-secondary); cursor: not-allowed; }
-[aria-invalid="true"], .field-error { border-color: var(--color-error); }
+input:not([type="hidden"])[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border: 2px solid var(--color-error); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 18%, transparent); }
+input:not([type="hidden"])[aria-invalid="true"]:is(:hover, :focus), select[aria-invalid="true"]:is(:hover, :focus), textarea[aria-invalid="true"]:is(:hover, :focus) { border-color: var(--color-error); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 18%, transparent); outline: 0; }
+.field-error { margin: var(--space-sm) 0 0; color: var(--color-error-text); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
 .form-field + .form-field { margin-top: var(--space-lg); }
 fieldset { margin: var(--space-lg) 0; padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
 
