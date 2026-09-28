@@ -2,6 +2,8 @@
 {% from "components/concept.html" import new_concept, versions_action, current_version_action, banner with context %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components.html" import content_metadata %}
+{% from "components/icons.html" import lock_icon %}
+{% from "components/search_field.html" import search_field %}
 {% from "layouts/page.html" import page_context %}
 {% from "pages/datasets/hierarchy/_tree.html" import node_actions, node_name, record_name, record_edit_action, node_value with context %}
 
@@ -51,6 +53,25 @@
   <h3>Start with the root</h3><p>Build the hierarchy first. Add optional fields and values when you are ready.</p>
   {% if may_edit and selected_view == 'hierarchy' %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
 </div>
+{% else %}
+<div class='record-toolbar record-toolbar-search' role='group' aria-label='Hierarchy results'>
+  <section class='record-criteria' aria-label='Search hierarchy'>
+    <div class='record-criteria-toolbar'>
+      <form id='record-search-form' method='get' role='search' aria-label='Search hierarchy' class='record-search-form'>
+        <input type='hidden' name='view' value='{{ selected_view }}'>
+        {% if selected_view == 'records' %}<input type='hidden' name='records_view' value='{{ records_view }}'>{% endif %}
+        {{ search_field('record-search', 'Search hierarchy', 'Search node names and text values', name='q', value=hierarchy_search, maxlength=200, clear_url=hierarchy_clear_url) }}
+      </form>
+      <button class='button button-secondary' type='submit' form='record-search-form'>Search</button>
+    </div>
+  </section>
+  {% if version_state %}<p class='record-toolbar-note'>{{ lock_icon() }}Published version · read only</p>
+  {% elif selected_view == 'hybrid' %}<p class='record-toolbar-note'>{{ lock_icon() }}Hybrid view · read only</p>{% endif %}
+  <span id='record-result-count'>{% if display_rows %}Showing 1–{{ display_rows|length }} of {{ hierarchy_result_total }}{% else %}Showing 0 of {{ hierarchy_result_total }}{% endif %}</span>
+  <div id='record-result-announcement' class='visually-hidden' role='status' aria-live='polite' aria-atomic='true'></div>
+</div>
+{% if hierarchy_search and not display_rows %}
+<div class='empty-state'><h3>No matching {{ 'records' if selected_view == 'records' else 'nodes' }}</h3><p>Try another search term or clear the current search.</p><a href='{{ hierarchy_clear_url }}'>Clear search</a></div>
 {% elif selected_view == 'records' and records_view == 'flattened' and not display_rows %}
 <div class='empty-state'><h3>No leaf records yet</h3><p>Add at least one child in Hierarchy. Leaf paths appear here once the root has a child.</p></div>
 {% else %}
@@ -59,7 +80,7 @@
 {% set flattened_records = selected_view == 'records' and records_view == 'flattened' %}
 {% set table_label = 'Hierarchy structure' if selected_view == 'hierarchy' else 'Records: flattened tree' if flattened_records else 'Records: reference table' if selected_view == 'records' else 'Hybrid: complete hierarchy, read only' %}
 <div class='table-scroll' role='region' aria-label='{{ table_label }}' tabindex='0'>
-  <table class='hierarchy-table{{ " hierarchy-tree-table" if tree_view else "" }}{{ " hierarchy-hybrid" if selected_view == "hybrid" else "" }}'>
+  <table class='hierarchy-table{{ " hierarchy-tree-table" if tree_view else "" }}{{ " hierarchy-records" if selected_view == "records" else "" }}{{ " hierarchy-hybrid" if selected_view == "hybrid" else "" }}'>
     <caption class='visually-hidden'>{{ table_label }}</caption>
     <thead><tr>
     {% if flattened_records %}{% for level in range(parent_level_count) %}<th scope='col'>Level {{ level + 1 }}</th>{% endfor %}<th scope='col'>Leaf</th>
@@ -97,7 +118,9 @@
 {% if selected_view == 'hybrid' %}<p class='help-text'>Empty means an applicable value has not been entered. Not applicable means the field is scoped to leaves. Values are not inherited or aggregated.</p>{% endif %}
 {% if selected_view == 'records' and records_view == 'reference' %}<p class='help-text'>Empty means an applicable value has not been entered. Not applicable means the field is scoped to leaves. Each row shows only that node’s own values.</p>{% elif flattened_records %}<p class='help-text'>A blank level has no node on that leaf’s path. Empty means the node has no value for that field. Values belong to the named level and are not inherited or aggregated.</p>{% endif %}
 {% endif %}
+{% endif %}
 {% if selected_view != 'hybrid' %}
   {% if may_edit %}{{ form_side_panel('hierarchy-panel') }}{% else %}{% include 'pages/datasets/hierarchy/_view_panels.html' %}{% endif %}
 {% endif %}
 {% endblock %}
+{% block scripts %}<script src='{{ url_for("static", filename="js/record-search.js") }}' defer></script>{% endblock %}

@@ -67,7 +67,9 @@ from refrncr.record_import import (
 from refrncr.record_search import (
     MAX_QUERY_BYTES,
     RecordSearchError,
+    matches,
     parse_parameters,
+    search_term,
 )
 from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review
 from refrncr.services import (
@@ -1521,8 +1523,11 @@ def create_flask_app(
         records_view = request.args.getlist("records_view") or ["reference"]
         if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
             abort(400, description="Choose Reference table or Flattened tree.")
-        if set(request.args) - {"view", "records_view"}:
+        searches = request.args.getlist("q")
+        if len(searches) > 1 or set(request.args) - {"view", "records_view", "q"}:
             abort(400, description="Unsupported hierarchy view parameters.")
+        hierarchy_search = search_term(searches[0] if searches else "")
+        normalized_search = hierarchy_search.casefold()
         rows, children = hierarchy_presentation(view)
         leaf_rows = [row for row in rows if row["leaf"] and row["node"].parent_id is not None]
         parent_level_count = max((len(row["ancestors"]) for row in leaf_rows), default=0)
@@ -1536,6 +1541,46 @@ def create_flask_app(
             flat_value_columns.append(
                 {"field": field, "label": f"{field.name} Leaf", "level": None}
             )
+
+        def row_matches(row):
+            return matches(row["node"], view.fields, normalized_search) or (
+                normalized_search in row["node"].name.casefold()
+            )
+
+        if selected[0] == "records" and records_view[0] == "flattened":
+            unfiltered_rows = leaf_rows
+            display_rows = [
+                row
+                for row in unfiltered_rows
+                if not normalized_search
+                or any(row_matches(candidate) for candidate in (*row["ancestor_rows"], row))
+            ]
+        elif selected[0] == "records":
+            unfiltered_rows = rows
+            display_rows = [
+                row for row in unfiltered_rows if not normalized_search or row_matches(row)
+            ]
+        else:
+            unfiltered_rows = rows
+            if normalized_search:
+                matched_rows = [row for row in rows if row_matches(row)]
+                visible_ids = {
+                    candidate["node"].id
+                    for row in matched_rows
+                    for candidate in (*row["ancestor_rows"], row)
+                }
+                display_rows = [row for row in rows if row["node"].id in visible_ids]
+            else:
+                display_rows = rows
+
+        hierarchy_clear_url = url_for(
+            "dataset_records_view",
+            key=view.context.dataset.key,
+            version_id=view.state.version.id if view.state else None,
+            concept=True if view.state is None else None,
+            view=selected[0],
+            records_view=records_view[0] if selected[0] == "records" else None,
+        )
         return render_authenticated_template(
             "pages/datasets/hierarchy.html",
             dataset=view.context.dataset,
@@ -1548,9 +1593,10 @@ def create_flask_app(
             parent_level_count=parent_level_count,
             flat_value_columns=flat_value_columns,
             records_view=records_view[0],
-            display_rows=leaf_rows
-            if selected[0] == "records" and records_view[0] == "flattened"
-            else rows,
+            display_rows=display_rows,
+            hierarchy_result_total=len(unfiltered_rows),
+            hierarchy_search=hierarchy_search,
+            hierarchy_clear_url=hierarchy_clear_url,
             selected_view=selected[0],
             version_state=view.state,
             may_edit=view.state is None and view.may_maintain,
@@ -1793,15 +1839,15 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         try:
+            if len(request.query_string) > MAX_QUERY_BYTES:
+                raise RecordSearchError(
+                    "Record criteria exceed the URL limit. Clear all to start again."
+                )
             if datasets.get_dataset(actor.id, key).kind == "hierarchy":
                 return render_hierarchy(
                     dataset_versions.read(
                         actor.id, key, version_id, page=None, prefer_concept=concept
                     )
-                )
-            if len(request.query_string) > MAX_QUERY_BYTES:
-                raise RecordSearchError(
-                    "Record criteria exceed the URL limit. Clear all to start again."
                 )
             parameters, selected_statuses, record_status, requested_page = parse_parameters(
                 request.args.items(multi=True)
@@ -3102,6 +3148,8 @@ def create_flask_app(
         is_required: bool,
         is_unique: bool,
         is_business_key_component: bool,
+        key_value: str,
+        may_edit_key: bool,
         error=None,
     ):
         return render_authenticated_template(
@@ -3115,6 +3163,8 @@ def create_flask_app(
             is_required=is_required,
             is_unique=is_unique,
             is_business_key_component=is_business_key_component,
+            key_value=key_value,
+            may_edit_key=may_edit_key,
             error=error,
             current_csrf=csrf,
             type_choices=tuple(DATATYPES.values()),
@@ -3131,6 +3181,7 @@ def create_flask_app(
         try:
             field = field_service.get_field(actor.id, key, field_key)
             business_key = business_key_service.get_business_key(actor.id, key)
+            may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
         except NotFoundError:
             abort(404)
         return render_dataset_field_edit_form(
@@ -3142,6 +3193,8 @@ def create_flask_app(
             is_required=field.is_required,
             is_unique=field.is_unique,
             is_business_key_component=field.key in business_key.field_keys,
+            key_value=field.key,
+            may_edit_key=may_edit_key,
         )
 
     @dataset_route("/datasets/<key>/fields/<field_key>", methods=["POST"])
@@ -3166,16 +3219,18 @@ def create_flask_app(
                 is_required,
                 is_unique,
                 is_business_key_component,
+                new_key=request.form.get("key", field_key),
                 definition=request.form.get("definition", ""),
                 unit=request.form.get("unit", ""),
                 hierarchy_scope=request.form.get("hierarchy_scope") or None,
             )
         except NotFoundError:
             abort(404)
-        except ValidationError as error:
+        except (ValidationError, ConflictError) as error:
             dataset = require_dataset_schema_admin(actor.id, key)
             try:
                 field = field_service.get_field(actor.id, key, field_key)
+                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             except NotFoundError:
                 abort(404)
             return (
@@ -3188,9 +3243,11 @@ def create_flask_app(
                     is_required=is_required,
                     is_unique=is_unique,
                     is_business_key_component=is_business_key_component,
+                    key_value=request.form.get("key", field.key),
+                    may_edit_key=may_edit_key,
                     error=str(error),
                 ),
-                400,
+                409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(
             url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
@@ -3212,6 +3269,7 @@ def create_flask_app(
             try:
                 field = field_service.get_field(actor.id, key, field_key)
                 business_key = business_key_service.get_business_key(actor.id, key)
+                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             except NotFoundError:
                 abort(404)
             return (
@@ -3224,6 +3282,8 @@ def create_flask_app(
                     is_required=field.is_required,
                     is_unique=field.is_unique,
                     is_business_key_component=field.key in business_key.field_keys,
+                    key_value=field.key,
+                    may_edit_key=may_edit_key,
                     error=str(error),
                 ),
                 400,

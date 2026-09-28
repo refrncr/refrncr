@@ -1,7 +1,7 @@
 {% macro field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, include_key=false, definition='', unit='', lock_constraints=false, lock_identifier=false, hierarchy=false, hierarchy_scope='leaves') -%}
   {% set selected_type = type_choices|selectattr('id', 'equalto', data_type)|first %}
   <label>Name <input name='name' value='{{ name }}'></label>
-  {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can't be changed later.</p>{% endif %}
+  {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can be changed until the first version is published.</p>{% endif %}
   <label>Definition <textarea name='definition' maxlength='4000' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
   <p class='help-text' id='field-definition-help'>Optional explanation of meaning and intended use. Maximum 4000 characters.</p>
   <label>Unit <input name='unit' value='{{ unit or "" }}' maxlength='64' aria-describedby='field-unit-help'></label>

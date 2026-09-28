@@ -1516,8 +1516,8 @@
         "dataset:business_key_defined": {},
         "dataset:business_key_updated": {}
       },
-      "success": "One definition_updated only if the definition changes; one business_key_defined or business_key_updated only if membership changes. Both share the UoW.",
-      "validation_failure": "No successful domain event; reject without committed business state changes.",
+      "success": "One definition_updated if the definition or pre-publication Field key changes; one business_key_defined or business_key_updated if identifier membership or an identifier Field key changes. All changes share the UoW.",
+      "validation_failure": "No successful domain event; reject invalid or duplicate keys, key changes after first publication, linked source/consumer key changes and invalid definition or identifier changes without committed business state changes.",
       "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
       "stale_input": "No general optimistic revision in this operation; enforce current lifecycle/uniqueness and authorization. Rejected stale targets produce no event.",
       "no_op": "No event and no business timestamp/revision changes; absent/deleted targets may return the existing safe error.",
@@ -1534,7 +1534,7 @@
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
-      "persistence_scope": "Existing installation database / AuditEvent."
+      "persistence_scope": "Existing working DatasetField, mutable deleted-Record Field snapshots, Dataset business key membership, Dataset/Concept timestamps and AuditEvent. Published version snapshots remain unchanged."
     },
     {
       "capability": "DatasetFieldService",
@@ -5469,7 +5469,10 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",

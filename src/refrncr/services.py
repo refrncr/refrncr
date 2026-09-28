@@ -1605,6 +1605,7 @@ class DatasetFieldService:
         is_unique: bool,
         is_business_key_component: bool,
         *,
+        new_key: str | None = None,
         definition: str | None = None,
         unit: str | None = None,
         hierarchy_scope: str | None = None,
@@ -1617,6 +1618,25 @@ class DatasetFieldService:
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
                 raise NotFoundError("Dataset field not found")
+            validated_new_key = (
+                field.key if new_key is None else validate_dataset_field_key(new_key)
+            )
+            key_changed = validated_new_key != field.key
+            if key_changed and field.source_field_key:
+                raise ValidationError("Source mapping field keys are read-only")
+            if key_changed and (
+                uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
+            ):
+                raise ValidationError(
+                    "Field key can only be changed before the first version is published."
+                )
+            if key_changed and uow.datasets.uses_linked_field(dataset.id, field.key):
+                raise ValidationError(
+                    "Field key cannot change while used by a linked mapping table."
+                )
+            existing_key = uow.dataset_fields.find_by_key(dataset.id, validated_new_key)
+            if key_changed and existing_key is not None:
+                raise ConflictError("Field key already exists in this Dataset")
 
             from refrncr.hierarchy import validate_hierarchy_scope
 
@@ -1667,7 +1687,7 @@ class DatasetFieldService:
                 field.hierarchy_scope,
             )
             definition_changed = replacement != current_definition
-            if not membership_changed and not definition_changed:
+            if not membership_changed and not definition_changed and not key_changed:
                 return field
 
             if membership_changed and uow.dataset_records.count(dataset.id):
@@ -1684,12 +1704,27 @@ class DatasetFieldService:
                         dataset.id, field.id, validated_unique
                     )
 
-            if membership_changed:
-                replacement_keys = set(current_key.field_keys)
-                if validated_component:
-                    replacement_keys.add(field.key)
-                else:
+            identifier_changed = membership_changed or (key_changed and currently_component)
+            replacement_keys = set(current_key.field_keys)
+            if key_changed:
+                if currently_component:
                     replacement_keys.discard(field.key)
+                    uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
+                try:
+                    field = uow.dataset_fields.rename_key(dataset.id, field.id, validated_new_key)
+                except PersistenceConflictError as exc:
+                    if exc.constraint == "uq_dataset_fields_dataset_key":
+                        raise ConflictError("Field key already exists in this Dataset") from exc
+                    raise
+                uow.dataset_records.rename_deleted_field_key(
+                    dataset.id, field.id, validated_new_key
+                )
+
+            if identifier_changed:
+                replacement_keys = set(current_key.field_keys)
+                replacement_keys.discard(validated_field_key)
+                if validated_component:
+                    replacement_keys.add(validated_new_key)
                 uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
                 record_audit(
                     uow,
@@ -1705,7 +1740,7 @@ class DatasetFieldService:
 
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
-            if definition_changed:
+            if definition_changed or key_changed:
                 field.definition, field.unit = definition, unit
                 field.name = normalized_name
                 field.data_type = validated_type

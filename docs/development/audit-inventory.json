@@ -880,6 +880,7 @@
         "refrncr.services.DatasetBusinessKeyService.get_business_key",
         "refrncr.services.DatasetFieldService.get_field",
         "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]
@@ -897,6 +898,7 @@
         "refrncr.services.DatasetFieldService.get_field",
         "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
         "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -916,6 +918,7 @@
         "refrncr.services.DatasetFieldService.delete_field",
         "refrncr.services.DatasetFieldService.get_field",
         "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"

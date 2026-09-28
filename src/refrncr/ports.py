@@ -377,6 +377,8 @@ class DatasetFieldOperations(Protocol):
 
     def replace_order(self, dataset_id: str, field_ids: tuple[str, ...]) -> None: ...
 
+    def rename_key(self, dataset_id: str, field_id: str, key: str) -> DatasetFieldRecord: ...
+
     def create(
         self,
         *,
@@ -404,6 +406,8 @@ class DatasetBusinessKeyOperations(Protocol):
 
 class DatasetRecordOperations(Protocol):
     def deleted_records(self, dataset_id): ...
+
+    def rename_deleted_field_key(self, dataset_id: str, field_id: str, key: str) -> None: ...
 
     def restore_if_revision(self, dataset_id, record_id, expected_revision, identifier_key): ...
 

@@ -111,6 +111,12 @@ or Expired versions. CSV, Excel and JSON retain REF-82 serializers and streaming
 filenames include the Dataset key and version number. Existing administrator concept export
 remains available from the concept Records page.
 
+A Dataset or Field technical key can be corrected while its first Concept is still unpublished.
+Publishing the first version makes those keys permanent. Field-key correction updates the working
+identifier definition and retained deleted-Record snapshots in the same transaction; published
+version snapshots are never rewritten. A Field key already used by a linked mapping remains
+protected because changing it would break that mapping contract.
+
 Publication and cancellation reuse the shared side-panel host, form controls, destructive
 button, feedback and focus handling. Both also work as full-page forms without JavaScript.
 Publication displays only aggregate counts and requires effective date, reviewed revision and

@@ -92,10 +92,12 @@ variants. Its Description field selects the generic textarea control while retai
 label, value, error, disabled, and accessible-description contract as text inputs.
 
 The `readonly_field` macro renders non-editable form values with the shared `.form-label`
-typography. Dataset and field edit forms use it for immutable keys; only the value uses
-monospace, while the label matches editable field labels in full pages and side panels.
+typography. Dataset and Field edit forms use an editable technical-key control in the first
+unpublished Concept. After the first version is published, they use `readonly_field` because
+the key is then permanent. Only a read-only value uses monospace, while the label matches
+editable field labels in full pages and side panels.
 
-The Dataset-edit page reuses those primitives directly. It presents the immutable Dataset key as
+The Dataset-edit page reuses those primitives directly. It presents a published Dataset key as
 text rather than a submitted control, and connects validation feedback only to the affected field.
 Create and edit remain separate page compositions because their key and action contracts differ.
 
@@ -128,6 +130,13 @@ shared; no dataset-specific selectors or component variants are introduced.
 The records route uses a file template with page-private table, field, and record-panel
 compositions. Its create and per-record workflows use the shared modal side-panel structure;
 one rendered panel per displayed record remains a deliberate temporary performance trade-off.
+
+Hierarchy, Records and Hybrid reuse the shared `record-toolbar`, `search_field` and result-count
+presentation above their tables. Search matches node names and string Field values. Flattened
+Records also match values displayed from predecessor nodes; tree views retain matching nodes'
+ancestors so a filtered result keeps its structural context. Published views and the Concept
+Hybrid view show their read-only state in the same toolbar. The toolbar and table retain the
+shared joined-border treatment and responsive wrapping behaviour.
 
 Community user, team, and membership management use file templates and the same modal side-panel
 structure. Team membership data is loaded only for the team selected through `open_team`, avoiding

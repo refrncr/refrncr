@@ -589,6 +589,25 @@ class SqlAlchemyDatasetFieldOperations:
             by_id[field_id].display_position = index
         self.session.flush()
 
+    def rename_key(self, dataset_id: str, field_id: str, key: str) -> DatasetField:
+        """Controlled pre-publication correction; lifecycle checks belong to the service."""
+        try:
+            result = self.session.execute(
+                update(DatasetField)
+                .where(DatasetField.dataset_id == dataset_id, DatasetField.id == field_id)
+                .values(_key=key, updated_at=utc_now())
+                .execution_options(synchronize_session=False)
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+        if result.rowcount != 1:
+            raise PersistenceConflictError()
+        self.session.expire_all()
+        field = self.find_by_key(dataset_id, key, for_update=True)
+        if field is None:
+            raise PersistenceConflictError()
+        return field
+
     def source_formats(self, dataset_id):
         return {
             key: dict(choice)
@@ -802,6 +821,25 @@ class SqlAlchemyDatasetRecordOperations:
                         )
                     )
             yield StoredRecord(row.id, dataset_id, tuple(values), row.revision), fields
+
+    def rename_deleted_field_key(self, dataset_id: str, field_id: str, key: str) -> None:
+        rows = self.session.scalars(
+            select(DatasetRecord).where(
+                DatasetRecord.dataset_id == dataset_id,
+                DatasetRecord.deleted_content.is_not(None),
+            )
+        )
+        for row in rows:
+            payload = dict(row.deleted_content)
+            fields = [dict(field) for field in payload["fields"]]
+            changed = False
+            for field in fields:
+                if field["id"] == field_id:
+                    field["key"] = key
+                    changed = True
+            if changed:
+                payload["fields"] = fields
+                row.deleted_content = payload
 
     def restore_if_revision(self, dataset_id, record_id, expected_revision, identifier_key):
         try:
