@@ -1478,12 +1478,17 @@ def create_flask_app(
                 if node.id in visited:
                     continue
                 visited.add(node.id)
-                path = (*ancestors, node.name)
+                ancestor_names = tuple(row["node"].name for row in ancestors)
+                path = (*ancestor_names, node.name)
                 rows.append(
                     {
                         "node": node,
                         "depth": len(ancestors),
-                        "ancestors": ancestors,
+                        "ancestors": ancestor_names,
+                        "ancestor_rows": ancestors,
+                        "parent_name": nodes[node.parent_id].name
+                        if node.parent_id in nodes
+                        else None,
                         "path": " / ".join(path),
                         "leaf": not children.get(node.id),
                         "values": {
@@ -1496,7 +1501,9 @@ def create_flask_app(
                         },
                     }
                 )
-                pending.extend((child, path) for child in reversed(children.get(node.id, ())))
+                pending.extend(
+                    (child, (*ancestors, rows[-1])) for child in reversed(children.get(node.id, ()))
+                )
 
         for node in children.get(None, ()):
             append_subtree(node)
@@ -1510,10 +1517,24 @@ def create_flask_app(
         selected = request.args.getlist("view") or ["hierarchy"]
         if len(selected) != 1 or selected[0] not in {"hierarchy", "records", "hybrid"}:
             abort(400, description="Choose Hierarchy, Records or Hybrid.")
-        if set(request.args) - {"view"}:
+        records_view = request.args.getlist("records_view") or ["reference"]
+        if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
+            abort(400, description="Choose Reference table or Flattened tree.")
+        if set(request.args) - {"view", "records_view"}:
             abort(400, description="Unsupported hierarchy view parameters.")
         rows, children = hierarchy_presentation(view)
         leaf_rows = [row for row in rows if row["leaf"] and row["node"].parent_id is not None]
+        parent_level_count = max((len(row["ancestors"]) for row in leaf_rows), default=0)
+        flat_value_columns = []
+        for field in view.fields:
+            if field.hierarchy_scope == "all_nodes":
+                flat_value_columns.extend(
+                    {"field": field, "label": f"{field.name} Level {level + 1}", "level": level}
+                    for level in range(parent_level_count)
+                )
+            flat_value_columns.append(
+                {"field": field, "label": f"{field.name} Leaf", "level": None}
+            )
         return render_authenticated_template(
             "pages/datasets/hierarchy.html",
             dataset=view.context.dataset,
@@ -1523,7 +1544,12 @@ def create_flask_app(
             hierarchy_rows=rows,
             hierarchy_errors=view.hierarchy_errors,
             leaf_rows=leaf_rows,
-            parent_level_count=max((len(row["ancestors"]) for row in leaf_rows), default=0),
+            parent_level_count=parent_level_count,
+            flat_value_columns=flat_value_columns,
+            records_view=records_view[0],
+            display_rows=leaf_rows
+            if selected[0] == "records" and records_view[0] == "flattened"
+            else rows,
             selected_view=selected[0],
             version_state=view.state,
             may_edit=view.state is None and view.may_maintain,
@@ -1570,6 +1596,7 @@ def create_flask_app(
             parent_id = rows[0]["node"].id
         if parent_id is not None and parent_id not in node_ids:
             abort(404)
+        return_view, return_records_view = hierarchy_return_view()
         return render_authenticated_template(
             "pages/datasets/hierarchy/node_form.html",
             dataset=view.context.dataset,
@@ -1596,12 +1623,24 @@ def create_flask_app(
             ),
             raw_values=request.method == "POST" and mode == "values",
             expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
-            return_view="records"
-            if request.values.get("return_view") == "records"
-            else "hierarchy",
+            return_view=return_view,
+            return_records_view=return_records_view,
             error=error,
             errors=errors or {},
         )
+
+    def hierarchy_return_view():
+        values = request.form if request.method == "POST" else request.args
+        selected = values.getlist("return_view") or ["hierarchy"]
+        records = values.getlist("return_records_view") or ["reference"]
+        if (
+            len(selected) != 1
+            or selected[0] not in {"hierarchy", "records"}
+            or len(records) != 1
+            or records[0] not in {"reference", "flattened"}
+        ):
+            abort(400, description="Choose a valid return view.")
+        return selected[0], records[0]
 
     @dataset_route("/datasets/<key>/concept/nodes/new", methods=["GET", "POST"])
     @version_errors
@@ -1648,6 +1687,7 @@ def create_flask_app(
     @version_errors
     def dataset_hierarchy_node_values(key, node_id):
         actor, view, rows, row = hierarchy_edit_context(key, node_id)
+        return_view, return_records_view = hierarchy_return_view()
         if request.method == "POST":
             applicable = [
                 field
@@ -1657,7 +1697,12 @@ def create_flask_app(
             submitted, errors = {}, {}
             expected_fields = {f"field:{field.key}" for field in applicable}
             for form_key, form_values in request.form.lists():
-                if form_key in {"csrf_token", "expected_revision", "return_view"}:
+                if form_key in {
+                    "csrf_token",
+                    "expected_revision",
+                    "return_view",
+                    "return_records_view",
+                }:
                     continue
                 field_key = form_key.removeprefix("field:")
                 if form_key not in expected_fields:
@@ -1690,7 +1735,8 @@ def create_flask_app(
                     "dataset_records_view",
                     key=key,
                     concept=True,
-                    view="records" if request.form.get("return_view") == "records" else "hierarchy",
+                    view=return_view,
+                    records_view=return_records_view if return_view == "records" else None,
                 )
             )
         return render_hierarchy_node_form(view, rows, row, mode="values")

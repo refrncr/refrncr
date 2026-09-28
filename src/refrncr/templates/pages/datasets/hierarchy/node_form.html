@@ -16,6 +16,7 @@
       <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
       {% if mode == 'values' %}
         <input type='hidden' name='return_view' value='{{ return_view }}'>
+        <input type='hidden' name='return_records_view' value='{{ return_records_view }}'>
         {{ record_form_fields(fields, 'hierarchy-' ~ node.id, values, errors, raw_values=raw_values, name_prefix='field:') }}
         {% if not fields %}<p>No fields apply to this node. <a href='{{ url_for("dataset_detail", key=dataset.key, concept=true, _anchor="fields") }}'>Configure fields</a> to add values.</p>{% endif %}
         {% if inactive_fields %}<section aria-labelledby='inactive-values-heading'><h3 id='inactive-values-heading'>Inactive values</h3><p class='help-text'>Leaves-only values stay on this node and become active if it is a leaf again or the field scope changes to All nodes.</p><dl class='record-details'>{% for field in inactive_fields %}{% if node_row['values'].get(field.key) is not none %}<div><dt>{{ field.name }}</dt><dd>{{ node_row['values'].get(field.key)|record_value_text(field.data_type) }}</dd></div>{% endif %}{% endfor %}</dl></section>{% endif %}
@@ -25,12 +26,12 @@
         <label for='hierarchy-node-parent'>Parent</label><select id='hierarchy-node-parent' name='parent_id' required>{% for row in parent_options %}<option value='{{ row.node.id }}'{% if row.node.id == parent_id %} selected{% endif %}>{{ row.path }}</option>{% endfor %}</select>
         <p class='help-text'>Moving a node also moves its descendants. Their identities and values are preserved.</p>
         {% else %}<input type='hidden' name='parent_id' value=''><p class='help-text'>This is the hierarchy’s single root.</p>{% endif %}
-        <p class='help-text'>Names must be unique among children of the same parent. A node with children retains its leaves-only values as inactive.</p>
+        <p class='help-text'>Names must be unique across the whole hierarchy. A node with children retains its leaves-only values as inactive.</p>
       {% endif %}
     </form>
   </div>
   {% call panel_form_actions() %}
-    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view) }}'>Cancel</a>
+    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view, records_view=return_records_view if return_view == "records" else none) }}'>Cancel</a>
     <button class='button button-primary' type='submit' form='hierarchy-node-form'>{{ 'Save values' if mode == 'values' else 'Save node' if node else 'Add child' if parent_id else 'Add root' }}</button>
   {% endcall %}
 </div>

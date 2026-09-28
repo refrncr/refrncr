@@ -304,8 +304,11 @@ class SqlAlchemyDiffOperations:
             identifier = DatasetBusinessKey(
                 version.dataset_id, tuple(sorted(f.key for f in fields if f.is_identifier))
             )
+            # Immutable publications may predate global node-name uniqueness.
+            # Preserve their original sibling-name contract so they can be read
+            # and restored for explicit repair; new publication validates globally.
             if len(fields) != version.field_count or hierarchy_validation_errors(
-                fields, identifier, nodes
+                fields, identifier, nodes, allow_legacy_names=True
             ):
                 return False
             expected = hierarchy_leaf_records(nodes, fields)

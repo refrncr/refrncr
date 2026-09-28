@@ -23,25 +23,33 @@ identifier completeness and composite uniqueness apply to leaf Records only.
 | View | Content | Editing |
 | --- | --- | --- |
 | Hierarchy | Names and parent/child structure | Structure and applicable node values through side panels |
-| Records | One row per leaf: ancestor names in Level columns, then Leaf, then the leaf's own custom Field values | Leaf values through the Record side panel; details include the full path |
+| Records: Reference table (default) | Every node: Name, direct Parent name, then own applicable Fields; root Parent is empty | Any node's values through the Record side panel |
+| Records: Flattened tree | One row per leaf: ancestor names in Level columns, Leaf, then separate values per applicable level | Leaf values through the Record side panel |
 | Hybrid | Complete tree with compact applicable values | Read-only; empty and not-applicable values are distinct |
 
-Switching views keeps the same selected Concept or publication. Root and branch nodes do
-not add Records. Values belong to their node; the application does not inherit, copy or
-aggregate parent values.
+Switching views keeps the same selected Concept or publication. Both Records
+representations derive from the existing nodes. Values belong to their node; the
+application does not inherit, copy or aggregate parent values.
 
-Records presents paths as a flat table. **Level 1** contains the root, **Level 2** the next
+The reference table shows each node once, including root and intermediate parents, with
+only its direct parent's name in Parent. Leaves-only Fields on parent rows display
+**Not applicable**, and retained inactive values stay hidden.
+
+The flattened tree presents paths as a flat table. **Level 1** contains the root, **Level 2** the next
 ancestor, and further Level columns follow the deepest leaf path in the selected Concept
 or publication. Every leaf name occupies the same **Leaf** column. Shorter paths leave
 unused ancestor columns empty; this does not create placeholder nodes or additional
-Records. Custom Field columns follow Leaf in their configured order and show only that
-leaf's own values. Ancestor columns provide name and path context, not inherited Field
-values. The view derives levels from the actual ancestor nodes, so a slash within a node
-name remains part of that name.
+Records. Custom Fields follow Leaf in configured order. Each All nodes Field has a
+separate value column for every ancestor level and Leaf. Leaves-only Fields have just
+the leaf value column. An absent ancestor leaves its value cell blank; **Empty** means
+an existing applicable node has no value. Levels derive from actual ancestor nodes, so
+a slash within a node name remains part of that name.
 
 In an editable Concept, each Record also has a pencil action at the right edge of the
-table. This column stays visible while scrolling horizontally and opens the existing
-Record value panel.
+table. Records cells stay on one line; wide content scrolls horizontally behind the
+fixed action column. This column stays visible and opens the existing
+Record value panel. Saving, cancelling and validation errors preserve the selected
+Records representation. Published versions provide read-only detail panels.
 
 Hierarchy uses icon actions for Edit node, Values and Add child. On desktop they appear
 when hovering or focusing a row; touch devices show them continuously. Tooltips retain
@@ -64,10 +72,17 @@ and do not require filling currently inapplicable Fields. A Field with retained 
 cannot be deleted or retyped without first resolving its stored content.
 
 A publishable hierarchy has one connected root with at least one child, no cycles or
-missing parents, unique sibling names and valid applicable constraints. A root-only
+missing parents, names unique across the entire Dataset and valid applicable constraints.
+Names are trimmed and compared exactly, preserving case-sensitive behavior. Different
+Datasets may reuse names. A root-only
 Concept remains editable. A valid tree can publish with no custom Fields or identifier.
 Published structure, scopes and values are immutable and share the Dataset version's
 effective date. Reorganizations require another Concept and publication.
+
+Historical snapshots published under the former sibling-only name rule remain readable
+and can initialize a Concept unchanged. New publication is blocked until any restored
+duplicate names are renamed. Separate duplicate groups can be repaired one at a time;
+the application does not rewrite or automatically rename historical data.
 
 ## Implementation boundaries
 
@@ -80,8 +95,9 @@ effective date. Reorganizations require another Concept and publication.
   content into the existing lifecycle. Structure comparisons include node names and
   parents, so a rename or move is reviewable even when leaf values do not change.
 - Mutable hierarchy content creates no Dataset Record rows. Publication stores the full
-  hierarchy and an applicable leaf projection in existing Record snapshot tables. Counts
-  and Records views exclude the root and branches.
+  hierarchy and an applicable leaf projection in existing Record snapshot tables. Stored
+  version Record counts keep this internal leaf meaning. Browser overview and deletion
+  counts use all nodes; neither Records representation changes snapshot storage.
 
 Dataset authority, active-Concept checks, CSRF, scoped node lookup and expected Dataset
 revision remain server-side controls. Hierarchy writers lock the Dataset and commit one

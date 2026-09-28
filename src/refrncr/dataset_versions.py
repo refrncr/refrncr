@@ -427,7 +427,7 @@ class DatasetVersionService:
         return dataset
 
     @staticmethod
-    def _published_context(dataset, version, owner_team_name):
+    def _published_context(dataset, version, owner_team_name, *, record_count=None):
         published = PublishedDataset(
             dataset.id,
             dataset.key,
@@ -445,7 +445,10 @@ class DatasetVersionService:
             kind=dataset.kind,
         )
         return DatasetOverview(
-            published, version.record_count, version.published_at, owner_team_name
+            published,
+            version.record_count if record_count is None else record_count,
+            version.published_at,
+            owner_team_name,
         )
 
     def overview(self, actor_id):
@@ -459,13 +462,23 @@ class DatasetVersionService:
                 else set(maintenance.resource_ids)
             )
             current = uow.versions.current_for_datasets(None, self._today().date())
+            hierarchy_counts = uow.versions.hierarchy_node_counts(
+                tuple(
+                    current[row.dataset.id].id
+                    for row in rows
+                    if row.dataset.kind == "hierarchy" and row.dataset.id in current
+                )
+            )
             concepts = uow.concepts.list_for_datasets(tuple(allowed))
             result = []
             for row in rows:
                 dataset = row.dataset
                 if dataset.id in current:
                     item = self._published_context(
-                        dataset, current[dataset.id], row.owner_team_name
+                        dataset,
+                        current[dataset.id],
+                        row.owner_team_name,
+                        record_count=hierarchy_counts.get(current[dataset.id].id),
                     )
                 elif dataset.id in allowed:
                     item = DatasetOverview(dataset, 0, dataset.created_at, row.owner_team_name)
@@ -528,19 +541,16 @@ class DatasetVersionService:
 
     def _read_context(self, uow, dataset, state):
         if state is None:
-            result = uow.datasets.current_overview((dataset.id,))[0]
-            if dataset.kind == "hierarchy":
-                nodes = uow.hierarchy.list_for_dataset(dataset.id)
-                parents = {node.parent_id for node in nodes}
-                result = replace(
-                    result,
-                    record_count=sum(
-                        node.parent_id is not None and node.id not in parents for node in nodes
-                    ),
-                )
-            return result
+            return uow.datasets.current_overview((dataset.id,))[0]
         owner = uow.teams.get(dataset.owner_team_id)
-        return self._published_context(dataset, state.version, owner.name if owner else "")
+        count = (
+            uow.versions.hierarchy_node_counts((state.version.id,))[state.version.id]
+            if dataset.kind == "hierarchy"
+            else state.version.record_count
+        )
+        return self._published_context(
+            dataset, state.version, owner.name if owner else "", record_count=count
+        )
 
     def context(self, actor_id, key):
         with self.uow(translate_errors=True) as uow:

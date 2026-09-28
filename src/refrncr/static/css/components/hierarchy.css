@@ -13,6 +13,8 @@
 .hierarchy-actions-column { text-align: right; white-space: nowrap; }
 .hierarchy-table { min-width: 30rem; }
 .hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
+/* Both Records variants scroll full, single-line values behind the sticky edit column. */
+.hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }
 .hierarchy-table thead th { white-space: nowrap; }
 .hierarchy-table th[scope="row"] { min-width: 12rem; background: transparent; }
 .hierarchy-tree-table tbody :is(th, td) { padding-block: var(--space-sm); }

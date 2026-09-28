@@ -84,7 +84,7 @@ def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
     assert "Add at least one child" in tree
 
 
-def test_views_show_structure_leaf_records_and_read_only_hybrid(dataset_browser):
+def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset, hierarchy, root, branch, child, sibling = hierarchy_fixture(services, admin)
     services.dataset_fields.create_field(
@@ -110,11 +110,11 @@ def test_views_show_structure_leaf_records_and_read_only_hybrid(dataset_browser)
     )
 
     records = body(request(client, "get", url + "?view=records"))
-    assert f"data-hierarchy-node='{root.id}'" not in records
-    assert f"data-hierarchy-node='{branch.id}'" not in records
+    assert f"data-hierarchy-node='{root.id}'" in records
+    assert f"data-hierarchy-node='{branch.id}'" in records
     assert f"data-hierarchy-node='{child.id}'" in records
     assert f"data-hierarchy-node='{sibling.id}'" in records
-    assert "Marketing owner" not in records
+    assert "Marketing owner" in records
 
     hybrid = body(request(client, "get", url + "?view=hybrid"))
     assert "Read only" in hybrid
@@ -281,7 +281,15 @@ def test_published_views_remain_read_only_and_use_selected_snapshot(dataset_brow
     )
 
 
-@pytest.mark.parametrize("view", ["unknown", "records&view=hybrid"])
+@pytest.mark.parametrize(
+    "view",
+    [
+        "unknown",
+        "records&view=hybrid",
+        "records&records_view=unknown",
+        "records&records_view=reference&records_view=flattened",
+    ],
+)
 def test_invalid_hierarchy_view_is_rejected(dataset_browser, view):
     _, services, admin, client = dataset_browser
     dataset, *_ = hierarchy_fixture(services, admin)
@@ -309,15 +317,20 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     assert body(tree).count("↳ </span>") == 349
     records = request(client, "get", "/datasets/deep/concept/records?view=records")
     assert records.status_code == 200
-    assert body(records).count("data-hierarchy-node=") == 1
+    assert body(records).count("data-hierarchy-node=") == 350
     assert "<noscript><details><summary>Full path</summary>" in body(records)
     assert "Node 0 / Node 1 / Node 2" in body(records)
+    flattened = request(
+        client, "get", "/datasets/deep/concept/records?view=records&records_view=flattened"
+    )
+    assert flattened.status_code == 200
+    assert body(flattened).count("data-hierarchy-node=") == 1
 
 
 def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset, _, _, _, child, _ = hierarchy_fixture(services, admin)
-    for key in ("csrf_token", "expected_revision", "return_view"):
+    for key in ("csrf_token", "expected_revision", "return_view", "return_records_view"):
         services.dataset_fields.create_field(
             admin.id, dataset.key, key, key, "string", hierarchy_scope="leaves"
         )
@@ -332,17 +345,20 @@ def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_b
             "csrf_token": session_csrf(client, services),
             "expected_revision": panel_revision(panel),
             "return_view": "records",
+            "return_records_view": "flattened",
             "field:csrf_token": "ordinary-data",
             "field:expected_revision": "ordinary-revision-data",
             "field:return_view": "ordinary-view-data",
+            "field:return_records_view": "ordinary-records-view-data",
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("?view=records")
+    assert response.location.endswith("?view=records&records_view=flattened")
     saved = body(request(client, "get", url))
     assert "value='ordinary-data'" in saved
     assert "value='ordinary-revision-data'" in saved
     assert "value='ordinary-view-data'" in saved
+    assert "value='ordinary-records-view-data'" in saved
 
 
 def test_user_without_dataset_maintenance_cannot_open_or_submit_node_panels(dataset_browser):

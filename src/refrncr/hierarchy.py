@@ -70,7 +70,7 @@ def hierarchy_leaf_records(nodes, fields):
     )
 
 
-def _structure_errors(nodes, *, publication):
+def _structure_errors(nodes, *, publication, allow_legacy_names=False):
     errors = []
     by_id = {node.id: node for node in nodes}
     roots = [node for node in nodes if node.parent_id is None]
@@ -80,7 +80,7 @@ def _structure_errors(nodes, *, publication):
         errors.append("Add at least one child beneath the root before publication")
     if len(by_id) != len(nodes):
         errors.append("Hierarchy node identities must be unique")
-    siblings = set()
+    names = set()
     children = {}
     for node in nodes:
         try:
@@ -88,10 +88,14 @@ def _structure_errors(nodes, *, publication):
                 errors.append("Node names must not start or end with whitespace")
         except ValidationError as error:
             errors.append(str(error))
-        marker = node.parent_id, node.name
-        if marker in siblings:
-            errors.append(f"Sibling names must be unique: {node.name}")
-        siblings.add(marker)
+        marker = (node.parent_id, node.name) if allow_legacy_names else node.name
+        if marker in names:
+            errors.append(
+                f"Sibling names must be unique: {node.name}"
+                if allow_legacy_names
+                else f"Node names must be unique within the hierarchy: {node.name}"
+            )
+        names.add(marker)
         if node.parent_id is not None and node.parent_id not in by_id:
             errors.append(f"Choose an existing parent for {node.name}")
         children.setdefault(node.parent_id, []).append(node.id)
@@ -108,9 +112,13 @@ def _structure_errors(nodes, *, publication):
     return errors
 
 
-def hierarchy_validation_errors(fields, identifier, nodes, *, publication=True):
+def hierarchy_validation_errors(
+    fields, identifier, nodes, *, publication=True, allow_legacy_names=False
+):
     """Validate applicable content; inactive values are retained without constraints."""
-    errors = _structure_errors(nodes, publication=publication)
+    errors = _structure_errors(
+        nodes, publication=publication, allow_legacy_names=allow_legacy_names
+    )
     paths = hierarchy_node_paths(nodes)
     parents = {node.parent_id for node in nodes}
     by_id = {field.id: field for field in fields}
@@ -279,8 +287,8 @@ class HierarchyService:
                     raise ValidationError("The hierarchy already has a root; choose a parent")
             elif not any(node.id == parent_id for node in nodes):
                 raise ValidationError("Choose a parent in this hierarchy")
-            if any(node.parent_id == parent_id and node.name == name for node in nodes):
-                raise ValidationError("A sibling already has this name")
+            if any(node.name == name for node in nodes):
+                raise ValidationError("A node in this hierarchy already has this name")
             node = work.hierarchy.create(dataset.id, name, parent_id)
             self._changed(work, dataset, actor_id, "hierarchy.node_created")
             return node
@@ -295,11 +303,18 @@ class HierarchyService:
             if (node.parent_id is None) != (parent_id is None):
                 raise ValidationError("Keep the existing root and choose a parent for other nodes")
             name = _node_name(name)
+            if name != node.name and any(
+                item.id != node_id and item.name == name for item in nodes
+            ):
+                raise ValidationError("A node in this hierarchy already has this name")
             proposed = tuple(
                 replace(item, name=name, parent_id=parent_id) if item.id == node_id else item
                 for item in nodes
             )
-            if errors := _structure_errors(proposed, publication=False):
+            # Previously published hierarchies may have duplicate names under
+            # different parents. Permit independent repairs and unchanged-name
+            # moves while still rejecting new conflicts and invalid structure.
+            if errors := _structure_errors(proposed, publication=False, allow_legacy_names=True):
                 raise ValidationError("; ".join(errors))
             if node.name == name and node.parent_id == parent_id:
                 return node

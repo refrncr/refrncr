@@ -4,8 +4,32 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const listeners = [];
 let selected = false;
+function tooltip(hovered = false, focused = false) {
+  return {
+    hovered, focused, attributes: new Set(), listeners: new Map(),
+    matches() { return this.hovered || this.focused; },
+    setAttribute(name) { this.attributes.add(name); },
+    removeAttribute(name) { this.attributes.delete(name); },
+    addEventListener(type, callback) { this.listeners.set(type, callback); },
+  };
+}
+const hoveredTooltip = tooltip(true);
+const focusedTooltip = tooltip(false, true);
+const inactiveTooltip = tooltip();
+const tooltips = [hoveredTooltip, focusedTooltip, inactiveTooltip];
+const exportMenu = {
+  open: true, contains: () => false,
+  removeAttribute(name) { if (name === 'open') this.open = false; },
+};
 const document = {
-  querySelectorAll: () => [], querySelector: () => null,
+  activeElement: focusedTooltip,
+  querySelectorAll(selector) {
+    if (selector === '.button-row-icon[data-tooltip]') return tooltips;
+    if (selector === '.button-row-icon[data-tooltip]:is(:hover, :focus-visible)') return tooltips.filter(t => t.matches());
+    if (selector === '.export-menu') return [exportMenu];
+    return [];
+  },
+  querySelector: () => null,
   addEventListener(type, callback, capture = false) { listeners.push({type, callback, capture}); },
 };
 const source = fs.readFileSync(process.argv[2], 'utf8');
@@ -65,6 +89,24 @@ assert.equal(primary.clicks, 2, 'explicit semantic cells remain usable row space
 fire({closest: () => null});
 assert.equal(primary.clicks, 2, 'headers and non-navigable rows are ignored');
 assert.equal(listeners.filter(l => l.type === 'keydown').length, 1, 'no extra row keyboard handler is registered');
+const keydown = listeners.find(l => l.type === 'keydown').callback;
+exportMenu.open = true;
+keydown({key: 'Enter'});
+assert.equal(exportMenu.open, true, 'other keys leave export menus open');
+assert.equal(tooltips.some(t => t.attributes.has('data-tooltip-dismissed')), false, 'other keys do not dismiss tooltips');
+keydown({key: 'Escape'});
+assert.equal(exportMenu.open, false, 'Escape still closes export menus');
+assert.equal(hoveredTooltip.attributes.has('data-tooltip-dismissed'), true, 'Escape dismisses hovered icon labels');
+assert.equal(focusedTooltip.attributes.has('data-tooltip-dismissed'), true, 'Escape dismisses focused icon labels');
+assert.equal(inactiveTooltip.attributes.has('data-tooltip-dismissed'), false, 'inactive icon labels remain available');
+assert.equal(document.activeElement, focusedTooltip, 'dismissing a tooltip preserves keyboard focus');
+focusedTooltip.listeners.get('pointerleave')();
+assert.equal(focusedTooltip.attributes.has('data-tooltip-dismissed'), true, 'dismissal persists while keyboard focus remains');
+hoveredTooltip.hovered = false;
+hoveredTooltip.listeners.get('pointerleave')();
+focusedTooltip.focused = false;
+focusedTooltip.listeners.get('blur')();
+assert.equal(tooltips.some(t => t.attributes.has('data-tooltip-dismissed')), false, 'labels reset once hover and focus both leave');
 fire(target({outsideRow:true,matches:()=>false}));
 assert.equal(primary.clicks,3,'focusable main landmark outside the row must not block its click');
 console.log('Shared table-row controller checks passed');

@@ -465,6 +465,22 @@ class SqlAlchemyVersionOperations:
             self.hierarchy_nodes(version) if not self.legacy_metadata else (),
         )
 
+    def hierarchy_node_counts(self, version_ids):
+        if not version_ids:
+            return {}
+        counts = dict.fromkeys(version_ids, 0)
+        counts.update(
+            self.session.execute(
+                select(
+                    DatasetVersionHierarchyNode.version_id,
+                    func.count(DatasetVersionHierarchyNode.id),
+                )
+                .where(DatasetVersionHierarchyNode.version_id.in_(version_ids))
+                .group_by(DatasetVersionHierarchyNode.version_id)
+            ).all()
+        )
+        return counts
+
     def hierarchy_nodes(self, version):
         nodes = self.session.scalars(
             select(DatasetVersionHierarchyNode)

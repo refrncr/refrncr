@@ -138,13 +138,6 @@
     trigger.addEventListener("pointerleave", reset);
     trigger.addEventListener("blur", reset);
   });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    document.querySelectorAll(".button-row-icon[data-tooltip]:is(:hover, :focus-visible)").forEach((trigger) => {
-      trigger.setAttribute("data-tooltip-dismissed", "");
-    });
-  });
-
   document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
     const trigger = details.querySelector("summary");
     const tooltip = details.querySelector('[role="tooltip"]');
@@ -729,6 +722,9 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       exportMenus.forEach((menu) => menu.removeAttribute("open"));
+      document.querySelectorAll(".button-row-icon[data-tooltip]:is(:hover, :focus-visible)").forEach((trigger) => {
+        trigger.setAttribute("data-tooltip-dismissed", "");
+      });
     }
   });
 

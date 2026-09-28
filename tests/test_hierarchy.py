@@ -108,21 +108,25 @@ def test_hierarchy_first_structure_and_optional_fields(hierarchy):
     assert not errors(c)
 
 
-def test_parent_constraints_sibling_names_and_stable_subtree(hierarchy):
+def test_parent_constraints_global_node_names_and_stable_subtree(hierarchy):
     c = hierarchy
     root = add(c, "Root")
     sales = add(c, "Sales", root.id)
     engineering = add(c, "Engineering", root.id)
     team = add(c, "Operations", sales.id)
     descendant = add(c, "Support", team.id)
-    add(c, "Operations", engineering.id)
+    add(c, "Engineering operations", engineering.id)
     before = snapshot(c)
     for operation in (
         lambda: add(c, "Operations", sales.id),
+        lambda: add(c, " Operations ", engineering.id),
+        lambda: add(c, "Root", sales.id),
+        lambda: add(c, "Sales", descendant.id),
         lambda: add(c, "Other root"),
         lambda: add(c, "Missing parent", "00000000-0000-0000-0000-000000000001"),
         lambda: move(c, sales, descendant.id),
-        lambda: move(c, team, engineering.id),
+        lambda: move(c, team, engineering.id, "Support"),
+        lambda: move(c, root, None, "Operations"),
         lambda: move(c, root, sales.id),
         lambda: move(c, sales, None),
     ):
@@ -134,6 +138,25 @@ def test_parent_constraints_sibling_names_and_stable_subtree(hierarchy):
     nodes = {node.id: node for node in content(c).hierarchy_nodes}
     assert nodes[descendant.id].parent_id == team.id
     assert nodes[team.id].parent_id == engineering.id
+
+
+def test_global_node_names_preserve_case_sensitivity_and_dataset_scope(hierarchy):
+    c = hierarchy
+    root = add(c, "Root")
+    left = add(c, "Left", root.id)
+    right = add(c, "Right", root.id)
+    add(c, "Operations", left.id)
+    distinct = add(c, "operations", right.id)
+    assert distinct.name == "operations"
+    with pytest.raises(ValidationError, match="already has this name"):
+        move(c, distinct, right.id, " Operations ")
+    other = c.s.datasets.create_dataset(
+        c.a.id, "other-hierarchy", "Other hierarchy", "", c.owner.id, kind="hierarchy"
+    )
+    with c.s.datasets.uow() as work:
+        expected = work.datasets.get(other.id).revision
+    other_root = c.s.hierarchy.create_node(c.a.id, other.key, "Root", expected_revision=expected)
+    assert other_root.name == root.name and other_root.id != root.id
 
 
 def test_leaf_transition_retains_restores_and_reports_conflicts(hierarchy):
@@ -283,6 +306,33 @@ def test_hierarchy_writers_serialize_and_reject_stale_revision(hierarchy):
         results = list(pool.map(create, ("First", "Second")))
     assert sum(item is not None for item in results) == 1
     assert len(content(c).hierarchy_nodes) == 2
+
+
+def test_concurrent_same_name_in_different_branches_cannot_create_duplicates(hierarchy):
+    c = hierarchy
+    root = add(c, "Root")
+    parents = (add(c, "Left", root.id), add(c, "Right", root.id))
+    expected = revision(c)
+    barrier = Barrier(2)
+
+    def create(parent):
+        barrier.wait(timeout=10)
+        try:
+            return c.s.hierarchy.create_node(
+                c.a.id, c.d.key, "Shared", parent.id, expected_revision=expected
+            )
+        except StaleRecordError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(create, parents))
+    assert sum(item is not None for item in results) == 1
+    assert sum(node.name == "Shared" for node in content(c).hierarchy_nodes) == 1
+    losing_parent = parents[next(index for index, result in enumerate(results) if result is None)]
+    before = snapshot(c)
+    with pytest.raises(ValidationError, match="already has this name"):
+        add(c, "Shared", losing_parent.id)
+    assert snapshot(c) == before
 
 
 def test_generic_record_import_and_export_paths_reject_hierarchies(hierarchy):

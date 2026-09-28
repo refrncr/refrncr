@@ -184,7 +184,7 @@ def test_cross_dataset_value_rejected_and_dataset_deletion_clears_tree(context):
             )
         )
     with c.s.datasets.uow(write=True, serialized=True) as work:
-        assert work.datasets.deletion_counts(c.d.id)[1] == 1
+        assert work.datasets.deletion_counts(c.d.id)[1] == 2
         work.datasets.delete_with_dependents(c.d.id)
     with c.sessions() as session:
         assert session.scalar(select(func.count()).select_from(DatasetHierarchyNode)) == 0
