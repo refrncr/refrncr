@@ -104,7 +104,7 @@ def test_views_show_structure_leaf_records_and_read_only_hybrid(dataset_browser)
     url = f"/datasets/{dataset.key}/concept/records"
     tree = body(request(client, "get", url))
     assert "Marketing owner" not in tree
-    assert "<table" not in tree
+    assert "class='hierarchy-table hierarchy-tree-table'" in tree
     assert all(
         f"data-hierarchy-node='{node.id}'" in tree for node in (root, branch, child, sibling)
     )
@@ -121,7 +121,7 @@ def test_views_show_structure_leaf_records_and_read_only_hybrid(dataset_browser)
     assert "Marketing owner" in hybrid
     assert "Not applicable" in hybrid
     assert "Empty" in hybrid
-    assert "Leaves only" in hybrid and "All nodes" in hybrid
+    assert "Leaves only" in hybrid and "All nodes" not in hybrid
     assert "name='hierarchy_scope'" not in hybrid
     assert "/nodes/" not in hybrid
     assert "Import" not in hybrid and ">Export<" not in hybrid
@@ -306,7 +306,7 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     assert tree.status_code == 200
     assert "Node 349" in body(tree)
     assert body(tree).count("data-hierarchy-node=") == 350
-    assert body(tree).count("<details class='hierarchy-branch'") == 349
+    assert body(tree).count("↳ </span>") == 349
     records = request(client, "get", "/datasets/deep/concept/records?view=records")
     assert records.status_code == 200
     assert body(records).count("data-hierarchy-node=") == 1

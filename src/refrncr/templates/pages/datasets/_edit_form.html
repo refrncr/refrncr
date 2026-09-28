@@ -18,7 +18,7 @@
       error_id="dataset-edit-error" if error_field == "description" else none,
       control="textarea"
     ) }}
-    {{ icon_picker(dataset_icon_choices, selected_icon) }}
+    {{ icon_picker(dataset_icon_choices, selected_icon, kind=dataset.kind) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='dataset-edit-pair'>
       {% if may_govern %}

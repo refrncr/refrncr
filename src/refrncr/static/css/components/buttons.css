@@ -13,5 +13,14 @@
 .button-icon-only { width: var(--space-lg); height: var(--space-lg); min-height: var(--space-lg); padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--color-text-secondary); flex-shrink: 0; }
 .button-icon-only:hover:not(:disabled) { color: var(--color-link-hover); }
 .button-icon-only .button-icon { margin: 0; }
+/* Row icon variant: a comfortable target with room for detailed 18px glyphs. */
+.button-row-icon { position: relative; width: var(--space-xl); height: var(--space-xl); min-height: var(--space-xl); border-radius: .375rem; color: var(--color-text-muted); }
+.button-row-icon .button-icon { width: 1.125rem; height: 1.125rem; }
+.button-row-icon:hover:not(:disabled), .button-row-icon:focus-visible { color: var(--color-action-primary); background: var(--color-row-selected); }
+/* A transparent bridge keeps the tooltip hoverable across the gap above its trigger. */
+.button-row-icon[data-tooltip]::before, .button-row-icon[data-tooltip]::after { position: absolute; z-index: var(--layer-menu); visibility: hidden; opacity: 0; pointer-events: none; }
+.button-row-icon[data-tooltip]::before { content: ""; inset-inline: 0; bottom: 100%; height: var(--space-xs); }
+.button-row-icon[data-tooltip]::after { content: attr(data-tooltip); inset-inline-end: 0; bottom: calc(100% + var(--space-xs)); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-md); background: var(--color-text); color: var(--color-surface); font: var(--font-weight-regular) var(--font-size-xs)/var(--line-height-body) var(--font-interface); white-space: nowrap; transition: opacity var(--motion-duration-layout) var(--motion-easing-standard); }
+.button-row-icon[data-tooltip]:not([data-tooltip-dismissed]):is(:hover, :focus-visible)::before, .button-row-icon[data-tooltip]:not([data-tooltip-dismissed]):is(:hover, :focus-visible)::after { visibility: visible; opacity: 1; pointer-events: auto; }
 /* The two hit areas extend into cell padding without increasing the row height. */
 .button-stack { display: inline-flex; height: var(--control-height-compact); flex-direction: column; align-items: center; justify-content: center; gap: 0; }

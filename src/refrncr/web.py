@@ -51,6 +51,7 @@ from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.presentation_metadata import (
     DATASET_ICONS,
     dataset_icon_sprite,
+    default_dataset_icon,
     key_from_name,
     rendered_dataset_icon,
 )
@@ -160,6 +161,7 @@ def create_flask_app(
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
+    app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
 
@@ -1012,8 +1014,8 @@ def create_flask_app(
             dataset_facts=dataset_facts,
             deletion=deletion,
             dataset_icon_label=DATASET_ICONS.get(
-                rendered_dataset_icon(dataset.icon),
-                rendered_dataset_icon(dataset.icon).replace("-", " ").capitalize(),
+                rendered_dataset_icon(dataset.icon, dataset.kind),
+                rendered_dataset_icon(dataset.icon, dataset.kind).replace("-", " ").capitalize(),
             ),
             business_key=identifier,
             version_state=state,
@@ -1481,6 +1483,7 @@ def create_flask_app(
                     {
                         "node": node,
                         "depth": len(ancestors),
+                        "ancestors": ancestors,
                         "path": " / ".join(path),
                         "leaf": not children.get(node.id),
                         "values": {
@@ -1510,6 +1513,7 @@ def create_flask_app(
         if set(request.args) - {"view"}:
             abort(400, description="Unsupported hierarchy view parameters.")
         rows, children = hierarchy_presentation(view)
+        leaf_rows = [row for row in rows if row["leaf"] and row["node"].parent_id is not None]
         return render_authenticated_template(
             "pages/datasets/hierarchy.html",
             dataset=view.context.dataset,
@@ -1518,7 +1522,8 @@ def create_flask_app(
             identifier=view.identifier,
             hierarchy_rows=rows,
             hierarchy_errors=view.hierarchy_errors,
-            leaf_rows=[row for row in rows if row["leaf"] and row["node"].parent_id is not None],
+            leaf_rows=leaf_rows,
+            parent_level_count=max((len(row["ancestors"]) for row in leaf_rows), default=0),
             selected_view=selected[0],
             version_state=view.state,
             may_edit=view.state is None and view.may_maintain,

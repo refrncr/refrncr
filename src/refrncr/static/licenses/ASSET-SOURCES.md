@@ -19,8 +19,8 @@ Latin Extended subset, selected by `unicode-range`.
 
 ## Icons
 
-Every icon is an inline SVG macro in `templates/components/icons.html`, so it takes the colour of
-the text around it. They are the following icons from the official Lucide release `0.468.0`
+Interface icons are inline SVG macros in `templates/components/icons.html`, so they take the
+colour of the text around them. The following icons use the official Lucide release `0.468.0`
 (the inline macros stay on that release; only the Dataset icon sprite moved to `1.46.0`),
 unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attributes:
 
@@ -30,11 +30,14 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | `configure_icon` | Settings 2 |
 | `home_icon` | House |
 | `datasets_icon` | Table |
+| `network_icon` | [Network](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/network.svg) — Hierarchy navigation |
 | `chevron_up_icon` / `chevron_down_icon` | Chevron Up / Chevron Down |
 | `back_icon` | Arrow Left |
 | `user_icon` / `team_icon` | User / Users |
 | `logout_icon` | Log Out |
 | `file_pen_icon` | File Pen |
+| `square_pen_icon` | [Square Pen](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/square-pen.svg) — Hierarchy: Edit node |
+| `table_properties_icon` | [Table Properties](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/table-properties.svg) — Hierarchy: Values |
 | `history_icon` | History |
 | `search_icon` | Search |
 | `audit_icon` | Scroll Text |
@@ -48,6 +51,26 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 
 `key_icon` is tinted with the accent colour through the `.key-icon` rule. See
 `LICENSE-Lucide.txt` for the upstream ISC/MIT notices.
+
+The two Hierarchy action glyphs above retain the exact SVG geometry from the linked
+official `0.468.0` source files. Their macro wrappers follow the existing interface icons;
+CSS controls the displayed dimensions. No package or runtime request is added.
+
+`network_icon` retains the exact official `0.468.0` geometry, which also matches the
+`network` symbol in the vendored `1.46.0` dataset sprite. Hierarchy navigation and
+the default hierarchy dataset icon therefore use the same glyph.
+
+### Custom Hierarchy action icon
+
+| Macro | Custom asset |
+| --- | --- |
+| `node_add_child_icon` | `node-add-child-open` — Hierarchy: Add child |
+
+`node-add-child-open` is original refrncr artwork supplied by the product owner in
+**Hierarchy: rij-acties als icons (28 sep 2026)**, section 3. It is not a Lucide asset.
+The supplied parent-node rectangle, branch hook and open plus geometry are retained
+exactly on a 24×24 grid with stroke width 2 and round caps/joins. This is a project
+asset; no separate third-party licence was supplied with it.
 
 ## Dataset icon selection (REF-162)
 

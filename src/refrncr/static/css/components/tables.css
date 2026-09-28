@@ -4,6 +4,10 @@ caption { padding: var(--space-md); font-weight: var(--font-weight-bold); text-a
 th, td { padding: .75rem var(--space-md); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
 th { background: var(--color-table-heading); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; }
 .table-scroll tbody tr:not(.interactive-row):hover { background: var(--color-row-hover); }
+/* Optional trailing action column stays visible inside a horizontally scrolling table. */
+.table-sticky-actions { position: sticky; inset-inline-end: 0; z-index: 1; width: 1%; background: var(--color-surface); box-shadow: inset 1px 0 var(--color-border-subtle); text-align: right; vertical-align: middle; white-space: nowrap; }
+thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading); }
+.table-scroll tbody tr:not(.interactive-row):hover > .table-sticky-actions { background: var(--color-row-hover); }
 .management-table { position: relative; box-shadow: var(--shadow-sm); }
 .management-table th, .management-table td { padding-block: .75rem; }
 .management-table td, .management-table th[scope="row"] { vertical-align: middle; }

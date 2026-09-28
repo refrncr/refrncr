@@ -67,6 +67,7 @@
       const sprite = picker.dataset.iconSprite;
       const legacySprite = picker.dataset.iconLegacySprite;
       const labelFor = (name) => options.find((option) => option.dataset.iconValue === name)?.dataset.iconName;
+      let defaultIcon = picker.dataset.iconDefault || "table";
       let syncRun = 0;
       const sync = async () => {
         const name = search.value.trim().toLowerCase();
@@ -87,13 +88,27 @@
             if (exists) source = legacySprite;
           }
         }
-        const shown = name && exists ? name : "table";
+        const shown = name && exists ? name : defaultIcon;
         previewUse.setAttribute("href", `${source}#${shown}`);
-        previewName.textContent = name || "table";
+        previewName.textContent = name || defaultIcon;
         previewLabel.textContent = !name ? "Default dataset icon"
           : !exists ? "Unknown name, default icon shown"
           : labelFor(name) || name.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
       };
+      const kinds = [...(search.form?.querySelectorAll('input[name="kind"]') || [])];
+      const syncDefault = () => {
+        const kind = kinds.find((input) => input.checked)?.value;
+        if (kind) defaultIcon = kind === "hierarchy"
+          ? picker.dataset.iconHierarchyDefault : picker.dataset.iconTableDefault;
+        picker.querySelectorAll("[data-icon-default-option]").forEach((option) => {
+          option.querySelector("use").setAttribute("href", `${sprite}#${defaultIcon}`);
+          const label = labelFor(defaultIcon) || defaultIcon.replace(/^./, (c) => c.toUpperCase());
+          option.title = `Default dataset icon (${label})`;
+        });
+        sync();
+      };
+      kinds.forEach((input) => input.addEventListener("change", syncDefault));
+      syncDefault();
       if (preview) preview.hidden = false;
       if (suggestions) suggestions.hidden = false;
       choices.forEach((choice) => choice.addEventListener("click", () => {

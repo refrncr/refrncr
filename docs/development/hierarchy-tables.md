@@ -11,6 +11,9 @@ through the existing Dataset lifecycle. Add a root, then its children; asymmetri
 and different leaf depths need no placeholders. Rename or move an existing node to
 reorganize its entire subtree while preserving identities and values.
 
+Hierarchy uses the Network icon in navigation and as its default Dataset icon. A chosen
+custom icon takes precedence; clearing it restores the Network default.
+
 Custom Fields and a composite Record identifier are optional. Each hierarchy Field has
 scope **Leaves only** or **All nodes**. Configure these in Fields after or during structure
 maintenance, then enter applicable values on the selected node. Identifier membership can
@@ -20,12 +23,30 @@ identifier completeness and composite uniqueness apply to leaf Records only.
 | View | Content | Editing |
 | --- | --- | --- |
 | Hierarchy | Names and parent/child structure | Structure and applicable node values through side panels |
-| Records | Leaves and their own Field values | Leaf values through the Record side panel; details include the path |
+| Records | One row per leaf: ancestor names in Level columns, then Leaf, then the leaf's own custom Field values | Leaf values through the Record side panel; details include the full path |
 | Hybrid | Complete tree with compact applicable values | Read-only; empty and not-applicable values are distinct |
 
 Switching views keeps the same selected Concept or publication. Root and branch nodes do
 not add Records. Values belong to their node; the application does not inherit, copy or
 aggregate parent values.
+
+Records presents paths as a flat table. **Level 1** contains the root, **Level 2** the next
+ancestor, and further Level columns follow the deepest leaf path in the selected Concept
+or publication. Every leaf name occupies the same **Leaf** column. Shorter paths leave
+unused ancestor columns empty; this does not create placeholder nodes or additional
+Records. Custom Field columns follow Leaf in their configured order and show only that
+leaf's own values. Ancestor columns provide name and path context, not inherited Field
+values. The view derives levels from the actual ancestor nodes, so a slash within a node
+name remains part of that name.
+
+In an editable Concept, each Record also has a pencil action at the right edge of the
+table. This column stays visible while scrolling horizontally and opens the existing
+Record value panel.
+
+Hierarchy uses icon actions for Edit node, Values and Add child. On desktop they appear
+when hovering or focusing a row; touch devices show them continuously. Tooltips retain
+the action names and can be dismissed with Escape. Accessible labels include the node
+name, and the actions open the same structure and value panels.
 
 ## Retention and validation
 

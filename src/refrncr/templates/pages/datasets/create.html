@@ -74,7 +74,7 @@
         </div>
       </div>
     </div>
-    {{ icon_picker(dataset_icon_choices, selected_icon) }}
+    {{ icon_picker(dataset_icon_choices, selected_icon, kind=table_kind) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
       <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>
