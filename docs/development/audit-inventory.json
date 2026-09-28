@@ -30,6 +30,7 @@
     "refrncr.dataset_versions.DatasetVersionService.review",
     "refrncr.dataset_versions.DatasetVersionService.review_discard",
     "refrncr.hierarchy.HierarchyService.create_node",
+    "refrncr.hierarchy.HierarchyService.delete_subtree",
     "refrncr.hierarchy.HierarchyService.update_node",
     "refrncr.hierarchy.HierarchyService.update_values",
     "refrncr.record_import.DatasetRecordImportService.active",
@@ -1295,6 +1296,19 @@
       "operations": [
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.hierarchy.HierarchyService.update_node",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_hierarchy_node_delete",
+      "path": "/datasets/<key>/concept/nodes/<node_id>/delete",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.hierarchy.HierarchyService.delete_subtree",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },

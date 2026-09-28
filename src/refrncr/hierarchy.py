@@ -324,6 +324,32 @@ class HierarchyService:
             self._changed(work, dataset, actor_id, "hierarchy.node_updated")
             return updated
 
+    def delete_subtree(self, actor_id, dataset_key, node_id, *, expected_revision):
+        """Delete one non-root node and every descendant in the same transaction."""
+        with self.uow(write=True, serialized=True) as work:
+            dataset = self._target(work, actor_id, dataset_key, expected_revision)
+            nodes = work.hierarchy.list_for_dataset(dataset.id)
+            node = next((item for item in nodes if item.id == node_id), None)
+            if node is None:
+                raise NotFoundError("Node not found")
+            if node.parent_id is None:
+                raise ValidationError("The root node cannot be deleted")
+
+            children = {}
+            for item in nodes:
+                children.setdefault(item.parent_id, []).append(item.id)
+            affected, pending = set(), [node.id]
+            while pending:
+                current = pending.pop()
+                if current in affected:
+                    continue
+                affected.add(current)
+                pending.extend(children.get(current, ()))
+
+            work.hierarchy.delete(dataset.id, node.id)
+            self._changed(work, dataset, actor_id, "hierarchy.subtree_deleted")
+            return len(affected)
+
     def update_values(self, actor_id, dataset_key, node_id, submitted, *, expected_revision):
         with self.uow(write=True, serialized=True) as work:
             dataset = self._target(work, actor_id, dataset_key, expected_revision)

@@ -1,8 +1,8 @@
 {% from "components/table_row.html" import row_action %}
-{% from "components/icons.html" import square_pen_icon, table_properties_icon, node_add_child_icon %}
+{% from "components/icons.html" import square_pen_icon, table_properties_icon, node_add_child_icon, trash_2_icon %}
 
-{% macro node_action(href, label, accessible_name, icon) -%}
-<a class='button button-icon-only button-row-icon' data-panel-url data-dialog-open='hierarchy-panel' href='{{ href }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='{{ accessible_name }}' data-tooltip='{{ label }}'>{{ icon() }}</a>
+{% macro node_action(href, label, accessible_name, icon, danger=false) -%}
+<a class='button button-icon-only button-row-icon{{ " button-danger" if danger else "" }}' data-panel-url data-dialog-open='hierarchy-panel' href='{{ href }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='{{ accessible_name }}' data-tooltip='{{ label }}'>{{ icon() }}</a>
 {%- endmacro %}
 
 {% macro node_actions(row) -%}
@@ -11,6 +11,7 @@
     {{ node_action(url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id), "Edit node", "Edit node " ~ row.node.name, square_pen_icon) }}
     {{ node_action(url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id), "Values", "Edit values for " ~ row.node.name, table_properties_icon) }}
     {{ node_action(url_for("dataset_hierarchy_node_create", key=dataset.key, parent_id=row.node.id), "Add child", "Add child to " ~ row.node.name, node_add_child_icon) }}
+    {% if row.node.parent_id is not none %}{{ node_action(url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=row.node.id), "Delete branch", "Delete branch " ~ row.node.name, trash_2_icon, true) }}{% endif %}
   {% else %}<button class='button button-secondary button-table-action' type='button' data-dialog-open='hierarchy-node-{{ row.node.id }}' aria-label='View values for {{ row.node.name }}'>View values</button>{% endif %}
 </div>
 {%- endmacro %}

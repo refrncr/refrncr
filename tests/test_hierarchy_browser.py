@@ -247,6 +247,115 @@ def test_hierarchy_node_mutations_reject_csrf_foreign_ids_and_stale_forms(datase
     )
 
 
+def test_branch_deletion_requires_confirmation_and_removes_the_complete_subtree(
+    dataset_browser,
+):
+    _, services, admin, client = dataset_browser
+    dataset, hierarchy, root, branch, child, sibling = hierarchy_fixture(services, admin)
+    services.dataset_fields.create_field(
+        admin.id, dataset.key, "owner", "Owner", "string", hierarchy_scope="all_nodes"
+    )
+    hierarchy.update_values(
+        admin.id,
+        dataset.key,
+        child.id,
+        {"owner": "Sensitive value"},
+        expected_revision=services.datasets.get_dataset(admin.id, dataset.key).revision,
+    )
+    login(client)
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
+    assert f"aria-label='Delete branch {root.name}'" not in page
+    assert f"aria-label='Delete branch {branch.name}'" in page
+
+    root_delete = request(client, "get", f"/datasets/{dataset.key}/concept/nodes/{root.id}/delete")
+    assert root_delete.status_code == 400
+    url = f"/datasets/{dataset.key}/concept/nodes/{branch.id}/delete"
+    panel = request(client, "get", url)
+    assert panel.status_code == 200
+    assert "This permanently deletes 2 nodes" in body(panel)
+    assert "Published versions remain unchanged" in body(panel)
+    csrf = session_csrf(client, services)
+    revision = panel_revision(panel)
+    assert (
+        request(
+            client,
+            "post",
+            url,
+            data={"csrf_token": csrf, "expected_revision": revision},
+        ).status_code
+        == 400
+    )
+    assert (
+        request(
+            client,
+            "post",
+            url,
+            data={"expected_revision": revision, "confirm": "yes"},
+        ).status_code
+        == 403
+    )
+    deleted = request(
+        client,
+        "post",
+        url,
+        data={"csrf_token": csrf, "expected_revision": revision, "confirm": "yes"},
+    )
+    assert deleted.status_code == 302
+    resulting_page = body(request(client, "get", deleted.location))
+    assert branch.name not in resulting_page and child.name not in resulting_page
+    assert root.name in resulting_page and sibling.name in resulting_page
+
+
+def test_branch_deletion_rejects_stale_and_unauthorized_requests(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset, hierarchy, root, branch, child, _sibling = hierarchy_fixture(services, admin)
+    login(client)
+    url = f"/datasets/{dataset.key}/concept/nodes/{branch.id}/delete"
+    panel = request(client, "get", url)
+    revision = panel_revision(panel)
+    hierarchy.update_node(
+        admin.id,
+        dataset.key,
+        child.id,
+        "Updated content",
+        branch.id,
+        expected_revision=services.datasets.get_dataset(admin.id, dataset.key).revision,
+    )
+    stale = request(
+        client,
+        "post",
+        url,
+        data={
+            "csrf_token": session_csrf(client, services),
+            "expected_revision": revision,
+            "confirm": "yes",
+        },
+    )
+    assert stale.status_code == 409
+    assert "Hierarchy changed since this form was opened" in body(stale)
+
+    services.users.create_user(
+        admin.id, "delete-reader@example.com", "Delete reader", "correct horse battery staple"
+    )
+    login(client, "delete-reader@example.com")
+    assert request(client, "get", url).status_code == 404
+    assert (
+        request(
+            client,
+            "post",
+            url,
+            data={
+                "csrf_token": session_csrf(client, services),
+                "expected_revision": str(
+                    services.datasets.get_dataset(admin.id, dataset.key).revision
+                ),
+                "confirm": "yes",
+            },
+        ).status_code
+        == 404
+    )
+
+
 def test_published_views_remain_read_only_and_use_selected_snapshot(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset, hierarchy, root, branch, child, sibling = hierarchy_fixture(services, admin)

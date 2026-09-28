@@ -2673,6 +2673,7 @@
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
         "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
         "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
@@ -4853,6 +4854,7 @@
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
@@ -5864,6 +5866,47 @@
       "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
       "exclusion_reason": "",
       "persistence_scope": "Existing Dataset unit of work and AuditEvent."
+    },
+    {
+      "capability": "Hierarchy maintenance",
+      "operation": "delete_subtree",
+      "service": "refrncr.hierarchy.HierarchyService.delete_subtree",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication, CSRF and non-disclosing authorization boundary; dataset-scoped node lookup.",
+      "technical_logging": "Fixed safe diagnostics only; never node names, field values or request contents.",
+      "events": [
+        [
+          "dataset",
+          "hierarchy.subtree_deleted"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID, not a node name or field value.",
+      "actor_source": "Authenticated active owning-team member or Community administrator.",
+      "allowed_context": {
+        "dataset:hierarchy.subtree_deleted": {}
+      },
+      "success": "One content-free event commits atomically with the complete non-root subtree deletion and concept revision.",
+      "validation_failure": "Root deletion, missing explicit confirmation and invalid form input create no content mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing rejection; no business mutation or domain audit event.",
+      "stale_input": "The expected Dataset revision is checked under the Dataset lock before any mutation.",
+      "no_op": "Not applicable; a valid target always deletes at least one node.",
+      "rollback": "Node and descendant deletion, values, concept revision and event roll back together on audit or persistence failure.",
+      "duplicate_retry": "A committed deletion advances the revision; a stale retry is rejected or the removed node is not found.",
+      "tests": [
+        "tests/test_hierarchy.py::test_delete_subtree_removes_descendants_and_values_but_protects_root",
+        "tests/test_hierarchy.py::test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit",
+        "tests/test_hierarchy_browser.py::test_branch_deletion_requires_confirmation_and_removes_the_complete_subtree",
+        "tests/test_hierarchy_lifecycle.py::test_subtree_deletion_is_versioned_without_changing_published_history"
+      ],
+      "implementation_status": "Implemented for REF-179; hierarchy names and values are never audit context.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing Dataset unit of work, cascading hierarchy relationships and AuditEvent."
     },
     {
       "capability": "Hierarchy maintenance",

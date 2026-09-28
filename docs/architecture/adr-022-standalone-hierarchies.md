@@ -33,6 +33,12 @@ root, parents and leaves. It also checks connectivity,
 missing parents and cycles under the existing Dataset writer lock. A publication requires
 the root and at least one child.
 
+An authorized Concept mutation may delete any non-root node. The node, its complete
+descendant subtree and all attached active or inactive values are deleted atomically by
+the existing relational cascades. The browser requires explicit confirmation and reports
+the affected node count. Root deletion is rejected. Published snapshots are separate,
+immutable version rows and therefore retain the deleted historical graph and values.
+
 Reuse Dataset Fields with an explicit `hierarchy_scope`: `leaves` or `all_nodes`.
 Store node values separately in `dataset_hierarchy_values` as canonical datatype keys
 and text. Composite foreign keys bind each value to a node and Field in the same Dataset.
@@ -93,6 +99,9 @@ presentation projections, with no inheritance, copied values or additional persi
   or new dependency.
 - A Concept may be incomplete or have restored-value/name conflicts. New publications
   must satisfy the current validator; existing snapshots remain immutable.
+- Subtree deletion is permanent within the Concept and can remove many nodes and values
+  in one transaction. Existing publications provide historical retention; the root remains
+  protected so a Concept always keeps its structural anchor.
 - Migration `0028_ref_179` adds nullable scope to existing Fields and snapshots, leaving
   their content unchanged. It adds the hierarchy tables without converting existing
   Reference or Mapping data. Downgrade refuses hierarchy Datasets, nodes or scoped Fields

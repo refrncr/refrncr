@@ -53,6 +53,15 @@ def values(c, node, **submitted):
     )
 
 
+def delete(c, node, *, expected_revision=None):
+    return c.s.hierarchy.delete_subtree(
+        c.a.id,
+        c.d.key,
+        node.id,
+        expected_revision=revision(c) if expected_revision is None else expected_revision,
+    )
+
+
 def content(c, validate=False):
     with c.s.datasets.uow() as work:
         return hierarchy_snapshot(work, work.datasets.get(c.d.id), validate=validate)
@@ -225,7 +234,45 @@ def test_optional_composite_identifier_and_field_scope_are_independent(hierarchy
         values(c, first, code="A", region="North", external="ONE")
 
 
-@pytest.mark.parametrize("operation", ["create_node", "update_node", "update_values"])
+def test_delete_subtree_removes_descendants_and_values_but_protects_root(hierarchy):
+    c = hierarchy
+    root = add(c, "Root")
+    branch = add(c, "Branch", root.id)
+    leaf = add(c, "Leaf", branch.id)
+    sibling = add(c, "Sibling", root.id)
+    field(c, scope="all_nodes")
+    for item in (root, branch, leaf, sibling):
+        values(c, item, code=item.name)
+
+    before = snapshot(c)
+    with pytest.raises(ValidationError, match="root node cannot be deleted"):
+        delete(c, root)
+    with pytest.raises(NotFoundError):
+        c.s.hierarchy.delete_subtree(
+            c.a.id,
+            c.d.key,
+            "00000000-0000-0000-0000-000000000001",
+            expected_revision=revision(c),
+        )
+    with pytest.raises(NotFoundError):
+        c.s.hierarchy.delete_subtree(c.u.id, c.d.key, branch.id, expected_revision=revision(c))
+    with pytest.raises(StaleRecordError):
+        delete(c, branch, expected_revision=1)
+    assert snapshot(c) == before
+
+    assert delete(c, branch) == 2
+    remaining = {item.id: item for item in content(c).hierarchy_nodes}
+    assert set(remaining) == {root.id, sibling.id}
+    assert remaining[root.id].values[0].value == "Root"
+    assert remaining[sibling.id].values[0].value == "Sibling"
+    event = audits(c)[-1]
+    assert event.action == "hierarchy.subtree_deleted"
+    assert event.object_id == c.d.id and event.details is None
+
+
+@pytest.mark.parametrize(
+    "operation", ["create_node", "delete_subtree", "update_node", "update_values"]
+)
 @pytest.mark.parametrize("failure", ["audit", "commit"])
 def test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit(
     hierarchy, monkeypatch, operation, failure
@@ -259,6 +306,8 @@ def test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit(
     with pytest.raises(RuntimeError, match="Injected"):
         if operation == "create_node":
             add(c, "Must roll back", root.id)
+        elif operation == "delete_subtree":
+            delete(c, leaf)
         elif operation == "update_node":
             move(c, leaf, root.id, "Must roll back")
         else:
@@ -273,18 +322,20 @@ def test_hierarchy_mutations_have_content_free_audit_and_noop(hierarchy):
     field(c)
     values(c, leaf, code="Sensitive value")
     move(c, leaf, root.id, "New sensitive name")
+    before = snapshot(c)
+    values(c, leaf, code="Sensitive value")
+    move(c, leaf, root.id, "New sensitive name")
+    assert snapshot(c) == before
+    delete(c, leaf)
     events = [item for item in audits(c) if item.action.startswith("hierarchy.")]
     assert [item.action for item in events].count("hierarchy.node_created") == 2
     assert {item.action for item in events} == {
         "hierarchy.node_created",
         "hierarchy.node_updated",
+        "hierarchy.subtree_deleted",
         "hierarchy.values_updated",
     }
     assert all(item.object_id == c.d.id and item.details is None for item in events)
-    before = snapshot(c)
-    values(c, leaf, code="Sensitive value")
-    move(c, leaf, root.id, "New sensitive name")
-    assert snapshot(c) == before
 
 
 def test_hierarchy_writers_serialize_and_reject_stale_revision(hierarchy):

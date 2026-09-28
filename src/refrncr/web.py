@@ -351,6 +351,7 @@ def create_flask_app(
         "dataset_version_publish",
         "dataset_concept_discard",
         "dataset_hierarchy_node_create",
+        "dataset_hierarchy_node_delete",
         "dataset_hierarchy_node_edit",
         "dataset_hierarchy_node_values",
     }
@@ -1682,6 +1683,45 @@ def create_flask_app(
                 ), 409 if isinstance(error, ConflictError) else 400
             return redirect(url_for("dataset_records_view", key=key, concept=True))
         return render_hierarchy_node_form(view, rows, row)
+
+    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/delete", methods=["GET", "POST"])
+    @version_errors
+    def dataset_hierarchy_node_delete(key, node_id):
+        actor, view, rows, row = hierarchy_edit_context(key, node_id)
+        if row["node"].parent_id is None:
+            abort(400, description="The root node cannot be deleted.")
+        subtree_count = 1 + sum(
+            any(ancestor["node"].id == node_id for ancestor in entry["ancestor_rows"])
+            for entry in rows
+            if entry["node"].id != node_id
+        )
+        error, status = None, 200
+        if request.method == "POST":
+            try:
+                if set(request.form) - {"csrf_token", "confirm", "expected_revision"}:
+                    raise ValidationError("Unknown form field")
+                if request.form.getlist("confirm") != ["yes"]:
+                    raise ValidationError("Explicit confirmation is required")
+                hierarchy.delete_subtree(
+                    actor.id,
+                    key,
+                    node_id,
+                    expected_revision=exact_expected_revision(),
+                )
+            except (ValidationError, ConflictError) as failure:
+                error = str(failure)
+                status = 409 if isinstance(failure, ConflictError) else 400
+            else:
+                return redirect(url_for("dataset_records_view", key=key, concept=True))
+        response = render_authenticated_template(
+            "pages/datasets/hierarchy/delete.html",
+            dataset=view.context.dataset,
+            node_row=row,
+            subtree_count=subtree_count,
+            expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
+            error=error,
+        )
+        return (response, status) if status != 200 else response
 
     @dataset_route("/datasets/<key>/concept/nodes/<node_id>/values", methods=["GET", "POST"])
     @version_errors

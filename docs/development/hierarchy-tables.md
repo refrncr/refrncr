@@ -9,7 +9,10 @@ The persistence decision is [ADR-022](../architecture/adr-022-standalone-hierarc
 Create a Dataset with type **Hierarchy** and an owning team. Creation starts its Concept
 through the existing Dataset lifecycle. Add a root, then its children; asymmetric branches
 and different leaf depths need no placeholders. Rename or move an existing node to
-reorganize its entire subtree while preserving identities and values.
+reorganize its entire subtree while preserving identities and values. Deleting a non-root
+node permanently deletes that complete subtree and all active or retained inactive values
+after an explicit confirmation that shows the number of affected nodes. The root cannot
+be deleted.
 
 Hierarchy uses the Network icon in navigation and as its default Dataset icon. A chosen
 custom icon takes precedence; clearing it restores the Network default.
@@ -51,7 +54,7 @@ fixed action column. This column stays visible and opens the existing
 Record value panel. Saving, cancelling and validation errors preserve the selected
 Records representation. Published versions provide read-only detail panels.
 
-Hierarchy uses icon actions for Edit node, Values and Add child. On desktop they appear
+Hierarchy uses icon actions for Edit node, Values, Add child and Delete branch. On desktop they appear
 when hovering or focusing a row; touch devices show them continuously. Tooltips retain
 the action names and can be dismissed with Escape. Accessible labels include the node
 name, and the actions open the same structure and value panels.
@@ -79,6 +82,10 @@ Concept remains editable. A valid tree can publish with no custom Fields or iden
 Published structure, scopes and values are immutable and share the Dataset version's
 effective date. Reorganizations require another Concept and publication.
 
+Subtree deletion changes only the active Concept. Previously published versions retain
+their complete historical graph and values. Publishing the changed Concept creates a new
+version without the deleted subtree.
+
 Historical snapshots published under the former sibling-only name rule remain readable
 and can initialize a Concept unchanged. New publication is blocked until any restored
 duplicate names are renamed. Separate duplicate groups can be repaired one at a time;
@@ -101,7 +108,8 @@ the application does not rewrite or automatically rename historical data.
 
 Dataset authority, active-Concept checks, CSRF, scoped node lookup and expected Dataset
 revision remain server-side controls. Hierarchy writers lock the Dataset and commit one
-bounded audit event with the mutation; audit metadata does not contain node values.
+bounded audit event with the mutation; audit metadata does not contain node names or values.
+Relational cascades remove descendant nodes and their values inside the same transaction.
 
 ## Schema upgrade and rollback
 

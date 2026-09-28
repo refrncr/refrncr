@@ -49,6 +49,10 @@ def values(c, item, submitted):
     )
 
 
+def delete(c, item):
+    return c.s.hierarchy.delete_subtree(c.a.id, c.d.key, item.id, expected_revision=revision(c))
+
+
 def fields(c, *, scope="leaves", unique=False):
     return c.s.dataset_fields.create_field(
         c.a.id,
@@ -131,6 +135,26 @@ def test_structure_only_review_publication_and_old_snapshot_are_independent(cont
         )
         == "Renamed"
     )
+
+
+def test_subtree_deletion_is_versioned_without_changing_published_history(context):  # noqa: F811
+    c = context
+    root = prepare(c)
+    branch = node(c, "Branch", root.id)
+    leaf = node(c, "Leaf", branch.id)
+    sibling = node(c, "Sibling", root.id)
+    first = publish(c)
+    saved = content(c, first)
+    c.service.create_concept(c.a.id, c.d.id)
+
+    assert delete(c, branch) == 2
+    review = c.diff.open_review(c.a.id, c.d.id)
+    assert review.has_changes
+    assert {change.id for change in review.hierarchy_changes} >= {branch.id, leaf.id}
+    second = publish(c)
+
+    assert content(c, first) == saved
+    assert {item.id for item in content(c, second).hierarchy_nodes} == {root.id, sibling.id}
 
 
 def test_retained_values_survive_publication_and_conflicts_remain_reviewable(context):  # noqa: F811
