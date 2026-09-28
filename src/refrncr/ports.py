@@ -5,7 +5,10 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from refrncr.hierarchy_contracts import HierarchyNode
 
 
 class PersistenceConflictError(Exception):
@@ -198,6 +201,7 @@ class DatasetFieldRecord(Protocol):
     mapping_role: str | None
     source_field_id: str | None
     source_field_key: str | None
+    hierarchy_scope: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -474,6 +478,18 @@ class ApiKeyOperations(Protocol):
     def create(self, **values) -> ApiKeyRecord: ...
 
 
+class HierarchyOperations(Protocol):
+    def list_for_dataset(self, dataset_id: str) -> tuple[HierarchyNode, ...]: ...
+    def get(self, dataset_id: str, node_id: str) -> HierarchyNode | None: ...
+    def create(self, dataset_id: str, name: str, parent_id: str | None) -> HierarchyNode: ...
+    def update(
+        self, dataset_id: str, node_id: str, name: str, parent_id: str | None
+    ) -> HierarchyNode: ...
+    def replace_values(self, dataset_id: str, node_id: str, values) -> HierarchyNode: ...
+    def delete(self, dataset_id: str, node_id: str) -> None: ...
+    def field_has_values(self, dataset_id: str, field_id: str) -> bool: ...
+
+
 class UnitOfWork(Protocol):
     write: bool
     api_keys: ApiKeyOperations
@@ -489,6 +505,7 @@ class UnitOfWork(Protocol):
     dataset_fields: DatasetFieldOperations
     dataset_business_keys: DatasetBusinessKeyOperations
     dataset_records: DatasetRecordOperations
+    hierarchy: HierarchyOperations
     dataset_export_access: DatasetExportAccessOperations
 
     def begin_export_snapshot(self) -> None: ...
@@ -570,6 +587,8 @@ class VersionOperations(Protocol):
     Append and cancellation require the parent Dataset write lock. All operations
     participate in the caller's UoW; none commits. Content/results are immutable.
     """
+
+    def hierarchy_nodes(self, version) -> tuple[HierarchyNode, ...]: ...
 
     def list_for_dataset(self, dataset_id): ...
 

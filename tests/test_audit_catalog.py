@@ -95,7 +95,8 @@ def test_historical_action_names_and_object_types_are_stable():
             "dataset.export_requested dataset.deleted "
             "dataset.version_published dataset.version_cancelled "
             "dataset.version_diff_viewed dataset.concept_created dataset.concept_discarded "
-            "dataset.new_version_imported"
+            "dataset.new_version_imported hierarchy.node_created hierarchy.node_updated "
+            "hierarchy.values_updated"
         ),
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted restored",
@@ -240,6 +241,9 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
             "refrncr.dataset_versions.DatasetVersionService.discard_concept",
+            "refrncr.hierarchy.HierarchyService.create_node",
+            "refrncr.hierarchy.HierarchyService.update_node",
+            "refrncr.hierarchy.HierarchyService.update_values",
         }
     )
     assert behaviors == {

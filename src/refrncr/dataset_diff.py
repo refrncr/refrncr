@@ -73,6 +73,9 @@ class DatasetDiffService:
                 f.key in identifier.field_keys,
                 getattr(f, "definition", None),
                 getattr(f, "unit", None),
+                getattr(f, "mapping_role", None),
+                getattr(f, "source_field_key", None),
+                getattr(f, "hierarchy_scope", None),
             )
             for f in uow.dataset_fields.list_for_dataset(dataset_id)
         )
@@ -95,7 +98,25 @@ class DatasetDiffService:
         # Dataset metadata is current configuration, not versioned content.
         metadata = ()
         counts = summary_counts(changes, uow.version_diff.counts(dataset.id, identity.baseline_id))
-        return DiffSummary(identity, dataset.key, dataset.name, metadata, counts)
+        hierarchy_changes, hierarchy_errors = (), ()
+        if dataset.kind == "hierarchy":
+            from refrncr.hierarchy import hierarchy_validation_errors
+
+            hierarchy_changes = uow.version_diff.hierarchy_changes(dataset.id, identity.baseline_id)
+            hierarchy_errors = hierarchy_validation_errors(
+                uow.dataset_fields.list_for_dataset(dataset.id),
+                uow.dataset_business_keys.get(dataset.id),
+                uow.hierarchy.list_for_dataset(dataset.id),
+            )
+        return DiffSummary(
+            identity,
+            dataset.key,
+            dataset.name,
+            metadata,
+            counts,
+            hierarchy_changes,
+            hierarchy_errors,
+        )
 
     def open_review(self, actor_id, dataset_id, expected=None):
         """One committed event before returning a new valid review; never a receipt claim."""
@@ -255,8 +276,12 @@ class DatasetDiffService:
     def _record(cls, row, current, previous):
         if not _valid_identity(row.id):
             raise ValidationError("Invalid stored Record identity")
-        old, old_sort = cls._identifier(row.before_identifier, previous)
-        new, new_sort = cls._identifier(row.after_identifier, current)
+        if row.hierarchy:
+            old, new = row.before_label, row.after_label
+            old_sort, new_sort = ((label.casefold(),) if label else () for label in (old, new))
+        else:
+            old, old_sort = cls._identifier(row.before_identifier, previous)
+            new, new_sort = cls._identifier(row.after_identifier, current)
         return RecordChange(
             row.id,
             row.status,

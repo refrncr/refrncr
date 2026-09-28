@@ -367,7 +367,14 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
         connection.commit()
     with factory() as session:
         stored = session.get(Dataset, dataset.id)
-        assert stored.content_updated_at.replace(tzinfo=UTC) == BASE
+        content_updated_at = stored.content_updated_at
+        # SQLite stores naive UTC; PostgreSQL may return the same instant in its
+        # configured session timezone. Convert aware values without changing time.
+        assert (
+            content_updated_at.replace(tzinfo=UTC)
+            if content_updated_at.tzinfo is None
+            else content_updated_at.astimezone(UTC)
+        ) == BASE
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
 
 

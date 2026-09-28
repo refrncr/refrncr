@@ -6,7 +6,9 @@
       "capability": "Security audit",
       "operation": "record_security_event",
       "service": "refrncr.audit.record_security_event",
-      "interface_entrypoints": ["Internal browser security boundary"],
+      "interface_entrypoints": [
+        "Internal browser security boundary"
+      ],
       "kind": "mutation",
       "classification": "security-audited",
       "domain_audit": false,
@@ -14,11 +16,26 @@
       "security_handoff": "REF-31 implementation: browser security boundaries call this centralized helper with a stable allowlisted event and trusted actor only when established.",
       "technical_logging": "REF-70 may record only a safe operational summary; it never copies the durable event payload.",
       "events": [
-        ["security", "security.login_failed"],
-        ["security", "security.session_rejected"],
-        ["security", "security.authorization_denied"],
-        ["security", "security.csrf_rejected"],
-        ["security", "security.workflow_token_rejected"]
+        [
+          "security",
+          "security.login_failed"
+        ],
+        [
+          "security",
+          "security.session_rejected"
+        ],
+        [
+          "security",
+          "security.authorization_denied"
+        ],
+        [
+          "security",
+          "security.csrf_rejected"
+        ],
+        [
+          "security",
+          "security.workflow_token_rejected"
+        ]
       ],
       "object_identifier": "Fresh UUID identifying the attempt, never a submitted account, object, key, session or token identifier.",
       "actor_source": "Resolved server-side session actor when known; otherwise null only for catalog-approved unauthenticated outcomes.",
@@ -49,8 +66,8 @@
       "operation": "create_initial_admin",
       "service": "refrncr.services.UserService.create_initial_admin",
       "interface_entrypoints": [
-        "refrncr user create-admin",
-        "refrncr.web.setup GET,POST /setup"
+        "refrncr.web.setup GET,POST /setup",
+        "refrncr user create-admin"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -304,8 +321,8 @@
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [
-        "refrncr user create-admin",
-        "refrncr.web.setup GET,POST /setup"
+        "refrncr.web.setup GET,POST /setup",
+        "refrncr user create-admin"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1245,7 +1262,10 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1652,8 +1672,6 @@
       "interface_entrypoints": [
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
@@ -1664,7 +1682,9 @@
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
-        "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit"
+        "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2651,7 +2671,10 @@
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.api_key_list GET /settings/api-keys",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
-        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
+        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
+        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3075,10 +3098,10 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4133,10 +4156,10 @@
       "operation": "health",
       "service": "refrncr.app.health",
       "interface_entrypoints": [
-        "FastAPI /docs /redoc /docs/oauth2-redirect /openapi.json",
         "refrncr.app.health GET /healthz",
         "refrncr.app.legacy_health GET /api/health",
-        "refrncr.app.ready GET /readyz"
+        "refrncr.app.ready GET /readyz",
+        "FastAPI /docs /redoc /docs/oauth2-redirect /openapi.json"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4167,9 +4190,9 @@
       "operation": "index",
       "service": "refrncr.web.index",
       "interface_entrypoints": [
+        "refrncr.web.index GET /",
         "Flask GET /static/<path:filename>",
-        "Flask HEAD for GET and OPTIONS",
-        "refrncr.web.index GET /"
+        "Flask HEAD for GET and OPTIONS"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4200,7 +4223,6 @@
       "operation": "require_csrf",
       "service": "refrncr.web.require_csrf",
       "interface_entrypoints": [
-        "Browser transport, CSRF, request-size and exception hooks",
         "refrncr.web.create_dataset POST /datasets",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
@@ -4233,7 +4255,8 @@
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
-        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
+        "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
+        "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4264,9 +4287,9 @@
       "operation": "require_cookie_settings",
       "service": "refrncr.web.require_cookie_settings",
       "interface_entrypoints": [
-        "Browser transport, CSRF, request-size and exception hooks",
         "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.login GET,POST /login",
+        "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4478,14 +4501,14 @@
       "operation": "get_dataset_for_deletion",
       "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
       "interface_entrypoints": [
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4781,13 +4804,13 @@
         "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4822,13 +4845,16 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
+        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5025,6 +5051,7 @@
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
@@ -5044,8 +5071,7 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5436,13 +5462,13 @@
       "operation": "get_dataset_configuration",
       "service": "refrncr.services.DatasetService.get_dataset_configuration",
       "interface_entrypoints": [
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5798,6 +5824,126 @@
       "implementation_status": "REF-109 local implementation; independent CI pending.",
       "exclusion_reason": "Public API documentation; no business state or credential read and no mutation.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "Hierarchy maintenance",
+      "operation": "create_node",
+      "service": "refrncr.hierarchy.HierarchyService.create_node",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication, CSRF and non-disclosing authorization boundary; dataset-scoped node lookup.",
+      "technical_logging": "Fixed safe diagnostics only; never node names, field values or request contents.",
+      "events": [
+        [
+          "dataset",
+          "hierarchy.node_created"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID, not a node name or field value.",
+      "actor_source": "Authenticated active owning-team member or Community administrator.",
+      "allowed_context": {
+        "dataset:hierarchy.node_created": {}
+      },
+      "success": "One content-free event commits atomically with the node mutation and concept revision.",
+      "validation_failure": "No content mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing rejection; no business mutation or domain audit event.",
+      "stale_input": "The expected Dataset revision is checked under the Dataset lock before any mutation.",
+      "no_op": "No event or revision change for identical names, parents or canonical values.",
+      "rollback": "Mutation, values, concept revision and event roll back together on audit or persistence failure.",
+      "duplicate_retry": "A committed mutation advances the revision; a stale retry is rejected.",
+      "tests": [
+        "tests/test_hierarchy.py::test_hierarchy_mutations_have_content_free_audit_and_noop",
+        "tests/test_hierarchy.py::test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit",
+        "tests/test_hierarchy.py::test_hierarchy_writers_serialize_and_reject_stale_revision"
+      ],
+      "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing Dataset unit of work and AuditEvent."
+    },
+    {
+      "capability": "Hierarchy maintenance",
+      "operation": "update_node",
+      "service": "refrncr.hierarchy.HierarchyService.update_node",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication, CSRF and non-disclosing authorization boundary; dataset-scoped node lookup.",
+      "technical_logging": "Fixed safe diagnostics only; never node names, field values or request contents.",
+      "events": [
+        [
+          "dataset",
+          "hierarchy.node_updated"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID, not a node name or field value.",
+      "actor_source": "Authenticated active owning-team member or Community administrator.",
+      "allowed_context": {
+        "dataset:hierarchy.node_updated": {}
+      },
+      "success": "One content-free event commits atomically with the node mutation and concept revision.",
+      "validation_failure": "No content mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing rejection; no business mutation or domain audit event.",
+      "stale_input": "The expected Dataset revision is checked under the Dataset lock before any mutation.",
+      "no_op": "No event or revision change for identical names, parents or canonical values.",
+      "rollback": "Mutation, values, concept revision and event roll back together on audit or persistence failure.",
+      "duplicate_retry": "A committed mutation advances the revision; a stale retry is rejected.",
+      "tests": [
+        "tests/test_hierarchy.py::test_hierarchy_mutations_have_content_free_audit_and_noop",
+        "tests/test_hierarchy.py::test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit",
+        "tests/test_hierarchy.py::test_hierarchy_writers_serialize_and_reject_stale_revision"
+      ],
+      "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing Dataset unit of work and AuditEvent."
+    },
+    {
+      "capability": "Hierarchy maintenance",
+      "operation": "update_values",
+      "service": "refrncr.hierarchy.HierarchyService.update_values",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication, CSRF and non-disclosing authorization boundary; dataset-scoped node lookup.",
+      "technical_logging": "Fixed safe diagnostics only; never node names, field values or request contents.",
+      "events": [
+        [
+          "dataset",
+          "hierarchy.values_updated"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID, not a node name or field value.",
+      "actor_source": "Authenticated active owning-team member or Community administrator.",
+      "allowed_context": {
+        "dataset:hierarchy.values_updated": {}
+      },
+      "success": "One content-free event commits atomically with the node mutation and concept revision.",
+      "validation_failure": "No content mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing rejection; no business mutation or domain audit event.",
+      "stale_input": "The expected Dataset revision is checked under the Dataset lock before any mutation.",
+      "no_op": "No event or revision change for identical names, parents or canonical values.",
+      "rollback": "Mutation, values, concept revision and event roll back together on audit or persistence failure.",
+      "duplicate_retry": "A committed mutation advances the revision; a stale retry is rejected.",
+      "tests": [
+        "tests/test_hierarchy.py::test_hierarchy_mutations_have_content_free_audit_and_noop",
+        "tests/test_hierarchy.py::test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit",
+        "tests/test_hierarchy.py::test_hierarchy_writers_serialize_and_reject_stale_revision"
+      ],
+      "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing Dataset unit of work and AuditEvent."
     }
   ]
 }

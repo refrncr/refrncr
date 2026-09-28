@@ -1,6 +1,9 @@
 {
   "historical_event_contracts": [
-    ["api_key", "api_key.authenticated"]
+    [
+      "api_key",
+      "api_key.authenticated"
+    ]
   ],
   "service_operations": [
     "refrncr.api_keys.ApiKeyService.authenticate",
@@ -23,8 +26,12 @@
     "refrncr.dataset_versions.DatasetVersionService.overview",
     "refrncr.dataset_versions.DatasetVersionService.publish",
     "refrncr.dataset_versions.DatasetVersionService.read",
+    "refrncr.dataset_versions.DatasetVersionService.read_current",
     "refrncr.dataset_versions.DatasetVersionService.review",
     "refrncr.dataset_versions.DatasetVersionService.review_discard",
+    "refrncr.hierarchy.HierarchyService.create_node",
+    "refrncr.hierarchy.HierarchyService.update_node",
+    "refrncr.hierarchy.HierarchyService.update_values",
     "refrncr.record_import.DatasetRecordImportService.active",
     "refrncr.record_import.DatasetRecordImportService.begin",
     "refrncr.record_import.DatasetRecordImportService.cancel",
@@ -51,6 +58,7 @@
     "refrncr.services.DatasetAuthorizationService.can_view_dataset",
     "refrncr.services.DatasetAuthorizationService.creation_teams",
     "refrncr.services.DatasetAuthorizationService.maintainable_resources",
+    "refrncr.services.DatasetAuthorizationService.viewable_resources",
     "refrncr.services.DatasetBusinessKeyService.get_business_key",
     "refrncr.services.DatasetBusinessKeyService.set_business_key",
     "refrncr.services.DatasetFieldService.create_field",
@@ -109,9 +117,7 @@
     "refrncr.services.UserService.disable_user",
     "refrncr.services.UserService.enable_user",
     "refrncr.services.UserService.has_users",
-    "refrncr.services.UserService.list_users",
-    "refrncr.dataset_versions.DatasetVersionService.read_current",
-    "refrncr.services.DatasetAuthorizationService.viewable_resources"
+    "refrncr.services.UserService.list_users"
   ],
   "routes": [
     {
@@ -426,7 +432,8 @@
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
         "refrncr.services.DatasetService.get_dataset_for_edit",
-        "refrncr.services.SessionService.resolve_with_session"
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.DatasetService.get_dataset"
       ]
     },
     {
@@ -440,7 +447,8 @@
         "refrncr.dataset_versions.DatasetVersionService.history",
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
-        "refrncr.services.SessionService.resolve_with_session"
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.DatasetService.get_dataset"
       ]
     },
     {
@@ -454,7 +462,8 @@
         "refrncr.dataset_versions.DatasetVersionService.history",
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
-        "refrncr.services.SessionService.resolve_with_session"
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.DatasetService.get_dataset"
       ]
     },
     {
@@ -1261,6 +1270,45 @@
       ],
       "operations": [
         "refrncr.api.documentation.swagger_ui"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_hierarchy_node_create",
+      "path": "/datasets/<key>/concept/nodes/new",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.hierarchy.HierarchyService.create_node",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_hierarchy_node_edit",
+      "path": "/datasets/<key>/concept/nodes/<node_id>/edit",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.hierarchy.HierarchyService.update_node",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_hierarchy_node_values",
+      "path": "/datasets/<key>/concept/nodes/<node_id>/values",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.hierarchy.HierarchyService.update_values",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     }
   ],

@@ -8,9 +8,13 @@ from refrncr.models import (
     DatasetConcept,
     DatasetField,
     DatasetFieldSourceFormat,
+    DatasetHierarchyNode,
+    DatasetHierarchyValue,
     DatasetRecord,
     DatasetRecordValue,
     DatasetVersionField,
+    DatasetVersionHierarchyNode,
+    DatasetVersionHierarchyValue,
     DatasetVersionRecord,
     DatasetVersionValue,
     new_id,
@@ -102,7 +106,18 @@ class SqlAlchemyConceptOperations:
                 )
             )
         )
-        for model in (DatasetRecordValue, DatasetRecord, DatasetBusinessKeyField, DatasetField):
+        hierarchy_models = (
+            (DatasetHierarchyValue, DatasetHierarchyNode)
+            if getattr(dataset, "kind", "reference") == "hierarchy"
+            else ()
+        )
+        for model in (
+            *hierarchy_models,
+            DatasetRecordValue,
+            DatasetRecord,
+            DatasetBusinessKeyField,
+            DatasetField,
+        ):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         self.close(dataset.id)
         dataset.content_updated_at = current.published_at
@@ -122,7 +137,18 @@ class SqlAlchemyConceptOperations:
             )
         ]
         # Preserve source UUIDs; INSERT SELECT avoids materializing any Record/value graph.
-        for model in (DatasetRecordValue, DatasetRecord, DatasetBusinessKeyField, DatasetField):
+        hierarchy_models = (
+            (DatasetHierarchyValue, DatasetHierarchyNode)
+            if getattr(dataset, "kind", "reference") == "hierarchy"
+            else ()
+        )
+        for model in (
+            *hierarchy_models,
+            DatasetRecordValue,
+            DatasetRecord,
+            DatasetBusinessKeyField,
+            DatasetField,
+        ):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         field = DatasetVersionField
         self.session.execute(
@@ -138,6 +164,7 @@ class SqlAlchemyConceptOperations:
                     "is_required",
                     "is_unique",
                     "display_position",
+                    "hierarchy_scope",
                     "created_at",
                     "updated_at",
                 ],
@@ -152,6 +179,7 @@ class SqlAlchemyConceptOperations:
                     field.is_required,
                     field.is_unique,
                     field.display_position,
+                    field.hierarchy_scope,
                     literal(now),
                     literal(now),
                 ).where(field.version_id == version.id),
@@ -167,6 +195,35 @@ class SqlAlchemyConceptOperations:
                 ),
             )
         )
+        if getattr(dataset, "kind", "reference") == "hierarchy":
+            node = DatasetVersionHierarchyNode
+            self.session.execute(
+                insert(DatasetHierarchyNode).from_select(
+                    ["id", "dataset_id", "name", "parent_id", "revision"],
+                    select(
+                        node.id,
+                        literal(dataset.id),
+                        node.name,
+                        node.parent_id,
+                        literal(dataset.revision + 1),
+                    ).where(node.version_id == version.id),
+                )
+            )
+            value = DatasetVersionHierarchyValue
+            self.session.execute(
+                insert(DatasetHierarchyValue).from_select(
+                    ["node_id", "field_id", "dataset_id", "canonical_key", "canonical_text"],
+                    select(
+                        value.node_id,
+                        value.field_id,
+                        literal(dataset.id),
+                        value.canonical_key,
+                        value.canonical_text,
+                    ).where(value.version_id == version.id),
+                )
+            )
+            dataset.content_updated_at = now
+            return
         record = DatasetVersionRecord
         self.session.execute(
             insert(DatasetRecord).from_select(

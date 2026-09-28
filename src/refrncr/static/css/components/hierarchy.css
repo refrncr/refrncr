@@ -1,0 +1,20 @@
+/* Hierarchy tree and compact tree-table variants reuse the shared design tokens. */
+.hierarchy-tree { padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.hierarchy-tree-list { margin: 0; padding: 0; list-style: none; }
+.hierarchy-tree-list .hierarchy-tree-list { margin-left: var(--space-md); padding-left: var(--space-md); border-left: 1px solid var(--color-border); }
+.hierarchy-tree-list > li + li { margin-top: var(--space-sm); }
+.hierarchy-branch > summary { min-height: var(--control-height-compact); padding: var(--space-sm); cursor: pointer; }
+.hierarchy-branch > summary:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.hierarchy-name { color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
+.hierarchy-leaf { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; min-height: var(--control-height-compact); padding: var(--space-sm); }
+.hierarchy-node-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md); padding: var(--space-xs) var(--space-sm) var(--space-sm); font-size: var(--font-size-body-sm); }
+.hierarchy-leaf .hierarchy-node-actions { margin-left: auto; padding: 0; }
+.hierarchy-node-actions > a { min-height: var(--control-height-compact); display: inline-flex; align-items: center; }
+.hierarchy-table { min-width: 30rem; }
+.hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
+.hierarchy-table th[scope="row"] { min-width: 12rem; background: transparent; }
+.hierarchy-hybrid :is(th, td) { padding-block: var(--space-sm); }
+.hierarchy-hybrid td { font-family: var(--font-data); font-size: var(--font-size-xs); }
+.hierarchy-field-scope { display: block; margin-top: var(--space-xs); font-family: var(--font-interface); font-size: var(--font-size-xs); letter-spacing: normal; text-transform: none; }
+.hierarchy-indent { display: inline-block; width: var(--space-md); }
+.hierarchy-path { color: var(--color-text-secondary); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }

@@ -73,6 +73,11 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset", "dataset.deleted"): ActionPresentation("Dataset deleted", True),
         ("dataset", "owner_changed"): ActionPresentation("Dataset owning team changed", False),
         ("dataset", "metadata_updated"): ActionPresentation("Dataset metadata updated", False),
+        ("dataset", "hierarchy.node_created"): ActionPresentation("Hierarchy node created", False),
+        ("dataset", "hierarchy.node_updated"): ActionPresentation("Hierarchy node updated", False),
+        ("dataset", "hierarchy.values_updated"): ActionPresentation(
+            "Hierarchy node values updated", False
+        ),
         ("dataset", "business_key_defined"): ActionPresentation("Record identifier defined", False),
         ("dataset", "business_key_updated"): ActionPresentation("Record identifier updated", False),
         ("dataset", "field_order_updated"): ActionPresentation(

@@ -1,0 +1,27 @@
+{% macro node_actions(row) -%}
+<div class='hierarchy-node-actions'>
+  {% if may_edit %}
+    <a data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id) }}' aria-label='Edit node {{ row.node.name }}'>Edit node</a>
+    <a data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id) }}' aria-label='Edit values for {{ row.node.name }}'>Values</a>
+    <a data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_create", key=dataset.key, parent_id=row.node.id) }}' aria-label='Add child to {{ row.node.name }}'>Add child</a>
+  {% else %}<button class='button button-secondary' type='button' data-dialog-open='hierarchy-node-{{ row.node.id }}' aria-label='View values for {{ row.node.name }}'>View values</button>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro tree_nodes(rows) -%}
+<ul class='hierarchy-tree-list'>
+{% for row in rows %}
+  {% set next_depth = rows[loop.index].depth if not loop.last else 0 %}
+  <li data-hierarchy-node='{{ row.node.id }}'>
+  {% if next_depth > row.depth %}<details class='hierarchy-branch' open>
+    <summary><span class='hierarchy-name'>{{ row.node.name }}</span>{% if not row.node.parent_id %} <span class='badge'>Root</span>{% endif %}</summary>
+    {{ node_actions(row) }}
+    <ul class='hierarchy-tree-list'>
+  {% else %}
+    <div class='hierarchy-leaf'><span class='hierarchy-name'>{{ row.node.name }}</span><span class='badge'>{{ 'Root' if not row.node.parent_id else 'Leaf' if row.leaf else 'Branch' }}</span>{{ node_actions(row) }}</div>
+    </li>
+    {% for level in range(next_depth, row.depth) %}</ul></details></li>{% endfor %}
+  {% endif %}
+{% endfor %}
+</ul>
+{%- endmacro %}

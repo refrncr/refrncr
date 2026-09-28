@@ -37,6 +37,7 @@
               <p class="nav-label">Datasets</p>
               <a class="nav-item{{ ' is-active' if active_navigation == 'reference_datasets' else '' }}" href="{{ url_for('dataset_list', kind='reference') }}"{% if active_navigation == 'reference_datasets' %} aria-current="page"{% endif %}>{{ table_icon() }}Reference datasets</a>
               <a class="nav-item{{ ' is-active' if active_navigation == 'mapping_datasets' else '' }}" href="{{ url_for('dataset_list', kind='mapping') }}"{% if active_navigation == 'mapping_datasets' %} aria-current="page"{% endif %}>{{ arrow_big_right_dash_icon() }}Mapping datasets</a>
+              <a class="nav-item{{ ' is-active' if active_navigation == 'hierarchy_datasets' else '' }}" href="{{ url_for('dataset_list', kind='hierarchy') }}"{% if active_navigation == 'hierarchy_datasets' %} aria-current="page"{% endif %}>{{ table_icon() }}Hierarchy datasets</a>
             {% endif %}
           </nav>
           <div class="account-context">

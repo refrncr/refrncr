@@ -12,6 +12,7 @@ from refrncr.api.routes import create_api
 from refrncr.api_keys import ApiKeyService, configured_api_keys
 from refrncr.audit_history import AuditHistoryService
 from refrncr.dataset_versions import DatasetVersionService
+from refrncr.hierarchy import HierarchyService
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.operational import (
     LOGGER_NAME,
@@ -57,6 +58,7 @@ class CommunityServices:
     dataset_business_keys: DatasetBusinessKeyService
     dataset_records: DatasetRecordService
     record_imports: DatasetRecordImportService
+    hierarchy: HierarchyService
 
 
 def create_community_services(
@@ -87,6 +89,7 @@ def create_community_services(
         dataset_business_keys=DatasetBusinessKeyService(uow, authorization, versions=versions),
         dataset_records=dataset_records,
         record_imports=DatasetRecordImportService(dataset_records),
+        hierarchy=HierarchyService(uow, authorization, versions=versions),
     )
 
 

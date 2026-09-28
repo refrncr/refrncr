@@ -598,6 +598,7 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
         '@import url("components/feedback.css");',
         '@import url("components/cards-badges.css");',
         '@import url("components/tables.css");',
+        '@import url("components/hierarchy.css");',
         '@import url("components/dialog.css");',
     ]
     assert "--color-action-primary:" in tokens

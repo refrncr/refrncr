@@ -99,6 +99,9 @@ _EVENTS = (
             "business_key_defined",
             "business_key_updated",
             "field_order_updated",
+            "hierarchy.node_created",
+            "hierarchy.node_updated",
+            "hierarchy.values_updated",
         )
     ),
     *(
@@ -350,6 +353,14 @@ def _audited(service, name, *events, module="services"):
 
 def _read(service, names, rationale="Ordinary authorized read; no business state change."):
     _register(service, names, "intentionally excluded", rationale=rationale)
+
+
+for _method, _action in (
+    ("create_node", "hierarchy.node_created"),
+    ("update_node", "hierarchy.node_updated"),
+    ("update_values", "hierarchy.values_updated"),
+):
+    _audited("HierarchyService", _method, ("dataset", _action), module="hierarchy")
 
 
 for _method, _action in (

@@ -1,10 +1,12 @@
-"""Relational diff projections; SQL joins canonical keys, never ORM object graphs."""
+"""Canonical Record projections and complete hierarchy comparisons by stable identity."""
 
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
 from refrncr.datatypes import get_datatype
 from refrncr.diff_contracts import PAGE_SIZE, RecordProjection, ValueChange
+from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.models import (
+    Dataset,
     DatasetField,
     DatasetRecord,
     DatasetRecordValue,
@@ -18,6 +20,116 @@ class SqlAlchemyDiffOperations:
     def __init__(self, session, *, legacy_schema=False):
         self.session = session
         self._active_records = True if legacy_schema else DatasetRecord.deleted_content.is_(None)
+        self._legacy_schema = legacy_schema
+        self._hierarchy_kinds = {}
+
+    def _is_hierarchy(self, dataset_id):
+        if self._legacy_schema:
+            return False
+        if dataset_id not in self._hierarchy_kinds:
+            dataset = self.session.get(Dataset, dataset_id)
+            self._hierarchy_kinds[dataset_id] = dataset is not None and dataset.kind == "hierarchy"
+        return self._hierarchy_kinds[dataset_id]
+
+    def _hierarchy_content(self, dataset_id, version_id):
+        from refrncr.hierarchy_persistence import SqlAlchemyHierarchyOperations
+        from refrncr.persistence import SqlAlchemyDatasetFieldOperations
+        from refrncr.version_persistence import SqlAlchemyVersionOperations
+
+        versions = SqlAlchemyVersionOperations(self.session)
+        version = versions.get(dataset_id, version_id) if version_id else None
+        return (
+            SqlAlchemyHierarchyOperations(self.session).list_for_dataset(dataset_id),
+            versions.hierarchy_nodes(version) if version else (),
+            tuple(SqlAlchemyDatasetFieldOperations(self.session).list_for_dataset(dataset_id)),
+            versions.fields(version) if version else (),
+        )
+
+    def hierarchy_changes(self, dataset_id, version_id):
+        from refrncr.diff_classification import classify_hierarchy
+
+        if not self._is_hierarchy(dataset_id):
+            return ()
+        return classify_hierarchy(*self._hierarchy_content(dataset_id, version_id))
+
+    def _hierarchy_records(self, dataset_id, version_id):
+        from refrncr.hierarchy import hierarchy_leaf_records
+
+        nodes, old_nodes, fields, old_fields = self._hierarchy_content(dataset_id, version_id)
+        new, old = (
+            {record.id: record for record in hierarchy_leaf_records(tree, schema)}
+            for tree, schema in ((nodes, fields), (old_nodes, old_fields))
+        )
+        new_nodes, previous_nodes = (
+            {node.id: node for node in tree} for tree in (nodes, old_nodes)
+        )
+        new_paths, old_paths = (hierarchy_node_paths(tree) for tree in (nodes, old_nodes))
+        old_types = {field.id: field.data_type for field in old_fields}
+        common = {field.id for field in fields if old_types.get(field.id) == field.data_type}
+        for identity in sorted(new.keys() | old.keys()):
+            before, after = old.get(identity), new.get(identity)
+            left = (
+                {value.field_id: value.canonical_key for value in before.values} if before else {}
+            )
+            right = {value.field_id: value.canonical_key for value in after.values} if after else {}
+            changed = sum(left.get(key) != right.get(key) for key in common)
+            structural = bool(
+                before
+                and after
+                and (
+                    new_nodes[identity].name != previous_nodes[identity].name
+                    or new_nodes[identity].parent_id != previous_nodes[identity].parent_id
+                )
+            )
+            if before is None or after is None or changed or structural:
+                yield RecordProjection(
+                    identity,
+                    "Added" if before is None else "Removed" if after is None else "Changed",
+                    b"hierarchy:" + identity.encode() if before else None,
+                    b"hierarchy:" + identity.encode() if after else None,
+                    changed,
+                    True,
+                    old_paths[identity] if before else None,
+                    new_paths[identity] if after else None,
+                )
+
+    def _hierarchy_values(self, dataset_id, version_id, record_id, status, page):
+        nodes, old_nodes, fields, old_fields = self._hierarchy_content(dataset_id, version_id)
+        node = next((item for item in nodes if item.id == record_id), None)
+        previous = next((item for item in old_nodes if item.id == record_id), None)
+        left = {value.field_id: value for value in previous.values} if previous else {}
+        right = {value.field_id: value for value in node.values} if node else {}
+        old_by_id = {field.id: field for field in old_fields}
+
+        def rendered(value):
+            if value is None:
+                return None
+            datatype = get_datatype(value.data_type)
+            return datatype.text(datatype.from_key(value.canonical_key))
+
+        changes = []
+        for field in old_fields if status == "Removed" else fields:
+            before, after = left.get(field.id), right.get(field.id)
+            old_field = old_by_id.get(field.id)
+            if status == "Changed" and (
+                old_field is None
+                or old_field.data_type != field.data_type
+                or (before.canonical_key if before else None)
+                == (after.canonical_key if after else None)
+            ):
+                continue
+            changes.append(
+                ValueChange(
+                    field.id,
+                    field.name,
+                    old_field.data_type if old_field and status != "Added" else None,
+                    field.data_type if status != "Removed" else None,
+                    rendered(before) if status != "Added" else None,
+                    rendered(after) if status != "Removed" else None,
+                )
+            )
+        start = (page - 1) * PAGE_SIZE
+        return tuple(changes[start : start + PAGE_SIZE]), len(changes)
 
     @staticmethod
     def _changes(dataset_id, version_id):
@@ -117,6 +229,13 @@ class SqlAlchemyDiffOperations:
     def record_states(self, dataset_id, version_id, record_ids):
         if not record_ids:
             return {}
+        if self._is_hierarchy(dataset_id):
+            selected = set(record_ids)
+            return {
+                row.id: row.status
+                for row in self._hierarchy_records(dataset_id, version_id)
+                if row.id in selected
+            }
         rows = self._records(dataset_id, version_id)
         return dict(
             self.session.execute(
@@ -128,6 +247,10 @@ class SqlAlchemyDiffOperations:
         # Selection is the same REF-83/84 projection used for summary and review.
         from refrncr.version_persistence import SqlAlchemyVersionOperations
 
+        if self._is_hierarchy(dataset_id):
+            # A former leaf becoming a branch is not a deleted hierarchy node.
+            return
+
         rows = self._records(dataset_id, version.id)
         ids = select(rows.c.id).where(rows.c.status == "Removed")
         yield from SqlAlchemyVersionOperations(self.session).iterate_records(
@@ -135,6 +258,11 @@ class SqlAlchemyDiffOperations:
         )
 
     def counts(self, dataset_id, version_id):
+        if self._is_hierarchy(dataset_id):
+            counts = {status: 0 for status in ("Added", "Changed", "Removed")}
+            for row in self._hierarchy_records(dataset_id, version_id):
+                counts[row.status] += 1
+            return tuple(counts.values())
         rows = self._records(dataset_id, version_id)
         counts = dict(
             self.session.execute(select(rows.c.status, func.count()).group_by(rows.c.status)).all()
@@ -142,6 +270,11 @@ class SqlAlchemyDiffOperations:
         return tuple(counts.get(status, 0) for status in ("Added", "Changed", "Removed"))
 
     def records(self, dataset_id, version_id, statuses, record_id=None):
+        if self._is_hierarchy(dataset_id):
+            for row in self._hierarchy_records(dataset_id, version_id):
+                if row.status in statuses and (record_id is None or record_id == row.id):
+                    yield row
+            return
         rows = self._records(dataset_id, version_id)
         statement = select(rows).where(rows.c.status.in_(statuses))
         if record_id is not None:
@@ -151,7 +284,65 @@ class SqlAlchemyDiffOperations:
             yield RecordProjection(*row)
 
     def validate_snapshot(self, version):
-        """Validate every scalar snapshot value and identifier with bounded memory."""
+        """Validate stored content and identifiers, including the hierarchy leaf projection."""
+        if self._is_hierarchy(version.dataset_id):
+            from refrncr.hierarchy import hierarchy_leaf_records, hierarchy_validation_errors
+            from refrncr.ports import DatasetBusinessKey
+            from refrncr.services import _valid_identity
+            from refrncr.version_persistence import SqlAlchemyVersionOperations
+
+            versions = SqlAlchemyVersionOperations(self.session)
+            fields = versions.fields(version)
+            nodes = versions.hierarchy_nodes(version)
+            if any(
+                node.dataset_id != version.dataset_id
+                or not _valid_identity(node.id)
+                or (node.parent_id is not None and not _valid_identity(node.parent_id))
+                for node in nodes
+            ):
+                return False
+            identifier = DatasetBusinessKey(
+                version.dataset_id, tuple(sorted(f.key for f in fields if f.is_identifier))
+            )
+            if len(fields) != version.field_count or hierarchy_validation_errors(
+                fields, identifier, nodes
+            ):
+                return False
+            expected = hierarchy_leaf_records(nodes, fields)
+            actual = tuple(versions.iterate_records(version))
+            expected_identifiers = {}
+            for record in expected:
+                by_key = {value.field_key: value.canonical_key for value in record.values}
+                expected_identifiers[record.id] = (
+                    b"".join(
+                        len(by_key[key]).to_bytes(4, "big") + by_key[key]
+                        for key in identifier.field_keys
+                    )
+                    if identifier.field_keys
+                    else b"hierarchy:" + record.id.encode()
+                )
+            actual_identifiers = dict(
+                self.session.execute(
+                    select(DatasetVersionRecord.id, DatasetVersionRecord.identifier_key).where(
+                        DatasetVersionRecord.version_id == version.id
+                    )
+                ).all()
+            )
+
+            def content(records):
+                return {
+                    record.id: {
+                        value.field_id: (value.data_type, value.canonical_key)
+                        for value in record.values
+                    }
+                    for record in records
+                }
+
+            return (
+                len(actual) == version.record_count
+                and actual_identifiers == expected_identifiers
+                and content(actual) == content(expected)
+            )
         identifier_fields = tuple(
             self.session.scalars(
                 select(DatasetVersionField.key)
@@ -194,6 +385,11 @@ class SqlAlchemyDiffOperations:
         return self._validate_rows(statement, identifier_fields, version.record_count)
 
     def validate_concept(self, dataset_id, fields):
+        if self._is_hierarchy(dataset_id):
+            # Concept review must remain available for incomplete content and for
+            # restored conflicts. Canonical storage is decoded by this adapter.
+            self._hierarchy_content(dataset_id, None)
+            return True
         identifier_fields = tuple(sorted(f.key for f in fields if f.is_identifier))
         statement = (
             select(
@@ -274,6 +470,8 @@ class SqlAlchemyDiffOperations:
         )
 
     def values(self, dataset_id, version_id, record_id, status, page):
+        if self._is_hierarchy(dataset_id):
+            return self._hierarchy_values(dataset_id, version_id, record_id, status, page)
         new = (
             select(
                 DatasetField.id,

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "components/concept.html" import new_concept, versions_action, current_version_action, banner with context %}
+{% from "components/side_panel.html" import form_side_panel %}
+{% from "components.html" import content_metadata %}
+{% from "layouts/page.html" import page_context %}
+{% from "pages/datasets/hierarchy/_tree.html" import tree_nodes with context %}
+
+{% block title %}{{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
+{% block content %}
+<div class='page-header'>
+  {% call page_context(dataset.name|dataset_title, content_metadata(leaf_rows|length, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none), icon=dataset.icon or 'table') %}
+    {% include "pages/datasets/_breadcrumbs.html" %}
+  {% endcall %}
+  <div class='page-actions'>
+    {% if not version_state %}{{ current_version_action(dataset.key) }}{% endif %}
+    {{ versions_action(dataset.key) }}
+    {% if may_start_concept %}{{ new_concept(dataset.key) }}{% endif %}
+  </div>
+</div>
+{% if not version_state %}
+{% call banner(dataset.key, concept_ui, publication_panel=true, show_current=false) %}
+  {% if may_edit %}<a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Configure</a>{% endif %}
+{% endcall %}
+{% endif %}
+<nav class='section-tabs' aria-label='Hierarchy views'>
+  {% for key, label in [('hierarchy', 'Hierarchy'), ('records', 'Records'), ('hybrid', 'Hybrid')] %}
+  <a class='section-tab' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view=key) }}'{% if selected_view == key %} aria-current='page'{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+{% if hierarchy_errors %}
+<section class='alert alert-warning' aria-labelledby='hierarchy-validation-heading'>
+  <h2 id='hierarchy-validation-heading'>Resolve before publication</h2>
+  <ul>{% for error in hierarchy_errors %}<li>{{ error }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<div class='page-header section-header'>
+  <div><h2>{{ selected_view|capitalize }}</h2>
+    <p class='section-description'>{{ 'Maintain names and parent/child relationships.' if selected_view == 'hierarchy' else 'Leaves and their own field values.' if selected_view == 'records' else 'The complete structure with each node’s own applicable values.' }}</p>
+  </div>
+  {% if selected_view == 'hybrid' or version_state %}<span class='badge'>Read only</span>{% endif %}
+</div>
+{% if not hierarchy_rows %}
+<div class='empty-state'>
+  <h3>Start with the root</h3><p>Build the hierarchy first. Add optional fields and values when you are ready.</p>
+  {% if may_edit and selected_view == 'hierarchy' %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
+</div>
+{% elif selected_view == 'hierarchy' %}
+<div class='hierarchy-tree' aria-label='Hierarchy structure'>{{ tree_nodes(hierarchy_rows) }}</div>
+{% if not fields and may_edit %}<p class='help-text'>The structure can be published without custom fields. <a href='{{ url_for("dataset_detail", key=dataset.key, concept=true, _anchor="fields") }}'>Define fields</a> to add values.</p>{% endif %}
+{% elif selected_view == 'records' and not leaf_rows %}
+<div class='empty-state'><h3>No leaf records yet</h3><p>Add at least one child in Hierarchy. Nodes with no children appear here as records.</p></div>
+{% else %}
+<div class='table-scroll' role='region' aria-label='{{ "Leaf records" if selected_view == "records" else "Read-only hierarchy and values" }}' tabindex='0'>
+  <table class='hierarchy-table{{ " hierarchy-hybrid" if selected_view == "hybrid" else "" }}'>
+    <caption class='visually-hidden'>{{ 'Leaf records' if selected_view == 'records' else 'Hybrid: complete hierarchy, read only' }}</caption>
+    <thead><tr><th scope='col'>{{ 'Record' if selected_view == 'records' else 'Hierarchy' }}</th>
+    {% for field in fields %}<th scope='col'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>{{ field.name }}{% if selected_view == 'hybrid' %}<span class='hierarchy-field-scope'>{{ 'All nodes' if field.hierarchy_scope == 'all_nodes' else 'Leaves only' }}</span>{% endif %}</th>{% endfor %}
+    {% if selected_view == 'records' %}<th scope='col'>Actions</th>{% endif %}</tr></thead>
+    <tbody>{% for row in (leaf_rows if selected_view == 'records' else hierarchy_rows) %}
+      <tr data-hierarchy-node='{{ row.node.id }}'>
+        <th scope='row'><span class='hierarchy-name'>{% if selected_view == 'hybrid' %}{% for level in range(row.depth) %}<span class='hierarchy-indent' aria-hidden='true'></span>{% endfor %}{% if row.depth %}<span aria-hidden='true'>↳ </span>{% endif %}{% endif %}{{ row.node.name }}</span>{% if selected_view == 'records' %}<noscript><details><summary>Full path</summary><p class='hierarchy-path'>{{ row.path }}</p></details></noscript>{% endif %}</th>
+        {% for field in fields %}<td{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>
+          {% if not row.leaf and field.hierarchy_scope != 'all_nodes' %}<span class='help-text'>Not applicable</span>{% if row['values'].get(field.key) is not none %} <span class='visually-hidden'>Retained inactive value</span>{% endif %}
+          {% elif row['values'].get(field.key) is none %}<span class='help-text'>Empty</span>
+          {% else %}{{ row['values'].get(field.key)|record_value_text(field.data_type) }}{% endif %}
+        </td>{% endfor %}
+        {% if selected_view == 'records' %}<td>{% if may_edit %}<a data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id, return_view="records") }}' aria-label='Edit record {{ row.node.name }}'>Edit</a>{% else %}<button class='button button-secondary' type='button' data-dialog-open='hierarchy-node-{{ row.node.id }}' aria-label='View record {{ row.node.name }}'>View</button>{% endif %}</td>{% endif %}
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+{% if selected_view == 'hybrid' %}<p class='help-text'>Empty means an applicable value has not been entered. Not applicable means the field is scoped to leaves. Values are not inherited or aggregated.</p>{% endif %}
+{% endif %}
+{% if selected_view != 'hybrid' %}
+  {% if may_edit %}{{ form_side_panel('hierarchy-panel') }}{% else %}{% include 'pages/datasets/hierarchy/_view_panels.html' %}{% endif %}
+{% endif %}
+{% endblock %}

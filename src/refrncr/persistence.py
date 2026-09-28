@@ -21,7 +21,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, aliased, sessionmaker
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.datatypes import DatatypeError, get_datatype
@@ -32,6 +32,8 @@ from refrncr.models import (
     DatasetExportAccess,
     DatasetField,
     DatasetFieldSourceFormat,
+    DatasetHierarchyNode,
+    DatasetHierarchyValue,
     DatasetRecord,
     DatasetRecordValue,
     DatasetVersion,
@@ -303,7 +305,14 @@ class SqlAlchemyDatasetOperations:
 
         return (
             total(DatasetField),
-            total(DatasetRecord),
+            (
+                self.session.scalar(
+                    select(func.count()).select_from(self._hierarchy_leaves(dataset_id).subquery())
+                )
+                if self.session.scalar(select(Dataset.kind).where(Dataset.id == dataset_id))
+                == "hierarchy"
+                else total(DatasetRecord)
+            ),
             total(DatasetVersion),
             total(DatasetExportAccess),
         )
@@ -313,6 +322,8 @@ class SqlAlchemyDatasetOperations:
         # unspecified ordering of multiple database cascades from Dataset.
         for model in (
             DatasetVersion,
+            DatasetHierarchyValue,
+            DatasetHierarchyNode,
             DatasetRecordValue,
             DatasetRecord,
             DatasetBusinessKeyField,
@@ -399,7 +410,13 @@ class SqlAlchemyDatasetOperations:
         ).where(DatasetRecord.deleted_content.is_(None))
         if dataset_ids is not None:
             current_counts = current_counts.where(DatasetRecord.dataset_id.in_(dataset_ids))
-        current_counts = current_counts.group_by(DatasetRecord.dataset_id).subquery()
+        leaves = self._hierarchy_leaves().subquery()
+        hierarchy_counts = select(leaves.c.dataset_id, func.count().label("record_count")).group_by(
+            leaves.c.dataset_id
+        )
+        current_counts = (
+            current_counts.group_by(DatasetRecord.dataset_id).union_all(hierarchy_counts).subquery()
+        )
         statement = (
             select(Dataset, func.coalesce(current_counts.c.record_count, 0))
             .outerjoin(current_counts, current_counts.c.dataset_id == Dataset.id)
@@ -416,6 +433,22 @@ class SqlAlchemyDatasetOperations:
             )
             for dataset, count in self.session.execute(statement)
         ]
+
+    @staticmethod
+    def _hierarchy_leaves(dataset_id=None):
+        child = aliased(DatasetHierarchyNode)
+        statement = select(DatasetHierarchyNode.id, DatasetHierarchyNode.dataset_id).where(
+            DatasetHierarchyNode.parent_id.is_not(None),
+            ~select(child.id)
+            .where(
+                child.dataset_id == DatasetHierarchyNode.dataset_id,
+                child.parent_id == DatasetHierarchyNode.id,
+            )
+            .exists(),
+        )
+        if dataset_id is not None:
+            statement = statement.where(DatasetHierarchyNode.dataset_id == dataset_id)
+        return statement
 
     def get(self, dataset_id: str, *, for_update: bool = False) -> Dataset | None:
         statement = _locked(
@@ -909,6 +942,7 @@ class SqlAlchemyDatasetRecordOperations:
                 defer(DatasetField.mapping_role),
                 defer(DatasetField.source_field_id),
                 defer(DatasetField.source_field_key),
+                defer(DatasetField.hierarchy_scope),
             )
         current = None
         values: list[RecordValue] = []
@@ -1253,6 +1287,9 @@ class SqlAlchemyUnitOfWork:
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
         self.dataset_records = SqlAlchemyDatasetRecordOperations(self.session)
+        from refrncr.hierarchy_persistence import SqlAlchemyHierarchyOperations
+
+        self.hierarchy = SqlAlchemyHierarchyOperations(self.session)
         from refrncr.version_persistence import SqlAlchemyVersionOperations
 
         self.versions = SqlAlchemyVersionOperations(self.session)

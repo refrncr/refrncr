@@ -11,6 +11,7 @@ from refrncr.audit import record_audit
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
+from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.models import utc_now
 from refrncr.ports import (
     DatasetBusinessKey,
@@ -62,6 +63,10 @@ def _validated_snapshot(uow, dataset):
     validate_dataset_key(dataset.key)
     name = normalize_dataset_name(dataset.name)
     description = validate_dataset_description(dataset.description)
+    if getattr(dataset, "kind", "reference") == "hierarchy":
+        from refrncr.hierarchy import hierarchy_snapshot
+
+        return hierarchy_snapshot(uow, dataset)
     fields = uow.dataset_fields.list_for_dataset(dataset.id)
     identifier = uow.dataset_business_keys.get(dataset.id)
     if not fields:
@@ -213,8 +218,10 @@ class DatasetVersionService:
                 except ValidationError:
                     raise NotFoundError("Dataset not found") from None
                 dataset = uow.datasets.find_by_key(key)
-                if dataset is None or not self.authorization.can_view_dataset(
-                    actor_id, dataset.id, uow=uow
+                if (
+                    dataset is None
+                    or dataset.kind == "hierarchy"
+                    or not self.authorization.can_view_dataset(actor_id, dataset.id, uow=uow)
                 ):
                     raise NotFoundError("Dataset not found")
                 if effective_date is not None:
@@ -285,7 +292,13 @@ class DatasetVersionService:
             dataset.owner_team_id,
             current.id,
         )
-        return DiscardReview(identity, dataset.name, summary.counts, len(summary.metadata)), current
+        return DiscardReview(
+            identity,
+            dataset.name,
+            summary.counts,
+            len(summary.metadata),
+            len(summary.hierarchy_changes),
+        ), current
 
     def review_discard(self, actor_id, dataset_id):
         with self.uow(translate_errors=True) as uow:
@@ -361,12 +374,19 @@ class DatasetVersionService:
                             f.key in identifier.field_keys,
                             getattr(f, "definition", None),
                             getattr(f, "unit", None),
+                            getattr(f, "mapping_role", None),
+                            getattr(f, "source_field_key", None),
+                            getattr(f, "hierarchy_scope", None),
                         )
                         for f in work.dataset_fields.list_for_dataset(dataset.id)
                     )
                     changes = classify_fields(current_fields, baseline_fields)
                     if (
                         changes
+                        or (
+                            dataset.kind == "hierarchy"
+                            and work.version_diff.hierarchy_changes(dataset.id, baseline.id)
+                        )
                         or next(work.dataset_records.deleted_records(dataset.id), None) is not None
                         or any(work.version_diff.counts(dataset.id, baseline.id))
                     ):
@@ -508,7 +528,17 @@ class DatasetVersionService:
 
     def _read_context(self, uow, dataset, state):
         if state is None:
-            return uow.datasets.current_overview((dataset.id,))[0]
+            result = uow.datasets.current_overview((dataset.id,))[0]
+            if dataset.kind == "hierarchy":
+                nodes = uow.hierarchy.list_for_dataset(dataset.id)
+                parents = {node.parent_id for node in nodes}
+                result = replace(
+                    result,
+                    record_count=sum(
+                        node.parent_id is not None and node.id not in parents for node in nodes
+                    ),
+                )
+            return result
         owner = uow.teams.get(dataset.owner_team_id)
         return self._published_context(dataset, state.version, owner.name if owner else "")
 
@@ -623,6 +653,23 @@ class DatasetVersionService:
                     dataset.id, tuple(sorted(field.key for field in fields if field.is_identifier))
                 )
                 records = uow.versions.iterate_records(state.version) if page is not None else ()
+            hierarchy_nodes, hierarchy_errors = (), ()
+            if dataset.kind == "hierarchy":
+                from refrncr.hierarchy import hierarchy_leaf_records, hierarchy_validation_errors
+
+                hierarchy_nodes = (
+                    uow.hierarchy.list_for_dataset(dataset.id)
+                    if state is None
+                    else uow.versions.hierarchy_nodes(state.version)
+                )
+                records = (
+                    hierarchy_leaf_records(hierarchy_nodes, fields) if page is not None else ()
+                )
+                if state is None:
+                    hierarchy_errors = hierarchy_validation_errors(
+                        fields, identifier, hierarchy_nodes
+                    )
+            node_names = hierarchy_node_paths(hierarchy_nodes)
             concept = uow.concepts.get(dataset.id) if maintain else None
             baseline_fields, removed = (), ()
             deleted_fields = {}
@@ -646,6 +693,10 @@ class DatasetVersionService:
                     else "—"
                     for key in keys
                 )
+                if dataset.kind == "hierarchy":
+                    labels[record.id] = labels[record.id] or node_names[record.id]
+                    if not keys:
+                        return False, ((0, "string", node_names[record.id].casefold()),), record.id
                 incomplete, components, _id = DatasetRecordService._record_sort_key(record, keys)
                 # Old/new identifier datatypes can differ. Type tags preserve typed ordering
                 # within each datatype and make their combined ordering total and stable.
@@ -660,7 +711,12 @@ class DatasetVersionService:
 
             ordered = sorted(chain(records, removed), key=sort_key)
             term = normalize("NFC", search).casefold()
-            matching = [record for record in ordered if matches(record, fields, term)]
+            matching = [
+                record
+                for record in ordered
+                if matches(record, fields, term)
+                or (dataset.kind == "hierarchy" and term in node_names[record.id].casefold())
+            ]
             projected = {}
             imported = {}
             if state is None:
@@ -719,7 +775,9 @@ class DatasetVersionService:
                 record_page,
                 state,
                 maintain,
-                export and (state is None or state.status in {"Current", "Expired"}),
+                dataset.kind != "hierarchy"
+                and export
+                and (state is None or state.status in {"Current", "Expired"}),
                 concept,
                 MappingProxyType(
                     {
@@ -737,6 +795,8 @@ class DatasetVersionService:
                 search,
                 MappingProxyType(deleted_fields),
                 status_counts,
+                hierarchy_nodes,
+                hierarchy_errors,
             )
 
     def review(self, actor_id, dataset_id):
@@ -778,6 +838,8 @@ class DatasetVersionService:
             fields = classify_fields(content.fields, uow.versions.fields(latest))
             summary = summary_counts(fields, uow.version_diff.counts(dataset.id, latest.id))
             changed = any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
+            if dataset.kind == "hierarchy":
+                changed = changed or bool(uow.version_diff.hierarchy_changes(dataset.id, latest.id))
         if not changed:
             raise ConflictError("Dataset content matches the latest published version")
         return content, summary, max((v.number for v in versions), default=0) + 1

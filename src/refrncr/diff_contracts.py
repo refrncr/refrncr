@@ -44,10 +44,12 @@ class DiffSummary:
     dataset_name: str
     metadata: tuple[PropertyChange, ...]
     counts: SummaryCounts
+    hierarchy_changes: tuple[FieldChange, ...] = ()
+    hierarchy_errors: tuple[str, ...] = ()
 
     @property
     def has_changes(self):
-        return bool(self.metadata) or any(
+        return bool(self.metadata or self.hierarchy_changes) or any(
             getattr(self.counts, name) for name in SummaryCounts.__dataclass_fields__
         )
 
@@ -77,6 +79,9 @@ class RecordProjection:
     before_identifier: bytes | None
     after_identifier: bytes | None
     changed_values: int
+    hierarchy: bool = False
+    before_label: str | None = None
+    after_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
