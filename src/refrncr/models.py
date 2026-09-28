@@ -200,9 +200,9 @@ class Dataset(Base):
         CheckConstraint("length(description) <= 10000", name="ck_datasets_description_length"),
         UniqueConstraint("key", name="uq_datasets_key"),
         CheckConstraint("revision >= 1", name="ck_datasets_revision"),
-        CheckConstraint("kind IN ('reference', 'mapping')", name="ck_datasets_kind"),
+        CheckConstraint("kind IN ('reference', 'mapping', 'hierarchy')", name="ck_datasets_kind"),
         CheckConstraint(
-            "(kind = 'reference' AND mapping_mode IS NULL) OR "
+            "(kind IN ('reference', 'hierarchy') AND mapping_mode IS NULL) OR "
             "(kind = 'mapping' AND mapping_mode IN ('standalone', 'linked'))",
             name="ck_datasets_mapping_mode",
         ),
@@ -275,6 +275,10 @@ class ImmutableDatasetFieldKeyError(ValueError):
 class DatasetField(Base):
     __tablename__ = "dataset_fields"
     __table_args__ = (
+        CheckConstraint(
+            "hierarchy_scope IS NULL OR hierarchy_scope IN ('leaves', 'all_nodes')",
+            name="ck_dataset_fields_hierarchy_scope",
+        ),
         CheckConstraint("length(definition) <= 4000", name="ck_dataset_fields_definition"),
         CheckConstraint("length(unit) <= 64", name="ck_dataset_fields_unit"),
         CheckConstraint("length(key) BETWEEN 1 AND 100", name="ck_dataset_fields_key_length"),
@@ -316,6 +320,7 @@ class DatasetField(Base):
     is_required: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     is_unique: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     display_position: Mapped[int] = mapped_column(Integer)
+    hierarchy_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mapping_role: Mapped[str | None] = mapped_column(String(24), nullable=True)
     source_field_id: Mapped[str | None] = mapped_column(
         ForeignKey("dataset_fields.id", ondelete="RESTRICT", name="fk_dataset_fields_source"),
@@ -434,6 +439,65 @@ class DatasetRecordValue(Base):
     unique_value_key: Mapped[bytes | None] = mapped_column(LargeBinary(1010), nullable=True)
 
 
+class DatasetHierarchyNode(Base):
+    """Structure has its own identity, independent of leaf Record identifiers."""
+
+    __tablename__ = "dataset_hierarchy_nodes"
+    __table_args__ = (
+        UniqueConstraint("id", "dataset_id", name="uq_hierarchy_nodes_id_dataset"),
+        ForeignKeyConstraint(
+            ["parent_id", "dataset_id"],
+            ["dataset_hierarchy_nodes.id", "dataset_hierarchy_nodes.dataset_id"],
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+            name="fk_hierarchy_nodes_parent",
+        ),
+        UniqueConstraint("dataset_id", "parent_id", "name", name="uq_hierarchy_nodes_sibling"),
+        Index(
+            "uq_hierarchy_nodes_root",
+            "dataset_id",
+            unique=True,
+            sqlite_where=text("parent_id IS NULL"),
+            postgresql_where=text("parent_id IS NULL"),
+        ),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_hierarchy_nodes_name"),
+        CheckConstraint("parent_id IS NULL OR parent_id <> id", name="ck_hierarchy_nodes_parent"),
+        CheckConstraint("revision >= 1", name="ck_hierarchy_nodes_revision"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(200))
+    parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class DatasetHierarchyValue(Base):
+    """All node values, including inactive ones; conflicts are concept validation."""
+
+    __tablename__ = "dataset_hierarchy_values"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["node_id", "dataset_id"],
+            ["dataset_hierarchy_nodes.id", "dataset_hierarchy_nodes.dataset_id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["field_id", "dataset_id"],
+            ["dataset_fields.id", "dataset_fields.dataset_id"],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("length(canonical_key) BETWEEN 1 AND 1010", name="ck_hierarchy_values_key"),
+    )
+
+    node_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    field_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(String(36))
+    canonical_key: Mapped[bytes] = mapped_column(LargeBinary(1010))
+    canonical_text: Mapped[str] = mapped_column(Text)
+
+
 class DatasetExportAccess(Base):
     __tablename__ = "dataset_export_access"
     __table_args__ = (
@@ -514,6 +578,10 @@ class DatasetVersion(Base):
 class DatasetVersionField(Base):
     __tablename__ = "dataset_version_fields"
     __table_args__ = (
+        CheckConstraint(
+            "hierarchy_scope IS NULL OR hierarchy_scope IN ('leaves', 'all_nodes')",
+            name="ck_version_fields_hierarchy_scope",
+        ),
         CheckConstraint("length(definition) <= 4000", name="ck_version_fields_definition"),
         CheckConstraint("length(unit) <= 64", name="ck_version_fields_unit"),
         UniqueConstraint("version_id", "key", name="uq_version_fields_key"),
@@ -545,6 +613,7 @@ class DatasetVersionField(Base):
     is_unique: Mapped[bool] = mapped_column(Boolean)
     display_position: Mapped[int] = mapped_column(Integer)
     is_identifier: Mapped[bool] = mapped_column(Boolean)
+    hierarchy_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mapping_role: Mapped[str | None] = mapped_column(String(24), nullable=True)
     source_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
@@ -586,6 +655,66 @@ class DatasetVersionValue(Base):
     unique_key: Mapped[bytes | None] = mapped_column(LargeBinary(1010))
 
 
+class DatasetVersionHierarchyNode(Base):
+    __tablename__ = "dataset_version_hierarchy_nodes"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["version_id", "parent_id"],
+            ["dataset_version_hierarchy_nodes.version_id", "dataset_version_hierarchy_nodes.id"],
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+            name="fk_version_hierarchy_nodes_parent",
+        ),
+        UniqueConstraint(
+            "version_id", "parent_id", "name", name="uq_version_hierarchy_nodes_sibling"
+        ),
+        Index(
+            "uq_version_hierarchy_nodes_root",
+            "version_id",
+            unique=True,
+            sqlite_where=text("parent_id IS NULL"),
+            postgresql_where=text("parent_id IS NULL"),
+        ),
+        CheckConstraint("length(name) BETWEEN 1 AND 200", name="ck_version_hierarchy_nodes_name"),
+        CheckConstraint(
+            "parent_id IS NULL OR parent_id <> id", name="ck_version_hierarchy_nodes_parent"
+        ),
+    )
+
+    version_id: Mapped[str] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="CASCADE"), primary_key=True
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class DatasetVersionHierarchyValue(Base):
+    __tablename__ = "dataset_version_hierarchy_values"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["version_id", "node_id"],
+            ["dataset_version_hierarchy_nodes.version_id", "dataset_version_hierarchy_nodes.id"],
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["version_id", "field_id"],
+            ["dataset_version_fields.version_id", "dataset_version_fields.id"],
+            ondelete="CASCADE",
+        ),
+        CheckConstraint(
+            "length(canonical_key) BETWEEN 1 AND 1010", name="ck_version_hierarchy_values_key"
+        ),
+    )
+
+    version_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    node_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    field_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    canonical_key: Mapped[bytes] = mapped_column(LargeBinary(1010))
+    canonical_text: Mapped[str] = mapped_column(Text)
+
+
 def _immutable_version_row(_mapper, _connection, _row):
     from refrncr.ports import PersistenceConflictError
 
@@ -599,6 +728,8 @@ for _snapshot_model in (
     DatasetVersionField,
     DatasetVersionRecord,
     DatasetVersionValue,
+    DatasetVersionHierarchyNode,
+    DatasetVersionHierarchyValue,
 ):
     event.listen(_snapshot_model, "before_update", _immutable_version_row)
     event.listen(_snapshot_model, "before_delete", _immutable_version_row)

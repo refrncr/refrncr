@@ -1,0 +1,13 @@
+{% from "components/side_panel.html" import side_panel %}
+{% from "pages/datasets/hierarchy/_tree.html" import node_value %}
+{% for row in display_rows %}
+{% call side_panel('hierarchy-node-' ~ row.node.id, row.node.name, 'hierarchy-node-title-' ~ row.node.id, 'Read only') %}
+<div class='side-panel-body'>
+  <p class='hierarchy-path'>{{ row.path }}</p>
+  <dl class='record-details'>
+  {% for field in fields %}<div><dt>{{ field.name }}</dt><dd>{{ node_value(row, field) }}</dd></div>{% endfor %}
+  </dl>
+  {% if not fields %}<p>No custom fields are configured.</p>{% endif %}
+</div>
+{% endcall %}
+{% endfor %}

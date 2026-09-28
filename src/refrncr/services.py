@@ -989,9 +989,9 @@ class DatasetService:
 
     @staticmethod
     def _mapping_metadata(kind, mapping_mode, source_system, target_system):
-        if kind not in {"reference", "mapping"}:
+        if kind not in {"reference", "mapping", "hierarchy"}:
             raise ValidationError("Choose a valid table type.")
-        if kind == "reference":
+        if kind in {"reference", "hierarchy"}:
             return kind, None, None, None
         if mapping_mode not in {"standalone", "linked"}:
             raise ValidationError("Choose standalone or linked mapping mode.")
@@ -1328,11 +1328,15 @@ class DatasetFieldService:
         unit: str | None = None,
         mapping_role: str | None = None,
         source_field_key: str | None = None,
+        hierarchy_scope: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            from refrncr.hierarchy import validate_hierarchy_scope
+
+            hierarchy_scope = validate_hierarchy_scope(hierarchy_scope, dataset.kind)
             source_field = None
             source_dataset = None
             if dataset.kind == "mapping":
@@ -1412,6 +1416,7 @@ class DatasetFieldService:
                 mapping_role=mapping_role,
                 source_field_id=source_field.id if source_field else None,
                 source_field_key=source_field.key if source_field else None,
+                hierarchy_scope=hierarchy_scope,
             )
             try:
                 uow.flush()
@@ -1512,6 +1517,7 @@ class DatasetFieldService:
         *,
         definition: str | None = None,
         unit: str | None = None,
+        hierarchy_scope: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1523,6 +1529,12 @@ class DatasetFieldService:
                 raise NotFoundError("Dataset field not found")
             if field.source_field_key:
                 raise ValidationError("Source mapping fields are read-only")
+
+            from refrncr.hierarchy import validate_hierarchy_scope
+
+            hierarchy_scope = validate_hierarchy_scope(
+                field.hierarchy_scope if hierarchy_scope is None else hierarchy_scope, dataset.kind
+            )
 
             definition, unit = validate_field_metadata(
                 field.definition if definition is None else definition,
@@ -1545,6 +1557,7 @@ class DatasetFieldService:
                 validated_unique,
                 definition,
                 unit,
+                hierarchy_scope,
             )
             if uow.dataset_business_keys.contains(dataset.id, field.key):
                 _require_identifier_type(validated_type)
@@ -1555,14 +1568,18 @@ class DatasetFieldService:
                 field.is_unique,
                 field.definition,
                 field.unit,
+                field.hierarchy_scope,
             )
             if replacement == current:
                 return field
 
-            self._validate_record_aware_definition_change(
-                uow, dataset.id, field, validated_type, validated_required, validated_unique
-            )
-            if validated_unique != field.is_unique:
+            if dataset.kind == "hierarchy":
+                self._validate_hierarchy_definition_change(uow, dataset, field, validated_type)
+            else:
+                self._validate_record_aware_definition_change(
+                    uow, dataset.id, field, validated_type, validated_required, validated_unique
+                )
+            if dataset.kind != "hierarchy" and validated_unique != field.is_unique:
                 uow.dataset_records.set_field_unique_keys(dataset.id, field.id, validated_unique)
 
             field.definition, field.unit = definition, unit
@@ -1570,6 +1587,7 @@ class DatasetFieldService:
             field.data_type = validated_type
             field.is_required = validated_required
             field.is_unique = validated_unique
+            field.hierarchy_scope = hierarchy_scope
             field.updated_at = _now()
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
@@ -1587,8 +1605,10 @@ class DatasetFieldService:
         is_unique: bool,
         is_business_key_component: bool,
         *,
+        new_key: str | None = None,
         definition: str | None = None,
         unit: str | None = None,
+        hierarchy_scope: str | None = None,
     ) -> DatasetFieldRecord:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
@@ -1598,6 +1618,31 @@ class DatasetFieldService:
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
                 raise NotFoundError("Dataset field not found")
+            validated_new_key = (
+                field.key if new_key is None else validate_dataset_field_key(new_key)
+            )
+            key_changed = validated_new_key != field.key
+            if key_changed and field.source_field_key:
+                raise ValidationError("Source mapping field keys are read-only")
+            if key_changed and (
+                uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
+            ):
+                raise ValidationError(
+                    "Field key can only be changed before the first version is published."
+                )
+            if key_changed and uow.datasets.uses_linked_field(dataset.id, field.key):
+                raise ValidationError(
+                    "Field key cannot change while used by a linked mapping table."
+                )
+            existing_key = uow.dataset_fields.find_by_key(dataset.id, validated_new_key)
+            if key_changed and existing_key is not None:
+                raise ConflictError("Field key already exists in this Dataset")
+
+            from refrncr.hierarchy import validate_hierarchy_scope
+
+            hierarchy_scope = validate_hierarchy_scope(
+                field.hierarchy_scope if hierarchy_scope is None else hierarchy_scope, dataset.kind
+            )
 
             definition, unit = validate_field_metadata(
                 field.definition if definition is None else definition,
@@ -1630,6 +1675,7 @@ class DatasetFieldService:
                 validated_unique,
                 definition,
                 unit,
+                hierarchy_scope,
             )
             current_definition = (
                 field.name,
@@ -1638,28 +1684,47 @@ class DatasetFieldService:
                 field.is_unique,
                 field.definition,
                 field.unit,
+                field.hierarchy_scope,
             )
             definition_changed = replacement != current_definition
-            if not membership_changed and not definition_changed:
+            if not membership_changed and not definition_changed and not key_changed:
                 return field
 
             if membership_changed and uow.dataset_records.count(dataset.id):
                 raise ValidationError("Record identifier cannot change after records exist")
             if definition_changed:
-                self._validate_record_aware_definition_change(
-                    uow, dataset.id, field, validated_type, validated_required, validated_unique
-                )
-                if validated_unique != field.is_unique:
+                if dataset.kind == "hierarchy":
+                    self._validate_hierarchy_definition_change(uow, dataset, field, validated_type)
+                else:
+                    self._validate_record_aware_definition_change(
+                        uow, dataset.id, field, validated_type, validated_required, validated_unique
+                    )
+                if dataset.kind != "hierarchy" and validated_unique != field.is_unique:
                     uow.dataset_records.set_field_unique_keys(
                         dataset.id, field.id, validated_unique
                     )
 
-            if membership_changed:
-                replacement_keys = set(current_key.field_keys)
-                if validated_component:
-                    replacement_keys.add(field.key)
-                else:
+            identifier_changed = membership_changed or (key_changed and currently_component)
+            replacement_keys = set(current_key.field_keys)
+            if key_changed:
+                if currently_component:
                     replacement_keys.discard(field.key)
+                    uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
+                try:
+                    field = uow.dataset_fields.rename_key(dataset.id, field.id, validated_new_key)
+                except PersistenceConflictError as exc:
+                    if exc.constraint == "uq_dataset_fields_dataset_key":
+                        raise ConflictError("Field key already exists in this Dataset") from exc
+                    raise
+                uow.dataset_records.rename_deleted_field_key(
+                    dataset.id, field.id, validated_new_key
+                )
+
+            if identifier_changed:
+                replacement_keys = set(current_key.field_keys)
+                replacement_keys.discard(validated_field_key)
+                if validated_component:
+                    replacement_keys.add(validated_new_key)
                 uow.dataset_business_keys.replace(dataset.id, tuple(sorted(replacement_keys)))
                 record_audit(
                     uow,
@@ -1675,12 +1740,13 @@ class DatasetFieldService:
 
             _advance_concept(uow, dataset)
             dataset.content_updated_at = _now()
-            if definition_changed:
+            if definition_changed or key_changed:
                 field.definition, field.unit = definition, unit
                 field.name = normalized_name
                 field.data_type = validated_type
                 field.is_required = validated_required
                 field.is_unique = validated_unique
+                field.hierarchy_scope = hierarchy_scope
                 field.updated_at = _now()
                 self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
@@ -1700,7 +1766,9 @@ class DatasetFieldService:
                 )
             if uow.datasets.uses_linked_field(dataset.id, field.key):
                 raise ValidationError("A field used by a linked mapping table cannot be deleted")
-            if uow.dataset_records.field_has_values(dataset.id, field.id):
+            if uow.dataset_records.field_has_values(dataset.id, field.id) or (
+                dataset.kind == "hierarchy" and uow.hierarchy.field_has_values(dataset.id, field.id)
+            ):
                 raise ValidationError("A field with stored values cannot be deleted")
             field_id = field.id
             uow.dataset_fields.delete(field)
@@ -1812,6 +1880,13 @@ class DatasetFieldService:
             object_id=field_id,
             action=action,
         )
+
+    @staticmethod
+    def _validate_hierarchy_definition_change(uow, dataset, field, data_type):
+        # Inactive values still belong to this field. Changing their datatype would
+        # destroy their lossless recovery contract. Applicability changes never delete.
+        if data_type != field.data_type and uow.hierarchy.field_has_values(dataset.id, field.id):
+            raise ValidationError("Field type cannot change while stored values exist")
 
     @staticmethod
     def _validate_record_aware_definition_change(
@@ -2305,6 +2380,11 @@ class DatasetRecordService:
             actor_id, "dataset", dataset.id, permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if dataset.kind == "hierarchy":
+            raise ValidationError(
+                "Use the hierarchy views to maintain this table. "
+                "Hierarchy import and export are not available yet."
+            )
         if permission in {"admin", "editor"}:
             if uow is not None:
                 _require_concept(uow, dataset.id)

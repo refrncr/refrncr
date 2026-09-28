@@ -80,6 +80,7 @@ def contents(engine):
                                 "mapping_role",
                                 "source_field_id",
                                 "source_field_key",
+                                "hierarchy_scope",
                             }
                         )
                         and not (model is DatasetRecord and column.name == "deleted_content")

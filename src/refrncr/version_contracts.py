@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from refrncr.concept_contracts import ActiveConcept
+from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOverview, StoredRecord
 
 if TYPE_CHECKING:
@@ -55,6 +56,7 @@ class SnapshotField:
     unit: str | None = None
     mapping_role: str | None = None
     source_field_key: str | None = None
+    hierarchy_scope: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +65,7 @@ class SnapshotContent:
     description: str
     fields: tuple[SnapshotField, ...]
     records: tuple[StoredRecord, ...]
+    hierarchy_nodes: tuple[HierarchyNode, ...] = ()
 
     @property
     def identifier_keys(self):
@@ -185,6 +188,8 @@ class VersionRead:
     deleted_fields: Mapping[str, tuple[SnapshotField, ...]] | None = None
     # Added, edited and deleted Records matching the search term, before change filters.
     status_counts: tuple[int, int, int] = (0, 0, 0)
+    hierarchy_nodes: tuple[HierarchyNode, ...] = ()
+    hierarchy_errors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

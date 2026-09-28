@@ -1,0 +1,25 @@
+/* Hierarchy and Hybrid share the compact tree-table variant and design tokens. */
+.hierarchy-name { color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
+.hierarchy-node-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-xs); font-size: var(--font-size-body-sm); }
+.hierarchy-node-actions-reveal { transition: opacity var(--motion-duration-layout) var(--motion-easing-standard); }
+.hierarchy-table tbody tr:has(.hierarchy-node-actions-reveal):focus-within { background: var(--color-row-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .hierarchy-node-actions-reveal { opacity: 0; }
+  .hierarchy-table tbody tr:is(:hover, :focus-within) .hierarchy-node-actions-reveal { opacity: 1; }
+}
+@media (any-pointer: coarse) {
+  .hierarchy-node-actions-reveal { opacity: 1; }
+}
+.hierarchy-actions-column { text-align: right; white-space: nowrap; }
+.hierarchy-table { min-width: 30rem; }
+.hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
+/* Both Records variants scroll full, single-line values behind the sticky edit column. */
+.hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }
+.hierarchy-table thead th { white-space: nowrap; }
+.hierarchy-table th[scope="row"] { min-width: 12rem; background: transparent; }
+.hierarchy-tree-table tbody :is(th, td) { padding-block: var(--space-sm); }
+.hierarchy-records td,
+.hierarchy-hybrid td { font-family: var(--font-data); font-size: var(--font-size-xs); }
+.hierarchy-field-scope { margin-inline-start: var(--space-sm); letter-spacing: normal; text-transform: none; }
+.hierarchy-indent { display: inline-block; width: var(--space-md); }
+.hierarchy-path { color: var(--color-text-secondary); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }

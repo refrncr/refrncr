@@ -24,16 +24,20 @@ ICON_SPRITES = {
 LUCIDE_ICON_NAMES = frozenset(ICON_SPRITES)
 
 
-def rendered_dataset_icon(value):
+def default_dataset_icon(kind=None):
+    return "network" if kind == "hierarchy" else "table"
+
+
+def rendered_dataset_icon(value, kind=None):
     return (
         value
         if isinstance(value, str) and len(value) <= 64 and value in LUCIDE_ICON_NAMES
-        else "table"
+        else default_dataset_icon(kind)
     )
 
 
-def dataset_icon_sprite(value):
-    return ICON_SPRITES[rendered_dataset_icon(value)]
+def dataset_icon_sprite(value, kind=None):
+    return ICON_SPRITES[rendered_dataset_icon(value, kind)]
 
 
 # Product-owner selection (REF-165); every name resolves in the pinned 1.46.0 sprite.

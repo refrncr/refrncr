@@ -13,6 +13,7 @@
     {% if review %}
     <dl class='detail-list detail-list-counts' aria-label='Unpublished change counts'>
       <div><dt>Dataset properties changed</dt><dd>{{ review.metadata_changes }}</dd></div>
+      {% if review.hierarchy_changes %}<div><dt>Hierarchy nodes changed</dt><dd>{{ review.hierarchy_changes }}</dd></div>{% endif %}
       {% for name, label in [('fields_added', 'Fields added'), ('fields_changed', 'Fields changed'), ('fields_removed', 'Fields deleted'), ('records_added', 'Records added'), ('records_changed', 'Records changed'), ('records_removed', 'Records deleted')] %}
       <div><dt>{{ label }}</dt><dd>{{ review.counts|attr(name) }}</dd></div>
       {% endfor %}

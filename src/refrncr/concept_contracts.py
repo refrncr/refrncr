@@ -27,6 +27,7 @@ class DiscardReview:
     dataset_name: str
     counts: object
     metadata_changes: int
+    hierarchy_changes: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,4 +79,8 @@ class ConceptContext:
 
     @property
     def may_publish(self):
-        return self.can_review and (self.baseline is None or self.baseline.status != "Scheduled")
+        return (
+            self.can_review
+            and not self.summary.hierarchy_errors
+            and (self.baseline is None or self.baseline.status != "Scheduled")
+        )

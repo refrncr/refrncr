@@ -1,16 +1,21 @@
-{% macro field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, include_key=false, definition='', unit='', lock_constraints=false, lock_identifier=false) -%}
+{% macro field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, include_key=false, definition='', unit='', lock_constraints=false, lock_identifier=false, hierarchy=false, hierarchy_scope='leaves') -%}
   {% set selected_type = type_choices|selectattr('id', 'equalto', data_type)|first %}
   <label>Name <input name='name' value='{{ name }}'></label>
-  {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can't be changed later.</p>{% endif %}
+  {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can be changed until the first version is published.</p>{% endif %}
   <label>Definition <textarea name='definition' maxlength='4000' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
   <p class='help-text' id='field-definition-help'>Optional explanation of meaning and intended use. Maximum 4000 characters.</p>
   <label>Unit <input name='unit' value='{{ unit or "" }}' maxlength='64' aria-describedby='field-unit-help'></label>
   <p class='help-text' id='field-unit-help'>Optional label such as EUR, kg, % or days. Maximum 64 characters; no conversion or calculation.</p>
   <label>Data type <select name='data_type' data-field-datatype>{% for choice in type_choices %}<option value='{{ choice.id }}' data-identifier-eligible='{{ 'true' if choice.identifier_eligible else 'false' }}'{% if choice.id == data_type %} selected{% endif %}>{{ choice.label }}</option>{% endfor %}</select></label>
+  {% if hierarchy %}
+  <label>Scope <select name='hierarchy_scope'><option value='leaves'{% if hierarchy_scope == 'leaves' %} selected{% endif %}>Leaves only</option><option value='all_nodes'{% if hierarchy_scope == 'all_nodes' %} selected{% endif %}>All nodes</option></select></label>
+  <p class='help-text'>Leaves have no children, at any depth. All nodes also includes the root and intermediate branches. Values outside the scope are retained as inactive.</p>
+  {% endif %}
   <label><input type='checkbox' name='is_required'{% if is_required %} checked{% endif %}{% if lock_constraints %} data-role-locked disabled{% endif %}> Required</label>
-  <p class='help-text field-option-help'>Every record needs a value.</p>
+  <p class='help-text field-option-help'>{{ 'Every node in the field’s scope needs a value.' if hierarchy else 'Every record needs a value.' }}</p>
   <label><input type='checkbox' name='is_unique'{% if is_unique %} checked{% endif %}{% if lock_constraints %} data-role-locked disabled{% endif %}> Unique</label>
-  <p class='help-text field-option-help'>No two records may share a value.</p>
+  <p class='help-text field-option-help'>{{ 'No two nodes in the field’s scope may share a value. Inactive values are excluded.' if hierarchy else 'No two records may share a value.' }}</p>
   <label><input type='checkbox' name='is_business_key_component'{% if lock_constraints or lock_identifier %} data-role-locked{% endif %}{% if lock_constraints or lock_identifier or (selected_type and not selected_type.identifier_eligible) %} disabled{% endif %}{% if is_business_key_component %} checked{% endif %}> Part of record identifier</label>
   <p class='help-text field-option-help'>Identifies each record together with the other identifier fields. Float cannot be part of a Record identifier.</p>
+  {% if hierarchy %}<p class='help-text field-option-help'>Optional. The record identifier identifies leaves only and can be configured after building the hierarchy.</p>{% endif %}
 {%- endmacro %}

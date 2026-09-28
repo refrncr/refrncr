@@ -39,6 +39,7 @@ from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.diff_contracts import STATUSES, DiffCriteria
+from refrncr.hierarchy import HierarchyService
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -50,6 +51,7 @@ from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.presentation_metadata import (
     DATASET_ICONS,
     dataset_icon_sprite,
+    default_dataset_icon,
     key_from_name,
     rendered_dataset_icon,
 )
@@ -65,7 +67,9 @@ from refrncr.record_import import (
 from refrncr.record_search import (
     MAX_QUERY_BYTES,
     RecordSearchError,
+    matches,
     parse_parameters,
+    search_term,
 )
 from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review
 from refrncr.services import (
@@ -159,6 +163,7 @@ def create_flask_app(
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
+    app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
 
@@ -221,6 +226,7 @@ def create_flask_app(
             or datasets.versions
             or DatasetVersionService(datasets.uow, authorization.datasets)
         )
+        hierarchy = HierarchyService(datasets.uow, authorization, versions=dataset_versions)
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
@@ -346,6 +352,10 @@ def create_flask_app(
         "dataset_version_field_diff",
         "dataset_version_publish",
         "dataset_concept_discard",
+        "dataset_hierarchy_node_create",
+        "dataset_hierarchy_node_delete",
+        "dataset_hierarchy_node_edit",
+        "dataset_hierarchy_node_values",
     }
 
     @app.before_request
@@ -694,7 +704,7 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         dataset_kind = request.args.get("kind")
-        if dataset_kind not in {None, "reference", "mapping"}:
+        if dataset_kind not in {None, "reference", "mapping", "hierarchy"}:
             abort(404)
         visible_datasets = dataset_service.list_dataset_overview(actor.id)
         if dataset_kind is not None:
@@ -705,6 +715,7 @@ def create_flask_app(
             None: "Datasets",
             "reference": "Reference datasets",
             "mapping": "Mapping datasets",
+            "hierarchy": "Hierarchy datasets",
         }[dataset_kind]
         return render_template(
             "pages/datasets/list.html",
@@ -777,7 +788,7 @@ def create_flask_app(
     def new_dataset():
         require_dataset_dependencies()
         initial_kind = request.args.get("kind")
-        if initial_kind not in {None, "reference", "mapping"}:
+        if initial_kind not in {None, "reference", "mapping", "hierarchy"}:
             abort(404)
         return render_dataset_create_form(initial_kind=initial_kind)
 
@@ -831,6 +842,8 @@ def create_flask_app(
             return response, 409 if isinstance(error, ConflictError) else 400
         if dataset.kind == "mapping":
             return redirect(url_for("dataset_configuration", key=dataset.key) + "#mapping")
+        if dataset.kind == "hierarchy":
+            return redirect(url_for("dataset_records_view", key=dataset.key, concept=True))
         return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
 
     @dataset_route("/datasets/<key>/concept", methods=["GET"], defaults={"concept": True})
@@ -1004,8 +1017,8 @@ def create_flask_app(
             dataset_facts=dataset_facts,
             deletion=deletion,
             dataset_icon_label=DATASET_ICONS.get(
-                rendered_dataset_icon(dataset.icon),
-                rendered_dataset_icon(dataset.icon).replace("-", " ").capitalize(),
+                rendered_dataset_icon(dataset.icon, dataset.kind),
+                rendered_dataset_icon(dataset.icon, dataset.kind).replace("-", " ").capitalize(),
             ),
             business_key=identifier,
             version_state=state,
@@ -1451,6 +1464,369 @@ def create_flask_app(
             abort(400, description="Page must be a canonical positive integer")
         return int(values[0])
 
+    def hierarchy_presentation(view):
+        """Arrange a snapshot for templates without changing its structure or values."""
+        nodes = {node.id: node for node in view.hierarchy_nodes}
+        children = {}
+        for node in nodes.values():
+            children.setdefault(node.parent_id, []).append(node)
+        for siblings in children.values():
+            siblings.sort(key=lambda node: (node.name.casefold(), node.id))
+        rows, visited = [], set()
+
+        def append_subtree(start):
+            pending = [(start, ())]
+            while pending:
+                node, ancestors = pending.pop()
+                if node.id in visited:
+                    continue
+                visited.add(node.id)
+                ancestor_names = tuple(row["node"].name for row in ancestors)
+                path = (*ancestor_names, node.name)
+                rows.append(
+                    {
+                        "node": node,
+                        "depth": len(ancestors),
+                        "ancestors": ancestor_names,
+                        "ancestor_rows": ancestors,
+                        "parent_name": nodes[node.parent_id].name
+                        if node.parent_id in nodes
+                        else None,
+                        "path": " / ".join(path),
+                        "leaf": not children.get(node.id),
+                        "values": {
+                            value.field_key: value.value
+                            for value in node.values
+                            if any(
+                                field.id == value.field_id and field.data_type == value.data_type
+                                for field in view.fields
+                            )
+                        },
+                    }
+                )
+                pending.extend(
+                    (child, (*ancestors, rows[-1])) for child in reversed(children.get(node.id, ()))
+                )
+
+        for node in children.get(None, ()):
+            append_subtree(node)
+        # Invalid disconnected structure remains visible while its validation is resolved.
+        for node in nodes.values():
+            if node.id not in visited:
+                append_subtree(node)
+        return rows, children
+
+    def render_hierarchy(view):
+        selected = request.args.getlist("view") or ["hierarchy"]
+        if len(selected) != 1 or selected[0] not in {"hierarchy", "records", "hybrid"}:
+            abort(400, description="Choose Hierarchy, Records or Hybrid.")
+        records_view = request.args.getlist("records_view") or ["reference"]
+        if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
+            abort(400, description="Choose Reference table or Flattened tree.")
+        searches = request.args.getlist("q")
+        if len(searches) > 1 or set(request.args) - {"view", "records_view", "q"}:
+            abort(400, description="Unsupported hierarchy view parameters.")
+        hierarchy_search = search_term(searches[0] if searches else "")
+        normalized_search = hierarchy_search.casefold()
+        rows, children = hierarchy_presentation(view)
+        leaf_rows = [row for row in rows if row["leaf"] and row["node"].parent_id is not None]
+        parent_level_count = max((len(row["ancestors"]) for row in leaf_rows), default=0)
+        flat_value_columns = []
+        for field in view.fields:
+            if field.hierarchy_scope == "all_nodes":
+                flat_value_columns.extend(
+                    {"field": field, "label": f"{field.name} Level {level + 1}", "level": level}
+                    for level in range(parent_level_count)
+                )
+            flat_value_columns.append(
+                {"field": field, "label": f"{field.name} Leaf", "level": None}
+            )
+
+        def row_matches(row):
+            return matches(row["node"], view.fields, normalized_search) or (
+                normalized_search in row["node"].name.casefold()
+            )
+
+        if selected[0] == "records" and records_view[0] == "flattened":
+            unfiltered_rows = leaf_rows
+            display_rows = [
+                row
+                for row in unfiltered_rows
+                if not normalized_search
+                or any(row_matches(candidate) for candidate in (*row["ancestor_rows"], row))
+            ]
+        elif selected[0] == "records":
+            unfiltered_rows = rows
+            display_rows = [
+                row for row in unfiltered_rows if not normalized_search or row_matches(row)
+            ]
+        else:
+            unfiltered_rows = rows
+            if normalized_search:
+                matched_rows = [row for row in rows if row_matches(row)]
+                visible_ids = {
+                    candidate["node"].id
+                    for row in matched_rows
+                    for candidate in (*row["ancestor_rows"], row)
+                }
+                display_rows = [row for row in rows if row["node"].id in visible_ids]
+            else:
+                display_rows = rows
+
+        hierarchy_clear_url = url_for(
+            "dataset_records_view",
+            key=view.context.dataset.key,
+            version_id=view.state.version.id if view.state else None,
+            concept=True if view.state is None else None,
+            view=selected[0],
+            records_view=records_view[0] if selected[0] == "records" else None,
+        )
+        return render_authenticated_template(
+            "pages/datasets/hierarchy.html",
+            dataset=view.context.dataset,
+            context=view.context,
+            fields=view.fields,
+            identifier=view.identifier,
+            hierarchy_rows=rows,
+            hierarchy_errors=view.hierarchy_errors,
+            leaf_rows=leaf_rows,
+            parent_level_count=parent_level_count,
+            flat_value_columns=flat_value_columns,
+            records_view=records_view[0],
+            display_rows=display_rows,
+            hierarchy_result_total=len(unfiltered_rows),
+            hierarchy_search=hierarchy_search,
+            hierarchy_clear_url=hierarchy_clear_url,
+            selected_view=selected[0],
+            version_state=view.state,
+            may_edit=view.state is None and view.may_maintain,
+            may_start_concept=view.may_maintain and view.concept is None,
+        )
+
+    def hierarchy_edit_context(key, node_id=None):
+        actor, _session = require_authenticated()
+        view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
+        if view.context.dataset.kind != "hierarchy" or view.state or not view.may_maintain:
+            abort(404)
+        rows, _children = hierarchy_presentation(view)
+        row = next((row for row in rows if row["node"].id == node_id), None)
+        if node_id is not None and row is None:
+            abort(404)
+        return actor, view, rows, row
+
+    def render_hierarchy_node_form(
+        view, rows, row=None, *, mode="structure", error=None, errors=None
+    ):
+        node = row["node"] if row else None
+        node_ids = {entry["node"].id for entry in rows}
+        excluded = {node.id} if node else set()
+        if node:
+            for _ in rows:
+                descendants = {
+                    entry["node"].id for entry in rows if entry["node"].parent_id in excluded
+                }
+                if descendants <= excluded:
+                    break
+                excluded.update(descendants)
+        applicable = tuple(
+            field
+            for field in view.fields
+            if row and (row["leaf"] or field.hierarchy_scope == "all_nodes")
+        )
+        parent_id = (
+            request.form.get(
+                "parent_id", request.args.get("parent_id", node.parent_id if node else "")
+            )
+            or None
+        )
+        if not node and rows and parent_id is None and request.method == "GET":
+            parent_id = rows[0]["node"].id
+        if parent_id is not None and parent_id not in node_ids:
+            abort(404)
+        return_view, return_records_view = hierarchy_return_view()
+        return render_authenticated_template(
+            "pages/datasets/hierarchy/node_form.html",
+            dataset=view.context.dataset,
+            node=node,
+            node_row=row,
+            mode=mode,
+            fields=applicable,
+            inactive_fields=tuple(
+                field
+                for field in view.fields
+                if field not in applicable and row and row["values"].get(field.key) is not None
+            ),
+            parent_options=[entry for entry in rows if entry["node"].id not in excluded],
+            parent_id=parent_id,
+            name=request.form.get("name", node.name if node else ""),
+            values=(
+                {
+                    key.removeprefix("field:"): value
+                    for key, value in request.form.items()
+                    if key.startswith("field:")
+                }
+                if request.method == "POST" and mode == "values"
+                else (row["values"] if row else {})
+            ),
+            raw_values=request.method == "POST" and mode == "values",
+            expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
+            return_view=return_view,
+            return_records_view=return_records_view,
+            error=error,
+            errors=errors or {},
+        )
+
+    def hierarchy_return_view():
+        values = request.form if request.method == "POST" else request.args
+        selected = values.getlist("return_view") or ["hierarchy"]
+        records = values.getlist("return_records_view") or ["reference"]
+        if (
+            len(selected) != 1
+            or selected[0] not in {"hierarchy", "records"}
+            or len(records) != 1
+            or records[0] not in {"reference", "flattened"}
+        ):
+            abort(400, description="Choose a valid return view.")
+        return selected[0], records[0]
+
+    @dataset_route("/datasets/<key>/concept/nodes/new", methods=["GET", "POST"])
+    @version_errors
+    def dataset_hierarchy_node_create(key):
+        actor, view, rows, _row = hierarchy_edit_context(key)
+        if request.method == "POST":
+            try:
+                hierarchy.create_node(
+                    actor.id,
+                    key,
+                    request.form.get("name", ""),
+                    request.form.get("parent_id") or None,
+                    expected_revision=exact_expected_revision(),
+                )
+            except (ValidationError, ConflictError) as error:
+                return render_hierarchy_node_form(view, rows, error=str(error)), 409 if isinstance(
+                    error, ConflictError
+                ) else 400
+            return redirect(url_for("dataset_records_view", key=key, concept=True))
+        return render_hierarchy_node_form(view, rows)
+
+    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/edit", methods=["GET", "POST"])
+    @version_errors
+    def dataset_hierarchy_node_edit(key, node_id):
+        actor, view, rows, row = hierarchy_edit_context(key, node_id)
+        if request.method == "POST":
+            try:
+                hierarchy.update_node(
+                    actor.id,
+                    key,
+                    node_id,
+                    request.form.get("name", ""),
+                    request.form.get("parent_id") or None,
+                    expected_revision=exact_expected_revision(),
+                )
+            except (ValidationError, ConflictError) as error:
+                return render_hierarchy_node_form(
+                    view, rows, row, error=str(error)
+                ), 409 if isinstance(error, ConflictError) else 400
+            return redirect(url_for("dataset_records_view", key=key, concept=True))
+        return render_hierarchy_node_form(view, rows, row)
+
+    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/delete", methods=["GET", "POST"])
+    @version_errors
+    def dataset_hierarchy_node_delete(key, node_id):
+        actor, view, rows, row = hierarchy_edit_context(key, node_id)
+        if row["node"].parent_id is None:
+            abort(400, description="The root node cannot be deleted.")
+        subtree_count = 1 + sum(
+            any(ancestor["node"].id == node_id for ancestor in entry["ancestor_rows"])
+            for entry in rows
+            if entry["node"].id != node_id
+        )
+        error, status = None, 200
+        if request.method == "POST":
+            try:
+                if set(request.form) - {"csrf_token", "confirm", "expected_revision"}:
+                    raise ValidationError("Unknown form field")
+                if request.form.getlist("confirm") != ["yes"]:
+                    raise ValidationError("Explicit confirmation is required")
+                hierarchy.delete_subtree(
+                    actor.id,
+                    key,
+                    node_id,
+                    expected_revision=exact_expected_revision(),
+                )
+            except (ValidationError, ConflictError) as failure:
+                error = str(failure)
+                status = 409 if isinstance(failure, ConflictError) else 400
+            else:
+                return redirect(url_for("dataset_records_view", key=key, concept=True))
+        response = render_authenticated_template(
+            "pages/datasets/hierarchy/delete.html",
+            dataset=view.context.dataset,
+            node_row=row,
+            subtree_count=subtree_count,
+            expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
+            error=error,
+        )
+        return (response, status) if status != 200 else response
+
+    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/values", methods=["GET", "POST"])
+    @version_errors
+    def dataset_hierarchy_node_values(key, node_id):
+        actor, view, rows, row = hierarchy_edit_context(key, node_id)
+        return_view, return_records_view = hierarchy_return_view()
+        if request.method == "POST":
+            applicable = [
+                field
+                for field in view.fields
+                if row["leaf"] or field.hierarchy_scope == "all_nodes"
+            ]
+            submitted, errors = {}, {}
+            expected_fields = {f"field:{field.key}" for field in applicable}
+            for form_key, form_values in request.form.lists():
+                if form_key in {
+                    "csrf_token",
+                    "expected_revision",
+                    "return_view",
+                    "return_records_view",
+                }:
+                    continue
+                field_key = form_key.removeprefix("field:")
+                if form_key not in expected_fields:
+                    errors[field_key] = "This field does not apply to the selected node."
+                elif len(form_values) != 1:
+                    errors[field_key] = "Submit exactly one value."
+                else:
+                    submitted[field_key] = form_values[0]
+            try:
+                if errors:
+                    raise RecordValidationError(errors)
+                hierarchy.update_values(
+                    actor.id,
+                    key,
+                    node_id,
+                    submitted,
+                    expected_revision=exact_expected_revision(),
+                )
+            except (ValidationError, ConflictError) as error:
+                return render_hierarchy_node_form(
+                    view,
+                    rows,
+                    row,
+                    mode="values",
+                    error=str(error),
+                    errors=getattr(error, "errors", {}),
+                ), 409 if isinstance(error, ConflictError) else 400
+            return redirect(
+                url_for(
+                    "dataset_records_view",
+                    key=key,
+                    concept=True,
+                    view=return_view,
+                    records_view=return_records_view if return_view == "records" else None,
+                )
+            )
+        return render_hierarchy_node_form(view, rows, row, mode="values")
+
     @dataset_route("/datasets/<key>/concept/records", methods=["GET"], defaults={"concept": True})
     @dataset_route("/datasets/<key>/records", methods=["GET"], defaults={"concept": False})
     @dataset_route(
@@ -1466,6 +1842,12 @@ def create_flask_app(
             if len(request.query_string) > MAX_QUERY_BYTES:
                 raise RecordSearchError(
                     "Record criteria exceed the URL limit. Clear all to start again."
+                )
+            if datasets.get_dataset(actor.id, key).kind == "hierarchy":
+                return render_hierarchy(
+                    dataset_versions.read(
+                        actor.id, key, version_id, page=None, prefer_concept=concept
+                    )
                 )
             parameters, selected_statuses, record_status, requested_page = parse_parameters(
                 request.args.items(multi=True)
@@ -2698,6 +3080,7 @@ def create_flask_app(
             has_mapping_source_identifier=has_mapping_source_identifier,
             mapping_source_field_key=request.form.get("source_field_key", ""),
             mapping_source_fields=mapping_source_fields,
+            hierarchy_scope=request.form.get("hierarchy_scope", "leaves"),
         )
 
     @dataset_route("/datasets/<key>/fields/new", methods=["GET"])
@@ -2733,6 +3116,7 @@ def create_flask_app(
                 unit=request.form.get("unit", ""),
                 mapping_role=request.form.get("mapping_field_role") or None,
                 source_field_key=request.form.get("source_field_key") or None,
+                hierarchy_scope=request.form.get("hierarchy_scope") or None,
             )
         except NotFoundError:
             abort(404)
@@ -2764,6 +3148,8 @@ def create_flask_app(
         is_required: bool,
         is_unique: bool,
         is_business_key_component: bool,
+        key_value: str,
+        may_edit_key: bool,
         error=None,
     ):
         return render_authenticated_template(
@@ -2777,9 +3163,12 @@ def create_flask_app(
             is_required=is_required,
             is_unique=is_unique,
             is_business_key_component=is_business_key_component,
+            key_value=key_value,
+            may_edit_key=may_edit_key,
             error=error,
             current_csrf=csrf,
             type_choices=tuple(DATATYPES.values()),
+            hierarchy_scope=request.form.get("hierarchy_scope", field.hierarchy_scope),
         )
 
     @dataset_route("/datasets/<key>/fields/<field_key>/edit", methods=["GET"])
@@ -2792,6 +3181,7 @@ def create_flask_app(
         try:
             field = field_service.get_field(actor.id, key, field_key)
             business_key = business_key_service.get_business_key(actor.id, key)
+            may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
         except NotFoundError:
             abort(404)
         return render_dataset_field_edit_form(
@@ -2803,6 +3193,8 @@ def create_flask_app(
             is_required=field.is_required,
             is_unique=field.is_unique,
             is_business_key_component=field.key in business_key.field_keys,
+            key_value=field.key,
+            may_edit_key=may_edit_key,
         )
 
     @dataset_route("/datasets/<key>/fields/<field_key>", methods=["POST"])
@@ -2827,15 +3219,18 @@ def create_flask_app(
                 is_required,
                 is_unique,
                 is_business_key_component,
+                new_key=request.form.get("key", field_key),
                 definition=request.form.get("definition", ""),
                 unit=request.form.get("unit", ""),
+                hierarchy_scope=request.form.get("hierarchy_scope") or None,
             )
         except NotFoundError:
             abort(404)
-        except ValidationError as error:
+        except (ValidationError, ConflictError) as error:
             dataset = require_dataset_schema_admin(actor.id, key)
             try:
                 field = field_service.get_field(actor.id, key, field_key)
+                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             except NotFoundError:
                 abort(404)
             return (
@@ -2848,9 +3243,11 @@ def create_flask_app(
                     is_required=is_required,
                     is_unique=is_unique,
                     is_business_key_component=is_business_key_component,
+                    key_value=request.form.get("key", field.key),
+                    may_edit_key=may_edit_key,
                     error=str(error),
                 ),
-                400,
+                409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(
             url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
@@ -2872,6 +3269,7 @@ def create_flask_app(
             try:
                 field = field_service.get_field(actor.id, key, field_key)
                 business_key = business_key_service.get_business_key(actor.id, key)
+                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             except NotFoundError:
                 abort(404)
             return (
@@ -2884,6 +3282,8 @@ def create_flask_app(
                     is_required=field.is_required,
                     is_unique=field.is_unique,
                     is_business_key_component=field.key in business_key.field_keys,
+                    key_value=field.key,
+                    may_edit_key=may_edit_key,
                     error=str(error),
                 ),
                 400,

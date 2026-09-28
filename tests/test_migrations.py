@@ -172,7 +172,9 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
     assert owner_foreign_key["options"].get("ondelete") in {None, "RESTRICT"}
     field_columns = {column["name"]: column for column in inspector.get_columns("dataset_fields")}
     assert set(field_columns) == ({"definition", "unit"} if dataset_revision else set()) | (
-        {"mapping_role", "source_field_id", "source_field_key"} if mapping_tables else set()
+        {"mapping_role", "source_field_id", "source_field_key", "hierarchy_scope"}
+        if mapping_tables
+        else set()
     ) | {
         "id",
         "dataset_id",
@@ -462,7 +464,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0027_ref_177"
+                "0028_ref_179"
             )
     finally:
         upgraded.dispose()
@@ -1025,7 +1027,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0027_ref_177"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0028_ref_179"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)

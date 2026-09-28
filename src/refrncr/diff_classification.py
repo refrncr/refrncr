@@ -5,6 +5,7 @@ from dataclasses import fields as dataclass_fields
 
 from refrncr.datatypes import get_datatype
 from refrncr.diff_contracts import STATUSES, FieldChange, PropertyChange
+from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.services import ValidationError
 from refrncr.version_contracts import SnapshotField, SummaryCounts
 
@@ -75,6 +76,7 @@ def classify_fields(current, previous):
         "is_identifier": "Record identifier",
         "mapping_role": "Mapping role",
         "source_field_key": "Source field",
+        "hierarchy_scope": "Applicability",
     }
 
     def text(field, name):
@@ -85,6 +87,8 @@ def classify_fields(current, previous):
             return None
         if name == "data_type":
             return get_datatype(value).label
+        if name == "hierarchy_scope":
+            return {"leaves": "Leaves only", "all_nodes": "All nodes"}.get(value, value)
         return ("Yes" if value else "No") if isinstance(value, bool) else str(value)
 
     result = []
@@ -129,4 +133,93 @@ def summary_counts(fields, records):
     return SummaryCounts(
         *(sum(field.status == status for field in fields) for status in STATUSES),
         *records,
+    )
+
+
+def classify_hierarchy(current, previous, current_fields, previous_fields):
+    """Compare the complete tree and retained values by stable node identity."""
+    new, old = ({node.id: node for node in nodes} for nodes in (current, previous))
+    new_fields, old_fields = (
+        {field.id: field for field in fields} for fields in (current_fields, previous_fields)
+    )
+    new_parents, old_parents = (
+        {node.parent_id for node in nodes if node.parent_id is not None}
+        for nodes in (current, previous)
+    )
+    new_paths, old_paths = (hierarchy_node_paths(nodes) for nodes in (current, previous))
+
+    def role(node, parents):
+        if node is None:
+            return None
+        return "Root" if node.parent_id is None else "Branch" if node.id in parents else "Leaf"
+
+    def rendered(value):
+        if value is None:
+            return None
+        datatype = get_datatype(value.data_type)
+        return datatype.text(datatype.from_key(value.canonical_key))
+
+    changes = []
+    for identity in new.keys() | old.keys():
+        before, after = old.get(identity), new.get(identity)
+        properties = []
+        for label, left, right in (
+            ("Name", before.name if before else None, after.name if after else None),
+            (
+                "Parent",
+                old_paths.get(before.parent_id) if before else None,
+                new_paths.get(after.parent_id) if after else None,
+            ),
+            (
+                "Node type",
+                role(before, old_parents),
+                role(after, new_parents),
+            ),
+        ):
+            if label == "Parent" and before and after and before.parent_id == after.parent_id:
+                continue
+            if left != right:
+                properties.append(PropertyChange(label, left, right))
+        left_values = {value.field_id: value for value in before.values} if before else {}
+        right_values = {value.field_id: value for value in after.values} if after else {}
+        for field_id in sorted(left_values.keys() | right_values.keys()):
+            left, right = left_values.get(field_id), right_values.get(field_id)
+            field = new_fields.get(field_id) or old_fields.get(field_id)
+            if field is None:
+                raise ValidationError("Invalid hierarchy Field configuration")
+            left_key = (left.data_type, left.canonical_key) if left else None
+            right_key = (right.data_type, right.canonical_key) if right else None
+            if left_key != right_key:
+                properties.append(PropertyChange(field.name, rendered(left), rendered(right)))
+            if left is not None and right is not None:
+                old_active = (
+                    identity not in old_parents
+                    or old_fields[field_id].hierarchy_scope == "all_nodes"
+                )
+                new_active = (
+                    identity not in new_parents
+                    or new_fields[field_id].hierarchy_scope == "all_nodes"
+                )
+                if old_active != new_active:
+                    properties.append(
+                        PropertyChange(
+                            f"{field.name} applicability",
+                            "Active" if old_active else "Retained",
+                            "Active" if new_active else "Retained",
+                        )
+                    )
+        if properties:
+            changes.append(
+                FieldChange(
+                    identity,
+                    new_paths.get(identity) or old_paths[identity],
+                    "Added" if before is None else "Removed" if after is None else "Changed",
+                    tuple(properties),
+                    bool(before and after and before.parent_id != after.parent_id),
+                )
+            )
+    return tuple(
+        sorted(
+            changes, key=lambda item: (STATUSES.index(item.status), item.name.casefold(), item.id)
+        )
     )

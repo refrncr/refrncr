@@ -598,6 +598,7 @@ def test_design_tokens_and_responsive_hooks_are_served_locally(dataset_browser):
         '@import url("components/feedback.css");',
         '@import url("components/cards-badges.css");',
         '@import url("components/tables.css");',
+        '@import url("components/hierarchy.css");',
         '@import url("components/dialog.css");',
     ]
     assert "--color-action-primary:" in tokens
@@ -2044,7 +2045,7 @@ def test_viewer_and_editor_field_mutation_routes_are_denied(dataset_browser, per
         assert session.scalar(select(func.count(DatasetField.id))) == 1
 
 
-def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_browser):
+def test_admin_edit_field_flow_allows_key_change_only_before_first_publication(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "edit-field")
     field = create_field(services, admin, dataset, "stable_key", "Original")
@@ -2054,7 +2055,7 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
 
     assert form.status_code == 200
     assert "stable_key" in body(form)
-    assert "name='key'" not in body(form)
+    assert "name='key' value='stable_key'" in body(form)
     response = request(
         client,
         "post",
@@ -2065,7 +2066,7 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
             "is_required": "on",
             "is_unique": "on",
             "csrf_token": form_csrf(form),
-            "key": "attacker_key",
+            "key": "corrected_key",
             "id": "attacker-id",
             "dataset_id": "attacker-dataset",
             "created_at": "1900-01-01",
@@ -2079,7 +2080,7 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
     assert response.headers["Location"].endswith("/datasets/edit-field/concept?tab=fields#fields")
     with factory() as session:
         persisted = session.get(DatasetField, original_id)
-        assert persisted.key == "stable_key"
+        assert persisted.key == "corrected_key"
         assert persisted.name == "Changed"
         assert persisted.data_type == "date"
         assert persisted.is_required is True and persisted.is_unique is True
@@ -2087,10 +2088,36 @@ def test_admin_edit_field_flow_is_allowlisted_and_key_is_immutable(dataset_brows
         assert persisted.created_at.year != 1900 and persisted.updated_at.year != 1900
         assert (
             session.scalar(
-                select(func.count(DatasetField.id)).where(DatasetField._key == "attacker_key")
+                select(func.count(DatasetField.id)).where(DatasetField._key == "stable_key")
             )
             == 0
         )
+
+    publish_dataset(services, admin.id, dataset)
+    services.dataset_versions.create_concept(admin.id, dataset.id)
+    published_form = request(client, "get", "/datasets/edit-field/fields/corrected_key/edit")
+
+    assert published_form.status_code == 200
+    assert "name='key'" not in body(published_form)
+    assert "corrected_key" in body(published_form)
+    rejected = request(
+        client,
+        "post",
+        "/datasets/edit-field/fields/corrected_key",
+        data={
+            "name": "Changed",
+            "data_type": "date",
+            "is_required": "on",
+            "is_unique": "on",
+            "key": "too_late",
+            "csrf_token": form_csrf(published_form),
+        },
+    )
+
+    assert rejected.status_code == 400
+    assert "Field key can only be changed before the first version is published." in body(rejected)
+    with factory() as session:
+        assert session.get(DatasetField, original_id).key == "corrected_key"
 
 
 def test_edit_field_absent_checkboxes_clear_flags(dataset_browser):

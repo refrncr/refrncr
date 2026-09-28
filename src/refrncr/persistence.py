@@ -32,6 +32,8 @@ from refrncr.models import (
     DatasetExportAccess,
     DatasetField,
     DatasetFieldSourceFormat,
+    DatasetHierarchyNode,
+    DatasetHierarchyValue,
     DatasetRecord,
     DatasetRecordValue,
     DatasetVersion,
@@ -303,7 +305,12 @@ class SqlAlchemyDatasetOperations:
 
         return (
             total(DatasetField),
-            total(DatasetRecord),
+            (
+                total(DatasetHierarchyNode)
+                if self.session.scalar(select(Dataset.kind).where(Dataset.id == dataset_id))
+                == "hierarchy"
+                else total(DatasetRecord)
+            ),
             total(DatasetVersion),
             total(DatasetExportAccess),
         )
@@ -313,6 +320,8 @@ class SqlAlchemyDatasetOperations:
         # unspecified ordering of multiple database cascades from Dataset.
         for model in (
             DatasetVersion,
+            DatasetHierarchyValue,
+            DatasetHierarchyNode,
             DatasetRecordValue,
             DatasetRecord,
             DatasetBusinessKeyField,
@@ -397,9 +406,19 @@ class SqlAlchemyDatasetOperations:
         current_counts = select(
             DatasetRecord.dataset_id, func.count(DatasetRecord.id).label("record_count")
         ).where(DatasetRecord.deleted_content.is_(None))
+        hierarchy_counts = select(
+            DatasetHierarchyNode.dataset_id,
+            func.count(DatasetHierarchyNode.id).label("record_count"),
+        )
         if dataset_ids is not None:
             current_counts = current_counts.where(DatasetRecord.dataset_id.in_(dataset_ids))
-        current_counts = current_counts.group_by(DatasetRecord.dataset_id).subquery()
+            hierarchy_counts = hierarchy_counts.where(
+                DatasetHierarchyNode.dataset_id.in_(dataset_ids)
+            )
+        hierarchy_counts = hierarchy_counts.group_by(DatasetHierarchyNode.dataset_id)
+        current_counts = (
+            current_counts.group_by(DatasetRecord.dataset_id).union_all(hierarchy_counts).subquery()
+        )
         statement = (
             select(Dataset, func.coalesce(current_counts.c.record_count, 0))
             .outerjoin(current_counts, current_counts.c.dataset_id == Dataset.id)
@@ -569,6 +588,25 @@ class SqlAlchemyDatasetFieldOperations:
         for index, field_id in enumerate(field_ids, 1):
             by_id[field_id].display_position = index
         self.session.flush()
+
+    def rename_key(self, dataset_id: str, field_id: str, key: str) -> DatasetField:
+        """Controlled pre-publication correction; lifecycle checks belong to the service."""
+        try:
+            result = self.session.execute(
+                update(DatasetField)
+                .where(DatasetField.dataset_id == dataset_id, DatasetField.id == field_id)
+                .values(_key=key, updated_at=utc_now())
+                .execution_options(synchronize_session=False)
+            )
+        except IntegrityError as exc:
+            raise PersistenceConflictError(_safe_constraint_name(exc)) from None
+        if result.rowcount != 1:
+            raise PersistenceConflictError()
+        self.session.expire_all()
+        field = self.find_by_key(dataset_id, key, for_update=True)
+        if field is None:
+            raise PersistenceConflictError()
+        return field
 
     def source_formats(self, dataset_id):
         return {
@@ -784,6 +822,25 @@ class SqlAlchemyDatasetRecordOperations:
                     )
             yield StoredRecord(row.id, dataset_id, tuple(values), row.revision), fields
 
+    def rename_deleted_field_key(self, dataset_id: str, field_id: str, key: str) -> None:
+        rows = self.session.scalars(
+            select(DatasetRecord).where(
+                DatasetRecord.dataset_id == dataset_id,
+                DatasetRecord.deleted_content.is_not(None),
+            )
+        )
+        for row in rows:
+            payload = dict(row.deleted_content)
+            fields = [dict(field) for field in payload["fields"]]
+            changed = False
+            for field in fields:
+                if field["id"] == field_id:
+                    field["key"] = key
+                    changed = True
+            if changed:
+                payload["fields"] = fields
+                row.deleted_content = payload
+
     def restore_if_revision(self, dataset_id, record_id, expected_revision, identifier_key):
         try:
             result = self.session.execute(
@@ -909,6 +966,7 @@ class SqlAlchemyDatasetRecordOperations:
                 defer(DatasetField.mapping_role),
                 defer(DatasetField.source_field_id),
                 defer(DatasetField.source_field_key),
+                defer(DatasetField.hierarchy_scope),
             )
         current = None
         values: list[RecordValue] = []
@@ -1253,6 +1311,9 @@ class SqlAlchemyUnitOfWork:
         self.dataset_fields = SqlAlchemyDatasetFieldOperations(self.session)
         self.dataset_business_keys = SqlAlchemyDatasetBusinessKeyOperations(self.session)
         self.dataset_records = SqlAlchemyDatasetRecordOperations(self.session)
+        from refrncr.hierarchy_persistence import SqlAlchemyHierarchyOperations
+
+        self.hierarchy = SqlAlchemyHierarchyOperations(self.session)
         from refrncr.version_persistence import SqlAlchemyVersionOperations
 
         self.versions = SqlAlchemyVersionOperations(self.session)

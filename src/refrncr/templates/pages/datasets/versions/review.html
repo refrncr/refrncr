@@ -25,7 +25,13 @@
   </nav>
   <h2>{{ section }}</h2>
   {% if section == 'Summary' %}
+    {% if result.hierarchy_errors %}<section class='alert alert-warning' aria-labelledby='hierarchy-review-errors'><h3 id='hierarchy-review-errors'>Resolve before publication</h3><ul>{% for error in result.hierarchy_errors %}<li>{{ error }}</li>{% endfor %}</ul></section>{% endif %}
     {% if result.metadata %}{{ properties(result.metadata, 'Dataset metadata changes') }}{% endif %}
+    {% if result.hierarchy_changes %}
+    <section aria-labelledby='hierarchy-changes-heading'><h3 id='hierarchy-changes-heading'>Hierarchy changes</h3>
+      {% for item in result.hierarchy_changes %}<section><h4>{{ item.name }} <span class='badge'>{{ item.status }}</span></h4>{{ properties(item.properties, 'Node changes: ' ~ item.name) }}</section>{% endfor %}
+    </section>
+    {% endif %}
     <div class='table-scroll' role='region' aria-label='Change counts' tabindex='0'>
       <table><caption>Change counts</caption><thead><tr><th scope='col'>Content</th><th scope='col'>Added</th><th scope='col'>Changed</th><th scope='col'>Removed</th></tr></thead>
       <tbody><tr><th scope='row'>Fields</th><td>{{ result.counts.fields_added }}</td><td>{{ result.counts.fields_changed }}</td><td>{{ result.counts.fields_removed }}</td></tr>

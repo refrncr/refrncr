@@ -138,6 +138,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/migrations/versions/0025_ref_177_mapping_fields.py",
         "refrncr/migrations/versions/0026_ref_177_mapping_field_roles.py",
         "refrncr/migrations/versions/0027_ref_177_standalone_source_context.py",
+        "refrncr/migrations/versions/0028_ref_179_hierarchies.py",
         "refrncr/api_keys.py",
         "refrncr/api_key_persistence.py",
         "refrncr/static/js/api-key-secret.js",

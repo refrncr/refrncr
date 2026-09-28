@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% from 'components/side_panel.html' import panel_form_actions %}
+{% set panel_title = 'Delete branch' %}
+{% block title %}{{ panel_title }} · REFRNCR{% endblock %}
+{% block content %}
+{% include 'pages/datasets/_breadcrumbs.html' %}
+<h1>{{ panel_title }}</h1>
+<div class='side-panel-view' data-side-panel-content data-panel-title='{{ panel_title }}' data-panel-eyebrow='Hierarchy · {{ dataset.name }}'>
+  <div class='side-panel-body'>
+    {% include 'pages/datasets/concepts/_banner.html' %}
+    <p class='hierarchy-path'>{{ node_row.path }}</p>
+    {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
+    <p class='delete-confirmation'>This permanently deletes {{ subtree_count }} {{ 'node' if subtree_count == 1 else 'nodes' }}, including all descendants and all values attached to them. Published versions remain unchanged.</p>
+    <form id='hierarchy-delete-form' class='form' method='post' action='{{ url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=node_row.node.id) }}'>
+      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+      <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
+      <label><input type='checkbox' name='confirm' value='yes' required> I confirm permanent deletion</label>
+    </form>
+  </div>
+  {% call panel_form_actions() %}
+    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>
+    <button class='button button-danger' type='submit' form='hierarchy-delete-form'>Delete branch</button>
+  {% endcall %}
+</div>
+{% endblock %}

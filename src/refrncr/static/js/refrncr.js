@@ -130,6 +130,14 @@
   };
   initializeConfirmations(document);
 
+  // Icon labels remain available on hover/focus and can be dismissed without moving focus.
+  document.querySelectorAll(".button-row-icon[data-tooltip]").forEach((trigger) => {
+    const reset = () => {
+      if (!trigger.matches(":hover, :focus-visible")) trigger.removeAttribute("data-tooltip-dismissed");
+    };
+    trigger.addEventListener("pointerleave", reset);
+    trigger.addEventListener("blur", reset);
+  });
   document.querySelectorAll("[data-mapping-tooltip]").forEach((details) => {
     const trigger = details.querySelector("summary");
     const tooltip = details.querySelector('[role="tooltip"]');
@@ -714,6 +722,9 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       exportMenus.forEach((menu) => menu.removeAttribute("open"));
+      document.querySelectorAll(".button-row-icon[data-tooltip]:is(:hover, :focus-visible)").forEach((trigger) => {
+        trigger.setAttribute("data-tooltip-dismissed", "");
+      });
     }
   });
 

@@ -47,7 +47,9 @@
       <legend>Table type</legend>
       <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference table</label>
       <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping table</label>
+      <label><input type='radio' name='kind' value='hierarchy'{% if table_kind == 'hierarchy' %} checked{% endif %}> Hierarchy table</label>
       <p class='help-text'>Mapping tables are versioned 1:1 crosswalks and use the same Concept → review → publish lifecycle.</p>
+      <p class='help-text'>Hierarchy tables start with a root and its children. Custom fields and a record identifier are optional.</p>
     </fieldset>
     <div data-mapping-setup{% if table_kind != 'mapping' %} hidden{% endif %}>
       <fieldset class='form-field'>
@@ -72,7 +74,7 @@
         </div>
       </div>
     </div>
-    {{ icon_picker(dataset_icon_choices, selected_icon) }}
+    {{ icon_picker(dataset_icon_choices, selected_icon, kind=table_kind) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
       <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>

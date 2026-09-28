@@ -1,14 +1,19 @@
 """Append-only snapshot adapter. Callers own the locked Dataset transaction."""
 
+from collections import defaultdict
 from dataclasses import asdict
 
 from sqlalchemy import Numeric, cast, func, select, update
 
 from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchy_persistence import hierarchy_value
 from refrncr.models import (
     Dataset,
     DatasetVersion,
     DatasetVersionField,
+    DatasetVersionHierarchyNode,
+    DatasetVersionHierarchyValue,
     DatasetVersionRecord,
     DatasetVersionValue,
     new_id,
@@ -114,7 +119,7 @@ class SqlAlchemyVersionOperations:
             select(Dataset, DatasetVersion)
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
-            .where(ranked.c.position == 1)
+            .where(ranked.c.position == 1, Dataset.kind != "hierarchy")
         )
         if dataset_ids is not None:
             statement = statement.where(Dataset.id.in_(dataset_ids))
@@ -179,7 +184,7 @@ class SqlAlchemyVersionOperations:
             select(Dataset, DatasetVersion)
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
-            .where(ranked.c.position == 1)
+            .where(ranked.c.position == 1, Dataset.kind != "hierarchy")
         )
         if version_number is not None:
             statement = statement.where(DatasetVersion.number == version_number)
@@ -204,6 +209,7 @@ class SqlAlchemyVersionOperations:
             .where(
                 DatasetVersion.cancelled_at.is_(None),
                 DatasetVersion.number == version_number,
+                Dataset.kind != "hierarchy",
             )
         )
         if dataset_ids is not None:
@@ -297,6 +303,7 @@ class SqlAlchemyVersionOperations:
                 values.pop("unit")
                 values.pop("mapping_role")
                 values.pop("source_field_key")
+                values.pop("hierarchy_scope")
                 self.session.execute(legacy_fields.insert().values(version_id=row.id, **values))
             else:
                 self.session.add(DatasetVersionField(version_id=row.id, **values))
@@ -306,6 +313,8 @@ class SqlAlchemyVersionOperations:
             encoded = b"".join(
                 len(by_key[k]).to_bytes(4, "big") + by_key[k] for k in content.identifier_keys
             )
+            if content.hierarchy_nodes and not content.identifier_keys:
+                encoded = b"hierarchy:" + record.id.encode("ascii")
             self.session.add(
                 DatasetVersionRecord(version_id=row.id, id=record.id, identifier_key=encoded)
             )
@@ -322,6 +331,26 @@ class SqlAlchemyVersionOperations:
                         canonical_key=value.canonical_key,
                         canonical_text=datatype.text(decoded),
                         unique_key=value.canonical_key if value.is_unique else None,
+                    )
+                )
+        self.session.flush()
+        for node in content.hierarchy_nodes:
+            self.session.add(
+                DatasetVersionHierarchyNode(
+                    version_id=row.id, id=node.id, name=node.name, parent_id=node.parent_id
+                )
+            )
+        self.session.flush()
+        for node in content.hierarchy_nodes:
+            for value in node.values:
+                datatype = get_datatype(value.data_type)
+                self.session.add(
+                    DatasetVersionHierarchyValue(
+                        version_id=row.id,
+                        node_id=node.id,
+                        field_id=value.field_id,
+                        canonical_key=value.canonical_key,
+                        canonical_text=datatype.text(datatype.from_key(value.canonical_key)),
                     )
                 )
         self.session.flush()
@@ -375,6 +404,7 @@ class SqlAlchemyVersionOperations:
                 f.unit,
                 f.mapping_role,
                 f.source_field_key,
+                f.hierarchy_scope,
             )
             for f in self.session.scalars(
                 select(DatasetVersionField)
@@ -432,4 +462,46 @@ class SqlAlchemyVersionOperations:
             version.description,
             self.fields(version),
             tuple(self.iterate_records(version)),
+            self.hierarchy_nodes(version) if not self.legacy_metadata else (),
+        )
+
+    def hierarchy_node_counts(self, version_ids):
+        if not version_ids:
+            return {}
+        counts = dict.fromkeys(version_ids, 0)
+        counts.update(
+            self.session.execute(
+                select(
+                    DatasetVersionHierarchyNode.version_id,
+                    func.count(DatasetVersionHierarchyNode.id),
+                )
+                .where(DatasetVersionHierarchyNode.version_id.in_(version_ids))
+                .group_by(DatasetVersionHierarchyNode.version_id)
+            ).all()
+        )
+        return counts
+
+    def hierarchy_nodes(self, version):
+        nodes = self.session.scalars(
+            select(DatasetVersionHierarchyNode)
+            .where(DatasetVersionHierarchyNode.version_id == version.id)
+            .order_by(DatasetVersionHierarchyNode.id)
+        ).all()
+        values = defaultdict(list)
+        for value, field in self.session.execute(
+            select(DatasetVersionHierarchyValue, DatasetVersionField)
+            .join(
+                DatasetVersionField,
+                (DatasetVersionField.version_id == DatasetVersionHierarchyValue.version_id)
+                & (DatasetVersionField.id == DatasetVersionHierarchyValue.field_id),
+            )
+            .where(DatasetVersionHierarchyValue.version_id == version.id)
+            .order_by(DatasetVersionHierarchyValue.node_id, DatasetVersionHierarchyValue.field_id)
+        ):
+            values[value.node_id].append(hierarchy_value(field, value))
+        return tuple(
+            HierarchyNode(
+                node.id, version.dataset_id, node.name, node.parent_id, tuple(values[node.id])
+            )
+            for node in nodes
         )
