@@ -22,7 +22,7 @@
 .hierarchy-records td,
 .hierarchy-hybrid td { font-family: var(--font-data); font-size: var(--font-size-xs); }
 .hierarchy-field-scope { margin-inline-start: var(--space-sm); letter-spacing: normal; text-transform: none; }
-.hierarchy-indent { display: inline-block; width: calc(var(--space-md) + 20px); }
-.hierarchy-tree-marker { display: inline-flex; width: calc(var(--space-md) + 20px); align-items: center; vertical-align: middle; }
-.hierarchy-tree-icon { width: 1rem; height: 1rem; margin-inline: 10px; transform: translateY(-3px); }
+.hierarchy-indent { display: inline-block; width: calc(var(--space-md) + 18px); }
+.hierarchy-tree-marker { display: inline-flex; width: calc(var(--space-md) + 18px); align-items: center; vertical-align: middle; }
+.hierarchy-tree-icon { width: 1rem; height: 1rem; margin-inline: 10px 8px; transform: translateY(-3px); }
 .hierarchy-path { color: var(--color-text-secondary); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
