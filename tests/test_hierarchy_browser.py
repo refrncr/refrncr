@@ -93,10 +93,7 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "Export</summary>" in page
-    assert f"/datasets/{dataset.key}/concept/records/export?format=csv&amp;variant=data" in page
-    assert (
-        f"/datasets/{dataset.key}/concept/records/export?format=csv&amp;variant=flattened" in page
-    )
+    assert f"/datasets/{dataset.key}/concept/records/export?format=csv_zip" in page
     assert f"/datasets/{dataset.key}/concept/records/export?format=xlsx" in page
     assert f"/datasets/{dataset.key}/concept/records/export?format=json" in page
     export = request(
@@ -469,7 +466,7 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     assert tree.status_code == 200
     assert "Node 349" in body(tree)
     assert body(tree).count("data-hierarchy-node=") == 350
-    assert body(tree).count("↳ </span>") == 349
+    assert body(tree).count('data-icon="corner-down-right"') == 349
     records = request(client, "get", "/datasets/deep/concept/records?view=records")
     assert records.status_code == 200
     assert body(records).count("data-hierarchy-node=") == 350

@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import zipfile
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
@@ -51,6 +52,22 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     assert rows[2][5] == ""
     assert rows[3][4:] == ["context", "L1"]
     assert artifact.download_name == "hierarchy-data.csv"
+    artifact.content.close()
+
+
+def test_hierarchy_csv_bundle_contains_both_variants():
+    fields = (field("f1", "code", "leaves"),)
+    nodes = (node("root", "Root"), node("leaf", "Leaf", "root", (value("f1", "code", "L"),)))
+
+    artifact = generate_export("csv_zip", fields, (), "hierarchy", hierarchy_nodes=nodes)
+
+    with zipfile.ZipFile(artifact.content) as archive:
+        assert archive.namelist() == ["hierarchy-data.csv", "hierarchy-flattened.csv"]
+        assert archive.read("hierarchy-data.csv").startswith(b"\xef\xbb\xbf")
+        assert archive.read("hierarchy-flattened.csv").startswith(b"\xef\xbb\xbf")
+    assert artifact.media_type == "application/zip"
+    assert artifact.extension == "zip"
+    assert artifact.download_name == "hierarchy.zip"
     artifact.content.close()
 
 

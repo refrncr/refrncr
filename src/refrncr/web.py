@@ -2063,7 +2063,7 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         formats = request.args.getlist("format")
-        if len(formats) != 1 or formats[0] not in {"csv", "xlsx", "json"}:
+        if len(formats) != 1 or formats[0] not in {"csv", "csv_zip", "xlsx", "json"}:
             return "Choose exactly one supported export format", 400
         variants = request.args.getlist("variant")
         if len(variants) > 1 or (variants and variants[0] not in {"data", "flattened"}):

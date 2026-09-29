@@ -2287,7 +2287,12 @@ class DatasetRecordService:
             verify_artifact_readable,
         )
 
-        if not isinstance(format_name, str) or format_name not in {"csv", "xlsx", "json"}:
+        if not isinstance(format_name, str) or format_name not in {
+            "csv",
+            "csv_zip",
+            "xlsx",
+            "json",
+        }:
             raise ExportGenerationError("Choose exactly one supported export format")
         if variant is not None and variant not in {"data", "flattened"}:
             raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
@@ -2349,7 +2354,11 @@ class DatasetRecordService:
                     raise ExportGenerationError(
                         "CSV variants are only available for hierarchy exports"
                     )
-                if hierarchy_nodes is None and variant is None:
+                if format_name == "csv_zip" and dataset.kind != "hierarchy":
+                    raise ExportGenerationError(
+                        "CSV bundles are only available for hierarchy exports"
+                    )
+                if hierarchy_nodes is None and variant is None and format_name != "csv_zip":
                     artifact = generate_export(format_name, fields, records, export_key)
                 else:
                     artifact = generate_export(

@@ -138,8 +138,9 @@ UUID columns from all three worksheets; users identify nodes through names, pare
 paths. `Hierarchy` is a readable structural projection and is not an independent import
 source of truth.
 
-CSV is selected explicitly as either `Data` or `Flattened` and includes the leaf `Node ID`
-and direct `Parent ID` in both variants. JSON contains `schema_version`, snapshot provenance,
+The hierarchy export menu provides one CSV bundle download. The ZIP contains both
+`<dataset>-data.csv` and `<dataset>-flattened.csv`; each includes the leaf `Node ID` and
+direct `Parent ID`. JSON contains `schema_version`, snapshot provenance,
 ordered Field metadata (key, display name, datatype and scope), and a `nodes` list with
 stable IDs, parent relationships, names and applicable own values. Field keys that collide
 with reserved structural headings receive a deterministic `Field: ` prefix. `Empty` means
@@ -149,8 +150,7 @@ an absent flattened level remains blank.
 Only applicable values are exported. Retained inactive values remain internal and are not
 written to visible cells, metadata or JSON/CSV output. The existing canonical datatype
 serializers and spreadsheet-safety encoding apply. Export filenames identify the CSV
-variant (`<dataset>-data.csv` or `<dataset>-flattened.csv`); one selected snapshot supplies
-all worksheets and representations.
+variant; one selected snapshot supplies both CSV files and all other representations.
 
 Focused tests cover domain validation, retention/restoration, optional identifiers,
 transaction rollback, concurrent edits, complete version snapshots, review and browser
