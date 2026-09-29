@@ -8,7 +8,7 @@ import logging
 import os
 import pickle
 import tempfile
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import BinaryIO
@@ -18,6 +18,7 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font
 
 from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.hierarchy import applicable
 from refrncr.ports import DatasetFieldRecord, StoredRecord
 
 SPOOL_MEMORY_LIMIT = 1024 * 1024
@@ -224,6 +225,255 @@ def write_xlsx(target: BinaryIO, fields, records, title: str) -> None:
             workbook.close()
 
 
+def _hierarchy_value(field, node):
+    return next((value for value in node.values if value.field_id == field.id), None)
+
+
+def _hierarchy_text(field, value):
+    if value is None:
+        return None
+    value = _validate_value(field, value.value)
+    if field.data_type == "number":
+        return _plain_decimal(value)
+    return get_datatype(field.data_type).text(value)
+
+
+def _hierarchy_json_value(field, value):
+    value = _validate_value(field, value.value)
+    if field.data_type == "number":
+        return _plain_decimal(value)
+    if field.data_type == "boolean":
+        return "true" if value else "false"
+    if field.data_type in {"integer", "float"}:
+        return get_datatype(field.data_type).text(value)
+    return json.dumps(
+        value if field.data_type == "string" else get_datatype(field.data_type).text(value),
+        ensure_ascii=False,
+    )
+
+
+def _hierarchy_columns(fields, reserved):
+    columns = []
+    for field in fields:
+        column = field.key
+        if column in reserved:
+            column = f"Field: {column}"
+        while column in columns:
+            column = f"Field: {column}"
+        columns.append(column)
+    return columns
+
+
+def _hierarchy_order(nodes):
+    by_parent = {}
+    for node in nodes:
+        by_parent.setdefault(node.parent_id, []).append(node)
+    for siblings in by_parent.values():
+        siblings.sort(key=lambda node: (node.name.casefold(), node.name, node.id))
+    result = []
+    pending = list(reversed(by_parent.get(None, ())))
+    while pending:
+        node = pending.pop()
+        result.append(node)
+        pending.extend(reversed(by_parent.get(node.id, ())))
+    result.extend(node for node in nodes if node not in result)
+    return result
+
+
+def _hierarchy_paths(nodes):
+    by_id = {node.id: node for node in nodes}
+    paths = {}
+    for node in nodes:
+        path, current, visited = [], node, set()
+        while current is not None and current.id not in visited:
+            visited.add(current.id)
+            path.append(current)
+            current = by_id.get(current.parent_id)
+        paths[node.id] = tuple(reversed(path))
+    return paths
+
+
+def _hierarchy_cell(field, node, parent_ids):
+    if not applicable(field, node, parent_ids):
+        return "Not applicable"
+    rendered = _hierarchy_text(field, _hierarchy_value(field, node))
+    return "Empty" if rendered is None else rendered
+
+
+def _hierarchy_data_rows(fields, nodes):
+    parent_ids = {node.parent_id for node in nodes}
+    by_id = {node.id: node for node in nodes}
+    columns = _hierarchy_columns(fields, {"Node ID", "Parent ID", "Name", "Parent"})
+    headers = ["Node ID", "Parent ID", "Name", "Parent", *columns]
+    rows = []
+    for node in _hierarchy_order(nodes):
+        rows.append(
+            [
+                node.id,
+                node.parent_id or "",
+                node.name,
+                by_id[node.parent_id].name if node.parent_id in by_id else "",
+                *[_hierarchy_cell(field, node, parent_ids) for field in fields],
+            ]
+        )
+    return headers, rows
+
+
+def _hierarchy_flattened_rows(fields, nodes):
+    parent_ids = {node.parent_id for node in nodes}
+    paths = _hierarchy_paths(nodes)
+    leaves = [
+        node
+        for node in _hierarchy_order(nodes)
+        if node.parent_id is not None and node.id not in parent_ids
+    ]
+    max_ancestors = max((len(paths[node.id]) - 1 for node in leaves), default=0)
+    level_headers = [f"Level {index}" for index in range(1, max_ancestors + 1)]
+    columns = []
+    field_columns = []
+    reserved = {"Node ID", "Parent ID", "Leaf", *level_headers}
+    for field in fields:
+        if field.hierarchy_scope == "all_nodes":
+            for level in level_headers:
+                field_columns.append((field, level))
+                columns.append(
+                    _hierarchy_columns((field,), reserved | set(columns))[0] + f" {level}"
+                )
+        field_columns.append((field, "Leaf"))
+        columns.append(_hierarchy_columns((field,), reserved | set(columns))[0] + " Leaf")
+    headers = ["Node ID", "Parent ID", *level_headers, "Leaf", *columns]
+    rows = []
+    for leaf in leaves:
+        path = paths[leaf.id]
+        ancestors = path[:-1]
+        row = [leaf.id, leaf.parent_id or ""]
+        row.extend([node.name for node in ancestors])
+        row.extend([""] * (max_ancestors - len(ancestors)))
+        row.append(leaf.name)
+        for field, target in field_columns:
+            node = (
+                leaf
+                if target == "Leaf"
+                else ancestors[int(target.split()[-1]) - 1]
+                if int(target.split()[-1]) <= len(ancestors)
+                else None
+            )
+            row.append("" if node is None else _hierarchy_cell(field, node, parent_ids))
+        rows.append(row)
+    return headers, rows
+
+
+def _write_hierarchy_csv(target, fields, nodes, variant):
+    headers, rows = (
+        _hierarchy_data_rows(fields, nodes)
+        if variant == "data"
+        else _hierarchy_flattened_rows(fields, nodes)
+    )
+    target.write(b"\xef\xbb\xbf")
+    text = io.TextIOWrapper(target, encoding="utf-8", newline="", write_through=True)
+    writer = csv.writer(text, delimiter=",", lineterminator="\r\n")
+    writer.writerow([_csv_string(str(header)) for header in headers])
+    for row in rows:
+        writer.writerow(
+            [_csv_string(str(value)) if isinstance(value, str) else value for value in row]
+        )
+    text.flush()
+    text.detach()
+
+
+def _write_hierarchy_sheet(worksheet, headers, rows):
+    header = []
+    for value in headers:
+        cell = WriteOnlyCell(worksheet, value=value)
+        cell.font = Font(bold=True)
+        header.append(cell)
+    worksheet.append(header)
+    for row in rows:
+        worksheet.append(row)
+
+
+def write_hierarchy_xlsx(target, fields, nodes, title: str) -> None:
+    workbook = Workbook(write_only=True)
+    try:
+        data = workbook.create_sheet(title="Data")
+        data_headers, data_rows = _hierarchy_data_rows(fields, nodes)
+        _write_hierarchy_sheet(data, data_headers, data_rows)
+        flattened = workbook.create_sheet(title="Flattened")
+        flat_headers, flat_rows = _hierarchy_flattened_rows(fields, nodes)
+        _write_hierarchy_sheet(flattened, flat_headers, flat_rows)
+        hierarchy = workbook.create_sheet(title="Hierarchy")
+        hierarchy_headers = ["Node ID", "Parent ID", "Name", "Path"]
+        paths = _hierarchy_paths(nodes)
+        hierarchy_rows = [
+            [
+                node.id,
+                node.parent_id or "",
+                node.name,
+                " / ".join(item.name for item in paths[node.id]),
+            ]
+            for node in _hierarchy_order(nodes)
+        ]
+        _write_hierarchy_sheet(hierarchy, hierarchy_headers, hierarchy_rows)
+        workbook.save(target)
+    finally:
+        for sheet in workbook.worksheets:
+            if not sheet.closed:
+                sheet.close()
+            writer = sheet._writer
+            if writer is not None and os.path.exists(writer.out):
+                writer.cleanup()
+        workbook.close()
+
+
+def write_hierarchy_json(target, fields, nodes, *, dataset_key, provenance):
+    metadata = {
+        "dataset_key": dataset_key,
+        "provenance": provenance,
+        "fields": [
+            {
+                "key": field.key,
+                "name": field.name,
+                "data_type": field.data_type,
+                "scope": field.hierarchy_scope,
+            }
+            for field in fields
+        ],
+    }
+    target.write(b'{"schema_version":1,"metadata":')
+    target.write(json.dumps(metadata, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    target.write(b',"nodes":[')
+    parent_ids = {node.parent_id for node in nodes}
+    first_node = True
+    for node in _hierarchy_order(nodes):
+        if not first_node:
+            target.write(b",")
+        first_node = False
+        target.write(
+            json.dumps(
+                {"node_id": node.id, "parent_id": node.parent_id, "name": node.name},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )[:-1].encode("utf-8")
+        )
+        target.write(b',"values":{')
+        first_value = True
+        for field in fields:
+            if not applicable(field, node, parent_ids):
+                continue
+            value = _hierarchy_value(field, node)
+            if value is None:
+                continue
+            if not first_value:
+                target.write(b",")
+            first_value = False
+            target.write(json.dumps(field.key, ensure_ascii=False).encode("utf-8"))
+            target.write(b":")
+            rendered = _hierarchy_json_value(field, value)
+            target.write(rendered.encode("utf-8"))
+        target.write(b"}}")
+    target.write(b"]}")
+
+
 def _worksheet_title(value: str) -> str:
     cleaned = "".join("_" if character in "[]:*?/\\" else character for character in value)
     cleaned = cleaned.strip("'")[:31]
@@ -301,7 +551,16 @@ def _next_pickled(run: BinaryIO) -> StoredRecord | None:
         return None
 
 
-def generate_export(format_name: str, fields, records, dataset_key: str) -> ExportArtifact:
+def generate_export(
+    format_name: str,
+    fields,
+    records,
+    dataset_key: str,
+    *,
+    hierarchy_nodes: Sequence | None = None,
+    hierarchy_variant: str = "data",
+    provenance: dict | None = None,
+) -> ExportArtifact:
     formats = {
         "csv": ("text/csv; charset=utf-8", write_csv),
         "json": ("application/json; charset=utf-8", write_json),
@@ -312,15 +571,33 @@ def generate_export(format_name: str, fields, records, dataset_key: str) -> Expo
     }
     if format_name not in formats:
         raise ExportGenerationError("Choose exactly one supported export format")
+    is_hierarchy = hierarchy_nodes is not None
+    if is_hierarchy and hierarchy_variant not in {"data", "flattened"}:
+        raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
     target = tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_LIMIT, mode="w+b")
     try:
         media_type, writer = formats[format_name]
-        if format_name == "xlsx":
+        if is_hierarchy and format_name == "csv":
+            _write_hierarchy_csv(target, fields, hierarchy_nodes, hierarchy_variant)
+        elif is_hierarchy and format_name == "json":
+            write_hierarchy_json(
+                target,
+                fields,
+                hierarchy_nodes,
+                dataset_key=dataset_key,
+                provenance=provenance or {},
+            )
+        elif is_hierarchy and format_name == "xlsx":
+            write_hierarchy_xlsx(target, fields, hierarchy_nodes, dataset_key)
+        elif format_name == "xlsx":
             writer(target, fields, records, dataset_key)
         else:
             writer(target, fields, records)
         target.seek(0)
-        return ExportArtifact(target, media_type, format_name, f"{dataset_key}.{format_name}")
+        suffix = f"-{hierarchy_variant}" if is_hierarchy and format_name == "csv" else ""
+        return ExportArtifact(
+            target, media_type, format_name, f"{dataset_key}{suffix}.{format_name}"
+        )
     except ExportGenerationError:
         target.close()
         raise

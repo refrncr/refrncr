@@ -14,6 +14,7 @@ from test_dataset_browser import (
 from test_dataset_browser import dataset_browser as dataset_browser
 
 from refrncr.hierarchy import HierarchyService
+from refrncr.services import DatasetRecordService, ValidationError
 
 
 def hierarchy_fixture(services, admin):
@@ -84,6 +85,51 @@ def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
     assert "Add at least one child" in tree
 
 
+def test_hierarchy_pages_show_export_menu(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset, _hierarchy, _root, _branch, _child, _sibling = hierarchy_fixture(services, admin)
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
+
+    assert "Export</summary>" in page
+    assert f"/datasets/{dataset.key}/concept/records/export?format=csv&amp;variant=data" in page
+    assert (
+        f"/datasets/{dataset.key}/concept/records/export?format=csv&amp;variant=flattened" in page
+    )
+    assert f"/datasets/{dataset.key}/concept/records/export?format=xlsx" in page
+    assert f"/datasets/{dataset.key}/concept/records/export?format=json" in page
+    export = request(
+        client,
+        "get",
+        f"/datasets/{dataset.key}/concept/records/export?format=xlsx",
+    )
+    assert export.status_code == 200
+    assert export.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_export_validation_error_uses_a_handling_screen(dataset_browser, monkeypatch):
+    _, services, admin, client = dataset_browser
+    dataset, _hierarchy, _root, _branch, _child, _sibling = hierarchy_fixture(services, admin)
+    login(client)
+
+    def unavailable(*_args, **_kwargs):
+        raise ValidationError("Hierarchy import is not available yet.")
+
+    monkeypatch.setattr(DatasetRecordService, "export_dataset", unavailable)
+    response = request(
+        client,
+        "get",
+        f"/datasets/{dataset.key}/concept/records/export?format=xlsx",
+    )
+
+    page = body(response)
+    assert response.status_code == 422
+    assert "<h1>Export unavailable</h1>" in page
+    assert "Your Dataset was not changed." in page
+    assert f"href='/datasets/{dataset.key}/concept/records'" in page
+
+
 def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset, hierarchy, root, branch, child, sibling = hierarchy_fixture(services, admin)
@@ -124,7 +170,7 @@ def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_brow
     assert "Leaves only" in hybrid and "All nodes" not in hybrid
     assert "name='hierarchy_scope'" not in hybrid
     assert "/nodes/" not in hybrid
-    assert "Import" not in hybrid and ">Export<" not in hybrid
+    assert "Import" not in hybrid and "Export</summary>" in hybrid
 
     panel = body(
         request(

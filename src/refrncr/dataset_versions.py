@@ -785,9 +785,7 @@ class DatasetVersionService:
                 record_page,
                 state,
                 maintain,
-                dataset.kind != "hierarchy"
-                and export
-                and (state is None or state.status in {"Current", "Expired"}),
+                export and (state is None or state.status in {"Current", "Expired"}),
                 concept,
                 MappingProxyType(
                     {

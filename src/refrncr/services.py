@@ -2278,6 +2278,7 @@ class DatasetRecordService:
         *,
         version_id=None,
         prefer_concept=False,
+        variant=None,
     ):
         from refrncr.dataset_export import (
             ExportGenerationError,
@@ -2288,6 +2289,8 @@ class DatasetRecordService:
 
         if not isinstance(format_name, str) or format_name not in {"csv", "xlsx", "json"}:
             raise ExportGenerationError("Choose exactly one supported export format")
+        if variant is not None and variant not in {"data", "flattened"}:
+            raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         artifact = None
         try:
@@ -2310,6 +2313,12 @@ class DatasetRecordService:
                     identifier = uow.dataset_business_keys.get(dataset_id)
                     source = uow.dataset_records.iterate_all(dataset_id)
                     export_key = dataset.key
+                    hierarchy_nodes = (
+                        tuple(uow.hierarchy.list_for_dataset(dataset_id))
+                        if dataset.kind == "hierarchy"
+                        else None
+                    )
+                    provenance = {"type": "concept"} if prefer_concept else {"type": "current"}
                 else:
                     if selected.status not in {"Current", "Expired"}:
                         raise NotFoundError("Dataset not found")
@@ -2320,11 +2329,38 @@ class DatasetRecordService:
                     )
                     source = uow.versions.iterate_records(selected.version)
                     export_key = f"{dataset.key}-v{selected.version.number}"
+                    hierarchy_nodes = (
+                        tuple(uow.versions.hierarchy_nodes(selected.version))
+                        if dataset.kind == "hierarchy"
+                        else None
+                    )
+                    provenance = {
+                        "type": "publication",
+                        "version": selected.version.number,
+                        "version_id": selected.version.id,
+                    }
                 records = externally_ordered_records(
                     source,
                     lambda record: self._record_sort_key(record, identifier.field_keys),
                 )
-                artifact = generate_export(format_name, fields, records, export_key)
+                if dataset.kind == "hierarchy" and variant is not None and format_name != "csv":
+                    raise ExportGenerationError("A hierarchy variant can only be selected for CSV")
+                if dataset.kind != "hierarchy" and variant is not None:
+                    raise ExportGenerationError(
+                        "CSV variants are only available for hierarchy exports"
+                    )
+                if hierarchy_nodes is None and variant is None:
+                    artifact = generate_export(format_name, fields, records, export_key)
+                else:
+                    artifact = generate_export(
+                        format_name,
+                        fields,
+                        records,
+                        export_key,
+                        hierarchy_nodes=hierarchy_nodes,
+                        hierarchy_variant=variant or "data",
+                        provenance=provenance,
+                    )
                 verify_artifact_readable(artifact)
             # Authorization and content were pinned to the completed snapshot.
             # Close it before acquiring the audit writer (including SQLite).
@@ -2380,10 +2416,10 @@ class DatasetRecordService:
             actor_id, "dataset", dataset.id, permission, uow=uow
         ):
             raise NotFoundError("Dataset not found")
-        if dataset.kind == "hierarchy":
+        if dataset.kind == "hierarchy" and permission != "export":
             raise ValidationError(
                 "Use the hierarchy views to maintain this table. "
-                "Hierarchy import and export are not available yet."
+                "Hierarchy import is not available yet."
             )
         if permission in {"admin", "editor"}:
             if uow is not None:
