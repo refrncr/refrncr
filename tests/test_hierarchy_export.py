@@ -48,7 +48,7 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     assert rows[0] == ["Node ID", "Parent ID", "Name", "Parent", "Field: Name", "code"]
     assert rows[1][0:4] == ["root", "", "Root", ""]
     assert rows[2][0:4] == ["branch", "root", "Branch", "Root"]
-    assert rows[2][5] == "Not applicable"
+    assert rows[2][5] == ""
     assert rows[3][4:] == ["context", "L1"]
     assert artifact.download_name == "hierarchy-data.csv"
     artifact.content.close()
@@ -77,7 +77,7 @@ def test_hierarchy_flattened_csv_aligns_levels_and_leaf_values():
         "region Level 2",
         "region Leaf",
     ]
-    assert rows[1] == ["leaf", "branch", "Root", "Branch", "Leaf", "Empty", "EU", "DE"]
+    assert rows[1] == ["leaf", "branch", "Root", "Branch", "Leaf", "", "EU", "DE"]
     artifact.content.close()
 
 
@@ -88,7 +88,13 @@ def test_hierarchy_xlsx_has_three_user_facing_sheets_and_json_has_metadata():
     workbook_artifact = generate_export("xlsx", fields, (), "hierarchy", hierarchy_nodes=nodes)
     workbook = load_workbook(workbook_artifact.content, read_only=True, data_only=True)
     assert workbook.sheetnames == ["Data", "Flattened", "Hierarchy"]
-    assert list(workbook["Hierarchy"].values)[2][2] == "Leaf"
+    assert all(
+        cell not in {"Node ID", "Parent ID"}
+        for sheet in workbook.worksheets
+        for row in sheet.values
+        for cell in row
+    )
+    assert list(workbook["Hierarchy"].values)[2][0] == "Leaf"
     workbook.close()
     workbook_artifact.content.close()
 
@@ -104,4 +110,35 @@ def test_hierarchy_xlsx_has_three_user_facing_sheets_and_json_has_metadata():
     assert payload["schema_version"] == 1
     assert payload["metadata"]["provenance"]["version"] == 2
     assert [node["node_id"] for node in payload["nodes"]] == ["root", "leaf"]
+    assert payload["nodes"][0]["values"]["code"] is None
+    json_artifact.content.close()
+
+
+def test_missing_numeric_hierarchy_values_stay_null_and_typed():
+    numeric = field("f1", "headcount", "all_nodes")
+    numeric.data_type = "integer"
+    nodes = (
+        node("root", "Root"),
+        node("leaf", "Leaf", "root", (RecordValue("f1", "headcount", "integer", 3, b"3", False),)),
+    )
+
+    csv_artifact = generate_export("csv", (numeric,), (), "hierarchy", hierarchy_nodes=nodes)
+    rows = read_csv(csv_artifact)
+    assert rows[1][-1] == ""
+    assert rows[2][-1] == "3"
+    csv_artifact.content.close()
+
+    xlsx_artifact = generate_export("xlsx", (numeric,), (), "hierarchy", hierarchy_nodes=nodes)
+    workbook = load_workbook(xlsx_artifact.content, read_only=True, data_only=True)
+    values = list(workbook["Data"].values)
+    assert values[1][-1] is None
+    assert values[2][-1] == 3
+    assert isinstance(values[2][-1], int)
+    workbook.close()
+    xlsx_artifact.content.close()
+
+    json_artifact = generate_export("json", (numeric,), (), "hierarchy", hierarchy_nodes=nodes)
+    payload = json.load(json_artifact.content)
+    assert payload["nodes"][0]["values"]["headcount"] is None
+    assert payload["nodes"][1]["values"]["headcount"] == 3
     json_artifact.content.close()

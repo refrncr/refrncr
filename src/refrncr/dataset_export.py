@@ -252,6 +252,18 @@ def _hierarchy_json_value(field, value):
     )
 
 
+def _hierarchy_export_value(field, node, parent_ids):
+    if not applicable(field, node, parent_ids):
+        return None
+    value = _hierarchy_value(field, node)
+    if value is None:
+        return None
+    value = _validate_value(field, value.value)
+    if field.data_type in {"number", "integer", "float", "boolean"}:
+        return value
+    return get_datatype(field.data_type).text(value)
+
+
 def _hierarchy_columns(fields, reserved):
     columns = []
     for field in fields:
@@ -300,26 +312,27 @@ def _hierarchy_cell(field, node, parent_ids):
     return "Empty" if rendered is None else rendered
 
 
-def _hierarchy_data_rows(fields, nodes):
+def _hierarchy_data_rows(fields, nodes, *, include_ids=True):
     parent_ids = {node.parent_id for node in nodes}
     by_id = {node.id: node for node in nodes}
     columns = _hierarchy_columns(fields, {"Node ID", "Parent ID", "Name", "Parent"})
-    headers = ["Node ID", "Parent ID", "Name", "Parent", *columns]
+    headers = (
+        ["Node ID", "Parent ID", "Name", "Parent", *columns]
+        if include_ids
+        else ["Name", "Parent", *columns]
+    )
     rows = []
     for node in _hierarchy_order(nodes):
-        rows.append(
-            [
-                node.id,
-                node.parent_id or "",
-                node.name,
-                by_id[node.parent_id].name if node.parent_id in by_id else "",
-                *[_hierarchy_cell(field, node, parent_ids) for field in fields],
-            ]
-        )
+        row = [
+            node.name,
+            by_id[node.parent_id].name if node.parent_id in by_id else "",
+            *[_hierarchy_export_value(field, node, parent_ids) for field in fields],
+        ]
+        rows.append([node.id, node.parent_id or "", *row] if include_ids else row)
     return headers, rows
 
 
-def _hierarchy_flattened_rows(fields, nodes):
+def _hierarchy_flattened_rows(fields, nodes, *, include_ids=True):
     parent_ids = {node.parent_id for node in nodes}
     paths = _hierarchy_paths(nodes)
     leaves = [
@@ -341,12 +354,13 @@ def _hierarchy_flattened_rows(fields, nodes):
                 )
         field_columns.append((field, "Leaf"))
         columns.append(_hierarchy_columns((field,), reserved | set(columns))[0] + " Leaf")
-    headers = ["Node ID", "Parent ID", *level_headers, "Leaf", *columns]
+    prefix = ["Node ID", "Parent ID"] if include_ids else []
+    headers = [*prefix, *level_headers, "Leaf", *columns]
     rows = []
     for leaf in leaves:
         path = paths[leaf.id]
         ancestors = path[:-1]
-        row = [leaf.id, leaf.parent_id or ""]
+        row = [leaf.id, leaf.parent_id or ""] if include_ids else []
         row.extend([node.name for node in ancestors])
         row.extend([""] * (max_ancestors - len(ancestors)))
         row.append(leaf.name)
@@ -358,7 +372,7 @@ def _hierarchy_flattened_rows(fields, nodes):
                 if int(target.split()[-1]) <= len(ancestors)
                 else None
             )
-            row.append("" if node is None else _hierarchy_cell(field, node, parent_ids))
+            row.append(None if node is None else _hierarchy_export_value(field, node, parent_ids))
         rows.append(row)
     return headers, rows
 
@@ -396,18 +410,16 @@ def write_hierarchy_xlsx(target, fields, nodes, title: str) -> None:
     workbook = Workbook(write_only=True)
     try:
         data = workbook.create_sheet(title="Data")
-        data_headers, data_rows = _hierarchy_data_rows(fields, nodes)
+        data_headers, data_rows = _hierarchy_data_rows(fields, nodes, include_ids=False)
         _write_hierarchy_sheet(data, data_headers, data_rows)
         flattened = workbook.create_sheet(title="Flattened")
-        flat_headers, flat_rows = _hierarchy_flattened_rows(fields, nodes)
+        flat_headers, flat_rows = _hierarchy_flattened_rows(fields, nodes, include_ids=False)
         _write_hierarchy_sheet(flattened, flat_headers, flat_rows)
         hierarchy = workbook.create_sheet(title="Hierarchy")
-        hierarchy_headers = ["Node ID", "Parent ID", "Name", "Path"]
+        hierarchy_headers = ["Name", "Path"]
         paths = _hierarchy_paths(nodes)
         hierarchy_rows = [
             [
-                node.id,
-                node.parent_id or "",
                 node.name,
                 " / ".join(item.name for item in paths[node.id]),
             ]
@@ -458,18 +470,17 @@ def write_hierarchy_json(target, fields, nodes, *, dataset_key, provenance):
         target.write(b',"values":{')
         first_value = True
         for field in fields:
-            if not applicable(field, node, parent_ids):
-                continue
             value = _hierarchy_value(field, node)
-            if value is None:
-                continue
             if not first_value:
                 target.write(b",")
             first_value = False
             target.write(json.dumps(field.key, ensure_ascii=False).encode("utf-8"))
             target.write(b":")
-            rendered = _hierarchy_json_value(field, value)
-            target.write(rendered.encode("utf-8"))
+            if not applicable(field, node, parent_ids) or value is None:
+                target.write(b"null")
+            else:
+                rendered = _hierarchy_json_value(field, value)
+                target.write(rendered.encode("utf-8"))
         target.write(b"}}")
     target.write(b"]}")
 

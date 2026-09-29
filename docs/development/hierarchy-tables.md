@@ -131,11 +131,12 @@ version when rollback is needed.
 
 Hierarchy exports use the complete selected Concept or publication snapshot. Excel always
 contains exactly three worksheets: `Data`, `Flattened` and `Hierarchy`. `Data` is the
-all-node table with `Node ID`, `Parent ID`, `Name`, direct `Parent`, and configured Field
-keys. `Flattened` contains one row per non-root leaf with root-first `Level N` columns,
-`Leaf`, and separate Field columns for applicable ancestor levels and the leaf. `Hierarchy`
-is a readable structural projection with the same node identities and paths; it is not an
-independent import source of truth.
+all-node table with `Name`, direct `Parent`, and configured Field keys. `Flattened` contains
+one row per non-root leaf with root-first `Level N` columns, `Leaf`, and separate Field
+columns for applicable ancestor levels and the leaf. Excel deliberately omits technical
+UUID columns from all three worksheets; users identify nodes through names, parents and
+paths. `Hierarchy` is a readable structural projection and is not an independent import
+source of truth.
 
 CSV is selected explicitly as either `Data` or `Flattened` and includes the leaf `Node ID`
 and direct `Parent ID` in both variants. JSON contains `schema_version`, snapshot provenance,
