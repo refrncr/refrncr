@@ -17,7 +17,7 @@
 {%- endmacro %}
 
 {% macro node_name(row, indented=false) -%}
-<span class='hierarchy-name'>{% if indented %}{% for level in range(row.depth) %}<span class='hierarchy-indent' aria-hidden='true'></span>{% endfor %}{% if row.depth %}{{ corner_down_right_icon() }}{% endif %}{% endif %}{{ row.node.name }}</span>
+<span class='hierarchy-name'>{% if indented %}{% if row.depth > 1 %}{% for level in range(row.depth - 1) %}<span class='hierarchy-indent' aria-hidden='true'></span>{% endfor %}{% endif %}{% if row.depth %}<span class='hierarchy-tree-marker'>{{ corner_down_right_icon() }}</span>{% endif %}{% endif %}{{ row.node.name }}</span>
 {% if indented %}<span class='visually-hidden'>Full path: {{ row.path }}</span>{% endif %}
 {%- endmacro %}
 
