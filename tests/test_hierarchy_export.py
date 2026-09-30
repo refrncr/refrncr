@@ -1,12 +1,12 @@
 import csv
 import io
 import json
-import zipfile
 from types import SimpleNamespace
 
+import pytest
 from openpyxl import load_workbook
 
-from refrncr.dataset_export import generate_export
+from refrncr.dataset_export import ExportGenerationError, generate_export
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import RecordValue
 
@@ -55,20 +55,12 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     artifact.content.close()
 
 
-def test_hierarchy_csv_bundle_contains_both_variants():
+def test_hierarchy_csv_bundle_is_no_longer_supported():
     fields = (field("f1", "code", "leaves"),)
     nodes = (node("root", "Root"), node("leaf", "Leaf", "root", (value("f1", "code", "L"),)))
 
-    artifact = generate_export("csv_zip", fields, (), "hierarchy", hierarchy_nodes=nodes)
-
-    with zipfile.ZipFile(artifact.content) as archive:
-        assert archive.namelist() == ["hierarchy-data.csv", "hierarchy-flattened.csv"]
-        assert archive.read("hierarchy-data.csv").startswith(b"\xef\xbb\xbf")
-        assert archive.read("hierarchy-flattened.csv").startswith(b"\xef\xbb\xbf")
-    assert artifact.media_type == "application/zip"
-    assert artifact.extension == "zip"
-    assert artifact.download_name == "hierarchy.zip"
-    artifact.content.close()
+    with pytest.raises(ExportGenerationError, match="supported export format"):
+        generate_export("csv_zip", fields, (), "hierarchy", hierarchy_nodes=nodes)
 
 
 def test_hierarchy_flattened_csv_aligns_levels_and_leaf_values():
@@ -105,12 +97,8 @@ def test_hierarchy_xlsx_has_three_user_facing_sheets_and_json_has_metadata():
     workbook_artifact = generate_export("xlsx", fields, (), "hierarchy", hierarchy_nodes=nodes)
     workbook = load_workbook(workbook_artifact.content, read_only=True, data_only=True)
     assert workbook.sheetnames == ["Data", "Flattened", "Hierarchy"]
-    assert all(
-        cell not in {"Node ID", "Parent ID"}
-        for sheet in workbook.worksheets
-        for row in sheet.values
-        for cell in row
-    )
+    assert list(workbook["Data"].values)[0][:2] == ("Node ID", "Parent ID")
+    assert list(workbook["Flattened"].values)[0][:2] == ("Node ID", "Parent ID")
     assert list(workbook["Hierarchy"].values)[2][0] == "Leaf"
     workbook.close()
     workbook_artifact.content.close()
