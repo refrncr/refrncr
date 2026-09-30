@@ -105,12 +105,8 @@ def test_hierarchy_xlsx_has_three_user_facing_sheets_and_json_has_metadata():
     workbook_artifact = generate_export("xlsx", fields, (), "hierarchy", hierarchy_nodes=nodes)
     workbook = load_workbook(workbook_artifact.content, read_only=True, data_only=True)
     assert workbook.sheetnames == ["Data", "Flattened", "Hierarchy"]
-    assert all(
-        cell not in {"Node ID", "Parent ID"}
-        for sheet in workbook.worksheets
-        for row in sheet.values
-        for cell in row
-    )
+    assert list(workbook["Data"].values)[0][:2] == ("Node ID", "Parent ID")
+    assert list(workbook["Flattened"].values)[0][:2] == ("Node ID", "Parent ID")
     assert list(workbook["Hierarchy"].values)[2][0] == "Leaf"
     workbook.close()
     workbook_artifact.content.close()

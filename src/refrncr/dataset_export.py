@@ -412,17 +412,26 @@ def _write_hierarchy_sheet(worksheet, headers, rows):
         header.append(cell)
     worksheet.append(header)
     for row in rows:
-        worksheet.append(row)
+        safe_row = []
+        for value in row:
+            if isinstance(value, str):
+                cell = WriteOnlyCell(worksheet, value=value)
+                # User-controlled node names and values must never become formulas.
+                cell.data_type = "s"
+                safe_row.append(cell)
+            else:
+                safe_row.append(value)
+        worksheet.append(safe_row)
 
 
 def write_hierarchy_xlsx(target, fields, nodes, title: str) -> None:
     workbook = Workbook(write_only=True)
     try:
         data = workbook.create_sheet(title="Data")
-        data_headers, data_rows = _hierarchy_data_rows(fields, nodes, include_ids=False)
+        data_headers, data_rows = _hierarchy_data_rows(fields, nodes)
         _write_hierarchy_sheet(data, data_headers, data_rows)
         flattened = workbook.create_sheet(title="Flattened")
-        flat_headers, flat_rows = _hierarchy_flattened_rows(fields, nodes, include_ids=False)
+        flat_headers, flat_rows = _hierarchy_flattened_rows(fields, nodes)
         _write_hierarchy_sheet(flattened, flat_headers, flat_rows)
         hierarchy = workbook.create_sheet(title="Hierarchy")
         hierarchy_headers = ["Name", "Path"]
