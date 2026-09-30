@@ -386,15 +386,16 @@ def test_concurrent_same_name_in_different_branches_cannot_create_duplicates(hie
     assert snapshot(c) == before
 
 
-def test_generic_record_import_and_export_paths_reject_hierarchies(hierarchy):
+def test_generic_record_import_rejects_hierarchies_but_export_supports_them(hierarchy):
     c = hierarchy
     root = add(c, "Root")
     add(c, "Leaf", root.id)
-    before = snapshot(c)
     with pytest.raises(ValidationError, match="hierarchy views"):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {})
     with pytest.raises(ValidationError, match="hierarchy views"):
         c.s.record_imports.eligibility(c.a.id, c.d.key)
-    with pytest.raises(ValidationError, match="hierarchy views"):
-        c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", prefer_concept=True)
-    assert snapshot(c) == before
+    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv_zip", prefer_concept=True)
+    try:
+        assert artifact.download_name == "hierarchy.zip"
+    finally:
+        artifact.content.close()

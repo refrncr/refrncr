@@ -127,6 +127,31 @@ version when rollback is needed.
 
 ## Verification and follow-up scope
 
+## Export schema (REF-181)
+
+Hierarchy exports use the complete selected Concept or publication snapshot. Excel always
+contains exactly three worksheets: `Data`, `Flattened` and `Hierarchy`. `Data` is the
+all-node table with `Name`, direct `Parent`, and configured Field keys. `Flattened` contains
+one row per non-root leaf with root-first `Level N` columns, `Leaf`, and separate Field
+columns for applicable ancestor levels and the leaf. Excel deliberately omits technical
+UUID columns from all three worksheets; users identify nodes through names, parents and
+paths. `Hierarchy` is a readable structural projection and is not an independent import
+source of truth.
+
+The hierarchy export menu provides one CSV bundle download. The ZIP contains both
+`<dataset>-data.csv` and `<dataset>-flattened.csv`; each includes the leaf `Node ID` and
+direct `Parent ID`. JSON contains `schema_version`, snapshot provenance,
+ordered Field metadata (key, display name, datatype and scope), and a `nodes` list with
+stable IDs, parent relationships, names and applicable own values. Field keys that collide
+with reserved structural headings receive a deterministic `Field: ` prefix. `Empty` means
+an applicable node has no value; `Not applicable` means the Field scope excludes that node;
+an absent flattened level remains blank.
+
+Only applicable values are exported. Retained inactive values remain internal and are not
+written to visible cells, metadata or JSON/CSV output. The existing canonical datatype
+serializers and spreadsheet-safety encoding apply. Export filenames identify the CSV
+variant; one selected snapshot supplies both CSV files and all other representations.
+
 Focused tests cover domain validation, retention/restoration, optional identifiers,
 transaction rollback, concurrent edits, complete version snapshots, review and browser
 views. Relational constraints and migration round trips run through the shared SQLite and

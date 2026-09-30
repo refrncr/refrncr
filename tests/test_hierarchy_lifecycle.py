@@ -92,7 +92,7 @@ def test_empty_fields_complete_snapshot_and_selected_leaf_reads(context):  # noq
     assert selected.hierarchy_nodes == saved.hierarchy_nodes
     assert selected.hierarchy_errors == ()
     assert selected.record_labels[leaf.id] == "Root / Branch / Leaf"
-    assert not selected.may_export
+    assert selected.may_export
     with c.sessions() as session:
         assert not session.scalars(
             select(DatasetRecord).where(DatasetRecord.dataset_id == c.d.id)

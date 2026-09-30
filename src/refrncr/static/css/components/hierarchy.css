@@ -17,9 +17,12 @@
 .hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }
 .hierarchy-table thead th { white-space: nowrap; }
 .hierarchy-table th[scope="row"] { min-width: 12rem; background: transparent; }
-.hierarchy-tree-table tbody :is(th, td) { padding-block: var(--space-sm); }
+.hierarchy-tree-table tbody tr { height: calc(var(--font-size-body-sm) * var(--line-height-body) + 2 * var(--space-sm)); }
+.hierarchy-tree-table tbody :is(th, td) { padding-block: 0; }
 .hierarchy-records td,
 .hierarchy-hybrid td { font-family: var(--font-data); font-size: var(--font-size-xs); }
 .hierarchy-field-scope { margin-inline-start: var(--space-sm); letter-spacing: normal; text-transform: none; }
-.hierarchy-indent { display: inline-block; width: var(--space-md); }
+.hierarchy-indent { display: inline-block; width: calc(var(--space-md) + 18px); }
+.hierarchy-tree-marker { display: inline-flex; width: calc(var(--space-md) + 18px); align-items: center; vertical-align: middle; }
+.hierarchy-tree-icon { width: 1rem; height: 1rem; margin-inline: 10px 8px; transform: translateY(-3px); }
 .hierarchy-path { color: var(--color-text-secondary); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }

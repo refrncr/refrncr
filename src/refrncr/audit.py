@@ -250,7 +250,13 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                 "subject": {"user": "user", "team": "team"},
                 "import_mode": {"new_version": "new_version"},
                 "import_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel"},
-                "export_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel", "json": "JSON"},
+                "export_format": {
+                    "csv": "CSV",
+                    "csv_zip": "CSV bundle (ZIP)",
+                    "xlsx": "Excel",
+                    "excel": "Excel",
+                    "json": "JSON",
+                },
             }[kind]
             if value not in allowed:
                 raise AuditContractError("Invalid structural audit context")

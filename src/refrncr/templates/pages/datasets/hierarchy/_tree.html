@@ -1,5 +1,5 @@
 {% from "components/table_row.html" import row_action %}
-{% from "components/icons.html" import square_pen_icon, table_properties_icon, node_add_child_icon, trash_2_icon %}
+{% from "components/icons.html" import square_pen_icon, table_properties_icon, node_add_child_icon, corner_down_right_icon, trash_2_icon %}
 
 {% macro node_action(href, label, accessible_name, icon, danger=false) -%}
 <a class='button button-icon-only button-row-icon{{ " button-danger" if danger else "" }}' data-panel-url data-dialog-open='hierarchy-panel' href='{{ href }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='{{ accessible_name }}' data-tooltip='{{ label }}'>{{ icon() }}</a>
@@ -17,7 +17,7 @@
 {%- endmacro %}
 
 {% macro node_name(row, indented=false) -%}
-<span class='hierarchy-name'>{% if indented %}{% for level in range(row.depth) %}<span class='hierarchy-indent' aria-hidden='true'></span>{% endfor %}{% if row.depth %}<span aria-hidden='true'>↳ </span>{% endif %}{% endif %}{{ row.node.name }}</span>
+<span class='hierarchy-name'>{% if indented %}{% if row.depth > 1 %}{% for level in range(row.depth - 1) %}<span class='hierarchy-indent' aria-hidden='true'></span>{% endfor %}{% endif %}{% if row.depth %}<span class='hierarchy-tree-marker'>{{ corner_down_right_icon() }}</span>{% endif %}{% endif %}{{ row.node.name }}</span>
 {% if indented %}<span class='visually-hidden'>Full path: {{ row.path }}</span>{% endif %}
 {%- endmacro %}
 

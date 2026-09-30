@@ -56,9 +56,10 @@
   [data-nav-open] { display: inline-flex; }
 }
 @media (min-width: 768px) {
+  body:has(.app-shell) { overflow: hidden; }
   .app-shell { height: 100vh; height: 100dvh; min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
   .app-main { min-height: 0; overflow-y: auto; }
-  .app-sidebar, .settings-sidebar { min-height: 0; }
+  .app-sidebar, .settings-sidebar { height: 100dvh; min-height: 0; }
   .primary-navigation { min-height: 0; overflow-y: auto; }
   .primary-navigation > *, .account-context { flex-shrink: 0; }
 }

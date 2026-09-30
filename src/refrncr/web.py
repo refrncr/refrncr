@@ -1599,6 +1599,7 @@ def create_flask_app(
             hierarchy_clear_url=hierarchy_clear_url,
             selected_view=selected[0],
             version_state=view.state,
+            may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
             may_start_concept=view.may_maintain and view.concept is None,
         )
@@ -2062,16 +2063,36 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         formats = request.args.getlist("format")
-        if len(formats) != 1 or formats[0] not in {"csv", "xlsx", "json"}:
+        if len(formats) != 1 or formats[0] not in {"csv", "csv_zip", "xlsx", "json"}:
             return "Choose exactly one supported export format", 400
+        variants = request.args.getlist("variant")
+        if len(variants) > 1 or (variants and variants[0] not in {"data", "flattened"}):
+            return "Choose Data or Flattened for a hierarchy CSV export", 400
         try:
             artifact = record_service.export_dataset(
-                actor.id, key, formats[0], version_id=version_id, prefer_concept=concept
+                actor.id,
+                key,
+                formats[0],
+                version_id=version_id,
+                prefer_concept=concept,
+                variant=variants[0] if variants else None,
             )
         except NotFoundError:
             abort(404)
         except (ExportGenerationError, ValidationError) as error:
-            return str(error), 422
+            return (
+                render_authenticated_template(
+                    "pages/datasets/export_error.html",
+                    error=str(error),
+                    return_url=url_for(
+                        "dataset_records_view",
+                        key=key,
+                        version_id=version_id,
+                        concept=concept or None,
+                    ),
+                ),
+                422,
+            )
         try:
             response = send_file(
                 artifact.content,

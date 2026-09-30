@@ -57,6 +57,17 @@ write-only XML generator and removes its temporary file on this path.
 
 ## Dataset deletion (REF-141)
 
+Hierarchy exports reuse the same bounded preparation and audit boundary. The complete
+hierarchy graph is loaded from the selected snapshot and emitted in deterministic preorder;
+Excel contains the three derived `Data`, `Flattened` and `Hierarchy` worksheets, while CSV
+is delivered as one ZIP containing both CSV projections, and JSON carries the node-list
+metadata contract. The two CSV files are generated from the same selected snapshot.
+Excel omits technical node and parent UUIDs from all worksheets; CSV and JSON retain stable
+identities for technical interchange and future import traceability.
+The graphical worksheet is a readable projection only and is not an editable source of
+truth. Structural names and headings receive the same spreadsheet formula-injection
+defenses as custom values, and inactive retained values are excluded from every format.
+
 An export whose authorized snapshot starts after deletion cannot resolve the Dataset and
 fails with the established non-disclosing result without an export event. A snapshot already
 in progress or successfully prepared artifact retains ADR-012 semantics, even if deletion

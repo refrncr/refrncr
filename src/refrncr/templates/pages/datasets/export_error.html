@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback %}
+
+{% block title %}Export unavailable · REFRNCR{% endblock %}
+{% block content %}
+<h1>Export unavailable</h1>
+<div id='export-error' tabindex='-1' data-error-focus>{{ feedback(error, 'error') }}</div>
+<p>We could not prepare this export. Your Dataset was not changed.</p>
+<div class='page-actions'>
+  <a class='button button-primary' href='{{ return_url }}'>Back to hierarchy views</a>
+</div>
+{% endblock %}
