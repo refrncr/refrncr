@@ -1,12 +1,12 @@
 import csv
 import io
 import json
+import zipfile
 from types import SimpleNamespace
 
-import pytest
 from openpyxl import load_workbook
 
-from refrncr.dataset_export import ExportGenerationError, generate_export
+from refrncr.dataset_export import generate_export
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import RecordValue
 
@@ -55,12 +55,20 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     artifact.content.close()
 
 
-def test_hierarchy_csv_bundle_is_no_longer_supported():
+def test_hierarchy_csv_bundle_contains_both_variants():
     fields = (field("f1", "code", "leaves"),)
     nodes = (node("root", "Root"), node("leaf", "Leaf", "root", (value("f1", "code", "L"),)))
 
-    with pytest.raises(ExportGenerationError, match="supported export format"):
-        generate_export("csv_zip", fields, (), "hierarchy", hierarchy_nodes=nodes)
+    artifact = generate_export("csv_zip", fields, (), "hierarchy", hierarchy_nodes=nodes)
+
+    with zipfile.ZipFile(artifact.content) as archive:
+        assert archive.namelist() == ["hierarchy-data.csv", "hierarchy-flattened.csv"]
+        assert archive.read("hierarchy-data.csv").startswith(b"\xef\xbb\xbf")
+        assert archive.read("hierarchy-flattened.csv").startswith(b"\xef\xbb\xbf")
+    assert artifact.media_type == "application/zip"
+    assert artifact.extension == "zip"
+    assert artifact.download_name == "hierarchy.zip"
+    artifact.content.close()
 
 
 def test_hierarchy_flattened_csv_aligns_levels_and_leaf_values():

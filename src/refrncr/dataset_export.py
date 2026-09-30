@@ -8,6 +8,7 @@ import logging
 import os
 import pickle
 import tempfile
+import zipfile
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -395,6 +396,14 @@ def _write_hierarchy_csv(target, fields, nodes, variant):
     text.detach()
 
 
+def write_hierarchy_csv_bundle(target, fields, nodes, dataset_key):
+    with zipfile.ZipFile(target, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for variant in ("data", "flattened"):
+            csv_target = io.BytesIO()
+            _write_hierarchy_csv(csv_target, fields, nodes, variant)
+            archive.writestr(f"{dataset_key}-{variant}.csv", csv_target.getvalue())
+
+
 def _write_hierarchy_sheet(worksheet, headers, rows):
     header = []
     for value in headers:
@@ -583,6 +592,7 @@ def generate_export(
 ) -> ExportArtifact:
     formats = {
         "csv": ("text/csv; charset=utf-8", write_csv),
+        "csv_zip": ("application/zip", write_hierarchy_csv_bundle),
         "json": ("application/json; charset=utf-8", write_json),
         "xlsx": (
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -594,10 +604,14 @@ def generate_export(
     is_hierarchy = hierarchy_nodes is not None
     if is_hierarchy and format_name == "csv" and hierarchy_variant not in {"data", "flattened"}:
         raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
+    if format_name == "csv_zip" and not is_hierarchy:
+        raise ExportGenerationError("CSV bundles are only available for hierarchy exports")
     target = tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_LIMIT, mode="w+b")
     try:
         media_type, writer = formats[format_name]
-        if is_hierarchy and format_name == "csv":
+        if is_hierarchy and format_name == "csv_zip":
+            writer(target, fields, hierarchy_nodes, dataset_key)
+        elif is_hierarchy and format_name == "csv":
             _write_hierarchy_csv(target, fields, hierarchy_nodes, hierarchy_variant)
         elif is_hierarchy and format_name == "json":
             write_hierarchy_json(
@@ -615,7 +629,7 @@ def generate_export(
             writer(target, fields, records)
         target.seek(0)
         suffix = f"-{hierarchy_variant}" if is_hierarchy and format_name == "csv" else ""
-        extension = format_name
+        extension = "zip" if format_name == "csv_zip" else format_name
         return ExportArtifact(target, media_type, extension, f"{dataset_key}{suffix}.{extension}")
     except ExportGenerationError:
         target.close()
