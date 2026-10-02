@@ -58,6 +58,62 @@ def api(context):  # noqa: F811
         yield c
 
 
+@pytest.fixture
+def hierarchy_api(api):
+    c = api
+    hierarchy = c.s.datasets.create_dataset(
+        c.a.id, "hierarchy-api", "Hierarchy API", "", c.owner.id, kind="hierarchy"
+    )
+    root = c.s.hierarchy.create_node(
+        c.a.id, hierarchy.key, "Root", expected_revision=hierarchy.revision
+    )
+    branch = c.s.hierarchy.create_node(
+        c.a.id,
+        hierarchy.key,
+        "Branch",
+        root.id,
+        expected_revision=c.s.datasets.get_dataset_for_edit(c.a.id, hierarchy.key).revision,
+    )
+    nested_leaf = c.s.hierarchy.create_node(
+        c.a.id,
+        hierarchy.key,
+        "Nested leaf",
+        branch.id,
+        expected_revision=c.s.datasets.get_dataset_for_edit(c.a.id, hierarchy.key).revision,
+    )
+    direct_leaf = c.s.hierarchy.create_node(
+        c.a.id,
+        hierarchy.key,
+        "Direct leaf",
+        root.id,
+        expected_revision=c.s.datasets.get_dataset_for_edit(c.a.id, hierarchy.key).revision,
+    )
+    field = c.s.dataset_fields.create_field(
+        c.a.id,
+        hierarchy.key,
+        "code",
+        "Code",
+        "string",
+        False,
+        False,
+        hierarchy_scope="leaves",
+    )
+    for node, value in ((nested_leaf, "nested"), (direct_leaf, "direct")):
+        c.s.hierarchy.update_values(
+            c.a.id,
+            hierarchy.key,
+            node.id,
+            {field.key: value},
+            expected_revision=c.s.datasets.get_dataset_for_edit(c.a.id, hierarchy.key).revision,
+        )
+    hierarchy = c.s.datasets.get_dataset_for_edit(c.a.id, hierarchy.key)
+    c.hierarchy = hierarchy
+    c.hierarchy_version = c.service.publish(
+        c.a.id, hierarchy.id, NOW.date(), "Hierarchy API", hierarchy.revision
+    )
+    return c
+
+
 def get(c, suffix="", **kwargs):
     return c.client.get(
         "/api/v1/datasets" + suffix, headers=kwargs.pop("headers", c.headers), **kwargs
@@ -102,6 +158,69 @@ def test_endpoints_and_contract(api):
     assert get(c, "/audit/records/" + c.record.id).status_code == 404
 
 
+def test_hierarchy_endpoint_returns_complete_flat_snapshot(hierarchy_api):
+    c = hierarchy_api
+    listed = get(c, "?effective_date=2026-09-30")
+    assert listed.status_code == 200, listed.text
+    hierarchy_listing = next(
+        item for item in listed.json()["data"] if item["key"] == c.hierarchy.key
+    )
+    assert hierarchy_listing["kind"] == "hierarchy"
+    detail = get(c, f"/{c.hierarchy.key}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["data"]["kind"] == "hierarchy"
+    assert detail.json()["data"]["hierarchy"] == {"depth": 2}
+    records = get(c, f"/{c.hierarchy.key}/records?offset=0&limit=50")
+    assert records.status_code == 200, records.text
+    flattened = records.json()["data"]
+    assert {record["values"]["code"] for record in flattened} == {"direct", "nested"}
+    nested = next(record for record in flattened if record["values"]["code"] == "nested")
+    assert nested["levels"] == ["Root", "Branch"]
+    assert nested["leaf"] == "Nested leaf"
+    assert nested["node_id"]
+    assert nested["parent_id"]
+    assert get(c, "/audit/hierarchy").status_code == 404
+    response = get(c, f"/{c.hierarchy.key}/hierarchy")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["version"]["number"] == 1
+    assert [field["key"] for field in body["data"]["fields"]] == ["code"]
+    nodes = {node["name"]: node for node in body["data"]["nodes"]}
+    assert nodes["Root"]["parent_id"] is None
+    assert nodes["Branch"]["parent_id"] == nodes["Root"]["id"]
+    assert nodes["Branch"]["record_identifier"] is None
+    assert nodes["Nested leaf"]["record_identifier"]
+    assert nodes["Direct leaf"]["record_identifier"]
+    assert [record["identifier"] for record in body["data"]["records"]] == sorted(
+        record["identifier"] for record in body["data"]["records"]
+    )
+    assert {record["values"]["code"] for record in body["data"]["records"]} == {
+        "direct",
+        "nested",
+    }
+    assert {record["identifier"] for record in body["data"]["records"]} == {
+        nodes["Nested leaf"]["record_identifier"],
+        nodes["Direct leaf"]["record_identifier"],
+    }
+    assert "dataset_version_hierarchy_nodes" not in response.text
+
+
+def test_hierarchy_endpoint_reuses_selection_and_conditional_contract(hierarchy_api):
+    c = hierarchy_api
+    first = get(c, f"/{c.hierarchy.key}/hierarchy")
+    explicit = get(c, f"/{c.hierarchy.key}/hierarchy?version=1")
+    dated = get(c, f"/{c.hierarchy.key}/hierarchy?effective_date={NOW.date().isoformat()}")
+    assert explicit.json() == first.json() == dated.json()
+    cached = get(
+        c,
+        f"/{c.hierarchy.key}/hierarchy",
+        headers={**c.headers, "If-None-Match": first.headers["etag"]},
+    )
+    assert cached.status_code == 304
+    assert get(c, f"/{c.hierarchy.key}/hierarchy?version=2").status_code == 404
+    assert get(c, f"/{c.hierarchy.key}/hierarchy?effective_date=2026-09-09").status_code == 404
+
+
 def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
     c = api
     caplog.set_level(logging.INFO, logger=LOGGER_NAME)
@@ -135,7 +254,9 @@ def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
         )
 
 
-@pytest.mark.parametrize("suffix", ["", "/audit", "/audit/records", "/audit/records/invalid"])
+@pytest.mark.parametrize(
+    "suffix", ["", "/audit", "/audit/records", "/audit/records/invalid", "/audit/hierarchy"]
+)
 @pytest.mark.parametrize(
     "credential", [None, "", "Bearer unknown", "Basic invalid", "Bearer " + "x" * 10000]
 )
@@ -497,7 +618,7 @@ def test_pydantic_models_and_source_schema():
     with pytest.raises(ModelValidationError):
         Record(identifier="opaque", values={"invalid": []})
     schema = create_api(None, None).openapi()
-    assert len(schema["paths"]) == 4
+    assert len(schema["paths"]) == 5
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert all(item["get"]["security"] for item in schema["paths"].values())
 

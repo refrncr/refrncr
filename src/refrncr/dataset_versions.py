@@ -169,6 +169,8 @@ class DatasetVersionService:
         unchanged=None,
         effective_date=None,
         version_number=None,
+        hierarchy=False,
+        allow_hierarchy=False,
     ):
         """Bounded published reads within the existing authorization/read snapshot.
 
@@ -197,6 +199,7 @@ class DatasetVersionService:
                         offset=offset,
                         limit=limit,
                         dataset_ids=dataset_ids,
+                        include_hierarchy=allow_hierarchy,
                     )
                 elif version_number is not None:
                     pairs, total = uow.versions.version_page(
@@ -204,6 +207,7 @@ class DatasetVersionService:
                         offset=offset,
                         limit=limit,
                         dataset_ids=dataset_ids,
+                        include_hierarchy=allow_hierarchy,
                     )
                 else:
                     pairs, total = uow.versions.current_page(
@@ -211,6 +215,7 @@ class DatasetVersionService:
                         offset=offset,
                         limit=limit,
                         dataset_ids=dataset_ids,
+                        include_hierarchy=allow_hierarchy,
                     )
             else:
                 try:
@@ -220,7 +225,8 @@ class DatasetVersionService:
                 dataset = uow.datasets.find_by_key(key)
                 if (
                     dataset is None
-                    or dataset.kind == "hierarchy"
+                    or (hierarchy and dataset.kind != "hierarchy")
+                    or (not allow_hierarchy and dataset.kind == "hierarchy")
                     or not self.authorization.can_view_dataset(actor_id, dataset.id, uow=uow)
                 ):
                     raise NotFoundError("Dataset not found")
@@ -268,9 +274,24 @@ class DatasetVersionService:
             rows = ()
             if record_id is not None:
                 rows = tuple(uow.versions.iterate_records(version, record_ids=(record_id,)))
+            elif hierarchy and not records:
+                rows = tuple(
+                    uow.versions.record_page(
+                        version, fields, offset=0, limit=max(version.record_count, 1)
+                    )
+                )
             elif records:
                 rows = uow.versions.record_page(version, fields, offset=offset, limit=limit)
-            return replace(result, fields=fields, records=rows)
+            return replace(
+                result,
+                fields=fields,
+                records=rows,
+                hierarchy_nodes=(
+                    uow.versions.hierarchy_nodes(version)
+                    if hierarchy or dataset.kind == "hierarchy"
+                    else ()
+                ),
+            )
 
     def _discard_review(self, uow, actor_id, dataset):
         from refrncr.services import _require_concept

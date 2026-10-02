@@ -1257,6 +1257,18 @@
       ]
     },
     {
+      "symbol": "refrncr.api.routes.hierarchy",
+      "path": "/datasets/{dataset_key}/hierarchy",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+      ]
+    },
+    {
       "symbol": "refrncr.api.documentation.openapi_document",
       "path": "/api/openapi.json",
       "methods": [

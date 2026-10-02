@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from refrncr.datatypes import DATATYPES, DatatypeError
+from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import StoredRecord
 from refrncr.version_contracts import PublishedVersion, SnapshotField
 
@@ -72,4 +73,5 @@ class CurrentRead:
     total: int
     fields: tuple[SnapshotField, ...] = ()
     records: tuple[StoredRecord, ...] = ()
+    hierarchy_nodes: tuple[HierarchyNode, ...] = ()
     not_modified: bool = False

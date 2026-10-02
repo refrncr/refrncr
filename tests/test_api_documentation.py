@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.openapi.models import OpenAPI
 from fastapi.routing import APIRoute
+from pydantic import TypeAdapter
 from sqlalchemy import func, select
 from test_audit_coverage import audit_db, context  # noqa: F401
 from test_rest_api import api, get  # noqa: F401
@@ -14,6 +15,8 @@ from refrncr.api.contracts import (
     Dataset,
     DatasetDetail,
     Detail,
+    HierarchyRecordCollection,
+    HierarchyResponse,
     RecordCollection,
     RecordDetail,
 )
@@ -24,8 +27,9 @@ from refrncr.models import AuditEvent
 DATA_PATHS = {
     "/api/v1/datasets": Collection[Dataset],
     "/api/v1/datasets/{dataset_key}": Detail[DatasetDetail],
-    "/api/v1/datasets/{dataset_key}/records": RecordCollection,
+    "/api/v1/datasets/{dataset_key}/records": RecordCollection | HierarchyRecordCollection,
     "/api/v1/datasets/{dataset_key}/records/{identifier}": RecordDetail,
+    "/api/v1/datasets/{dataset_key}/hierarchy": HierarchyResponse,
 }
 
 
@@ -68,18 +72,22 @@ def test_schema_matches_registered_routes_and_contracts(api):  # noqa: F811
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["type"] == "http"
     for path, model in DATA_PATHS.items():
-        assert routes[path].response_model is model
+        assert routes[path].response_model == model
         assert routes[path].methods == {"GET"}
         assert set(schema["paths"][path]) == {"get"}
         op = schema["paths"][path]["get"]
         assert op["security"] == [{"HTTPBearer": []}]
         assert set(op["responses"]) == {"200", "304", "400", "401", "404", "405", "503"}
-        ref = op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-        expected = model.model_json_schema(
+        response_schema = op["responses"]["200"]["content"]["application/json"]["schema"]
+        expected = TypeAdapter(model).json_schema(
             mode="serialization", ref_template="#/components/schemas/{model}"
         )
-        expected.pop("$defs", None)
-        assert models[ref.rsplit("/", 1)[1]] == expected
+        if "anyOf" in response_schema:
+            assert response_schema["anyOf"] == expected["anyOf"]
+        else:
+            ref = response_schema["$ref"]
+            expected.pop("$defs", None)
+            assert models[ref.rsplit("/", 1)[1]] == expected
         assert "content" not in op["responses"]["304"]
         for status in ("200", "304"):
             assert set(op["responses"][status]["headers"]) == {
