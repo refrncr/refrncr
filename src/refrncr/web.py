@@ -40,6 +40,7 @@ from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.diff_contracts import STATUSES, DiffCriteria
 from refrncr.hierarchy import HierarchyService
+from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -138,6 +139,7 @@ def create_flask_app(
     dataset_business_keys: DatasetBusinessKeyService | None = None,
     dataset_records: DatasetRecordService | None = None,
     record_imports: DatasetRecordImportService | None = None,
+    hierarchy_imports: HierarchyImportService | None = None,
     allow_loopback_http: bool = False,
     login_limiter: LoginAttemptLimiter | None = None,
     source_resolver: SourceIdentityResolver | None = None,
@@ -2616,6 +2618,125 @@ def create_flask_app(
         record_imports.cancel(actor.id, login_session.id, key, token)
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
+    @import_route("/datasets/<key>/concept/hierarchy-import", methods=["GET", "POST"])
+    def import_hierarchy_file(key: str):
+        if hierarchy_imports is None:
+            abort(404)
+        actor, login_session = require_authenticated()
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        if dataset.kind != "hierarchy":
+            abort(404)
+        state = hierarchy_imports.active(actor.id, login_session.id, key)
+        if request.method == "GET":
+            preview = (
+                hierarchy_imports.preview(actor.id, login_session.id, key, state.token)
+                if state
+                else None
+            )
+            return render_authenticated_template(
+                "pages/datasets/hierarchy_import.html",
+                dataset=dataset,
+                state=state,
+                preview=preview,
+                current_csrf=login_session.csrf_token,
+            )
+        require_csrf(login_session.csrf_token)
+        if (
+            set(request.form) != {"csrf_token"}
+            or set(request.files) != {"file"}
+            or len(request.files.getlist("file")) != 1
+        ):
+            return render_authenticated_template(
+                "pages/datasets/hierarchy_import.html",
+                dataset=dataset,
+                state=state,
+                preview=None,
+                current_csrf=login_session.csrf_token,
+                error="Submit exactly one Excel workbook",
+            ), 400
+        uploaded = request.files["file"]
+        try:
+            state = hierarchy_imports.begin(
+                actor.id,
+                login_session.id,
+                key,
+                uploaded.filename or "",
+                uploaded.stream.read(MAX_UPLOAD_BYTES + 1),
+            )
+        except ImportValidationError as error:
+            return render_authenticated_template(
+                "pages/datasets/hierarchy_import.html",
+                dataset=dataset,
+                state=state,
+                preview=None,
+                current_csrf=login_session.csrf_token,
+                error=str(error),
+            ), 400
+        return redirect(url_for("hierarchy_import_preview", key=key, token=state.token), code=303)
+
+    @import_route("/datasets/<key>/concept/hierarchy-import/<token>", methods=["GET"])
+    def hierarchy_import_preview(key: str, token: str):
+        if hierarchy_imports is None:
+            abort(404)
+        actor, login_session = require_authenticated()
+        dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        state = hierarchy_imports.state(actor.id, login_session.id, key, token)
+        preview = hierarchy_imports.preview(actor.id, login_session.id, key, token)
+        return render_authenticated_template(
+            "pages/datasets/hierarchy_import.html",
+            dataset=dataset,
+            state=state,
+            preview=preview,
+            current_csrf=login_session.csrf_token,
+        )
+
+    @import_route("/datasets/<key>/concept/hierarchy-import/<token>/confirm", methods=["POST"])
+    def confirm_hierarchy_import(key: str, token: str):
+        if hierarchy_imports is None:
+            abort(404)
+        actor, login_session = require_authenticated()
+        require_csrf(login_session.csrf_token)
+        expected = {"csrf_token", "confirmation"}
+        if "acknowledge_removals" in request.form:
+            expected.add("acknowledge_removals")
+        if set(request.form) != expected or any(
+            len(request.form.getlist(name)) != 1 for name in expected
+        ):
+            abort(400)
+        try:
+            hierarchy_imports.confirm(
+                actor.id,
+                login_session.id,
+                key,
+                token,
+                confirmation=request.form["confirmation"],
+                acknowledge_removals=request.form.get("acknowledge_removals") == "yes",
+            )
+        except (ImportValidationError, StaleRecordError, ConflictError) as error:
+            dataset = dataset_records.get_dataset_for_add(actor.id, key)
+            state = hierarchy_imports.state(actor.id, login_session.id, key, token)
+            preview = hierarchy_imports.preview(actor.id, login_session.id, key, token)
+            return render_authenticated_template(
+                "pages/datasets/hierarchy_import.html",
+                dataset=dataset,
+                state=state,
+                preview=preview,
+                current_csrf=login_session.csrf_token,
+                error=str(error),
+            ), 409
+        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+
+    @import_route("/datasets/<key>/concept/hierarchy-import/<token>/cancel", methods=["POST"])
+    def cancel_hierarchy_import(key: str, token: str):
+        if hierarchy_imports is None:
+            abort(404)
+        actor, login_session = require_authenticated()
+        require_csrf(login_session.csrf_token)
+        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
+            abort(400)
+        hierarchy_imports.cancel(actor.id, login_session.id, key, token)
+        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+
     def render_record_form(
         dataset,
         fields,
@@ -3458,6 +3579,8 @@ def create_flask_app(
         require_csrf(resolved[1].csrf_token)
         if record_imports is not None:
             record_imports.revoke_session(resolved[1].id)
+        if hierarchy_imports is not None:
+            hierarchy_imports.revoke_session(resolved[1].id)
         sessions.revoke(token)
         response = redirect(url_for("index"))
         response.delete_cookie(settings.session_name, **settings.common_options)

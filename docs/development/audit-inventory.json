@@ -33,6 +33,13 @@
     "refrncr.hierarchy.HierarchyService.delete_subtree",
     "refrncr.hierarchy.HierarchyService.update_node",
     "refrncr.hierarchy.HierarchyService.update_values",
+    "refrncr.hierarchy_import.HierarchyImportService.active",
+    "refrncr.hierarchy_import.HierarchyImportService.begin",
+    "refrncr.hierarchy_import.HierarchyImportService.cancel",
+    "refrncr.hierarchy_import.HierarchyImportService.confirm",
+    "refrncr.hierarchy_import.HierarchyImportService.preview",
+    "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
+    "refrncr.hierarchy_import.HierarchyImportService.state",
     "refrncr.record_import.DatasetRecordImportService.active",
     "refrncr.record_import.DatasetRecordImportService.begin",
     "refrncr.record_import.DatasetRecordImportService.cancel",
@@ -695,6 +702,62 @@
       ]
     },
     {
+      "symbol": "refrncr.web.import_hierarchy_file",
+      "path": "/datasets/<key>/concept/hierarchy-import",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.hierarchy_import.HierarchyImportService.active",
+        "refrncr.hierarchy_import.HierarchyImportService.begin",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.hierarchy_import_preview",
+      "path": "/datasets/<key>/concept/hierarchy-import/<token>",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.hierarchy_import.HierarchyImportService.preview",
+        "refrncr.hierarchy_import.HierarchyImportService.state",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.confirm_hierarchy_import",
+      "path": "/datasets/<key>/concept/hierarchy-import/<token>/confirm",
+      "methods": [
+        "POST"
+      ],
+      "operations": [
+        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.hierarchy_import.HierarchyImportService.confirm",
+        "refrncr.hierarchy_import.HierarchyImportService.preview",
+        "refrncr.hierarchy_import.HierarchyImportService.state",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.cancel_hierarchy_import",
+      "path": "/datasets/<key>/concept/hierarchy-import/<token>/cancel",
+      "methods": [
+        "POST"
+      ],
+      "operations": [
+        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.hierarchy_import.HierarchyImportService.cancel",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
       "symbol": "refrncr.web.new_dataset_record",
       "path": "/datasets/<key>/records/new",
       "methods": [
@@ -967,10 +1030,11 @@
       "methods": [
         "POST"
       ],
-      "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.record_import.DatasetRecordImportService.revoke_session",
-        "refrncr.services.SessionService.resolve_with_session",
+        "operations": [
+          "refrncr.browser_security.BrowserCookiePolicy.for_request",
+          "refrncr.record_import.DatasetRecordImportService.revoke_session",
+          "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
+          "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.SessionService.revoke",
         "refrncr.web.require_csrf"
       ]

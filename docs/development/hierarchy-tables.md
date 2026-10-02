@@ -152,6 +152,21 @@ written to visible cells, metadata or JSON/CSV output. The existing canonical da
 serializers and spreadsheet-safety encoding apply. Export filenames identify the CSV
 variant; one selected snapshot supplies both CSV files and all other representations.
 
+## Editable workbook import (REF-183)
+
+The browser workflow at `/datasets/<dataset-key>/concept/hierarchy-import` accepts only
+the editable `.xlsx` export. The visible `Data` worksheet is authoritative; `Flattened`
+and `Hierarchy` are presentation sheets and are ignored. `Node ID` and `Parent ID` are
+the stable structural identifiers. The `Parent` column is display-only, so a renamed
+parent and a moved child can be imported in the same workbook.
+
+Import first creates a complete difference preview. Additions, edits, moves, unchanged
+rows and proposed removals are shown before any Concept mutation. Missing existing rows
+are never removed silently: confirmation must explicitly acknowledge proposed removals.
+Invalid identities, references, structure, field values or workbook shape fail closed.
+Confirmation applies the validated difference atomically to the draft Concept; publication
+remains a separate lifecycle action.
+
 Focused tests cover domain validation, retention/restoration, optional identifiers,
 transaction rollback, concurrent edits, complete version snapshots, review and browser
 views. Relational constraints and migration round trips run through the shared SQLite and

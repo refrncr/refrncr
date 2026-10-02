@@ -105,6 +105,16 @@ _EVENTS = (
             "hierarchy.values_updated",
         )
     ),
+    EventContract(
+        "dataset",
+        "hierarchy.import_applied",
+        (
+            ("additions", "version_count"),
+            ("edits", "version_count"),
+            ("moves", "version_count"),
+            ("removals", "version_count"),
+        ),
+    ),
     *(
         EventContract(
             "dataset_export_access",
@@ -369,6 +379,21 @@ for _method, _action in (
     ("update_values", "hierarchy.values_updated"),
 ):
     _audited("HierarchyService", _method, ("dataset", _action), module="hierarchy")
+
+_register(
+    "HierarchyImportService",
+    "confirm",
+    "domain-audited",
+    events=(("dataset", "hierarchy.import_applied"),),
+    module="hierarchy_import",
+)
+_register(
+    "HierarchyImportService",
+    "begin active state preview cancel revoke_session",
+    "intentionally excluded",
+    module="hierarchy_import",
+    rationale="Transient preview state only; no committed hierarchy change.",
+)
 
 
 for _method, _action in (

@@ -81,6 +81,7 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset", "hierarchy.values_updated"): ActionPresentation(
             "Hierarchy node values updated", False
         ),
+        ("dataset", "hierarchy.import_applied"): ActionPresentation("Hierarchy imported", False),
         ("dataset", "business_key_defined"): ActionPresentation("Record identifier defined", False),
         ("dataset", "business_key_updated"): ActionPresentation("Record identifier updated", False),
         ("dataset", "field_order_updated"): ActionPresentation(
@@ -161,9 +162,13 @@ CONTEXT_LABELS = MappingProxyType(
         "record_count": "Records",
         "mode": "Import mode",
         "added": "Added",
+        "additions": "Hierarchy nodes added",
         "changed": "Changed",
+        "edits": "Hierarchy nodes edited",
         "unchanged": "Unchanged",
+        "moves": "Hierarchy nodes moved",
         "deleted": "Deleted",
+        "removals": "Hierarchy nodes removed",
         "total_processed": "Total processed",
         "rejected_row_count": "Rows rejected",
     }
