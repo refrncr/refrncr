@@ -14,6 +14,7 @@ OpenAPI 3.1 contract generated from the registered FastAPI routes and Pydantic m
 | `/api/v1/datasets/{dataset_key}` | Dataset summary plus ordered `fields` | None |
 | `/api/v1/datasets/{dataset_key}/records` | Array of Records | `version`, `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}/records/{identifier}` | One Record | `version` |
+| `/api/v1/datasets/{dataset_key}/hierarchy` | Complete flat hierarchy snapshot | `version` |
 
 A Dataset summary has `key`, `name`, `description`, `icon` (nullable), and
 `version` (`number`, `published_at`, canonical UTC timestamp, and `effective_from`,
@@ -62,8 +63,28 @@ arbitrary supplied querystrings. Reverse proxies should preserve the `/api/v1` p
 Dataset order is key ascending. Records retain typed canonical identifier order and
 stable internal tie-breaking. Offset beyond the result set succeeds with an empty
 array and the correct total. No Concept, Cancelled or fallback working copy is available.
-Unsupported search, filters, sort, writes/imports/exports/mappings/hierarchies
-are not part of v1. Incompatible future changes require a new API version.
+Unsupported search, filters, sort, writes/imports/exports/mappings are not part of v1.
+Hierarchy reads are available only through the dedicated endpoint below. Incompatible future
+changes require a new API version.
+
+### Published hierarchy snapshots (REF-182)
+
+`GET /api/v1/datasets/{dataset_key}/hierarchy` returns one complete, immutable published
+snapshot. The response is not paginated: it contains the selected `version`, ordered
+`fields`, flat `nodes`, and the corresponding leaf `records`. Each node has a stable
+published `id`, nullable `parent_id`, `name`, canonical field-keyed `values`, and a nullable
+`record_identifier`; only leaves have a record identifier. Intermediate branches are not
+additional records. The records use the existing opaque identifier and canonical typed
+values. When a hierarchy has no business-key fields, the opaque identifier is derived from
+the persisted hierarchy leaf identity and is not an internal UUID or authorization token.
+
+Nodes are ordered by stable node identifier. Records use the existing canonical identifier
+ordering. The endpoint reuses `effective_date` and `version` selection, bearer-only
+authentication, DatasetAuthorizationService authorization, safe 400/401/404/503 responses,
+conditional requests and private cache isolation. Concepts, mutations, imports/exports,
+cross-dataset references and aggregation calculations remain out of scope. A dataset
+version owns one fixed hierarchy structure; relationship validity is not independent of the
+version.
 
 ## Authentication, authorization, errors and privacy
 

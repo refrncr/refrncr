@@ -34,6 +34,14 @@ Identifiers are opaque business identifiers, never internal Record UUIDs. Single
 composite identifiers share the same contract: URL encode the **entire returned identifier**;
 do not reconstruct it from display values. Encoding is reversible, not encryption.
 
+The hierarchy endpoint returns one complete published snapshot at
+`/api/v1/datasets/{dataset_key}/hierarchy`. Its flat `nodes` contain stable node IDs,
+`parent_id`, names, canonical values and a `record_identifier` for leaves; `records`
+contains the corresponding leaf records. Intermediate branches are not records. The
+snapshot is not paginated so it can be reconstructed independently. Hierarchy selection
+uses the same version/effective-date, authorization, error, ETag and cache rules as the
+other published-data endpoints.
+
 Every successful data response supplies a strong ETag and publication-based Last-Modified.
 Send If-None-Match to revalidate; matching tags (including weak/list matches and `*`)
 return 304 only after authentication, authorization and existence checks. ETags also track
@@ -43,7 +51,8 @@ Last-Modified is unchanged. Dataset lists use the page's latest publication time
 epoch for an empty page. Private caches must revalidate every use; shared caching is forbidden.
 
 **Excluded:** Concepts, Cancelled versions, history listing, search/filtering/sorting, writes,
-import/export, mappings and hierarchies.
+import/export and mappings. The hierarchy endpoint is read-only and does not expose concept
+data, internal IDs as record identifiers, cross-dataset references or aggregations.
 """.strip()
 
 CONDITIONAL_PARAMETERS = [

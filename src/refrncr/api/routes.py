@@ -19,6 +19,12 @@ from refrncr.api.contracts import (
     Detail,
     Error,
     FieldMetadata,
+    HierarchyData,
+    HierarchyMetadata,
+    HierarchyNode,
+    HierarchyRecord,
+    HierarchyRecordCollection,
+    HierarchyResponse,
     Links,
     PageQuery,
     Pagination,
@@ -32,7 +38,7 @@ from refrncr.api.documentation import CONDITIONAL_PARAMETERS, DESCRIPTION, RESPO
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead, utc
 from refrncr.api_keys import ApiKeyAuthenticationError
 from refrncr.datatypes import get_datatype
-from refrncr.published_contracts import record_identifier
+from refrncr.published_contracts import encode_identifier, record_identifier
 from refrncr.services import AuthenticatedPrincipal, NotFoundError, ValidationError
 
 
@@ -57,7 +63,19 @@ def _dataset(publication):
 
 
 def _record(record, fields):
-    values = {v.field_key: v.value for v in record.values}
+    return Record(
+        identifier=_record_identifier(record, fields), values=_values(record.values, fields)
+    )
+
+
+def _record_identifier(record, fields):
+    if not any(field.is_identifier for field in fields):
+        return encode_identifier(b"hierarchy:" + record.id.encode("ascii"))
+    return record_identifier(record, fields)
+
+
+def _values(values, fields):
+    values = {v.field_key: v.value for v in values}
     canonical = {}
     for field in fields:
         value = values.get(field.key)
@@ -67,7 +85,43 @@ def _record(record, fields):
             if field.data_type in {"date", "time", "datetime", "timestamp"}:
                 value = datatype.text(value)
         canonical[field.key] = value
-    return Record(identifier=record_identifier(record, fields), values=canonical)
+    return canonical
+
+
+def _hierarchy_node(node, fields, record_identifiers):
+    return HierarchyNode(
+        id=node.id,
+        parent_id=node.parent_id,
+        name=node.name,
+        values=_values(node.values, fields),
+        record_identifier=record_identifiers.get(node.id),
+    )
+
+
+def _hierarchy_paths(nodes):
+    by_id = {node.id: node for node in nodes}
+    paths = {}
+    for node in nodes:
+        path, current, visited = [], node, set()
+        while current is not None and current.id not in visited:
+            visited.add(current.id)
+            path.append(current)
+            current = by_id.get(current.parent_id)
+        paths[node.id] = tuple(reversed(path))
+    return paths
+
+
+def _hierarchy_record(record, fields, nodes_by_id, paths):
+    node = nodes_by_id[record.id]
+    path = paths[node.id]
+    return HierarchyRecord(
+        identifier=_record_identifier(record, fields),
+        node_id=node.id,
+        parent_id=node.parent_id,
+        levels=tuple(item.name for item in path[:-1]),
+        leaf=node.name,
+        values=_values(record.values, fields),
+    )
 
 
 def _query(request, collection):
@@ -209,6 +263,8 @@ def create_api(versions, api_keys):
             unchanged=condition,
             effective_date=effective_date,
             version_number=version_number,
+            hierarchy=kind == "hierarchy",
+            allow_hierarchy=True,
         )
         if result.not_modified:
             return Response(status_code=304, headers=condition.headers)
@@ -234,20 +290,77 @@ def create_api(versions, api_keys):
                 )
                 for f in result.fields
             )
+            publication = result.publications[0]
+            hierarchy = None
+            if publication.kind == "hierarchy":
+                hierarchy = HierarchyMetadata(
+                    depth=max(
+                        (
+                            max(len(path) - 1, 0)
+                            for path in _hierarchy_paths(result.hierarchy_nodes).values()
+                        ),
+                        default=0,
+                    )
+                )
             payload = Detail[DatasetDetail](
-                data=DatasetDetail(**_dataset(result.publications[0]).model_dump(), fields=fields)
+                data=DatasetDetail(
+                    **_dataset(publication).model_dump(), fields=fields, hierarchy=hierarchy
+                )
             )
         elif kind == "records":
-            payload = RecordCollection(
-                data=tuple(_record(r, result.fields) for r in result.records),
-                version=_version(result.publications[0]),
-                **_pagination(
-                    page,
-                    result.total,
-                    f"/api/v1/datasets/{key}/records",
-                    effective_date,
-                    version_number,
+            pagination = _pagination(
+                page,
+                result.total,
+                f"/api/v1/datasets/{key}/records",
+                effective_date,
+                version_number,
+            )
+            if result.publications[0].kind == "hierarchy":
+                nodes_by_id = {node.id: node for node in result.hierarchy_nodes}
+                paths = _hierarchy_paths(result.hierarchy_nodes)
+                payload = HierarchyRecordCollection(
+                    data=tuple(
+                        _hierarchy_record(r, result.fields, nodes_by_id, paths)
+                        for r in result.records
+                    ),
+                    version=_version(result.publications[0]),
+                    **pagination,
+                )
+            else:
+                payload = RecordCollection(
+                    data=tuple(_record(r, result.fields) for r in result.records),
+                    version=_version(result.publications[0]),
+                    **pagination,
+                )
+        elif kind == "hierarchy":
+            records = tuple(_record(r, result.fields) for r in result.records)
+            record_identifiers = {
+                raw.id: record.identifier
+                for raw, record in zip(result.records, records, strict=True)
+            }
+            payload = HierarchyResponse(
+                data=HierarchyData(
+                    fields=tuple(
+                        FieldMetadata(
+                            key=f.key,
+                            name=f.name,
+                            datatype=f.data_type,
+                            is_identifier=f.is_identifier,
+                            is_required=f.is_required,
+                            is_unique=f.is_unique,
+                            display_position=f.display_position,
+                            definition=f.definition,
+                            unit=f.unit,
+                        )
+                        for f in result.fields
+                    ),
+                    nodes=tuple(
+                        _hierarchy_node(node, result.fields, record_identifiers)
+                        for node in result.hierarchy_nodes
+                    ),
+                    records=records,
                 ),
+                version=_version(result.publications[0]),
             )
         else:
             payload = RecordDetail(
@@ -321,7 +434,7 @@ def create_api(versions, api_keys):
 
     @app.get(
         "/datasets/{dataset_key}/records",
-        response_model=RecordCollection,
+        response_model=RecordCollection | HierarchyRecordCollection,
         responses=errors,
         summary="List published Records",
         tags=["Published data"],
@@ -354,6 +467,26 @@ def create_api(versions, api_keys):
         selection: Annotated[SelectionQuery, Depends()] = None,
     ):
         return read(request, actor, "record", dataset_key, identifier)
+
+    @app.get(
+        "/datasets/{dataset_key}/hierarchy",
+        response_model=HierarchyResponse,
+        responses=errors,
+        summary="Read a published hierarchy",
+        tags=["Published data"],
+        openapi_extra=conditional,
+        description=(
+            "Read one complete, flat published hierarchy snapshot. Nodes reference their "
+            "parent_id and leaves reference the corresponding opaque Record identifier."
+        ),
+    )
+    def hierarchy(
+        request: Request,
+        dataset_key: str,
+        actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        selection: Annotated[SelectionQuery, Depends()] = None,
+    ):
+        return read(request, actor, "hierarchy", dataset_key)
 
     generated_openapi = app.openapi
 

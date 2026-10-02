@@ -5658,7 +5658,8 @@
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
-        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
       ],
       "kind": "mutation",
       "classification": "security-audited",
@@ -5704,7 +5705,8 @@
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
-        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5740,7 +5742,8 @@
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
-        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}"
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

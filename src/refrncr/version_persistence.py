@@ -100,7 +100,7 @@ class SqlAlchemyVersionOperations:
         )
         return {row.dataset_id: self._version(row) for row in rows}
 
-    def current_page(self, today, *, dataset_ids=None, offset, limit):
+    def current_page(self, today, *, dataset_ids=None, offset, limit, include_hierarchy=False):
         """Database page of Current publications; no concepts or historical fallback."""
         ranked = (
             select(
@@ -119,8 +119,10 @@ class SqlAlchemyVersionOperations:
             select(Dataset, DatasetVersion)
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
-            .where(ranked.c.position == 1, Dataset.kind != "hierarchy")
+            .where(ranked.c.position == 1)
         )
+        if not include_hierarchy:
+            statement = statement.where(Dataset.kind != "hierarchy")
         if dataset_ids is not None:
             statement = statement.where(Dataset.id.in_(dataset_ids))
         total = self.session.scalar(select(func.count()).select_from(statement.subquery()))
@@ -164,6 +166,7 @@ class SqlAlchemyVersionOperations:
         dataset_ids=None,
         offset,
         limit,
+        include_hierarchy=False,
     ):
         ranked = select(
             DatasetVersion.id,
@@ -184,8 +187,10 @@ class SqlAlchemyVersionOperations:
             select(Dataset, DatasetVersion)
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
-            .where(ranked.c.position == 1, Dataset.kind != "hierarchy")
+            .where(ranked.c.position == 1)
         )
+        if not include_hierarchy:
+            statement = statement.where(Dataset.kind != "hierarchy")
         if version_number is not None:
             statement = statement.where(DatasetVersion.number == version_number)
         total = self.session.scalar(select(func.count()).select_from(statement.subquery()))
@@ -202,16 +207,19 @@ class SqlAlchemyVersionOperations:
             statement = statement.where(DatasetVersion.dataset_id.in_(dataset_ids))
         return {row.dataset_id: self._version(row) for row in self.session.scalars(statement)}
 
-    def version_page(self, version_number, *, dataset_ids=None, offset, limit):
+    def version_page(
+        self, version_number, *, dataset_ids=None, offset, limit, include_hierarchy=False
+    ):
         statement = (
             select(Dataset, DatasetVersion)
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .where(
                 DatasetVersion.cancelled_at.is_(None),
                 DatasetVersion.number == version_number,
-                Dataset.kind != "hierarchy",
             )
         )
+        if not include_hierarchy:
+            statement = statement.where(Dataset.kind != "hierarchy")
         if dataset_ids is not None:
             statement = statement.where(Dataset.id.in_(dataset_ids))
         total = self.session.scalar(select(func.count()).select_from(statement.subquery()))

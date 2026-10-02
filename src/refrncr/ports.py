@@ -604,17 +604,26 @@ class VersionOperations(Protocol):
 
     def current_for_datasets(self, dataset_ids, today): ...
 
-    def current_page(self, today, *, dataset_ids=None, offset, limit): ...
+    def current_page(self, today, *, dataset_ids=None, offset, limit, include_hierarchy=False): ...
 
     def selected_for_datasets(self, dataset_ids, effective_date, version_number=None): ...
 
     def selected_page(
-        self, effective_date, *, version_number=None, dataset_ids=None, offset, limit
+        self,
+        effective_date,
+        *,
+        version_number=None,
+        dataset_ids=None,
+        offset,
+        limit,
+        include_hierarchy=False,
     ): ...
 
     def version_for_datasets(self, dataset_ids, version_number): ...
 
-    def version_page(self, version_number, *, dataset_ids=None, offset, limit): ...
+    def version_page(
+        self, version_number, *, dataset_ids=None, offset, limit, include_hierarchy=False
+    ): ...
 
     def record_identity(self, version, identifier_key): ...
 

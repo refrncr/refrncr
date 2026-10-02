@@ -82,8 +82,12 @@ class Dataset(Contract):
     name: str
     description: str
     icon: str | None
-    kind: Literal["reference", "mapping"]
+    kind: Literal["reference", "mapping", "hierarchy"]
     version: VersionMetadata
+
+
+class HierarchyMetadata(Contract):
+    depth: int = Field(ge=0)
 
 
 class FieldMetadata(Contract):
@@ -104,6 +108,7 @@ class FieldMetadata(Contract):
 
 class DatasetDetail(Dataset):
     fields: tuple[FieldMetadata, ...]
+    hierarchy: HierarchyMetadata | None = None
 
 
 CanonicalDecimal = Annotated[Decimal, WithJsonSchema({"type": "number"}, mode="serialization")]
@@ -122,6 +127,20 @@ class Record(Contract):
     values: dict[str, CanonicalValue]
 
 
+class HierarchyNode(Contract):
+    id: str
+    parent_id: str | None
+    name: str
+    values: dict[str, CanonicalValue]
+    record_identifier: str | None
+
+
+class HierarchyData(Contract):
+    fields: tuple[FieldMetadata, ...]
+    nodes: tuple[HierarchyNode, ...]
+    records: tuple[Record, ...]
+
+
 class Detail[T](Contract):
     data: T
 
@@ -137,6 +156,24 @@ class RecordDetail(Detail[Record]):
 
 
 class RecordCollection(Collection[Record]):
+    version: VersionMetadata
+
+
+class HierarchyRecord(Contract):
+    identifier: str
+    node_id: str
+    parent_id: str | None
+    levels: tuple[str, ...]
+    leaf: str
+    values: dict[str, CanonicalValue]
+
+
+class HierarchyRecordCollection(Collection[HierarchyRecord]):
+    version: VersionMetadata
+
+
+class HierarchyResponse(Contract):
+    data: HierarchyData
     version: VersionMetadata
 
 
