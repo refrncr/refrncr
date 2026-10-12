@@ -116,11 +116,11 @@ reference: a flat column-flex group with no breadcrumb/title gap, zero child mar
 `--space-sm` (8 px) padding before metadata. This reproduces the reference's single collapsed
 8 px heading/paragraph margin without relying on margin collapse inside flex layout.
 The `.page-title` class shares the canonical heading font family and wrapping rule, using
-`--font-size-page-title` (24 px since the visual refresh), semibold weight and normal font line-height. Other `h1`
-styles use the same size. Breadcrumbs use regular 12 px JetBrains Mono, normal line-height, uppercase presentation
+`--font-size-page-title` (24 px since the visual refresh), `--font-weight-bold` and normal font line-height. Other `h1`
+styles use the same size. Breadcrumbs use regular 12 px `--font-technical` (IBM Plex Mono), normal line-height, uppercase presentation
 and `--letter-spacing-label` (0.08 em). Breadcrumb links use the accent via `--color-breadcrumb-link` (#0f7a4f), with 4.97:1 contrast
 on the #f4f7f5 background and 5.36:1 on white.
-Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px Inter, normal line-height,
+Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px `--font-interface` (IBM Plex Sans), normal line-height,
 tabular figures and one inline-flex row with 8 px horizontal gaps. The decorative bullet has
 `aria-hidden="true"` and is grouped with Updated so it cannot wrap alone. Whitespace between the
 count and Updated groups retains a text boundary for assistive technology. The outer header's
@@ -811,6 +811,11 @@ sublabel, accessible name Status (application metadata), interface typography an
 boundary distinguish it from user Fields. Published uses the green `badge-published` in concept, Current and historical views;
 Edited/Added use draft badges and Deleted a removed badge on a muted row, each with a row edge marker. No green Complete badge remains. Content
 Fields named Status, Change and Validation retain their names and actual values.
+Design-system v2 §7 keeps concept system statuses as Published, Edited, Added and Deleted. Version diff/review domain
+statuses remain Added, Changed and Removed; Moved is a neutral hierarchy marker. Published and
+Current use the green success treatment, Added/Changed/Edited use the draft/amber treatment,
+Deleted/Removed use the removed treatment, and Moved remains neutral. The shared `status_badge`
+macro owns this presentation mapping; it does not rename or classify domain values.
 Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
 Escape and focus restoration. Search and deterministic pagination include old identifiers.
 The metadata line counts surviving Records plus a separate marked-for-deletion count.
@@ -1046,7 +1051,7 @@ implied by the semantic and keyboard checks in the REF-160 report.
 - Page rules: Configure's small Edit link and access placement, Versions action
   removal, and the authorized no-Current Dataset list destination.
 - Tokens: no new design tokens; new rules reuse existing spacing, colour and font
-  tokens. Product branding uses the supplied concentric-ring assets.
+  tokens. Product branding uses the current REFRNCR wordmark and related packaged assets.
 
 Key generation uses equivalent Python/JavaScript NFKD, lowercase, explicit whitespace,
 slash/backslash/dot/dash separators to underscores, ASCII filtering, underscore

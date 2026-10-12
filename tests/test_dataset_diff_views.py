@@ -1,5 +1,6 @@
 """REF-84 browser contracts on SQLite and PostgreSQL; real Chrome is separate."""
 
+import re
 from datetime import timedelta
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
@@ -42,6 +43,12 @@ def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
         assert "Concept revision" in response.text and "Version 1" in response.text
         assert "You’re working on a concept" in response.text and "Publish version" in response.text
         assert "no-store" in response.headers["Cache-Control"]
+        if section == "Fields":
+            assert "<span class='badge badge-draft'>Changed</span>" in response.text
+            assert "<span class='badge badge-published'>Changed</span>" not in response.text
+        if section == "Records":
+            assert "<span class='badge badge-draft'>Changed</span>" in response.text
+            assert "<span class='badge badge-published'>Changed</span>" not in response.text
     detail = request(
         browser,
         "get",
@@ -59,6 +66,20 @@ def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
     assert snapshot(c) == before
     events = [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
     assert len(events) == 1
+
+
+def test_review_status_badges_keep_added_and_removed_distinct(context):  # noqa: F811
+    c = context
+    browser, _csrf, base, _token = prepared(c)
+    c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "added", "label": "Added"})
+    current = c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, c.record.id)
+    c.s.dataset_records.delete_record(c.a.id, c.d.key, c.record.id, current.revision)
+    entrypoint = request(browser, "get", base)
+    token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+    response = request(browser, "get", path(base, token, section="Records"))
+    assert response.status_code == 200
+    statuses = re.findall(r"<span class='badge ([^']+)'>(Added|Removed)</span>", response.text)
+    assert sorted(statuses) == sorted([("badge-draft", "Added"), ("badge-removed", "Removed")])
 
 
 def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F811

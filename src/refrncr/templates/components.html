@@ -12,6 +12,11 @@
   {% endif %}
 {%- endmacro %}
 
+{% macro status_badge(label) -%}
+{%- set variant = 'badge-published' if label in ('Published', 'Current') else 'badge-draft' if label in ('Added', 'Changed', 'Edited') else 'badge-removed' if label in ('Deleted', 'Removed') else '' -%}
+<span class='badge{% if variant %} {{ variant }}{% endif %}'>{{ label }}</span>
+{%- endmacro %}
+
 {% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false, min_value=none, max_length=none) -%}
   <div class='form-field'>
     <label for='{{ id }}'>{{ label }}</label>
