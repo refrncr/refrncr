@@ -1,0 +1,3 @@
+name: refrncr CodeQL configuration
+packs:
+  - ./.github/codeql/extensions/refrncr-python-models

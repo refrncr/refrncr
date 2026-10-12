@@ -104,10 +104,10 @@ GENERIC_LOGIN_FAILURE = "Invalid credentials"
 MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
 
 
-def safe_login_target(target: str | None) -> str:
-    """Accept only root-relative paths, never URLs or query/fragment payloads."""
+def is_safe_login_target(target: str | None) -> bool:
+    """Return whether a login target is a safe root-relative path."""
     if not target:
-        return "/"
+        return True
     decoded = unquote(target)
     if (
         not decoded.startswith("/")
@@ -119,11 +119,16 @@ def safe_login_target(target: str | None) -> str:
         or any(character in decoded for character in "\\%?#")
         or any(segment in {".", ".."} for segment in decoded.split("/"))
     ):
-        return "/"
+        return False
     parsed = urlsplit(decoded)
     if parsed.scheme or parsed.netloc or parsed.path in {"/login", "/logout", "/setup"}:
-        return "/"
-    return target
+        return False
+    return True
+
+
+def safe_login_target(target: str | None) -> str:
+    """Accept only root-relative paths, never URLs or query/fragment payloads."""
+    return target if is_safe_login_target(target) else "/"
 
 
 def create_flask_app(
@@ -3484,9 +3489,10 @@ def create_flask_app(
     @app.route("/login", methods=["GET", "POST"])
     def login():
         settings = require_cookie_settings()
-        return_target = safe_login_target(
+        submitted_target = (
             request.form.get("next") if request.method == "POST" else request.args.get("next")
         )
+        return_target = submitted_target if is_safe_login_target(submitted_target) else "/"
 
         def invalid_credentials_response():
             return (
