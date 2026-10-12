@@ -1,0 +1,11 @@
+extensions:
+  - addsTo:
+      pack: codeql/python-all
+      extensible: barrierGuardModel
+    data:
+      - [
+          "refrncr.web",
+          "Member[is_safe_login_target].Argument[0,target:]",
+          "true",
+          "url-redirection",
+        ]
