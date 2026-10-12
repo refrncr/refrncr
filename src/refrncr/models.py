@@ -55,6 +55,9 @@ class User(Base):
     __table_args__ = (
         CheckConstraint("role IN ('admin', 'user')", name="ck_users_role"),
         CheckConstraint("NOT is_deleted OR NOT is_active", name="ck_users_deleted_inactive"),
+        CheckConstraint(
+            "theme_preference IN ('system', 'light', 'dark')", name="ck_users_theme_preference"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -62,6 +65,9 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(512))
     role: Mapped[str] = mapped_column(String(16))
+    theme_preference: Mapped[str] = mapped_column(
+        String(8), default="system", server_default="system"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

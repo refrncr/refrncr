@@ -1155,3 +1155,10 @@ keyboard containment, Escape dismissal and opener focus restoration. Leaving the
 page clears transient authorization; no browser storage is used. No-JavaScript
 users receive the JSON fallback. See the REF-109 report for browser evidence and
 upstream accessibility limitations; no screen-reader-user certification is implied.
+
+## Appearance settings (REF-195)
+
+Theme selection lives at `/settings/appearance` under Settings → Personal → Appearance. The
+account block only contains the account identity, Settings link and Log out action. The page stores
+System, Light or Dark per account without JavaScript and uses the local `theme-preview-*.svg`
+artwork to illustrate the choices.

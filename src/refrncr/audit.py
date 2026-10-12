@@ -406,6 +406,11 @@ for _method, _action in (
 ):
     _audited("UserService", _method, ("user", _action))
 _read("UserService", "list_users")
+_read(
+    "UserService",
+    "update_theme_preference",
+    "Presentation preference persistence; no domain event or protected content change.",
+)
 _read("UserService", "has_users", "Boolean first-setup availability check; no protected content.")
 _register(
     "UserService",

@@ -927,6 +927,10 @@ def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browse
         "lucide-legacy-0.468.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
+        "refrncr-wordmark-reversed.svg",
+        "theme-preview-dark.svg",
+        "theme-preview-light.svg",
+        "theme-preview-system.svg",
     }
     macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
     assert len(macros) == len(set(macros)) >= 20

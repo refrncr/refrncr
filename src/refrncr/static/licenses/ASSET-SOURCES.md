@@ -33,6 +33,7 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | `network_icon` | [Network](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/network.svg) — Hierarchy navigation |
 | `chevron_up_icon` / `chevron_down_icon` | Chevron Up / Chevron Down |
 | `back_icon` | Arrow Left |
+| `appearance_icon` | Sun Moon |
 | `user_icon` / `team_icon` | User / Users |
 | `logout_icon` | Log Out |
 | `file_pen_icon` | File Pen |
@@ -131,6 +132,8 @@ Source: `docs/refrncr-brand-kit`.
 - `refrncr-loader.svg`: animated mark above the login wordmark; hidden with
   `prefers-reduced-motion: reduce`.
 - `favicon.svg`: favicon.
+- `refrncr-wordmark-reversed.svg`: dark-theme navigation, mobile bar, setup and login wordmark.
+- `theme-preview-light.svg`, `theme-preview-dark.svg`, `theme-preview-system.svg`: REF-195 project artwork for Appearance settings.
 
 The wordmark is decorative (`aria-hidden`, empty alt text); the brand links carry
 the accessible name "REFRNCR home". Explicit image dimensions reserve space.

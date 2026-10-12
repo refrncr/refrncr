@@ -125,7 +125,8 @@
     "refrncr.services.UserService.disable_user",
     "refrncr.services.UserService.enable_user",
     "refrncr.services.UserService.has_users",
-    "refrncr.services.UserService.list_users"
+    "refrncr.services.UserService.list_users",
+    "refrncr.services.UserService.update_theme_preference"
   ],
   "routes": [
     {
@@ -1037,6 +1038,30 @@
           "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.SessionService.revoke",
         "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.theme_preference",
+      "path": "/settings/theme",
+      "methods": [
+        "POST"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.UserService.update_theme_preference",
+        "refrncr.web.require_csrf"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.appearance_settings",
+      "path": "/settings/appearance",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     },
     {

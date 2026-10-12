@@ -165,6 +165,14 @@ class SqlAlchemyUserOperations:
             raise PasswordHashReplacementError("Password hash replacement failed") from None
         return result.rowcount == 1
 
+    def update_theme_preference(self, user_id: str, theme_preference: str) -> User:
+        user = self.get(user_id, for_update=True)
+        if user is None:
+            raise PersistenceConflictError("User no longer exists")
+        user.theme_preference = theme_preference
+        self.session.flush()
+        return user
+
     def revoke_active_sessions(self, user_id: str, revoked_at) -> None:
         self.session.execute(
             update(LoginSession)

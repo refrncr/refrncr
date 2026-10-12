@@ -256,6 +256,7 @@ class UserOperations(Protocol):
         display_name: str,
         password_hash: str,
         role: str,
+        theme_preference: str,
         is_active: bool,
         is_deleted: bool,
     ) -> UserRecord: ...
@@ -263,6 +264,8 @@ class UserOperations(Protocol):
     def replace_password_hash(
         self, user_id: str, expected_hash: str, replacement_hash: str
     ) -> bool: ...
+
+    def update_theme_preference(self, user_id: str, theme_preference: str) -> UserRecord: ...
 
     def revoke_active_sessions(self, user_id: str, revoked_at: datetime) -> None: ...
 

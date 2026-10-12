@@ -68,7 +68,7 @@
   .primary-navigation { min-height: auto; }
   .account-context { margin-top: var(--space-lg); }
   /* The white work surface fills the phone screen, also on short pages. */
-  .app-main:not(.app-main-anonymous, .settings-content) { min-height: 100vh; min-height: 100dvh; }
+  .app-main:not(.app-main-anonymous) { min-height: 100vh; min-height: 100dvh; }
 }
 .app-shell:not(.settings-shell) { grid-template-rows: minmax(0, 1fr); }
 .app-main > [data-nav-open], .mobile-bar > [data-nav-open] { margin-bottom: var(--space-sm); }

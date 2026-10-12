@@ -1,11 +1,12 @@
 {% extends "layouts/auth/base.html" %}
 {% from "components.html" import button, feedback, form_field %}
+{% from "components/branding.html" import wordmark %}
 
 {% block title %}Sign in · REFRNCR{% endblock %}
 
 {% block auth_logo %}
   <img class="auth-loader" src="{{ url_for('static', filename='images/refrncr-loader.svg') }}" alt="" width="100" height="100">
-  <img class="auth-wordmark" src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="200" height="52">
+  {{ wordmark(current_theme_preference|default('system', true), 'auth-wordmark', 200, 52) }}
 {% endblock %}
 
 {% block auth_content %}

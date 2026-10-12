@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import back_icon, settings_icon, user_icon, team_icon, audit_icon %}
+{% from "components/icons.html" import back_icon, settings_icon, user_icon, team_icon, audit_icon, appearance_icon %}
 
 {% block title %}{{ settings_title }}{% endblock %}
 
@@ -15,6 +15,8 @@
         {{ navigation_button('settings-sidebar') }}
       </div>
       <nav id="settings-navigation" class="primary-navigation" aria-label="Settings navigation">
+        <p class="nav-label">Personal</p>
+        <a class="nav-item{{ ' is-active' if active_navigation == 'appearance' else '' }}" href="{{ url_for('appearance_settings') }}"{% if active_navigation == 'appearance' %} aria-current="page"{% endif %}>{{ appearance_icon() }}Appearance</a>
         <p class="nav-label">Access management</p>
         {% if current_actor.role == "admin" %}<a class="nav-item{{ ' is-active' if active_navigation == 'users' else '' }}" href="{{ url_for('user_list') }}"{% if active_navigation == 'users' %} aria-current="page"{% endif %}>{{ user_icon() }}Users</a>{% endif %}
         <a class="nav-item{{ ' is-active' if active_navigation == 'teams' else '' }}" href="{{ url_for('team_list') }}"{% if active_navigation == 'teams' %} aria-current="page"{% endif %}>{{ team_icon() }}Teams</a>

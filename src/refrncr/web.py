@@ -390,6 +390,11 @@ def create_flask_app(
     def concept_template_context():
         return {"concept_ui": getattr(g, "concept_ui", None)}
 
+    @app.context_processor
+    def theme_template_context():
+        resolved = authenticated()
+        return {"current_theme_preference": resolved[0].theme_preference if resolved else "system"}
+
     def render_authenticated_template(template_name: str, **context):
         resolved = authenticated()
         actor = resolved[0] if resolved else None
@@ -3591,6 +3596,27 @@ def create_flask_app(
         response = redirect(url_for("index"))
         response.delete_cookie(settings.session_name, **settings.common_options)
         return response
+
+    @app.post("/settings/theme")
+    def theme_preference():
+        actor, login_session = require_authenticated()
+        require_csrf(login_session.csrf_token)
+        try:
+            users.update_theme_preference(actor.id, request.form.get("theme_preference", ""))
+        except ValidationError:
+            abort(400)
+        return redirect(url_for("appearance_settings"), code=303)
+
+    @app.get("/settings/appearance")
+    def appearance_settings():
+        actor, login_session = require_authenticated()
+        return render_authenticated_template(
+            "pages/settings/appearance.html",
+            settings_title="Appearance",
+            active_navigation="appearance",
+            theme_preference=actor.theme_preference,
+            current_csrf=login_session.csrf_token,
+        )
 
     @app.get("/users")
     def user_list():

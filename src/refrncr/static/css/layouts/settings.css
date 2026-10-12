@@ -5,6 +5,20 @@
 .settings-sidebar .nav-item { font-weight: var(--font-weight-regular); }
 .settings-back .button-icon, .settings-topbar .button-icon, .settings-sidebar .button-icon { flex-shrink: 0; margin: 0; }
 .settings-title .button-icon { width: var(--space-lg); height: var(--space-lg); }
+.theme-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 17.5rem)); gap: var(--space-md); margin: 0 0 var(--space-lg); padding: 0; border: 0; }
+.theme-options > legend, .theme-options > .help-text { grid-column: 1 / -1; }
+.theme-options > legend { margin: 0; font-family: var(--font-display); font-size: var(--font-size-heading-sm); font-weight: var(--font-weight-semibold); }
+.theme-options > .help-text { margin: var(--space-xs) 0 var(--space-sm); color: var(--color-text-muted); }
+.theme-option { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; padding: calc(var(--space-md) + 1px); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); cursor: pointer; }
+.theme-option:has(input:checked) { padding: var(--space-md); border: 2px solid var(--color-action-primary); background: var(--color-row-selected); }
+.theme-option:has(input:focus-visible) { outline: 3px solid var(--color-focus-ring); outline-offset: 2px; }
+.theme-option input { align-self: flex-start; }
+.theme-option img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.theme-option-copy { display: flex; flex-direction: column; gap: var(--space-xs); }
+.theme-option-copy strong { font-weight: var(--font-weight-semibold); }
+.theme-option-copy span { color: var(--color-text-secondary); font-size: var(--font-size-body-sm); }
+.appearance-form > .button { margin-top: var(--space-sm); }
+@media (max-width: 767px) { .theme-options { grid-template-columns: 1fr; gap: var(--space-sm); } .theme-option { flex-direction: row; align-items: center; gap: var(--space-md); } .theme-option input { align-self: center; } .theme-option img { width: 6rem; flex: none; } }
 /* Compact filter bar: the head of the audit table object. */
 .audit-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: var(--space-sm) var(--space-md); align-items: end; margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
 .audit-filters .form-field { min-width: 0; margin: 0; }
