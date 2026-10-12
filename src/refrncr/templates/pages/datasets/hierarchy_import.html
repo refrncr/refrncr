@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback %}
+{% block content %}
+<header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import hierarchy</h1><p class='metadata'>{{ dataset.name }}</p></div></header>
+<section class='import-content' aria-labelledby='hierarchy-import-title'>
+  <h2 id='hierarchy-import-title'>{% if preview %}Review hierarchy changes{% else %}Upload hierarchy workbook{% endif %}</h2>
+  {{ feedback(error, id='import-error', focus=true) }}
+  {% if not preview %}
+  <p>Upload the editable Excel workbook exported from this hierarchy. The Data worksheet is the authoritative source.</p>
+  <form class='form' method='post' enctype='multipart/form-data' action='{{ url_for("import_hierarchy_file", key=dataset.key) }}'>
+    <label for='hierarchy-file'>Excel workbook</label>
+    <input id='hierarchy-file' name='file' type='file' accept='.xlsx' required>
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <button class='button button-primary' type='submit'>Validate workbook</button>
+  </form>
+  {% else %}
+  <p>File: <strong>{{ state.filename }}</strong>. No changes have been applied.</p>
+  {% if preview.errors %}<div class='alert alert-error' role='alert'><ul>{% for item in preview.errors %}<li>{{ item }}</li>{% endfor %}</ul></div>
+  {% else %}
+  <dl class='import-summary'><dt>Additions</dt><dd>{{ preview.additions }}</dd><dt>Edits</dt><dd>{{ preview.edits }}</dd><dt>Moves</dt><dd>{{ preview.moves }}</dd><dt>Proposed removals</dt><dd>{{ preview.removals }}</dd><dt>Unchanged</dt><dd>{{ preview.unchanged }}</dd></dl>
+  <p>Review the complete difference before applying it. Proposed removals require explicit confirmation.</p>
+  <form method='post' action='{{ url_for("confirm_hierarchy_import", key=dataset.key, token=state.token) }}'>
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><input type='hidden' name='confirmation' value='{{ state.confirmation }}'>
+    {% if preview.removals %}<label><input type='checkbox' name='acknowledge_removals' value='yes' required> I understand that {{ preview.removals }} existing nodes will be removed.</label>{% endif %}
+    <button class='button button-primary' type='submit'>Apply confirmed changes</button>
+  </form>
+  {% endif %}
+  <form method='post' action='{{ url_for("cancel_hierarchy_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>Cancel import</button></form>
+  {% endif %}
+</section>
+{% endblock %}

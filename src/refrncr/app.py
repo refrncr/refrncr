@@ -13,6 +13,7 @@ from refrncr.api_keys import ApiKeyService, configured_api_keys
 from refrncr.audit_history import AuditHistoryService
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.hierarchy import HierarchyService
+from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.operational import (
     LOGGER_NAME,
@@ -58,6 +59,7 @@ class CommunityServices:
     dataset_business_keys: DatasetBusinessKeyService
     dataset_records: DatasetRecordService
     record_imports: DatasetRecordImportService
+    hierarchy_imports: HierarchyImportService
     hierarchy: HierarchyService
 
 
@@ -89,6 +91,7 @@ def create_community_services(
         dataset_business_keys=DatasetBusinessKeyService(uow, authorization, versions=versions),
         dataset_records=dataset_records,
         record_imports=DatasetRecordImportService(dataset_records),
+        hierarchy_imports=HierarchyImportService(uow, authorization),
         hierarchy=HierarchyService(uow, authorization, versions=versions),
     )
 
@@ -106,6 +109,7 @@ def create_application(
     dataset_business_keys: DatasetBusinessKeyService,
     dataset_records: DatasetRecordService | None = None,
     record_imports: DatasetRecordImportService | None = None,
+    hierarchy_imports: HierarchyImportService | None = None,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
     audit_history: AuditHistoryService | None = None,
@@ -185,6 +189,7 @@ def create_application(
         dataset_business_keys=dataset_business_keys,
         dataset_records=dataset_records,
         record_imports=record_imports,
+        hierarchy_imports=hierarchy_imports,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
         audit_history=audit_history,

@@ -272,7 +272,7 @@ def test_dataset_and_team_grants_do_not_authorize(history, permission):
 def test_all_contracts_have_safe_presentations(history):
     h = history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 50
+    assert len(EVENTS) == len(ACTION_LABELS) == 51
     assert ACTION_LABELS[("dataset", "dataset.version_diff_viewed")] == "Dataset changes reviewed"
     assert ACTION_LABELS[("dataset", "hierarchy.node_created")] == "Hierarchy node created"
     assert ACTION_LABELS[("dataset", "hierarchy.node_updated")] == "Hierarchy node updated"
