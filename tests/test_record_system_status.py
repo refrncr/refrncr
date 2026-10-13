@@ -53,12 +53,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         concept_html,
     )
     assert sorted(statuses) == sorted(
-        [
-            ("badge-published", "Published"),
-            ("badge-draft", "Edited"),
-            ("badge-draft", "Added"),
-            ("badge-removed", "Deleted"),
-        ]
+        [("badge-draft", "Edited"), ("badge-draft", "Added"), ("badge-removed", "Deleted")]
     )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
     response = request(

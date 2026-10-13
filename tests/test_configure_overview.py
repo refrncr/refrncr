@@ -186,6 +186,7 @@ def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, t
     login(client)
     page = body(request(client, "get", f"/datasets/title-tabs/concept?tab={tab}"))
     assert f"<title>{title} · Countries · REFRNCR</title>" in page
+    assert page.count(">View current version</a>") == 1
 
 
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F811

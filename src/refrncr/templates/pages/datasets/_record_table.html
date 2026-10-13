@@ -35,7 +35,7 @@
       </thead>
       <tbody>
         {% for record, values, incomplete in rows %}
-          {% set status = record_states.get(record.id) %}
+          {% set status = record_states.get(record.id) if record_states.get(record.id) != 'Published' else none %}
           {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
             {% set row_direction = namespace(rendered=false) %}
             {% for field in fields %}

@@ -76,6 +76,8 @@ def test_review_status_badges_keep_added_and_removed_distinct(context):  # noqa:
     c.s.dataset_records.delete_record(c.a.id, c.d.key, c.record.id, current.revision)
     entrypoint = request(browser, "get", base)
     token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+    summary = request(browser, "get", path(base, token, section="Summary"))
+    assert re.search(r"<th scope='row'>Records</th><td>1</td><td>0</td><td>1</td>", summary.text)
     response = request(browser, "get", path(base, token, section="Records"))
     assert response.status_code == 200
     statuses = re.findall(r"<span class='badge ([^']+)'>(Added|Removed)</span>", response.text)
