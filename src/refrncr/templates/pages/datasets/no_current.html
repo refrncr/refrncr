@@ -2,5 +2,5 @@
 {% from "components/concept.html" import new_concept, versions_action with context %}
 {% block content %}
 <div class='page-header'><h1>{{ dataset.name|dataset_title }}</h1><div class='page-actions'>{{ versions_action(dataset.key) }}{% if not history.concept %}{{ new_concept(dataset.key) }}{% endif %}</div></div>
-<div class='empty-state'><h2>No current version</h2><p>No published version is currently effective. Open Versions to work on a concept or view available versions.</p></div>
+<div class='empty-state'><h2>No current version</h2><p>No published version is currently effective. Open Versions to work on a draft or view available versions.</p></div>
 {% endblock %}

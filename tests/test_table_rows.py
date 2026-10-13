@@ -120,9 +120,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         elements = Elements(contents).elements
         controls = [(tag, attrs) for tag, attrs in elements if tag in ("a", "button", "input")]
         if kind == "datasets":
-            assert len(controls) == 3
-            assert controls[2][1]["href"] == "/datasets/row-contract/configure"
-            assert controls[2][1]["title"] == "configuration"
+            assert len(controls) == 2
             assert controls[1][1]["href"] == "/datasets/row-contract/versions"
         else:
             assert len(controls) == 1
@@ -131,7 +129,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         assert tag == ("a" if kind in ("datasets", "teams") else "button")
         assert len([tag for tag, _ in elements if tag == "td"]) == columns
         assert "row-chevron" not in contents
-        assert len([tag for tag, _ in elements if tag == "svg"]) == (2 if kind == "datasets" else 0)
+        assert len([tag for tag, _ in elements if tag == "svg"]) == (1 if kind == "datasets" else 0)
         assert all(
             a["aria-hidden"] == "true" and a["focusable"] == "false"
             for tag, a in elements

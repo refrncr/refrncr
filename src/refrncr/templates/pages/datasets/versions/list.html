@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "components/concept.html" import new_concept with context %}
+{% from "components/concept.html" import new_concept, banner with context %}
+{% from "components/dataset_navigation.html" import dataset_navigation with context %}
 {% from "components.html" import feedback %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "layouts/page.html" import page_context %}
@@ -11,9 +12,11 @@
     {% endcall %}
     <div class='page-actions'>
       <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
-      {% if history.may_maintain and not history.concept %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if history.concept %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% elif history.may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
     </div>
   </div>
+  {% if history.concept %}{{ banner(dataset.key, history.concept_summary, actions=false, show_current=true) }}{% endif %}
+  {{ dataset_navigation(dataset, none, concept=history.concept is not none, may_govern=history.may_maintain) }}
   {{ feedback(notice, kind='success') }}
   <p class='help-text'>Effective dates use UTC calendar days. Published content is read only.</p>
   {% if history.entries or history.concept %}
@@ -35,7 +38,7 @@
         {% endfor %}</tbody>
       </table>
     </div>
-  {% else %}<div class='empty-state'><h2>No published versions yet</h2><p>Prepare the concept and publish its first version.</p></div>{% endif %}
+  {% else %}<div class='empty-state'><h2>No published versions yet</h2><p>Prepare the draft and publish its first version.</p></div>{% endif %}
   {% if history.may_maintain %}{{ form_side_panel('version-panel') }}{% endif %}
 {% endblock %}
 {% block scripts %}<script src='{{ url_for("static", filename="js/audit-time.js") }}' defer></script>{% endblock %}

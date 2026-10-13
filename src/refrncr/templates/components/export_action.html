@@ -1,8 +1,8 @@
 {% from "components/icons.html" import download_icon %}
 
-{% macro export_action(dataset, version_state, may_export) %}
+{% macro export_action(dataset, version_state, may_export, label='Export') %}
   {% if may_export %}<details class='export-menu'>
-    <summary class='button button-secondary'>{{ download_icon() }}Export</summary>
+    <summary class='button button-secondary'>{{ download_icon() }}{{ label }}</summary>
     <div class='export-menu-options' aria-label='Export format'>
       {% if dataset.kind == 'hierarchy' %}
       <a href='{{ url_for("export_dataset_records", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, format="csv_zip") }}'>CSV</a>

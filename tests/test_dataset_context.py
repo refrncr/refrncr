@@ -250,7 +250,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
     assert "<th scope='col'>Updated</th>" in page
     assert "<td class='numeric-column'>—</td>" in page
     assert "<th scope='col'>Version</th>" in page
-    assert "href='/datasets/context/versions' title='Concept in progress'>Concept</a>" in page
+    assert "href='/datasets/context/versions' title='Draft in progress'>Draft</a>" in page
     assert "No current version" not in page
     assert "7 Sep 2026, 12:58 UTC" not in page
     for path in (
@@ -262,7 +262,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
         if path.endswith("/import"):
             blocked = request(client, "get", path)
             assert blocked.status_code == 400
-            assert "Records in this Concept have already been changed" in body(blocked)
+            assert "Records in this Draft have already been changed" in body(blocked)
             publish_dataset(services, admin.id, dataset)
             services.dataset_versions.create_concept(admin.id, dataset.id)
         response = request(client, "get", path)

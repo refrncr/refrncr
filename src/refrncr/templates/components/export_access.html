@@ -4,7 +4,7 @@
    Forms return to the configuration page they came from (concept, current or standalone). #}
 {% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, standalone=false, change_owner_url=none) -%}
 {% set return_to = {'concept': 1 if concept else none, 'standalone': 1 if standalone else none} %}
-{% set fallback = url_for('dataset_configuration', key=dataset.key, _anchor='access-management') %}
+{% set fallback = url_for('dataset_configuration', key=dataset.key, _anchor='access-management') if standalone else url_for('dataset_detail', key=dataset.key, concept=true if concept else none, _anchor='access-management') %}
 {% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
     <div class='access-management' data-export-access>
       <p class='section-description'>Who can work with this dataset. The owning team maintains it; you can add export-only access for other users and teams.</p>

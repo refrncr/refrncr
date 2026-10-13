@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept with context %}
 {% block content %}
-<h1>Concept unavailable</h1>
+<h1>Draft unavailable</h1>
 <p class='alert alert-info'>{{ error }}</p>
 <div class='page-actions'>
 <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>Versions</a>

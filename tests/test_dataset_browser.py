@@ -258,7 +258,7 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "Concept in progress" not in cells[0]
     assert "Reference" in cells[1]
     assert "href='/datasets/searchable/versions'" in cells[-1]
-    assert "Concept in progress" in cells[-1]
+    assert "Draft in progress" in cells[-1]
     assert "Current" not in row.group(2)
     assert "<td class='numeric-column'>—</td>" in row.group(2)
     assert "Name <unsafe>" not in page
@@ -625,15 +625,16 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "<div class='page-actions record-page-actions'>" in page
-    for label in ("Export</summary>", "Configure</a>", "Import</a>", "Add record</button>"):
+    for label in ("Export draft</summary>", "Import</a>", "Add record</button>"):
         icon = page.rsplit(label, 1)[0].rsplit('<svg class="button-icon"', 1)
         assert len(icon) == 2 and "</svg>" in icon[1] and "<button" not in icon[1]
-    assert "Export</summary>" in page
+    assert "Export draft</summary>" in page
     assert "format=csv" in page and "format=xlsx" in page and "format=json" in page
     assert "class='button button-secondary'" in page and "Import</a>" in page
     assert "Add records from file" not in page
-    assert "aria-label='Edit Concept Records'" in page
-    assert "href='/datasets/button-actions/concept'>" in page and "Configure</a>" in page
+    assert "aria-label='Edit draft records'" in page
+    assert "href='/datasets/button-actions/concept?tab=dataset-details#dataset-details'" in page
+    assert ">Settings</a>" in page
     assert "data-dialog-open='add-record-panel'" in page
     assert "<dialog class='side-panel' id='add-record-panel' data-side-panel" in page
     assert "New button-action record" in page
@@ -720,7 +721,7 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "data-panel-view='edit' method='post'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     assert "value='1'" in page
-    assert "You can Undo delete while this Concept remains active." in page
+    assert "You can Undo delete while this Draft remains active." in page
     assert "name='confirm' value='yes'" in page
 
 

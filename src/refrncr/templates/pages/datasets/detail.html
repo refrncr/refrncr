@@ -1,45 +1,50 @@
 {% from 'components/section_tabs.html' import section_tabs %}
 {% from 'components/export_access.html' import export_access %}
 {% extends "base.html" %}
-{% from "components/concept.html" import new_concept, versions_action with context %}
+{% from "components/concept.html" import new_concept, versions_action, current_version_action with context %}
+{% from "components/dataset_navigation.html" import dataset_navigation with context %}
+{% from "components/export_action.html" import export_action %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon %}
+{% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon, configure_icon %}
 {% from "components/dataset_icon.html" import dataset_icon %}
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
-{% block title %}Configure {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
+{% block title %}{{ 'Configure' if standalone_configuration else 'Settings' }} {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 
 {% block content %}
   {% set records_url = url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state and not standalone_configuration else none) %}
   {% if request.args.get('notice') == 'discarded' %}
-  {{ feedback('Concept discarded. Current was not changed.', kind='success') }}
+  {{ feedback('Draft discarded. Current was not changed.', kind='success') }}
   {% endif %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context("Configure " ~ (dataset.name|dataset_title), content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none) if not standalone_configuration else '', icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
+      {% if not version_state %}{{ current_version_action(dataset.key) }}{% endif %}
       {{ versions_action(dataset.key) }}
-      {% if may_start_concept %}{{ new_concept(dataset.key, 'Create concept' if request.args.get('notice') == 'discarded' else '+ New version') }}{% endif %}
-      <a class='button button-primary' href='{{ records_url }}'>{{ 'View hierarchy' if dataset.kind == 'hierarchy' else 'View records' }}</a>
+      {{ export_action(dataset, version_state, may_export, 'Export draft' if not version_state else 'Export') }}
+      {% if may_start_concept %}{{ new_concept(dataset.key, 'Create draft') }}{% endif %}
+      {% if draft_in_progress and version_state %}<a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Open draft</a><span class='badge badge-draft'>Draft in progress</span>{% endif %}
     </div>
   </div>
-  {% if not standalone_configuration %}{% include 'pages/datasets/versions/_navigation.html' %}{% endif %}
-  {% set tabs = [('dataset-details', 'Dataset details')] %}
+  {% if not standalone_configuration and not version_state %}{% with publication_panel=true %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
+  {% if not standalone_configuration %}{{ dataset_navigation(dataset, 'settings' if request.args.get('tab', 'dataset-details') == 'dataset-details' else request.args.get('tab', 'settings'), concept=not version_state, version_id=version_state.version.id if version_state else none, may_govern=may_govern, local=true) }}{% endif %}
+  {% set tabs = [('dataset-details', 'Settings')] %}
   {% if dataset.kind == 'mapping' %}{% set tabs = tabs + [('mapping', 'Mapping')] %}{% endif %}
   {% set tabs = tabs + [('fields', 'Fields')] %}
-  {% if may_govern %}{% set tabs = tabs + [('access-management', 'Access management')] %}{% endif %}
+  {% if may_govern %}{% set tabs = tabs + [('access-management', 'Access')] %}{% endif %}
   {% if editable %}{% set tabs = tabs + [('danger-zone', 'Danger zone')] %}{% endif %}
-  {{ section_tabs(tabs, 'Configure dataset sections') }}
+  {% if standalone_configuration %}{{ section_tabs(tabs, 'Settings sections') }}{% endif %}
   <div class='configuration-overview' data-tab-panels>
     <section id='dataset-details' aria-labelledby='dataset-details-heading'>
       <div class='page-header section-header'>
         <div>
-          <h2 id='dataset-details-heading' tabindex='-1'>Dataset details</h2>
-          {% if not edit_mode %}<p class='section-description'>How this dataset is named and shown across REFRNCR.</p>{% endif %}
+          <h2 id='dataset-details-heading' tabindex='-1'>Settings</h2>
+          {% if not edit_mode %}<p class='section-description'>How this dataset is named and shown across REFRNCR. Applies to the whole dataset, not to one version. Changes take effect right away.</p>{% endif %}
         </div>
-        {% if editable and not edit_mode %}<div class='page-actions'><a class='button button-secondary' href='{{ url_for("dataset_configuration", key=dataset.key, edit=1) }}#dataset-name'>{{ file_pen_icon() }}Edit dataset</a></div>{% endif %}
+        {% if editable and not edit_mode %}<div class='page-actions'><a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true if not version_state and not standalone_configuration else none, edit=1) }}#dataset-name'>{{ file_pen_icon() }}Edit dataset</a></div>{% endif %}
       </div>
       {% if edit_mode %}
         {% include 'pages/datasets/_edit_form.html' %}
@@ -56,7 +61,7 @@
           </div>
           <dl class='detail-list'>
             <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
-            <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Concept is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
+            <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Draft is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
             <div><dt>Table type</dt><dd>{{ 'Mapping table' if dataset.kind == 'mapping' else 'Hierarchy table' if dataset.kind == 'hierarchy' else 'Reference table' }}</dd></div>
             <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
           </dl>
@@ -106,7 +111,7 @@
       </div>
       {% if field_context_label %}
       <div class='context-notice'>{{ lock_icon() }}<span>{{ field_context_label }}</span>
-        {%- if may_start_concept %}<form method='post' action='{{ url_for("dataset_concept_create", key=dataset.key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='context-notice-action' type='submit'>Start a concept to change fields</button></form>{% endif %}
+        {%- if may_start_concept %}<form method='post' action='{{ url_for("dataset_concept_create", key=dataset.key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='context-notice-action' type='submit'>Create a draft to change fields</button></form>{% endif %}
       </div>
       {% endif %}
       {% if fields %}
@@ -154,8 +159,8 @@
         <div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset. Fields describe the values each record can contain.</p></div>
       {% endif %}
     </section>
-    {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><h2 id='access-management-heading'>Access management</h2>
-      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=not version_state and not standalone_configuration, standalone=standalone_configuration, change_owner_url=url_for("dataset_configuration", key=dataset.key, edit=1) ~ '#owner-team' if editable else none) }}
+    {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><h2 id='access-management-heading'>Access management</h2><p class='section-description'>Applies to the whole dataset, not to one version. Changes take effect right away.</p>
+      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=not version_state and not standalone_configuration, standalone=standalone_configuration, change_owner_url=url_for("dataset_detail", key=dataset.key, concept=true if not version_state and not standalone_configuration else none, edit=1) ~ '#owner-team' if editable else none) }}
     </section>{% endif %}
     {% if editable %}
     <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>

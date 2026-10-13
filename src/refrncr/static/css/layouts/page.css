@@ -78,6 +78,9 @@
 
 .section-tab[aria-selected="true"] { border-bottom-color: var(--color-action-primary); color: var(--color-action-primary); }
 .section-tab:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
+.dataset-tabs .section-tab:focus-visible { outline: 0; box-shadow: inset 0 -2px 0 var(--color-text-muted); }
+.dataset-tabs .dataset-access-tab { margin-inline-start: var(--space-md); border-inline-start: 1px solid var(--color-border); padding-inline-start: var(--space-md); }
+.concept-actions summary::after { content: none; }
 
 button.section-tab { font-family: inherit; background: transparent; border: 0; border-bottom: 2px solid transparent; }
 /* Panels stay visible until section-tabs.js successfully enhances the section links. */

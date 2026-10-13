@@ -894,29 +894,33 @@ def create_flask_app(
         require_dataset_dependencies()
         field_context_label = None
         overview = None
+        draft_in_progress = False
+        may_export = False
         if standalone:
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
             editable = configuration.may_maintain
             may_govern = configuration.may_govern
             may_edit_key = configuration.may_edit_key
+            may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
             context, state, identifier = None, None, None
             fields, field_states = (), {}
             try:
                 field_view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
             except NotFoundError:
-                field_context_label = "No Current version or active Concept available."
+                field_context_label = "No Current version or active Draft available."
             else:
                 fields, identifier = field_view.fields, field_view.identifier
                 overview, state_for_facts = field_view.context, field_view.state
                 schema_admin = field_view.state is None and field_view.may_maintain
                 may_start_concept = field_view.may_maintain and field_view.concept is None
+                draft_in_progress = field_view.concept is not None
                 if field_view.state:
                     field_context_label = (
                         f"Current · Version {field_view.state.version.number} · Read only"
                     )
                 elif not schema_admin:
-                    field_context_label = "Concept · Read only"
+                    field_context_label = "Draft · Read only"
             if overview is None:
                 schema_admin, may_start_concept = False, False
         else:
@@ -951,17 +955,19 @@ def create_flask_app(
             may_start_concept = view.may_maintain and view.concept is None
             if editable:
                 may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
+            may_export = view.may_export
             if view.state is not None:
                 field_context_label = (
                     f"{view.state.status} · Version {view.state.version.number} · Read only"
                 )
+            draft_in_progress = view.concept is not None
         # "At a glance" facts for the Dataset details tab.
         if overview is None:
             version_label = "No version available"
         elif state_for_facts is not None:
             version_label = f"Version {state_for_facts.version.number} · {state_for_facts.status}"
         else:
-            version_label = "Concept in progress"
+            version_label = "Draft in progress"
         dataset_facts = {
             "version": version_label,
             "record_count": overview.record_count if overview else None,
@@ -1015,6 +1021,8 @@ def create_flask_app(
             schema_admin=schema_admin,
             may_start_concept=may_start_concept,
             may_govern=may_govern,
+            may_export=may_export,
+            draft_in_progress=draft_in_progress,
             access_teams=access_teams,
             access_users=access_users,
             access_entries=access_entries,
@@ -1528,7 +1536,7 @@ def create_flask_app(
                 append_subtree(node)
         return rows, children
 
-    def render_hierarchy(view):
+    def render_hierarchy(view, actor_id):
         selected = request.args.getlist("view") or ["tree"]
         if len(selected) != 1 or selected[0] not in {
             "tree",
@@ -1667,6 +1675,10 @@ def create_flask_app(
             version_state=view.state,
             may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
+            may_govern=authorization.datasets.can_change_dataset_owner(
+                actor_id, view.context.dataset.id
+            ),
+            draft_in_progress=view.concept is not None,
             may_start_concept=view.may_maintain and view.concept is None,
         )
 
@@ -1952,7 +1964,8 @@ def create_flask_app(
                 return render_hierarchy(
                     dataset_versions.read(
                         actor.id, key, version_id, page=None, prefer_concept=concept
-                    )
+                    ),
+                    actor.id,
                 )
             parameters, selected_statuses, record_status, requested_page = parse_parameters(
                 request.args.items(multi=True)
@@ -2122,6 +2135,8 @@ def create_flask_app(
             may_add_record=may_add_record,
             may_export=view.may_export,
             version_state=view.state,
+            may_govern=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
+            draft_in_progress=view.concept is not None,
             may_configure=may_configure,
             may_start_concept=view.may_maintain and view.concept is None,
             record_states=view.record_states or {},

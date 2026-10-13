@@ -473,7 +473,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     detail = get(f"/datasets/{d.key}").text
     assert "id='access-management-heading'>Access management</h2>" in detail
     assert (
-        f"<a class='access-overview-action' href='/datasets/{d.key}/configure?edit=1#owner-team'>"
+        f"<a class='access-overview-action' href='/datasets/{d.key}?edit=1#owner-team'>"
         "Change owning team</a>" in detail
     )
     assert "All active Community users can view this dataset." not in detail

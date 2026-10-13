@@ -37,8 +37,9 @@
         const fromLocation = () => {
           const requested = location.hash.slice(1) || new URL(location.href).searchParams.get('tab');
           const target = document.getElementById(requested || '');
+          const current = tabs.findIndex(tab => tab.getAttribute('aria-current') === 'page');
           const index = panels.findIndex(panel => panel === target || panel.contains(target));
-          activate(index < 0 ? 0 : index);
+          activate(index < 0 ? (current < 0 ? 0 : current) : index);
         };
         tabs.forEach((tab, index) => {
           tab.addEventListener('click', event => {

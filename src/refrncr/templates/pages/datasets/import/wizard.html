@@ -33,7 +33,7 @@
       <dl class='import-summary'><dt>File name</dt><dd>{{ state.filename }}</dd><dt>Worksheet</dt><dd>{{ source.worksheet or 'Not applicable' }}</dd><dt>Source records</dt><dd>{{ source.rows|length }}</dd><dt>Mapped fields</dt><dd>{{ preview_fields|length }}</dd></dl>
       {% if mode == 'new_version' %}
       {% include 'pages/datasets/import/differences.html' %}
-      <p>The complete difference is applied atomically to this Concept.</p>
+      <p>The complete difference is applied atomically to this Draft.</p>
       {% else %}<p>This import is create-only and atomic: all records are added together, or none are added. Existing records are never updated.</p>{% endif %}
       <form id='import-step-form' data-import-confirm method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       {% if mode == 'new_version' %}<input type='hidden' name='confirmation' value='{{ state.confirmation }}'>

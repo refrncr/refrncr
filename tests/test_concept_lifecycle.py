@@ -117,7 +117,7 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context): 
     current = request(browser, "get", f"/datasets/{c.d.key}/records")
     assert current.status_code == 200 and "Before" in current.text
     assert "Add record" not in current.text and "Configure</a>" not in current.text
-    assert "You’re working on a concept" not in current.text
+    assert "You’re working on a draft" not in current.text
     created = request(
         browser, "post", f"/datasets/{c.d.key}/concept/new", data={"csrf_token": csrf}
     )
@@ -131,7 +131,7 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context): 
     )
     response = request(browser, "get", created.location)
     assert response.status_code == 200 and "Edited" in response.text and "Complete" in response.text
-    assert "You’re working on a concept" in response.text
+    assert "You’re working on a draft" in response.text
     state = snapshot(c)
     assert "Before" in request(browser, "get", f"/datasets/{c.d.key}/records").text
     assert snapshot(c) == state

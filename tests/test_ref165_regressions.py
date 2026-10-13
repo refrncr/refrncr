@@ -89,7 +89,8 @@ def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):  # noqa: 
     login(client)
     page = body(request(client, "get", f"/datasets/fallback{path}"))
     targets = re.findall(r"data-inline-refresh='([^']+)'", page)
-    assert targets == ["/datasets/fallback/configure#access-management"] * 2
+    target = "/configure" if path == "/configure" else "/concept"
+    assert targets == [f"/datasets/fallback{target}#access-management" for _ in range(2)]
     assert request(client, "get", targets[0]).status_code == 200
     assert request(client, "get", "/datasets/fallback/export-access").status_code == 405
 

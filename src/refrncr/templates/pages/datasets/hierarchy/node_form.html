@@ -8,7 +8,7 @@
 <h1>{{ panel_title }}</h1>
 <div class='side-panel-view' data-side-panel-content data-panel-title='{{ panel_title }}' data-panel-eyebrow='Hierarchy · {{ dataset.name }}'>
   <div class='side-panel-body'>
-    <p class='help-text'><span class='badge badge-draft'>Concept</span> Saved to the concept. Consumers see it after you publish.</p>
+    <p class='help-text'><span class='badge badge-draft'>Draft</span> Saved to the draft. Consumers see it after you publish.</p>
     {% if node_row %}<p class='hierarchy-path'>{{ node_row.path }}</p>{% endif %}
     {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
     <form id='hierarchy-node-form' class='form' method='post' novalidate action='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>

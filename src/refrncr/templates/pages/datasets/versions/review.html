@@ -3,13 +3,13 @@
 {% from "layouts/page.html" import page_context %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components/version_diff.html" import properties, field_changes %}
-{% block title %}Review changes · {{ dataset.name }} · REFRNCR{% endblock %}
+{% block title %}Review &amp; publish · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
 <div data-version-review>
   <div class='page-header'>
-    {% set review_meta %}<p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Concept revision {{ identity.revision }} · read only, optional before publication</p>{% endset %}
-    {% call page_context('Review changes', review_meta) %}
-      {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review changes', none)]) }}
+    {% set review_meta %}<p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Draft revision {{ identity.revision }} · read only, optional before publication</p>{% endset %}
+    {% call page_context('Review &amp; publish', review_meta) %}
+      {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review &amp; publish', none)]) }}
     {% endcall %}
     <div class='page-actions'>
       <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Versions</a>
@@ -37,7 +37,7 @@
       <tbody><tr><th scope='row'>Fields</th><td>{{ result.counts.fields_added }}</td><td>{{ result.counts.fields_changed }}</td><td>{{ result.counts.fields_removed }}</td></tr>
       <tr><th scope='row'>Records</th><td>{{ result.counts.records_added }}</td><td>{{ result.counts.records_changed }}</td><td>{{ result.counts.records_removed }}</td></tr></tbody></table>
     </div>
-    {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The concept matches this published version.</p></div>{% endif %}
+    {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The Draft matches this published version.</p></div>{% endif %}
   {% else %}
     <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Removed</p>
     {% if section == 'Records' %}

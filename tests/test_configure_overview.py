@@ -54,7 +54,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert response.status_code == 200
     page = body(response)
     headings = re.findall(r"<h1[^>]*>(.*?)</h1>", page, re.DOTALL)
-    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == ["Configure Reference data"]
+    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == ["Reference data"]
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
@@ -69,7 +69,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         if version
         else "/datasets/overview/concept/records"
     )
-    assert f"class='button button-primary' href='{records_url}'>View records" in actions
+    assert f"class='button button-secondary' href='{records_url}'>View records" not in actions
     assert "Edit dataset" not in actions
     details = section(page, "dataset-details-heading")
     assert ("Edit dataset" in details) == (permission != "viewer")
@@ -89,7 +89,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert expected_key_status in details
     assert f"<dt>Fields</dt><dd>{count}</dd>" in details
     assert "<dt>Records</dt><dd>0</dd>" in details
-    version_label = "Version 1 · Current" if version else "Concept in progress"
+    version_label = "Version 1 · Current" if version else "Draft in progress"
     assert f"<dt>Version</dt><dd>{version_label}</dd>" in details
     assert "They are not part of a version." in details
     # UUIDs remain legal in functional hidden inputs and access subject values.

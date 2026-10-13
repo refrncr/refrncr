@@ -1,0 +1,15 @@
+{% macro dataset_navigation(dataset, active, concept=false, version_id=none, may_govern=false, local=false) -%}
+<nav class='section-tabs dataset-tabs' aria-label='Dataset sections' data-section-tabs>
+  {% set records_url = url_for('dataset_records_view', key=dataset.key, version_id=version_id, concept=true if concept else none) %}
+  <a class='section-tab' href='{{ records_url }}'{% if active == 'records' %} aria-current='page'{% endif %}>Records</a>
+  {% if local %}
+    <a class='section-tab' id='tab-fields' data-tab-target='fields' href='#fields'{% if active == 'fields' %} aria-current='page'{% endif %}>Fields</a>
+    {% if may_govern %}<a class='section-tab dataset-access-tab' id='tab-access' data-tab-target='access-management' href='#access-management'{% if active == 'access' %} aria-current='page'{% endif %}>Access</a>{% endif %}
+    <a class='section-tab' id='tab-settings' data-tab-target='dataset-details' href='#dataset-details'{% if active == 'settings' %} aria-current='page'{% endif %}>Settings</a>
+  {% else %}
+    <a class='section-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="fields", _anchor="fields") }}'{% if active == 'fields' %} aria-current='page'{% endif %}>Fields</a>
+    {% if may_govern %}<a class='section-tab dataset-access-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="access-management", _anchor="access-management") }}'{% if active == 'access' %} aria-current='page'{% endif %}>Access</a>{% endif %}
+    <a class='section-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="dataset-details", _anchor="dataset-details") }}'{% if active == 'settings' %} aria-current='page'{% endif %}>Settings</a>
+  {% endif %}
+</nav>
+{%- endmacro %}

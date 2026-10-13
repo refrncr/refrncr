@@ -75,7 +75,7 @@ def test_history_places_concept_before_scheduled_and_current_versions(context, b
     response = request(browser, "get", f"/datasets/{c.d.key}/versions")
     assert response.status_code == 200
     names = re.findall(r"<th scope='row'><a[^>]*>([^<]+)</a></th>", response.text)
-    assert names == ["Concept", "Version 3", "Version 2", "Version 1"]
+    assert names == ["Draft", "Version 3", "Version 2", "Version 1"]
 
 
 def payload(c, csrf, *, day=None, note="Release"):
@@ -161,7 +161,7 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
     assert snapshot(c) == before
     owner_browser, _ = client(c)
     concept = request(owner_browser, "get", f"/datasets/{c.d.key}/concept/records")
-    assert "Private value" in concept.text and "Concept" in concept.text
+    assert "Private value" in concept.text and "Draft" in concept.text
     historical = request(owner_browser, "get", f"/datasets/{c.d.key}/versions/{version.id}/records")
     assert "Private" not in historical.text and "Edit" not in historical.text
 

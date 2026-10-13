@@ -258,9 +258,9 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):  # noqa: 
     login(client)
     html = body(request(client, "get", f"/datasets/{d.key}/concept"))
     assert "id='access-management'" in html
-    assert "href='#access-management'>Access management</a>" in html
+    assert "href='#access-management'>Access</a>" in html
     edit = re.search(
-        r"<a[^>]+href='/datasets/polish/configure\?edit=1#dataset-name'[^>]*>.*?Edit dataset</a>",
+        r"<a[^>]+href='/datasets/polish/concept\?edit=1#dataset-name'[^>]*>.*?Edit dataset</a>",
         html,
         re.DOTALL,
     ).group()
@@ -297,9 +297,8 @@ def test_dataset_list_selects_concept_without_current(dataset_browser):  # noqa:
     html = body(request(client, "get", "/datasets"))
     assert "href='/datasets/polish/concept/records'" in html
     version_cell = re.search(r"<td>\s*<a class='badge badge-draft badge-link'.*?</td>", html)
-    assert version_cell and "title='Concept in progress'>Concept</a>" in version_cell.group()
-    assert "title='configuration'" in html
-    assert "href='/datasets/polish/configure'" in html
+    assert version_cell and "title='Draft in progress'>Draft</a>" in version_cell.group()
+    assert "dataset-configuration-link" not in html
     assert request(client, "get", "/datasets/polish/concept/records").status_code == 200
     assert request(client, "get", "/datasets/missing/concept/records").status_code == 404
     assert d.key == "polish"
@@ -595,12 +594,7 @@ def test_configure_section_links_respect_existing_permissions(dataset_browser): 
     login(client)
     html = body(request(client, "get", "/datasets/tabs/concept"))
     nav = re.search(r"<nav[^>]*data-section-tabs>(.*?)</nav>", html, re.S).group(1)
-    assert re.findall(r"href='#([^']+)'", nav) == [
-        "dataset-details",
-        "fields",
-        "access-management",
-        "danger-zone",
-    ]
+    assert re.findall(r"href='#([^']+)'", nav) == ["fields", "access-management", "dataset-details"]
     for target in ["dataset-details", "fields", "access-management", "danger-zone"]:
         assert f"id='{target}'" in html
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
@@ -610,7 +604,7 @@ def test_configure_section_links_respect_existing_permissions(dataset_browser): 
     login(reader, user.email, "valid password")
     html = body(request(reader, "get", "/datasets/tabs"))
     nav = re.search(r"<nav[^>]*data-section-tabs>(.*?)</nav>", html, re.S).group(1)
-    assert re.findall(r"href='#([^']+)'", nav) == ["dataset-details", "fields"]
+    assert re.findall(r"href='#([^']+)'", nav) == ["fields", "dataset-details"]
     assert "id='access-management'" not in html and "id='danger-zone'" not in html
 
 
@@ -784,21 +778,21 @@ def test_configuration_fields_follow_concept_lifecycle(dataset_browser, publishe
     if published:
         assert "Current · Version 1 · Read only" in fields
         assert "Add field" not in fields
-        assert "Start a concept to change fields" in fields
+        assert "Create a draft to change fields" in fields
         assert "field-edit-action" not in fields
     else:
-        assert "Concept · Read only" not in fields
+        assert "Draft · Read only" not in fields
         assert ">Add field</a>" in fields
         assert "field-edit-action" in fields
     if published:
         current = body(request(client, "get", f"/datasets/{d.key}"))
         current_fields = current.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
         assert "Current · Version 1 · Read only" in current_fields
-        assert "Start a concept to change fields" in current_fields
+        assert "Create a draft to change fields" in current_fields
         assert "field-drag-handle" not in current_fields
         s.dataset_versions.create_concept(a.id, d.id)
     concept = body(request(client, "get", f"/datasets/{d.key}/concept"))
-    assert "field-drag-handle" in concept and "Start a concept" not in concept
+    assert "field-drag-handle" in concept and "Create a draft" not in concept
     assert "Add field" in concept and "field-edit-action" in concept
 
 

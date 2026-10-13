@@ -828,23 +828,23 @@ class DatasetRecordImportService:
         if concept.import_result is not None:
             return (
                 "Import already completed",
-                "A new version has already been imported into this Concept. "
-                "Review and publish or discard this Concept before starting another import.",
+                "A new version has already been imported into this Draft. "
+                "Review and publish or discard this Draft before starting another import.",
             )
         if concept.records_mutated is None:
             return (
                 "Import unavailable",
-                "This Concept was created before new-version imports were introduced, "
+                "This Draft was created before new-version imports were introduced, "
                 "so REFRNCR cannot reliably verify that its Records are unchanged. "
-                "Publish or discard this Concept, then create a new Concept "
+                "Publish or discard this Draft, then create a new Draft "
                 "to import a new version.",
             )
         if concept.records_mutated:
             return (
                 "Import unavailable",
-                "Records in this Concept have already been changed. "
+                "Records in this Draft have already been changed. "
                 "Importing a file could overwrite or mix with those changes. Publish or discard "
-                "this Concept, then create a new Concept to import a new version.",
+                "this Draft, then create a new Draft to import a new version.",
             )
         return None
 

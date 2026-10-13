@@ -40,8 +40,8 @@ def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
     for section in ("Summary", "Fields", "Records"):
         response = request(browser, "get", path(base, token, section=section))
         assert response.status_code == 200
-        assert "Concept revision" in response.text and "Version 1" in response.text
-        assert "You’re working on a concept" in response.text and "Publish version" in response.text
+        assert "Draft revision" in response.text and "Version 1" in response.text
+        assert "You’re working on a draft" in response.text and "Publish version" in response.text
         assert "no-store" in response.headers["Cache-Control"]
         if section == "Fields":
             assert "<span class='badge badge-draft'>Changed</span>" in response.text
@@ -87,9 +87,9 @@ def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F81
     browser, csrf, base, token = prepared(c)
     versions = request(browser, "get", f"/datasets/{c.d.key}/versions")
     assert "Review changes" not in versions.text
-    assert f"href='/datasets/{c.d.key}/versions/review'>Review</a>" in versions.text
+    assert f"href='/datasets/{c.d.key}/versions/review'>Review &amp; publish</a>" in versions.text
     url = f"/datasets/{c.d.key}/versions/publish"
-    assert "Review changes" in request(browser, "get", url).text
+    assert "Review &amp; publish" in request(browser, "get", url).text
     panel = request(browser, "get", path(url, token))
     assert panel.status_code == 200 and "publication-form" in panel.text
     assert f"review={token}" in panel.text
@@ -114,7 +114,7 @@ def test_versions_review_entry_does_not_materialize_publication(context, monkeyp
     monkeypatch.setattr(c.service, "review", forbidden)
     response = request(browser, "get", f"/datasets/{c.d.key}/versions")
     assert response.status_code == 200 and "Review changes" not in response.text
-    assert f"href='/datasets/{c.d.key}/versions/review'>Review</a>" in response.text
+    assert f"href='/datasets/{c.d.key}/versions/review'>Review &amp; publish</a>" in response.text
     assert snapshot(c) == before
 
 
@@ -128,7 +128,7 @@ def test_first_publication_panel_offers_optional_review(context):  # noqa: F811
     assert concept.text.count("id='concept-publication-panel'") == 1
     assert "data-dialog-open='concept-publication-panel'" in concept.text
     panel = request(browser, "get", url)
-    assert panel.status_code == 200 and "Review changes" in panel.text
+    assert panel.status_code == 200 and "Review &amp; publish" in panel.text
     assert "publication-form" in panel.text
     assert snapshot(c) == before
     result = request(browser, "post", url, data=payload(c, csrf))
