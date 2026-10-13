@@ -1,3 +1,5 @@
+{% from "components.html" import status_badge %}
+
 {% macro value(text, absent=false) -%}
   {% if absent %}<span class='help-text'>Not present</span>{% elif text is none %}<span class='help-text'>No value</span>{% elif text|length > 1000 %}<details><summary>Read full value</summary><div class='diff-value'>{{ text }}</div></details>{% else %}<div class='diff-value'>{{ text }}</div>{% endif %}
 {%- endmacro %}
@@ -13,7 +15,7 @@
 {%- endmacro %}
 
 {% macro field_changes(item) -%}
-  <p><span class='badge{{ " badge-published" if item.status == "Added" else " badge-draft" if item.status == "Changed" else " badge-removed" if item.status == "Removed" else "" }}'>{{ item.status }}</span>{% if item.moved %} <span class='badge'>Moved</span>{% endif %}</p>
+  <p>{{ status_badge(item.status) }}{% if item.moved %} <span class='badge'>Moved</span>{% endif %}</p>
   {% if item.datatype_changed %}<p class='alert alert-warning'>Datatype changed. Interpretation or presentation may differ; publication still validates the values.</p>{% endif %}
   {{ properties(item.properties, 'Field changes: ' ~ item.name) }}
 {%- endmacro %}

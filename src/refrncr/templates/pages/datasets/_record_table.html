@@ -1,4 +1,5 @@
 {% from 'components/field_metadata.html' import field_metadata %}
+{% from 'components.html' import status_badge %}
 {% from "components/icons.html" import key_icon, lock_icon %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/record_search.html" import record_search_controls with context %}
@@ -57,7 +58,7 @@
               </td>
             {% endfor %}
 
-            {% if not version_state %}<td class='record-system-status'><span class='badge {{ "badge-published" if status == "Published" else "badge-removed" if status == "Deleted" else "badge-draft" }}'>{{ status }}</span></td>{% endif %}
+            {% if not version_state %}<td class='record-system-status'>{{ status_badge(status) }}</td>{% endif %}
           {% endcall %}
         {% endfor %}
       </tbody>

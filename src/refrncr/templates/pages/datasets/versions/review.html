@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "components.html" import breadcrumbs %}
+{% from "components.html" import breadcrumbs, status_badge %}
 {% from "layouts/page.html" import page_context %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components/version_diff.html" import properties, field_changes %}
@@ -53,7 +53,7 @@
         <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Removed</caption>
         <thead><tr><th scope='col'>Status</th><th scope='col'>Identifier</th><th scope='col'>Old identifier</th><th scope='col'>Changed values</th></tr></thead>
         <tbody>{% for item in result.items %}<tr class='interactive-row record-row' data-record-row data-row-action>
-          <td><span class='badge{{ " badge-published" if item.status == "Added" else " badge-draft" if item.status == "Changed" else " badge-removed" if item.status == "Removed" else "" }}'>{{ item.status }}</span></td>
+          <td>{{ status_badge(item.status) }}</td>
           <td><a class='row-action' data-row-primary data-panel-url data-dialog-open='review-panel' href='{{ detail_url("record", item.id) }}'><span class='visually-hidden'>Review record </span><span class='row-action-label'>{{ item.after_identifier or item.before_identifier }}</span></a></td>
           <td>{% if item.status == 'Changed' and item.before_identifier != item.after_identifier %}{{ item.before_identifier }}{% else %}—{% endif %}</td>
           <td>{{ item.changed_values if item.status == 'Changed' else '—' }}</td>
