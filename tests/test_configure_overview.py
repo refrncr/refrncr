@@ -176,6 +176,18 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert reordered_fields.index("Last field") < reordered_fields.index("First field")
 
 
+@pytest.mark.parametrize(
+    ("tab", "title"),
+    [("fields", "Fields"), ("access-management", "Access"), ("dataset-details", "Settings")],
+)
+def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, title):  # noqa: F811
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "title-tabs", "Countries")
+    login(client)
+    page = body(request(client, "get", f"/datasets/title-tabs/concept?tab={tab}"))
+    assert f"<title>{title} · Countries · REFRNCR</title>" in page
+
+
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F811
     _, services, admin, client = dataset_browser
     name = '<script>alert("metadata")</script>' + "N" * 150

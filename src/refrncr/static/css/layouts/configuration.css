@@ -1,5 +1,6 @@
 .configuration-overview { display: grid; gap: var(--space-xl); min-width: 0; }
 .configuration-overview > section:first-child > #danger-zone { margin-top: var(--space-xl); }
+.configuration-overview [role='tabpanel']:focus { outline: 0; }
 .configuration-overview > section:first-child { padding-top: 10px; }
 .configuration-overview section { min-width: 0; overflow-wrap: anywhere; }
 .configuration-overview h2 { margin: 0 0 var(--space-md); font-size: var(--font-size-heading-sm); }
