@@ -41,8 +41,8 @@
   </nav>
 {%- endmacro %}
 
-{% macro content_metadata(count, updated, version_number=none, deleted_count=0, status=none) -%}
-  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}<span class="badge {{ 'badge-published' if status == 'Current' else 'badge-info' if status == 'Scheduled' else '' }}">{{ status }}</span>{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ 'record' if count == 1 else 'records' }}</span>
+{% macro content_metadata(count, updated, version_number=none, deleted_count=0, status=none, record_label='records', secondary_count=none, secondary_label='') -%}
+  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}<span class="badge {{ 'badge-published' if status == 'Current' else 'badge-info' if status == 'Scheduled' else '' }}">{{ status }}</span>{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ record_label[:-1] if count == 1 and record_label.endswith('s') else record_label }}</span>{% if secondary_count is not none %}<span aria-hidden="true"> · </span><span>{{ secondary_count }} {{ secondary_label[:-1] if secondary_count == 1 and secondary_label.endswith('s') else secondary_label }}</span>{% endif %}
     {% if deleted_count %}<span class="metadata-item metadata-warning"><span aria-hidden="true">•</span><span>{{ deleted_count }} marked for deletion</span></span>{% endif %}
     <span class="metadata-item"><span aria-hidden="true">•</span><span>Updated <time datetime="{{ updated.isoformat() }}">{{ updated|absolute_utc }}</time></span></span>
   </p>

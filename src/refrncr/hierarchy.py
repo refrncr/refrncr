@@ -324,6 +324,104 @@ class HierarchyService:
             self._changed(work, dataset, actor_id, "hierarchy.node_updated")
             return updated
 
+    def _validated_values(
+        self, work, dataset, target_node, candidate_nodes, fields, submitted, parent_ids
+    ):
+        active = [field for field in fields if applicable(field, target_node, parent_ids)]
+        if not isinstance(submitted, dict) or set(submitted) - {field.key for field in active}:
+            raise ValidationError("Only applicable fields may be edited for this node")
+        active_ids = {field.id for field in active}
+        values = [value for value in target_node.values if value.field_id not in active_ids]
+        errors = {}
+        for field in active:
+            try:
+                canonical = canonicalize_record_value(field.data_type, submitted.get(field.key))
+            except ValidationError as error:
+                errors[field.key] = str(error)
+                continue
+            if canonical is None:
+                if field.is_required:
+                    errors[field.key] = "A value is required"
+                continue
+            value, key = canonical
+            if field.is_unique and any(
+                other.id != target_node.id
+                and applicable(field, other, parent_ids)
+                and any(
+                    item.field_id == field.id and item.canonical_key == key for item in other.values
+                )
+                for other in candidate_nodes
+            ):
+                errors[field.key] = "This value must be unique within the field scope"
+            values.append(
+                RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
+            )
+        if errors:
+            raise RecordValidationError(errors)
+        identifier = work.dataset_business_keys.get(dataset.id)
+        if (
+            identifier.field_keys
+            and target_node.parent_id is not None
+            and target_node.id not in parent_ids
+        ):
+            by_key = {value.field_key: value.canonical_key for value in values}
+            marker = tuple(by_key.get(key) for key in identifier.field_keys)
+            if (
+                any(component is None for component in marker)
+                or sum(4 + len(component) for component in marker) > 2000
+            ):
+                raise ValidationError("Record identifier must be complete and at most 2000 bytes")
+            for other in candidate_nodes:
+                if other.id == target_node.id or other.parent_id is None or other.id in parent_ids:
+                    continue
+                other_values = {value.field_key: value.canonical_key for value in other.values}
+                if marker == tuple(other_values.get(key) for key in identifier.field_keys):
+                    raise RecordConflictError("Record identifier already exists on another leaf")
+        return tuple(sorted(values, key=lambda value: value.field_id))
+
+    def update_node_and_values(
+        self, actor_id, dataset_key, node_id, name, parent_id, submitted, *, expected_revision
+    ):
+        """Update a node and its applicable values in one authorized transaction."""
+        with self.uow(write=True, serialized=True) as work:
+            dataset = self._target(work, actor_id, dataset_key, expected_revision)
+            nodes = work.hierarchy.list_for_dataset(dataset.id)
+            node = next((item for item in nodes if item.id == node_id), None)
+            if node is None:
+                raise NotFoundError("Node not found")
+            if (node.parent_id is None) != (parent_id is None):
+                raise ValidationError("Keep the existing root and choose a parent for other nodes")
+            name = _node_name(name)
+            if name != node.name and any(
+                item.id != node_id and item.name == name for item in nodes
+            ):
+                raise ValidationError("A node in this hierarchy already has this name")
+            proposed = tuple(
+                replace(item, name=name, parent_id=parent_id) if item.id == node_id else item
+                for item in nodes
+            )
+            if errors := _structure_errors(proposed, publication=False, allow_legacy_names=True):
+                raise ValidationError("; ".join(errors))
+
+            proposed_node = next(item for item in proposed if item.id == node_id)
+            parent_ids = {item.parent_id for item in proposed}
+            fields = work.dataset_fields.list_for_dataset(dataset.id)
+            values = self._validated_values(
+                work, dataset, proposed_node, proposed, fields, submitted, parent_ids
+            )
+            values_changed = {value.field_id: value.canonical_key for value in values} != {
+                value.field_id: value.canonical_key for value in node.values
+            }
+            structure_changed = node.name != name or node.parent_id != parent_id
+            if not structure_changed and not values_changed:
+                return node
+            if structure_changed:
+                work.hierarchy.update(dataset.id, node_id, name, parent_id)
+            if values_changed:
+                work.hierarchy.replace_values(dataset.id, node.id, values)
+            self._changed(work, dataset, actor_id, "hierarchy.node_updated")
+            return work.hierarchy.get(dataset.id, node.id)
+
     def delete_subtree(self, actor_id, dataset_key, node_id, *, expected_revision):
         """Delete one non-root node and every descendant in the same transaction."""
         with self.uow(write=True, serialized=True) as work:
@@ -359,55 +457,7 @@ class HierarchyService:
                 raise NotFoundError("Node not found")
             fields = work.dataset_fields.list_for_dataset(dataset.id)
             parents = {item.parent_id for item in nodes}
-            active = [field for field in fields if applicable(field, node, parents)]
-            active_ids = {field.id for field in active}
-            if not isinstance(submitted, dict) or set(submitted) - {f.key for f in active}:
-                raise ValidationError("Only applicable fields may be edited for this node")
-            values = [value for value in node.values if value.field_id not in active_ids]
-            errors = {}
-            for field in active:
-                try:
-                    canonical = canonicalize_record_value(field.data_type, submitted.get(field.key))
-                except ValidationError as error:
-                    errors[field.key] = str(error)
-                    continue
-                if canonical is None:
-                    if field.is_required:
-                        errors[field.key] = "A value is required"
-                    continue
-                value, key = canonical
-                if field.is_unique and any(
-                    other.id != node.id
-                    and applicable(field, other, parents)
-                    and any(v.field_id == field.id and v.canonical_key == key for v in other.values)
-                    for other in nodes
-                ):
-                    errors[field.key] = "This value must be unique within the field scope"
-                values.append(
-                    RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
-                )
-            if errors:
-                raise RecordValidationError(errors)
-            identifier = work.dataset_business_keys.get(dataset.id)
-            if identifier.field_keys and node.parent_id is not None and node.id not in parents:
-                by_key = {value.field_key: value.canonical_key for value in values}
-                marker = tuple(by_key.get(key) for key in identifier.field_keys)
-                if (
-                    any(component is None for component in marker)
-                    or sum(4 + len(component) for component in marker) > 2000
-                ):
-                    raise ValidationError(
-                        "Record identifier must be complete and at most 2000 bytes"
-                    )
-                for other in nodes:
-                    if other.id == node.id or other.parent_id is None or other.id in parents:
-                        continue
-                    other_values = {value.field_key: value.canonical_key for value in other.values}
-                    if marker == tuple(other_values.get(key) for key in identifier.field_keys):
-                        raise RecordConflictError(
-                            "Record identifier already exists on another leaf"
-                        )
-            values = tuple(sorted(values, key=lambda value: value.field_id))
+            values = self._validated_values(work, dataset, node, nodes, fields, submitted, parents)
             if {v.field_id: v.canonical_key for v in values} == {
                 v.field_id: v.canonical_key for v in node.values
             }:

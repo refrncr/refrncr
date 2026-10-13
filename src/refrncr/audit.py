@@ -376,6 +376,7 @@ for _method, _action in (
     ("create_node", "hierarchy.node_created"),
     ("delete_subtree", "hierarchy.subtree_deleted"),
     ("update_node", "hierarchy.node_updated"),
+    ("update_node_and_values", "hierarchy.node_updated"),
     ("update_values", "hierarchy.values_updated"),
 ):
     _audited("HierarchyService", _method, ("dataset", _action), module="hierarchy")

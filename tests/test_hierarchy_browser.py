@@ -127,7 +127,7 @@ def test_export_validation_error_uses_a_handling_screen(dataset_browser, monkeyp
     assert f"href='/datasets/{dataset.key}/concept/records'" in page
 
 
-def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_browser):
+def test_tree_and_table_show_the_complete_hierarchy(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset, hierarchy, root, branch, child, sibling = hierarchy_fixture(services, admin)
     services.dataset_fields.create_field(
@@ -146,28 +146,27 @@ def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_brow
     login(client)
     url = f"/datasets/{dataset.key}/concept/records"
     tree = body(request(client, "get", url))
-    assert "Marketing owner" not in tree
-    assert "class='hierarchy-table hierarchy-tree-table'" in tree
+    assert "Marketing owner" in tree
+    assert "class='hierarchy-table hierarchy-tree'" in tree
+    assert "aria-label='Hierarchy views'" in tree
+    assert "Tree" in tree and "Table" in tree
     assert all(
         f"data-hierarchy-node='{node.id}'" in tree for node in (root, branch, child, sibling)
     )
 
-    records = body(request(client, "get", url + "?view=records"))
-    assert f"data-hierarchy-node='{root.id}'" in records
-    assert f"data-hierarchy-node='{branch.id}'" in records
-    assert f"data-hierarchy-node='{child.id}'" in records
-    assert f"data-hierarchy-node='{sibling.id}'" in records
-    assert "Marketing owner" in records
-
-    hybrid = body(request(client, "get", url + "?view=hybrid"))
-    assert "Read only" in hybrid
-    assert "Marketing owner" in hybrid
-    assert "Not applicable" in hybrid
-    assert "Empty" in hybrid
-    assert "Leaves only" in hybrid and "All nodes" not in hybrid
-    assert "name='hierarchy_scope'" not in hybrid
-    assert "/nodes/" not in hybrid
-    assert "Import" not in hybrid and "Export</summary>" in hybrid
+    table = body(request(client, "get", url + "?view=table"))
+    assert "class='hierarchy-table hierarchy-table'" in table
+    assert all(
+        f"data-hierarchy-node='{node.id}'" in table for node in (root, branch, child, sibling)
+    )
+    assert "Marketing owner" in table
+    assert "Leaves only" in table and "aria-label='Not applicable'" in table
+    assert "Edit values for" not in table
+    for old_view in ("hierarchy", "records", "hybrid"):
+        response = request(client, "get", url + "?view=" + old_view)
+        assert response.status_code == 301
+        expected_view = "table" if old_view == "records" else "tree"
+        assert f"view={expected_view}" in response.location
 
     panel = body(
         request(
@@ -177,7 +176,7 @@ def test_views_show_structure_all_node_records_and_read_only_hybrid(dataset_brow
         )
     )
     assert "Executive / Marketing / Content" in panel
-    assert "data-panel-title='Edit record'" in panel
+    assert "data-panel-title='Edit node'" in panel
     assert "name='field:code'" in panel
 
 
@@ -412,11 +411,11 @@ def test_published_views_remain_read_only_and_use_selected_snapshot(dataset_brow
     login(client)
     url = f"/datasets/{dataset.key}/versions/{published.id}/records"
     for view in ("hierarchy", "records", "hybrid"):
-        response = request(client, "get", url + "?view=" + view)
+        response = request(client, "get", url + "?view=" + view, follow_redirects=True)
         assert response.status_code == 200
         page = body(response)
-        assert "Read only" in page
-        assert f"/versions/{published.id}/records?view=hybrid" in page
+        assert "Published version · read only" in page
+        assert "aria-label='Hierarchy views'" in page
         assert "/concept/nodes/" not in page
     services.dataset_versions.create_concept(admin.id, dataset.id)
     hierarchy.update_node(
@@ -427,9 +426,9 @@ def test_published_views_remain_read_only_and_use_selected_snapshot(dataset_brow
         branch.id,
         expected_revision=services.datasets.get_dataset(admin.id, dataset.key).revision,
     )
-    assert "New content" not in body(request(client, "get", url + "?view=hybrid"))
+    assert "New content" not in body(request(client, "get", url + "?view=tree"))
     assert "New content" in body(
-        request(client, "get", f"/datasets/{dataset.key}/concept/records?view=hybrid")
+        request(client, "get", f"/datasets/{dataset.key}/concept/records?view=tree")
     )
 
 
@@ -467,16 +466,21 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     assert "Node 349" in body(tree)
     assert body(tree).count("data-hierarchy-node=") == 350
     assert body(tree).count('data-icon="corner-down-right"') == 349
-    records = request(client, "get", "/datasets/deep/concept/records?view=records")
+    records = request(
+        client, "get", "/datasets/deep/concept/records?view=records", follow_redirects=True
+    )
     assert records.status_code == 200
     assert body(records).count("data-hierarchy-node=") == 350
-    assert "<noscript><details><summary>Full path</summary>" in body(records)
-    assert "Node 0 / Node 1 / Node 2" in body(records)
+    assert "<th scope='col'>Level</th>" in body(records)
+    assert "Node 0" in body(records)
     flattened = request(
-        client, "get", "/datasets/deep/concept/records?view=records&records_view=flattened"
+        client,
+        "get",
+        "/datasets/deep/concept/records?view=records&records_view=flattened",
+        follow_redirects=True,
     )
     assert flattened.status_code == 200
-    assert body(flattened).count("data-hierarchy-node=") == 1
+    assert body(flattened).count("data-hierarchy-node=") == 350
 
 
 def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_browser):
@@ -505,7 +509,7 @@ def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_b
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("?view=records&records_view=flattened")
+    assert response.location.endswith("?view=table")
     saved = body(request(client, "get", url))
     assert "value='ordinary-data'" in saved
     assert "value='ordinary-revision-data'" in saved

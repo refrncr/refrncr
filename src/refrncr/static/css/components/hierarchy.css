@@ -1,4 +1,4 @@
-/* Hierarchy and Hybrid share the compact tree-table variant and design tokens. */
+/* Tree and Table share the compact hierarchy table and design tokens. */
 .hierarchy-name { color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
 .hierarchy-node-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-xs); font-size: var(--font-size-body-sm); }
 .hierarchy-node-actions-reveal { transition: opacity var(--motion-duration-layout) var(--motion-easing-standard); }
@@ -11,7 +11,49 @@
   .hierarchy-node-actions-reveal { opacity: 1; }
 }
 .hierarchy-actions-column { text-align: right; white-space: nowrap; }
-.hierarchy-table { min-width: 30rem; }
+.hierarchy-table { min-width: 42rem; border-collapse: separate; border-spacing: 0; }
+.hierarchy-table-scroll { overflow-x: auto; }
+.hierarchy-table thead { background: var(--color-table-heading); }
+.hierarchy-table .hierarchy-node-column,
+.hierarchy-table th:first-child,
+.hierarchy-table td:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--color-surface); }
+.hierarchy-table thead th:first-child { z-index: 2; background: var(--color-table-heading); }
+.hierarchy-table .hierarchy-actions-column,
+.hierarchy-table th:last-child,
+.hierarchy-table td:last-child { position: sticky; inset-inline-end: 0; z-index: 1; background: var(--color-surface); }
+.hierarchy-table thead th:last-child { z-index: 2; background: var(--color-table-heading); }
+.hierarchy-table .hierarchy-node-column { min-width: 16rem; border-inline-end: 1px solid var(--color-border-subtle); }
+.hierarchy-table .hierarchy-actions-column { min-width: 7rem; border-inline-start: 1px solid var(--color-border-subtle); }
+.hierarchy-table td[data-column] { min-width: 8rem; }
+.hierarchy-table :is(th, td):first-child { border-inline-end: 1px solid var(--color-border-subtle); }
+.hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(16 25 21 / 22%); }
+.hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(16 25 21 / 22%); }
+.hierarchy-table .hierarchy-filler-column { width: 100%; min-width: 0; padding: 0; }
+.hierarchy-table .numeric-column { text-align: start; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(0 0 0 / 70%); }
+  :root:not([data-theme="light"]) .hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(0 0 0 / 70%); }
+}
+:root[data-theme="dark"] .hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(0 0 0 / 70%); }
+:root[data-theme="dark"] .hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(0 0 0 / 70%); }
+.hierarchy-table .hierarchy-not-applicable { color: var(--color-text-secondary); }
+.hierarchy-sort { color: inherit; text-decoration: none; }
+.hierarchy-sort:hover, .hierarchy-sort:focus-visible { text-decoration: underline; }
+.hierarchy-key-sort { min-width: 8rem; }
+.hierarchy-columns { position: relative; }
+.hierarchy-columns > summary { list-style: none; cursor: pointer; }
+.hierarchy-columns > summary::-webkit-details-marker { display: none; }
+.hierarchy-columns fieldset { position: absolute; z-index: 3; inset-inline-end: 0; margin-block-start: var(--space-xs); padding: var(--space-md); min-width: 14rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.hierarchy-columns label { display: block; padding-block: var(--space-xs); }
+.record-toolbar-search .record-criteria { flex: 1 1 auto; min-width: 0; }
+.record-toolbar-search .record-criteria-toolbar { flex-wrap: nowrap; min-width: 0; }
+.record-toolbar-search .record-search-form { flex: 1 1 16rem; min-width: 12rem; max-width: none; }
+.record-toolbar-search .record-search-form .search-field { flex: 1 1 16rem; min-width: 12rem; }
+.record-toolbar-search .record-criteria-toolbar > button,
+.record-toolbar-search .record-criteria-toolbar .hierarchy-columns { flex: 0 0 auto; }
+.hierarchy-toolbar-status { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-md); margin-inline-start: auto; min-width: max-content; }
+.hierarchy-toolbar-status .record-toolbar-note { margin: 0; }
+.hierarchy-toolbar-status #record-result-count { margin-inline-start: 0; white-space: nowrap; }
 .hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
 /* Both Records variants scroll full, single-line values behind the sticky edit column. */
 .hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }

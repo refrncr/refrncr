@@ -1,38 +1,44 @@
 {% extends 'base.html' %}
 {% from 'components/side_panel.html' import panel_form_actions %}
 {% from 'pages/datasets/_record_form_fields.html' import record_form_fields %}
-{% set panel_title = ('Edit record' if return_view == 'records' else 'Edit node values') if mode == 'values' else ('Edit node' if node else ('Add child' if parent_id else 'Add root')) %}
+{% set panel_title = ('Edit node' if node else ('Add child' if parent_id else 'Add root')) %}
 {% block title %}{{ panel_title }} · REFRNCR{% endblock %}
 {% block content %}
 {% include 'pages/datasets/_breadcrumbs.html' %}
 <h1>{{ panel_title }}</h1>
 <div class='side-panel-view' data-side-panel-content data-panel-title='{{ panel_title }}' data-panel-eyebrow='Hierarchy · {{ dataset.name }}'>
   <div class='side-panel-body'>
-    {% include 'pages/datasets/concepts/_banner.html' %}
+    <p class='help-text'><span class='badge badge-draft'>Concept</span> Saved to the concept. Consumers see it after you publish.</p>
     {% if node_row %}<p class='hierarchy-path'>{{ node_row.path }}</p>{% endif %}
     {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
     <form id='hierarchy-node-form' class='form' method='post' novalidate action='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
-      {% if mode == 'values' %}
-        <input type='hidden' name='return_view' value='{{ return_view }}'>
-        <input type='hidden' name='return_records_view' value='{{ return_records_view }}'>
-        {{ record_form_fields(fields, 'hierarchy-' ~ node.id, values, errors, raw_values=raw_values, name_prefix='field:') }}
-        {% if not fields %}<p>No fields apply to this node. <a href='{{ url_for("dataset_detail", key=dataset.key, concept=true, _anchor="fields") }}'>Configure fields</a> to add values.</p>{% endif %}
-        {% if inactive_fields %}<section aria-labelledby='inactive-values-heading'><h3 id='inactive-values-heading'>Inactive values</h3><p class='help-text'>Leaves-only values stay on this node and become active if it is a leaf again or the field scope changes to All nodes.</p><dl class='record-details'>{% for field in inactive_fields %}{% if node_row['values'].get(field.key) is not none %}<div><dt>{{ field.name }}</dt><dd>{{ node_row['values'].get(field.key)|record_value_text(field.data_type) }}</dd></div>{% endif %}{% endfor %}</dl></section>{% endif %}
-      {% else %}
+      <input type='hidden' name='return_view' value='{{ return_view }}'>
+      <input type='hidden' name='return_q' value='{{ return_q }}'>
+      <input type='hidden' name='return_sort' value='{{ return_sort }}'>
+      <input type='hidden' name='return_direction' value='{{ return_direction }}'>
+      {% if mode != 'values' %}
         <label for='hierarchy-node-name'>Name</label><input id='hierarchy-node-name' name='name' value='{{ name }}' required maxlength='200'>
         {% if (node and node.parent_id) or (not node and parent_options) %}
         <label for='hierarchy-node-parent'>Parent</label><select id='hierarchy-node-parent' name='parent_id' required>{% for row in parent_options %}<option value='{{ row.node.id }}'{% if row.node.id == parent_id %} selected{% endif %}>{{ row.path }}</option>{% endfor %}</select>
         <p class='help-text'>Moving a node also moves its descendants. Their identities and values are preserved.</p>
         {% else %}<input type='hidden' name='parent_id' value=''><p class='help-text'>This is the hierarchy’s single root.</p>{% endif %}
         <p class='help-text'>Names must be unique across the whole hierarchy. A node with children retains its leaves-only values as inactive.</p>
+        {% if node %}
+          {% if fields %}{{ record_form_fields(fields, 'hierarchy-' ~ node.id, values, errors, raw_values=raw_values, name_prefix='field:') }}{% endif %}
+          {% if not fields and not inactive_fields %}<p>No fields are configured.</p>{% endif %}
+          {% if inactive_fields %}<section aria-labelledby='inactive-fields-heading'><h3 id='inactive-fields-heading'>Leaves-only fields</h3>{% for field in inactive_fields %}<div class='form-field'><label for='hierarchy-{{ node.id }}-{{ field.key }}-inactive'>{{ field.name }}</label><input id='hierarchy-{{ node.id }}-{{ field.key }}-inactive' type='text' value='{{ node_row["values"].get(field.key)|record_value_text(field.data_type) if node_row["values"].get(field.key) is not none else "" }}' disabled aria-describedby='hierarchy-{{ node.id }}-{{ field.key }}-reason'><p class='help-text' id='hierarchy-{{ node.id }}-{{ field.key }}-reason'>{{ node.name }} has children, so this field does not apply.</p></div>{% endfor %}</section>{% endif %}
+        {% endif %}
+      {% else %}
+        {{ record_form_fields(fields, 'hierarchy-' ~ node.id, values, errors, raw_values=raw_values, name_prefix='field:') }}
+        {% if inactive_fields %}<section aria-labelledby='inactive-values-heading'><h3 id='inactive-values-heading'>Inactive values</h3><p class='help-text'>Leaves-only values stay on this node and become active if it is a leaf again or the field scope changes to All nodes.</p><dl class='record-details'>{% for field in inactive_fields %}{% if node_row['values'].get(field.key) is not none %}<div><dt>{{ field.name }}</dt><dd>{{ node_row['values'].get(field.key)|record_value_text(field.data_type) }}</dd></div>{% endif %}{% endfor %}</dl></section>{% endif %}
       {% endif %}
     </form>
   </div>
   {% call panel_form_actions() %}
-    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view, records_view=return_records_view if return_view == "records" else none) }}'>Cancel</a>
-    <button class='button button-primary' type='submit' form='hierarchy-node-form'>{{ 'Save values' if mode == 'values' else 'Save node' if node else 'Add child' if parent_id else 'Add root' }}</button>
+    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view, q=return_q or none, sort=return_sort or none, direction=return_direction if return_sort else none) }}'>Cancel</a>
+    <button class='button button-primary' type='submit' form='hierarchy-node-form'>{{ 'Save node' if node else 'Add child' if parent_id else 'Add root' }}</button>
   {% endcall %}
 </div>
 {% endblock %}

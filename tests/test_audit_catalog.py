@@ -244,6 +244,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.hierarchy.HierarchyService.create_node",
             "refrncr.hierarchy.HierarchyService.delete_subtree",
             "refrncr.hierarchy.HierarchyService.update_node",
+            "refrncr.hierarchy.HierarchyService.update_node_and_values",
             "refrncr.hierarchy.HierarchyService.update_values",
             "refrncr.hierarchy_import.HierarchyImportService.confirm",
         }
