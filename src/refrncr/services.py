@@ -51,6 +51,7 @@ from refrncr.presentation_metadata import (
 from refrncr.version_contracts import mapping_incomplete_message
 
 SUBJECT_TYPES = {"user", "team"}
+THEME_PREFERENCES = frozenset(("system", "light", "dark"))
 
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
@@ -403,6 +404,15 @@ class UserService:
             require_admin(uow, actor_id)
             return uow.users.list_by_email()
 
+    def update_theme_preference(self, actor_id: str, theme_preference: str) -> UserRecord:
+        if theme_preference not in THEME_PREFERENCES:
+            raise ValidationError("Choose System, Light or Dark")
+        with self.uow(write=True) as uow:
+            actor = uow.users.get(actor_id, for_update=True)
+            if actor is None or not actor.is_active or actor.is_deleted:
+                raise AuthorizationError("Active user access required")
+            return uow.users.update_theme_preference(actor.id, theme_preference)
+
     def _set_state(self, actor_id: str, target_id: str, action: str) -> UserRecord:
         with self.uow(write=True, serialized=True) as uow:
             self._lock_organisation(uow)
@@ -450,6 +460,7 @@ class UserService:
             display_name=display_name.strip(),
             password_hash=self.hasher.hash(validate_password(password)),
             role=role,
+            theme_preference="system",
             is_active=True,
             is_deleted=False,
         )

@@ -322,6 +322,10 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
         "lucide-legacy-0.468.0.svg",
         "refrncr-loader.svg",
         "refrncr-wordmark-primary.svg",
+        "refrncr-wordmark-reversed.svg",
+        "theme-preview-dark.svg",
+        "theme-preview-light.svg",
+        "theme-preview-system.svg",
     }
 
 

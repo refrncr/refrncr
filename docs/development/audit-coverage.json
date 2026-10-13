@@ -3,6 +3,37 @@
   "source_of_truth": "Authoritative current coverage matrix. audit.py validates event/operation contracts; audit-inventory.json traces interfaces. CI verifies agreement.",
   "operations": [
     {
+      "capability": "UserService",
+      "operation": "update_theme_preference",
+      "service": "refrncr.services.UserService.update_theme_preference",
+      "interface_entrypoints": [
+        "refrncr.web.theme_preference POST /settings/theme"
+      ],
+      "kind": "mutation",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-195: authenticated account preference change; validate the allowlisted theme value and never log the preference payload.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details.",
+      "events": [],
+      "object_identifier": "Stable UUID of the affected user.",
+      "actor_source": "Authenticated browser session actor.",
+      "allowed_context": {},
+      "success": "Preference is persisted for the authenticated user; no domain event is emitted for this presentation preference.",
+      "validation_failure": "No state change; reject values outside system, light and dark.",
+      "authorization_failure": "No state change; reject absent, inactive or deleted actors.",
+      "stale_input": "No optimistic revision is required; the last valid preference wins.",
+      "no_op": "No event; persisting the selected current value is harmless.",
+      "rollback": "Preference update shares the user service transaction.",
+      "duplicate_retry": "No event or additional side effect on retry.",
+      "tests": [
+        "tests/test_interfaces.py::test_theme_preference_is_csrf_protected_and_server_rendered"
+      ],
+      "implementation_status": "Implemented by REF-195.",
+      "exclusion_reason": "Presentation preference persistence; no domain event or protected content change.",
+      "persistence_scope": "Existing installation database / User.theme_preference."
+    },
+    {
       "capability": "Security audit",
       "operation": "record_security_event",
       "service": "refrncr.audit.record_security_event",
@@ -2833,6 +2864,8 @@
         "refrncr.web.audit_list GET /settings/audit-log",
         "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
+        "refrncr.web.theme_preference POST /settings/theme",
+        "refrncr.web.appearance_settings GET /settings/appearance",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
@@ -4085,6 +4118,8 @@
         "refrncr.web.setup GET,POST /setup",
         "refrncr.web.login GET,POST /login",
         "refrncr.web.logout POST /logout",
+        "refrncr.web.theme_preference POST /settings/theme",
+        "refrncr.web.appearance_settings GET /settings/appearance",
         "refrncr.web.user_list GET /users",
         "refrncr.web.create_user POST /users",
         "refrncr.web.change_user_state POST /users/<target_id>/<action>",
@@ -4486,6 +4521,7 @@
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
         "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
+        "refrncr.web.theme_preference POST /settings/theme",
         "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",

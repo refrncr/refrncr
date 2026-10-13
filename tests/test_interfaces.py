@@ -95,6 +95,57 @@ def login(client, email="admin@example.com", password=ADMIN_PASSWORD):
     )
 
 
+def test_theme_preference_is_csrf_protected_and_server_rendered(interface):
+    _, _, _, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    page = request(client, "get", "/")
+    assert 'data-theme="' not in response_text(page)
+    token = authenticated_csrf(client)
+
+    response = request(
+        client,
+        "post",
+        "/settings/theme",
+        data={"theme_preference": "dark", "csrf_token": token},
+    )
+    assert response.status_code == 303
+    assert response.headers["Location"] == "/settings/appearance"
+    appearance = request(client, "get", "/settings/appearance")
+    assert appearance.status_code == 200
+    assert 'value="dark"' in response_text(appearance)
+    assert re.search(r'value="dark"[^>]*checked', response_text(appearance))
+    assert "Theme saved." not in response_text(appearance)
+
+    dark_page = request(client, "get", "/")
+    assert '<html lang="en" data-theme="dark">' in response_text(dark_page)
+    assert "images/refrncr-wordmark-reversed.svg" in response_text(dark_page)
+    assert 'class="account-theme"' not in response_text(dark_page)
+
+    token = authenticated_csrf(client)
+    response = request(
+        client,
+        "post",
+        "/settings/theme",
+        data={"theme_preference": "system", "csrf_token": token},
+    )
+    assert response.status_code == 303
+    assert 'data-theme="' not in response_text(request(client, "get", "/"))
+
+    token = authenticated_csrf(client)
+    response = request(
+        client,
+        "post",
+        "/settings/theme",
+        data={"theme_preference": "unknown", "csrf_token": token},
+    )
+    assert response.status_code == 400
+
+    response = request(client, "post", "/settings/theme", data={"theme_preference": "dark"})
+    assert response.status_code == 403
+
+
 def authenticated_csrf(client):
     response = request(client, "get", "/users")
     assert response.status_code == 200
@@ -794,12 +845,12 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert 'class="primary-navigation"' in secondary
     assert "Access management" in secondary
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
-    assert secondary.count("<a ") == 4
+    assert secondary.count("<a ") == 5
     assert re.search(r'href="/settings/api-keys">.*?</svg>API keys</a>', secondary, re.S)
     assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
     assert secondary.count('aria-current="page"') == 1
-    assert secondary.count('aria-hidden="true"') == 4
+    assert secondary.count('aria-hidden="true"') == 5
     assert re.search(
         r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,
@@ -815,18 +866,8 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert body.count('class="flash-region"') == 1
     shell_styles = response_text(request(client, "get", "/static/css/layouts/app-shell.css"))
     assert re.search(r"\.primary-navigation\s*{[^}]*flex-direction: column;", shell_styles)
-    for label in (
-        "Personal",
-        "Appearance",
-        "Tasks",
-        "Cases",
-        "Theme",
-        "Developer",
-        "Billing",
-        "Notifications",
-        "Language",
-    ):
-        assert label not in secondary
+    assert ">Appearance</a>" in secondary
+    assert ">Personal</p>" in secondary
 
 
 def test_settings_visibility_and_direct_access_follow_authenticated_role(interface):
@@ -846,7 +887,12 @@ def test_settings_visibility_and_direct_access_follow_authenticated_role(interfa
     login(client, regular.email, "valid password")
     body = response_text(request(client, "get", "/"))
     assert ">Settings</a>" in body
-    assert re.search(r'href="/settings/api-keys">.*?</svg>Settings</a>', body, re.S)
+    assert re.search(r'href="/settings/appearance">.*?</svg>Settings</a>', body, re.S)
+    appearance = request(client, "get", "/settings/appearance")
+    assert appearance.status_code == 200
+    appearance_body = response_text(appearance)
+    assert re.search(r'href="/settings/appearance"[^>]*aria-current="page"', appearance_body)
+    assert ">Appearance</a>" in appearance_body
     assert ">Users</a>" not in body
     assert ">Teams</a>" not in body
     assert request(client, "get", "/teams").status_code == 200
@@ -854,6 +900,13 @@ def test_settings_visibility_and_direct_access_follow_authenticated_role(interfa
     for path in ("/users", "/teams/missing/members"):
         assert request(client, "get", path).status_code == 403
         assert request(client, "post", path, data={}).status_code == 403
+
+
+def test_appearance_settings_requires_authentication(interface):
+    _, _, _, _, _, _, client = interface
+    response = request(client, "get", "/settings/appearance")
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/login?next=/settings/appearance")
 
 
 def test_expected_user_error_does_not_expose_sensitive_values(interface):

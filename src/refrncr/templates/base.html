@@ -1,7 +1,9 @@
 {% from "components/icons.html" import settings_icon, home_icon, table_icon, arrow_big_right_dash_icon, logout_icon, network_icon -%}
 {% from "components/navigation.html" import navigation_button, navigation_drawer -%}
+{% from "components/branding.html" import wordmark -%}
+{% from "components/account.html" import account_context -%}
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if current_theme_preference|default('system', true) != 'system' %} data-theme="{{ current_theme_preference }}"{% endif %}>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -27,7 +29,7 @@
         <aside class="app-sidebar" data-navigation id="application-navigation">
           <div class="navigation-heading">
             <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-              <img src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="120" height="45">
+              {{ wordmark(current_theme_preference|default('system', true), 'wordmark', 120, 45) }}
             </a>
             {{ navigation_button('application-navigation') }}
           </div>
@@ -40,23 +42,14 @@
               <a class="nav-item{{ ' is-active' if active_navigation == 'hierarchy_datasets' else '' }}" href="{{ url_for('dataset_list', kind='hierarchy') }}"{% if active_navigation == 'hierarchy_datasets' %} aria-current="page"{% endif %}>{{ network_icon() }}Hierarchy datasets</a>
             {% endif %}
           </nav>
-          <div class="account-context">
-            <span class="account-avatar" aria-hidden="true">{{ (current_actor.display_name|trim)[:1]|upper }}</span>
-            <p class="account-name">{{ current_actor.display_name }}</p>
-            <p class="account-role">{{ 'Administrator' if current_actor.role == 'admin' else 'User' }}</p>
-              <a class="account-link" href="{{ url_for('user_list') if current_actor.role == 'admin' else url_for('api_key_list') }}"{% if active_navigation in ('users', 'teams') %} aria-current="page"{% endif %}>{{ settings_icon() }}Settings</a>
-            <form method="post" action="{{ url_for('logout') }}">
-              <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
-              <button class="account-link" type="submit">{{ logout_icon() }}Log out</button>
-            </form>
-          </div>
+          {{ account_context(current_actor, current_csrf) }}
         </aside>
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
         {% if current_actor %}{% set mobile_title = self.title().split(' · ')[0] %}
         <div class="mobile-bar">
           {{ navigation_button('application-navigation', expand=true) }}
-          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home"><img src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="90" height="34"></a>
+          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">{{ wordmark(current_theme_preference|default('system', true), 'wordmark', 90, 34) }}</a>
           {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
         </div>{% endif %}
         {% if current_actor %}<noscript><p><a href="{{ url_for('api_key_list') }}">API keys</a></p></noscript>{% endif %}

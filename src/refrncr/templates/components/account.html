@@ -1,0 +1,14 @@
+{% from "components/icons.html" import settings_icon, logout_icon %}
+
+{% macro account_context(actor, csrf) -%}
+  <div class="account-context">
+    <span class="account-avatar" aria-hidden="true">{{ (actor.display_name|trim)[:1]|upper }}</span>
+    <p class="account-name">{{ actor.display_name }}</p>
+    <p class="account-role">{{ 'Administrator' if actor.role == 'admin' else 'User' }}</p>
+    <a class="account-link" href="{{ url_for("appearance_settings") }}">{{ settings_icon() }}Settings</a>
+    <form method="post" action="{{ url_for("logout") }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button class="account-link" type="submit">{{ logout_icon() }}Log out</button>
+    </form>
+  </div>
+{%- endmacro %}

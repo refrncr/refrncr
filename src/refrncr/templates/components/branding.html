@@ -1,0 +1,10 @@
+{% macro wordmark(theme_preference='system', class_name='wordmark', width=120, height=45) -%}
+  {% if theme_preference == 'system' %}
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="{{ url_for("static", filename="images/refrncr-wordmark-reversed.svg") }}">
+        <img class="{{ class_name }}" src="{{ url_for("static", filename="images/refrncr-wordmark-primary.svg") }}" alt="" width="{{ width }}" height="{{ height }}">
+    </picture>
+  {% else %}
+      <img class="{{ class_name }}" src="{{ url_for("static", filename="images/refrncr-wordmark-reversed.svg" if theme_preference == "dark" else "images/refrncr-wordmark-primary.svg") }}" alt="" width="{{ width }}" height="{{ height }}">
+  {% endif %}
+{%- endmacro %}

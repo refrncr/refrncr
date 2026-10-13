@@ -1,5 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; }
-html { color-scheme: light; font-size: 100%; }
+html { color-scheme: light dark; font-size: 100%; }
 /* Same-origin page loads keep the old page on screen until the new one can paint, so
    search, status and other criteria reloads do not flash. The swap itself is instant. */
 @view-transition { navigation: auto; }

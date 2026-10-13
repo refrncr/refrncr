@@ -1,0 +1,25 @@
+{% extends "layouts/settings.html" %}
+
+{% set settings_title = "Appearance" %}
+
+{% block settings_content %}
+  <form class="appearance-form" method="post" action="{{ url_for('theme_preference') }}" novalidate>
+    <fieldset class="theme-options">
+      <legend>Theme</legend>
+      <p class="help-text" id="theme-help">Stored for your account and used on every device.</p>
+      {% for choice, label, description, preview in (
+        ('system', 'System', "Follows your device's light or dark setting.", 'theme-preview-system.svg'),
+        ('light', 'Light', 'Mist background with white surfaces.', 'theme-preview-light.svg'),
+        ('dark', 'Dark', 'Forest: deep green-black with brand green actions.', 'theme-preview-dark.svg')
+      ) %}
+        <label class="theme-option">
+          <input type="radio" name="theme_preference" value="{{ choice }}" aria-describedby="theme-help"{% if theme_preference|default('system', true) == choice %} checked{% endif %}>
+          <img src="{{ url_for('static', filename='images/' ~ preview) }}" alt="" width="160" height="100">
+          <span class="theme-option-copy"><strong>{{ label }}</strong><span>{{ description }}</span></span>
+        </label>
+      {% endfor %}
+    </fieldset>
+    <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
+    <button class="button button-primary" type="submit">Save theme</button>
+  </form>
+{% endblock %}

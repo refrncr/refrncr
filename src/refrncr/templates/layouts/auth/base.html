@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from "components/branding.html" import wordmark %}
 
 {% block layout %}
   <main id="content" class="auth-layout" tabindex="-1">
     <div class="auth-container">
       <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
-        {% block auth_logo %}<img class="auth-wordmark" src="{{ url_for('static', filename='images/refrncr-wordmark-primary.svg') }}" alt="" width="200" height="52">{% endblock %}
+        {% block auth_logo %}{{ wordmark(current_theme_preference|default('system', true), 'auth-wordmark', 200, 52) }}{% endblock %}
       </a>
       <section class='card' aria-labelledby='auth-title'>
         {% block auth_content %}{% endblock %}
