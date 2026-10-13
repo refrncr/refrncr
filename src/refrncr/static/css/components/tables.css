@@ -127,8 +127,6 @@ tbody th[scope="row"] { background: transparent; color: var(--color-text); font-
 .version-tag { font-family: var(--font-technical); font-size: var(--font-size-xs); color: var(--color-text-secondary); white-space: nowrap; }
 /* Toolbar note: read-only state of a published version, next to the result count. */
 .record-toolbar .record-toolbar-note { display: flex; align-items: center; gap: var(--space-sm); margin: 0 0 0 auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
-.record-toolbar-search .record-toolbar-note { min-width: 0; flex: 0 1 auto; white-space: normal; }
-.record-toolbar-search #record-result-count { flex: 0 0 auto; }
 .record-toolbar-note .button-icon { flex-shrink: 0; width: 1rem; height: 1rem; }
 .record-toolbar:has(.record-toolbar-note) > span { margin-left: var(--space-md); }
 

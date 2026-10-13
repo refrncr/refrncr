@@ -62,19 +62,21 @@
         {{ search_field('record-search', 'Search hierarchy', 'Search node names and text values', name='q', value=hierarchy_search, maxlength=200, clear_url=hierarchy_clear_url) }}
       </form>
       <button class='button button-secondary' type='submit' form='record-search-form'>Search</button>
+      {% if fields %}
+      <details class='hierarchy-columns'>
+        <summary class='button button-secondary'><span>Columns · <span data-column-count>{{ default_column_keys|length }}</span> of {{ fields|length }}</span></summary>
+        <fieldset><legend>Visible columns</legend>
+          {% for field in fields %}<label><input type='checkbox' value='{{ field.key }}'{% if field.key in default_column_keys %} checked{% endif %}{% if field.key == key_field_key %} disabled{% endif %} data-column-toggle> {{ field.name }}{% if field.key == key_field_key %} <span class='help-text'>(key)</span>{% endif %}</label>{% endfor %}
+          <button type='button' class='button button-secondary' data-columns-reset>Reset</button>
+        </fieldset>
+      </details>
+      {% endif %}
     </div>
   </section>
-  {% if version_state %}<p class='record-toolbar-note'>{{ lock_icon() }}Published version · read only</p>{% endif %}
-  {% if fields %}
-  <details class='hierarchy-columns'>
-    <summary class='button button-secondary'><span>Columns · <span data-column-count>{{ default_column_keys|length }}</span> of {{ fields|length }}</span></summary>
-    <fieldset><legend>Visible columns</legend>
-      {% for field in fields %}<label><input type='checkbox' value='{{ field.key }}'{% if field.key in default_column_keys %} checked{% endif %}{% if field.key == key_field_key %} disabled{% endif %} data-column-toggle> {{ field.name }}{% if field.key == key_field_key %} <span class='help-text'>(key)</span>{% endif %}</label>{% endfor %}
-      <button type='button' class='button button-secondary' data-columns-reset>Reset</button>
-    </fieldset>
-  </details>
-  {% endif %}
-  <span id='record-result-count'>{% if display_rows %}Showing 1–{{ display_rows|length }} of {{ hierarchy_result_total }}{% else %}Showing 0 of {{ hierarchy_result_total }}{% endif %}</span>
+  <div class='hierarchy-toolbar-status'>
+    {% if version_state %}<p class='record-toolbar-note'>{{ lock_icon() }}Published version · read only</p>{% endif %}
+    <span id='record-result-count'>{% if display_rows %}Showing 1–{{ display_rows|length }} of {{ hierarchy_result_total }}{% else %}Showing 0 of {{ hierarchy_result_total }}{% endif %}</span>
+  </div>
   <div id='record-result-announcement' class='visually-hidden' role='status' aria-live='polite' aria-atomic='true'></div>
 </div>
 {% if hierarchy_search and not display_rows %}

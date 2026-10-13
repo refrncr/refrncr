@@ -45,6 +45,9 @@
 .hierarchy-columns > summary::-webkit-details-marker { display: none; }
 .hierarchy-columns fieldset { position: absolute; z-index: 3; inset-inline-end: 0; margin-block-start: var(--space-xs); padding: var(--space-md); min-width: 14rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
 .hierarchy-columns label { display: block; padding-block: var(--space-xs); }
+.hierarchy-toolbar-status { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-md); margin-inline-start: auto; min-width: max-content; }
+.hierarchy-toolbar-status .record-toolbar-note { margin: 0; }
+.hierarchy-toolbar-status #record-result-count { margin-inline-start: 0; white-space: nowrap; }
 .hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
 /* Both Records variants scroll full, single-line values behind the sticky edit column. */
 .hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }
