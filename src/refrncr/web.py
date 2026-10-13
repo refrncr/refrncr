@@ -197,6 +197,24 @@ def create_flask_app(
         )
         return f"{value.day} {months[value.month - 1]} {value.year}, {value:%H:%M} UTC"
 
+    @app.template_filter("short_date")
+    def short_date(value):
+        months = (
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
+        )
+        return f"{value.day} {months[value.month - 1]} {value.year}"
+
     app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
 
     @app.before_request
@@ -913,7 +931,12 @@ def create_flask_app(
                 fields, identifier = field_view.fields, field_view.identifier
                 overview, state_for_facts = field_view.context, field_view.state
                 schema_admin = field_view.state is None and field_view.may_maintain
-                may_start_concept = field_view.may_maintain and field_view.concept is None
+                may_start_concept = (
+                    field_view.may_maintain
+                    and field_view.concept is None
+                    and field_view.state is not None
+                    and field_view.state.status == "Current"
+                )
                 draft_in_progress = field_view.concept is not None
                 if field_view.state:
                     field_context_label = (
@@ -952,7 +975,12 @@ def create_flask_app(
                 for change in (g.concept_ui.field_changes if concept else ())
                 if change.status != "Added"
             }
-            may_start_concept = view.may_maintain and view.concept is None
+            may_start_concept = (
+                view.may_maintain
+                and view.concept is None
+                and view.state is not None
+                and view.state.status == "Current"
+            )
             if editable:
                 may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
             may_export = view.may_export
@@ -1679,7 +1707,12 @@ def create_flask_app(
                 actor_id, view.context.dataset.id
             ),
             draft_in_progress=view.concept is not None,
-            may_start_concept=view.may_maintain and view.concept is None,
+            may_start_concept=(
+                view.may_maintain
+                and view.concept is None
+                and view.state is not None
+                and view.state.status == "Current"
+            ),
         )
 
     def hierarchy_edit_context(key, node_id=None):
@@ -2138,7 +2171,12 @@ def create_flask_app(
             may_govern=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
             draft_in_progress=view.concept is not None,
             may_configure=may_configure,
-            may_start_concept=view.may_maintain and view.concept is None,
+            may_start_concept=(
+                view.may_maintain
+                and view.concept is None
+                and view.state is not None
+                and view.state.status == "Current"
+            ),
             record_states=view.record_states or {},
             record_labels=view.record_labels or {},
             record_details={

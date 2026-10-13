@@ -558,7 +558,7 @@ def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):  # 
     display = body(request(client, "get", "/datasets/inline-edit/concept"))
     assert "Save dataset" not in display
     assert "Delete dataset" in display
-    assert display.index("fields-heading") < display.index("dataset-danger-heading")
+    assert display.index("dataset-danger-heading") < display.index("fields-heading")
     editing = body(request(client, "get", "/datasets/inline-edit/concept?edit=1"))
     assert "id='dataset-edit-form'" in editing
     assert "Save dataset" in editing and ">Cancel</a>" in editing

@@ -288,7 +288,9 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
             )
             assert "1 record</span>" in html
             metadata = html.split('<p class="metadata">', 1)[1].split("</p>", 1)[0]
-            assert metadata.count('class="metadata-item"') == 1
+            assert metadata.count('class="metadata-item"') == (
+                2 if "Draft in progress" in metadata else 1
+            )
             assert '<span aria-hidden="true">•</span><span>Updated ' in metadata
             assert re.search(r'</span>\s+<span class="metadata-item">', metadata)
             assert "&nbsp;" not in metadata

@@ -35,7 +35,7 @@
 </details>
 {% endif %}
 {%- endmacro %}
-{% macro banner(key, ui, actions=true, publication_panel=false, show_current=true) -%}
+{% macro banner(key, ui, actions=true, publication_panel=false, show_current=true, include_discard_panel=false) -%}
 {% if ui %}
 <section class='concept-banner' aria-label='Draft context'>
 <div class='concept-banner-text'>
@@ -47,9 +47,9 @@
 {% if show_current %}{{ current_version_action(key) }}{% endif %}
 {% if caller is defined %}{{ caller() }}{% endif %}
 {% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_review", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Review &amp; publish</a>{% endif %}
-{% if actions %}{{ concept_actions(key, ui, ui.can_review, publication_panel) }}{% endif %}
+{% if actions %}{{ concept_actions(key, ui, ui.can_review, true) }}{% endif %}
 </div></section>
-{% if actions and publication_panel %}{{ discard_panel() }}{% endif %}
+{% if actions and include_discard_panel %}{{ discard_panel() }}{% endif %}
 {% if actions and ui.may_publish and publication_panel %}{{ form_side_panel('concept-publication-panel') }}{% endif %}
 {% endif %}
 {%- endmacro %}

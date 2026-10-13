@@ -1,24 +1,26 @@
 {% extends "base.html" %}
 {% from "components.html" import breadcrumbs, status_badge %}
+{% from "components/concept.html" import banner with context %}
 {% from "layouts/page.html" import page_context %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components/version_diff.html" import properties, field_changes %}
-{% block title %}Review &amp; publish · {{ dataset.name }} · REFRNCR{% endblock %}
+{% block title %}Review & publish · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
 <div data-version-review>
   <div class='page-header'>
-    {% set review_meta %}<p class='metadata'>{% if identity.baseline_id %}Version {{ identity.baseline_number }} · {{ identity.baseline_status }}{% else %}No published version yet{% endif %} · Draft revision {{ identity.revision }} · read only, optional before publication</p>{% endset %}
-    {% call page_context('Review &amp; publish', review_meta) %}
-      {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review &amp; publish', none)]) }}
+    {% set review_meta %}<p class='metadata'>{{ 'Changes in the draft compared with Version ' ~ identity.baseline_number if identity.baseline_id else 'Changes in the draft compared with the first publication' }}</p>{% endset %}
+    {% call page_context('Review & publish', review_meta) %}
+      {{ breadcrumbs([('Datasets', url_for('dataset_list')), (dataset.name, url_for('dataset_detail', key=dataset.key)), ('Versions', url_for('dataset_versions_view', key=dataset.key)), ('Review & publish', none)]) }}
     {% endcall %}
     <div class='page-actions'>
       <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}'>Versions</a>
-      {% if identity.baseline_status != 'Scheduled' and (section != 'Summary' or result.has_changes) %}
-        <a class='button button-primary' href='{{ url_for("dataset_version_publish", key=dataset.key, review=token) }}' data-panel-url data-dialog-open='review-panel'>Publish version</a>
-      {% endif %}
     </div>
   </div>
-  {% include 'pages/datasets/concepts/_banner.html' %}
+  {% call banner(dataset.key, concept_ui, actions=false, show_current=false) %}
+    {% if identity.baseline_status != 'Scheduled' and (section != 'Summary' or result.has_changes) %}
+      <a class='button button-primary' href='{{ url_for("dataset_version_publish", key=dataset.key, review=token) }}' data-panel-url data-dialog-open='review-panel'>Publish version</a>
+    {% endif %}
+  {% endcall %}
   {% if identity.baseline_status == 'Scheduled' %}<p class='help-text'>Publication is available after the Scheduled version becomes Current or is cancelled. Restart this review after that change.</p>{% endif %}
   <nav class='section-tabs' aria-label='Review sections'>
     {% for name, href in sections.items() %}<a class='section-tab' href='{{ href }}'{% if name == section %} aria-current='page'{% endif %}>{{ name }}</a>{% endfor %}

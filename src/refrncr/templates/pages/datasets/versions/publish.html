@@ -5,7 +5,7 @@
 {% block content %}
   <h1>Publish version</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Publish version' data-panel-eyebrow='{{ dataset.name }}'>
-    <div class='side-panel-body panel-sections'>{% include 'pages/datasets/concepts/_banner.html' %}
+    <div class='side-panel-body panel-sections'>
       {{ feedback(error, id='publication-error', focus=true) }}
       {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a></p>{% endif %}
       {% if review %}{% set revision, number, content, summary = review %}

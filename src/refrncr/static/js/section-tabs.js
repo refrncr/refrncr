@@ -24,6 +24,8 @@
           if (!enabled.includes(index)) index = enabled[0];
           tabs.forEach((tab, i) => {
             tab.setAttribute('aria-selected', String(i === index));
+            if (i === index) tab.setAttribute('aria-current', 'page');
+            else tab.removeAttribute('aria-current');
             tab.tabIndex = i === index ? 0 : -1;
             panels[i].hidden = i !== index;
           });

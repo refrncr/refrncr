@@ -1,4 +1,4 @@
-// Optional browser acceptance for the Access management tab (REF-165).
+// Optional browser acceptance for the Access tab (REF-165).
 // Start tests/browser_table_rows_app.py with fresh fixture data first.
 const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
@@ -14,7 +14,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
   page.on('pageerror', e => errors.push(e.message));
   if (output) fs.mkdirSync(output, {recursive: true});
   const shot = async name => { if (output) await page.screenshot({path: `${output}/${name}.png`, fullPage: true}); };
-  const tab = () => page.getByRole('tabpanel', {name: 'Access management', exact: true});
+  const tab = () => page.getByRole('tabpanel', {name: 'Access', exact: true});
   const select = () => tab().getByLabel('User or team', {exact: true});
   const grant = () => tab().getByRole('button', {name: 'Grant access', exact: true});
   const rows = () => tab().locator('.access-table tbody tr');

@@ -22,3 +22,6 @@
 .side-panel-body .concept-banner .button { flex: 1 1 auto; min-height: 2rem; padding: .3125rem .625rem; font-size: var(--font-size-sm); white-space: nowrap; }
 /* On pages the explanatory note continues the status line instead of taking its own row. */
 .concept-banner-note { flex-basis: auto; }
+.version-status-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); margin-block: var(--space-lg); padding: .625rem .75rem .625rem var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.version-status-bar p { margin: 0; font-size: var(--font-size-body-sm); }
+.version-status-bar .button { flex-shrink: 0; }

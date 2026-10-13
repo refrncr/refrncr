@@ -1,2 +1,2 @@
 {% from 'components/concept.html' import banner %}
-{{ banner(dataset.key, concept_ui, actions=request.endpoint not in ['dataset_version_review', 'dataset_version_publish', 'dataset_version_record_diff', 'dataset_version_field_diff'], publication_panel=publication_panel|default(false)) }}
+{{ banner(dataset.key, concept_ui, actions=actions|default(request.endpoint not in ['dataset_version_review', 'dataset_version_publish', 'dataset_version_record_diff', 'dataset_version_field_diff']), publication_panel=publication_panel|default(false), include_discard_panel=include_discard_panel|default(false)) }}

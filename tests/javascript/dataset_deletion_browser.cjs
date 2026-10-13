@@ -1,5 +1,5 @@
 // REF-141: use a fresh tests/browser_table_rows_app.py disposable fixture.
-// REF-165: Delete dataset lives in the Danger zone tab; editing is inline, not a panel.
+// REF-165: Delete dataset lives in Settings; editing is inline, not a panel.
 const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -29,7 +29,6 @@ async function focused(page, locator) {
   const dialog = page.getByRole('dialog');
   // The confirmation label carries the Dataset's own name, in its own casing.
   const confirmField = name => dialog.getByLabel(`Type ${name} to confirm`, {exact:true});
-  const dangerTab = page.locator('[data-section-tabs]').getByRole('tab', {name:'Danger zone', exact:true});
   try {
     await signIn(page);
     for (const width of [320, 768, 1440]) {
@@ -37,7 +36,7 @@ async function focused(page, locator) {
       // Editing is inline; an unsaved draft has to survive the deletion detour.
       await page.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
       await page.locator('#dataset-description').fill('Unsaved draft must survive cancel');
-      await dangerTab.click();
+      await page.locator('[data-section-tabs]').getByRole('tab', {name:'Dataset details', exact:true}).click();
       assert.equal(await page.locator('#dataset-description').inputValue(), 'Unsaved draft must survive cancel');
 
       // The tab states what a deletion removes before anything is confirmed.
@@ -102,7 +101,7 @@ async function focused(page, locator) {
     }
 
     // A server metadata change while the confirmation is open rejects the old state.
-    await page.goto(base + '/datasets/row-check/configure#danger-zone');
+    await page.goto(base + '/datasets/row-check/configure#dataset-details');
     await page.getByRole('link',{name:'Delete dataset',exact:true}).click();
     let name = confirmField('Row check');
     await name.waitFor();
@@ -142,7 +141,7 @@ async function focused(page, locator) {
     await other.close();
 
     // Long hostile names stay escaped in confirmation and post-deletion audit UI.
-    await page.goto(base + '/datasets/long-check/configure#danger-zone');
+    await page.goto(base + '/datasets/long-check/configure#dataset-details');
     await page.getByRole('link',{name:'Delete dataset',exact:true}).click();
     await dialog.locator('form[data-exact-confirmation]').waitFor();
     const longName = await dialog.locator('form[data-exact-confirmation]').getAttribute('data-exact-confirmation');
@@ -170,7 +169,6 @@ async function focused(page, locator) {
     await reader.goto(base + '/datasets/empty-check');
     assert.equal(await reader.getByRole('link',{name:'Edit dataset',exact:true}).count(),0);
     assert.equal(await reader.locator('#danger-zone').count(),0);
-    assert.equal(await reader.getByRole('tab',{name:'Danger zone',exact:true}).count(),0);
     await readerContext.close();
     assert.deepEqual(errors,[]);
     console.log('Stale validation, server-side exact match, one POST, success redirect, Back/Refresh, escaped snapshots and reader visibility passed');

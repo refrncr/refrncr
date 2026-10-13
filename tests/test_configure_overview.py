@@ -91,7 +91,11 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "<dt>Records</dt><dd>0</dd>" in details
     version_label = "Version 1 · Current" if version else "Draft in progress"
     assert f"<dt>Version</dt><dd>{version_label}</dd>" in details
-    assert "They are not part of a version." in details
+    assert "They are not part of a version." not in details
+    assert (
+        "Applies to the whole dataset, not to one version. Changes take effect right away."
+        in details
+    )
     # UUIDs remain legal in functional hidden inputs and access subject values.
     presentation = re.sub(
         r"<input[^>]*type='hidden'[^>]*>| value='[^']*'| href='/datasets/id/[^']*'", "", page

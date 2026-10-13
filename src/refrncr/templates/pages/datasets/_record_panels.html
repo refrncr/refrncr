@@ -6,7 +6,7 @@
   {% call side_panel("add-record-panel", "New " ~ record_type ~ " record", "add-record-title", "Add record", "add-record-description") %}
     <div class='side-panel-view' data-panel-host>
       <form class='side-panel-form' method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
-        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
+        <div class='side-panel-body'>{% if may_edit %}{% with actions=false %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <footer class='side-panel-footer'>
           <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
@@ -26,7 +26,7 @@
   {% call side_panel(panel_id, record_labels.get(record.id) or record.id, title_id, "Edit record" if record_may_edit else "View record", description_id, true, "record", default_mode="edit" if record_may_edit else "view") %}
     <div class='side-panel-view' data-panel-host>
     <section class='side-panel-view' data-panel-view='view'{% if record_may_edit %} hidden{% endif %}>
-      <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
+      <div class='side-panel-body'>{% if may_edit %}{% with actions=false %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
         {% if deleted %}<p class='record-deletion-notice'><span class='badge badge-removed'>Deleted</span><br>This Record will be removed when you publish. These are the retained values from deletion.</p>{% endif %}
         {% if version_state %}<p class='panel-context'>{{ lock_icon() }}Version {{ version_state.version.number }} · published, read only</p>{% endif %}
         <dl class='record-details'>
@@ -50,7 +50,7 @@
     </section>
     {% if record_may_edit %}
       <form class='side-panel-view side-panel-form' data-panel-view='edit' method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
-        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
+        <div class='side-panel-body'>{% if may_edit %}{% with actions=false %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
         <footer class='side-panel-footer'>
@@ -60,7 +60,7 @@
         </footer>
       </form>
       <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
-        <div class='side-panel-body'>{% if may_edit %}{% include 'pages/datasets/concepts/_banner.html' %}{% endif %}
+        <div class='side-panel-body'>{% if may_edit %}{% with actions=false %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
           <h3>Delete record?</h3>
           <p class='delete-confirmation'>You can Undo delete while this Draft remains active.</p>
           <input type='hidden' name='confirm' value='yes'>

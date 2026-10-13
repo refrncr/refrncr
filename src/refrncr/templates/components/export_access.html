@@ -7,10 +7,10 @@
 {% set fallback = url_for('dataset_configuration', key=dataset.key, _anchor='access-management') if standalone else url_for('dataset_detail', key=dataset.key, concept=true if concept else none, _anchor='access-management') %}
 {% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
     <div class='access-management' data-export-access>
-      <p class='section-description'>Who can work with this dataset. The owning team maintains it; you can add export-only access for other users and teams.</p>
       <p class='help-text' data-panel-status tabindex='-1' hidden></p>
       <section aria-labelledby='access-overview-heading'>
         <h3 id='access-overview-heading'>Who has access</h3>
+        <p class='section-description'>The owning team maintains this dataset. Give other users or teams export access so they can download it.</p>
         <ul class='access-overview'>
           <li>
             <span class='access-overview-subject'>{{ team_icon() }}<span>{{ dataset.owner_team_name }}</span> <span class='badge badge-identifier'>Owning team</span></span>

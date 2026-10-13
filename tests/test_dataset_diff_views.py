@@ -40,7 +40,7 @@ def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
     for section in ("Summary", "Fields", "Records"):
         response = request(browser, "get", path(base, token, section=section))
         assert response.status_code == 200
-        assert "Draft revision" in response.text and "Version 1" in response.text
+        assert "Changes in the draft compared with Version 1" in response.text
         assert "You’re working on a draft" in response.text and "Publish version" in response.text
         assert "no-store" in response.headers["Cache-Control"]
         if section == "Fields":
@@ -125,8 +125,8 @@ def test_first_publication_panel_offers_optional_review(context):  # noqa: F811
     url = f"/datasets/{c.d.key}/versions/publish"
     before = snapshot(c)
     concept = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
-    assert concept.text.count("id='concept-publication-panel'") == 1
-    assert "data-dialog-open='concept-publication-panel'" in concept.text
+    assert "id='concept-publication-panel'" not in concept.text
+    assert "data-dialog-open='concept-publication-panel'" not in concept.text
     panel = request(browser, "get", url)
     assert panel.status_code == 200 and "Review &amp; publish" in panel.text
     assert "publication-form" in panel.text

@@ -65,7 +65,7 @@ async function login(page,email) {
       assert.match(await row.innerText(),/Complete/);assert.match(await row.innerText(),/Edited/);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
-      assert.deepEqual(await page.locator('table .record-system-status .badge-published').allTextContents(),['Published','Published']);
+      assert.deepEqual(await page.locator('table .record-system-status .badge-published').allTextContents(),[]);
       const remove=page.getByRole('button',{name:/Edit record Verwijderen/});
       await remove.click();await page.locator('dialog[open]').getByRole('button',{name:'Delete',exact:true}).click();
       await page.locator('dialog[open] [data-panel-view="delete"]').getByRole('button',{name:'Delete record',exact:true}).click();
@@ -75,7 +75,7 @@ async function login(page,email) {
       await page.locator('dialog[open]').getByRole('button',{name:'Create record',exact:true}).click();
       await page.waitForURL(`${base}/datasets/${key}/concept/records`);
       assert.match(await page.locator('.page-context .metadata').innerText(),/3 records.*1 marked for deletion/s);
-      assert.deepEqual(await page.locator('tbody td.record-system-status').allTextContents(),['Edited','Published','Added','Deleted']);
+      assert.deepEqual(await page.locator('tbody td.record-system-status').allTextContents(),['Edited','','Added','Deleted']);
       await shot(page,`concept-${width}`);
       await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).scrollIntoViewIfNeeded();
       await shot(page,`system-status-${width}`);
