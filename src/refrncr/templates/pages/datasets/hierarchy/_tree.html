@@ -9,7 +9,6 @@
 <div class='hierarchy-node-actions{{ " hierarchy-node-actions-reveal" if may_edit else "" }}'>
   {% if may_edit %}
     {{ node_action(url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id), "Edit node", "Edit node " ~ row.node.name, square_pen_icon) }}
-    {{ node_action(url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id), "Values", "Edit values for " ~ row.node.name, table_properties_icon) }}
     {{ node_action(url_for("dataset_hierarchy_node_create", key=dataset.key, parent_id=row.node.id), "Add child", "Add child to " ~ row.node.name, node_add_child_icon) }}
     {% if row.node.parent_id is not none %}{{ node_action(url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=row.node.id), "Delete branch", "Delete branch " ~ row.node.name, trash_2_icon, true) }}{% endif %}
   {% else %}<button class='button button-secondary button-table-action' type='button' data-dialog-open='hierarchy-node-{{ row.node.id }}' aria-label='View values for {{ row.node.name }}'>View values</button>{% endif %}
@@ -21,21 +20,18 @@
 {% if indented %}<span class='visually-hidden'>Full path: {{ row.path }}</span>{% endif %}
 {%- endmacro %}
 
-{% macro record_name(row) -%}
+{% macro record_name(row, action_only=false, indented=false) -%}
 {% if may_edit %}
-  {% call row_action(href=url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id, return_view="records", return_records_view=records_view), panel="hierarchy-panel", panel_url=true, accessible_name="Edit record " ~ row.path) %}{{ node_name(row) }}{% endcall %}
+  {% if action_only %}<a class='button button-icon-only' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id) }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='Edit node {{ row.node.name }}' data-tooltip='Edit node'>{{ square_pen_icon() }}</a>
+  {% else %}{% call row_action(href=url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id), panel="hierarchy-panel", panel_url=true, accessible_name="Edit node " ~ row.path) %}{{ node_name(row, indented=indented) }}{% endcall %}{% endif %}
 {% else %}
-  {% call row_action(panel="hierarchy-node-" ~ row.node.id, accessible_name="View record " ~ row.path) %}{{ node_name(row) }}{% endcall %}
+  {% if not action_only %}{% call row_action(panel="hierarchy-node-" ~ row.node.id, accessible_name="View node " ~ row.path) %}{{ node_name(row, indented=indented) }}{% endcall %}{% endif %}
 {% endif %}
-{%- endmacro %}
-
-{% macro record_edit_action(row) -%}
-<a class='button button-icon-only' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=row.node.id, return_view="records", return_records_view=records_view) }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='Edit record {{ row.path }}' title='Edit record {{ row.node.name }}'>{{ square_pen_icon() }}</a>
 {%- endmacro %}
 
 {% macro node_value(row, field) -%}
 {% if row is none %}<span class='visually-hidden'>No node at this level</span>
-{% elif not row.leaf and field.hierarchy_scope != 'all_nodes' %}<span class='help-text'>Not applicable</span>
+{% elif not row.leaf and field.hierarchy_scope != 'all_nodes' %}<span class='hierarchy-not-applicable' aria-label='Not applicable'>—</span>
 {% elif row['values'].get(field.key) is none %}<span class='help-text'>Empty</span>
 {% else %}{{ row['values'].get(field.key)|record_value_text(field.data_type) }}{% endif %}
 {%- endmacro %}

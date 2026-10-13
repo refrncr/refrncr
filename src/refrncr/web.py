@@ -1529,14 +1529,29 @@ def create_flask_app(
         return rows, children
 
     def render_hierarchy(view):
-        selected = request.args.getlist("view") or ["hierarchy"]
-        if len(selected) != 1 or selected[0] not in {"hierarchy", "records", "hybrid"}:
-            abort(400, description="Choose Hierarchy, Records or Hybrid.")
+        selected = request.args.getlist("view") or ["tree"]
+        if len(selected) != 1 or selected[0] not in {
+            "tree",
+            "table",
+            "hierarchy",
+            "records",
+            "hybrid",
+        }:
+            abort(400, description="Choose Tree or Table.")
+        selected[0] = {"hierarchy": "tree", "hybrid": "tree", "records": "table"}.get(
+            selected[0], selected[0]
+        )
         records_view = request.args.getlist("records_view") or ["reference"]
         if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
-            abort(400, description="Choose Reference table or Flattened tree.")
+            abort(400, description="Choose a valid hierarchy view.")
         searches = request.args.getlist("q")
-        if len(searches) > 1 or set(request.args) - {"view", "records_view", "q"}:
+        sorts = request.args.getlist("sort") or [""]
+        directions = request.args.getlist("direction") or ["asc"]
+        if len(searches) > 1 or len(sorts) != 1 or len(directions) != 1:
+            abort(400, description="Unsupported hierarchy view parameters.")
+        if sorts[0] not in {"", "name", "parent", "key"} or directions[0] not in {"asc", "desc"}:
+            abort(400, description="Unsupported hierarchy sort.")
+        if set(request.args) - {"view", "records_view", "q", "sort", "direction"}:
             abort(400, description="Unsupported hierarchy view parameters.")
         hierarchy_search = search_term(searches[0] if searches else "")
         normalized_search = hierarchy_search.casefold()
@@ -1559,15 +1574,7 @@ def create_flask_app(
                 normalized_search in row["node"].name.casefold()
             )
 
-        if selected[0] == "records" and records_view[0] == "flattened":
-            unfiltered_rows = leaf_rows
-            display_rows = [
-                row
-                for row in unfiltered_rows
-                if not normalized_search
-                or any(row_matches(candidate) for candidate in (*row["ancestor_rows"], row))
-            ]
-        elif selected[0] == "records":
+        if selected[0] == "table":
             unfiltered_rows = rows
             display_rows = [
                 row for row in unfiltered_rows if not normalized_search or row_matches(row)
@@ -1585,13 +1592,33 @@ def create_flask_app(
             else:
                 display_rows = rows
 
+        sort_key = sorts[0]
+        if selected[0] == "table" and sort_key:
+            key_field_key = (getattr(view.identifier, "field_keys", ()) or (None,))[0]
+            key_field = next((field for field in view.fields if field.key == key_field_key), None)
+
+            def row_sort_value(row):
+                if sort_key == "name":
+                    return row["node"].name.casefold()
+                if sort_key == "parent":
+                    return (row["parent_name"] or "").casefold()
+                value = row["values"].get(key_field.key) if key_field else None
+                return "" if value is None else str(value).casefold()
+
+            display_rows = sorted(
+                display_rows,
+                key=lambda row: (row_sort_value(row), row["path"].casefold()),
+                reverse=directions[0] == "desc",
+            )
+
         hierarchy_clear_url = url_for(
             "dataset_records_view",
             key=view.context.dataset.key,
             version_id=view.state.version.id if view.state else None,
             concept=True if view.state is None else None,
             view=selected[0],
-            records_view=records_view[0] if selected[0] == "records" else None,
+            sort=sorts[0] or None,
+            direction=directions[0] if sorts[0] else None,
         )
         return render_authenticated_template(
             "pages/datasets/hierarchy.html",
@@ -1610,6 +1637,9 @@ def create_flask_app(
             hierarchy_search=hierarchy_search,
             hierarchy_clear_url=hierarchy_clear_url,
             selected_view=selected[0],
+            sort_key=sort_key,
+            sort_direction=directions[0],
+            key_field_key=(getattr(view.identifier, "field_keys", ()) or (None,))[0],
             version_state=view.state,
             may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
@@ -1665,9 +1695,7 @@ def create_flask_app(
             mode=mode,
             fields=applicable,
             inactive_fields=tuple(
-                field
-                for field in view.fields
-                if field not in applicable and row and row["values"].get(field.key) is not None
+                field for field in view.fields if field not in applicable and row
             ),
             parent_options=[entry for entry in rows if entry["node"].id not in excluded],
             parent_id=parent_id,
@@ -1678,10 +1706,10 @@ def create_flask_app(
                     for key, value in request.form.items()
                     if key.startswith("field:")
                 }
-                if request.method == "POST" and mode == "values"
+                if request.method == "POST"
                 else (row["values"] if row else {})
             ),
-            raw_values=request.method == "POST" and mode == "values",
+            raw_values=request.method == "POST",
             expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
             return_view=return_view,
             return_records_view=return_records_view,
@@ -1727,13 +1755,19 @@ def create_flask_app(
     def dataset_hierarchy_node_edit(key, node_id):
         actor, view, rows, row = hierarchy_edit_context(key, node_id)
         if request.method == "POST":
+            submitted = {
+                form_key.removeprefix("field:"): form_values[0]
+                for form_key, form_values in request.form.lists()
+                if form_key.startswith("field:") and len(form_values) == 1
+            }
             try:
-                hierarchy.update_node(
+                hierarchy._update_node_and_values(
                     actor.id,
                     key,
                     node_id,
                     request.form.get("name", ""),
                     request.form.get("parent_id") or None,
+                    submitted,
                     expected_revision=exact_expected_revision(),
                 )
             except (ValidationError, ConflictError) as error:

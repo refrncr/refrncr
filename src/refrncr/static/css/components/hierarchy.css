@@ -1,4 +1,4 @@
-/* Hierarchy and Hybrid share the compact tree-table variant and design tokens. */
+/* Tree and Table share the compact hierarchy table and design tokens. */
 .hierarchy-name { color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
 .hierarchy-node-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-xs); font-size: var(--font-size-body-sm); }
 .hierarchy-node-actions-reveal { transition: opacity var(--motion-duration-layout) var(--motion-easing-standard); }
@@ -11,7 +11,30 @@
   .hierarchy-node-actions-reveal { opacity: 1; }
 }
 .hierarchy-actions-column { text-align: right; white-space: nowrap; }
-.hierarchy-table { min-width: 30rem; }
+.hierarchy-table { min-width: 42rem; border-collapse: separate; border-spacing: 0; }
+.hierarchy-table-scroll { overflow-x: auto; }
+.hierarchy-table thead { background: var(--color-surface-raised); }
+.hierarchy-table .hierarchy-node-column,
+.hierarchy-table th:first-child,
+.hierarchy-table td:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--color-surface); }
+.hierarchy-table thead th:first-child { z-index: 2; background: var(--color-surface-raised); }
+.hierarchy-table .hierarchy-actions-column,
+.hierarchy-table th:last-child,
+.hierarchy-table td:last-child { position: sticky; inset-inline-end: 0; z-index: 1; background: var(--color-surface); }
+.hierarchy-table thead th:last-child { z-index: 2; background: var(--color-surface-raised); }
+.hierarchy-table .hierarchy-node-column { min-width: 16rem; border-inline-end: 1px solid var(--color-border-subtle); }
+.hierarchy-table .hierarchy-actions-column { min-width: 7rem; border-inline-start: 1px solid var(--color-border-subtle); }
+.hierarchy-table td[data-column] { min-width: 8rem; }
+.hierarchy-table td[data-column] + td[data-column] { border-inline-start: 1px solid var(--color-border-subtle); }
+.hierarchy-table .hierarchy-not-applicable { color: var(--color-text-secondary); }
+.hierarchy-sort { color: inherit; text-decoration: none; }
+.hierarchy-sort:hover, .hierarchy-sort:focus-visible { text-decoration: underline; }
+.hierarchy-key-sort { min-width: 8rem; }
+.hierarchy-columns { position: relative; }
+.hierarchy-columns > summary { list-style: none; cursor: pointer; }
+.hierarchy-columns > summary::-webkit-details-marker { display: none; }
+.hierarchy-columns fieldset { position: absolute; z-index: 3; inset-inline-end: 0; margin-block-start: var(--space-xs); padding: var(--space-md); min-width: 14rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.hierarchy-columns label { display: block; padding-block: var(--space-xs); }
 .hierarchy-table :is(th, td) { vertical-align: middle; overflow-wrap: anywhere; }
 /* Both Records variants scroll full, single-line values behind the sticky edit column. */
 .hierarchy-table:not(.hierarchy-tree-table) :is(th, td) { white-space: nowrap; }
