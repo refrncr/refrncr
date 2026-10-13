@@ -18,7 +18,10 @@ def upgrade():
             "users",
             sa.Column("theme_preference", sa.String(8), nullable=False, server_default="system"),
         )
-    if op.get_bind().dialect.name != "sqlite":
+    check_names = {
+        constraint.get("name") for constraint in sa.inspect(bind).get_check_constraints("users")
+    }
+    if bind.dialect.name != "sqlite" and "ck_users_theme_preference" not in check_names:
         op.create_check_constraint(
             "ck_users_theme_preference",
             "users",
@@ -32,13 +35,14 @@ def downgrade():
         column["name"] for column in sa.inspect(bind).get_columns("users")
     }:
         return
-    if bind.dialect.name != "sqlite":
-        op.drop_constraint("ck_users_theme_preference", "users", type_="check")
-        op.drop_column("users", "theme_preference")
-        return
     check_names = {
         constraint.get("name") for constraint in sa.inspect(bind).get_check_constraints("users")
     }
+    if bind.dialect.name != "sqlite":
+        if "ck_users_theme_preference" in check_names:
+            op.drop_constraint("ck_users_theme_preference", "users", type_="check")
+        op.drop_column("users", "theme_preference")
+        return
     with op.batch_alter_table("users") as batch:
         if "ck_users_theme_preference" in check_names:
             batch.drop_constraint("ck_users_theme_preference", type_="check")
