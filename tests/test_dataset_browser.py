@@ -1618,7 +1618,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema/concept"))
-    assert "<h2 id='fields-heading'>Fields <span class='section-count'>0<" in empty_page
+    assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
 

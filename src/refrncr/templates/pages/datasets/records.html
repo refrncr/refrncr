@@ -10,7 +10,7 @@
 {% block title %}Records · {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none, draft_in_progress=draft_in_progress), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none, draft_in_progress=draft_in_progress and version_state is not none), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>

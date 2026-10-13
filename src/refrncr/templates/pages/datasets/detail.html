@@ -10,7 +10,9 @@
 {% from "components.html" import content_metadata, feedback %}
 {% from "layouts/page.html" import page_context %}
 
-{% block title %}{{ 'Configure' if standalone_configuration else 'Settings' }} {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
+{% set detail_tab = request.args.get('tab', 'dataset-details') %}
+{% set detail_title = 'Configure' if standalone_configuration else {'fields': 'Fields', 'access-management': 'Access'}.get(detail_tab, 'Settings') %}
+{% block title %}{{ detail_title }} {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 
 {% block content %}
   {% set records_url = url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state and not standalone_configuration else none) %}
@@ -18,7 +20,7 @@
   {{ feedback('Draft discarded. Current was not changed.', kind='success') }}
   {% endif %}
   <div class='page-header page-header-actions-end'>
-    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none, draft_in_progress=draft_in_progress) if not standalone_configuration else '', icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none, draft_in_progress=draft_in_progress and version_state is not none) if not standalone_configuration else '', icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -29,7 +31,7 @@
       {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
     </div>
   </div>
-  {% if not standalone_configuration and not version_state %}{% with publication_panel=false, include_discard_panel=true %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
+  {% if not standalone_configuration and not version_state %}{% with publication_panel=false, show_current=false, include_discard_panel=true %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
   {% if not standalone_configuration %}{{ dataset_navigation(dataset, 'settings' if request.args.get('tab', 'dataset-details') == 'dataset-details' else request.args.get('tab', 'settings'), concept=not version_state, version_id=version_state.version.id if version_state else none, may_govern=may_govern, local=true) }}{% endif %}
   {% set tabs = [('dataset-details', 'Settings')] %}
   {% if dataset.kind == 'mapping' %}{% set tabs = tabs + [('mapping', 'Mapping')] %}{% endif %}
@@ -131,7 +133,7 @@
     {% if dataset.kind == 'hierarchy' %}<p class='help-text'>Custom fields and a field-based record identifier are optional. Required and Unique apply within each field’s scope; a configured record identifier identifies leaves only.</p>{% endif %}
       <div class='page-header section-header'>
         <div>
-          <h2 id='fields-heading'>Fields <span class='section-count'>{{ fields|length }}<span class='visually-hidden'> {{ 'field' if fields|length == 1 else 'fields' }}</span></span></h2>
+          <h2 id='fields-heading'>Fields</h2>
           {% if fields %}<p class='section-description'>{{ 'Drag a field to change the column order in tables and exports.' if schema_admin else 'The order here is the column order in tables and exports.' }}</p>{% endif %}
         </div>
         {% if schema_admin %}<div class='page-actions'><a class='button button-primary' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("new_dataset_field", key=dataset.key) }}'>Add field</a></div>{% endif %}

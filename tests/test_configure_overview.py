@@ -104,8 +104,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         assert internal_id not in presentation
     field_section = section(page, "fields-heading")
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
-    count_label = "field" if count == 1 else "fields"
-    assert f"{count}<span class='visually-hidden'> {count_label}</span>" in field_section
+    assert "<h2 id='fields-heading'>Fields</h2>" in field_section
     assert ("Add field" in field_section) == (permission != "viewer")
     assert ("configuration-panel" in page) == (permission != "viewer")
     assert "record-identifier-heading" not in page

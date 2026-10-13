@@ -348,6 +348,8 @@ def test_paged_record_badges_use_stable_identity_and_shared_classification(conte
     assert found.page.total == 1 and found.context.record_count == 51
     summary = c.service.concept_context(c.a.id, c.d.key).summary.counts
     assert (summary.records_added, summary.records_changed, summary.records_removed) == (1, 1, 1)
+    review = DatasetDiffService(c.service).open_review(c.a.id, c.d.id)
+    assert review.counts.records_removed == 1
 
 
 def test_cancel_audit_failure_rolls_back_staleness_and_preserves_changes(context, monkeypatch):  # noqa: F811

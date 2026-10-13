@@ -18,7 +18,10 @@
           tab.setAttribute('aria-controls', panels[index].id);
           panels[index].setAttribute('role', 'tabpanel');
           panels[index].setAttribute('aria-labelledby', tab.id);
-          panels[index].tabIndex = 0;
+          // The panel is a labelled landmark, not a tab stop. Keeping it out of
+          // the tab order prevents a pointer activation from leaving a persistent
+          // focus ring around the entire Fields/Access block.
+          panels[index].tabIndex = -1;
         });
         const activate = (index, updateUrl = false) => {
           if (!enabled.includes(index)) index = enabled[0];
