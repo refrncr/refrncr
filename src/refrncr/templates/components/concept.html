@@ -39,8 +39,7 @@
 {% if ui %}
 <section class='concept-banner' aria-label='Draft context'>
 <div class='concept-banner-text'>
-<h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}' aria-hidden='true'>{{ 'Stale' if ui.stale else 'Draft' }}</span> You’re working on a draft</h2>
-<p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Draft to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p>
+<div class='concept-banner-line'><h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}' aria-hidden='true'>{{ 'Stale' if ui.stale else 'Draft' }}</span> You’re working on a draft</h2><p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Draft to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p></div>
 <p class='concept-banner-note'>Changes are not visible in the current published version until you publish them.</p>
 </div>
 <div class='page-actions'>

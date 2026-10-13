@@ -594,7 +594,8 @@ def test_manual_deleted_added_record_retains_last_concept_values(context):  # no
     )
     c.s.dataset_records.delete_record(c.a.id, c.d.key, added.id, 2)
     view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
-    assert view.record_states[added.id] == "Deleted"
+    assert added.id not in view.record_states
+    assert view.deleted_count == 0
     restored = c.s.dataset_records.restore_record(
         c.a.id, c.d.key, added.id, 3, concept_id=concept.id
     )

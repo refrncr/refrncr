@@ -56,6 +56,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         [("badge-draft", "Edited"), ("badge-draft", "Added"), ("badge-removed", "Deleted")]
     )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
+    assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_removed == 1
     response = request(
         browser, "get", f"/datasets/{c.d.key}/concept/records?q=old&record_status=deleted"
     )

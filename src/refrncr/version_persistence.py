@@ -464,6 +464,13 @@ class SqlAlchemyVersionOperations:
         if current is not None:
             yield StoredRecord(current, version.dataset_id, tuple(values), 1)
 
+    def record_ids(self, version):
+        return tuple(
+            self.session.scalars(
+                select(DatasetVersionRecord.id).where(DatasetVersionRecord.version_id == version.id)
+            )
+        )
+
     def content(self, version):
         return SnapshotContent(
             version.name,

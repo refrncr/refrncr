@@ -711,10 +711,8 @@ class DatasetVersionService:
                     if concept.base_version_id
                     else None
                 )
-                baseline_ids = (
-                    {record.id for record in uow.versions.iterate_records(baseline)}
-                    if baseline is not None
-                    else set()
+                baseline_ids = set(
+                    uow.versions.record_ids(baseline) if baseline is not None else set()
                 )
                 removed = tuple(record for record, _fields in pairs if record.id in baseline_ids)
                 deleted_fields = {record.id: field_set for record, field_set in pairs}

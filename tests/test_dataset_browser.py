@@ -326,8 +326,8 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     )
 
     configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
-    assert "<title>Configure SAP → Salesforce · REFRNCR</title>" in configuration
-    assert "Configure SAP → Salesforce" in configuration
+    assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
+    assert "Configure · SAP → Salesforce" in configuration
     assert "<p class='dataset-identity-name'>SAP → Salesforce</p>" in configuration
     assert "SAP -&gt; Salesforce" not in configuration
     assert "<dt>Technical name</dt>" in configuration
@@ -720,6 +720,9 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "data-panel-view='view' hidden" in page
     assert "data-panel-view='edit' method='post'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
+    panel = page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[0]
+    assert ">View current version</a>" not in panel
+    assert "concept-banner-line" in panel and "concept-banner-note" in panel
     assert "value='1'" in page
     assert "You can Undo delete while this Draft remains active." in page
     assert "name='confirm' value='yes'" in page
@@ -1459,7 +1462,7 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     page = body(response)
 
     assert response.status_code == 200
-    assert "<title>Configure Stored &lt;name&gt; · REFRNCR</title>" in page
+    assert "<title>Configure · Stored &lt;name&gt; · REFRNCR</title>" in page
     assert "<div class='page-header page-header-actions-end'>" in page
     assert "<label for='dataset-technical-key'>Technical name</label>" in page
     assert "name='technical_key'" in page
