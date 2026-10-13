@@ -8,10 +8,10 @@
 {% macro node_actions(row) -%}
 <div class='hierarchy-node-actions{{ " hierarchy-node-actions-reveal" if may_edit else "" }}'>
   {% if may_edit %}
-    {{ node_action(url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id), "Edit node", "Edit node " ~ row.node.name, square_pen_icon) }}
+    {{ node_action(url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id, view=selected_view, q=hierarchy_search or none, sort=sort_key or none, direction=sort_direction if sort_key else none), "Edit node", "Edit node " ~ row.node.name, square_pen_icon) }}
     {{ node_action(url_for("dataset_hierarchy_node_create", key=dataset.key, parent_id=row.node.id), "Add child", "Add child to " ~ row.node.name, node_add_child_icon) }}
     {% if row.node.parent_id is not none %}{{ node_action(url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=row.node.id), "Delete branch", "Delete branch " ~ row.node.name, trash_2_icon, true) }}{% endif %}
-  {% else %}<button class='button button-secondary button-table-action' type='button' data-dialog-open='hierarchy-node-{{ row.node.id }}' aria-label='View values for {{ row.node.name }}'>View values</button>{% endif %}
+  {% endif %}
 </div>
 {%- endmacro %}
 
@@ -22,8 +22,8 @@
 
 {% macro record_name(row, action_only=false, indented=false) -%}
 {% if may_edit %}
-  {% if action_only %}<a class='button button-icon-only' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id) }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='Edit node {{ row.node.name }}' data-tooltip='Edit node'>{{ square_pen_icon() }}</a>
-  {% else %}{% call row_action(href=url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id), panel="hierarchy-panel", panel_url=true, accessible_name="Edit node " ~ row.path) %}{{ node_name(row, indented=indented) }}{% endcall %}{% endif %}
+  {% if action_only %}<a class='button button-icon-only hierarchy-node-actions-reveal' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id, view=selected_view, q=hierarchy_search or none, sort=sort_key or none, direction=sort_direction if sort_key else none) }}' aria-haspopup='dialog' aria-controls='hierarchy-panel' aria-label='Edit node {{ row.node.name }}' data-tooltip='Edit node'>{{ square_pen_icon() }}</a>
+  {% else %}{% call row_action(href=url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=row.node.id, view=selected_view, q=hierarchy_search or none, sort=sort_key or none, direction=sort_direction if sort_key else none), panel="hierarchy-panel", panel_url=true, accessible_name="Edit node " ~ row.path) %}{{ node_name(row, indented=indented) }}{% endcall %}{% endif %}
 {% else %}
   {% if not action_only %}{% call row_action(panel="hierarchy-node-" ~ row.node.id, accessible_name="View node " ~ row.path) %}{{ node_name(row, indented=indented) }}{% endcall %}{% endif %}
 {% endif %}

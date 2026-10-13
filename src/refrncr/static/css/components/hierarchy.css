@@ -13,19 +13,29 @@
 .hierarchy-actions-column { text-align: right; white-space: nowrap; }
 .hierarchy-table { min-width: 42rem; border-collapse: separate; border-spacing: 0; }
 .hierarchy-table-scroll { overflow-x: auto; }
-.hierarchy-table thead { background: var(--color-surface-raised); }
+.hierarchy-table thead { background: var(--color-table-heading); }
 .hierarchy-table .hierarchy-node-column,
 .hierarchy-table th:first-child,
 .hierarchy-table td:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--color-surface); }
-.hierarchy-table thead th:first-child { z-index: 2; background: var(--color-surface-raised); }
+.hierarchy-table thead th:first-child { z-index: 2; background: var(--color-table-heading); }
 .hierarchy-table .hierarchy-actions-column,
 .hierarchy-table th:last-child,
 .hierarchy-table td:last-child { position: sticky; inset-inline-end: 0; z-index: 1; background: var(--color-surface); }
-.hierarchy-table thead th:last-child { z-index: 2; background: var(--color-surface-raised); }
+.hierarchy-table thead th:last-child { z-index: 2; background: var(--color-table-heading); }
 .hierarchy-table .hierarchy-node-column { min-width: 16rem; border-inline-end: 1px solid var(--color-border-subtle); }
 .hierarchy-table .hierarchy-actions-column { min-width: 7rem; border-inline-start: 1px solid var(--color-border-subtle); }
 .hierarchy-table td[data-column] { min-width: 8rem; }
-.hierarchy-table td[data-column] + td[data-column] { border-inline-start: 1px solid var(--color-border-subtle); }
+.hierarchy-table :is(th, td):first-child { border-inline-end: 1px solid var(--color-border-subtle); }
+.hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(16 25 21 / 22%); }
+.hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(16 25 21 / 22%); }
+.hierarchy-table .hierarchy-filler-column { width: 100%; min-width: 0; padding: 0; }
+.hierarchy-table .numeric-column { text-align: start; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(0 0 0 / 70%); }
+  :root:not([data-theme="light"]) .hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(0 0 0 / 70%); }
+}
+:root[data-theme="dark"] .hierarchy-table-scroll[data-scroll-start="true"] .hierarchy-table :is(.hierarchy-node-column, th:first-child, td:first-child) { box-shadow: 6px 0 6px -6px rgb(0 0 0 / 70%); }
+:root[data-theme="dark"] .hierarchy-table-scroll[data-scroll-end="true"] .hierarchy-table .hierarchy-actions-column { box-shadow: -6px 0 6px -6px rgb(0 0 0 / 70%); }
 .hierarchy-table .hierarchy-not-applicable { color: var(--color-text-secondary); }
 .hierarchy-sort { color: inherit; text-decoration: none; }
 .hierarchy-sort:hover, .hierarchy-sort:focus-visible { text-decoration: underline; }

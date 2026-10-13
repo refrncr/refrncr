@@ -6184,7 +6184,7 @@
       "operation": "update_node",
       "service": "refrncr.hierarchy.HierarchyService.update_node",
       "interface_entrypoints": [
-        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
+        "refrncr.hierarchy.HierarchyService.update_node direct service interface"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6216,6 +6216,46 @@
         "tests/test_hierarchy.py::test_hierarchy_writers_serialize_and_reject_stale_revision"
       ],
       "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing Dataset unit of work and AuditEvent."
+    },
+    {
+      "capability": "Hierarchy maintenance",
+      "operation": "update_node_and_values",
+      "service": "refrncr.hierarchy.HierarchyService.update_node_and_values",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication, CSRF and non-disclosing authorization boundary; dataset-scoped node lookup.",
+      "technical_logging": "Fixed safe diagnostics only; never node names, field values or request contents.",
+      "events": [
+        [
+          "dataset",
+          "hierarchy.node_updated"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID, not a node name or field value.",
+      "actor_source": "Authenticated active owning-team member or Community administrator.",
+      "allowed_context": {
+        "dataset:hierarchy.node_updated": {}
+      },
+      "success": "One content-free event commits atomically with the node, values and concept revision.",
+      "validation_failure": "No content mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing rejection; no business mutation or domain audit event.",
+      "stale_input": "The expected Dataset revision is checked under the Dataset lock before any mutation.",
+      "no_op": "No event or revision change for identical names, parents or canonical values.",
+      "rollback": "Mutation, values, concept revision and event roll back together on audit or persistence failure.",
+      "duplicate_retry": "A committed mutation advances the revision; a stale retry is rejected.",
+      "tests": [
+        "tests/test_hierarchy_records_views.py::test_editing_node_and_value_uses_one_revision_and_transaction",
+        "tests/test_hierarchy_records_views.py::test_combined_node_panel_rejects_stale_revision_without_partial_changes",
+        "tests/test_hierarchy_records_views.py::test_combined_node_panel_rerenders_submitted_values_on_validation_error"
+      ],
+      "implementation_status": "Implemented for REF-199; hierarchy values are never audit context.",
       "exclusion_reason": "",
       "persistence_scope": "Existing Dataset unit of work and AuditEvent."
     },

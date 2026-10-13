@@ -32,6 +32,7 @@
     "refrncr.hierarchy.HierarchyService.create_node",
     "refrncr.hierarchy.HierarchyService.delete_subtree",
     "refrncr.hierarchy.HierarchyService.update_node",
+    "refrncr.hierarchy.HierarchyService.update_node_and_values",
     "refrncr.hierarchy.HierarchyService.update_values",
     "refrncr.hierarchy_import.HierarchyImportService.active",
     "refrncr.hierarchy_import.HierarchyImportService.begin",
@@ -1399,7 +1400,7 @@
       ],
       "operations": [
         "refrncr.dataset_versions.DatasetVersionService.read",
-        "refrncr.hierarchy.HierarchyService.update_node",
+        "refrncr.hierarchy.HierarchyService.update_node_and_values",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },

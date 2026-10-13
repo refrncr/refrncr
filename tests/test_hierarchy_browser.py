@@ -163,7 +163,10 @@ def test_tree_and_table_show_the_complete_hierarchy(dataset_browser):
     assert "Leaves only" in table and "aria-label='Not applicable'" in table
     assert "Edit values for" not in table
     for old_view in ("hierarchy", "records", "hybrid"):
-        assert request(client, "get", url + "?view=" + old_view).status_code == 200
+        response = request(client, "get", url + "?view=" + old_view)
+        assert response.status_code == 301
+        expected_view = "table" if old_view == "records" else "tree"
+        assert f"view={expected_view}" in response.location
 
     panel = body(
         request(
@@ -408,10 +411,10 @@ def test_published_views_remain_read_only_and_use_selected_snapshot(dataset_brow
     login(client)
     url = f"/datasets/{dataset.key}/versions/{published.id}/records"
     for view in ("hierarchy", "records", "hybrid"):
-        response = request(client, "get", url + "?view=" + view)
+        response = request(client, "get", url + "?view=" + view, follow_redirects=True)
         assert response.status_code == 200
         page = body(response)
-        assert "Read only" in page
+        assert "Published version · read only" in page
         assert "aria-label='Hierarchy views'" in page
         assert "/concept/nodes/" not in page
     services.dataset_versions.create_concept(admin.id, dataset.id)
@@ -463,13 +466,18 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     assert "Node 349" in body(tree)
     assert body(tree).count("data-hierarchy-node=") == 350
     assert body(tree).count('data-icon="corner-down-right"') == 349
-    records = request(client, "get", "/datasets/deep/concept/records?view=records")
+    records = request(
+        client, "get", "/datasets/deep/concept/records?view=records", follow_redirects=True
+    )
     assert records.status_code == 200
     assert body(records).count("data-hierarchy-node=") == 350
     assert "<th scope='col'>Level</th>" in body(records)
     assert "Node 0" in body(records)
     flattened = request(
-        client, "get", "/datasets/deep/concept/records?view=records&records_view=flattened"
+        client,
+        "get",
+        "/datasets/deep/concept/records?view=records&records_view=flattened",
+        follow_redirects=True,
     )
     assert flattened.status_code == 200
     assert body(flattened).count("data-hierarchy-node=") == 350
@@ -501,7 +509,7 @@ def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_b
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("?view=records&records_view=flattened")
+    assert response.location.endswith("?view=table")
     saved = body(request(client, "get", url))
     assert "value='ordinary-data'" in saved
     assert "value='ordinary-revision-data'" in saved
