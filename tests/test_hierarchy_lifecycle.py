@@ -1,5 +1,7 @@
 """Complete hierarchy versions, selected reads, review and concept restoration."""
 
+import csv
+import io
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from threading import Barrier
@@ -135,6 +137,47 @@ def test_structure_only_review_publication_and_old_snapshot_are_independent(cont
         )
         == "Renamed"
     )
+
+
+def test_reporting_exports_select_concept_current_and_historical_snapshots(context):  # noqa: F811
+    c = context
+    root = prepare(c)
+    branch = node(c, "Branch", root.id)
+    leaf = node(c, "Leaf", branch.id)
+    first = publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+    move(c, branch, "Renamed", root.id)
+    second = publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+    move(c, leaf, "Draft leaf", branch.id)
+
+    concept = c.s.dataset_records.export_dataset(
+        c.a.id, c.d.key, "csv", prefer_concept=True, variant="reporting"
+    )
+    current = c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", variant="reporting")
+    historical = c.s.dataset_records.export_dataset(
+        c.a.id, c.d.key, "csv", version_id=first.id, variant="reporting"
+    )
+    try:
+        concept_rows = list(
+            csv.DictReader(io.TextIOWrapper(concept.content, encoding="utf-8-sig", newline=""))
+        )
+        historical_rows = list(
+            csv.DictReader(io.TextIOWrapper(historical.content, encoding="utf-8-sig", newline=""))
+        )
+        current_rows = list(
+            csv.DictReader(io.TextIOWrapper(current.content, encoding="utf-8-sig", newline=""))
+        )
+        assert [row["name"] for row in concept_rows] == ["Root", "Renamed", "Draft leaf"]
+        assert [row["name"] for row in current_rows] == ["Root", "Renamed", "Leaf"]
+        assert [row["name"] for row in historical_rows] == ["Root", "Branch", "Leaf"]
+        assert concept.download_name == "hierarchy-concept-reporting.csv"
+        assert current.download_name == f"hierarchy-v{second.number}-reporting.csv"
+        assert historical.download_name == "hierarchy-v1-reporting.csv"
+    finally:
+        concept.content.close()
+        current.content.close()
+        historical.content.close()
 
 
 def test_subtree_deletion_is_versioned_without_changing_published_history(context):  # noqa: F811

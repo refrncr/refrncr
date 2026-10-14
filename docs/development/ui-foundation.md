@@ -1167,3 +1167,14 @@ Theme selection lives at `/settings/appearance` under Settings → Personal → 
 account block only contains the account identity, Settings link and Log out action. The page stores
 System, Light or Dark per account without JavaScript and uses the local `theme-preview-*.svg`
 artwork to illustrate the choices.
+
+## REF-202 purpose-based hierarchy export menu
+
+Classification: product functionality using a hierarchy-specific variant of the shared Export
+component. The variant groups links under semantic **Reporting table** and **File for editing**
+sections, with short purpose descriptions and native download anchors. Shared disclosure behavior
+continues to provide keyboard activation, Escape handling, outside-click closing and visible focus.
+No design tokens, JavaScript controller or framework changes are required; the component-level CSS
+adds only group spacing, a divider and wrapping format links. API-link, JSON and legacy CSV actions
+are deliberately absent from this hierarchy menu while server-side export authorization remains
+authoritative.

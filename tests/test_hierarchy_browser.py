@@ -93,16 +93,30 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
     assert "Export draft</summary>" in page
-    assert f"/datasets/{dataset.key}/concept/records/export?format=csv_zip" in page
+    assert "Reporting table" in page
+    assert "Ready for BI tools and pivot tables" in page
+    assert "File for editing" in page
+    assert "Edit the hierarchy and import it again" in page
+    assert (
+        f"/datasets/{dataset.key}/concept/records/export?format=csv&amp;variant=reporting" in page
+    )
+    assert (
+        f"/datasets/{dataset.key}/concept/records/export?format=xlsx&amp;variant=reporting" in page
+    )
     assert f"/datasets/{dataset.key}/concept/records/export?format=xlsx" in page
-    assert f"/datasets/{dataset.key}/concept/records/export?format=json" in page
+    assert "format=csv_zip" not in page
+    assert "format=json" not in page
+    assert "Copy API link" not in page
     export = request(
         client,
         "get",
-        f"/datasets/{dataset.key}/concept/records/export?format=xlsx",
+        f"/datasets/{dataset.key}/concept/records/export?format=xlsx&variant=reporting",
     )
     assert export.status_code == 200
     assert export.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    assert export.headers["Content-Disposition"].endswith(
+        f"filename={dataset.key}-concept-reporting.xlsx"
+    )
 
 
 def test_export_validation_error_uses_a_handling_screen(dataset_browser, monkeypatch):
