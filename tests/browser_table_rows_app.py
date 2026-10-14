@@ -1,6 +1,6 @@
 """Disposable in-memory app for the optional REF-144 browser regression script."""
 
-from dataset_helpers import publish_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from test_dataset_browser import create_dataset, create_field, dataset_browser
 
 from refrncr.web import create_flask_app
@@ -20,6 +20,26 @@ for i in range(52):
         },
     )
 publish_dataset(s, admin.id, d)
+hierarchy = create_owned_dataset(
+    s.datasets,
+    admin.id,
+    "reporting-check",
+    "Reporting check",
+    "",
+    kind="hierarchy",
+)
+
+
+def add_hierarchy_node(name, parent_id=None):
+    revision = s.datasets.get_dataset(admin.id, hierarchy.key).revision
+    return s.hierarchy.create_node(
+        admin.id, hierarchy.key, name, parent_id, expected_revision=revision
+    )
+
+
+root = add_hierarchy_node("Executive")
+branch = add_hierarchy_node("Commercial", root.id)
+add_hierarchy_node("West", branch.id)
 create_dataset(s, admin, "empty-check", "Empty check")
 create_dataset(s, admin, "long-check", "Long" * 18 + " <img src=x onerror=alert(1)>")
 s.teams.create_team(admin.id, "Row team")

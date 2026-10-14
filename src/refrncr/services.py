@@ -2305,8 +2305,10 @@ class DatasetRecordService:
             "json",
         }:
             raise ExportGenerationError("Choose exactly one supported export format")
-        if variant is not None and variant not in {"data", "flattened"}:
-            raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
+        if variant is not None and variant not in {"data", "flattened", "reporting"}:
+            raise ExportGenerationError(
+                "Choose Data, Flattened or Reporting for a hierarchy export"
+            )
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         artifact = None
         try:
@@ -2328,7 +2330,11 @@ class DatasetRecordService:
                     fields = tuple(uow.dataset_fields.list_for_dataset(dataset_id))
                     identifier = uow.dataset_business_keys.get(dataset_id)
                     source = uow.dataset_records.iterate_all(dataset_id)
-                    export_key = dataset.key
+                    export_key = (
+                        f"{dataset.key}-concept"
+                        if dataset.kind == "hierarchy" and variant == "reporting"
+                        else dataset.key
+                    )
                     hierarchy_nodes = (
                         tuple(uow.hierarchy.list_for_dataset(dataset_id))
                         if dataset.kind == "hierarchy"
@@ -2359,8 +2365,18 @@ class DatasetRecordService:
                     source,
                     lambda record: self._record_sort_key(record, identifier.field_keys),
                 )
-                if dataset.kind == "hierarchy" and variant is not None and format_name != "csv":
+                if (
+                    dataset.kind == "hierarchy"
+                    and variant in {"data", "flattened"}
+                    and format_name != "csv"
+                ):
                     raise ExportGenerationError("A hierarchy variant can only be selected for CSV")
+                if (
+                    dataset.kind == "hierarchy"
+                    and variant == "reporting"
+                    and format_name not in {"csv", "xlsx"}
+                ):
+                    raise ExportGenerationError("Reporting tables are available as CSV or Excel")
                 if dataset.kind != "hierarchy" and variant is not None:
                     raise ExportGenerationError(
                         "CSV variants are only available for hierarchy exports"

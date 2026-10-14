@@ -43,6 +43,34 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       if (extension === 'xlsx') assert.equal(bytes.subarray(0, 2).toString(), 'PK');
       console.log('PASS: authorized ' + label + ' browser download completed with expected content');
     }
+    await page.goto(base + '/datasets/reporting-check/concept/records');
+    const hierarchyExport = page.locator('.export-menu').filter({has: page.getByText('Export draft', {exact: true})});
+    await hierarchyExport.locator('summary').click();
+    const menu = hierarchyExport.locator('.export-menu-options');
+    assert.match(await menu.innerText(), /Reporting table ›\s+Ready for BI tools and pivot tables/);
+    assert.match(await menu.innerText(), /File for editing ›\s+Edit the hierarchy and import it again/);
+    assert.equal(await menu.getByRole('link', {name: 'JSON', exact: true}).count(), 0);
+    assert.equal((await menu.innerText()).includes('Copy API link'), false);
+    const groups = menu.locator('.export-menu-group');
+    for (const [groupIndex, label, filename] of [
+      [0, 'Excel', 'reporting-check-concept-reporting.xlsx'],
+      [0, 'CSV', 'reporting-check-concept-reporting.csv'],
+      [1, 'Excel', 'reporting-check.xlsx'],
+    ]) {
+      const pending = page.waitForEvent('download');
+      await groups.nth(groupIndex).getByRole('link', {name: label, exact: true}).click();
+      const download = await pending;
+      assert.equal(await download.failure(), null);
+      assert.equal(download.suggestedFilename(), filename);
+      await hierarchyExport.locator('summary').click();
+    }
+    await page.keyboard.press('Escape');
+    assert.equal(await hierarchyExport.getAttribute('open'), null);
+    await page.setViewportSize({width: 320, height: 900});
+    await page.reload();
+    await hierarchyExport.locator('summary').click();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    console.log('PASS: hierarchy export menu exposes reporting CSV/Excel and editable Excel only');
     const denied = await browser.newContext();
     const deniedPage = await denied.newPage();
     await login(deniedPage, 'row@example.com');

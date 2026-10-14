@@ -2225,8 +2225,10 @@ def create_flask_app(
         if len(formats) != 1 or formats[0] not in {"csv", "csv_zip", "xlsx", "json"}:
             return "Choose exactly one supported export format", 400
         variants = request.args.getlist("variant")
-        if len(variants) > 1 or (variants and variants[0] not in {"data", "flattened"}):
-            return "Choose Data or Flattened for a hierarchy CSV export", 400
+        if len(variants) > 1 or (
+            variants and variants[0] not in {"data", "flattened", "reporting"}
+        ):
+            return "Choose Data, Flattened or Reporting for a hierarchy export", 400
         try:
             artifact = record_service.export_dataset(
                 actor.id,

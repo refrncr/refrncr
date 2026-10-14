@@ -127,10 +127,10 @@ version when rollback is needed.
 
 ## Verification and follow-up scope
 
-## Export schema (REF-181)
+## Export schemas (REF-181 and REF-202)
 
-Hierarchy exports use the complete selected Concept or publication snapshot. Excel always
-contains exactly three worksheets: `Data`, `Flattened` and `Hierarchy`. `Data` is the
+Hierarchy exports use the complete selected Concept or publication snapshot. The editable Excel
+workbook contains exactly three worksheets: `Data`, `Flattened` and `Hierarchy`. `Data` is the
 all-node table with `Name`, direct `Parent`, and configured Field keys. `Flattened` contains
 one row per non-root leaf with root-first `Level N` columns, `Leaf`, and separate Field
 columns for applicable ancestor levels and the leaf. Excel deliberately omits technical
@@ -151,6 +151,21 @@ Only applicable values are exported. Retained inactive values remain internal an
 written to visible cells, metadata or JSON/CSV output. The existing canonical datatype
 serializers and spreadsheet-safety encoding apply. Export filenames identify the CSV
 variant; one selected snapshot supplies both CSV files and all other representations.
+
+The REF-202 reporting table is a separate, node-based CSV or one-sheet Excel projection. It emits
+one row for every node in deterministic preorder, base Field columns in configured display order,
+and structural `depth`, `is_leaf`, `sort_order` and `path` columns. `level_1` through the deepest
+selected level contain root-first names; levels below a shorter path repeat its final node. Each
+All nodes Field also receives a per-level column and follows the same fill-down rule. Leaves only
+Fields remain base columns and are blank for branches. Reserved structural headings use a
+deterministic `field_` prefix when they collide with Field keys.
+
+Reporting CSV retains UTF-8 BOM, RFC 4180 escaping and spreadsheet-formula protection. Reporting
+Excel contains one `Reporting` worksheet, an Excel table with filters and a frozen header. Its
+filenames contain the Dataset key, `concept` or `v<number>`, and `reporting`. The browser groups
+these downloads under **Reporting table** and the editable workbook under **File for editing**;
+JSON and the legacy CSV projections are not separate menu actions. Reporting API links are not
+part of this behavior.
 
 ## Editable workbook import (REF-183)
 

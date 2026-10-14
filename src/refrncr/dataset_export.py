@@ -17,6 +17,8 @@ from typing import BinaryIO
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.hierarchy import applicable
@@ -378,19 +380,102 @@ def _hierarchy_flattened_rows(fields, nodes, *, include_ids=True):
     return headers, rows
 
 
+def _reporting_field_columns(fields, reserved):
+    """Keep reporting headings machine-friendly when a Field uses a reserved key."""
+    field_keys = {field.key for field in fields}
+    columns = []
+    for field in fields:
+        column = field.key
+        other_field_keys = field_keys - {field.key}
+        while column in reserved or column in other_field_keys or column in columns:
+            column = f"field_{column}"
+        columns.append(column)
+    return columns
+
+
+def _hierarchy_reporting_rows(fields, nodes):
+    ordered = _hierarchy_order(nodes)
+    parent_ids = {node.parent_id for node in nodes}
+    paths = _hierarchy_paths(nodes)
+    max_depth = max((len(path) for path in paths.values()), default=0)
+    level_names = [f"level_{index}" for index in range(1, max_depth + 1)]
+    all_node_fields = [field for field in fields if field.hierarchy_scope == "all_nodes"]
+    per_level_names = [
+        f"level_{index}_{field.key}"
+        for index in range(1, max_depth + 1)
+        for field in all_node_fields
+    ]
+    reserved = {
+        "node_id",
+        "name",
+        "parent_id",
+        "depth",
+        "is_leaf",
+        "sort_order",
+        "path",
+        *level_names,
+        *per_level_names,
+    }
+    field_columns = _reporting_field_columns(fields, reserved)
+    headers = [
+        "node_id",
+        "name",
+        "parent_id",
+        *field_columns,
+        "depth",
+        "is_leaf",
+        "sort_order",
+        "path",
+        *level_names,
+        *per_level_names,
+    ]
+    rows = []
+    for sort_order, node in enumerate(ordered, start=1):
+        path = paths[node.id]
+        filled_path = [*path, *([node] * (max_depth - len(path)))]
+        row = [
+            node.id,
+            node.name,
+            node.parent_id or "",
+            *[_hierarchy_export_value(field, node, parent_ids) for field in fields],
+            len(path),
+            node.id not in parent_ids,
+            sort_order,
+            "/".join(item.name for item in path),
+            *[item.name for item in filled_path],
+        ]
+        row.extend(
+            _hierarchy_export_value(field, item, parent_ids)
+            for item in filled_path
+            for field in all_node_fields
+        )
+        rows.append(row)
+    return headers, rows
+
+
 def _write_hierarchy_csv(target, fields, nodes, variant):
-    headers, rows = (
-        _hierarchy_data_rows(fields, nodes)
-        if variant == "data"
-        else _hierarchy_flattened_rows(fields, nodes)
-    )
+    if variant == "data":
+        headers, rows = _hierarchy_data_rows(fields, nodes)
+    elif variant == "flattened":
+        headers, rows = _hierarchy_flattened_rows(fields, nodes)
+    else:
+        headers, rows = _hierarchy_reporting_rows(fields, nodes)
     target.write(b"\xef\xbb\xbf")
     text = io.TextIOWrapper(target, encoding="utf-8", newline="", write_through=True)
     writer = csv.writer(text, delimiter=",", lineterminator="\r\n")
     writer.writerow([_csv_string(str(header)) for header in headers])
     for row in rows:
         writer.writerow(
-            [_csv_string(str(value)) if isinstance(value, str) else value for value in row]
+            [
+                _csv_string(value)
+                if isinstance(value, str)
+                else "true"
+                if variant == "reporting" and value is True
+                else "false"
+                if variant == "reporting" and value is False
+                else value
+                for value in row
+            ]
         )
     text.flush()
     text.detach()
@@ -444,6 +529,42 @@ def write_hierarchy_xlsx(target, fields, nodes, title: str) -> None:
             for node in _hierarchy_order(nodes)
         ]
         _write_hierarchy_sheet(hierarchy, hierarchy_headers, hierarchy_rows)
+        workbook.save(target)
+    finally:
+        for sheet in workbook.worksheets:
+            if not sheet.closed:
+                sheet.close()
+            writer = sheet._writer
+            if writer is not None and os.path.exists(writer.out):
+                writer.cleanup()
+        workbook.close()
+
+
+def write_hierarchy_reporting_xlsx(target, fields, nodes) -> None:
+    headers, rows = _hierarchy_reporting_rows(fields, nodes)
+    workbook = Workbook(write_only=True)
+    try:
+        worksheet = workbook.create_sheet(title="Reporting")
+        worksheet.freeze_panes = "A2"
+        _write_hierarchy_sheet(worksheet, headers, rows)
+        if headers:
+            table = Table(
+                displayName="ReportingTable",
+                ref=f"A1:{get_column_letter(len(headers))}{len(rows) + 1}",
+            )
+            table.tableColumns = [
+                TableColumn(id=index, name=header) for index, header in enumerate(headers, start=1)
+            ]
+            table.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium2",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=True,
+                showColumnStripes=False,
+            )
+            # The write-only warning in add_table concerns missing manual columns;
+            # they are defined above, so register the completed table directly.
+            worksheet.tables.add(table)
         workbook.save(target)
     finally:
         for sheet in workbook.worksheets:
@@ -602,8 +723,10 @@ def generate_export(
     if format_name not in formats:
         raise ExportGenerationError("Choose exactly one supported export format")
     is_hierarchy = hierarchy_nodes is not None
-    if is_hierarchy and format_name == "csv" and hierarchy_variant not in {"data", "flattened"}:
-        raise ExportGenerationError("Choose Data or Flattened for a hierarchy CSV export")
+    if is_hierarchy and hierarchy_variant not in {"data", "flattened", "reporting"}:
+        raise ExportGenerationError("Choose Data, Flattened or Reporting for a hierarchy export")
+    if is_hierarchy and hierarchy_variant == "reporting" and format_name not in {"csv", "xlsx"}:
+        raise ExportGenerationError("Reporting tables are available as CSV or Excel")
     if format_name == "csv_zip" and not is_hierarchy:
         raise ExportGenerationError("CSV bundles are only available for hierarchy exports")
     target = tempfile.SpooledTemporaryFile(max_size=SPOOL_MEMORY_LIMIT, mode="w+b")
@@ -621,6 +744,8 @@ def generate_export(
                 dataset_key=dataset_key,
                 provenance=provenance or {},
             )
+        elif is_hierarchy and format_name == "xlsx" and hierarchy_variant == "reporting":
+            write_hierarchy_reporting_xlsx(target, fields, hierarchy_nodes)
         elif is_hierarchy and format_name == "xlsx":
             write_hierarchy_xlsx(target, fields, hierarchy_nodes, dataset_key)
         elif format_name == "xlsx":
@@ -628,7 +753,11 @@ def generate_export(
         else:
             writer(target, fields, records)
         target.seek(0)
-        suffix = f"-{hierarchy_variant}" if is_hierarchy and format_name == "csv" else ""
+        suffix = (
+            f"-{hierarchy_variant}"
+            if is_hierarchy and (format_name == "csv" or hierarchy_variant == "reporting")
+            else ""
+        )
         extension = "zip" if format_name == "csv_zip" else format_name
         return ExportArtifact(target, media_type, extension, f"{dataset_key}{suffix}.{extension}")
     except ExportGenerationError:
