@@ -789,8 +789,8 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert f"aria-label='View user {managed.display_name} ({managed.id})'" in table
 
     css = response_text(request(client, "get", "/static/css/components/tables.css"))
-    breakpoint = "@media (max-width: 767px)"
-    desktop, mobile = css.split(breakpoint, 1)
+    breakpoint_rule = "@media (max-width: 767px)"
+    desktop, mobile = css.split(breakpoint_rule, 1)
     mobile = mobile.split("\n}", 1)[0]
     assert "user-management-table" not in desktop
     rules = {
@@ -812,7 +812,7 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert "overflow-wrap: anywhere;" in rules[".user-management-table .table-cell-wrap"]
 
     panel_css = response_text(request(client, "get", "/static/css/components/dialog.css"))
-    mobile_panel = panel_css.split(breakpoint)[1].split("/* Shared")[0]
+    mobile_panel = panel_css.split(breakpoint_rule)[1].split("/* Shared")[0]
     assert "grid-template-columns: minmax(0, 1fr) var(--control-height);" in mobile_panel
     assert "width: var(--control-height); justify-self: end; align-self: start;" in mobile_panel
 
@@ -1081,7 +1081,7 @@ def test_team_list_only_loads_memberships_for_the_open_team(interface, monkeypat
 
 def test_management_routes_use_file_templates_without_inline_markup():
     web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
-    management_source = web_source.split('    @app.get("/users")', 1)[1].split(
+    management_source = web_source.split("    def render_user_list", 1)[1].split(
         "    @app.errorhandler(UserManagementError)", 1
     )[0]
 

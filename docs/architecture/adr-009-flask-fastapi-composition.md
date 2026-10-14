@@ -52,3 +52,11 @@ only; runtime readiness uses the composition's existing SQLAlchemy engine and th
 packaged Alembic script head. Neither probe enters OpenAPI or durable domain audit.
 The Flask mount, API mount and CLI's automatic fail-closed migration/bootstrap
 sequence remain unchanged. REF-168 owns any future migration/start separation.
+
+## Current deviations
+
+The Flask boundary still contains a small amount of request-specific mapping validation for
+server-rendered forms. This is presentation orchestration only: authorization, validation rules,
+transactions and persistence remain in the shared application services. A future extraction is
+appropriate only when a separate story defines a reusable API contract; this ADR does not require
+a web.py/services split as cleanup work.

@@ -169,7 +169,7 @@ class InteractiveTerminalHandler(logging.Handler):
                     message = f"refrncr warning: {event}"
                 kind = "error" if record.levelno >= logging.ERROR else "warning"
                 self._write(self._accent(message, kind))
-        except Exception:
+        except Exception:  # noqa: BLE001 - logging failure must not break application flow.
             self.handleError(record)
 
     def close(self) -> None:
@@ -337,7 +337,7 @@ async def readiness_status(engine: Engine) -> bool:
         return await asyncio.wait_for(
             asyncio.to_thread(database_is_ready, engine), timeout=READINESS_TIMEOUT_SECONDS
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - readiness is deliberately fail-closed.
         return False
 
 

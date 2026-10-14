@@ -397,29 +397,63 @@ class SqlAlchemyVersionOperations:
                     .order_by(table.c.display_position)
                 ).mappings()
             )
-        return tuple(
-            SnapshotField(
-                f.id,
-                version.dataset_id,
-                f.key,
-                f.name,
-                f.data_type,
-                f.is_required,
-                f.is_unique,
-                f.display_position,
-                f.is_identifier,
-                f.definition,
-                f.unit,
-                f.mapping_role,
-                f.source_field_key,
-                f.hierarchy_scope,
+        return self.fields_for_versions((version,)).get(version.id, ())
+
+    def fields_for_versions(self, versions):
+        if not versions:
+            return {}
+        version_ids = tuple(version.id for version in versions)
+        dataset_ids = {version.id: version.dataset_id for version in versions}
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            table = Table(
+                "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
             )
-            for f in self.session.scalars(
-                select(DatasetVersionField)
-                .where(DatasetVersionField.version_id == version.id)
-                .order_by(DatasetVersionField.display_position)
+            rows = list(
+                self.session.execute(
+                    select(table)
+                    .where(table.c.version_id.in_(version_ids))
+                    .order_by(table.c.version_id, table.c.display_position)
+                ).mappings()
             )
+            return {
+                version_id: tuple(
+                    SnapshotField(
+                        dataset_id=dataset_ids[version_id],
+                        **{key: value for key, value in row.items() if key != "version_id"},
+                    )
+                    for row in rows
+                    if row["version_id"] == version_id
+                )
+                for version_id in version_ids
+            }
+        rows = self.session.scalars(
+            select(DatasetVersionField)
+            .where(DatasetVersionField.version_id.in_(version_ids))
+            .order_by(DatasetVersionField.version_id, DatasetVersionField.display_position)
         )
+        result = {version_id: [] for version_id in version_ids}
+        for field in rows:
+            result[field.version_id].append(
+                SnapshotField(
+                    field.id,
+                    dataset_ids[field.version_id],
+                    field.key,
+                    field.name,
+                    field.data_type,
+                    field.is_required,
+                    field.is_unique,
+                    field.display_position,
+                    field.is_identifier,
+                    field.definition,
+                    field.unit,
+                    field.mapping_role,
+                    field.source_field_key,
+                    field.hierarchy_scope,
+                )
+            )
+        return {version_id: tuple(fields) for version_id, fields in result.items()}
 
     def iterate_records(self, version, *, record_ids=None):
         statement = (

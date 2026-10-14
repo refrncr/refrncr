@@ -4,13 +4,18 @@
 
 Refrncr is a lightweight application for managing reference data that is accurate, shared and easy to consume. Create datasets with defined fields and identifiers, organise ownership through teams, and control who may edit, export or access data through the API. Work safely in Concepts: review changes, import versions, restore deleted records, and publish only when ready. Built-in validation, audit history, versioning and import flows protect data quality without adding enterprise complexity. Teams can browse published data in the web interface, download it as Excel, CSV, JSON or retrieve it through a REST API with personal API keys. Run it locally with your database and deployment setup.
 
+Refrncr Community is distributed under the Apache License 2.0. See [LICENSE](LICENSE) for the
+full terms.
+
 ## Quick start
 
-Install and start the Community application with two commands:
+The PyPI package is not published yet. From a source checkout, create an isolated development
+environment and install the Community application with:
 
 ```shell
-pipx install refrncr
-refrncr start
+python -m venv .venv
+python -m pip install -e ".[dev]"
+.venv/bin/refrncr start
 ```
 
 Open <http://127.0.0.1:8000>. The server binds only to the local loopback interface by
@@ -70,6 +75,43 @@ can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options or the co
 `REFRNCR_TRUSTED_PROXIES` environment variable; direct Community use requires no proxy setting.
 Configuring a trusted proxy disables plain-HTTP loopback cookies, so proxy deployments require
 HTTPS.
+
+## Development
+
+Development uses Python 3.12 or newer. From the repository root:
+
+```shell
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+```
+
+The fast local test run uses SQLite:
+
+```shell
+.venv/bin/python -m pytest -m "not postgres"
+```
+
+The full database matrix also runs the tests marked `postgres`. PostgreSQL 16 is the supported
+CI version. Start a local PostgreSQL 16 container, set `REFRNCR_TEST_POSTGRES_URL`, and run:
+
+```shell
+docker run --rm --name refrncr-postgres -e POSTGRES_DB=refrncr_test -e POSTGRES_USER=refrncr -e POSTGRES_PASSWORD=refrncr -p 5432:5432 postgres:16
+export REFRNCR_TEST_POSTGRES_URL='postgresql+psycopg://refrncr:refrncr@127.0.0.1:5432/refrncr_test'
+.venv/bin/python -m pytest
+```
+
+The repository checks are:
+
+| Check | Command | Local use |
+| --- | --- | --- |
+| Tests | `.venv/bin/python -m pytest` | Required; PostgreSQL tests run when configured |
+| Ruff lint | `.venv/bin/python -m ruff check .` | Required |
+| Ruff format | `.venv/bin/python -m ruff format --check .` | Required |
+| Pre-commit | `.venv/bin/python -m pre_commit run --all-files` | Required before review |
+| CI-only security/release jobs | GitHub Actions | Run by CI |
+
+Without `REFRNCR_TEST_POSTGRES_URL`, PostgreSQL-marked tests are skipped with an explicit reason;
+SQLite tests still run. Use `pytest --durations=50` when profiling test feedback.
 
 ### Health and operational logs
 

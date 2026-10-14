@@ -378,7 +378,7 @@ def start(configuration: StartConfiguration) -> None:
         )
     except (DatasetUpgradeError, VersionUpgradeError, ConceptUpgradeError):
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the CLI converts unknown failures safely.
         raise RuntimeError("database migration or bootstrap failed") from exc
     configure_operational_logging(
         log_level=configuration.log_level,
@@ -416,7 +416,7 @@ def read_confirmed_password(password_reader: PasswordReader) -> str:
         confirmation = password_reader("Confirm administrator password: ")
     except (CliError, KeyboardInterrupt):
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the CLI emits a safe final error.
         raise CliError("administrator password could not be read safely") from exc
     if password != confirmation:
         raise CliError("administrator password confirmation does not match")
@@ -574,7 +574,7 @@ def main(
     except CliError as exc:
         print(f"refrncr failed: {exc}", file=sys.stderr)
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the CLI emits a safe final error.
         if args.command in {"dataset-publication-preflight", "dataset-concept-preflight"}:
             message = (
                 str(exc)

@@ -1,5 +1,9 @@
 # Contributing
 
+The repository is licensed under Apache-2.0; see the root [LICENSE](LICENSE). Development setup,
+the SQLite/PostgreSQL test matrix, and required checks are maintained in the [README Development
+section](README.md#development).
+
 Use Python 3.12 or newer and the repository `.venv`. Install development tools with
 `python -m pip install -e ".[dev]"`, work on a short-lived branch, and run Ruff, pre-commit and the
 full pytest suite before proposing a pull request.

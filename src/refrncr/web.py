@@ -1,5 +1,3 @@
-# Legacy inline templates remain temporarily while pages move to file-based Jinja templates.
-# ruff: noqa: E501
 from __future__ import annotations
 
 import hmac
@@ -549,7 +547,10 @@ def create_flask_app(
     def api_key_revoke(key_id):
         actor, session = require_authenticated()
         api_key_service = require_api_keys()
-        key = api_key_service.get_key(actor.id, key_id)
+        try:
+            key = api_key_service.get_key(actor.id, key_id)
+        except NotFoundError:
+            return "API key not found", 400
         error = None
         if request.method == "POST":
             require_csrf(session.csrf_token)
@@ -652,9 +653,9 @@ def create_flask_app(
                 raise
             except Exception as error:
                 logging.getLogger(__name__).error(
-                    "Dataset version operation unavailable: %s", type(error).__name__
+                    "Dataset version operation failed: %s", type(error).__name__, exc_info=True
                 )
-                return "Dataset versions are temporarily unavailable. Reload and try again.", 503
+                return "Dataset versions are temporarily unavailable. Reload and try again.", 500
 
         return secured
 
@@ -783,9 +784,12 @@ def create_flask_app(
             for context in service.list_dataset_overview(actor.id)
             if context.dataset.kind == "reference"
         )
+        bulk_field_lookup = field_service.list_fields_for_datasets
+        fields_by_dataset = bulk_field_lookup(
+            actor.id, tuple(table.id for table in available_reference_tables)
+        )
         reference_table_fields = {
-            table.id: field_service.list_fields(actor.id, table.key)
-            for table in available_reference_tables
+            table.id: fields_by_dataset.get(table.id, ()) for table in available_reference_tables
         }
         return render_template(
             "pages/datasets/create.html",
@@ -1007,14 +1011,11 @@ def create_flask_app(
         }
         mapping_source_table = None
         if dataset.kind == "mapping" and dataset.source_dataset_id:
-            mapping_source_table = next(
-                (
-                    item.dataset
-                    for item in datasets.list_dataset_overview(actor.id)
-                    if item.dataset.id == dataset.source_dataset_id
-                ),
-                None,
-            )
+            try:
+                visible_dataset_lookup = datasets.get_visible_dataset_by_id
+                mapping_source_table = visible_dataset_lookup(actor.id, dataset.source_dataset_id)
+            except NotFoundError:
+                mapping_source_table = None
         mapping_incomplete_text = (
             mapping_incomplete_message(fields) if dataset.kind == "mapping" else None
         )
@@ -2263,6 +2264,7 @@ def create_flask_app(
                 max_age=0,
             )
         except Exception:
+            logging.getLogger(__name__).exception("Dataset export stream cleanup failed")
             artifact.content.close()
             raise
         response.response = logged_export_stream(response.response)
@@ -2334,8 +2336,10 @@ def create_flask_app(
                 except (NotFoundError, ImportValidationError):
                     raise
                 except Exception:
+                    logging.getLogger(__name__).exception("Import preview validation failed")
                     return (
-                        "Validation could not be completed. No records have been imported. Try again.",
+                        "Validation could not be completed. No records have been imported. "
+                        "Try again.",
                         503,
                     )
                 state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
@@ -2385,7 +2389,8 @@ def create_flask_app(
                     mapping_errors[index] = "Choose a field from this dataset."
                 elif choice and choices.count(choice) > 1:
                     mapping_errors[index] = (
-                        "This field is mapped more than once. Choose a different field or Do not import."
+                        "This field is mapped more than once. Choose a different field or "
+                        "Do not import."
                     )
         success = state is not None and state.imported_count is not None
         automatic = source is not None and (source.kind == "csv" or len(source.worksheets) == 1)
@@ -2689,13 +2694,16 @@ def create_flask_app(
         except NotFoundError:
             raise
         except Exception:
+            logging.getLogger(__name__).exception("Import mapping validation failed")
             state = record_imports.state(actor.id, login_session.id, key, token)
             return render_import_wizard(
                 dataset,
                 login_session,
                 state,
                 step=3,
-                error="Validation could not be completed. No records have been imported. Try again.",
+                error=(
+                    "Validation could not be completed. No records have been imported. Try again."
+                ),
                 status=503,
             )
         state = record_imports.state(actor.id, login_session.id, key, token)
@@ -2749,17 +2757,23 @@ def create_flask_app(
                 login_session,
                 state,
                 step=4,
-                error="The import changed since validation. No records have been imported. Review the validation results before continuing.",
+                error=(
+                    "The import changed since validation. No records have been imported. "
+                    "Review the validation results before continuing."
+                ),
                 status=409,
             )
         except Exception:
+            logging.getLogger(__name__).exception("Import preview confirmation failed")
             state = record_imports.state(actor.id, login_session.id, key, token)
             return render_import_wizard(
                 dataset,
                 login_session,
                 state,
                 step=5,
-                error="The import could not be completed. No records have been imported. Try again.",
+                error=(
+                    "The import could not be completed. No records have been imported. Try again."
+                ),
                 status=503,
             )
         if state.mode == "new_version":
@@ -3336,14 +3350,11 @@ def create_flask_app(
         )
         mapping_source_fields = ()
         if dataset.kind == "mapping" and dataset.mapping_mode == "linked":
-            source = next(
-                (
-                    item.dataset
-                    for item in dataset_service.list_dataset_overview(actor.id)
-                    if item.dataset.id == dataset.source_dataset_id
-                ),
-                None,
-            )
+            try:
+                visible_dataset_lookup = dataset_service.get_visible_dataset_by_id
+                source = visible_dataset_lookup(actor.id, dataset.source_dataset_id)
+            except NotFoundError:
+                source = None
             if source is not None:
                 existing = {
                     field.source_field_key
@@ -3703,6 +3714,7 @@ def create_flask_app(
                 with permit:
                     principal = authentication.authenticate(submitted_email, submitted_password)
             except Exception:
+                logging.getLogger(__name__).exception("Browser authentication failed")
                 attempt.failed()
                 raise
             if principal is not None:
@@ -3767,35 +3779,52 @@ def create_flask_app(
             current_csrf=login_session.csrf_token,
         )
 
-    @app.get("/users")
-    def user_list():
+    def render_user_list(*, form_error=None, form_target_id=None, form_data=None, status=200):
         actor, login_session = require_admin()
         managed_users = users.list_users(actor.id)
         user_teams = {}
         for relationship in memberships.list_relationships(actor.id):
             user_teams.setdefault(relationship.user_id, []).append(relationship)
+        form_data = form_data or {}
         return render_template(
             "pages/users/list.html",
             users=managed_users,
             user_teams=user_teams,
-            open_user=request.args.get("open_user"),
+            open_user=form_target_id or request.args.get("open_user"),
+            form_error=form_error,
+            form_target_id=form_target_id,
+            form_email=form_data.get("email", ""),
+            form_display_name=form_data.get("display_name", ""),
+            form_role=form_data.get("role", "user"),
             current_actor=actor,
             current_csrf=login_session.csrf_token,
             active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
-        )
+        ), status
+
+    @app.get("/users")
+    def user_list():
+        return render_user_list()
 
     @app.post("/users")
     def create_user():
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        users.create_user(
-            actor.id,
-            request.form["email"],
-            request.form["display_name"],
-            request.form["password"],
-            request.form.get("role", "user"),
-        )
+        try:
+            users.create_user(
+                actor.id,
+                request.form.get("email", ""),
+                request.form.get("display_name", ""),
+                request.form.get("password", ""),
+                request.form.get("role", "user"),
+            )
+        except (ValidationError, ConflictError) as error:
+            render = render_user_list
+            return render(
+                form_error=str(error),
+                form_data=request.form,
+                status=400,
+            )
         return redirect(url_for("user_list"))
 
     @app.post("/users/<target_id>/<action>")
@@ -3810,18 +3839,30 @@ def create_flask_app(
         operation = operations.get(action)
         if operation is None:
             abort(404)
-        operation(actor.id, target_id)
+        try:
+            operation(actor.id, target_id)
+        except NotFoundError:
+            abort(404)
         return redirect(url_for("user_list"))
 
     @app.post("/users/<target_id>/email")
     def change_user_email(target_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        users.change_email(actor.id, target_id, request.form["email"])
+        try:
+            users.change_email(actor.id, target_id, request.form.get("email", ""))
+        except NotFoundError:
+            abort(404)
+        except (ValidationError, ConflictError) as error:
+            render = render_user_list
+            return render(
+                form_error=str(error),
+                form_target_id=target_id,
+                status=400,
+            )
         return redirect(url_for("user_list"))
 
-    @app.get("/teams")
-    def team_list():
+    def render_team_list(*, form_error=None, form_target_id=None, form_name="", status=200):
         actor, login_session = require_authenticated()
         if actor.role != "admin":
             return render_template(
@@ -3831,12 +3872,12 @@ def create_flask_app(
                 current_csrf=login_session.csrf_token,
                 active_navigation=active_navigation(),
                 dataset_ui_enabled=dataset_ui_enabled,
-            )
+            ), status
         managed_teams = teams.list_teams(actor.id)
         team_users = {}
         for relationship in memberships.list_relationships(actor.id):
             team_users.setdefault(relationship.team_id, []).append(relationship)
-        open_team = request.args.get("open_team")
+        open_team = form_target_id or request.args.get("open_team")
         selected_team = next((team for team in managed_teams if team.id == open_team), None)
         selected_team_members = (
             memberships.list_team_members(actor.id, selected_team.id) if selected_team else []
@@ -3851,31 +3892,60 @@ def create_flask_app(
             selected_team=selected_team,
             selected_team_members=selected_team_members,
             selected_eligible_users=selected_eligible_users,
+            form_error=form_error,
+            form_target_id=form_target_id,
+            form_name=form_name,
             current_actor=actor,
             current_csrf=login_session.csrf_token,
             active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
-        )
+        ), status
+
+    @app.get("/teams")
+    def team_list():
+        return render_team_list()
 
     @app.post("/teams")
     def create_team():
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        teams.create_team(actor.id, request.form["name"])
+        try:
+            teams.create_team(actor.id, request.form.get("name", ""))
+        except (ValidationError, ConflictError) as error:
+            render = render_team_list
+            return render(
+                form_error=str(error),
+                form_name=request.form.get("name", ""),
+                status=400,
+            )
         return redirect(url_for("team_list"))
 
     @app.post("/teams/<team_id>/rename")
     def rename_team(team_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        teams.rename_team(actor.id, team_id, request.form["name"])
+        try:
+            teams.rename_team(actor.id, team_id, request.form.get("name", ""))
+        except NotFoundError:
+            abort(404)
+        except (ValidationError, ConflictError) as error:
+            render = render_team_list
+            return render(
+                form_error=str(error),
+                form_target_id=team_id,
+                form_name=request.form.get("name", ""),
+                status=400,
+            )
         return redirect(url_for("team_list"))
 
     @app.post("/teams/<team_id>/delete")
     def delete_team(team_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        teams.delete_team(actor.id, team_id)
+        try:
+            teams.delete_team(actor.id, team_id)
+        except NotFoundError:
+            abort(404)
         return redirect(url_for("team_list"))
 
     @app.get("/teams/<team_id>/members")
@@ -3898,14 +3968,22 @@ def create_flask_app(
     def create_membership(team_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        memberships.create_membership(actor.id, request.form["user_id"], team_id)
+        try:
+            memberships.create_membership(actor.id, request.form["user_id"], team_id)
+        except (NotFoundError, ValidationError, ConflictError) as error:
+            render = render_team_list
+            return render(form_error=str(error), form_target_id=team_id, status=400)
         return redirect(url_for("team_list", open_team=team_id))
 
     @app.post("/teams/<team_id>/members/<membership_id>/delete")
     def delete_membership(team_id: str, membership_id: str):
         actor, login_session = require_admin()
         require_csrf(login_session.csrf_token)
-        memberships.delete_membership(actor.id, team_id, membership_id)
+        try:
+            memberships.delete_membership(actor.id, team_id, membership_id)
+        except (NotFoundError, ValidationError, ConflictError) as error:
+            render = render_team_list
+            return render(form_error=str(error), form_target_id=team_id, status=400)
         return redirect(url_for("team_list", open_team=team_id))
 
     @app.errorhandler(UserManagementError)
@@ -3915,12 +3993,16 @@ def create_flask_app(
             "revoke_dataset_export_access",
         }:
             return "Dataset not found", 404
+        if isinstance(error, NotFoundError):
+            abort(404)
         if isinstance(error, AuthorizationError):
             resolved = getattr(g, "authenticated_resolution", None)
             audit_security(
                 "security.authorization_denied",
                 actor_user_id=resolved[0].id if resolved else None,
             )
+        if isinstance(error, ConflictError):
+            return str(error), 409
         status = 403 if isinstance(error, AuthorizationError) else 400
         return str(error), status
 

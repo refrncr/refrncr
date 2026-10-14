@@ -557,6 +557,38 @@ class SqlAlchemyDatasetFieldOperations:
             )
         )
 
+    def list_for_datasets(self, dataset_ids: tuple[str, ...]) -> dict[str, list[DatasetField]]:
+        if not dataset_ids:
+            return {}
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            table = Table("dataset_fields", MetaData(), autoload_with=self.session.connection())
+            position = table.c.display_position if "display_position" in table.c else table.c.key
+            rows = list(
+                self.session.execute(
+                    select(table)
+                    .where(table.c.dataset_id.in_(dataset_ids))
+                    .order_by(table.c.dataset_id, position, table.c.key)
+                ).mappings()
+            )
+            return {
+                dataset_id: [
+                    SimpleNamespace(definition=None, unit=None, **row) for row in rows_for_dataset
+                ]
+                for dataset_id in dataset_ids
+                for rows_for_dataset in ([row for row in rows if row["dataset_id"] == dataset_id],)
+            }
+        rows = self.session.scalars(
+            select(DatasetField)
+            .where(DatasetField.dataset_id.in_(dataset_ids))
+            .order_by(DatasetField.dataset_id, DatasetField.display_position, DatasetField._key)
+        )
+        result = {dataset_id: [] for dataset_id in dataset_ids}
+        for field in rows:
+            result[field.dataset_id].append(field)
+        return result
+
     def create(self, **values) -> DatasetField:
         if not self._has_display_position():
             values.pop("display_position", None)

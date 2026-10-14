@@ -470,7 +470,7 @@ def test_response_construction_failure_closes_generated_artifact(monkeypatch):
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("response failed")),
     )
     response = client.get(f"/datasets/{dataset.key}/records/export?format=json", base_url=HTTPS)
-    assert response.status_code == 503
+    assert response.status_code == 500
     assert b"response failed" not in response.data
     assert spool.was_closed
 

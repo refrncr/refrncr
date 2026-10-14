@@ -461,7 +461,8 @@ _audited("DatasetService", "revoke_export_access", ("dataset_export_access", "re
 _read(
     "DatasetService",
     "export_access_context list_datasets list_dataset_overview "
-    "get_dataset_context get_dataset get_dataset_details get_dataset_for_edit",
+    "get_dataset_context get_dataset get_dataset_details get_dataset_for_edit "
+    "get_visible_dataset_by_id",
 )
 _identifier_events = (("dataset", "business_key_defined"), ("dataset", "business_key_updated"))
 _audited("DatasetFieldService", "create_field", ("dataset_field", "created"), *_identifier_events)
@@ -474,7 +475,7 @@ _audited(
 )
 _audited("DatasetFieldService", "delete_field", ("dataset_field", "deleted"))
 _audited("DatasetFieldService", "replace_order move_field", ("dataset", "field_order_updated"))
-_read("DatasetFieldService", "list_fields get_field")
+_read("DatasetFieldService", "list_fields get_field list_fields_for_datasets")
 _audited("DatasetBusinessKeyService", "set_business_key", *_identifier_events)
 _read("DatasetBusinessKeyService", "get_business_key")
 for _method, _action in (

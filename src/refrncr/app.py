@@ -158,7 +158,7 @@ def create_application(
     async def ready(request: Request):
         try:
             available = readiness_engine is not None and await readiness_status(readiness_engine)
-        except Exception:
+        except Exception:  # noqa: BLE001 - readiness is deliberately fail-closed.
             available = False
         if available:
             return operational_response("ok", request.scope["refrncr.request_id"])

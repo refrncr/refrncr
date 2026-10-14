@@ -150,7 +150,7 @@ class MappingAssistance:
 
 
 @dataclass(frozen=True, slots=True)
-class ImportError:
+class ImportIssue:
     row: int | None
     header: str | None
     field: str | None
@@ -164,7 +164,7 @@ class ImportPreview:
     mapping: tuple[str | None, ...]
     valid_rows: int
     invalid_rows: int
-    errors: tuple[ImportError, ...]
+    errors: tuple[ImportIssue, ...]
     total_errors: int
     row_report_truncated: bool
     sample: tuple[tuple[str, ...], ...]
@@ -178,11 +178,11 @@ class ImportPreview:
         return self.invalid_rows == 0 and self.total_errors == 0
 
     @property
-    def non_row_errors(self) -> tuple[ImportError, ...]:
+    def non_row_errors(self) -> tuple[ImportIssue, ...]:
         return tuple(error for error in self.errors if error.row is None)
 
     @property
-    def row_error_groups(self) -> tuple[tuple[int, tuple[ImportError, ...]], ...]:
+    def row_error_groups(self) -> tuple[tuple[int, tuple[ImportIssue, ...]], ...]:
         rows = sorted({error.row for error in self.errors if error.row is not None})
         return tuple(
             (row, tuple(error for error in self.errors if error.row == row)) for row in rows
@@ -1502,7 +1502,7 @@ class DatasetRecordImportService:
         mapping_errors = []
         if len(mapping) != len(source.headers):
             mapping_errors.append(
-                ImportError(None, None, None, "Submit exactly one mapping for every source column")
+                ImportIssue(None, None, None, "Submit exactly one mapping for every source column")
             )
         unmapped = [value for value in mapping if value == ""]
         unknown = [
@@ -1513,11 +1513,11 @@ class DatasetRecordImportService:
         ]
         if unknown:
             mapping_errors.append(
-                ImportError(None, None, None, "A mapping refers to an unknown Dataset field")
+                ImportIssue(None, None, None, "A mapping refers to an unknown Dataset field")
             )
         if unmapped:
             mapping_errors.append(
-                ImportError(
+                ImportIssue(
                     None,
                     None,
                     None,
@@ -1526,7 +1526,7 @@ class DatasetRecordImportService:
             )
         if duplicate:
             mapping_errors.append(
-                ImportError(None, None, None, "A Dataset field may be mapped only once")
+                ImportIssue(None, None, None, "A Dataset field may be mapped only once")
             )
         required = {field.key for field in fields if field.is_required} | set(identifier.field_keys)
         if mode == "new_version":
@@ -1534,7 +1534,7 @@ class DatasetRecordImportService:
         missing = sorted(required - {value for value in mapping if value})
         if missing:
             mapping_errors.append(
-                ImportError(
+                ImportIssue(
                     None,
                     None,
                     None,
@@ -1563,7 +1563,7 @@ class DatasetRecordImportService:
         for index, key in enumerate(mapping):
             if key in field_by_key and not source_formats.get(key, {}).get("profile_id"):
                 mapping_errors.append(
-                    ImportError(
+                    ImportIssue(
                         None,
                         source.headers[index] if index < len(source.headers) else None,
                         field_by_key[key].name,
@@ -1599,18 +1599,18 @@ class DatasetRecordImportService:
                     )
                 except SourceFormatError as exc:
                     if exc.requires_choice:
-                        choice_errors[target] = ImportError(
+                        choice_errors[target] = ImportIssue(
                             None, source.headers[index], field_by_key[target].name, str(exc)
                         )
                     row_errors.append(
-                        ImportError(
+                        ImportIssue(
                             row.number, source.headers[index], field_by_key[target].name, str(exc)
                         )
                     )
             for index in row.formulas:
                 if mapping[index] is not None:
                     row_errors.append(
-                        ImportError(
+                        ImportIssue(
                             row.number,
                             source.headers[index],
                             field_by_key[mapping[index]].name,
@@ -1629,17 +1629,17 @@ class DatasetRecordImportService:
                         continue
                     index = mapping.index(key)
                     row_errors.append(
-                        ImportError(
+                        ImportIssue(
                             row.number, source.headers[index], field_by_key[key].name, message
                         )
                     )
             except ValidationError as error:
                 values, encoded = (), b""
-                row_errors.append(ImportError(row.number, None, None, str(error)))
+                row_errors.append(ImportIssue(row.number, None, None, str(error)))
             if not row_errors:
                 if encoded in seen_ids:
                     row_errors.append(
-                        ImportError(
+                        ImportIssue(
                             row.number, None, None, "Record identifier is duplicated in this file"
                         )
                     )
@@ -1647,7 +1647,7 @@ class DatasetRecordImportService:
                     marker = (value.field_id, value.canonical_key)
                     if value.is_unique and marker in seen_unique:
                         row_errors.append(
-                            ImportError(
+                            ImportIssue(
                                 row.number,
                                 source.headers[mapping.index(value.field_key)],
                                 field_by_key[value.field_key].name,
@@ -1686,7 +1686,7 @@ class DatasetRecordImportService:
             database_errors = []
             if encoded in existing_identifiers:
                 database_errors.append(
-                    ImportError(
+                    ImportIssue(
                         row.number,
                         None,
                         None,
@@ -1697,7 +1697,7 @@ class DatasetRecordImportService:
                 marker = (value.field_id, value.canonical_key)
                 if value.is_unique and marker in existing_unique:
                     database_errors.append(
-                        ImportError(
+                        ImportIssue(
                             row.number,
                             source.headers[mapping.index(value.field_key)],
                             field_by_key[value.field_key].name,

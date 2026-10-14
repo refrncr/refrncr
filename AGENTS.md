@@ -93,24 +93,13 @@ The current development quality baseline consists of:
 - GitHub Actions CI;
 - Dependabot.
 
-### Planned quality controls
+### Additional CI controls
 
-The following are planned but are not yet mandatory repository checks:
-
-- type checking;
-- migration tests;
-- dedicated SAST;
-- dedicated secret scanning;
-- container scanning;
-- SBOM generation;
-- end-to-end tests;
-- authorization-matrix tests;
-- tenant-isolation tests;
-- automated release pipelines.
-
-Do not claim that planned tooling is configured or required.
-
-When a Jira story requires one of these controls and the tooling does not yet exist, identify the gap rather than silently assuming the control is available.
+The repository also runs migration and authorization-boundary tests, CodeQL, Gitleaks,
+and release-time CycloneDX SBOM generation in GitHub Actions. These are CI controls, not
+local replacements for the required commands above. Type checking, container scanning,
+tenant-isolation testing, and automated release publication remain out of scope unless a
+future story configures them.
 
 
 ## Required checks before completing a change

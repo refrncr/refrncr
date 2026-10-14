@@ -210,7 +210,7 @@ def create_api(versions, api_keys):
     async def safety(request, call_next):
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception:  # noqa: BLE001 - the API boundary returns a generic safe response.
             # Never forward exception text/SQL/request state to ASGI exception logging.
             response = CanonicalJSONResponse(Error(error="service_unavailable"), status_code=503)
         for name, value in SAFE_HEADERS.items():

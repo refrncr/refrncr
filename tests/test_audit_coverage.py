@@ -971,7 +971,7 @@ def test_response_construction_failure_keeps_request_and_closes_artifact(context
     response = client.get(
         f"/datasets/{c.d.key}/concept/records/export?format=json", base_url="https://localhost"
     )
-    assert response.status_code == 503
+    assert response.status_code == 500
     assert b"response construction" not in response.data
     assert len(artifacts) == 1 and artifacts[0].content.closed
     events = [e for e in audits(c) if e.id not in before]
