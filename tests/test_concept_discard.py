@@ -755,7 +755,7 @@ def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeyp
     assert response.status_code == 503
     assert response.text == "Dataset versions are temporarily unavailable. Reload and try again."
     assert [record.getMessage() for record in caplog.records] == [
-        "Dataset version operation unavailable"
+        "Dataset version operation unavailable: RuntimeError"
     ]
     assert all(record.exc_info is None for record in caplog.records)
     assert snapshot(c) == before
