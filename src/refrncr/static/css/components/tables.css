@@ -73,7 +73,9 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 }
 
 /* Application metadata stays distinct from user-defined Dataset Fields. */
-.record-table .record-system-status { width: 9rem; border-inline-start: 1px solid var(--color-border); font-family: var(--font-interface); }
+.record-table .record-system-status { position: sticky; inset-inline-end: 0; z-index: 2; width: 9rem; border-inline-start: 1px solid var(--color-border); background: var(--color-surface); box-shadow: -6px 0 6px -6px rgb(16 25 21 / 22%); font-family: var(--font-interface); }
+.record-table thead .record-system-status { z-index: 3; background: var(--color-table-heading); }
+.record-table tbody tr:hover > .record-system-status { background: var(--color-row-hover); }
 .system-column-label { display: block; font-size: .6875rem; font-weight: var(--font-weight-regular); text-transform: none; letter-spacing: normal; }
 .record-table .record-tombstone td { background-color: var(--color-surface-subtle); color: var(--color-text-secondary); }
 .record-toolbar form { display: flex; flex: 1; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }

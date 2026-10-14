@@ -325,7 +325,10 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):  # noqa: F811
     assert page.headers["Cache-Control"] == "no-store"
     records = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert records.text.count("id='concept-discard-panel'") == 1
-    assert records.text.count("<summary class='button button-secondary'>Concept actions") == 1
+    assert (
+        records.text.count("<summary class='button button-secondary' aria-label='Draft actions'>⋯")
+        == 1
+    )
     assert "aria-describedby='concept-discard-panel-description'" in records.text
     before = snapshot(c)
     for invalid in (
@@ -353,8 +356,8 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):  # noqa: F811
         response.status_code == 303 and response.location == f"/datasets/{c.d.key}?notice=discarded"
     )
     landed = request(browser, "get", response.location)
-    assert "Concept discarded. Current was not changed." in landed.text
-    assert ">Create concept</button>" in landed.text
+    assert "Draft discarded. Current was not changed." in landed.text
+    assert ">Create draft</button>" in landed.text
     assert "New changes" not in landed.text
     before = snapshot(c)
     assert request(browser, "post", path, data=fresh).status_code == 409

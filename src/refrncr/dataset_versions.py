@@ -706,7 +706,15 @@ class DatasetVersionService:
             deleted_fields = {}
             if state is None and page is not None:
                 pairs = tuple(uow.dataset_records.deleted_records(dataset.id))
-                removed = tuple(record for record, _fields in pairs)
+                baseline = (
+                    uow.versions.get(dataset.id, concept.base_version_id)
+                    if concept.base_version_id
+                    else None
+                )
+                baseline_ids = set(
+                    uow.versions.record_ids(baseline) if baseline is not None else set()
+                )
+                removed = tuple(record for record, _fields in pairs if record.id in baseline_ids)
                 deleted_fields = {record.id: field_set for record, field_set in pairs}
             deleted_ids = {record.id for record in removed}
             labels = {}

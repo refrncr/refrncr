@@ -11,7 +11,7 @@
 {% endif %}
 <div class='record-toolbar record-toolbar-search' role='group' aria-label='Record results'>
   {{ record_search_controls() }}
-  {% if version_state %}<p class='record-toolbar-note'>{{ lock_icon() }}Published version · read only</p>{% endif %}
+  {% if version_state %}<p class='record-toolbar-note'>{{ lock_icon() }}{{ 'Expired version · read only' if version_state.status == 'Expired' else 'Published version · read only' }}</p>{% endif %}
   <span id='record-result-count'>Showing {{ range_start }}–{{ range_end }} of {{ page.total }}</span>
   <div id='record-result-announcement' class='visually-hidden' role='status' aria-live='polite' aria-atomic='true'></div>
 </div>
@@ -35,7 +35,7 @@
       </thead>
       <tbody>
         {% for record, values, incomplete in rows %}
-          {% set status = record_states.get(record.id, 'Published') %}
+          {% set status = record_states.get(record.id) if record_states.get(record.id) != 'Published' else none %}
           {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
             {% set row_direction = namespace(rendered=false) %}
             {% for field in fields %}
@@ -58,7 +58,7 @@
               </td>
             {% endfor %}
 
-            {% if not version_state %}<td class='record-system-status'>{{ status_badge(status) }}</td>{% endif %}
+            {% if not version_state %}<td class='record-system-status'>{% if status %}{{ status_badge(status) }}{% endif %}</td>{% endif %}
           {% endcall %}
         {% endfor %}
       </tbody>

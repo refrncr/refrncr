@@ -8,7 +8,8 @@
 
 /* Shared context for every concept content page and form: a compact draft-status strip. */
 .concept-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); width: 100%; box-sizing: border-box; padding: .625rem .75rem .625rem var(--space-md); margin-block: var(--space-lg); border: 1px solid var(--color-status-draft-border); border-radius: var(--radius-lg); background: var(--color-status-draft-surface); overflow-wrap: anywhere; }
-.concept-banner-text { display: flex; flex: 1 1 22rem; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); min-width: 0; }
+.concept-banner-text { display: flex; flex: 1 1 22rem; flex-direction: column; gap: var(--space-xs); min-width: 0; }
+.concept-banner-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); min-width: 0; }
 .concept-banner h2 { display: inline-flex; align-items: center; gap: var(--space-sm); margin: 0; font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); line-height: var(--line-height-control); }
 .concept-banner p { margin: 0; font-size: var(--font-size-body-sm); }
 .concept-banner-note { flex-basis: 100%; color: var(--color-text-muted); }
@@ -20,5 +21,6 @@
 .side-panel-body .concept-banner .concept-banner-note { display: none; }
 .side-panel-body .concept-banner .page-actions { width: 100%; gap: var(--space-xs); }
 .side-panel-body .concept-banner .button { flex: 1 1 auto; min-height: 2rem; padding: .3125rem .625rem; font-size: var(--font-size-sm); white-space: nowrap; }
-/* On pages the explanatory note continues the status line instead of taking its own row. */
-.concept-banner-note { flex-basis: auto; }
+.version-status-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-md); margin-block: var(--space-lg); padding: .625rem .75rem .625rem var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.version-status-bar p { margin: 0; font-size: var(--font-size-body-sm); }
+.version-status-bar .button { flex-shrink: 0; }

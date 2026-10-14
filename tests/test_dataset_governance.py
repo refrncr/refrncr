@@ -471,9 +471,9 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert get(f"/datasets/{d.key}/owner").status_code == 404
     csrf = sign_in(a)
     detail = get(f"/datasets/{d.key}").text
-    assert "id='access-management-heading'>Access management</h2>" in detail
+    assert "id='access-management-heading'>Access</h2>" in detail
     assert (
-        f"<a class='access-overview-action' href='/datasets/{d.key}/configure?edit=1#owner-team'>"
+        f"<a class='access-overview-action' href='/datasets/{d.key}?edit=1#owner-team'>"
         "Change owning team</a>" in detail
     )
     assert "All active Community users can view this dataset." not in detail
@@ -530,7 +530,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     for right in ("View", "Edit", "Publish", "Export", "All rights"):
         assert f"<span class='badge'>{right}</span>" in empty
     assert "<img src=x" not in empty
-    assert "<table" not in empty and "side-panel" not in empty
+    assert "<table" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
     assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty

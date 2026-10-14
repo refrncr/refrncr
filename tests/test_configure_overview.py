@@ -54,7 +54,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert response.status_code == 200
     page = body(response)
     headings = re.findall(r"<h1[^>]*>(.*?)</h1>", page, re.DOTALL)
-    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == ["Configure Reference data"]
+    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headings] == ["Reference data"]
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
@@ -69,7 +69,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         if version
         else "/datasets/overview/concept/records"
     )
-    assert f"class='button button-primary' href='{records_url}'>View records" in actions
+    assert f"class='button button-secondary' href='{records_url}'>View records" not in actions
     assert "Edit dataset" not in actions
     details = section(page, "dataset-details-heading")
     assert ("Edit dataset" in details) == (permission != "viewer")
@@ -89,9 +89,13 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert expected_key_status in details
     assert f"<dt>Fields</dt><dd>{count}</dd>" in details
     assert "<dt>Records</dt><dd>0</dd>" in details
-    version_label = "Version 1 · Current" if version else "Concept in progress"
+    version_label = "Version 1 · Current" if version else "Draft in progress"
     assert f"<dt>Version</dt><dd>{version_label}</dd>" in details
-    assert "They are not part of a version." in details
+    assert "They are not part of a version." not in details
+    assert (
+        "Applies to the whole dataset, not to one version. Changes take effect right away."
+        in details
+    )
     # UUIDs remain legal in functional hidden inputs and access subject values.
     presentation = re.sub(
         r"<input[^>]*type='hidden'[^>]*>| value='[^']*'| href='/datasets/id/[^']*'", "", page
@@ -100,8 +104,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
         assert internal_id not in presentation
     field_section = section(page, "fields-heading")
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
-    count_label = "field" if count == 1 else "fields"
-    assert f"{count}<span class='visually-hidden'> {count_label}</span>" in field_section
+    assert "<h2 id='fields-heading'>Fields</h2>" in field_section
     assert ("Add field" in field_section) == (permission != "viewer")
     assert ("configuration-panel" in page) == (permission != "viewer")
     assert "record-identifier-heading" not in page
@@ -171,6 +174,19 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert reordered_fields.index("First field") < reordered_fields.index("Last field")
         else:
             assert reordered_fields.index("Last field") < reordered_fields.index("First field")
+
+
+@pytest.mark.parametrize(
+    ("tab", "title"),
+    [("fields", "Fields"), ("access-management", "Access"), ("dataset-details", "Settings")],
+)
+def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, title):  # noqa: F811
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "title-tabs", "Countries")
+    login(client)
+    page = body(request(client, "get", f"/datasets/title-tabs/concept?tab={tab}"))
+    assert f"<title>{title} · Countries · REFRNCR</title>" in page
+    assert page.count(">View current version</a>") == 1
 
 
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F811

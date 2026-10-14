@@ -445,7 +445,7 @@ def test_conflict_after_preview_requires_new_validation(wizard):
     )
     failed = wizard.post(wizard.path + "/confirm")
     assert failed.status_code == 400
-    assert "Records in this Concept have already been changed" in failed.text
+    assert "Records in this Draft have already been changed" in failed.text
     assert wizard.post(wizard.path + "/confirm").status_code == 400
     assert wizard.count() == 1
 

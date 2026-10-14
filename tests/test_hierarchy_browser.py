@@ -92,7 +92,7 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
-    assert "Export</summary>" in page
+    assert "Export draft</summary>" in page
     assert f"/datasets/{dataset.key}/concept/records/export?format=csv_zip" in page
     assert f"/datasets/{dataset.key}/concept/records/export?format=xlsx" in page
     assert f"/datasets/{dataset.key}/concept/records/export?format=json" in page

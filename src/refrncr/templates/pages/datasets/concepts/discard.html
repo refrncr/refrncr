@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 {% from 'components.html' import feedback, readonly_field %}
 {% from 'components/side_panel.html' import panel_form_actions %}
-{% block title %}Discard concept · REFRNCR{% endblock %}
+{% block title %}Discard draft · REFRNCR{% endblock %}
 {% block content %}
-<h1>Discard concept</h1>
-<div class='side-panel-view' data-side-panel-content data-panel-title='Discard concept' data-panel-eyebrow='{{ dataset.name }}'>
+<h1>Discard draft</h1>
+<div class='side-panel-view' data-side-panel-content data-panel-title='Discard draft' data-panel-eyebrow='{{ dataset.name }}'>
   <div class='side-panel-body panel-sections'>
     {{ readonly_field('Dataset', dataset.name) }}
-    {% if review %}{{ readonly_field('Concept', review.identity.concept_id) }}{% endif %}
-    <p tabindex='-1' data-initial-focus>All unpublished Concept changes will be permanently removed. This cannot be undone. Current, Scheduled and historical versions remain unchanged. You can create a new Concept afterwards.</p>
+    {% if review %}{{ readonly_field('Draft', review.identity.concept_id) }}{% endif %}
+    <p tabindex='-1' data-initial-focus>All unpublished Draft changes will be permanently removed. This cannot be undone. Current, Scheduled and historical versions remain unchanged. You can create a new Draft afterwards.</p>
     {{ feedback(error, id='discard-error', focus=true) }}
     {% if review %}
     <dl class='detail-list detail-list-counts' aria-label='Unpublished change counts'>
@@ -18,7 +18,7 @@
       <div><dt>{{ label }}</dt><dd>{{ review.counts|attr(name) }}</dd></div>
       {% endfor %}
     </dl>
-    <form id='discard-concept-form' method='post' action='{{ url_for("dataset_concept_discard", key=dataset.key) }}' data-single-submit data-busy-message='Discarding concept…'>
+    <form id='discard-concept-form' method='post' action='{{ url_for("dataset_concept_discard", key=dataset.key) }}' data-single-submit data-busy-message='Discarding draft…'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='confirmation' value='{{ confirmation }}'>
       <input type='hidden' name='confirmed' value='yes'>
@@ -28,7 +28,7 @@
   </div>
   {% call panel_form_actions() %}
   <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>
-  {% if review %}<button class='button button-danger' type='submit' form='discard-concept-form'>Discard concept</button>{% endif %}
+  {% if review %}<button class='button button-danger' type='submit' form='discard-concept-form'>Discard draft</button>{% endif %}
   {% endcall %}
 </div>
 {% endblock %}

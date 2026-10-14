@@ -53,20 +53,17 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         concept_html,
     )
     assert sorted(statuses) == sorted(
-        [
-            ("badge-published", "Published"),
-            ("badge-draft", "Edited"),
-            ("badge-draft", "Added"),
-            ("badge-removed", "Deleted"),
-        ]
+        [("badge-draft", "Edited"), ("badge-draft", "Added"), ("badge-removed", "Deleted")]
     )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
+    assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_removed == 1
     response = request(
         browser, "get", f"/datasets/{c.d.key}/concept/records?q=old&record_status=deleted"
     )
     assert response.status_code == 200
     html = response.text
     assert "3 records" in html and "1 marked for deletion" in html
+
     headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
     assert [re.sub(r"<[^>]+>", "", h).strip() for h in headers[-4:-1]] == [
         "Status",
@@ -124,6 +121,21 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     assert len(rows) == 3
     assert all(set(row) == {"code", "label", "status", "change", "validation"} for row in rows)
     assert all(row["status"] == "Complete" for row in rows)
+
+
+def test_added_then_deleted_record_is_not_shown_or_counted(context):  # noqa: F811
+    c = context
+    setup(c)
+    publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+    added = c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "temporary"})
+    c.s.dataset_records.delete_record(c.a.id, c.d.key, added.id, 1)
+
+    view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
+    assert added.id not in {record.id for record in view.page.records}
+    assert view.deleted_count == 0
+    assert view.status_counts == (0, 0, 0)
+    assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_removed == 0
 
 
 def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):  # noqa: F811

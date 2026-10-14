@@ -18,12 +18,17 @@
           tab.setAttribute('aria-controls', panels[index].id);
           panels[index].setAttribute('role', 'tabpanel');
           panels[index].setAttribute('aria-labelledby', tab.id);
-          panels[index].tabIndex = 0;
+          // The panel is a labelled landmark, not a tab stop. Keeping it out of
+          // the tab order prevents a pointer activation from leaving a persistent
+          // focus ring around the entire Fields/Access block.
+          panels[index].tabIndex = -1;
         });
         const activate = (index, updateUrl = false) => {
           if (!enabled.includes(index)) index = enabled[0];
           tabs.forEach((tab, i) => {
             tab.setAttribute('aria-selected', String(i === index));
+            if (i === index) tab.setAttribute('aria-current', 'page');
+            else tab.removeAttribute('aria-current');
             tab.tabIndex = i === index ? 0 : -1;
             panels[i].hidden = i !== index;
           });
@@ -37,8 +42,9 @@
         const fromLocation = () => {
           const requested = location.hash.slice(1) || new URL(location.href).searchParams.get('tab');
           const target = document.getElementById(requested || '');
+          const current = tabs.findIndex(tab => tab.getAttribute('aria-current') === 'page');
           const index = panels.findIndex(panel => panel === target || panel.contains(target));
-          activate(index < 0 ? 0 : index);
+          activate(index < 0 ? (current < 0 ? 0 : current) : index);
         };
         tabs.forEach((tab, index) => {
           tab.addEventListener('click', event => {

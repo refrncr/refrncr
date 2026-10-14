@@ -38,6 +38,7 @@ for (const failure of ['missing-panel', 'during-activation', null]) {
     }
   } else {
     assert.deepEqual(panels.map(p=>p.hidden), [true,false]);
+    assert.deepEqual(panels.map(p=>p.tabIndex), [-1,-1]);
     assert.equal(nav.getAttribute('role'), 'tablist');
     window.refrncrSectionTabs();
     assert.deepEqual(panels.map(p=>p.hidden), [true,false]);

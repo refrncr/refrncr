@@ -1,6 +1,6 @@
 {% from 'components/icons.html' import history_icon %}
 {% from 'components/side_panel.html' import form_side_panel %}
-{% macro new_concept(key, label='+ New version') -%}
+{% macro new_concept(key, label='Create draft') -%}
 <form method='post' action='{{ url_for("dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>{{ label }}</button></form>
 {%- endmacro %}
 {% macro versions_action(key) -%}
@@ -12,45 +12,43 @@
 {% macro discard_action(key, ui, panel_id='concept-discard-panel') -%}
 {% if ui.discard_unavailable %}
 <div class='disabled-action-help'>
-  <span class='button button-secondary' role='button' aria-disabled='true' tabindex='0' aria-describedby='{{ panel_id }}-unavailable'>Discard concept</span>
+  <span class='button button-secondary' role='button' aria-disabled='true' tabindex='0' aria-describedby='{{ panel_id }}-unavailable'>Discard draft</span>
   <p class='help-text' id='{{ panel_id }}-unavailable'>{{ ui.discard_unavailable }}</p>
 </div>
 {% else %}
-<a class='button button-danger' href='{{ url_for("dataset_concept_discard", key=key) }}' data-panel-url data-dialog-open='{{ panel_id }}'>Discard concept</a>
+<a class='button button-danger' href='{{ url_for("dataset_concept_discard", key=key) }}' data-panel-url data-dialog-open='{{ panel_id }}'>Discard draft</a>
 {% endif %}
 {%- endmacro %}
 {% macro discard_panel(panel_id='concept-discard-panel') -%}
 {% from 'components/side_panel.html' import side_panel %}
-{% call side_panel(panel_id, 'Discard concept', panel_id ~ '-title', description='Permanently remove unpublished changes. Current, Scheduled and history remain unchanged.', eyebrow_slot=true) %}
+{% call side_panel(panel_id, 'Discard draft', panel_id ~ '-title', description='Permanently remove unpublished changes. Current, Scheduled and history remain unchanged.', eyebrow_slot=true) %}
 <div class='side-panel-view' data-panel-host></div>
 {% endcall %}
 {%- endmacro %}
 {% macro concept_actions(key, ui, can_review=false, can_discard=true) -%}
-{% if can_review or can_discard %}
+{% if can_discard %}
 <details class='export-menu concept-actions' data-concept-actions>
-  <summary class='button button-secondary'>Concept actions</summary>
+  <summary class='button button-secondary' aria-label='Draft actions'>⋯</summary>
   <div class='export-menu-options'>
-    {% if can_review %}<a href='{{ url_for("dataset_version_review", key=key) }}'>Review changes</a>{% endif %}
     {% if can_discard %}{{ discard_action(key, ui) }}{% endif %}
   </div>
 </details>
 {% endif %}
 {%- endmacro %}
-{% macro banner(key, ui, actions=true, publication_panel=false, show_current=true) -%}
+{% macro banner(key, ui, actions=true, publication_panel=false, show_current=true, include_discard_panel=false) -%}
 {% if ui %}
-<section class='concept-banner' aria-label='Concept context'>
+<section class='concept-banner' aria-label='Draft context'>
 <div class='concept-banner-text'>
-<h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}' aria-hidden='true'>{{ 'Stale' if ui.stale else 'Concept' }}</span> You’re working on a concept</h2>
-<p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Concept to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p>
+<div class='concept-banner-line'><h2><span class='badge {{ "badge-removed" if ui.stale else "badge-draft" }}' aria-hidden='true'>{{ 'Stale' if ui.stale else 'Draft' }}</span> You’re working on a draft</h2><p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Draft to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p></div>
 <p class='concept-banner-note'>Changes are not visible in the current published version until you publish them.</p>
 </div>
 <div class='page-actions'>
 {% if show_current %}{{ current_version_action(key) }}{% endif %}
 {% if caller is defined %}{{ caller() }}{% endif %}
-{% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_publish", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Publish version</a>{% endif %}
-{% if actions %}{{ concept_actions(key, ui, ui.can_review, publication_panel) }}{% endif %}
+{% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_review", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Review &amp; publish</a>{% endif %}
+{% if actions %}{{ concept_actions(key, ui, ui.can_review, true) }}{% endif %}
 </div></section>
-{% if actions and publication_panel %}{{ discard_panel() }}{% endif %}
+{% if actions and include_discard_panel %}{{ discard_panel() }}{% endif %}
 {% if actions and ui.may_publish and publication_panel %}{{ form_side_panel('concept-publication-panel') }}{% endif %}
 {% endif %}
 {%- endmacro %}

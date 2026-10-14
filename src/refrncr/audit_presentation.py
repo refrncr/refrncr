@@ -143,7 +143,7 @@ CONTEXT_LABELS = MappingProxyType(
         "creator_user_id": "Creator user ID",
         "version_number": "Version number",
         "baseline_version_number": "Baseline version",
-        "concept_revision": "Concept revision",
+        "concept_revision": "Draft revision",
         "concept_id": "Concept ID",
         "metadata_changes": "Dataset properties changed",
         "fields_added": "Fields added",

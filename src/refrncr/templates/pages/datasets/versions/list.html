@@ -11,22 +11,21 @@
     {% endcall %}
     <div class='page-actions'>
       <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
-      {% if history.may_maintain and not history.concept %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if history.concept %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% elif history.may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
     </div>
   </div>
   {{ feedback(notice, kind='success') }}
-  <p class='help-text'>Effective dates use UTC calendar days. Published content is read only.</p>
   {% if history.entries or history.concept %}
     <div class='table-scroll management-table' role='region' aria-label='Dataset versions' tabindex='0'>
       <table>
         <caption class='visually-hidden'>Dataset versions, newest version first</caption>
-        <thead><tr>{% for label in ['Version', 'Status', 'Effective date', 'End date', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col'>{{ label }}{% if label == 'Publication date' %} <span class='table-zone' data-local-timezone>(UTC)</span>{% endif %}</th>{% endfor %}</tr></thead>
+        <thead><tr>{% for label in ['Version', 'Status', 'Effective from (UTC)', 'Effective until (UTC)', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col' title='{{ "Starts at 00:00 UTC" if label == "Effective from (UTC)" else "Ends at 23:59 UTC" if label == "Effective until (UTC)" else "" }}'>{{ label }}{% if label == 'Publication date' %} <span class='table-zone' data-local-timezone>(UTC)</span>{% endif %}</th>{% endfor %}</tr></thead>
         <tbody>{% if history.concept %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
             <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
             <td><span class='badge{{ " badge-published" if state.status == "Current" else " badge-info" if state.status == "Scheduled" else "" }}'>{{ state.status }}</span></td>
-            <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date.isoformat() }}</time></td>
-            <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date.isoformat() }}</time>{% else %}—{% endif %}</td>
+            <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date|short_date }}</time></td>
+            <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date|short_date }}</time>{% else %}—{% endif %}</td>
             <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time='datetime'>{{ version.published_at|absolute_utc }}</time></td>
             <td><bdi>{{ 'System' if version.system_published else history.publisher_names.get(version.publisher_id, 'Deleted user') }}</bdi></td>
             <td>{{ version.release_note or '—' }}</td>
@@ -35,7 +34,7 @@
         {% endfor %}</tbody>
       </table>
     </div>
-  {% else %}<div class='empty-state'><h2>No published versions yet</h2><p>Prepare the concept and publish its first version.</p></div>{% endif %}
+  {% else %}<div class='empty-state'><h2>No published versions yet</h2><p>Prepare the draft and publish its first version.</p></div>{% endif %}
   {% if history.may_maintain %}{{ form_side_panel('version-panel') }}{% endif %}
 {% endblock %}
 {% block scripts %}<script src='{{ url_for("static", filename="js/audit-time.js") }}' defer></script>{% endblock %}

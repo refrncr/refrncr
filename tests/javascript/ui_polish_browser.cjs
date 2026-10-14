@@ -95,7 +95,7 @@ async function layout(page, label) {
       await page.getByRole('link', {name: 'Configure', exact: true}).click();
       const tabs = page.getByRole('tablist', {name: 'Configure dataset sections'});
       await tabs.waitFor();
-      assert.deepEqual(await tabs.getByRole('tab').allTextContents(), ['Dataset details', 'Fields', 'Access management', 'Danger zone']);
+      assert.deepEqual(await tabs.getByRole('tab').allTextContents(), ['Dataset details', 'Fields', 'Access management']);
       await page.evaluate(() => { window.refrncrSectionTabs(); window.refrncrSectionTabs(); });
       await tabs.getByRole('tab', {name: 'Dataset details', exact: true}).focus();
       await page.keyboard.press('ArrowRight');
@@ -104,8 +104,6 @@ async function layout(page, label) {
       await page.reload();
       await page.getByRole('tabpanel', {name: 'Fields', exact: true}).waitFor();
       await tabs.getByRole('tab', {name: 'Fields', exact: true}).focus();
-      await page.keyboard.press('End');
-      await page.getByRole('tabpanel', {name: 'Danger zone', exact: true}).waitFor();
       await page.keyboard.press('Home');
       await page.getByRole('tabpanel', {name: 'Dataset details', exact: true}).waitFor();
       const edit = page.getByRole('link', {name: 'Edit dataset', exact: true});
@@ -136,7 +134,7 @@ async function layout(page, label) {
       await panel.getByLabel('Description', {exact: true}).fill('Draft retained after deletion cancel');
       assert.equal(await panel.getByLabel('Description', {exact: true}).inputValue(), 'Draft retained after deletion cancel');
       const deletionTrigger = page.getByRole('link', {name: 'Delete dataset', exact: true});
-      await tabs.getByRole('tab', {name: 'Danger zone', exact: true}).click();
+      await tabs.getByRole('tab', {name: 'Dataset details', exact: true}).click();
       assert.equal(await page.locator('#dataset-description').inputValue(), 'Draft retained after deletion cancel');
       await deletionTrigger.click();
       const deletion = page.locator('dialog[open]');

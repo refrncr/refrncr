@@ -3323,6 +3323,13 @@
       "operation": "can_export_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_export_dataset",
       "interface_entrypoints": [
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
         "Internal service caller or direct authorized service use"
       ],
       "kind": "read",
@@ -3358,6 +3365,9 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",

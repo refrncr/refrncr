@@ -1,36 +1,45 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept, versions_action, current_version_action, banner with context %}
+{% from "components/dataset_navigation.html" import dataset_navigation with context %}
 {% from "components.html" import content_metadata %}
 {% from "layouts/page.html" import page_context %}
-{% from "components/icons.html" import configure_icon, plus_icon %}
+{% from "components/icons.html" import plus_icon %}
 {% from "components/export_action.html" import export_action %}
 
 {% from "components/import_action.html" import record_import_action %}
+{% block title %}Records · {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none, draft_in_progress=draft_in_progress and version_state is not none), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
       {% if not version_state %}{{ current_version_action(dataset.key) }}{% endif %}
       {{ versions_action(dataset.key) }}
-      {{ export_action(dataset, version_state, may_export) }}
+      {{ export_action(dataset, version_state, may_export, 'Export draft' if not version_state else 'Export') }}
       {% if may_start_concept %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
     </div>
   </div>
+  {% if version_state and version_state.status == 'Expired' %}
+  <section class='version-status-bar version-status-bar-neutral' aria-label='Expired version'>
+    <p>You're viewing an expired version · in effect from <time datetime='{{ version_state.version.effective_date.isoformat() }}'>{{ version_state.version.effective_date|short_date }}</time> to <time datetime='{{ version_state.end_date.isoformat() }}'>{{ version_state.end_date|short_date }}</time></p>
+    <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
+  </section>
+  {% endif %}
   {% if not version_state %}
-  {% call banner(dataset.key, concept_ui, publication_panel=true, show_current=false) %}
-    {% if may_configure or may_edit %}
-    <div class='page-actions' role='group' aria-label='Edit Concept Records'>
-      {% if may_configure %}<a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>{{ configure_icon() }}Configure</a>{% endif %}
+  {% call banner(dataset.key, concept_ui, publication_panel=false, show_current=false, include_discard_panel=true) %}
+      {% if may_edit %}
+      <div class='page-actions' role='group' aria-label='Edit draft records'>
       {% if may_edit %}
       {{ record_import_action(dataset.key, import_unavailable) }}
-      {% if may_add_record %}<button class='button button-primary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
+      {% if may_add_record %}<button class='button button-secondary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
       {% endif %}
     </div>
     {% endif %}
   {% endcall %}
   {% endif %}
+  {{ dataset_navigation(dataset, 'records', concept=not version_state, version_id=version_state.version.id if version_state else none, may_govern=may_govern) }}
   {% include "pages/datasets/_record_table.html" %}
   {% include "pages/datasets/_record_panels.html" %}
 {% endblock %}
