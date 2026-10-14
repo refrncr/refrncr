@@ -1,7 +1,8 @@
 """Explicit lifecycle, atomicity and Current/Concept separation on both engines."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 from threading import Barrier
 
 import pytest
@@ -44,6 +45,46 @@ def test_first_concept_review_publication_and_closed_mutations(context):  # noqa
     with pytest.raises(ConflictError, match="No changes"):
         diff.open_review(c.a.id, c.d.id)
     assert snapshot(c) == before
+
+
+@pytest.mark.parametrize(
+    ("data_type", "raw", "expected"),
+    [
+        ("string", "typed", "typed"),
+        ("number", "12.50", Decimal("12.5")),
+        ("boolean", "false", False),
+        ("date", "2026-10-14", date(2026, 10, 14)),
+    ],
+)
+def test_rebuilt_concept_preserves_typed_record_values(context, data_type, raw, expected):  # noqa: F811
+    c = context
+    setup(c, populated=False)
+    c.s.dataset_fields.create_field(c.a.id, c.d.key, "typed", "Typed", data_type)
+    removed = c.s.dataset_records.create_record(
+        c.a.id, c.d.key, {"code": "remove", "label": "Remove", "typed": raw}
+    )
+    kept = c.s.dataset_records.create_record(
+        c.a.id, c.d.key, {"code": "keep", "label": "Keep", "typed": raw}
+    )
+    publish(c)
+
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.delete_record(c.a.id, c.d.key, removed.id, 1)
+    publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+
+    with c.s.datasets.uow() as uow:
+        records = uow.dataset_records.list_all(c.d.id)
+    assert [record.id for record in records] == [kept.id]
+    typed = next(value for value in records[0].values if value.field_key == "typed")
+    assert typed.value == expected and type(typed.value) is type(expected)
+
+    browser, _csrf = client(c)
+    records_page = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+    search = request(browser, "get", f"/datasets/{c.d.key}/concept/records?q=Keep")
+    exported = request(browser, "get", f"/datasets/{c.d.key}/concept/records/export?format=json")
+    assert records_page.status_code == search.status_code == exported.status_code == 200
+    assert "Keep" in records_page.text and "Keep" in search.text and "keep" in exported.text
 
 
 def test_duplicate_and_concurrent_creation_one_event(context):  # noqa: F811

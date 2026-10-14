@@ -1,6 +1,6 @@
 """Active concept storage and bounded, identity-preserving snapshot initialization."""
 
-from sqlalchemy import delete, insert, literal, select, update
+from sqlalchemy import Date, Numeric, case, cast, delete, insert, literal, select, update
 
 from refrncr.concept_contracts import ActiveConcept
 from refrncr.models import (
@@ -239,6 +239,9 @@ class SqlAlchemyConceptOperations:
             )
         )
         value = DatasetVersionValue
+        date_value = value.canonical_text
+        if self.session.get_bind().dialect.name != "sqlite":
+            date_value = cast(value.canonical_text, Date)
         self.session.execute(
             insert(DatasetRecordValue).from_select(
                 [
@@ -246,6 +249,9 @@ class SqlAlchemyConceptOperations:
                     "field_id",
                     "dataset_id",
                     "string_value",
+                    "number_value",
+                    "boolean_value",
+                    "date_value",
                     "canonical_value_key",
                     "unique_value_key",
                 ],
@@ -253,10 +259,28 @@ class SqlAlchemyConceptOperations:
                     value.record_id,
                     value.field_id,
                     literal(dataset.id),
-                    value.canonical_text,
+                    case(
+                        (
+                            field.data_type.notin_(("number", "boolean", "date")),
+                            value.canonical_text,
+                        )
+                    ),
+                    case(
+                        (
+                            field.data_type == "number",
+                            cast(value.canonical_text, Numeric(38, 18)),
+                        )
+                    ),
+                    case((field.data_type == "boolean", value.canonical_text == "true")),
+                    case((field.data_type == "date", date_value)),
                     value.canonical_key,
                     value.unique_key,
-                ).where(value.version_id == version.id),
+                )
+                .join(
+                    field,
+                    (field.version_id == value.version_id) & (field.id == value.field_id),
+                )
+                .where(value.version_id == version.id),
             )
         )
         dataset.content_updated_at = now

@@ -18,7 +18,7 @@ def test_effective_date_index_upgrade_and_downgrade(audit_db):  # noqa: F811
         }
         connection.commit()
         command.upgrade(config, "head")
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0029_ref_195"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
         index = next(
             item
             for item in inspect(connection).get_indexes("dataset_versions")

@@ -650,8 +650,10 @@ def create_flask_app(
                 abort(404)
             except HTTPException:
                 raise
-            except Exception:
-                logging.getLogger(__name__).error("Dataset version operation unavailable")
+            except Exception as error:
+                logging.getLogger(__name__).error(
+                    "Dataset version operation unavailable: %s", type(error).__name__
+                )
                 return "Dataset versions are temporarily unavailable. Reload and try again.", 503
 
         return secured
