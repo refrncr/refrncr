@@ -226,8 +226,8 @@ node tests/javascript/audit_history_browser.cjs
 Set `REFRNCR_PLAYWRIGHT_MODULE` and `REFRNCR_BROWSER_EXECUTABLE` to your existing external Playwright
 module and Chrome executable. Screenshots use `REFRNCR_SCREENSHOT_DIR` or the OS temporary directory.
 The fixture is disposable, in-memory and loopback-only. Playwright remains optional external test
-tooling, not a new application or CI dependency. See the [part-1 report](ref-39-part-1-report.md)
-and the [independent review report](ref-39-part-2-report.md) for executed commands/results and remaining limits.
+tooling, not a new application or CI dependency. The executed commands, results and remaining
+limits are retained in the project archive outside this repository.
 GitHub Actions is authoritative before merge.
 
 Out of scope: new events/payloads, auditor role, team/object audit pages, audit export/API, free text,

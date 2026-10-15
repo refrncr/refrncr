@@ -22,7 +22,7 @@ environment and install the Community application with:
 
 ```shell
 python -m venv .venv
-python -m pip install -e ".[dev]"
+.venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/refrncr start
 ```
 

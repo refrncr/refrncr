@@ -4699,7 +4699,7 @@
         "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
         "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
       ],
-      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. Current validation is retained in the project archive. REF-31 owns denied/suspicious security logging.",
       "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -4733,7 +4733,7 @@
         "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
         "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
       ],
-      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. Current validation is retained in the project archive. REF-31 owns denied/suspicious security logging.",
       "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },

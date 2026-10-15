@@ -221,7 +221,7 @@ The guard is a completeness tripwire, not proof that arbitrary Python code perfo
 A newly introduced adapter-driven top-level workflow or dynamic interface mechanism must be registered
 and added to discovery during review. Do not move a use case into an unregistered helper to bypass it.
 Runtime behavior tests provide evidence that the declared decisions are implemented. Part-2 review and full local SQLite/PostgreSQL 16 validation are recorded in the
-[final report](ref-149-part-2-report.md). Local checks do not replace GitHub CI before merge.
+the project archive. Local checks do not replace GitHub CI before merge.
 
 
 ## Optional real-browser verification
