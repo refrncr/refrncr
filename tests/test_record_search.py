@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 import pytest
 from sqlalchemy import event
-from support import NOW, publish, request, setup, snapshot
+from support import NOW, html_elements, publish, request, setup, snapshot
 from support import dataset_version_client as client
 
 from refrncr.datatypes import DATATYPES
@@ -124,7 +124,7 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):
     default = request(browser, "get", path)
     assert "of 66" in default.text
     toggles = default.text.split("data-record-status-form>")[1].split("</form>")[0]
-    assert toggles.count("aria-pressed='false'") == 3
+    assert sum(attrs.get("aria-pressed") == "false" for _, attrs in html_elements(toggles)) == 3
     for label, value in (("Added", "added"), ("Edited", "edited"), ("Deleted", "deleted")):
         assert f"name='record_status' value='{value}'>\n    {label}" in toggles
     edited = request(browser, "get", path + "?record_status=edited").text

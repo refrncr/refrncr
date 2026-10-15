@@ -10,7 +10,7 @@ from threading import Barrier, Event
 import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
-from support import NOW, active, audits, publish, request, setup, snapshot
+from support import NOW, active, audits, html_elements, publish, request, setup, snapshot
 from support import dataset_version_client as client
 from werkzeug.datastructures import MultiDict
 
@@ -322,9 +322,15 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):
     assert "Café" not in page.text and "Secret description" not in page.text
     assert page.headers["Cache-Control"] == "no-store"
     records = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
-    assert records.text.count("id='concept-discard-panel'") == 1
+    elements = html_elements(records.text)
+    assert sum(attrs.get("id") == "concept-discard-panel" for _, attrs in elements) == 1
     assert (
-        records.text.count("<summary class='button button-secondary' aria-label='Draft actions'>⋯")
+        sum(
+            tag == "summary"
+            and attrs.get("class") == "button button-secondary"
+            and attrs.get("aria-label") == "Draft actions"
+            for tag, attrs in elements
+        )
         == 1
     )
     assert "aria-describedby='concept-discard-panel-description'" in records.text

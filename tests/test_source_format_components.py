@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 
 import pytest
+from support import html_elements
 from werkzeug.datastructures import MultiDict
 
 from refrncr.source_formats import (
@@ -380,9 +381,14 @@ def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambi
     assert response.status_code == 200
     # Count the select itself: the wrapper's data-source-type-field attribute also
     # contains "data-source-type" as a substring.
-    assert response.text.count("data-source-type ") == (0 if ambiguous else MAX_COLUMNS - 2)
+    elements = html_elements(response.text)
+    assert sum(tag == "select" and "data-source-type" in attrs for tag, attrs in elements) == (
+        0 if ambiguous else MAX_COLUMNS - 2
+    )
     if ambiguous:
-        assert response.text.count("class='format-reading'") == 2 * (MAX_COLUMNS - 2)
+        assert sum(
+            "format-reading" in attrs.get("class", "").split() for _, attrs in elements
+        ) == 2 * (MAX_COLUMNS - 2)
         for index in range(2, MAX_COLUMNS):
             assert data[f"source_{index}"] == ""
             data[f"source_{index}"] = "v1-datetime-dmy-slash-hms"

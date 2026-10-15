@@ -8,7 +8,7 @@ from threading import Event
 import pytest
 from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
-from support import PASSWORD
+from support import PASSWORD, html_elements, html_tag_texts
 
 from refrncr.record_import import TransientImportStore
 from refrncr.services import NotFoundError
@@ -184,7 +184,7 @@ def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wiz
         "Field values",
     ]
     assert re.findall("<dt>(.*?)</dt>", table)[:4] == ["Code", "Amount", "Active", "Day"]
-    assert table.count("<tr>") == 13
+    assert sum(tag == "tr" for tag, _ in html_elements(table)) == 13
     assert "C9" in table and "C10" in table
     assert "New value: — (No value)" in table
     assert "12 differences" in preview.text
@@ -215,7 +215,7 @@ def test_error_summary_and_capped_accessible_modal(wizard, count):
     assert "View error report" in outside
     assert "Failing data row" not in outside
     assert "<table>" not in outside
-    assert dialog.count("<section>") == min(100, count)
+    assert sum(tag == "section" for tag, _ in html_elements(dialog)) == min(100, count)
     assert f"Failing data row {min(100, count)} — source file row {min(100, count) + 1}" in dialog
     assert ("Showing 100 of 101" in dialog) == (count == 101)
     assert "aria-labelledby=" in dialog and "aria-describedby=" in dialog
@@ -466,8 +466,8 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     page = wizard.preview(("code", "code"))
     assert "mapping-error-0" in page.text
     assert "mapping-error-1" in page.text
-    assert page.text.count("aria-invalid='true'") == 2
-    assert page.text.count(">Mapping error</summary>") == 2
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page.text)) == 2
+    assert html_tag_texts(page.text, "summary").count("Mapping error") == 2
     assert "data-missing-key='amount'" in page.text
     assert "This field is mapped more than once" in page.text
 

@@ -27,13 +27,14 @@ from refrncr.presentation_metadata import (
 ROOT = Path(__file__).parents[1]
 
 
-def test_retired_lucide_symbols_keep_their_original_geometry():
-    sprite = ROOT / "src/refrncr/static" / LEGACY_ICON_SPRITE
+def test_retired_lucide_symbols_keep_their_original_geometry(dataset_browser):
+    _, _, _, client = dataset_browser
+    sprite = request(client, "get", f"/static/{LEGACY_ICON_SPRITE}")
     # Frozen subset of the previously shipped 0.468.0 sprite, not newly invented glyphs.
-    assert hashlib.sha256(sprite.read_bytes()).hexdigest() == (
+    assert hashlib.sha256(sprite.data).hexdigest() == (
         "54279ae9585b7deb66c0813dcfb1d1735405a736d3f36b5d75a10b741389f554"
     )
-    symbols = ET.parse(sprite).getroot().findall(".//{http://www.w3.org/2000/svg}symbol")
+    symbols = ET.fromstring(sprite.data).findall(".//{http://www.w3.org/2000/svg}symbol")
     assert len(symbols) == 74
     assert all(ICON_SPRITES[s.attrib["id"]] == LEGACY_ICON_SPRITE for s in symbols)
     assert all(re.fullmatch(r"[a-z0-9-]{1,64}", s.attrib["id"]) for s in symbols)

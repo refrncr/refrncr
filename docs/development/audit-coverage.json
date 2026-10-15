@@ -3196,8 +3196,7 @@
       "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
       "tests": [
         "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
-        "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history",
-        "tests/test_audit_catalog.py::test_http_inventory_traces_current_service_calls_and_shared_helpers"
+        "tests/test_audit_coverage.py::test_ordinary_service_reads_and_preview_do_not_write_domain_history"
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending.",
       "exclusion_reason": "Capability calculation only; the authoritative caller owns the mutation/extraction event and REF-31 owns denied/suspicious attempts.",

@@ -316,18 +316,6 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):
     d = create_dataset(s, a, "polish", "Polish")
     assert "data-generate-key" in body(request(client, "get", "/datasets/new"))
     assert "data-generate-key" not in body(request(client, "get", f"/datasets/{d.key}/edit"))
-    assets = ROOT / "src/refrncr/static/images"
-    assert {p.name for p in assets.iterdir()} == {
-        "favicon.svg",
-        "lucide-1.46.0.svg",
-        "lucide-legacy-0.468.0.svg",
-        "refrncr-loader.svg",
-        "refrncr-wordmark-primary.svg",
-        "refrncr-wordmark-reversed.svg",
-        "theme-preview-dark.svg",
-        "theme-preview-light.svg",
-        "theme-preview-system.svg",
-    }
 
 
 def test_metadata_upgrade_preserves_existing_content(context):

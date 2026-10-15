@@ -8,6 +8,7 @@ from dataset_helpers import publish_dataset
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from support import governance_state as state
+from support import html_elements
 
 from refrncr.models import AuditEvent, Dataset, DatasetExportAccess, DatasetRecord, Grant
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
@@ -509,11 +510,17 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert team.status_code == 302
     assert team.location == f"/datasets/{d.key}/configure#access-management"
     populated = access_section(get(concept_url).text)
-    assert populated.count("<tr>") == 3
+    assert sum(tag == "tr" for tag, _ in html_elements(populated)) == 3
     assert "<span class='badge'>User</span>" in populated
     assert "<span class='badge'>Team</span>" in populated
     assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
-    assert populated.count("<time class='access-added' datetime=") == 2
+    assert (
+        sum(
+            tag == "time" and "access-added" in attrs.get("class", "").split()
+            for tag, attrs in html_elements(populated)
+        )
+        == 2
+    )
     assert "<span class='section-count'>2</span>" in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated

@@ -9,7 +9,7 @@ from alembic.config import Config
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
-from support import PASSWORD
+from support import PASSWORD, html_tag_texts
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
@@ -619,7 +619,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
     listing = client.get(f"/datasets/{dataset.key}/concept/records", base_url="https://localhost")
     assert "Edit" in listing.get_data(as_text=True)
     assert listing.status_code == 200
-    assert listing.get_data(as_text=True).count(">Added</span>") == 3
+    assert html_tag_texts(listing.get_data(as_text=True), "span").count("Added") == 3
     assert "Incomplete record" not in listing.get_data(as_text=True)
     assert "slegacy" not in listing.get_data(as_text=True)
     edit_url = f"/datasets/{dataset.key}/records/{record.id}/edit"

@@ -6,6 +6,7 @@ from datetime import datetime, time
 import pytest
 from openpyxl import Workbook
 from sqlalchemy import func, select
+from support import html_elements
 
 from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
 from refrncr.record_import import ImportValidationError, TransientImportStore, parse_source
@@ -175,7 +176,7 @@ def form_data(wizard, profile="v1-eu"):
 def test_mapping_progressive_disclosure_and_live_examples(wizard):
     page = wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
     assert "Show all formats" in page.text
-    assert page.text.count("data-format-details open") == 1
+    assert sum(tag == "details" and "open" in attrs for tag, attrs in html_elements(page.text)) == 1
     assert "Choose how this column is interpreted." in page.text
     assert "Ambiguous source format;" not in page.text
     assert "id='source-1-0'" in page.text
@@ -184,7 +185,13 @@ def test_mapping_progressive_disclosure_and_live_examples(wizard):
     response = wizard.post(wizard.path + "/formats", form_data(wizard))
     assert response.status_code == 200
     assert "<code>1234</code>" in response.text and "<code>2345</code>" in response.text
-    assert response.text.count("class='source-format-pair'") == 2
+    assert (
+        sum(
+            "source-format-pair" in attrs.get("class", "").split()
+            for _, attrs in html_elements(response.text)
+        )
+        == 2
+    )
     response = wizard.post(wizard.path + "/preview", form_data(wizard, "v1-plain"))
     assert "1.234" in response.text and "2.345" in response.text
     assert "Proposed Record differences" in response.text
@@ -199,7 +206,13 @@ def test_example_escaping_bounds_and_format_endpoint_csrf_binding(wizard):
     data = form_data(wizard)
     response = wizard.post(wizard.path + "/formats", data)
     # The fixture repeats one row five times, so the distinct-value rule shows it once.
-    assert response.text.count("class='source-format-pair'") == 1
+    assert (
+        sum(
+            "source-format-pair" in attrs.get("class", "").split()
+            for _, attrs in html_elements(response.text)
+        )
+        == 1
+    )
     assert "<script>" not in response.text
     bad = dict(data, csrf_token="forged")
     assert wizard.post(wizard.path + "/formats", bad).status_code == 403

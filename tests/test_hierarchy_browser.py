@@ -7,6 +7,7 @@ import pytest
 from dataset_helpers import create_owned_dataset
 from support import (
     body,
+    html_elements,
     login,
     request,
     session_csrf,
@@ -477,13 +478,16 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     tree = request(client, "get", "/datasets/deep/concept/records")
     assert tree.status_code == 200
     assert "Node 349" in body(tree)
-    assert body(tree).count("data-hierarchy-node=") == 350
-    assert body(tree).count('data-icon="corner-down-right"') == 349
+    assert sum("data-hierarchy-node" in attrs for _, attrs in html_elements(body(tree))) == 350
+    assert (
+        sum(attrs.get("data-icon") == "corner-down-right" for _, attrs in html_elements(body(tree)))
+        == 349
+    )
     records = request(
         client, "get", "/datasets/deep/concept/records?view=records", follow_redirects=True
     )
     assert records.status_code == 200
-    assert body(records).count("data-hierarchy-node=") == 350
+    assert sum("data-hierarchy-node" in attrs for _, attrs in html_elements(body(records))) == 350
     assert "<th scope='col'>Level</th>" in body(records)
     assert "Node 0" in body(records)
     flattened = request(
@@ -493,7 +497,7 @@ def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
         follow_redirects=True,
     )
     assert flattened.status_code == 200
-    assert body(flattened).count("data-hierarchy-node=") == 350
+    assert sum("data-hierarchy-node" in attrs for _, attrs in html_elements(body(flattened))) == 350
 
 
 def test_custom_field_keys_cannot_collide_with_hierarchy_form_controls(dataset_browser):

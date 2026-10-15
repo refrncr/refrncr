@@ -106,6 +106,66 @@ def request(client, method, path, **kwargs):
     return getattr(client, method)(path, base_url=HTTPS, **kwargs)
 
 
+class _Elements(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.items = []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        self.items.append((tag, dict(attrs)))
+
+    def handle_startendtag(self, tag, attrs):
+        self.items.append((tag, dict(attrs)))
+
+
+def html_elements(html):
+    """Return parsed HTML elements as ``(tag, attributes)`` pairs."""
+    return _Elements(html).items
+
+
+class _Text(HTMLParser):
+    def __init__(self, html):
+        super().__init__()
+        self.parts = []
+        self.feed(html)
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def html_text(html):
+    """Return text nodes from parsed HTML, excluding markup."""
+    return "".join(_Text(html).parts)
+
+
+class _TagTexts(HTMLParser):
+    def __init__(self, html, wanted):
+        super().__init__()
+        self.wanted = wanted
+        self.values = []
+        self._current = None
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == self.wanted:
+            self._current = []
+
+    def handle_data(self, data):
+        if self._current is not None:
+            self._current.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == self.wanted and self._current is not None:
+            self.values.append("".join(self._current).strip())
+            self._current = None
+
+
+def html_tag_texts(html, tag):
+    """Return text content for each parsed element with the given tag."""
+    return _TagTexts(html, tag).values
+
+
 def get(c, suffix="", **kwargs):
     return c.client.get(
         "/api/v1/datasets" + suffix, headers=kwargs.pop("headers", c.headers), **kwargs

@@ -10,6 +10,8 @@ from dataset_helpers import publish_dataset
 from support import (
     body,
     create_dataset,
+    html_elements,
+    html_tag_texts,
     login,
     request,
 )
@@ -57,7 +59,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
-    assert page.count("<section ") == (
+    assert sum(tag == "section" for tag, _ in html_elements(page)) == (
         8 if permission == "community_admin" else 2 if permission == "viewer" else 4
     )
     header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
@@ -125,7 +127,13 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     identifier_count = 1 if count == 1 else 2
     identifier_badge = "<span class='badge badge-identifier'>Identifier</span>"
     assert field_section.count(identifier_badge) == identifier_count
-    assert field_section.count('<svg class="key-icon"') == identifier_count
+    assert (
+        sum(
+            tag == "svg" and "key-icon" in attrs.get("class", "").split()
+            for tag, attrs in html_elements(field_section)
+        )
+        == identifier_count
+    )
     rows = re.findall(r"<tr[^>]*>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
@@ -185,7 +193,7 @@ def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, t
     login(client)
     page = body(request(client, "get", f"/datasets/title-tabs/concept?tab={tab}"))
     assert f"<title>{title} · Countries · REFRNCR</title>" in page
-    assert page.count(">View current version</a>") == 1
+    assert html_tag_texts(page, "a").count("View current version") == 1
 
 
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
@@ -202,8 +210,9 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
     assert name not in page and description not in page and field_name not in page
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
-    assert page.count("<section ") == 8
-    assert page.count("<table ") + page.count("<table>") == 1
+    elements = html_elements(page)
+    assert sum(tag == "section" for tag, _ in elements) == 8
+    assert sum(tag == "table" for tag, _ in elements) == 1
     assert "aria-label='Edit field &lt;img" in page
 
     field_section = section(page, "fields-heading")

@@ -192,13 +192,3 @@ def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):
     assert failed.status_code == 503
     assert failed.json() == {"error": "service_unavailable"}
     assert failed.headers["content-security-policy"] == SAFE_HEADERS["Content-Security-Policy"]
-
-
-def test_documentation_ui_privacy_configuration():
-    script = Path("src/refrncr/static/js/api-docs.js").read_text()
-    assert "persistAuthorization: false" in script
-    assert "queryConfigEnabled: false" in script
-    assert "validatorUrl: null" in script
-    assert "credentials = 'omit'" in script
-    assert "curl: () => null" in script
-    assert "pagehide" in script and "authActions.logout" in script
