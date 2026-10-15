@@ -385,7 +385,9 @@
       "operation": "list_users",
       "service": "refrncr.services.UserService.list_users",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users"
+        "refrncr.web.user_list GET /users",
+        "refrncr.web.create_user POST /users",
+        "refrncr.web.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -799,7 +801,11 @@
       "operation": "list_teams",
       "service": "refrncr.services.TeamService.list_teams",
       "interface_entrypoints": [
-        "refrncr.web.team_list GET /teams"
+        "refrncr.web.team_list GET /teams",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -832,7 +838,11 @@
       "service": "refrncr.services.MembershipService.list_team_members",
       "interface_entrypoints": [
         "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members"
+        "refrncr.web.team_members GET /teams/<team_id>/members",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -865,7 +875,11 @@
       "service": "refrncr.services.MembershipService.list_eligible_users",
       "interface_entrypoints": [
         "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members"
+        "refrncr.web.team_members GET /teams/<team_id>/members",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5707,7 +5721,13 @@
       "service": "refrncr.services.MembershipService.list_relationships",
       "interface_entrypoints": [
         "refrncr.web.user_list GET /users",
-        "refrncr.web.team_list GET /teams"
+        "refrncr.web.team_list GET /teams",
+        "refrncr.web.create_user POST /users",
+        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

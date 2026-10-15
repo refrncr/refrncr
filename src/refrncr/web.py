@@ -285,6 +285,40 @@ def create_flask_app(
             return GENERIC_LOGIN_FAILURE, 401
         return "Request is too large", 413
 
+    @app.errorhandler(HTTPException)
+    def handle_http_error(error):
+        if error.code in {403, 404, 500}:
+            messages = {
+                403: "You are not allowed to view this page.",
+                404: "The requested page could not be found.",
+                500: "Something went wrong. Please try again.",
+            }
+            return (
+                render_authenticated_template(
+                    "pages/error.html",
+                    error_code=error.code,
+                    error_message=messages[error.code],
+                    current_actor=None,
+                ),
+                error.code,
+            )
+        return error
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        logging.getLogger(__name__).exception(
+            "Unhandled web request failed: %s", type(error).__name__
+        )
+        return (
+            render_authenticated_template(
+                "pages/error.html",
+                error_code=500,
+                error_message="Something went wrong. Please try again.",
+                current_actor=None,
+            ),
+            500,
+        )
+
     authentication_cache_missing = object()
 
     def authenticated():
@@ -550,7 +584,7 @@ def create_flask_app(
         try:
             key = api_key_service.get_key(actor.id, key_id)
         except NotFoundError:
-            return "API key not found", 400
+            return "API key not found", 404
         error = None
         if request.method == "POST":
             require_csrf(session.csrf_token)
@@ -646,7 +680,7 @@ def create_flask_app(
                     "security.authorization_denied",
                     actor_user_id=resolved[0].id if resolved else None,
                 )
-                abort(404)
+                abort(403)
             except NotFoundError:
                 abort(404)
             except HTTPException:
@@ -655,7 +689,7 @@ def create_flask_app(
                 logging.getLogger(__name__).error(
                     "Dataset version operation failed: %s", type(error).__name__, exc_info=True
                 )
-                return "Dataset versions are temporarily unavailable. Reload and try again.", 500
+                return "Dataset versions could not be loaded. Reload and try again.", 500
 
         return secured
 
@@ -2286,7 +2320,7 @@ def create_flask_app(
                         "security.authorization_denied",
                         actor_user_id=resolved[0].id if resolved else None,
                     )
-                    return "The import has expired or is unavailable. Upload the file again.", 404
+                    return "The import is not available to this account.", 403
                 except NotFoundError:
                     resolved = getattr(g, "authenticated_resolution", None)
                     if resolved is not None:
@@ -2340,7 +2374,7 @@ def create_flask_app(
                     return (
                         "Validation could not be completed. No records have been imported. "
                         "Try again.",
-                        503,
+                        500,
                     )
                 state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
                 if preview.non_row_errors:
@@ -2704,7 +2738,7 @@ def create_flask_app(
                 error=(
                     "Validation could not be completed. No records have been imported. Try again."
                 ),
-                status=503,
+                status=500,
             )
         state = record_imports.state(actor.id, login_session.id, key, token)
         if target_step in {"1", "2"}:
@@ -2774,7 +2808,7 @@ def create_flask_app(
                 error=(
                     "The import could not be completed. No records have been imported. Try again."
                 ),
-                status=503,
+                status=500,
             )
         if state.mode == "new_version":
             return redirect(
@@ -3819,11 +3853,10 @@ def create_flask_app(
                 request.form.get("role", "user"),
             )
         except (ValidationError, ConflictError) as error:
-            render = render_user_list
-            return render(
+            return render_user_list(
                 form_error=str(error),
                 form_data=request.form,
-                status=400,
+                status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("user_list"))
 
@@ -3854,11 +3887,10 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         except (ValidationError, ConflictError) as error:
-            render = render_user_list
-            return render(
+            return render_user_list(
                 form_error=str(error),
                 form_target_id=target_id,
-                status=400,
+                status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("user_list"))
 
@@ -3912,11 +3944,10 @@ def create_flask_app(
         try:
             teams.create_team(actor.id, request.form.get("name", ""))
         except (ValidationError, ConflictError) as error:
-            render = render_team_list
-            return render(
+            return render_team_list(
                 form_error=str(error),
                 form_name=request.form.get("name", ""),
-                status=400,
+                status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))
 
@@ -3929,12 +3960,11 @@ def create_flask_app(
         except NotFoundError:
             abort(404)
         except (ValidationError, ConflictError) as error:
-            render = render_team_list
-            return render(
+            return render_team_list(
                 form_error=str(error),
                 form_target_id=team_id,
                 form_name=request.form.get("name", ""),
-                status=400,
+                status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))
 
@@ -3970,9 +4000,14 @@ def create_flask_app(
         require_csrf(login_session.csrf_token)
         try:
             memberships.create_membership(actor.id, request.form["user_id"], team_id)
-        except (NotFoundError, ValidationError, ConflictError) as error:
-            render = render_team_list
-            return render(form_error=str(error), form_target_id=team_id, status=400)
+        except NotFoundError:
+            abort(404)
+        except (ValidationError, ConflictError) as error:
+            return render_team_list(
+                form_error=str(error),
+                form_target_id=team_id,
+                status=409 if isinstance(error, ConflictError) else 400,
+            )
         return redirect(url_for("team_list", open_team=team_id))
 
     @app.post("/teams/<team_id>/members/<membership_id>/delete")
@@ -3981,9 +4016,14 @@ def create_flask_app(
         require_csrf(login_session.csrf_token)
         try:
             memberships.delete_membership(actor.id, team_id, membership_id)
-        except (NotFoundError, ValidationError, ConflictError) as error:
-            render = render_team_list
-            return render(form_error=str(error), form_target_id=team_id, status=400)
+        except NotFoundError:
+            abort(404)
+        except (ValidationError, ConflictError) as error:
+            return render_team_list(
+                form_error=str(error),
+                form_target_id=team_id,
+                status=409 if isinstance(error, ConflictError) else 400,
+            )
         return redirect(url_for("team_list", open_team=team_id))
 
     @app.errorhandler(UserManagementError)

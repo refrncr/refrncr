@@ -1097,8 +1097,10 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.create_user",
+        "refrncr.services.UserService.list_users",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1125,8 +1127,10 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.change_email",
+        "refrncr.services.UserService.list_users",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1153,8 +1157,12 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.TeamService.create_team",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1166,8 +1174,12 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.TeamService.rename_team",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1206,7 +1218,11 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.create_membership",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1219,7 +1235,11 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.delete_membership",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },

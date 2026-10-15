@@ -146,6 +146,9 @@ Do not claim that a quality control has passed if the corresponding tooling is n
 
 ## Security
 
+Authenticated authorization failures return HTTP 403 consistently across the web layer;
+missing resources remain HTTP 404. Do not use 404 to disguise a permission failure.
+
 - Never commit passwords, API keys, access tokens, private keys or production credentials.
 - Treat credentials used in local/CI test containers as disposable test-only values.
 - Do not include sensitive vulnerability details in public GitHub Issues.

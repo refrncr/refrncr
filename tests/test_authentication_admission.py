@@ -159,8 +159,7 @@ def test_permit_is_released_after_unexpected_authentication_exception():
     app, _ = make_app(authentication, admission=admission)
     first = app.test_client()
 
-    with pytest.raises(RuntimeError, match="synthetic failure"):
-        post_login(first, csrf(first))
+    assert post_login(first, csrf(first)).status_code == 500
 
     authentication.outcome = None
     second = app.test_client()

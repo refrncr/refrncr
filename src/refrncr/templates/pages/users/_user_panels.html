@@ -34,7 +34,7 @@
   {% endcall %}
 {% endfor %}
 
-{% call side_panel("add-user-panel", "New user", "add-user-title", "Add user", "add-user-description") %}
+{% call side_panel("add-user-panel", "New user", "add-user-title", "Add user", "add-user-description", false, none, "true" if form_error and not form_target_id else none) %}
   <form class='side-panel-form' method='post' action='{{ url_for("create_user") }}'>
     <div class='side-panel-body'>{% if form_error and not form_target_id %}<div class='alert alert-error' role='alert'>{{ form_error }}</div>{% endif %}{{ create_user_fields(form_email, form_display_name, form_role) }}</div>
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>

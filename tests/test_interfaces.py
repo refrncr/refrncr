@@ -927,7 +927,7 @@ def test_expected_user_error_does_not_expose_sensitive_values(interface):
             "csrf_token": csrf,
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 409
     body = response_text(response)
     assert secret_password not in body
     assert "password_hash" not in body
@@ -1161,7 +1161,7 @@ def test_team_interface_escapes_names_and_controls_validation_errors(interface):
         "/teams",
         data={"name": "<SCRIPT>ALERT(1)</SCRIPT>", "csrf_token": csrf},
     )
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert "<SCRIPT>" not in response_text(response)
 
 
@@ -1279,25 +1279,29 @@ def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(
     users.delete_user(admin.id, deleted.id)
     csrf = authenticated_csrf(client)
 
-    for path, data in [
-        (f"/teams/{team.id}/members", {"user_id": managed.id, "csrf_token": csrf}),
+    cases = [
+        (f"/teams/{team.id}/members", {"user_id": managed.id, "csrf_token": csrf}, 409),
         (
             f"/teams/{team.id}/members",
             {"user_id": str(uuid.uuid4()), "csrf_token": csrf},
+            404,
         ),
-        (f"/teams/{team.id}/members", {"user_id": disabled.id, "csrf_token": csrf}),
-        (f"/teams/{team.id}/members", {"user_id": deleted.id, "csrf_token": csrf}),
+        (f"/teams/{team.id}/members", {"user_id": disabled.id, "csrf_token": csrf}, 400),
+        (f"/teams/{team.id}/members", {"user_id": deleted.id, "csrf_token": csrf}, 400),
         (
             f"/teams/{uuid.uuid4()}/members",
             {"user_id": managed.id, "csrf_token": csrf},
+            404,
         ),
         (
             f"/teams/{team.id}/members/{uuid.uuid4()}/delete",
             {"csrf_token": csrf},
+            404,
         ),
-    ]:
+    ]
+    for path, data, expected_status in cases:
         response = request(client, "post", path, data=data)
-        assert response.status_code == 400
+        assert response.status_code == expected_status
         assert "password_hash" not in response_text(response)
         assert SESSION_COOKIE not in response_text(response)
 
