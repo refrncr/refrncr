@@ -3006,7 +3006,7 @@ def test_user_email_error_reopens_edit_panel_with_submitted_value(dataset_browse
         f"id='edit-user-email-{user.id}' name='email' type='email' value='taken@example.com'"
         in page
     )
-    assert f"id='user-panel-{user.id}'" in page and "data-default-mode='edit'" in page
+    assert f"id='user-panel-{user.id}'" in page and "data-auto-open='edit'" in page
 
 
 def test_membership_error_stays_in_team_members_section(dataset_browser):

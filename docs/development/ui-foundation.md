@@ -1,1180 +1,157 @@
-# REFRNCR UI foundation
-
-REF-122 establishes the shared visual foundation for the Community application. Cloud may
-reuse this foundation, but edition-specific functionality must not fork these tokens or
-components.
-
-## Assets and typography
-
-Use the supplied `refrncr-wordmark-primary.svg` for navigation, the mobile bar,
-setup and login, and `favicon.svg` for the favicon. Login additionally displays
-`refrncr-loader.svg` above the wordmark. With `prefers-reduced-motion: reduce`,
-CSS hides the loader while the wordmark remains visible, including when the
-preference changes at runtime. All three assets are served locally; their SVG
-geometry and colours are preserved. Images reserve dimensions and use empty alt
-text; their brand links provide the accessible name "REFRNCR home".
-See the [asset inventory](../../src/refrncr/static/licenses/ASSET-SOURCES.md) for
-provenance and licensing.
-
-The typography contract is:
-
-- Instrument Sans 500–600 for page-level headings (the wordmark is the SVG logo);
-- IBM Plex Sans 400–700 for interface text;
-- IBM Plex Mono 400 for technical identifiers, code-like values, record data and mono labels;
-- system fonts remain the fallback.
-
-The required upstream WOFF2 files and their OFL notices are packaged below `static/fonts/` and
-`static/licenses/`. `static/licenses/ASSET-SOURCES.md` records their pinned upstream versions,
-filenames and licenses. The browser loads them through relative local URLs; no font or icon CDN
-is used at runtime.
-
-The application never requests fonts or icons from a CDN. Inline SVG is appropriate for a
-small functional icon; icon-only controls always require an accessible name.
-
-## Tokens
-
-All canonical tokens live in `static/css/tokens.css` under `:root`. They cover the green,
-neutral, success, warning, error and information colours; semantic aliases; the three font
-stacks; the 4/8/16/24/32/48 px spacing scale; radii; shadows; and the 320/768/1024/1440 px
-breakpoints. New pages must use semantic variables such as `--color-action-primary` and
-`--color-border`. Do not copy token sets into page-specific CSS.
-
-CSS custom properties cannot be used directly in media-query conditions. The documented
-breakpoint values therefore remain tokens for tooling/documentation, while media queries use
-their corresponding literal values.
-
-## Layout and components
-
-`templates/base.html` owns the document structure, skip link and overridable layout block.
-Its default application layout owns the logo, permission-aware primary
-navigation, current-page state, account context, CSRF-protected sign-out action, flash region,
-main landmark, and page script extension point. File-based page templates extend this shell.
-
-Page-level layout macros live under `templates/layouts/`. Reusable controls live under
-`templates/components.html` until the component set is large enough to split by component.
-The overview page demonstrates the current composition pattern:
-
-```jinja
-{% extends "base.html" %}
-{% from "components.html" import button %}
-{% from "layouts/page.html" import page_header %}
-
-{% block content %}
-  {{ page_header("Overview", "Manage your reference data in one place.") }}
-  {{ button("View datasets", url_for("dataset_list")) }}
-{% endblock %}
-```
-
-The current reusable Jinja primitives are:
-
-- `page_header`, for a page title and optional description;
-- `button`, for link actions and real buttons using the same variants;
-- `form_field`, for a labelled input with optional autocomplete, required, value, help, error,
-  disabled, `aria-describedby`, and `aria-invalid` behaviour; the same contract renders an
-  input or textarea when a migrated page needs that control;
-- `feedback`, for escaped status or error feedback with the appropriate live-region role.
-
-The overview uses `page_header` and both link-button variants. The login and setup pages use the
-shared auth layout, `form_field`, `feedback`, and a real submit-button variant. The auth layout
-overrides the application shell with a centred canonical wordmark and card. Login opts into the
-shared field password-visibility button and focusable feedback summary. The shared external
-controller reveals the button only when JavaScript is available, updates its action name and
-focuses the error summary after a failed submission. Required-field validation runs on the
-server to keep messages in English even without JavaScript. Credential
-failures are shown once as generic form feedback and referenced by both login fields. The
-submitted email is escaped and retained (bounded to the browser identifier limit); the
-password is never rendered back into the response. Setup may safely redisplay the email
-and display name after validation, but never the submitted password. Login does not promise
-administrator password resets: no reset UI, service or CLI is currently implemented.
-
-The Dataset-create page combines `page_header`, `form_field`, `feedback`, and link/submit button
-variants. Its Description field selects the generic textarea control while retaining the same
-label, value, error, disabled, and accessible-description contract as text inputs.
-
-The `readonly_field` macro renders non-editable form values with the shared `.form-label`
-typography. Dataset and Field edit forms use an editable technical-key control in the first
-unpublished Concept. After the first version is published, they use `readonly_field` because
-the key is then permanent. Only a read-only value uses monospace, while the label matches
-editable field labels in full pages and side panels.
-
-The Dataset-edit page reuses those primitives directly. It presents a published Dataset key as
-text rather than a submitted control, and connects validation feedback only to the affected field.
-Create and edit remain separate page compositions because their key and action contracts differ.
-
-The Dataset-detail page uses a file template under the shared shell. Its existing metadata,
-permission-dependent schema controls, field table, and field-order forms remain unchanged.
-
-The Dataset list uses a file template with Dataset, Owning team, Records and Updated columns. Counts use
-the shared `numeric-column` treatment; there are no search, filter or sort controls. Dataset
-names remain keyboard-accessible links and pointer row navigation remains an enhancement.
-REF-130 adds shared `breadcrumbs` and `content_metadata` macros in `components.html`.
-The dataset breadcrumb include supplies Datasets → owning-team display name → dataset name, with only
-Datasets linked and the last item marked as current. Creation uses Datasets → New dataset
-because no dataset exists yet. The records and configuration headings consume the same secondary
-metadata component. The shared `page_context` layout follows the supplied dataset-table HTML
-reference: a flat column-flex group with no breadcrumb/title gap, zero child margins, and
-`--space-sm` (8 px) padding before metadata. This reproduces the reference's single collapsed
-8 px heading/paragraph margin without relying on margin collapse inside flex layout.
-The `.page-title` class shares the canonical heading font family and wrapping rule, using
-`--font-size-page-title` (24 px since the visual refresh), `--font-weight-bold` and normal font line-height. Other `h1`
-styles use the same size. Breadcrumbs use regular 12 px `--font-technical` (IBM Plex Mono), normal line-height, uppercase presentation
-and `--letter-spacing-label` (0.08 em). Breadcrumb links use the accent via `--color-breadcrumb-link` (#0f7a4f), with 4.97:1 contrast
-on the #f4f7f5 background and 5.36:1 on white.
-Hover retains `--color-link-hover`; other breadcrumb items and statistics use the shared muted grey. Metadata uses 14 px `--font-interface` (IBM Plex Sans), normal line-height,
-tabular figures and one inline-flex row with 8 px horizontal gaps. The decorative bullet has
-`aria-hidden="true"` and is grouped with Updated so it cannot wrap alone. Whitespace between the
-count and Updated groups retains a text boundary for assistive technology. The outer header's
-24 px bottom margin and responsive action layout remain unchanged. The typography and breadcrumb-colour tokens are
-shared; no dataset-specific selectors or component variants are introduced.
-
-The records route uses a file template with page-private table, field, and record-panel
-compositions. Its create and per-record workflows use the shared modal side-panel structure;
-one rendered panel per displayed record remains a deliberate temporary performance trade-off.
-
-Hierarchy, Records and Hybrid reuse the shared `record-toolbar`, `search_field` and result-count
-presentation above their tables. Search matches node names and string Field values. Flattened
-Records also match values displayed from predecessor nodes; tree views retain matching nodes'
-ancestors so a filtered result keeps its structural context. Published views and the Concept
-Hybrid view show their read-only state in the same toolbar. The toolbar and table retain the
-shared joined-border treatment and responsive wrapping behaviour.
-
-Community user, team, and membership management use file templates and the same modal side-panel
-structure. Team membership data is loaded only for the team selected through `open_team`, avoiding
-per-team membership queries on the list page while preserving the existing management workflows.
-
-Dataset field, standalone record mutation, and record-import workflows also use file templates.
-The legacy inline-template adapter has been removed; non-HTML downloads, redirects, and plain-text
-security responses retain their existing response contracts.
-
-Reusable classes include:
-
-- `button-primary`, `button-secondary`, `button-danger`, and `button-link`;
-- standard text, select, checkbox, file and textarea styling;
-- `help-text`, `error-text`, and `alert-*` feedback;
-- `card`, `badge-*`, `table-scroll`, `pagination`, and `empty-state`;
-- `dialog` and its open/close data attributes for confirmations.
-
-Management-table row headers share the vertical centring of data cells. The
-`button-table-action` variant uses existing spacing and typography tokens for compact,
-single-line actions such as scheduled-version cancellation, retaining a minimum 24 px
-target height. Confirmation-panel buttons keep their standard sizing.
-
-Component names use lowercase kebab-case. State classes use the `is-` prefix, and JavaScript
-hooks use `data-*` attributes rather than presentation classes. Documentation must only list a
-Jinja component after a page actually consumes it.
-
-All applicable controls define hover, visible keyboard focus, active, disabled and error
-states. Destructive actions use the danger treatment but still include explicit text; colour
-is never the only signal.
-
-## Template and accessibility rules
-
-New templates must:
-
-1. keep business logic in routes and services;
-2. use one `h1` and a logical heading hierarchy;
-3. use landmarks and named navigation regions;
-4. associate every control with a `label` and connect help/errors with `aria-describedby`;
-5. use `aria-current="page"` for active navigation;
-6. give tables a caption (visually hidden is acceptable) and `scope="col"` headers;
-7. wrap wide tables in `table-scroll`, never the whole page;
-8. preserve visible focus and keyboard access;
-9. return focus to a dialog trigger through the native `<dialog>` behaviour;
-10. render all user-controlled values through Jinja auto-escaping.
-
-The supported application workspace starts at 768 px and targets tablet and desktop use. Below
-768 px access is best effort: navigation, forms, and side panels remain operable, while no
-mobile-specific redesign is implied. Pages remain free of horizontal overflow; wide data tables
-retain readable minimum dimensions and scroll horizontally inside their `table-scroll` container.
-The shared navigation contract below applies at every supported width, including 320 px.
-
-At desktop/tablet widths (768 px and above), the shared app shell is bounded by the viewport
-height. Main content scrolls independently so long dataset tables cannot push the account
-details, Settings and Log out below the screen. Sidebar navigation can scroll separately
-when necessary, while the account area does not shrink. The same viewport layout serves
-the dedicated Settings shell. Smaller screens retain page scroll with a temporary navigation drawer.
-Navigation focus outlines sit inside each item so scrolling containers cannot clip them.
-
-The record import wizard is deliberately not a second scroll container inside that shell. It
-grows with its content, so short steps such as Upload file are never squeezed and the drop zone
-is never clipped, and the single main scrollbar serves the whole page. Its action bar closes the
-card instead of sticking: inside a card taller than the viewport a sticky bar parks mid-screen
-with the column list scrolling visibly behind it.
-
-Navigation visibility improves clarity but is never authorization. Every route and mutation
-must continue to enforce server-side permissions and CSRF independently.
-
-## Responsive navigation state (REF-128)
-
-Both authenticated shells use `components/navigation.html`, `layouts/app-shell.css` and
-`static/js/navigation.js`. The existing navigation DOM is reused, including active destinations,
-permission-aware links, account context and the CSRF-protected sign-out form. Settings retains
-its own navigation content. No page-specific controller, token, dependency or account preference
-is added. Data tables, record workflows and side-panel controllers retain their existing contracts.
-
-- At **1024 px and wider**, the complete sidebar is expanded by default. Its top-right
-  icon-only control aligns with the wordmark (Back to app in Settings). `panel-left-close`
-  has accessible name and native tooltip **Collapse navigation**. Collapsing hides the entire
-  sidebar and releases its 240 px column to main content. The content header then shows
-  `panel-left-open` at its top-left, named and titled **Expand navigation**. Neither action
-  navigates or reloads. Desktop has no modal overlay or focus trap.
-- Desktop choices use `sessionStorage["refrncr.navigation.desktop"]`, with `expanded` or
-  `collapsed` values. This is tab/browser-session presentation state, shared across shell pages,
-  never a server/account preference. Missing or invalid values default to expanded. Storage
-  failure leaves in-page toggles usable. The small external script runs synchronously in the
-  document head, before styles/content, to apply the stored class before first paint.
-- **Below 1024 px**, CSS reserves no navigation width regardless of desktop storage. The
-  header control is named and titled **Open navigation**. Navigation starts in a closed native
-  dialog and opens as a temporary drawer with the existing overlay colour/shadow. `showModal()`
-  makes the background inert. Initial focus goes to **Close navigation**; Tab/Shift+Tab wrap
-  through visible drawer controls. Escape, the close button or a completed backdrop click
-  closes it and restores the exact opener. Activating a destination closes before navigation.
-- Crossing 1024 px closes any drawer and moves the same sidebar between the modal host and
-  desktop grid. Returning to desktop restores the current desktop choice. Focus moves to a
-  visible navigation control if the previously focused control would become hidden. Drawer
-  interactions never overwrite desktop state. Pages restored from the back/forward cache reread
-  the current session choice. The dialog scrolls vertically on short screens.
-- Native buttons supply Enter/Space, pointer and touch activation, 44 px targets and the
-  shared visible focus ring. Both expose current `aria-expanded` and `aria-controls` pointing
-  to the complete controlled sidebar. Decorative Lucide SVGs use the existing inline macro
-  mechanism and pinned asset licence. State changes are immediate, without animation, so
-  reduced-motion preferences are respected and no intermediate-width layout is introduced.
-
-`test_navigation_javascript.py` exercises default/manual state, restoration before content,
-blocked storage, both breakpoint directions, drawer lifecycle, focus wrapping and restoration.
-Shell response tests cover both icons, native buttons, accessible names, tooltips, controlled
-IDs and early local script loading. Existing interface/dataset tests retain permission, active
-state and sign-out CSRF coverage. DOM doubles do not establish rendered layout or native
-browser modality: review 320, 767, 768, 1023 and 1024 px in a browser, plus a wide desktop;
-check keyboard operation, background inertness, main-width recovery, cross-page retention,
-focus rings, logo/control alignment, overflow and first paint with stored collapsed state.
-
-The optional `tests/javascript/navigation_browser.cjs` regression script asserts real Chrome
-layout, native Enter/Space and touch activation, focus trapping/restoration, drawer dismissal,
-state retention across actual links and reloads, reduced motion and no horizontal overflow at
-all five boundary widths. It requires an externally available Playwright module and browser;
-neither is added as a project dependency or mandatory CI gate. Start a disposable local app,
-create an administrator through setup, then set `REFRNCR_BROWSER_URL` (loopback origin, no
-trailing slash), `REFRNCR_BROWSER_EMAIL` and `REFRNCR_BROWSER_PASSWORD` to that test account.
-Run `node tests/javascript/navigation_browser.cjs`. `REFRNCR_PLAYWRIGHT_MODULE` may point to
-an existing Playwright installation; `REFRNCR_BROWSER_EXECUTABLE` may select local Chrome.
-`REFRNCR_BROWSER_OUTPUT` optionally collects screenshots for visual review. This script reads
-and navigates the test app; it does not change account permissions or dataset contents.
-
-## CSS loading order
-
-`static/css/refrncr.css` is the only public stylesheet entrypoint. It imports, in order:
-
-1. primitive and semantic tokens;
-2. element defaults and accessibility utilities;
-3. the app-shell, page, Settings and authentication layouts;
-4. buttons, forms, feedback, cards/badges/empty states, tables/pagination and dialogs.
-
-Imports are relative to the entrypoint and all nested files are package data, so the same URLs
-work from a source checkout and an installed wheel. Breakpoint literals in media conditions must
-stay aligned with the reference values documented in `tokens.css`; custom properties cannot be
-used as media-query boundaries.
-
-Broad implicit component selectors are intentionally avoided. Forms that need the shared width
-contract use `.form`; standard buttons use `.button` plus a variant. The REF-144 primary
-row control uses `.row-action` for its shared anchor/button presentation. Table hover styling
-is scoped to `.table-scroll` or the explicit `.interactive-row` variant. Plain semantic
-elements remain available when no component treatment is intended.
-
-## Focused login verification (REF-129)
-
-Automated tests cover routing, form semantics, errors, redirects and security regressions.
-`test_login_javascript.py` executes the shared controller when Node is available; this does
-not replace a real browser or assistive-technology check. No browser dependency was added.
-
-Manual checks still required when browser automation is unavailable:
-
-1. Open `/` and a protected page while signed out. Confirm the focused login page has no
-   application navigation or Overview, and shows the canonical wordmark.
-2. At 320 px and desktop widths, check the card, labels, errors and buttons fit without
-   horizontal scrolling; repeat with zoom and increased text size.
-3. Tab through the skip link, brand link, email, password, Show password and Sign in. Confirm
-   visible focus throughout. Activate Show/Hide password with Space and Enter: the value stays
-   unchanged, the form does not submit and a screen reader announces the new action name.
-4. Submit empty fields and incorrect credentials. Confirm focus reaches the error summary and
-   the screen reader associates each invalid field with its error. Email stays populated;
-   password stays empty after server responses. Repeat with JavaScript disabled: login and
-   server validation still work and the visibility button is hidden.
-5. Sign in from a protected page and confirm return to its path. Sign out and confirm protected
-   content is unavailable. Verify text, button and focus-state contrast with the shared tokens.
-
-## Configuration side panels (REF-131)
-
-All side panels use `components/side_panel.html` and the shared external controller.
-Do not build separate page-dependent dialog markup, CSS variants or controllers. The
-`side_panel` macro accepts a unique panel ID, title and title ID, optional description and
-optional description ID, and caller content. It generates `aria-labelledby` and, when a
-description is present, `aria-describedby` (with a generated description ID if omitted).
-Use `.side-panel-body` for scrolling content and `.side-panel-footer` for separate actions.
-The header stays fixed; shared form actions remain available while scrolling. Existing width,
-spacing, focus and responsive tokens apply, including full-width panels below 768 px.
-
-Dataset creation uses a single `form_side_panel()` on the dataset list. Field
-creation, Field editing and deletion confirmation share one instance on Configure.
-Dataset details editing is inline (REF-162). Each trigger retains
-its existing authorized route as its `href`:
-
-```jinja
-{% from "components/side_panel.html" import form_side_panel %}
-<a data-panel-url data-dialog-open="configuration-panel"
-   href="{{ url_for('new_dataset') }}">New dataset</a>
-{{ form_side_panel() }}
-```
-
-Render triggers and the host within the existing permission conditions. Multiple hosts need
-unique IDs passed to `form_side_panel(panel_id)` and matching `data-dialog-open` values.
-
-The existing full page is the form source: wrap its reusable form content in
-`data-side-panel-content` with an English `data-panel-title`. The controller fetches that
-same GET route and imports only this content, leaving the document shell and scripts behind.
-There are no extra endpoints, duplicate forms, or client-side validation rules. Keep business
-logic, authorization, normalization, CSRF, audit and transactions in the existing server
-layers. Form actions and hidden CSRF fields remain the originals. Use `novalidate` so server
-validation consistently supplies English messages. A `data-panel-cancel` link retains its
-fallback destination and closes the panel when enhanced.
-
-POSTs use the same form data and routes. Server validation responses (400/409) replace the
-form in the panel, preserving escaped submitted values; successful redirects navigate to the
-server's destination. Authentication redirects and failed GETs fall back to full-page
-navigation. Other POST errors retain the form and announce an error; network failures do not
-automatically retry mutations. Stale GET/validation responses cannot overwrite a newly opened
-form. Only one mutation per panel may be pending at a time.
-
-Opening calls native `showModal()`: the browser supplies background inertness and Escape
-closing. The shared controller wraps Tab/Shift+Tab within visible dialog controls, including
-read-only panels. Focus moves to a visible error summary, an invalid control,
-or the first relevant visible form control; the close button is the fallback. Error summaries
-use `data-error-focus` and `tabindex="-1"`; invalid controls retain their accessible error
-references. Closing through Cancel, the close button or native Escape restores the exact
-trigger, including when several triggers share a host. If that trigger has disappeared,
-focus returns to the main content. Initial-focus markers survive section-heading normalization;
-queued close events cannot discard a newer opening. Controller registration is idempotent. Without JavaScript
-(or native dialog support), links and full-page forms continue to work.
-
-`test_dataset_browser.py` covers rendering, shared composition, permission-aware triggers,
-full-page forms, server mutations, validation, CSRF and escaping. `test_side_panel_javascript.py`
-uses the existing Node test approach for control events, focus selection/restoration,
-multiple triggers/panels, loading, submissions and errors. DOM doubles verify that native
-modality is requested; they cannot prove browser Tab containment, Escape handling or layout.
-Before merge, verify in a real browser:
-
-1. Open each of the four flows with the keyboard and confirm the first form control receives
-   visible focus. Cycle Tab and Shift+Tab, including from the last control, and confirm focus
-   stays inside the dialog and the background cannot be activated.
-2. Close with Escape, Close panel and Cancel; confirm focus returns to the particular opener.
-   Repeat across different field triggers and existing record/user/team panels.
-3. Submit invalid values, correct them and save; check error announcements, focus, retained
-   values, successful redirects and existing field deletion behavior.
-4. Test desktop, tablet and 320 px widths, short viewports, long labels/keys, zoom and increased
-   text size. Check header/close visibility, scrolling, actions and absence of page overflow.
-5. Disable JavaScript and repeat all four workflows using the full pages.
-
-Dataset and field edit panels use `panel_form_actions` for the same fixed footer as record
-panels. Dataset Save fills the single-column footer; field Save and Delete share the two-column
-footer. These edit panels have no Cancel action; the header close button and Escape close them.
-Footer submit buttons use native `form` attributes to preserve their original form and CSRF
-association, including on full-page fallbacks. Creation panels retain their Cancel action.
-
-## Community Settings (REF-132)
-
-`layouts/settings.html` overrides the base layout to provide a dedicated Settings workspace
-for Users, Teams, Audit log and the standalone membership page. It reuses the app-shell grid and sidebar
-width, shared sidebar styling, vertical navigation, management headers and existing page
-content. The normal application sidebar and account controls are not rendered in Settings.
-
-Back to app opens Overview and sits in the sidebar heading beside the shared collapse
-control. The Settings icon/title stays in the content header, beside the opener when collapsed.
-The sidebar contains Access management (Users and Teams) and Activity (Audit log). Active navigation uses the
-existing green surface, foreground and `aria-current="page"`. Main content fills the remaining
-width, with one page heading and no redundant breadcrumb or horizontal Settings tabs.
-Settings follows the same REF-128 desktop/session and temporary-drawer contract as the normal
-application shell; destinations, permissions and the distinct Settings context are preserved.
-
-`components/flash_messages.html` supplies the same live region to both shells.
-`components/icons.html` shares the existing Settings cogwheel between the account link and
-Settings header and provides small decorative line icons for Back to app, Users and Teams.
-The existing Users/Teams tables, actions, membership controls and shared side panels remain
-the page content; routes, form actions, CSRF, sessions, authorization and persistence do not
-change. The Settings account link opens `/users`; `/teams` and membership URLs remain intact.
-Visibility uses the session-resolved actor's existing `role == 'admin'` condition, independently
-of route-level `require_admin()` and service authorization.
-
-The normal app account area shows a decorative initial avatar (`aria-hidden`, `--avatar-size` 32 px,
-`--color-avatar-*` tokens) beside the semibold name and muted role. Settings and Log out share one
-row below, 12 px under the role. The links share the interface face, regular weight and
-`--font-size-sm` with the role label, `1em` icons, a 6 px `--account-link-icon-gap`, and no button
-surface or underline; `--color-account-link` supplies the muted green-grey foreground. A CSS grid
-places each direct child, so the block keeps its flat name → role → Settings → Log out order
-without extra wrappers. Log out remains a CSRF-protected POST button.
-
-`test_interfaces.py` covers the dedicated shell, absence of normal navigation, navigation
-contents and active state, page titles, compact menu semantics, account-link visibility,
-direct access restrictions and existing management regressions. `test_dataset_browser.py`
-covers the stylesheet import contract. Before merge, verify both pages at desktop and compact
-widths, including the menu, keyboard focus, Back to app and existing side-panel flows.
-
-The shared `.management-table` scroll container establishes a positioning context for
-visually hidden headings at narrow widths. Wide tables scroll within their own region.
-
-The Users table has a `user-management-table` variant below 768 px. Each body row is a
-single flexible column with the bold primary Name button above Email address. The shared
-REF-144 chevron occupies reserved space at the trailing row edge; no View or Actions column
-remains. Role and Status retain their existing mobile visibility rules. Values wrap with
-`overflow-wrap: anywhere` for unbroken content. The mobile Name cell uses a fixed avatar
-track and a shrinkable `minmax(0, 1fr)` text track so long unbroken names cannot push into
-the reserved chevron space. The visually hidden desktop header retains
-its column headers, explicit cell/header associations and caption. Explicit table roles
-preserve semantics when CSS changes the display layout.
-
-The shared mobile side-panel header reserves a fixed close-button column at the top right
-and lets the title wrap in the remaining space. Compact header padding uses the existing
-spacing token. Full-width fields, scrollable body, footer and focus behavior are unchanged.
-
-## Record import wizard (REF-134)
-
-The import workflow keeps the dataset shell and breadcrumb context. Its shared wizard template
-composes five step includes, an ordered progress indicator, and one navigation footer. Desktop
-content scrolls within the available workspace, keeping the footer at the same height on every
-step. On narrow viewports the page scrolls and the footer remains sticky.
-`layouts/import.css` contains deliberate workflow-specific layout rules; existing color, spacing,
-typography, radius, button, field and table tokens are reused without adding tokens. Completed,
-current and future steps have text labels as well as color. Automatic worksheet completion stays
-visible and noninteractive. The progress list becomes vertical on narrow viewports; tables scroll
-inside their named keyboard-focusable region.
-
-`.dialog-large` is a shared dialog size/layout variant with a fixed heading/Close area and a
-separately scrollable report body. Its inner flex layout inherits the viewport-bounded
-maximum height; the dialog itself never scrolls. Short reports retain their natural height,
-and long reports use nearly the full screen below 768 px. The report consumes the existing
-open/close controller, native modality and Escape handling, adds explicit Tab/Shift+Tab wrapping,
-and restores the exact opener on close. Validation summaries reuse `feedback` and `data-error-focus`.
-Mapping errors are associated with their relevant select; the completeness summary identifies
-missing required and identifier fields. Client-side completeness and duplicate-submit guards are
-progressive enhancements; the server independently checks all transitions and confirmation.
-No wizard animation is introduced, and existing reduced-motion tokens remain effective.
-
-For visual review, check all five steps, success and invalid-preview/report states at desktop and
-narrow widths. Check long values, mapping examples, preview table scrolling, sticky action placement,
-Tab/Shift+Tab containment, Escape/Close focus restoration, and reduced-motion mode. The native file
-control remains keyboard accessible and supports dropping files onto the control itself.
-
-The mapping instruction, file/worksheet metadata, live completeness summary, missing-field badges
-and continuation hint are inside the accessible `i` disclosure beside the Map columns heading.
-The mapping list follows the heading directly. The information panel uses the existing tooltip
-controller and supports keyboard focus/scrolling within its content; Escape returns focus to the `i`.
-Summary counts and missing fields keep updating while the panel is closed. The mapping page uses a page-specific compact list: source name/examples, a decorative arrow,
-and the target control. Rows use the existing 3rem record-row minimum, 14px text, 12px examples, compact 36px
-controls and reduced padding, and grow with their content. Below 768px source and target stack;
-controls retain 44px touch targets and 16px text. These density rules are scoped to the mapping
-list and do not change global fields, badges or tokens. Desktop target cells reserve an 8rem
-status column so dropdown widths stay equal across all rows and all status badges align at the
-right edge. On mobile the full-width dropdown sits above its right-aligned badge. Existing controls, badges and tokens are reused without global
-component changes. Selected mapping status is independent of automatic suggestion confidence;
-confidence always names its suggested field. Proposal reasons and confidence are behind the existing mapping status badge (Mapped, Needs a
-choice, Do not import, or Mapping error), without an additional badge: native `details` provides a no-JavaScript
-fallback, enhanced to a viewport-contained tooltip on hover, focus or touch/click. Escape, blur
-and outside clicks dismiss it. The tooltip names the suggested target independently of the selected
-mapping. Warnings appear once inside that same tooltip. Ambiguous suggestions use the dropdown
-placeholder `Multiple matches — choose one`, with no separate hint below the dropdown. Dropdown options retain their values and short field names. Fields used by another row appear
-in a muted `Already mapped` group at the bottom, while the current selection stays in its normal
-group. JavaScript updates these groups immediately and restores freed fields in their original
-proposal/dataset order. Used fields remain selectable; duplicate validation stays unchanged. The live completeness summary includes identifier fields and updates missing
-field badges. Server errors retain their select associations. Truncated examples offer a native,
-keyboard-accessible disclosure of the same first three non-empty, non-formula sample values;
-full values are escaped and wrap within the row. No mapping or import rules change.
-
-## Configure dataset overview (REF-142)
-
-The overview composes the shared dataset context, header action layout and configuration
-side-panel host with two labelled sections: Dataset details and Fields. The product owner's
-visual refinements replace the original separate Record identifier section with shared warning
-feedback, shown only when fields exist and no identifier is configured. The warning adds no
-mutation controls. Empty datasets and configured identifiers produce no warning.
-
-REF-73 replaces the former **No owning team** placeholder with the persisted owning-team display
-name, matching the shared breadcrumb. Historical creator metadata is not current ownership.
-Do not substitute a user name or expose internal UUIDs. Ordering forms retain UUIDs only in the
-functional hidden inputs required by the existing endpoint.
-
-The table has Field order, Field, Key, Type, Constraints and Actions columns in canonical field
-display order. Field order and Key headings are visually hidden but available to assistive
-technology. Identifier fields show the existing decorative key SVG after the field name,
-separated by a space, with hidden text naming the field and its identifier role. Constraints
-shows Required, Unique and Identifier badges, or None when no constraint applies. Keys are muted monospace values in their own column.
-
-Actions and their heading are right-aligned. Edit field uses the shared `file_pen_icon` macro
-without a button border or background, retaining the existing authorized route, accessible
-field name, keyboard focus and minimum click area. The Fields header retains one Add field
-trigger in both populated and empty states.
-
-### Field-order chevrons (REF-137)
-
-The first column contains a `button-stack` form for each field visible to a schema admin.
-Two native submit buttons use `button button-icon-only` and the shared `chevron_up_icon`
-and `chevron_down_icon` macros. They are vertically stacked with no gap, visible border,
-background or shadow. Each hit area is 24 × 24 px; the centered 36 px stack extends into
-existing cell padding so it does not increase the table row height. Keep that padding when
-reusing this stack in tables. The Edit control remains in Actions.
-
-The form retains the REF-121 POST destination `/datasets/<key>/fields/order`, session-bound
-`csrf_token`, complete `expected_field_id` sequence and the row's `field_id`. The clicked
-button supplies `direction=up` or `direction=down`; both share this single form. Each action
-moves exactly one position through the existing `move_field` service. Its authorization,
-Dataset lock, stale-order validation, atomic persistence and audit event are unchanged.
-The existing redirect reloads Configure dataset with the persisted canonical order.
-There is no drag-and-drop, drag handle, client-side sorting or new JavaScript controller.
-
-Accessible names are `Move [field name] up` and `Move [field name] down`, escaped by Jinja.
-The SVGs are decorative (`aria-hidden="true"`, `focusable="false"`). Up is natively disabled
-for the first field and Down for the last; a single field has both disabled. Disabled icons
-use the shared reduced opacity without a button container. Enabled buttons retain native
-keyboard activation and the shared `:focus-visible` outline. The existing server-redirect
-focus behavior is retained; no focus-restoration script is added. Users outside the owning team who are not Community administrators receive
-no move buttons, and unauthorized direct POST requests remain rejected server-side.
-
-Regression coverage in `test_configure_overview.py` checks first-column placement, shared
-stack class, middle/boundary states and identifier placement. `test_dataset_browser.py`
-checks decorative chevrons, accessible names and escaping, both submit directions and form
-payloads, persisted order after redirect, stale rejection and exactly-one audit, owning-team/Community-admin
-access and missing/invalid/cross-session CSRF rejection. Existing REF-121 service and database
-tests cover rollback, exact permutations and concurrency. No browser framework is added.
-
-`layouts/configuration.css` supplies the overview and field-table variant. No tokens, service
-contracts, domain rules, persistence operations or dependencies were added. The explicitly
-requested extra 10 px above Dataset details is a deliberate page-specific spacing exception.
-Dataset key padding is removed to align it with other detail values. Other values reuse existing
-semantic tokens. The table uses its own keyboard-focusable horizontal scroll region; metadata
-remains untruncated, wraps within its region and uses ordinary Jinja escaping.
-
-`test_configure_overview.py` covers read-only, owning-team member and Community-admin presentation, zero/single/multiple fields,
-conditional identifier warnings, canonical ordering after reorder, separate key cells, constraints,
-icon-only editing, boundary controls, internal-ID exclusion and malicious input escaping.
-Existing dataset browser and side-panel controller tests retain authorization, CSRF, not-found
-and panel lifecycle regression coverage.
-
-Final local verification used Chrome at 1440, 768 and 320 px with populated, empty and long/malicious
-metadata fixtures. Six semantic columns, hidden Key heading, 48 px leading column, separate
-name/key cells, right-aligned actions and borderless file-pen presentation were verified. No
-page overflow occurred; wide tables scrolled internally. Keyboard order, visible focus, reachable
-actions and read-only viewer presentation were checked. All three panel entry points opened with
-initial field focus and restored their invoking control after Escape or Close. Successful dataset
-submission returned to the updated overview. The browser test waits for the native close event
-before opening another panel; Chrome may include browser chrome in native modal Tab cycling.
-
-CI's PostgreSQL 16 gate remains pending until the change is pushed after visual review. Local
-integration tests use PostgreSQL 15. No actual dark theme or assistive-technology session was
-verified; the implementation retains semantic tokens and accessible markup.
-
-## Primary table-row actions (REF-144)
-
-A navigational table is a read-only listing whose ordinary item rows each have one clear
-primary detail destination: either an existing page URL or an existing JavaScript side panel.
-The row action must preserve that exact destination and its server-side authorization.
-
-`components/table_row.html` provides `table_row` and `row_action`. Wrap the existing cells in
-`{% call table_row(...) %}` and render one `row_action` in the item's identifying cell.
-Pass `href` for an existing URL, or `panel` for an existing side-panel ID; use `panel=true`
-on the row for the existing selected-panel state. `search_text` preserves list filtering,
-and `explicit_role=true` preserves the user table's responsive semantic roles. The action
-accepts escaped label text or caller content, plus an optional descriptive accessible name.
-Its decorative chevron sits at the trailing edge of the row without adding a column or tab stop.
-Keep any other legitimate actions in their own cells.
-
-The shared variant applies to the dataset and team lists (anchors) and user and record lists
-(panel buttons). The dataset-fields table is configuration and retains its explicit Actions
-column. The import-preview table is non-interactive. Neither uses this variant. Only ordinary
-body rows with one primary destination should adopt it; omit it for empty, summary, selection,
-bulk-action or equally ranked multi-destination rows.
-
-`components/tables.css` shares hover, active and visible focus treatment between both controls.
-It reuses existing semantic tokens; the hover layer preserves underlying row backgrounds and
-the selected-row marker. Underlining and an inset row focus outline supplement colour. The
-existing table-region scroll containment and the user table's compact layout remain in use.
-
-`refrncr.js` delegates unused row-space clicks to the real control. A CSS stretched-control
-overlay is deliberately avoided because it would cover selectable text and nested controls.
-The controller ignores handled events, modified/non-primary clicks, text selections and other
-interactive elements. It adds no row key handler or row tab stop: Enter uses native anchor or
-button behaviour; Space uses native button behaviour. Anchors retain native context menus,
-modified activation and direct navigation without JavaScript. Modifier clicks on unused row
-space are ignored; use the actual link or its chevron for native link actions. Panel buttons
-continue to depend on the existing JavaScript side-panel controller, including focus return.
-Primary links use `draggable="false"` so dragging text selects it instead of starting a link
-drag operation; this does not replace the anchor's URL, context menu or new-tab behaviour.
-No new page URLs or server-side contracts are introduced.
-
-Keep valid `table`, `caption`, `thead`/`tbody`, `tr`, `th scope="col"` and `td` structure.
-The macros place the control inside a cell, never around a row. Do not add row `tabindex`,
-button roles, inline handlers or duplicate controls/names for the same primary destination.
-The identifying text is the visible label; optional accessible names must include it, including
-numeric display formatting. Jinja auto-escaping applies to labels, search text and attributes.
-The SVG chevron has `aria-hidden="true"` and `focusable="false"` and creates no extra tab stop.
-Long record values remain available to assistive technology and in the keyboard-accessible
-record panel. Keep any nested control's own accessible name, focus styling and authorization.
-
-The component must not produce page-level horizontal overflow at 320 px, tablet or desktop
-widths. Keep the `table-scroll` wrapper; deliberately wide record tables scroll internally.
-The chevron is reserved within the last cell (or compact row padding), not an Actions column.
-Hover underlines the primary label; active uses a double underline, and keyboard focus adds
-a 3 px inset outline to the row alongside the primary control's outline. Other row background
-states and the selected-panel marker remain intact; no palette or appearance mode is added.
-
-Example inside a table's `tbody` (one primary control per row):
-
-```jinja
-{% from "components/table_row.html" import table_row, row_action %}
-{% for item in items %}
-  {% call table_row() %}
-    <td>{{ row_action(item.name, href=item.existing_detail_url) }}</td>
-    <td>{{ item.updated_at }}</td>
-  {% endcall %}
-{% endfor %}
-```
-
-For a panel-only item, use `table_row(panel=true, kind='record-row')` and
-`row_action(item.name, panel=item.existing_panel_id)` instead. The existing panel must already
-be rendered with the shared side-panel component. Retain remaining legitimate controls in
-an Actions cell; do not apply either macro to a row with no primary destination or several
-equally ranked destinations. Never rely on hiding an affordance for access control.
-
-### Regression verification
-
-`tests/test_table_rows.py` covers the real four list templates, unchanged destinations,
-identity and formatted labels, escaping, primary-control counts, column removal/retention,
-empty states and the excluded configuration/import-preview tables. The dependency-free
-`tests/javascript/table_rows.cjs` and `side_panels.cjs` exercise delegated event guards,
-selection, nested controls and panel focus-return contracts. They run through pytest.
-
-`tests/javascript/table_rows_browser.cjs` is an optional real-browser check using the same
-external Playwright convention as the navigation regression script. It is not a new mandatory
-CI browser framework. Start the disposable in-memory fixture in a separate terminal:
-
-```sh
-.venv/bin/python tests/browser_table_rows_app.py
-```
-
-Then, with an externally available Playwright installation and Chrome/Chromium executable:
-
-```sh
-REFRNCR_PLAYWRIGHT_MODULE=/path/to/playwright \
-REFRNCR_BROWSER_EXECUTABLE=/path/to/chrome \
-REFRNCR_BROWSER_OUTPUT=/tmp/ref144-browser \
-node tests/javascript/table_rows_browser.cjs
-```
-
-The fixture binds only to `127.0.0.1:5144`, uses disposable test credentials, and discards its
-data when stopped. The script checks all four tables at 1440, 768 and 320 px, native primary
-keyboard activation and focus return, selection/copy, row-space clicks, real new tabs and
-no-JavaScript anchors, nested controls and pagination. It records screenshots and results
-outside the repository when `REFRNCR_BROWSER_OUTPUT` is set. Native OS context-menu item
-selection and a real assistive-technology session remain manual checks; a headless contextmenu
-event and semantic DOM assertions do not claim those checks were performed.
-
-
-Local REF-144 verification (2026-09-09): the full pytest run passed 827 tests with PostgreSQL
-15.18 enabled and no skips. The row browser script passed 18 scenario groups in Chrome
-152.0.7977.83, including hover/active feedback and preservation of selected/warning row states;
-the existing navigation browser regression also passed. Representative screenshots were
-reviewed at 1440, 768 and 320 px. Ruff and pre-commit checks passed. The mandatory CI gate
-with PostgreSQL 16 is still required before merge; no commit or push was performed as part
-of this local verification. Actual OS context-menu item selection and a screen-reader session
-were not performed.
-
-## REF-73 Dataset governance
-
-Creation and ownership reassignment share the team-choice form macro. Ownership and additional
-export access reuse the existing sidepanel controller, feedback focus and table/form styles.
-Dataset UI flags come from central service capabilities: read-only configuration is available to
-every active user, maintenance follows owning-team membership, and export is independent.
-See [Dataset governance](dataset-governance.md) for workflow and migration contracts. No CSS tokens are changed. The existing controller receives the opt-in enhancements described below. The reusable `page-header-actions-end` variant keeps
-configuration actions right-aligned. Owning team is edited with metadata through Save dataset;
-export access is managed on the Access management tab.
-
-### Sectioned action panels and additional access lists
-
-Use one `side-panel-view` containing a scrolling `side-panel-body panel-sections` and a sibling
-`panel_form_actions` footer. The section stack uses shared spacing tokens and removes incidental
-paragraph margins. Do not nest padded panel bodies or alter the shared header to fix local spacing.
-Section headings use `data-panel-section-heading`. Full-page sources retain h2 below their h1.
-The existing controller imports them as native h3 below the dialog's h2 title, preserving IDs and
-plain text.
-
-`inline-form-action` places a flexible selector and a naturally sized button on one row, with
-shared spacing. At the existing 767px breakpoint it stacks them. Forms may opt into
-`data-requires-selection`: JavaScript
-initially disables the submit button until the required selector has a value. Without JavaScript,
-submission remains available and the same server validation reports errors. This enhancement
-never grants authority or replaces server validation. Retain field-associated errors and the
-shared error-summary focus contract.
-
-The Access management tab (`components/export_access.html`) lists explicit user/team export
-access in a table with a decorative identity icon, name (and email for users), type badge, the
-date the access was added and a secondary Remove action with a descriptive accessible name. It
-does not derive permissions or manufacture rows for automatic access; the "Who has access"
-overview names the owning team and Community administrators as fixed rules. Grant and Remove
-forms use `data-inline-refresh`: the refreshed component replaces the current one and
-`data-panel-success` is announced and focused through `data-panel-status`.
-
-`tests/javascript/access_management_browser.cjs` uses the existing external Playwright convention
-and `tests/browser_table_rows_app.py` fixture. It checks 1440/320px empty, user, team and duplicate
-states, keyboard submission, error focus and no-JavaScript server validation. Screenshots are
-written only when `REFRNCR_BROWSER_OUTPUT` is set; dependencies and screenshots stay outside the
-repository.
-
-## Dataset deletion panels (REF-141)
-
-The Danger zone tab states the destructive action in one framed card: a warning header on the
-error surface, the counts the deletion removes (Versions, Records, Fields, Export access) and the
-danger button, followed by a note that the audit log retains the deletion. The confirmation is a
-Dataset workflow template with the same counts, a permanent-deletion warning, a required
-"Type <name> to confirm" input, error summary and Cancel. The tab itself is marked with the error
-colour while selected. `.danger-card`, `.danger-counts` and `.deletion-counts` use existing
-error/border/spacing tokens; no tokens change.
-
-`DatasetService.get_dataset_for_deletion` supplies the counts on both surfaces, so Configure reads
-it whenever the actor may maintain the Dataset. It stays an ordinary authorized read: no audit
-event, and readers without maintain rights get no tab and no call.
-
-An opt-in `data-panel-next` link replaces the content of the current remote side panel with
-a dedicated confirmation view. Only one modal remains open. The controller retains the parent
-DOM and exact trigger, preserving unsaved inputs. Cancel, Escape and the header close control
-restore the parent view and focus the trigger; closing the parent restores its original opener.
-Late responses cannot overwrite the restored view. Pending forms keep the existing single-POST
-contract. This supports one parent transition, not arbitrary nested dialogs.
-
-`data-exact-confirmation` provides supportive browser validation; the application service always
-checks the current name, timestamp and permission. Successful POST uses 303 to the Dataset list,
-which renders fixed success feedback. The `deleted=1` URL marker is presentation only, never
-authorization or proof of a deletion; it contains no object data. Existing authentication/session
-cookies remain unchanged. Ordinary no-JavaScript links and forms retain full-page fallbacks.
-
-`tests/javascript/dataset_deletion_browser.cjs` exercises the disposable table-row fixture with
-real Chrome at 320/768/1440px. See the REF-141 report for executed results.
-
-
-## REF-83 version workflows
-
-Classification: product functionality presented through existing global components. Dataset
-context now distinguishes `Concept · Working copy` from `Version N · Status · Read only`, with
-Versions navigation. The Versions page reuses page headers, breadcrumbs, responsive table
-containers/caption/column headers, textual badges and standard actions. No new design token,
-CSS selector, component variant, framework or dependency is introduced.
-
-Publish/cancel reuse the shared remote side-panel host and full-page fallback. Publish shows
-counts only, UTC calendar date, bounded release note and an explicit confirmation. Cancel uses
-the existing destructive button and explains retained administrator history and number retention.
-The shared field macro supports optional `min` and `maxlength`; the shared submit controller
-supports opt-in single submit and a visible `role=status` busy message. Server validation still
-controls dates, permission, revision and confirmation. Error feedback receives focus and fields
-reference it; Cancel/Escape restores the trigger without mutation. Snapshot record panels reuse
-existing read-only content and expose no mutation controls.
-
-Chrome acceptance covers 320/768/1440 px in light mode, keyboard activation, initial focus,
-Tab containment, Escape/Cancel restoration, error focus, native date constraints plus server
-rejection, busy/double submit, escaped release notes, historical views and downloads. Tests wait
-for panel animations before checking bounds/screenshots. Existing navigation and table regression
-scripts cover their original breakpoint set. These structural/accessibility checks do not claim
-certification by a human screen-reader user. See the REF-83 report for exact results.
-
-
-## REF-84 concept context component
-
-The explicit lifecycle correction is product functionality with a shared concept banner,
-header Versions action (existing icon family), and quiet table change indicators. It reuses
-existing spacing, radius, info-surface and button tokens; no new design token or dependency.
-`components/concept.html` owns the banner/action markup, with shared styling in feedback.css.
-Versions uses aligned Concept and published-version rows with the same columns.
-Versions offers Review changes for a reviewable concept. Publish version is a page action
-on concept and review pages, using the existing REF-83 sidepanel and form. The panel's
-optional Review changes link also supports a first publication without a baseline.
-
-Current is read-only for every user. Versions is the central lifecycle page; its Concept
-row opens the explicit concept even before edits. Concept pages/forms identify themselves
-with You’re working on a concept, pinned baseline (or No published version yet), status and
-View current version. Review/Publish are hidden when unchanged, and stale cancellation
-states explicitly explain preserved edits and blocked publication/replacement. Shared
-native panels retain Escape, focus trapping and opener restoration. Content strings remain
-escaped, and the banner uses text as well as colour.
-
-The application shell has no empty top bar. Content starts at the top with its normal
-page padding. The navigation opener sits inside the content area when the sidebar is
-collapsed or displayed as a mobile drawer. The labelled Settings header remains part
-of the separate Settings layout.
-
-The Record table ends with one system Status column before its row chevron. A System
-sublabel, accessible name Status (application metadata), interface typography and column
-boundary distinguish it from user Fields. Published uses the green `badge-published` in concept, Current and historical views;
-Edited/Added use draft badges and Deleted a removed badge on a muted row, each with a row edge marker. No green Complete badge remains. Content
-Fields named Status, Change and Validation retain their names and actual values.
-Design-system v2 §7 keeps concept system statuses as Published, Edited, Added and Deleted. Version diff/review domain
-statuses remain Added, Changed and Removed; Moved is a neutral hierarchy marker. Published and
-Current use the green success treatment, Added/Changed/Edited use the draft/amber treatment,
-Deleted/Removed use the removed treatment, and Moved remains neutral. The shared `status_badge`
-macro owns this presentation mapping; it does not rename or classify domain values.
-Deleted rows open read-only baseline details with explanatory text, preserving keyboard,
-Escape and focus restoration. Search and deterministic pagination include old identifiers.
-The metadata line counts surviving Records plus a separate marked-for-deletion count.
-Wide tables remain keyboard-scrollable at 320/768/1440. Configure Field badges reuse shared
-classification and never enter button accessible names. No new design tokens were added.
-
-
-## Visual refresh: alignment with the website design
-
-The application adopts the palette and component treatment of the refrncr website design v1, so
-product screenshots and the running application read as one identity. Token names are unchanged;
-only values and a few additions differ.
-
-Tokens (`tokens.css`):
-
-- accent `--ref-green-500` is #0f7a4f (primary buttons, links, active navigation), hover #0c6341;
-- neutrals are biased toward the accent (#f4f7f5 background, #f7faf8 subtle surface, #e2e9e5
-  borders, #5d6d65 muted text, #101915 text) instead of pure greys;
-- feedback colours move to the same family: success #0f7a4f, warning #a35b06, error #b42318,
-  info #0b5cad, each with a matching surface and darker text colour;
-- new lifecycle tokens `--color-status-draft|published|removed` with `-surface` and `-border`
-  variants; they express concept/version state and are separate from feedback colours;
-- `--color-control-border` (#7f9088) for form controls and secondary buttons, `--font-size-label` (11 px) for
-  mono labels and column headings, `--font-size-page-title` 24 px, softer green-tinted shadows.
-
-All text pairs meet WCAG 2.2 AA: text 17.9:1 on white, muted text 5.1:1 on the background,
-white on the accent 5.4:1, draft text 7.3:1 on its surface, removed text 9.3:1 on its surface.
-
-Global components:
-
-- the sidebar uses the subtle surface; the content area is white;
-- navigation items are compact, regular weight, with a semibold accent state; navigation labels,
-  breadcrumbs, table headings, side-panel eyebrows and record/field labels use the mono face;
-- secondary buttons are white with `--color-control-border`, matching form controls;
-- `.badge` is a quiet mono pill; status variants (`badge-success|warning|error|info|draft|
-  published|removed`) add a dot so colour is never the only signal;
-- a record toolbar directly followed by its table renders as one bordered object;
-- the concept banner is a compact draft-status strip: a Concept (or Stale) badge, the existing
-  heading text, basis and status, the explanatory note and the existing actions.
-
-Search: record toolbars and the Users/Teams lists share the `search_field` macro
-(`components/search_field.html`). It renders a visually hidden label, an inline Lucide Search icon
-and a `type='search'` input at `--control-height-compact`, so it matches the adjacent compact
-buttons. Form controls and secondary buttons share `--color-control-border` (#7f9088, 3.36:1 on
-white), which keeps control boundaries at WCAG 1.4.11 contrast.
-
-Side panels: the mode label (View record, Edit record) is a mono eyebrow above the title; the close
-control is a quiet compact icon button. Detail lists separate Fields with hairlines and muted mono
-labels. Record panels (`data-panel-entity="record"`) render values and inputs in the data face, as in
-the record table. The first footer step towards deletion (`.button-danger[type="button"]`) is
-outlined; the confirming submit stays solid. Inside a panel the concept banner drops its explanatory
-note and uses compact buttons; the actions and their visibility rules are unchanged.
-
-Component variants: Active users read as plain text (`.status-quiet`). Record lifecycle states
-always use text badges, including green Published badges in read-only tables. Concept rows use draft badges, Current
-versions the published badge, Scheduled versions the info badge. The dataset list shows the
-permanent key under each name, because dataset names are not unique.
-
-Time notation: one notation, `11 Sep 2026, 15:18:35`. Server-rendered summaries keep the
-authoritative UTC form (`absolute_utc`, labelled UTC). Lists that `audit-time.js` localises
-(`time[data-local-time="datetime"]`, or `"time"` inside a `table[data-local-days]`) show local
-time to the second, name the browser timezone once in the column heading
-(`[data-local-timezone]`) and keep the exact local instant with microseconds and offset in the
-`title`; detail views (`data-local-time` without a value) keep the full-precision text. Day-grouped
-tables split rows into one `tbody` per local day, each opened by a `.table-day-row` heading cell
-(`scope="rowgroup"`); without script, rows keep their full UTC timestamp and are not grouped.
-The audit filters form a compact bar at the head of the audit table object.
-
-Not part of the refresh (product functionality, tracked separately): the Overview content, the
-other website-mockup proposals. The website typefaces (Instrument Sans, IBM Plex Sans, IBM Plex
-Mono) are packaged as Latin and Latin Extended WOFF2 subsets; see `static/licenses/ASSET-SOURCES.md`.
-
-
-## Compact import source-format group (REF-158)
-
-Classification: a shared component within the import workflow, with deliberately
-workflow-specific layout in `layouts/import.css`. No design token, global field,
-button, component variant or dependency changes. The existing source-format Jinja
-partial renders initial and live responses; related controls use a native
-fieldset/legend and visible labels. Date and Time controls use the existing native
-select styling and appear side by side from 768 px; they stack at narrower widths.
-Each source/stored example pair retains its existing responsive relationship.
-
-**Source type** distinguishes text from Native Excel; Timestamp also offers
-Z/offset. Only relevant text/zone controls are visible. Switching away from text
-disables those controls; a transient controller cache restores the previous textual
-choices when switching back. A fresh native proposal starts textual choices in
-catalogue order when the importer explicitly chooses text. This browser cache is
-neither an import preference nor saved content. String has no format controls;
-Float and Boolean show their fixed profile and examples without a selector.
-
-**Advanced options** opens/closes all applicable mapped Fields. **Change format**
-opens its own Field and focuses its first control (the effective summary for a
-fixed profile). Escape retains the existing close-and-return-focus contract.
-Invalid controls reference their Field error with `aria-describedby` and expose
-`aria-invalid`; live responses preserve the active visible control. The combined
-summary and a stable polite live region announce effective-format/example updates.
-The summary contains the selected exact pattern as well as the readable clock
-label, so long native-select text is also available as wrapping text.
-
-`window.refrncrSourceFormats(root)` is idempotent, is called for server-imported
-panel content, and delegates form changes. Replaced disclosures are bound once.
-`data-source-timezone` is specific to import input and does not collide with the
-existing `data-local-timezone` output label. Existing generation/abort guards
-protect text being typed from late responses. Dynamic native/text switching and
-live examples use JavaScript; initially detected selections still submit through
-the server-rendered form. A visible no-JavaScript message explains the limitations.
-The all-Fields action keeps its **Advanced options** name and is hidden when no
-format disclosures apply; there is no Simple/Advanced mode. Opening a single
-Field always exposes its examples. Stacked mobile pairs show individual visible
-source/stored labels. See the archived REF-158 validation report.
-
-
-## Verdict-first import mapping (REF-159)
-
-The shared import source-format partial now leads with a server-composed verdict.
-`clean` reports the selected format and full non-empty column count; it says
-“stored exactly as written” only when all bounded source/stored examples match.
-`transformed` uses exactly one changed pair in the verdict. Their controls and
-optional detailed examples stay inside the initially closed disclosure.
-`undecided` uses an amber, initially open choice group; `failing` opens correction
-controls and reports the exact full-column failure count. String has no block.
-
-Two to four complete-column matches appear as labelled native radio readings with
-one worked example each. Unknown, singleton and more-than-four results retain the
-REF-158 controls. The existing detection scan supplies these matches, using the
-same canonical IDs and results. A hidden checked empty radio keeps `source_N`
-present until a visible reading is selected; no candidate is preselected. Radios
-replace the source select and do not submit Date/Time components. All other
-required envelope fields remain successful, even inside closed disclosures.
-
-**Change** opens one disclosure and focuses its first enabled control; **Done**
-closes it. Escape closes and returns focus to Change (or the native summary).
-**Show all formats / Hide all formats** controls all disclosures; the latter keeps
-undecided and failing columns open. Individual Done/Escape remain available; a
-blocked Preview reopens and focuses the unresolved choice. The aggregate action
-is hidden when no disclosures apply. Labels and `aria-expanded` stay synchronized
-with native toggle events and live replacements; repeated initialization is safe.
-
-Native summaries remain visible without JavaScript; enhanced verdicts replace
-them with the Change/Done button only after binding. No essential behavior depends
-on `:has()`. Native radio checked state and a visible focus outline communicate
-selection. Error descriptions and the mapping examples' `aria-describedby` targets
-remain accessible. A stable polite live region announces interpreted formats after
-refresh. Without JavaScript, detected choices and candidate radios can be submitted
-to Preview; dynamic source-type switching still has the documented REF-158 limits.
-
-Classification: shared import component and deliberate mapping-page layout rules.
-Existing semantic colors, spacing, type and focus tokens are reused. No design
-token, global component or new component variant changes. Controls and radio cards
-stack on narrow screens; verdict text wraps while Change/Done remains available.
-The archived REF-159 report records exact browser and regression evidence.
-This section supersedes the REF-154/158 resting presentation and button labels above.
-
-
-REF-159 presentation review: selected candidate cards retain the primary-colored
-border and inset ring after focus leaves; `:focus-within` remains a separate focus
-signal. Native radios remain usable without `:has()` support. Temporal reading
-labels share `source_format_label` with the Date/Time dropdowns. With candidate
-readings present, the amber guidance owns the existing error-description ID and
-the effective-format live region stays present but empty. Unknown/mixed fallback
-columns retain their effective placeholder and error text. Change follows its
-verdict sentence at the normal gap and may wrap below it on narrow screens.
-
-Native Excel date/datetime verdicts spell out the first example's month and show
-its canonical stored value. Clean native columns add “no day/month guessing
-needed” in the same sentence. Examples use target-aware ISO rendering: a native
-midnight datetime mapped to Date shows only the date; DateTime retains its time.
-Workbook number-format masks are not presented as the user's Excel display,
-since Excel's locale can render them differently. Text examples remain verbatim.
-
-## REF-155 Concept discard
-
-Classification: product functionality using the shared Concept component and existing
-native-dialog sidepanel. Concept actions includes a destructive Discard concept action.
-Without Current it is an inert focusable `aria-disabled` control with an associated,
-always-visible explanation; this works for hover, keyboard and screen readers without
-custom tooltip code or JavaScript. The Concept menu variant bounds width and wraps help.
-No design tokens or dependencies change.
-
-The shared dialog supplies accessible title/description, warning-first focus, Cancel,
-Escape, focus trap, error focus and duplicate-submit prevention. Focus restoration
-reopens a details menu containing the opener before focusing it. The discard form also
-works as a full-page confirmation. Success returns to the Current overview and offers
-Create concept. Real Chrome keyboard/layout verification covers 320, 768 and 1440 px; see
-the archived REF-155 implementation notes.
-
-The `detail-list-counts` variant gives labels the available width and counts an auto-sized
-column, including in narrow sidepanels. Labels wrap without clipping. No tokens change.
-Screen-reader software was not exercised; accessible names, descriptions, alerts and
-focus behavior were checked through semantic DOM assertions and real Chrome.
-
-## REF-160 complete-version import
-
-Classification: product functionality using the shared import wizard, a reusable import
-action macro and page-specific difference/results controls. No design tokens or global
-button/table/form styles change. The Concept Record page header holds View current
-version, Versions and Export; the Concept banner holds editing, publication and lifecycle actions. Review changes
-is inside the shared Concept actions menu, including on Versions and in Record panels.
-The banner's action slot groups Configure, Import and Add record together inside the
-yellow Concept surface. Import is one action opening full-file comparison; there is no
-append/replace choice. Upload explains the complete-set semantics, including that missing
-Records become Deleted. The same flow shows only additions for an empty table. The
-unavailable Import action remains keyboard-focusable with `aria-disabled` and an
-`aria-describedby` explanation using the existing rationale tooltip. Escape dismisses
-the explanation; the native disclosure fallback works without JavaScript. The action
-group wraps inside the Concept banner on mobile.
-
-The Record toolbar's status-filter component reuses the native disclosure menu beside
-identifier search. Added, Changed and Deleted are independent checkboxes, all selected
-for All changes, with counts from the original import receipt. Search applies their
-combination. All records inside the menu clears the filter while retaining identifier
-search; submitting no selected statuses also shows all records. The menu remains available
-after clearing when the Concept has an import receipt. Its summary names the selection;
-JavaScript updates that caption as choices change and Escape restores summary focus.
-Native form submission works without JavaScript. Existing spacing, focus and menu styles
-are reused; no design tokens change.
-
-The mode appears in the page heading and final action. Differences use semantic table
-captions/headers, text statuses and labelled old/new values inside the existing scroll
-region. The deletion checkbox has the exact full count and starts unchecked. Filtering,
-search, pagination, acknowledgement and confirmation are native server-rendered forms
-and links. The existing JS dialog contract governs Record detail/Undo; the import wizard
-works without JavaScript. No screenreader-user test or automated accessibility audit is
-implied by the semantic and keyboard checks in the REF-160 report.
-
-## REF-162 shared UI additions
-
-- Global components: generated keys for opt-in create forms; progressive Dataset
-  icon picker; Field metadata disclosure; relationship list; shared export access.
-- Component variants: responsive relationship tables reuse the Users card rules;
-  Dataset badge-link alignment; inline export access with distinct IDs/headings.
-- Page rules: Configure's small Edit link and access placement, Versions action
-  removal, and the authorized no-Current Dataset list destination.
-- Tokens: no new design tokens; new rules reuse existing spacing, colour and font
-  tokens. Product branding uses the current REFRNCR wordmark and related packaged assets.
-
-Key generation uses equivalent Python/JavaScript NFKD, lowercase, explicit whitespace,
-slash/backslash/dot/dash separators to underscores, ASCII filtering, underscore
-collapse and trim. It does not truncate or append suffixes. Manual key edits stop
-synchronization; server validation, uniqueness and reserved keys remain authoritative.
-Without JavaScript both fields remain normal inputs. Edit pages never opt in.
-
-The Dataset icon picker enhances a text input with a searchable combobox/listbox,
-visible icon names, active-descendant navigation, selection, clear and Escape/Tab
-handling. Initialization is repeat-safe, including side-panel fragment replacement.
-Manual icon-name entry is available without JavaScript. With JavaScript the picker also
-shows a preview of the selected icon (label and name; unknown names show the default)
-and the suggestions as always-visible toggle buttons (`aria-pressed`); the combobox list
-opens as an overlay so closing it never moves the form. The preview checks typed names
-against the symbol ids of the pinned sprite. Definition and Unit use plain
-escaped text and keyboard-accessible disclosure at Record column headers.
-See [asset provenance and licences](../../src/refrncr/static/licenses/ASSET-SOURCES.md)
-and [the part-1 implementation notes](ref-162-part-1-notes.md).
-
-
-### Manual Dataset icon names
-
-The user-approved REF-162 follow-up expands the suggestions to manual names
-from the full pinned Lucide 1.46.0 sprite. The input contains the canonical name;
-Tab, blur and form submission retain typed text without requiring selection from
-the suggestions. Enter chooses a highlighted suggestion or accepts the typed name;
-Escape restores the value from before editing. The same text input works without
-JavaScript. Unknown names save as the default selection. Names are bounded to 64
-characters before normalization, stripped and lowercased. Malformed, oversized,
-unknown and unavailable names save as null and render the default; they never cause
-an icon validation error. Raw input is not persisted or interpreted.
-
-
-### Configure inline editing
-
-The Dataset details tab shows an identity card (icon tile, name, description), a short
-list with owning team, permanent key and icon, and an "At a glance" summary (version,
-Records, Fields, created and last updated). A note states that name, description and icon
-apply immediately and are not versioned (REF-165).
-
-Edit dataset opens the general `/datasets/<key>/configure` route in inline edit mode. Name,
-Description and Dataset icon are stacked inside Dataset details, followed by Owning team
-and the read-only key side by side; Save dataset and Cancel sit below a divider. Danger zone is a separate tab and uses the existing confirmed-delete
-panel (see "Dataset deletion panels"). Cancelling that panel preserves unsaved inline values and restores focus.
-
-One `_edit_form.html` include supplies the edit controls; the old Dataset edit
-panel template is removed. The legacy `/edit` entry point renders the same page.
-Validation errors render Configure with submitted values and focused feedback.
-Owning-team changes retain their existing expected-owner check; authorization,
-CSRF, immutable keys and publication boundaries remain server-side. The normal
-link and form navigation work without JavaScript. Edit targets the Name input's
-fragment; Cancel returns to the Dataset details heading.
-
-
-### Configure section tabs
-
-Configure groups its existing content into Dataset details, Fields, Access
-management and Danger zone. Permission checks determine which sections and tabs
-are rendered. The shared `section_tabs.html` component reuses section-tab styling;
-`section-tabs.js` progressively enhances same-page anchors to a tablist with
-roving focus, arrow/Home/End navigation, labelled panels and selected state.
-Tab switches hide panels without replacing their DOM, preserving inline drafts.
-
-The hash restores a selected section after reload. Field write redirects include
-`tab=fields#fields`: the query survives fetch-based panel redirects and the hash
-provides the native no-JavaScript scroll destination. Switching tabs updates the
-hash and removes that transient query. Unsupported section names select Dataset
-details and never expose unauthorized content. Without JavaScript all authorized
-sections remain visible and the navigation works as ordinary anchor links.
-
-REF-162 general configuration uses the shared section-tabs component with an enabled, read-only Fields tab. Keyboard and hash navigation select Fields
-normally; the view contains no Field mutation controls. The Dataset overview uses a separate gear
-link with a `configuration` tooltip and Dataset-specific accessible name. Other
-row actions retain their existing chevron. No design tokens change.
-
-## Records basic search (REF-136)
-
-The product owner reduced this implementation to basic search. There is no Add filter,
-Field/operator/value editor or typed-filter URL support. `components/record_search.html`
-composes the existing search field, Search action and conditional Clear all link
-inside the Record table toolbar, sharing its border directly above the column headings.
-No tokens or global controls change. Desktop keeps the toolbar on one line where space
-allows; mobile puts the input above the action row.
-
-Search/Enter explicitly submits a native GET form. Concept status has a separate GET
-form carrying only the last applied search term, with Apply status as its no-JavaScript
-fallback. `record-search.js` submits status changes and announces the result count.
-An unsubmitted search draft is not applied by a status change. All search/status changes
-reset pagination. Clear all returns to Active; the import-change selector retains its
-existing receipt and selection behavior. Browser history and shared URLs contain only
-applied criteria. No search state is persisted. See the archived REF-136 report.
-
-## REF-40 API keys
-
-Settings includes API keys for every active user. Creation, one-time display and confirmed revocation use full pages with shared fields, buttons, feedback and Settings navigation. No design tokens or global component variants changed. API-key pages deliberately disable cross-document view transitions and allow long heading wrapping; their metadata table uses the existing scrollable table pattern. No-JavaScript users can copy manually and finish the lifecycle. See [API-key accessibility](api-keys.md).
-
-
-## REF-109 public API documentation
-
-Classification: product functionality with deliberate Swagger-page rules in
-`layouts/api-docs.css` and the local `api-docs.js` initializer. No design tokens,
-global components or shared component variants change. The standalone page uses
-existing color/spacing/font/focus tokens, a skip link, title, main landmark and
-permanent raw OpenAPI link. The authorization dialog has a masked labelled input,
-keyboard containment, Escape dismissal and opener focus restoration. Leaving the
-page clears transient authorization; no browser storage is used. No-JavaScript
-users receive the JSON fallback. See the REF-109 report for browser evidence and
-upstream accessibility limitations; no screen-reader-user certification is implied.
-
-## Appearance settings (REF-195)
-
-Theme selection lives at `/settings/appearance` under Settings → Personal → Appearance. The
-account block only contains the account identity, Settings link and Log out action. The page stores
-System, Light or Dark per account without JavaScript and uses the local `theme-preview-*.svg`
-artwork to illustrate the choices.
-
-## REF-202 purpose-based hierarchy export menu
-
-Classification: product functionality using a hierarchy-specific variant of the shared Export
-component. The variant groups links under semantic **Reporting table** and **File for editing**
-sections, with short purpose descriptions and native download anchors. Shared disclosure behavior
-continues to provide keyboard activation, Escape handling, outside-click closing and visible focus.
-No design tokens, JavaScript controller or framework changes are required; the component-level CSS
-adds only group spacing, a divider and wrapping format links. API-link, JSON and legacy CSV actions
-are deliberately absent from this hierarchy menu while server-side export authorization remains
-authoritative.
+# UI foundation
+
+## Purpose and source of truth
+
+This document describes the current Community UI contract for refrncr. The
+templates, CSS, JavaScript, automated tests, and accessibility behaviour in
+the repository are authoritative; this document explains the patterns they
+are expected to follow.
+
+The UI is server-rendered. Routes prepare presentation data, services own
+business rules, templates own markup, and the shared CSS and JavaScript own
+reusable presentation and interaction behaviour. New screens should extend
+these existing patterns instead of creating parallel conventions.
+
+## Brand, typography, and assets
+
+- Brand assets and fonts are local repository assets. Do not add runtime CDN
+  dependencies for the application shell.
+- Use the existing font family and weights from the static asset bundle.
+- Use semantic colour variables rather than literal colours in page-specific
+  styles.
+- Icons must retain an accessible name when they communicate meaning. An
+  icon-only control needs a visible or assistive label.
+
+## Design tokens
+
+The shared tokens live in `src/refrncr/static/css/tokens.css`. Components and
+pages should consume those variables for colour, typography, spacing,
+radius, shadows, and motion.
+
+The responsive layout uses the existing breakpoints at 320, 768, 1024, and
+1440 pixels. The 320-pixel layout is a supported minimum viewport: content
+must remain readable without horizontal page scrolling.
+
+When a repeated visual value is introduced, first decide whether it is a
+design token, global component rule, component variant, or a genuinely
+page-specific rule. Put it at the highest level that accurately describes
+the behaviour. Avoid duplicating the same value in templates or inline
+styles.
+
+## Application shell and layout
+
+`src/refrncr/templates/base.html` owns the global shell:
+
+- the skip link and primary landmarks;
+- the brand and primary navigation;
+- authenticated account context and the CSRF-protected logout form;
+- the page title and main content region;
+- global feedback and footer structure.
+
+Authenticated error pages use the same shell when an actor is available, so
+the user retains navigation and account actions while an error is explained.
+Unauthenticated errors remain safe and minimal.
+
+Settings pages use the shared settings shell and navigation. Page templates
+should extend the appropriate base template and provide semantic content
+blocks; they should not reproduce the application shell.
+
+## Shared components
+
+Reusable macros and includes provide the common presentation vocabulary:
+
+- page headers and breadcrumbs;
+- buttons and button variants;
+- labelled form fields, help text, and validation feedback;
+- alerts and status feedback;
+- search fields;
+- data-table rows and empty states;
+- side panels and record toolbars.
+
+Use the existing component API and classes before adding a new selector. A
+new component is justified when the interaction or semantic structure is
+reused in more than one workflow. Keep component markup in templates and
+macros, not in Python strings.
+
+## Forms and error handling
+
+Server-side validation is authoritative. A failed submission must return the
+form to the relevant context, preserve ordinary submitted values in escaped
+form controls where doing so helps correction, and associate each error with
+its field using semantic labels and accessible error text.
+
+Passwords, API keys, session tokens, and other secrets must never be echoed
+back into HTML, logs, or error messages. Error messages must not expose
+unnecessary internal identifiers or sensitive implementation details.
+
+Use the established status semantics:
+
+- 400 for invalid input or malformed requests;
+- 403 for a known actor without permission;
+- 404 for a missing resource or a deliberately non-disclosing response;
+- 405 for an unsupported method;
+- 409 for a recoverable state conflict;
+- 500 for an unexpected application failure.
+
+Error responses use the normal application error page. Unexpected failures
+are logged with a fixed diagnostic message and traceback for operators, while
+the browser receives a safe explanation and recovery action.
+
+## Accessibility
+
+Every page has one clear `h1`, meaningful landmarks, visible keyboard focus,
+and labels for interactive controls. Use native buttons and links for their
+respective actions. Do not rely on hover, colour, or an icon alone to convey
+state.
+
+Interactive controls must remain usable with keyboard navigation and touch
+input. The shared control sizing targets a minimum 44-pixel hit area where
+the component allows it. Tables use captions and appropriate header scope;
+status and validation feedback use the established live-region behaviour.
+
+If visual text is truncated, the complete value remains available to
+keyboard and assistive-technology users. Responsive layouts must not hide
+required actions from those users.
+
+## Responsive navigation
+
+The navigation has two modes:
+
+- At desktop widths it is expanded by default and may be collapsed by the
+  user. The preference is stored only in the existing browser session state.
+- Below the desktop breakpoint it is presented as a native dialog drawer with
+  focus management, an explicit close action, and restoration of focus to the
+  invoking control.
+
+The behaviour must remain correct when the viewport crosses the breakpoint.
+Do not persist a server-side navigation preference for this client-only UI
+state.
+
+## Tables, side panels, and record workflows
+
+Data tables remain readable at narrow widths and expose the record identity,
+primary action, and relevant status without requiring hover. Row actions use
+the established confirmation and feedback patterns.
+
+Side panels preserve the page context and expose their state in the URL or
+form target where the workflow requires it. When a form validation error is
+returned, the panel containing the invalid form opens automatically. A
+membership error remains in the Team members context; it must not silently
+move the user to an unrelated team form.
+
+Record workflows keep destructive actions visually and semantically distinct,
+require the existing confirmation step, and preserve server-side
+authorization regardless of whether an action is visible in the UI.
+
+## Implementation and verification
+
+Before adding a page-specific style, check the shared tokens, macros, and
+component variants. Keep routes focused on request handling and presentation
+data. Preserve escaping, CSRF protection, authorization, IDOR protection,
+transaction boundaries, and audit behaviour.
+
+UI changes should include focused tests for the affected workflow and
+regression coverage for validation, permissions, responsive state, and error
+handling where applicable. Verify the supported viewport widths, especially
+320, 767, 768, 1023, and 1024 pixels. Run the repository's configured
+pre-commit, pytest, and Ruff checks before considering the change complete.

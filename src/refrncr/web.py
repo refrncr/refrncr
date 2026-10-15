@@ -287,10 +287,11 @@ def create_flask_app(
 
     @app.errorhandler(HTTPException)
     def handle_http_error(error):
-        if error.code in {403, 404, 500}:
+        if error.code in {403, 404, 405, 500}:
             messages = {
                 403: "You are not allowed to view this page.",
                 404: "The requested page could not be found.",
+                405: "This action is not supported for this page.",
                 500: "Something went wrong. Please try again.",
             }
             return (
@@ -298,7 +299,6 @@ def create_flask_app(
                     "pages/error.html",
                     error_code=error.code,
                     error_message=messages[error.code],
-                    current_actor=None,
                 ),
                 error.code,
             )
@@ -314,7 +314,6 @@ def create_flask_app(
                 "pages/error.html",
                 error_code=500,
                 error_message="Something went wrong. Please try again.",
-                current_actor=None,
             ),
             500,
         )
@@ -689,7 +688,14 @@ def create_flask_app(
                 logging.getLogger(__name__).error(
                     "Dataset version operation failed: %s", type(error).__name__, exc_info=True
                 )
-                return "Dataset versions could not be loaded. Reload and try again.", 500
+                return (
+                    render_authenticated_template(
+                        "pages/error.html",
+                        error_code=500,
+                        error_message="Dataset versions could not be loaded. Please try again.",
+                    ),
+                    500,
+                )
 
         return secured
 
@@ -2320,7 +2326,14 @@ def create_flask_app(
                         "security.authorization_denied",
                         actor_user_id=resolved[0].id if resolved else None,
                     )
-                    return "The import is not available to this account.", 403
+                    return (
+                        render_authenticated_template(
+                            "pages/error.html",
+                            error_code=403,
+                            error_message="The import is not available to this account.",
+                        ),
+                        403,
+                    )
                 except NotFoundError:
                     resolved = getattr(g, "authenticated_resolution", None)
                     if resolved is not None:
@@ -2328,7 +2341,16 @@ def create_flask_app(
                             "security.workflow_token_rejected",
                             actor_user_id=resolved[0].id,
                         )
-                    return "The import has expired or is unavailable. Upload the file again.", 404
+                    return (
+                        render_authenticated_template(
+                            "pages/error.html",
+                            error_code=404,
+                            error_message=(
+                                "The import has expired or is unavailable. Upload the file again."
+                            ),
+                        ),
+                        404,
+                    )
                 except ImportValidationError as error:
                     return render_authenticated_template(
                         "pages/datasets/import/unavailable.html", error=str(error)

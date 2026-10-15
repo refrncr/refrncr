@@ -152,6 +152,32 @@ def authenticated_csrf(client):
     return csrf_token(response)
 
 
+def test_browser_error_pages_keep_the_authenticated_shell(interface):
+    _, users, authentication, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    not_found = request(client, "get", "/does-not-exist")
+    method_not_allowed = request(client, "get", "/users/not-an-id/email")
+
+    assert not_found.status_code == 404
+    assert method_not_allowed.status_code == 405
+    for response, code in ((not_found, 404), (method_not_allowed, 405)):
+        page = response_text(response)
+        assert f"Error {code}" in page
+        assert "Back to overview" in page
+        assert "Log out" in page
+
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    regular = users.create_user(admin.id, "regular@example.com", "Regular", "valid password")
+    assert login(client, regular.email, "valid password").status_code == 302
+    forbidden = request(client, "get", "/users")
+
+    assert forbidden.status_code == 403
+    assert "Error 403" in response_text(forbidden)
+    assert "Log out" in response_text(forbidden)
+
+
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
     (
         _,
@@ -973,15 +999,20 @@ def test_change_email_validation_error_is_controlled(interface):
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
     csrf = authenticated_csrf(client)
 
+    malformed_email = '<script>alert("bad")</script>'
     response = request(
         client,
         "post",
         f"/users/{managed.id}/email",
-        data={"email": "malformed email", "csrf_token": csrf},
+        data={"email": malformed_email, "csrf_token": csrf},
     )
 
     assert response.status_code == 400
-    assert "malformed email" not in response_text(response)
+    page = response_text(response)
+    assert "value='&lt;script&gt;alert(&#34;bad&#34;)&lt;/script&gt;'" in page
+    assert malformed_email not in page
+    error = re.search(r"<div class='alert alert-error'[^>]*>(.*?)</div>", page, re.S)
+    assert error is not None and "bad" not in error.group(1)
     assert authentication.authenticate("managed@example.com", "valid password").id == managed.id
 
 

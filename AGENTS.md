@@ -156,6 +156,8 @@ do not introduce new 404 masking without an explicit security contract and a reg
 - Follow `SECURITY.md` for security reporting.
 - Avoid logging secrets or sensitive data.
 - Prefer least-privilege behaviour when adding authorization or access controls.
+- After a form error, ordinary submitted values are returned escaped so users can correct them;
+  passwords, API keys and session tokens are never rendered back into HTML.
 
 ## Community vs Cloud boundary
 

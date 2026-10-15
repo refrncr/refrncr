@@ -2,7 +2,7 @@
 {% from "pages/users/_user_form_fields.html" import create_user_fields, edit_user_fields %}
 
 {% for user in users %}
-  {% call side_panel("user-panel-" ~ user.id, user.display_name, "user-panel-title-" ~ user.id, "View user", "user-panel-description-" ~ user.id, true, "user", "view" if open_user == user.id else none, default_mode="edit" if form_error and form_target_id == user.id else "view") %}
+  {% call side_panel("user-panel-" ~ user.id, user.display_name, "user-panel-title-" ~ user.id, "View user", "user-panel-description-" ~ user.id, true, "user", "edit" if form_error and form_target_id == user.id else ("view" if open_user == user.id else none), default_mode="edit" if form_error and form_target_id == user.id else "view") %}
     <section class='side-panel-view' data-panel-view='view'>
       <div class='side-panel-body'>
         <dl class='record-details'>

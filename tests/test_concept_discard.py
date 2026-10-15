@@ -753,7 +753,8 @@ def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeyp
         patch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail)
         response = request(browser, "post", f"/datasets/{c.d.key}/concept/discard", data=payload)
     assert response.status_code == 500
-    assert response.text == "Dataset versions could not be loaded. Reload and try again."
+    assert "Error 500" in response.text
+    assert "Dataset versions could not be loaded. Please try again." in response.text
     assert [record.getMessage() for record in caplog.records] == [
         "Dataset version operation failed: RuntimeError"
     ]
