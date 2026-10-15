@@ -4,8 +4,16 @@
 
 Refrncr is a lightweight application for managing reference data that is accurate, shared and easy to consume. Create datasets with defined fields and identifiers, organise ownership through teams, and control who may edit, export or access data through the API. Work safely in Concepts: review changes, import versions, restore deleted records, and publish only when ready. Built-in validation, audit history, versioning and import flows protect data quality without adding enterprise complexity. Teams can browse published data in the web interface, download it as Excel, CSV, JSON or retrieve it through a REST API with personal API keys. Run it locally with your database and deployment setup.
 
-Refrncr Community is distributed under the Apache License 2.0. See [LICENSE](LICENSE) for the
-full terms.
+Refrncr is source-available software licensed under the [Elastic License 2.0](LICENSE) (ELv2).
+You may use, copy, modify and self-host Refrncr, including inside your organisation. You may not
+offer Refrncr to third parties as a hosted or managed service that gives them access to a
+substantial set of its features, circumvent any license key functionality, or remove licensing
+and copyright notices. See [LICENSE](LICENSE) for the full terms.
+
+Third-party dependencies are not bundled: pip installs them separately from their own
+distributions, and they remain under their own licenses. This includes the PostgreSQL driver
+`psycopg`, which is licensed under the LGPL-3.0. Licenses for assets shipped with Refrncr are
+listed in `src/refrncr/static/licenses/`.
 
 ## Quick start
 
