@@ -309,6 +309,7 @@ def test_early_sort_disconnect_closes_every_temporary_run(monkeypatch):
 
 
 @pytest.mark.parametrize("mutation", ["create", "update", "delete", "reorder"])
+@pytest.mark.postgres
 def test_postgresql_export_is_one_snapshot_during_mutation(
     postgresql_export_services, monkeypatch, mutation
 ):

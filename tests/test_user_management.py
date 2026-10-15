@@ -155,6 +155,7 @@ def test_concurrent_bootstrap_and_initial_admin_are_serialized_on_sqlite(tmp_pat
     assert_concurrent_bootstrap_and_initial_admin(create_session_factory(engine))
 
 
+@pytest.mark.postgres
 def test_concurrent_bootstrap_and_initial_admin_are_serialized_on_postgresql():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)

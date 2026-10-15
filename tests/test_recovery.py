@@ -267,6 +267,7 @@ def postgres_recovery_databases():
         administration.dispose()
 
 
+@pytest.mark.postgres
 def test_postgresql_logical_backup_restore_preserves_complete_database_and_source(
     tmp_path, postgres_recovery_databases, monkeypatch
 ):
@@ -309,6 +310,7 @@ def test_postgresql_logical_backup_restore_preserves_complete_database_and_sourc
     assert _snapshot(source_url) == before
 
 
+@pytest.mark.postgres
 def test_postgresql_failed_restore_is_secret_free_and_leaves_source_unchanged(
     tmp_path, postgres_recovery_databases
 ):

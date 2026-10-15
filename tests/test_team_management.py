@@ -308,6 +308,7 @@ def test_concurrent_equivalent_names_on_sqlite(tmp_path):
     assert_concurrent_equivalent_names(create_session_factory(engine))
 
 
+@pytest.mark.postgres
 def test_concurrent_equivalent_names_on_postgresql():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)

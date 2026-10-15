@@ -14,7 +14,7 @@ from refrncr.record_import import ImportValidationError, TransientImportStore, p
 from refrncr.services import NotFoundError
 
 
-@pytest.fixture(params=["sqlite", "postgresql"])
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
 def context(request):
     if request.param == "sqlite":
         yield imports.import_context.__wrapped__()

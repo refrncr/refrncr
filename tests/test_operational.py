@@ -103,7 +103,7 @@ def test_interactive_colors_are_semantic_and_no_color_is_respected(monkeypatch, 
         root.setLevel(previous_level)
 
 
-@pytest.fixture(params=["sqlite", "postgresql"])
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
 def operational_database(request, tmp_path):
     administration = None
     if request.param == "postgresql":

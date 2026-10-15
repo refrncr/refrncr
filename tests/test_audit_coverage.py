@@ -33,7 +33,7 @@ from refrncr.services import (
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 
-@pytest.fixture(params=["sqlite", "postgresql"])
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
 def audit_db(request, tmp_path):
     administration = None
     if request.param == "postgresql":

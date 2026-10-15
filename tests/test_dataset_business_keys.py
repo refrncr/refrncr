@@ -423,6 +423,7 @@ def test_combined_field_and_identifier_update_rolls_back_together(
     )
 
 
+@pytest.mark.postgres
 def test_postgresql_fk_and_commit_failure_rollback(postgresql_business_key_services, monkeypatch):
     _, factory, services, admin, _config = postgresql_business_key_services
     first = create_dataset(services, admin, "first")
@@ -448,6 +449,7 @@ def test_postgresql_fk_and_commit_failure_rollback(postgresql_business_key_servi
     )
 
 
+@pytest.mark.postgres
 def test_postgresql_populated_downgrade_refuses_then_succeeds(
     postgresql_business_key_services,
 ):
@@ -469,6 +471,7 @@ def test_postgresql_populated_downgrade_refuses_then_succeeds(
 
 
 @pytest.mark.parametrize("first_operation", ["configure", "make_optional"])
+@pytest.mark.postgres
 def test_postgresql_replace_and_optional_update_serialize_in_both_orders(
     postgresql_business_key_services, monkeypatch, first_operation
 ):

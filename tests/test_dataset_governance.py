@@ -28,7 +28,7 @@ from refrncr.services import (
 from refrncr.web import create_flask_app
 
 
-@pytest.fixture(params=["sqlite", "postgresql"])
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
 def governance(request, tmp_path):
     administrative = None
     if request.param == "postgresql":

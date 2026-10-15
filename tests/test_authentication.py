@@ -294,6 +294,7 @@ def postgresql_authentication_services():
         administration_engine.dispose()
 
 
+@pytest.mark.postgres
 def test_postgresql_authentication_rehash_and_compare_and_set(
     postgresql_authentication_services,
 ):

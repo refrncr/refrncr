@@ -397,6 +397,7 @@ def test_sqlite_membership_concurrency(tmp_path):
     assert_team_membership_races(factory)
 
 
+@pytest.mark.postgres
 def test_postgresql_membership_persistence_and_concurrency():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)

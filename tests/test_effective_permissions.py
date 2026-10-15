@@ -313,6 +313,7 @@ def assert_postgresql_multi_source_evaluation(factory):
     assert scenario.effective() == "admin"
 
 
+@pytest.mark.postgres
 def test_postgresql_multi_team_and_direct_grant_evaluation():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)

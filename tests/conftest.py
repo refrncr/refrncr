@@ -14,19 +14,11 @@ def dataset_browser():
 
 
 def pytest_collection_modifyitems(config, items):
-    """Mark PostgreSQL cases and skip them consistently when no database is configured."""
+    """Skip explicitly marked PostgreSQL cases when no database is configured."""
     del config
     postgres_configured = bool(os.environ.get("REFRNCR_TEST_POSTGRES_URL"))
     for item in items:
-        parameters = getattr(item, "callspec", None)
-        parameter_values = getattr(parameters, "params", {}).values() if parameters else ()
-        is_postgres = (
-            "postgres" in item.name.lower()
-            or any("postgres" in fixture.lower() for fixture in item.fixturenames)
-            or any(value == "postgresql" for value in parameter_values)
-        )
-        if not is_postgres:
+        if item.get_closest_marker("postgres") is None:
             continue
-        item.add_marker(pytest.mark.postgres)
         if not postgres_configured:
             item.add_marker(pytest.mark.skip(reason=POSTGRES_SKIP_REASON))

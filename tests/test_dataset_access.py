@@ -332,6 +332,7 @@ def test_audit_failure_rolls_back_metadata_update(dataset_access, monkeypatch):
         assert persisted.description == "About rollback"
 
 
+@pytest.mark.postgres
 def test_postgresql_dataset_read_list_update_and_rollback(monkeypatch):
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_database_engine(database_url)

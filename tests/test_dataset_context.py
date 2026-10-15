@@ -19,7 +19,12 @@ from refrncr.services import RecordConflictError, StaleRecordError, ValidationEr
 BASE = datetime(2026, 9, 7, 12, 58, tzinfo=UTC)
 
 
-@pytest.fixture(params=["record_services", "postgresql_record_services"])
+@pytest.fixture(
+    params=[
+        "record_services",
+        pytest.param("postgresql_record_services", marks=pytest.mark.postgres),
+    ]
+)
 def context_services(request):
     return request.getfixturevalue(request.param)
 

@@ -769,6 +769,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
         services.dataset_records.get_record_for_edit(admin.id, dataset.key, legacy_delete.id)
 
 
+@pytest.mark.postgres
 def test_postgresql_constraints_order_and_atomicity(postgresql_record_services):
     _, factory, services, admin = postgresql_record_services
     dataset, _ = configured_dataset(services, admin)
@@ -793,6 +794,7 @@ def test_postgresql_constraints_order_and_atomicity(postgresql_record_services):
         )
 
 
+@pytest.mark.postgres
 def test_postgresql_same_revision_update_race_has_one_stale(postgresql_record_services):
     _, _, services, admin = postgresql_record_services
     dataset, _ = configured_dataset(services, admin)

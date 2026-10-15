@@ -561,6 +561,7 @@ def test_create_admin_reuses_explicit_database_url(tmp_path):
     assert len(_stored_users(database)) == 1
 
 
+@pytest.mark.postgres
 def test_create_admin_postgresql_compatibility():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)
