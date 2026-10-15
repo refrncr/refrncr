@@ -171,7 +171,7 @@ consume O(schema + page values) Python memory. This is bounded loading, not a cl
 of constant database CPU or memory. REF-164 owns broader query/index scaling.
 
 See [ADR-019](../architecture/adr-019-current-rest-reads.md) and
-[the validation/review report](ref-107-report.md).
+the archived REF-107 validation/review report.
 
 HTTP validator precedence and weak comparison follow
 [RFC 9110 conditional requests](https://www.rfc-editor.org/rfc/rfc9110.html#name-conditional-requests).
@@ -213,7 +213,7 @@ The raw JSON link is always available, including without JavaScript. Swagger has
 a page title, main landmark, skip link, visible focus, a labelled password input,
 authorization-dialog focus containment and Escape/focus restoration. Scoped CSS
 reuses shared tokens and wraps narrow content at 320/768/1440 px. Exact evidence
-and upstream accessibility limits are in [the REF-109 report](ref-109-report.md).
+and upstream accessibility limits are in the archived REF-109 report.
 
 Configuration follows the upstream [Swagger UI configuration reference](https://swagger.io/docs/open-source-tools/swagger-ui/usage/configuration/).
 

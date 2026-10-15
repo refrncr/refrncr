@@ -1,5 +1,6 @@
-{% macro membership_controls(team_id, members, eligible_users, csrf, standalone=false) -%}
+{% macro membership_controls(team_id, members, eligible_users, csrf, standalone=false, error=none) -%}
   <h3>Team members</h3>
+  {% if error %}<div class='alert alert-error' role='alert'>{{ error }}</div>{% endif %}
   {% if members %}
     <ul class='member-list'>{% for membership, user in members %}<li><div><strong>{{ user.display_name }}</strong><span>{{ user.email }}</span></div><form method='post' action='{{ url_for("delete_membership", team_id=team_id, membership_id=membership.id) }}'><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-secondary' type='submit'>{{ 'Remove member' if standalone else 'Remove' }}</button></form></li>{% endfor %}</ul>
   {% else %}<p>This team has no members.</p>{% endif %}

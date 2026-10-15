@@ -926,7 +926,7 @@ the server-rendered form. A visible no-JavaScript message explains the limitatio
 The all-Fields action keeps its **Advanced options** name and is hidden when no
 format disclosures apply; there is no Simple/Advanced mode. Opening a single
 Field always exposes its examples. Stacked mobile pairs show individual visible
-source/stored labels. See [REF-158 validation](ref-158-report.md).
+source/stored labels. See the archived REF-158 validation report.
 
 
 ## Verdict-first import mapping (REF-159)
@@ -967,7 +967,7 @@ Classification: shared import component and deliberate mapping-page layout rules
 Existing semantic colors, spacing, type and focus tokens are reused. No design
 token, global component or new component variant changes. Controls and radio cards
 stack on narrow screens; verdict text wraps while Change/Done remains available.
-The [REF-159 report](ref-159-report.md) records exact browser and regression evidence.
+The archived REF-159 report records exact browser and regression evidence.
 This section supersedes the REF-154/158 resting presentation and button labels above.
 
 
@@ -1001,7 +1001,7 @@ Escape, focus trap, error focus and duplicate-submit prevention. Focus restorati
 reopens a details menu containing the opener before focusing it. The discard form also
 works as a full-page confirmation. Success returns to the Current overview and offers
 Create concept. Real Chrome keyboard/layout verification covers 320, 768 and 1440 px; see
-[REF-155 implementation notes](ref-155-report.md).
+the archived REF-155 implementation notes.
 
 The `detail-list-counts` variant gives labels the available width and counts an auto-sized
 column, including in narrow sidepanels. Labels wrap without clipping. No tokens change.
@@ -1142,7 +1142,7 @@ fallback. `record-search.js` submits status changes and announces the result cou
 An unsubmitted search draft is not applied by a status change. All search/status changes
 reset pagination. Clear all returns to Active; the import-change selector retains its
 existing receipt and selection behavior. Browser history and shared URLs contain only
-applied criteria. No search state is persisted. See [REF-136](ref-136-report.md).
+applied criteria. No search state is persisted. See the archived REF-136 report.
 
 ## REF-40 API keys
 

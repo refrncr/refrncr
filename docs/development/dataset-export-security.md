@@ -109,4 +109,4 @@ writes no export event. This deliberate Concept-only exception invalidates pendi
 preparations when discard wins. A prepared, audited response already accepted for
 streaming retains its truthful event and cannot be recalled. Current and historical
 exports retain ADR-012 snapshot semantics. No export jobs or download tokens exist.
-See [REF-155 report](ref-155-report.md).
+See the archived REF-155 report.

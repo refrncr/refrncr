@@ -55,8 +55,8 @@ sequence remain unchanged. REF-168 owns any future migration/start separation.
 
 ## Current deviations
 
-The Flask boundary still contains a small amount of request-specific mapping validation for
-server-rendered forms. This is presentation orchestration only: authorization, validation rules,
-transactions and persistence remain in the shared application services. A future extraction is
-appropriate only when a separate story defines a reusable API contract; this ADR does not require
-a web.py/services split as cleanup work.
+The Flask boundary contains request-specific orchestration and presentation mapping for
+server-rendered forms, including translating service errors into form responses. This remains a
+boundary concern: authorization, domain validation rules, transactions and persistence remain in
+the shared application services. A future extraction is appropriate only when a separate story
+defines a reusable API contract; this ADR does not require a web.py/services split as cleanup work.

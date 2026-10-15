@@ -6,7 +6,7 @@ import pytest
 from dataset_helpers import create_owned_dataset, publish_dataset
 from flask import template_rendered
 from jinja2 import BaseLoader
-from sqlalchemy import func, select, update
+from sqlalchemy import event, func, select, update
 from sqlalchemy.pool import StaticPool
 
 from refrncr.app import create_community_services
@@ -198,6 +198,27 @@ def test_dataset_navigation_filters_reference_and_mapping_datasets(dataset_brows
     assert "name='kind' value='mapping' checked" in mapping_form
     assert "data-mapping-setup hidden" in reference_form
     assert "data-mapping-setup hidden" not in mapping_form
+
+
+def test_new_dataset_form_query_count_does_not_grow_with_reference_datasets(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    for index in range(40):
+        create_dataset(services, admin, f"reference-{index}")
+    login(client)
+    queries = []
+
+    def capture(_connection, _cursor, statement, *_args):
+        queries.append(statement)
+
+    engine = factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = request(client, "get", "/datasets/new")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    assert response.status_code == 200
+    assert len(queries) <= 20
 
 
 def test_unknown_dataset_navigation_filter_is_not_found(dataset_browser):
@@ -2959,3 +2980,54 @@ def test_reorder_requires_session_bound_csrf_without_order_or_audit_change(
             )
             == 0
         )
+
+
+def test_user_email_error_reopens_edit_panel_with_submitted_value(dataset_browser):
+    _, services, admin, client = dataset_browser
+    user = services.users.create_user(admin.id, "user@example.com", "User", "user password")
+    services.users.create_user(admin.id, "taken@example.com", "Taken", "user password")
+    login(client)
+
+    response = request(
+        client,
+        "post",
+        f"/users/{user.id}/email",
+        data={
+            "email": "taken@example.com",
+            "csrf_token": session_csrf(client, services),
+        },
+    )
+
+    page = body(response)
+    assert response.status_code == 409
+    assert f"id='user-panel-{user.id}'" in page
+    assert "Email already exists in this installation" in page
+    assert (
+        f"id='edit-user-email-{user.id}' name='email' type='email' value='taken@example.com'"
+        in page
+    )
+    assert f"id='user-panel-{user.id}'" in page and "data-default-mode='edit'" in page
+
+
+def test_membership_error_stays_in_team_members_section(dataset_browser):
+    _, services, admin, client = dataset_browser
+    user = services.users.create_user(admin.id, "member@example.com", "Member", "user password")
+    team = services.teams.create_team(admin.id, "Members")
+    services.memberships.create_membership(admin.id, user.id, team.id)
+    login(client)
+
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/members",
+        data={
+            "user_id": user.id,
+            "csrf_token": session_csrf(client, services),
+        },
+    )
+
+    page = body(response)
+    assert response.status_code == 409
+    assert "User is already a member of this team" in page
+    assert "data-default-mode='view'" in page
+    assert "data-panel-view='edit' hidden" in page

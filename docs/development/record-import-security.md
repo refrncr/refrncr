@@ -272,7 +272,7 @@ Live format review remains read-only. Accepted Preview submissions still invalid
 previous Preview/Confirm state through the existing secured staging service.
 Show/Hide all formats keeps undecided/failing disclosures open on a global close;
 individual Done/Escape may close them. Native summaries and selected radio
-submission work without JavaScript. See [REF-159](ref-159-report.md) for evidence.
+submission work without JavaScript. See the archived REF-159 report for evidence.
 No migration, schema, audit, authorization, token, TTL or transaction change.
 
 ## Concept discard (REF-155)
@@ -289,7 +289,7 @@ Discard removes source-format proposals with their working Fields explicitly.
 Their values are not versioned/restored from historical snapshots. It creates no
 import success audit. A winning import commits all Records/proposals and its audit
 first and makes the discard confirmation stale; a winning discard prevents import
-persistence. See [REF-155 implementation notes](ref-155-report.md).
+persistence. See the archived REF-155 implementation notes.
 
 ## Complete new-version imports (REF-160)
 

@@ -239,7 +239,7 @@ Flask tests, not inferred from a successful download.
 
 `DatasetService.delete_dataset` authorizes the current Dataset administrator and compares
 the current name exactly, with the expected UTC metadata timestamp checked under its lock.
-It deletes the [inventoried operational dependencies](ref-141-report.md), preserving all
+It deletes the inventoried operational dependencies from the archived REF-141 report, preserving all
 historical events, then writes exactly one `dataset.deleted` on the Dataset UUID in the same
 Unit of Work. The only context key is `dataset_name`; counts are returned to the caller but
 are not persisted because they are unnecessary for this deletion contract. There are no
@@ -343,7 +343,7 @@ real lifecycle deletion. The event does not mark the Dataset itself as deleted.
 Opening the confirmation is an ordinary authorized read, with no diff-viewed event.
 Transient Concept cleanup is explicitly excluded from domain audit. Pending Concept
 export now rechecks Concept existence and maintenance under its audit transaction
-lock; see [REF-155 report](ref-155-report.md).
+lock; see the archived REF-155 report.
 
 ## REF-160 complete-version import and Undo
 

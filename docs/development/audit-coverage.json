@@ -5220,7 +5220,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5256,7 +5256,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5292,7 +5292,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5328,7 +5328,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5385,7 +5385,7 @@
         "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
         "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5427,7 +5427,7 @@
         "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
         "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5458,7 +5458,7 @@
       "tests": [
         "tests/test_concept_migration.py::test_lossless_migration_and_retry"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5489,7 +5489,7 @@
       "tests": [
         "tests/test_concept_migration.py::test_lossless_migration_and_retry"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5559,7 +5559,7 @@
         "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
         "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
       "persistence_scope": "Read-only Concept identity, Dataset metadata and snapshot/diff aggregates."
     },
@@ -5607,7 +5607,7 @@
         "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
         "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "",
       "persistence_scope": "Working values, Records, identifiers, source-format proposals, Fields and Concept; Dataset metadata restored from Current. Snapshots and governance retained."
     },
@@ -5638,7 +5638,7 @@
       "tests": [
         "tests/test_concept_discard.py::test_import_tokens_cannot_attach_to_replacement_concept"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -5989,7 +5989,7 @@
         "tests/test_rest_api.py::test_success_log_is_safe_and_304_updates_last_used",
         "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
       ],
-      "implementation_status": "REF-169 implemented locally; validation is recorded in ref-169-report.md.",
+      "implementation_status": "REF-169 implemented locally; validation is recorded in the archived REF-169 report.",
       "exclusion_reason": "REF-169 keeps durable failed-authentication coverage; successful requests use only safe operational request completion metadata."
     },
     {
@@ -6025,7 +6025,7 @@
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
       ],
-      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -6062,7 +6062,7 @@
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
       ],
-      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Bulk current Community Dataset view decision; no mutation or domain event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },

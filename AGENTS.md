@@ -23,7 +23,7 @@ These instructions apply to the entire `refrncr` repository.
   - `chore/<short-description>`
   - `docs/<short-description>`
   - `test/<short-description>`
-- Use Conventional Commits.
+- Use Conventional Commits, for example `fix(web): preserve form feedback`.
 - Keep commits and pull requests focused on one logical change.
 - Do not merge a pull request until CI is green.
 - Use squash merge into `main`.
@@ -146,8 +146,9 @@ Do not claim that a quality control has passed if the corresponding tooling is n
 
 ## Security
 
-Authenticated authorization failures return HTTP 403 consistently across the web layer;
-missing resources remain HTTP 404. Do not use 404 to disguise a permission failure.
+Use HTTP 403 for authenticated authorization failures. Resource-specific routes that deliberately
+avoid disclosing whether an inaccessible object exists may return the documented uniform HTTP 404;
+do not introduce new 404 masking without an explicit security contract and a regression test.
 
 - Never commit passwords, API keys, access tokens, private keys or production credentials.
 - Treat credentials used in local/CI test containers as disposable test-only values.

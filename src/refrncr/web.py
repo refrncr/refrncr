@@ -3890,11 +3890,14 @@ def create_flask_app(
             return render_user_list(
                 form_error=str(error),
                 form_target_id=target_id,
+                form_data=request.form,
                 status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("user_list"))
 
-    def render_team_list(*, form_error=None, form_target_id=None, form_name="", status=200):
+    def render_team_list(
+        *, form_error=None, membership_error=None, form_target_id=None, form_name="", status=200
+    ):
         actor, login_session = require_authenticated()
         if actor.role != "admin":
             return render_template(
@@ -3925,6 +3928,7 @@ def create_flask_app(
             selected_team_members=selected_team_members,
             selected_eligible_users=selected_eligible_users,
             form_error=form_error,
+            membership_error=membership_error,
             form_target_id=form_target_id,
             form_name=form_name,
             current_actor=actor,
@@ -4004,7 +4008,7 @@ def create_flask_app(
             abort(404)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
-                form_error=str(error),
+                membership_error=str(error),
                 form_target_id=team_id,
                 status=409 if isinstance(error, ConflictError) else 400,
             )
@@ -4020,7 +4024,7 @@ def create_flask_app(
             abort(404)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
-                form_error=str(error),
+                membership_error=str(error),
                 form_target_id=team_id,
                 status=409 if isinstance(error, ConflictError) else 400,
             )

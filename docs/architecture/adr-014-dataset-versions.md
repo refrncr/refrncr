@@ -100,7 +100,7 @@ review identity and validates it under its established lock; review remains opti
 A successful new review commits one bounded `dataset.version_diff_viewed` event before
 returning its result. This is the explicitly approved REF-149 ordinary-read exception;
 child reads have no additional events, and audit failure returns no result. Implementation,
-query/memory limits and validation are in `docs/development/ref-84-report.md`. These choices extend this decision's snapshot/read boundary. ADR-015 records the
+query/memory limits and validation are in the archived REF-84 report. These choices extend this decision's snapshot/read boundary. ADR-015 records the
 subsequent persistent concept lifecycle approved in the manual UI review.
 
 ## REF-162 metadata decision
