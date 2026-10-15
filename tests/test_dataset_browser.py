@@ -732,7 +732,12 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
     assert '--font-interface: "IBM Plex Sans"' in tokens
     assert '--font-technical: "IBM Plex Mono"' in tokens
     assert all(
-        re.search(r"url\(\s*[\"']?(?:https?:)?//", css, re.IGNORECASE) is None
+        re.search(
+            r"(?:url\(\s*[\"']?|@import\s+[\"'])(?:https?:)?//",
+            css,
+            re.IGNORECASE,
+        )
+        is None
         for css in stylesheets.values()
     )
 
