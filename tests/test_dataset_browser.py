@@ -701,19 +701,9 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
 
 def test_all_design_system_assets_are_local_and_served(dataset_browser):
     _, _, _, client = dataset_browser
-    css_files = (
-        "tokens.css",
-        "base.css",
-        "utilities.css",
-        "layouts/app-shell.css",
-        "layouts/page.css",
-        "layouts/auth.css",
-        "components/buttons.css",
-        "components/forms.css",
-        "components/feedback.css",
-        "components/cards-badges.css",
-        "components/tables.css",
-        "components/dialog.css",
+    css_root = Path(__file__).resolve().parents[1] / "src/refrncr/static/css"
+    css_files = tuple(
+        path.relative_to(css_root).as_posix() for path in sorted(css_root.rglob("*.css"))
     )
     fonts = tuple(
         f"{family}/{family}-{subset}-{weight}-normal.woff2"
@@ -741,7 +731,10 @@ def test_all_design_system_assets_are_local_and_served(dataset_browser):
     assert '--font-display: "Instrument Sans"' in tokens
     assert '--font-interface: "IBM Plex Sans"' in tokens
     assert '--font-technical: "IBM Plex Mono"' in tokens
-    assert all("http://" not in css and "https://" not in css for css in stylesheets.values())
+    assert all(
+        re.search(r"url\(\s*[\"']?(?:https?:)?//", css, re.IGNORECASE) is None
+        for css in stylesheets.values()
+    )
 
 
 def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browser):
