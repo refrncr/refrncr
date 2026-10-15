@@ -38,8 +38,6 @@ def audit_db(request, tmp_path):
     administration = None
     if request.param == "postgresql":
         url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        if not url:
-            pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
         administration = create_database_engine(url)
         schema = f"audit_{uuid.uuid4().hex}"
         with administration.begin() as connection:

@@ -399,8 +399,6 @@ def test_sqlite_membership_concurrency(tmp_path):
 
 def test_postgresql_membership_persistence_and_concurrency():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"membership_service_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

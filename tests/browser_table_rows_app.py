@@ -1,11 +1,12 @@
 """Disposable in-memory app for the optional REF-144 browser regression script."""
 
 from dataset_helpers import create_owned_dataset, publish_dataset
-from test_dataset_browser import create_dataset, create_field, dataset_browser
+from support import _dataset_browser as dataset_browser
+from support import create_dataset, create_field
 
 from refrncr.web import create_flask_app
 
-_factory, s, admin, _ = dataset_browser.__wrapped__()
+_factory, s, admin, _ = dataset_browser()
 d = create_dataset(s, admin, "row-check", "Row check")
 create_field(s, admin, d, "description", "Description")
 create_field(s, admin, d, "code", "Code", is_required=True)

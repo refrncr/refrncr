@@ -233,8 +233,6 @@ def _postgres_command(arguments, *, url: URL, error: str):
 @pytest.fixture
 def postgres_recovery_databases():
     configured = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not configured:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     for executable in ("pg_dump", "pg_restore"):
         if not shutil.which(executable):
             pytest.fail(f"PostgreSQL recovery prerequisite is unavailable: {executable}")

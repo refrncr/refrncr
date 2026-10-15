@@ -1,11 +1,12 @@
 """Disposable explicit-concept browser fixture; no persistent user data."""
 
-from test_dataset_browser import create_dataset, create_field, dataset_browser
+from support import _dataset_browser as dataset_browser
+from support import create_dataset, create_field
 
 from refrncr.models import utc_now
 from refrncr.web import create_flask_app
 
-_factory, services, admin, _client = dataset_browser.__wrapped__()
+_factory, services, admin, _client = dataset_browser()
 now = utc_now()
 services.dataset_versions.clock = lambda: now
 password = "correct horse battery staple"

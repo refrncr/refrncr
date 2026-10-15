@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import event, select
-from test_dataset_browser import body, dataset_browser, login, request  # noqa: F401
+from support import body, login, request
 from test_dataset_records import (  # noqa: F401
     postgresql_record_services,
     record_services,

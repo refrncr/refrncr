@@ -1,7 +1,7 @@
 """Disposable fixture for report sizing and mobile Users browser regressions."""
 
 from browser_table_rows_app import admin, app, s
-from test_dataset_browser import create_dataset, create_field
+from support import create_dataset, create_field
 
 for width in (320, 768, 1440):
     for count in (1, 100):

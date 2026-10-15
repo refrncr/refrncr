@@ -1,6 +1,6 @@
 """Disposable REF-145 loopback browser fixture; no application data."""
 
-from test_dataset_browser import dataset_browser
+from support import dataset_browser
 from test_field_datatype_services import setup_dataset
 
 from refrncr.web import create_flask_app

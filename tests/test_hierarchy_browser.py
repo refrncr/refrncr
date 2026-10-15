@@ -5,13 +5,12 @@ from datetime import UTC, datetime
 
 import pytest
 from dataset_helpers import create_owned_dataset
-from test_dataset_browser import (
+from support import (
     body,
     login,
     request,
     session_csrf,
 )
-from test_dataset_browser import dataset_browser as dataset_browser
 
 from refrncr.hierarchy import HierarchyService
 from refrncr.services import DatasetRecordService, ValidationError

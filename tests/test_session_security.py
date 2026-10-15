@@ -465,8 +465,6 @@ def test_concurrent_cleanup_callers_each_make_serialized_bounded_progress():
 
 def test_postgresql_session_create_resolve_expire_revoke_rotation_and_cleanup():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"session_security_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

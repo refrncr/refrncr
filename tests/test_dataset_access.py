@@ -334,8 +334,6 @@ def test_audit_failure_rolls_back_metadata_update(dataset_access, monkeypatch):
 
 def test_postgresql_dataset_read_list_update_and_rollback(monkeypatch):
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_database_engine(database_url)
     schema = f"dataset_access_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

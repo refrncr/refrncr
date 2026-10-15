@@ -9,11 +9,10 @@ from pathlib import Path
 
 import pytest
 from jinja2 import Environment, FileSystemLoader
-from test_dataset_browser import (  # noqa: F401
+from support import (
     body,
     create_dataset,
     create_field,
-    dataset_browser,
     login,
     request,
 )

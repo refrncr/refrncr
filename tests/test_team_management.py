@@ -310,8 +310,6 @@ def test_concurrent_equivalent_names_on_sqlite(tmp_path):
 
 def test_concurrent_equivalent_names_on_postgresql():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"team_service_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

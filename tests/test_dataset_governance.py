@@ -33,8 +33,6 @@ def governance(request, tmp_path):
     administrative = None
     if request.param == "postgresql":
         url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        if not url:
-            pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
         administrative = create_database_engine(url)
         schema = f"governance_{uuid.uuid4().hex}"
         with administrative.begin() as connection:

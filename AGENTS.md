@@ -139,6 +139,8 @@ Do not claim that a quality control has passed if the corresponding tooling is n
 ## Tests
 
 - Unit tests should be fast and isolated where possible.
+- Test modules should verify behaviour through public interfaces, not read or parse source files.
+- Test files should be named after the functionality they cover, not Jira ticket numbers.
 - SQLite in-memory tests are appropriate for generic persistence behaviour.
 - PostgreSQL integration tests are required for PostgreSQL-specific or persistence-critical behaviour.
 - GitHub Actions provides PostgreSQL 16 as a service for the test job.

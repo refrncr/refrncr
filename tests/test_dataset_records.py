@@ -46,8 +46,6 @@ def record_services():
 @pytest.fixture
 def postgresql_record_services():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"dataset_records_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

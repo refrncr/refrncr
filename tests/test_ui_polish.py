@@ -11,15 +11,14 @@ import pytest
 from alembic import command
 from dataset_helpers import publish_dataset
 from sqlalchemy import event, inspect, text
-from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_browser import (  # noqa: F401
+from support import (
     body,
     create_dataset,
-    dataset_browser,
     login,
     request,
     session_csrf,
 )
+from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
 from test_dataset_version_migration import config_for
 from test_dataset_versions import NOW, content, publish, setup
 

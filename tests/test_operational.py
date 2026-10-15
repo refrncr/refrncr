@@ -108,8 +108,6 @@ def operational_database(request, tmp_path):
     administration = None
     if request.param == "postgresql":
         database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        if not database_url:
-            pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
         administration = create_engine(database_url)
         schema = f"operational_{uuid.uuid4().hex}"
         with administration.begin() as connection:

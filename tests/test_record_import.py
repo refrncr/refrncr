@@ -245,8 +245,6 @@ def import_context():
 @pytest.fixture
 def postgresql_import_context():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"record_import_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

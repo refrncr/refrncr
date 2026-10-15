@@ -7,10 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 from dataset_helpers import publish_dataset
-from test_dataset_browser import (  # noqa: F401
+from support import (
     body,
     create_dataset,
-    dataset_browser,
     login,
     request,
 )

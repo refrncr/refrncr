@@ -7,15 +7,14 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_browser import (  # noqa: F401
+from support import (
     body,
     create_dataset,
-    dataset_browser,
     login,
     request,
     session_csrf,
 )
+from test_audit_coverage import audit_db, context  # noqa: F401
 
 from refrncr.models import Dataset
 from refrncr.presentation_metadata import (

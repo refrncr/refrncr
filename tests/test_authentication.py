@@ -273,8 +273,6 @@ def test_account_creation_preserves_spaces_and_unicode_without_rewriting(
 @pytest.fixture
 def postgresql_authentication_services():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"authentication_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:
