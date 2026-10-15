@@ -75,4 +75,4 @@ maintenance authority under the Dataset lock immediately before their prepared-r
 audit. Discard winning this boundary returns no artifact or success export event.
 This implements REF-155's explicit invalidation requirement using the existing second
 UoW, without changing coherent preparation, Current/historical export or already accepted
-streaming semantics. See [implementation notes](../development/ref-155-report.md).
+streaming semantics. See the archived REF-155 implementation notes.

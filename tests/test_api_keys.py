@@ -377,7 +377,7 @@ def test_browser_revoke_validation_idor_and_api_key_cannot_login(keys):
     assert response.status_code == 303
     for target in (other.key.id, str(uuid4())):
         response = client.get("/settings/api-keys/" + target + "/revoke", base_url=base)
-        assert response.status_code == 400
+        assert response.status_code == 404
         assert response.get_data(as_text=True) == "API key not found"
     client.delete_cookie(SESSION_COOKIE, domain="localhost")
     response = client.get(

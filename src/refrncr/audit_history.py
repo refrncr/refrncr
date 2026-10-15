@@ -209,7 +209,7 @@ class AuditHistoryService:
                         for result in results.values()
                     ):
                         raise ValueError("Incomplete resolver result")
-                except Exception:
+                except Exception:  # noqa: BLE001 - audit reads expose no resolver details.
                     # A fixed technical diagnostic, never identifiers, names, SQL or exception data.
                     logging.getLogger(__name__).error("Audit object resolution failed")
                     raise AuditReadUnavailable("Audit history is temporarily unavailable") from None

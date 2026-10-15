@@ -7,8 +7,10 @@ name = "refrncr"
 version = "0.1.0"
 description = "Reference data without the enterprise baggage."
 readme = "README.md"
+license = "Elastic-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
-authors = [{ name = "refrncr" }]
+authors = [{ name = "DataMisu" }]
 dependencies = [
     "a2wsgi>=1.10,<2",
     "sqlalchemy>=2.0,<3",
@@ -64,13 +66,20 @@ refrncr = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "postgres: tests that require the configured PostgreSQL test database",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "A", "BLE", "C90"]
+per-file-ignores = { "src/refrncr/web.py" = ["C901"] }
+
+[tool.ruff.lint.mccabe]
+max-complexity = 44
 
 [tool.ruff.format]
 quote-style = "double"

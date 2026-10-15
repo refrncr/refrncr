@@ -16,7 +16,7 @@ REF-136 keeps header counts/freshness version-wide. The separate Records result 
 the exact count after String search and status selection, before
 pagination. The browser defaults to Active; a Concept offers Deleted and All. Criteria
 and page live in the GET URL, with no session search state. Every UI criteria change resets
-to page 1. Export actions retain their complete-version scope. See [REF-136](ref-136-report.md).
+to page 1. Export actions retain their complete-version scope. See the archived REF-136 report.
 
 `DatasetRecord` stores only the mutable current working set. Its revision is an optimistic
 concurrency counter, not another row/version. The explicitly named `current_overview` contract

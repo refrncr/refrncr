@@ -1174,6 +1174,15 @@ class DatasetService:
     def get_dataset(self, actor_id: str, key: str) -> DatasetRecord:
         return self.get_dataset_context(actor_id, key).dataset
 
+    def get_visible_dataset_by_id(self, actor_id: str, dataset_id: str) -> DatasetRecord:
+        with self.uow() as uow:
+            dataset = uow.datasets.get(dataset_id)
+            if dataset is None or not self.authorization.datasets.can_view_dataset(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            return dataset
+
     def get_dataset_details(self, actor_id: str, key: str) -> DatasetDetails:
         context = self.get_dataset_context(actor_id, key)
         dataset = context.dataset
@@ -1506,6 +1515,43 @@ class DatasetFieldService:
         return list(
             _version_reads(self).read(actor_id, dataset_key, page=None, prefer_concept=True).fields
         )
+
+    def list_fields_for_datasets(
+        self, actor_id: str, dataset_ids: tuple[str, ...]
+    ) -> dict[str, tuple[DatasetFieldRecord, ...]]:
+        """Read visible Dataset schemas in one snapshot and bounded query set."""
+        dataset_ids = tuple(dict.fromkeys(dataset_ids))
+        if not dataset_ids:
+            return {}
+        versions = _version_reads(self)
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            datasets = {dataset.id: dataset for dataset in uow.datasets.list_by_ids(dataset_ids)}
+            if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
+                raise AuthorizationError("Active user access required")
+            maintenance = self.authorization.datasets.maintainable_resources(actor_id, uow=uow)
+            allowed = set(maintenance.resource_ids)
+            concepts = uow.concepts.list_for_datasets(tuple(datasets))
+            current = uow.versions.current_for_datasets(tuple(datasets), versions._today().date())
+            working_ids = tuple(
+                dataset_id
+                for dataset_id in dataset_ids
+                if maintenance.all_resources or dataset_id in allowed
+                if dataset_id in concepts or dataset_id not in current
+            )
+            working_fields = uow.dataset_fields.list_for_datasets(working_ids)
+            version_fields = uow.versions.fields_for_versions(tuple(current.values()))
+            result = {}
+            for dataset_id in dataset_ids:
+                if dataset_id not in datasets:
+                    continue
+                if (maintenance.all_resources or dataset_id in allowed) and (
+                    dataset_id in concepts or dataset_id not in current
+                ):
+                    result[dataset_id] = tuple(working_fields.get(dataset_id, ()))
+                elif dataset_id in current:
+                    result[dataset_id] = tuple(version_fields.get(current[dataset_id].id, ()))
+            return result
 
     def get_field(self, actor_id: str, dataset_key: str, field_key: str) -> DatasetFieldRecord:
         key = self._validated_field_lookup_key(field_key)

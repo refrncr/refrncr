@@ -74,6 +74,7 @@
     "refrncr.services.DatasetFieldService.delete_field",
     "refrncr.services.DatasetFieldService.get_field",
     "refrncr.services.DatasetFieldService.list_fields",
+    "refrncr.services.DatasetFieldService.list_fields_for_datasets",
     "refrncr.services.DatasetFieldService.move_field",
     "refrncr.services.DatasetFieldService.replace_order",
     "refrncr.services.DatasetFieldService.update_field",
@@ -96,6 +97,7 @@
     "refrncr.services.DatasetService.get_dataset_details",
     "refrncr.services.DatasetService.get_dataset_for_deletion",
     "refrncr.services.DatasetService.get_dataset_for_edit",
+    "refrncr.services.DatasetService.get_visible_dataset_by_id",
     "refrncr.services.DatasetService.grant_export_access",
     "refrncr.services.DatasetService.list_dataset_overview",
     "refrncr.services.DatasetService.list_datasets",
@@ -1095,8 +1097,10 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.create_user",
+        "refrncr.services.UserService.list_users",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1123,8 +1127,10 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.change_email",
+        "refrncr.services.UserService.list_users",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1151,8 +1157,12 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.TeamService.create_team",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1164,8 +1174,12 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.TeamService.rename_team",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1204,7 +1218,11 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.create_membership",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },
@@ -1217,7 +1235,11 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.delete_membership",
+        "refrncr.services.MembershipService.list_eligible_users",
+        "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.TeamService.list_teams",
         "refrncr.web.require_csrf"
       ]
     },

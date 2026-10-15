@@ -108,7 +108,7 @@ def publish_documentation(app, api):
     def openapi_document():
         try:
             return CanonicalJSONResponse(app.openapi(), headers=SAFE_HEADERS)
-        except Exception:
+        except Exception:  # noqa: BLE001 - the public schema endpoint must fail closed.
             return CanonicalJSONResponse(
                 {"error": "service_unavailable"}, status_code=503, headers=SAFE_HEADERS
             )

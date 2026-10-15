@@ -752,10 +752,11 @@ def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeyp
     with monkeypatch.context() as patch:
         patch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail)
         response = request(browser, "post", f"/datasets/{c.d.key}/concept/discard", data=payload)
-    assert response.status_code == 503
-    assert response.text == "Dataset versions are temporarily unavailable. Reload and try again."
+    assert response.status_code == 500
+    assert "Error 500" in response.text
+    assert "Dataset versions could not be loaded. Please try again." in response.text
     assert [record.getMessage() for record in caplog.records] == [
-        "Dataset version operation unavailable: RuntimeError"
+        "Dataset version operation failed: RuntimeError"
     ]
-    assert all(record.exc_info is None for record in caplog.records)
+    assert all(record.exc_info is not None for record in caplog.records)
     assert snapshot(c) == before

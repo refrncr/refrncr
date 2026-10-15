@@ -1,8 +1,8 @@
 # Dataset versions: domain and controlled upgrade (REF-83)
 
 Foundation: REF-83 is merged in `main` (`a3f8fed`); see its
-[validation report](ref-83-report.md). The local REF-84 extension is documented below
-and in the [review implementation report](ref-84-report.md).
+the archived REF-83 validation report. The local REF-84 extension is documented below
+and in the archived REF-84 review implementation report.
 
 An active concept is an explicit editing round backed by the existing Dataset working set.
 Its persistent lifecycle is defined in [ADR-015](../architecture/adr-015-explicit-dataset-concepts.md). Each publication stores its complete
@@ -177,7 +177,7 @@ Review opening is the explicit REF-149 read-audit exception: one atomically comm
 `dataset.version_diff_viewed` event containing only actor/Dataset identity and eight bounded
 integer context fields. Child navigation produces no events. Audit insert/commit failure
 returns no review. See [audit policy](audit-policy.md) and the
-[REF-84 implementation and measured validation report](ref-84-report.md).
+archived REF-84 implementation and measured validation report.
 
 Review uses scalar streams and SQL aggregates, bounded Record heaps and paged value reads.
 There is no diff storage/cache, full value graph, N+1 query, background job, download, API,
@@ -261,7 +261,7 @@ preserves current Dataset metadata and writes one bounded audit; published snaps
 governance remain intact. It creates no new Concept. The existing explicit creation
 policy remains unchanged: Scheduled when applicable, otherwise Current. This also
 applies to Create concept after discard, as explicitly confirmed for REF-155. See
-[architecture and validation report](ref-155-report.md).
+the archived REF-155 architecture and validation report.
 
 ## REF-160 retained deletions and import eligibility
 
@@ -325,5 +325,5 @@ The internal `DatasetVersionService.read` keeps its pre-existing All default for
 that consume the combined Record projection; the Records HTTP adapter explicitly supplies
 Active by default. No public Record mutation, import, export or audit contract changes.
 No schema/index migration is needed. Full-set canonical sorting remains in Python, with
-the existing joined/batched loading. See [REF-136](ref-136-report.md) for URL grammar,
+the existing joined/batched loading. See the archived REF-136 report for URL grammar,
 null/schema semantics, performance and validation evidence.

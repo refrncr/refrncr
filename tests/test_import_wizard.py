@@ -428,7 +428,7 @@ def test_technical_failure_is_safe_and_retryable(wizard, monkeypatch):
 
     monkeypatch.setattr(importer, "uow", fail_write)
     failed = wizard.post(wizard.path + "/confirm")
-    assert failed.status_code == 503
+    assert failed.status_code == 500
     assert "SECRET" not in failed.text
     assert "No records have been imported." in failed.text
     assert wizard.count() == 0
@@ -498,7 +498,7 @@ def test_unexpected_preview_failure_exposes_no_details(wizard, monkeypatch):
 
     monkeypatch.setattr(wizard.services.record_imports, "_validate", fail)
     page = wizard.get(wizard.path + "/step/4")
-    assert page.status_code == 503
+    assert page.status_code == 500
     assert "No records have been imported" in page.text
     assert "INTERNAL" not in page.text
     assert wizard.count() == 0
@@ -518,7 +518,7 @@ def test_changed_mapping_invalidates_old_confirmation_even_when_validation_fails
 
     monkeypatch.setattr(wizard.services.record_imports, "_validate", fail)
     page = wizard.preview(("code", "amount", None))
-    assert page.status_code == 503
+    assert page.status_code == 500
     assert "value='__ignored__' selected" in page.text
     assert "INTERNAL" not in page.text
     assert wizard.post(wizard.path + "/confirm").status_code == 404

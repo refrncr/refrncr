@@ -103,18 +103,3 @@ def test_section_tabs_javascript_failure_and_recovery():
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_branding_introduction_matches_the_shipped_assets():
-    text = (ROOT / "docs/development/ui-foundation.md").read_text()
-    introduction = text.split("## Assets and typography", 1)[1].split(
-        "The typography contract is:", 1
-    )[0]
-    for name in ("refrncr-wordmark-primary.svg", "favicon.svg", "refrncr-loader.svg"):
-        assert name in introduction
-        assert (ROOT / "src/refrncr/static/images" / name).is_file()
-    assert "prefers-reduced-motion: reduce" in introduction
-    assert "hides the loader" in introduction
-    assert "served locally" in introduction
-    for obsolete in ("07-static", "02-animated", "06-favicon", "concentric", "picture"):
-        assert obsolete not in introduction

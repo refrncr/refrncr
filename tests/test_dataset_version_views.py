@@ -499,7 +499,7 @@ def test_database_read_failure_is_bounded_and_has_no_success_event(context, monk
             c.s.dataset_records.export_dataset(c.a.id, c.d.key, "json", version_id=version.id)
     suffix = "/records" if operation == "read" else "/records/export?format=json"
     response = request(browser, "get", f"/datasets/{c.d.key}/versions/{version.id}{suffix}")
-    assert response.status_code == 503
+    assert response.status_code == 500
     for private in ("SELECT", "secret_value", "private-database-path", "OperationalError"):
         assert private not in response.text
     assert snapshot(c) == before

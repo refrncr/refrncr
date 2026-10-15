@@ -114,7 +114,7 @@ last, with stable Record-ID tie-breaking. REF-136 general search covers only Str
 including String identifiers, using NFC and Unicode casefold. Non-String values
 are not searched through their presentation text. Typed Field filters are deferred
 at the product owner's request. There is no per-column ordering UI.
-See [the search contract and evidence](ref-136-report.md).
+See the archived REF-136 search contract and evidence.
 
 Field create/edit exposes all nine labels. A datatype change is allowed only
 when **that Field has no non-null stored value**, including when other Records
@@ -290,7 +290,7 @@ Detected and successfully remembered proposals initialize the same components.
 Float's one fixed `v1-float` profile accepts ordinary and scientific notation in
 one column; its parser and canonical finite-double representation are unchanged.
 Decimal remains exact and rejects exponent notation. See
-[the REF-158 report](ref-158-report.md) for validation evidence and
+the archived REF-158 report for validation evidence and
 [import security](record-import-security.md) for form validation.
 
 ## Descriptive Field metadata (REF-162)

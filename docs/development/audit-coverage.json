@@ -385,7 +385,9 @@
       "operation": "list_users",
       "service": "refrncr.services.UserService.list_users",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users"
+        "refrncr.web.user_list GET /users",
+        "refrncr.web.create_user POST /users",
+        "refrncr.web.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -799,7 +801,11 @@
       "operation": "list_teams",
       "service": "refrncr.services.TeamService.list_teams",
       "interface_entrypoints": [
-        "refrncr.web.team_list GET /teams"
+        "refrncr.web.team_list GET /teams",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -832,7 +838,11 @@
       "service": "refrncr.services.MembershipService.list_team_members",
       "interface_entrypoints": [
         "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members"
+        "refrncr.web.team_members GET /teams/<team_id>/members",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -865,7 +875,11 @@
       "service": "refrncr.services.MembershipService.list_eligible_users",
       "interface_entrypoints": [
         "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members"
+        "refrncr.web.team_members GET /teams/<team_id>/members",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4685,7 +4699,7 @@
         "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
         "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
       ],
-      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. Current validation is retained in the project archive. REF-31 owns denied/suspicious security logging.",
       "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -4719,7 +4733,7 @@
         "tests/test_audit_history_review.py::test_demoted_admin_and_forged_session_cannot_reuse_any_read",
         "tests/test_audit_history_review.py::test_read_failure_at_each_stage_is_neutral_and_never_commits"
       ],
-      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. See ref-39-part-2-report.md for current validation. REF-31 owns denied/suspicious security logging.",
+      "implementation_status": "REF-39 locally implemented and independently reviewed; uncommitted, GitHub CI pending. Current validation is retained in the project archive. REF-31 owns denied/suspicious security logging.",
       "exclusion_reason": "Administrator-only audit history read; no business state change or domain event.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
     },
@@ -5206,7 +5220,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5242,7 +5256,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5278,7 +5292,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5314,7 +5328,7 @@
         "tests/test_dataset_diff.py::test_stale_baseline_and_revision",
         "tests/test_dataset_diff_views.py::test_review_navigation_details_and_no_audit_noise"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Child read in one authorized revision-bound review; opening owns the event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -5371,7 +5385,7 @@
         "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
         "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5413,7 +5427,7 @@
         "tests/test_concept_lifecycle.py::test_first_concept_review_publication_and_closed_mutations",
         "tests/test_concept_lifecycle.py::test_duplicate_and_concurrent_creation_one_event"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5444,7 +5458,7 @@
       "tests": [
         "tests/test_concept_migration.py::test_lossless_migration_and_retry"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5475,7 +5489,7 @@
       "tests": [
         "tests/test_concept_migration.py::test_lossless_migration_and_retry"
       ],
-      "implementation_status": "Implemented; validation recorded in docs/development/ref-84-report.md",
+      "implementation_status": "Implemented; validation recorded in the archived REF-84 report",
       "exclusion_reason": "Stopped-writer concept migration/preflight; no invented actor or domain event.",
       "persistence_scope": "Active concept row, existing working tables, immutable baseline and central AuditEvent."
     },
@@ -5545,7 +5559,7 @@
         "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
         "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "Authorized coherent concept/published read; current REF-73 permissions, no mutation or domain event.",
       "persistence_scope": "Read-only Concept identity, Dataset metadata and snapshot/diff aggregates."
     },
@@ -5593,7 +5607,7 @@
         "tests/test_concept_discard.py::test_discard_removes_working_state_preserves_snapshots_and_governance",
         "tests/test_concept_discard.py::test_current_required_preserves_first_metadata"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "",
       "persistence_scope": "Working values, Records, identifiers, source-format proposals, Fields and Concept; Dataset metadata restored from Current. Snapshots and governance retained."
     },
@@ -5624,7 +5638,7 @@
       "tests": [
         "tests/test_concept_discard.py::test_import_tokens_cannot_attach_to_replacement_concept"
       ],
-      "implementation_status": "REF-155 implementation; validation and limitations in docs/development/ref-155-report.md.",
+      "implementation_status": "REF-155 implementation; validation and limitations in the archived REF-155 report.",
       "exclusion_reason": "Process-local staged import lifecycle; no durable business change. Confirmation owns the summary.",
       "persistence_scope": "Transient process state only; no durable business state."
     },
@@ -5707,7 +5721,13 @@
       "service": "refrncr.services.MembershipService.list_relationships",
       "interface_entrypoints": [
         "refrncr.web.user_list GET /users",
-        "refrncr.web.team_list GET /teams"
+        "refrncr.web.team_list GET /teams",
+        "refrncr.web.create_user POST /users",
+        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5969,7 +5989,7 @@
         "tests/test_rest_api.py::test_success_log_is_safe_and_304_updates_last_used",
         "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
       ],
-      "implementation_status": "REF-169 implemented locally; validation is recorded in ref-169-report.md.",
+      "implementation_status": "REF-169 implemented locally; validation is recorded in the archived REF-169 report.",
       "exclusion_reason": "REF-169 keeps durable failed-authentication coverage; successful requests use only safe operational request completion metadata."
     },
     {
@@ -6005,7 +6025,7 @@
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
       ],
-      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -6042,7 +6062,7 @@
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
       ],
-      "implementation_status": "REF-107 local implementation; validation recorded in ref-107-report.md.",
+      "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Bulk current Community Dataset view decision; no mutation or domain event.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
     },
@@ -6308,6 +6328,68 @@
       "implementation_status": "Implemented for REF-179; hierarchy values are never audit context.",
       "exclusion_reason": "",
       "persistence_scope": "Existing Dataset unit of work and AuditEvent."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "get_visible_dataset_by_id",
+      "service": "refrncr.services.DatasetService.get_visible_dataset_by_id",
+      "interface_entrypoints": [
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
+      "implementation_status": "Implemented for REF-207 N+1 lookup reduction.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetFieldService",
+      "operation": "list_fields_for_datasets",
+      "service": "refrncr.services.DatasetFieldService.list_fields_for_datasets",
+      "interface_entrypoints": [
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Bulk field lookup remains scoped to the authorized dataset IDs supplied by the service boundary.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or field values in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use only trusted dataset IDs in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
+      "implementation_status": "Implemented for REF-207 N+1 lookup reduction.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing DatasetField read boundary; no new domain persistence."
     }
   ]
 }

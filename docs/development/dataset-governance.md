@@ -130,7 +130,7 @@ access do not authorize deletion. The separate confirmation shows current Field/
 and requires the exact current Dataset name plus unchanged expected metadata timestamp.
 Deletion is permanent and atomic with its one audit event. All operational dependencies
 are removed; users, teams, memberships and append-only history remain. See the
-[dependency inventory and confirmation contract](ref-141-report.md). No soft delete, undo,
+the archived REF-141 dependency inventory and confirmation contract. No soft delete, undo,
 recovery, retention policy, background job or migration is introduced.
 
 ## REF-83 publication authority (product-owner clarification, 2026-09-10)
@@ -174,7 +174,7 @@ under the Dataset lock. Legacy Viewer/Editor grants and export access are insuff
 It additionally requires an active Concept and a Current version. Ownership changes
 invalidate the signed confirmation even for a Community admin; membership removal
 revokes discard authority. Discard preserves ownership, grants, memberships and export
-access. See [REF-155 report](ref-155-report.md).
+access. See the archived REF-155 report.
 
 ## REF-162 Configure access placement
 

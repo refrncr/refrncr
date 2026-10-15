@@ -52,3 +52,16 @@ only; runtime readiness uses the composition's existing SQLAlchemy engine and th
 packaged Alembic script head. Neither probe enters OpenAPI or durable domain audit.
 The Flask mount, API mount and CLI's automatic fail-closed migration/bootstrap
 sequence remain unchanged. REF-168 owns any future migration/start separation.
+
+## Current deviations
+
+The Flask boundary currently contains request-specific orchestration and presentation mapping for
+server-rendered forms, including parsing request data, selecting the response context and
+translating service errors into form responses. This is intentional composition code at the web
+edge, not a second business-logic layer: authorization, domain validation rules, transactions and
+persistence remain in the shared application services. FastAPI endpoints must continue to call
+those same services and may use their own API-specific mapping.
+
+A future extraction is appropriate only when a separate story defines a reusable API contract or
+another concrete consumer. This ADR does not require a speculative `web.py`/services split as
+cleanup work.

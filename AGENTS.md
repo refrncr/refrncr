@@ -23,7 +23,7 @@ These instructions apply to the entire `refrncr` repository.
   - `chore/<short-description>`
   - `docs/<short-description>`
   - `test/<short-description>`
-- Use Conventional Commits.
+- Use Conventional Commits, for example `fix(web): preserve form feedback`.
 - Keep commits and pull requests focused on one logical change.
 - Do not merge a pull request until CI is green.
 - Use squash merge into `main`.
@@ -93,24 +93,13 @@ The current development quality baseline consists of:
 - GitHub Actions CI;
 - Dependabot.
 
-### Planned quality controls
+### Additional CI controls
 
-The following are planned but are not yet mandatory repository checks:
-
-- type checking;
-- migration tests;
-- dedicated SAST;
-- dedicated secret scanning;
-- container scanning;
-- SBOM generation;
-- end-to-end tests;
-- authorization-matrix tests;
-- tenant-isolation tests;
-- automated release pipelines.
-
-Do not claim that planned tooling is configured or required.
-
-When a Jira story requires one of these controls and the tooling does not yet exist, identify the gap rather than silently assuming the control is available.
+The repository also runs migration and authorization-boundary tests, CodeQL, Gitleaks,
+and release-time CycloneDX SBOM generation in GitHub Actions. These are CI controls, not
+local replacements for the required commands above. Type checking, container scanning,
+tenant-isolation testing, and automated release publication remain out of scope unless a
+future story configures them.
 
 
 ## Required checks before completing a change
@@ -157,12 +146,18 @@ Do not claim that a quality control has passed if the corresponding tooling is n
 
 ## Security
 
+Use HTTP 403 for authenticated authorization failures. Resource-specific routes that deliberately
+avoid disclosing whether an inaccessible object exists may return the documented uniform HTTP 404;
+do not introduce new 404 masking without an explicit security contract and a regression test.
+
 - Never commit passwords, API keys, access tokens, private keys or production credentials.
 - Treat credentials used in local/CI test containers as disposable test-only values.
 - Do not include sensitive vulnerability details in public GitHub Issues.
 - Follow `SECURITY.md` for security reporting.
 - Avoid logging secrets or sensitive data.
 - Prefer least-privilege behaviour when adding authorization or access controls.
+- After a form error, ordinary submitted values are returned escaped so users can correct them;
+  passwords, API keys and session tokens are never rendered back into HTML.
 
 ## Community vs Cloud boundary
 

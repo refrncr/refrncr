@@ -49,7 +49,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     response = request(client, "get", url)
     if permission == "viewer" and not count:
         assert response.status_code == 404
-        assert b"Reference data" not in response.data
+        assert b'<h1 id="error-title">The requested page could not be found.</h1>' in response.data
         return
     assert response.status_code == 200
     page = body(response)

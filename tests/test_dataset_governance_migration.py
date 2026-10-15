@@ -32,7 +32,7 @@ def legacy(engine):
     Base.metadata.drop_all(engine)
     migrate(engine, "0011_ref_130")
     with engine.begin() as c:
-        for id in ("creator", "other"):
+        for identifier in ("creator", "other"):
             c.execute(
                 text(
                     "INSERT INTO "
@@ -40,15 +40,15 @@ def legacy(engine):
                     "eated_at,updated_at) VALUES (:id,:email,:id,'unused','user',true,false"
                     ",CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
                 ),
-                {"id": id, "email": id + "@example.com"},
+                {"id": identifier, "email": identifier + "@example.com"},
             )
-        for id in ("one", "two"):
+        for identifier in ("one", "two"):
             c.execute(
                 text(
                     "INSERT INTO teams(id,name,name_key,created_at,updated_at) VALUES "
                     "(:id,:id,:id,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
                 ),
-                {"id": id},
+                {"id": identifier},
             )
         c.execute(
             text(

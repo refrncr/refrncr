@@ -143,7 +143,7 @@ No dependency, Cloud tenant model, external secrets service, API scope system or
 retention purge is introduced. Key/audit history grows under existing retention
 policy. Rate limiting and the future HTTP adapter remain outside REF-40.
 See [ADR-018](../architecture/adr-018-user-api-keys.md) and the
-[validation report](ref-40-report.md).
+the archived REF-40 validation report.
 
 ## REF-107 HTTP integration
 

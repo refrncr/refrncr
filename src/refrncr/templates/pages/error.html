@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}{{ error_code }} · REFRNCR{% endblock %}
+
+{% block content %}
+  <section class="page-header" aria-labelledby="error-title">
+    <div>
+      <p class="eyebrow">Error {{ error_code }}</p>
+      <h1 id="error-title">{{ error_message }}</h1>
+      <p><a class="button button-secondary" href="{{ url_for('index') }}">Back to overview</a></p>
+    </div>
+  </section>
+{% endblock %}

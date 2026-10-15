@@ -321,7 +321,7 @@ def test_review_failure_hides_internal_details(context, monkeypatch):  # noqa: F
 
     monkeypatch.setattr(DatasetDiffService, "record_detail", fail)
     response = request(browser, "get", path(base + f"/records/{c.record.id}", token))
-    assert response.status_code == 503
+    assert response.status_code == 500
     assert response.headers["Cache-Control"] == "no-store"
     for internal in ("SELECT", "constraint", "/private/", "Traceback", "RuntimeError"):
         assert internal not in response.text

@@ -152,6 +152,32 @@ def authenticated_csrf(client):
     return csrf_token(response)
 
 
+def test_browser_error_pages_keep_the_authenticated_shell(interface):
+    _, users, authentication, _, _, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+
+    not_found = request(client, "get", "/does-not-exist")
+    method_not_allowed = request(client, "get", "/users/not-an-id/email")
+
+    assert not_found.status_code == 404
+    assert method_not_allowed.status_code == 405
+    for response, code in ((not_found, 404), (method_not_allowed, 405)):
+        page = response_text(response)
+        assert f"Error {code}" in page
+        assert "Back to overview" in page
+        assert "Log out" in page
+
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    regular = users.create_user(admin.id, "regular@example.com", "Regular", "valid password")
+    assert login(client, regular.email, "valid password").status_code == 302
+    forbidden = request(client, "get", "/users")
+
+    assert forbidden.status_code == 403
+    assert "Error 403" in response_text(forbidden)
+    assert "Log out" in response_text(forbidden)
+
+
 def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
     (
         _,
@@ -789,8 +815,8 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert f"aria-label='View user {managed.display_name} ({managed.id})'" in table
 
     css = response_text(request(client, "get", "/static/css/components/tables.css"))
-    breakpoint = "@media (max-width: 767px)"
-    desktop, mobile = css.split(breakpoint, 1)
+    breakpoint_rule = "@media (max-width: 767px)"
+    desktop, mobile = css.split(breakpoint_rule, 1)
     mobile = mobile.split("\n}", 1)[0]
     assert "user-management-table" not in desktop
     rules = {
@@ -812,7 +838,7 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert "overflow-wrap: anywhere;" in rules[".user-management-table .table-cell-wrap"]
 
     panel_css = response_text(request(client, "get", "/static/css/components/dialog.css"))
-    mobile_panel = panel_css.split(breakpoint)[1].split("/* Shared")[0]
+    mobile_panel = panel_css.split(breakpoint_rule)[1].split("/* Shared")[0]
     assert "grid-template-columns: minmax(0, 1fr) var(--control-height);" in mobile_panel
     assert "width: var(--control-height); justify-self: end; align-self: start;" in mobile_panel
 
@@ -927,7 +953,7 @@ def test_expected_user_error_does_not_expose_sensitive_values(interface):
             "csrf_token": csrf,
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 409
     body = response_text(response)
     assert secret_password not in body
     assert "password_hash" not in body
@@ -973,15 +999,20 @@ def test_change_email_validation_error_is_controlled(interface):
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")
     csrf = authenticated_csrf(client)
 
+    malformed_email = '<script>alert("bad")</script>'
     response = request(
         client,
         "post",
         f"/users/{managed.id}/email",
-        data={"email": "malformed email", "csrf_token": csrf},
+        data={"email": malformed_email, "csrf_token": csrf},
     )
 
     assert response.status_code == 400
-    assert "malformed email" not in response_text(response)
+    page = response_text(response)
+    assert "value='&lt;script&gt;alert(&#34;bad&#34;)&lt;/script&gt;'" in page
+    assert malformed_email not in page
+    error = re.search(r"<div class='alert alert-error'[^>]*>(.*?)</div>", page, re.S)
+    assert error is not None and "bad" not in error.group(1)
     assert authentication.authenticate("managed@example.com", "valid password").id == managed.id
 
 
@@ -1081,7 +1112,7 @@ def test_team_list_only_loads_memberships_for_the_open_team(interface, monkeypat
 
 def test_management_routes_use_file_templates_without_inline_markup():
     web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
-    management_source = web_source.split('    @app.get("/users")', 1)[1].split(
+    management_source = web_source.split("    def render_user_list", 1)[1].split(
         "    @app.errorhandler(UserManagementError)", 1
     )[0]
 
@@ -1161,7 +1192,7 @@ def test_team_interface_escapes_names_and_controls_validation_errors(interface):
         "/teams",
         data={"name": "<SCRIPT>ALERT(1)</SCRIPT>", "csrf_token": csrf},
     )
-    assert response.status_code == 400
+    assert response.status_code == 409
     assert "<SCRIPT>" not in response_text(response)
 
 
@@ -1279,25 +1310,29 @@ def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(
     users.delete_user(admin.id, deleted.id)
     csrf = authenticated_csrf(client)
 
-    for path, data in [
-        (f"/teams/{team.id}/members", {"user_id": managed.id, "csrf_token": csrf}),
+    cases = [
+        (f"/teams/{team.id}/members", {"user_id": managed.id, "csrf_token": csrf}, 409),
         (
             f"/teams/{team.id}/members",
             {"user_id": str(uuid.uuid4()), "csrf_token": csrf},
+            404,
         ),
-        (f"/teams/{team.id}/members", {"user_id": disabled.id, "csrf_token": csrf}),
-        (f"/teams/{team.id}/members", {"user_id": deleted.id, "csrf_token": csrf}),
+        (f"/teams/{team.id}/members", {"user_id": disabled.id, "csrf_token": csrf}, 400),
+        (f"/teams/{team.id}/members", {"user_id": deleted.id, "csrf_token": csrf}, 400),
         (
             f"/teams/{uuid.uuid4()}/members",
             {"user_id": managed.id, "csrf_token": csrf},
+            404,
         ),
         (
             f"/teams/{team.id}/members/{uuid.uuid4()}/delete",
             {"csrf_token": csrf},
+            404,
         ),
-    ]:
+    ]
+    for path, data, expected_status in cases:
         response = request(client, "post", path, data=data)
-        assert response.status_code == 400
+        assert response.status_code == expected_status
         assert "password_hash" not in response_text(response)
         assert SESSION_COOKIE not in response_text(response)
 
