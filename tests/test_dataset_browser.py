@@ -929,13 +929,14 @@ def test_admin_create_flow_persists_owner_and_audit_without_grant(dataset_browse
         grant = session.scalar(
             select(Grant).where(Grant.resource_type == "dataset", Grant.resource_id == dataset.id)
         )
-        events = set(
-            session.execute(
+        events = {
+            tuple(row)
+            for row in session.execute(
                 select(AuditEvent.object_type, AuditEvent.action).where(
                     AuditEvent.object_id == dataset.id
                 )
-            ).tuples()
-        )
+            ).all()
+        }
     assert dataset.name == "Reference data"
     assert dataset.description == "  Preserved description  "
     assert dataset.owner_user_id == admin.id

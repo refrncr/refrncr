@@ -7,6 +7,12 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tools.compile_dev_lock import (
+    COMPILE_FLAGS as DEV_COMPILE_FLAGS,
+)
+from tools.compile_dev_lock import (
+    PIP_TOOLS_VERSION as DEV_PIP_TOOLS_VERSION,
+)
 from tools.compile_release_lock import (
     CANONICAL_PLATFORM,
     CANONICAL_PYTHON,
@@ -109,6 +115,59 @@ def test_release_lock_generator_pins_tool_and_all_relevant_flags():
         step for step in dependency_job["steps"] if "setup-python@" in step.get("uses", "")
     )
     assert setup_python["with"]["python-version"] == "3.12"
+
+
+def test_development_tool_pins_match_project_hooks_and_workflows():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    dev = metadata["project"]["optional-dependencies"]["dev"]
+    dev_input = (ROOT / "requirements/dev.in").read_text()
+    dev_lock = (ROOT / "requirements/dev.txt").read_text()
+    pre_commit = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    release = load_workflow("release.yml")
+
+    expected = {
+        "ruff": "0.16.5",
+        "pytest": "8.4.2",
+        "pytest-cov": "6.2.1",
+        "cyclonedx-bom": "7.4.0",
+    }
+    for package, pinned in expected.items():
+        assert f"{package}=={pinned}" in dev
+        assert f"{package}=={pinned}" in dev_input
+        assert f"{package}=={pinned}" in dev_lock
+
+    ruff_hook = next(repo for repo in pre_commit["repos"] if "ruff-pre-commit" in repo["repo"])
+    assert ruff_hook["rev"] == "v0.16.5"
+    release_install = next(
+        step["run"]
+        for step in release["jobs"]["build"]["steps"]
+        if "cyclonedx-bom==" in step.get("run", "")
+    )
+    assert "cyclonedx-bom==7.4.0" in release_install
+
+
+def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
+    assert (
+        f"pip-tools=={DEV_PIP_TOOLS_VERSION}"
+        in (
+            tomllib.loads((ROOT / "pyproject.toml").read_text())["project"][
+                "optional-dependencies"
+            ]["dev"]
+        )
+    )
+    assert set(DEV_COMPILE_FLAGS) >= {
+        "--no-config",
+        "--generate-hashes",
+        "--resolver=backtracking",
+        "--strip-extras",
+        "--allow-unsafe",
+        "--build-isolation",
+        "--no-upgrade",
+        "--reuse-hashes",
+    }
+    security = (ROOT / ".github/workflows/security.yml").read_text()
+    assert "python tools/compile_dev_lock.py" in security
+    assert "git diff --exit-code -- requirements/dev.txt" in security
 
 
 def test_exception_register_accepts_valid_exception(tmp_path):

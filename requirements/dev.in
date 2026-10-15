@@ -1,0 +1,12 @@
+# Exact development-tool input. Runtime dependencies remain in release.txt.
+build==1.6.1
+cyclonedx-bom==7.4.0
+httpx==0.28.1
+pip-tools==7.6.1
+pre-commit==4.6.2
+pytest==8.4.2
+pytest-cov==6.2.1
+pyyaml==6.0.3
+ruff==0.16.5
+setuptools==80.9.0
+twine==6.2.0

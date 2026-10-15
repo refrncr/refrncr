@@ -29,17 +29,23 @@ refrncr = "refrncr.cli:entrypoint"
 
 [project.optional-dependencies]
 dev = [
-    "build>=1.3,<2",
-    "cyclonedx-bom>=7.1,<8",
-    "httpx>=0.28,<1",
-    "pip-audit>=2.9,<3",
+    "build==1.6.1",
+    "cyclonedx-bom==7.4.0",
+    "httpx==0.28.1",
+    "pytest-cov==6.2.1",
     "pip-tools==7.6.1",
-    "pre-commit>=4.0,<5",
-    "pytest>=8.3,<10",
-    "pyyaml>=6.0,<7",
-    "ruff>=0.16,<0.17",
-    "setuptools>=75",
-    "twine>=6.2,<8",
+    "pre-commit==4.6.2",
+    "pytest==8.4.2",
+    "pyyaml==6.0.3",
+    "ruff==0.16.5",
+    "setuptools==80.9.0",
+    "twine==6.2.0",
+]
+quality = [
+    "bandit>=1.8,<2",
+    "pip-audit>=2.9,<3",
+    "radon>=6,<7",
+    "vulture>=2.14,<3",
 ]
 
 [tool.setuptools]
@@ -66,9 +72,33 @@ refrncr = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    "error::DeprecationWarning:refrncr",
+    "ignore:.*httpx.*deprecated.*:starlette.exceptions.StarletteDeprecationWarning:fastapi.testclient",
+    "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated.*:DeprecationWarning:starlette.testclient",
+    # Python 3.12's sqlite3 adapter warns for SQLAlchemy's supported datetime binding;
+    # this is third-party compatibility code and is covered by the database matrix.
+    "ignore:The default datetime adapter is deprecated.*:DeprecationWarning:sqlalchemy.engine.default",
+]
 markers = [
     "postgres: tests that require the configured PostgreSQL test database",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["src/refrncr"]
+omit = [
+    "src/refrncr/migrations/*",
+    "*/installed-artifact*/build source/*",
+]
+
+[tool.coverage.report]
+omit = [
+    "src/refrncr/migrations/*",
+    "*/installed-artifact*/build source/*",
+]
+fail_under = 90
+show_missing = true
 
 [tool.ruff]
 target-version = "py312"
