@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
-from support import html_elements
+from support import html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
@@ -574,7 +574,7 @@ def test_invalid_login_uses_generic_accessible_feedback_without_reflection(inter
     page = response_text(response)
 
     assert response.status_code == 401
-    assert page.count("Invalid credentials") == 1
+    assert html_tag_texts(page, "div").count("Invalid credentials") == 1
     assert "id='login-error' role='alert'" in page
     elements = html_elements(page)
     assert sum(attrs.get("aria-describedby") == "login-error" for _, attrs in elements) == 2

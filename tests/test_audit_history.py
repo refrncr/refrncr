@@ -1,9 +1,11 @@
 """REF-39 read, privacy and pagination contracts on both supported databases."""
 
+import ast
 import html as html_module
 import re
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
@@ -464,6 +466,17 @@ def test_database_failure_is_neutral(history, monkeypatch):
     response = browser.get("/settings/audit-log", base_url="https://localhost")
     assert response.status_code == 503
     assert "secret" not in response.get_data(as_text=True)
+
+
+def test_read_boundary_has_no_framework_or_database_imports():
+    root = Path(__file__).parents[1] / "src/refrncr"
+    for name in ("audit_history.py", "audit_presentation.py", "ports.py", "web.py"):
+        tree = ast.parse((root / name).read_text())
+        imports = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
+        imports += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
+        assert not any(n and n.startswith("sqlalchemy") for n in imports)
+        if name != "web.py":
+            assert not any(n and n.startswith("flask") for n in imports)
 
 
 def test_chronology_query_plan(history):

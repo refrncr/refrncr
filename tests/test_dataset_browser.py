@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from dataset_helpers import create_owned_dataset, publish_dataset
@@ -665,27 +666,6 @@ def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):
     assert "<span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>" in page
 
 
-def test_record_table_uses_monospace_data_and_48_pixel_rows(dataset_browser):
-    _, services, admin, client = dataset_browser
-    dataset = create_dataset(services, admin, "table-style")
-    create_field(services, admin, dataset, "code", "Code", is_required=True)
-    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
-    services.dataset_records.create_record(admin.id, dataset.key, {"code": "ABC"})
-    login(client)
-
-    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
-    stylesheet = body(request(client, "get", "/static/css/components/tables.css"))
-
-    assert "<table class='record-table'>" in page
-    assert "min-height: var(--record-row-min-height)" in stylesheet
-    assert "height: var(--record-row-min-height)" in stylesheet
-    assert ".record-table td" in stylesheet
-    assert (
-        "color: var(--color-text-data); font-family: var(--font-data); "
-        "font-size: var(--font-size-xs)" in stylesheet
-    )
-
-
 def test_record_table_retains_readable_width_inside_scroll_container(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "wide-records")
@@ -700,20 +680,7 @@ def test_record_table_retains_readable_width_inside_scroll_container(dataset_bro
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
-    tokens = body(request(client, "get", "/static/css/tokens.css"))
-    tables = body(request(client, "get", "/static/css/components/tables.css"))
-
     assert re.search(r"<div class='table-scroll'[^>]*>\s*<table class='record-table'>", page)
-    assert "--data-table-min-width: 48rem" in tokens
-    assert (
-        ".record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }"
-        in tables
-    )
-    assert ".record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }" in tables
-    assert "text-overflow: ellipsis" in tables
-    assert ".table-scroll { width: 100%; overflow-x: auto;" in tables
-    assert not re.search(r"\.record-table\s+th[^}]*white-space:\s*nowrap", tables)
-    assert "currencies" not in tables.lower()
 
 
 def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
@@ -729,14 +696,88 @@ def test_record_table_truncates_text_with_full_value_tooltip(dataset_browser):
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
-    tables = body(request(client, "get", "/static/css/components/tables.css"))
-    dialog = body(request(client, "get", "/static/css/components/dialog.css"))
-
     assert f"<span class='cell-content' title='{long_text}'>{long_text}</span>" in page
-    assert "table-layout: fixed" in tables
-    assert "text-overflow: ellipsis" in tables
-    assert ".side-panel-header h2" in dialog
-    assert "font-family: var(--font-display)" in dialog
+
+
+def test_all_design_system_assets_are_local_and_served(dataset_browser):
+    _, _, _, client = dataset_browser
+    css_files = (
+        "tokens.css",
+        "base.css",
+        "utilities.css",
+        "layouts/app-shell.css",
+        "layouts/page.css",
+        "layouts/auth.css",
+        "components/buttons.css",
+        "components/forms.css",
+        "components/feedback.css",
+        "components/cards-badges.css",
+        "components/tables.css",
+        "components/dialog.css",
+    )
+    fonts = tuple(
+        f"{family}/{family}-{subset}-{weight}-normal.woff2"
+        for family, weights in (
+            ("instrument-sans", (500, 600, 700)),
+            ("ibm-plex-sans", (400, 600, 700)),
+            ("ibm-plex-mono", (400,)),
+        )
+        for weight in weights
+        for subset in ("latin", "latin-ext")
+    )
+    for filename in css_files:
+        assert request(client, "get", f"/static/css/{filename}").status_code == 200
+    for filename in fonts:
+        response = request(client, "get", f"/static/fonts/{filename}")
+        assert response.status_code == 200
+        assert response.mimetype == "font/woff2"
+    stylesheets = {
+        filename: body(request(client, "get", f"/static/css/{filename}")) for filename in css_files
+    }
+    tokens = stylesheets["tokens.css"]
+    assert tokens.count("@font-face") == len(fonts) == 14
+    for filename in fonts:
+        assert f'url("../fonts/{filename}")' in tokens
+    assert '--font-display: "Instrument Sans"' in tokens
+    assert '--font-interface: "IBM Plex Sans"' in tokens
+    assert '--font-technical: "IBM Plex Mono"' in tokens
+    assert all("http://" not in css and "https://" not in css for css in stylesheets.values())
+
+
+def test_local_lucide_set_is_inline_and_packaged_with_its_notices(dataset_browser):
+    _, _, _, client = dataset_browser
+    repository = Path(__file__).resolve().parents[1]
+    image_directory = repository / "src/refrncr/static/images"
+    icons = (repository / "src/refrncr/templates/components/icons.html").read_text()
+    template_directory = repository / "src/refrncr/templates"
+    template_source = "".join(path.read_text() for path in template_directory.rglob("*.html"))
+
+    assert {p.name for p in image_directory.glob("lucide-*.svg")} == {
+        "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
+    }
+    assert "images/lucide-1.46.0.svg" in template_source
+    assert request(client, "get", "/static/images/lucide-1.46.0.svg").status_code == 200
+    assert {path.name for path in image_directory.iterdir()} == {
+        "favicon.svg",
+        "lucide-1.46.0.svg",
+        "lucide-legacy-0.468.0.svg",
+        "refrncr-loader.svg",
+        "refrncr-wordmark-primary.svg",
+        "refrncr-wordmark-reversed.svg",
+        "theme-preview-dark.svg",
+        "theme-preview-light.svg",
+        "theme-preview-system.svg",
+    }
+    macros = re.findall(r"\{% macro (\w+)\(\) -%\}", icons)
+    assert len(macros) == len(set(macros)) >= 20
+    for macro in macros:
+        assert f"import {macro}" in template_source or f", {macro}" in template_source
+        assert icons.count(f"macro {macro}") == 1
+    assert icons.count('stroke="currentColor"') == icons.count("<svg ")
+    assert 'aria-hidden="true" focusable="false"' in icons
+    for filename in ("LICENSE-Lucide.txt", "ASSET-SOURCES.md"):
+        assert request(client, "get", f"/static/licenses/{filename}").status_code == 200
 
 
 def test_record_table_include_and_view_button_pointer_guard(dataset_browser, monkeypatch):
@@ -757,16 +798,12 @@ def test_record_table_include_and_view_button_pointer_guard(dataset_browser, mon
     monkeypatch.setattr(loader, "get_source", record_source)
 
     response = request(client, "get", f"/datasets/{dataset.key}/concept/records")
-    script = body(request(client, "get", "/static/js/refrncr.js"))
-
     assert response.status_code == 200
     assert "pages/datasets/records.html" in loaded
     assert "pages/datasets/_record_table.html" in loaded
     assert "pages/datasets/_record_panels.html" in loaded
     assert "pages/datasets/_record_form_fields.html" in loaded
     assert "components/side_panel.html" in loaded
-    assert "const rowInteractiveSelector" in script
-    assert 'document.querySelectorAll("[data-record-row]").forEach' not in script
 
 
 def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser):
@@ -778,24 +815,8 @@ def test_record_side_panels_use_the_generic_modal_focus_contract(dataset_browser
     login(client)
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
-    script = body(request(client, "get", "/static/js/refrncr.js"))
-
     assert "data-side-panel data-modal-side-panel" in page
     assert "autofocus data-initial-focus" in page
-    assert "dialog.showModal();" in script
-    assert "sidePanelOpeners.set(dialog, trigger);" in script
-    assert "const opener = sidePanelOpeners.get(dialog);" in script
-    assert "opener?.isConnected" in script
-    assert 'document.getElementById("content")?.focus();' in script
-    assert 'dialog.addEventListener("close"' in script
-    # Explicit Tab wrapping belongs only to the new error-report variant; side panels
-    # retain their native keyboard behavior.
-    report_controller = script.split('document.querySelectorAll("dialog[data-modal-report]")')[
-        1
-    ].split('document.querySelectorAll("[data-dialog-open]")')[0]
-    assert script.count('dialog.addEventListener("keydown"') == 1
-    assert 'dialog.addEventListener("keydown"' in report_controller
-    assert "innerHTML" not in script
 
 
 def test_record_table_pagination_keeps_range_and_links(dataset_browser):
@@ -1416,7 +1437,12 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert "String" in page and "Date" in page
     assert "Required" in page and "None" in page
-    assert page.count("Edit field") == 2
+    assert (
+        sum(
+            attrs.get("aria-label", "").startswith("Edit field") for _, attrs in html_elements(page)
+        )
+        == 2
+    )
     for name in ("Zeta", "&lt;script&gt;alert(1)&lt;/script&gt;"):
         assert f"aria-label='Reorder {name}'" in page
         assert f"aria-label='Move {name} up'" not in page

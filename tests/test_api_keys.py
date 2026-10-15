@@ -394,7 +394,7 @@ def test_browser_revoke_validation_idor_and_api_key_cannot_login(keys):
         ("expires_at", "2000-01-01"),
         ("expires_at", "2026-02-30"),
         ("creation_token", "a" * 36 + "." + "\N{SNOWMAN}" * 64),
-        ("creation_token", str(uuid4()) + "." + "0" * 64),
+        ("creation_token", "00000000-0000-4000-8000-000000000000" + "." + "0" * 64),
     ],
 )
 def test_browser_invalid_fields_fail_safely(keys, field, value):

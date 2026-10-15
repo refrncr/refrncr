@@ -8,7 +8,7 @@ from threading import Event
 import pytest
 from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
-from support import PASSWORD, html_elements, html_tag_texts
+from support import PASSWORD, html_elements, html_tag_texts, html_text
 
 from refrncr.record_import import TransientImportStore
 from refrncr.services import NotFoundError
@@ -493,7 +493,7 @@ def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_
     assert "class='mapping-advice'" not in page.text
     tooltip = re.search(r"id='mapping-rationale-0'.*?</div>", page.text, re.S)[0]
     assert "Multiple possible fields — choose one" in tooltip
-    assert page.text.count("Multiple possible fields — choose one") == 1
+    assert html_text(page.text).count("Multiple possible fields — choose one") == 1
 
 
 def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
@@ -501,7 +501,7 @@ def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
     assert "aria-label='About column mapping'" in page.text
     assert "aria-describedby='mapping-instructions'" in page.text
     instruction = "Match each source column to one dataset field, or choose Do not import."
-    assert page.text.count(instruction) == 1
+    assert html_text(page.text).count(instruction) == 1
     info = page.text.split("id='mapping-instructions'", 1)[1].split("</details>", 1)[0]
     assert instruction in info
     assert "File:" in info

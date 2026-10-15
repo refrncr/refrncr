@@ -192,3 +192,16 @@ def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):
     assert failed.status_code == 503
     assert failed.json() == {"error": "service_unavailable"}
     assert failed.headers["content-security-policy"] == SAFE_HEADERS["Content-Security-Policy"]
+
+
+def test_documentation_ui_privacy_configuration_executes_in_node():
+    import subprocess
+
+    root = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        ["node", "tests/javascript/api_docs.cjs", "src/refrncr/static/js/api-docs.js"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )

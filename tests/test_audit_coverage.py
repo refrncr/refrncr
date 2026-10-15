@@ -853,6 +853,27 @@ def test_ordinary_service_reads_and_preview_do_not_write_domain_history(context)
     assert {e.id for e in audits(c)} == before
 
 
+def test_browser_route_inventory_matches_real_registration(context):
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    inventory = json.loads((root / "docs/development/audit-inventory.json").read_text())
+    expected = {}
+    for row in inventory["routes"]:
+        if not row["symbol"].startswith("refrncr.web."):
+            continue
+        methods = set(row["methods"]) | {"OPTIONS"}
+        if "GET" in methods:
+            methods.add("HEAD")
+        expected[(row["symbol"].split(".")[-1], row["path"])] = methods
+    actual = {
+        (rule.endpoint, rule.rule): rule.methods
+        for rule in browser(context).application.url_map.iter_rules()
+        if rule.endpoint != "static"
+    }
+    assert actual == expected
+
+
 def test_response_construction_failure_keeps_request_and_closes_artifact(context, monkeypatch):
     from refrncr import dataset_export, web
 

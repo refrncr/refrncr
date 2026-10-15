@@ -851,3 +851,11 @@ def test_server_bind_failure_propagates_nonzero_exit(monkeypatch):
         cli.main(["start", "--database-url", "sqlite:///unused.db"])
 
     assert exit_info.value.code == 1
+
+
+def test_community_startup_has_no_cloud_or_tenant_dependency():
+    source = (cli.Path(cli.__file__)).read_text()
+
+    assert "refrncr_cloud" not in source
+    assert "tenant" not in source
+    assert "organisation_id" not in source
