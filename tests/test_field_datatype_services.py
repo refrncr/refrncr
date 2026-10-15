@@ -10,10 +10,7 @@ from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from test_dataset_records import PASSWORD
-from test_dataset_records import postgresql_record_services as postgresql_record_services
-from test_dataset_records import record_services as record_services
-from test_field_datatypes import CASES
+from support import CASES, PASSWORD
 
 from refrncr.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.models import AuditEvent, Dataset, DatasetField, DatasetRecord

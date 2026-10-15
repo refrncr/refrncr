@@ -4,9 +4,7 @@ import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import event, inspect, select, text
-from test_audit_coverage import audit_db as audit_db
-from test_dataset_governance_migration import migrate
-from test_dataset_records import PASSWORD, configured_dataset
+from support import PASSWORD, configured_dataset, migrate
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base

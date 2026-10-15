@@ -14,7 +14,6 @@ from support import (
     request,
     session_csrf,
 )
-from test_audit_coverage import audit_db, context  # noqa: F401
 
 from refrncr.models import Dataset
 from refrncr.presentation_metadata import (
@@ -44,7 +43,7 @@ def test_retired_lucide_symbols_keep_their_original_geometry():
         assert dataset_icon_sprite(unsafe) == "images/lucide-1.46.0.svg"
 
 
-def test_all_retired_icons_survive_ordinary_metadata_edits(context):  # noqa: F811
+def test_all_retired_icons_survive_ordinary_metadata_edits(context):
     c = context
     for name, sprite in ICON_SPRITES.items():
         if sprite != LEGACY_ICON_SPRITE:
@@ -59,7 +58,7 @@ def test_all_retired_icons_survive_ordinary_metadata_edits(context):  # noqa: F8
         assert dataset_icon_sprite(name) == LEGACY_ICON_SPRITE
 
 
-def test_history_icon_survives_the_browser_metadata_form(dataset_browser):  # noqa: F811
+def test_history_icon_survives_the_browser_metadata_form(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "legacy-icon", "Legacy icon")
     with factory.begin() as session:
@@ -81,7 +80,7 @@ def test_history_icon_survives_the_browser_metadata_form(dataset_browser):  # no
 
 
 @pytest.mark.parametrize("path", ["/configure", "/concept"])
-def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):  # noqa: F811
+def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "fallback", "Fallback")
     services.datasets.grant_export_access(admin.id, dataset.key, "user", admin.id)

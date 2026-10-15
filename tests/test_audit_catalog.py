@@ -222,7 +222,7 @@ def test_catalog_and_guard_have_no_framework_or_persistence_dependencies():
 
 
 def test_every_audited_operation_has_behavior_cases():
-    from test_audit_coverage import MUTATIONS
+    from support import MUTATIONS
 
     behaviors = {
         f"refrncr.services.{name}"

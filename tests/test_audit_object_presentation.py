@@ -7,9 +7,9 @@ from uuid import uuid4
 import pytest
 from markupsafe import escape
 from sqlalchemy import select
-from test_audit_coverage import audit_db as audit_db
-from test_audit_history import client, seed, state
-from test_audit_history import history as history
+from support import audit_history_client as client
+from support import audit_history_state as state
+from support import seed
 
 from refrncr.audit import EVENTS, AuditContractError
 from refrncr.audit_presentation import (

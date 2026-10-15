@@ -3,8 +3,6 @@
 from html.parser import HTMLParser
 
 import pytest
-from test_source_format_import import import_context as import_context
-from test_source_format_import import wizard as wizard
 from werkzeug.datastructures import MultiDict
 
 from refrncr.source_formats import (

@@ -8,8 +8,7 @@ from threading import Barrier
 
 import pytest
 from sqlalchemy import select, update
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_dataset_versions import NOW, content, publish, revision
+from support import NOW, audits, content, publish, revision, snapshot
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
@@ -68,7 +67,7 @@ def fields(c, *, scope="leaves", unique=False):
     )
 
 
-def test_empty_fields_complete_snapshot_and_selected_leaf_reads(context):  # noqa: F811
+def test_empty_fields_complete_snapshot_and_selected_leaf_reads(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -111,7 +110,7 @@ def test_empty_fields_complete_snapshot_and_selected_leaf_reads(context):  # noq
             c.service.read_current(c.a.id, c.d.key, **selection)
 
 
-def test_structure_only_review_publication_and_old_snapshot_are_independent(context):  # noqa: F811
+def test_structure_only_review_publication_and_old_snapshot_are_independent(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -139,7 +138,7 @@ def test_structure_only_review_publication_and_old_snapshot_are_independent(cont
     )
 
 
-def test_reporting_exports_select_concept_current_and_historical_snapshots(context):  # noqa: F811
+def test_reporting_exports_select_concept_current_and_historical_snapshots(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -180,7 +179,7 @@ def test_reporting_exports_select_concept_current_and_historical_snapshots(conte
         historical.content.close()
 
 
-def test_subtree_deletion_is_versioned_without_changing_published_history(context):  # noqa: F811
+def test_subtree_deletion_is_versioned_without_changing_published_history(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -200,7 +199,7 @@ def test_subtree_deletion_is_versioned_without_changing_published_history(contex
     assert {item.id for item in content(c, second).hierarchy_nodes} == {root.id, sibling.id}
 
 
-def test_retained_values_survive_publication_and_conflicts_remain_reviewable(context):  # noqa: F811
+def test_retained_values_survive_publication_and_conflicts_remain_reviewable(context):
     c = context
     root = prepare(c)
     former_leaf = node(c, "Former leaf", root.id)
@@ -233,7 +232,7 @@ def test_retained_values_survive_publication_and_conflicts_remain_reviewable(con
     assert {r.id for r in content(c, second).records} == {former_leaf.id, other.id, child.id}
 
 
-def test_branch_values_and_scope_changes_are_versioned_and_reviewed(context):  # noqa: F811
+def test_branch_values_and_scope_changes_are_versioned_and_reviewed(context):
     c = context
     root = prepare(c)
     leaf = node(c, "Leaf", root.id)
@@ -266,7 +265,7 @@ def test_branch_values_and_scope_changes_are_versioned_and_reviewed(context):  #
     )
 
 
-def test_discard_and_cancel_restore_complete_baseline(context):  # noqa: F811
+def test_discard_and_cancel_restore_complete_baseline(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -295,7 +294,7 @@ def test_discard_and_cancel_restore_complete_baseline(context):  # noqa: F811
     assert not c.service.concept_context(c.a.id, c.d.key).has_changes
 
 
-def test_hierarchy_review_authority_staleness_and_atomic_publication(context, monkeypatch):  # noqa: F811
+def test_hierarchy_review_authority_staleness_and_atomic_publication(context, monkeypatch):
     c = context
     root = prepare(c)
     leaf = node(c, "Leaf", root.id)
@@ -322,7 +321,7 @@ def test_hierarchy_review_authority_staleness_and_atomic_publication(context, mo
     assert not any(event.action == "dataset.version_published" for event in audits(c))
 
 
-def test_optional_identifier_after_tree_and_all_nodes_components(context):  # noqa: F811
+def test_optional_identifier_after_tree_and_all_nodes_components(context):
     c = context
     root = prepare(c)
     branch = node(c, "Branch", root.id)
@@ -349,7 +348,7 @@ def test_optional_identifier_after_tree_and_all_nodes_components(context):  # no
     publish(c)
 
 
-def test_corrupt_leaf_snapshot_identifier_fails_closed(context):  # noqa: F811
+def test_corrupt_leaf_snapshot_identifier_fails_closed(context):
     c = context
     root = prepare(c)
     node(c, "Leaf", root.id)
@@ -364,7 +363,7 @@ def test_corrupt_leaf_snapshot_identifier_fails_closed(context):  # noqa: F811
         c.service.create_concept(c.a.id, c.d.id)
 
 
-def test_historical_duplicate_names_restore_for_sequential_explicit_repair(context):  # noqa: F811
+def test_historical_duplicate_names_restore_for_sequential_explicit_repair(context):
     c = context
     root = prepare(c)
     left = node(c, "Left", root.id)
@@ -429,7 +428,7 @@ def test_historical_duplicate_names_restore_for_sequential_explicit_repair(conte
     assert {item.id for item in content(c, second).hierarchy_nodes} == set(restored)
 
 
-def test_hierarchy_mutation_and_publication_share_one_revision_lock(context):  # noqa: F811
+def test_hierarchy_mutation_and_publication_share_one_revision_lock(context):
     c = context
     root = prepare(c)
     leaf = node(c, "Leaf", root.id)

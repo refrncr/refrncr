@@ -1,19 +1,14 @@
 """REF-73 authority, ownership compare-and-set, and orthogonal export contracts."""
 
-import os
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
 import pytest
 from dataset_helpers import publish_dataset
-from sqlalchemy import func, select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from support import governance_state as state
 
-from refrncr.app import create_community_services
-from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, DatasetExportAccess, DatasetRecord, Grant
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.services import (
@@ -21,46 +16,10 @@ from refrncr.services import (
     ConflictError,
     InvalidLifecycleError,
     NotFoundError,
-    ResourceTypeRegistry,
     StaleDatasetOwnerError,
     ValidationError,
 )
 from refrncr.web import create_flask_app
-
-
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def governance(request, tmp_path):
-    administrative = None
-    if request.param == "postgresql":
-        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        administrative = create_database_engine(url)
-        schema = f"governance_{uuid.uuid4().hex}"
-        with administrative.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    else:
-        url = f"sqlite:///{tmp_path / 'governance.db'}"
-    engine = create_database_engine(url)
-    Base.metadata.create_all(engine)
-    factory = create_session_factory(engine)
-    services = create_community_services(factory, ResourceTypeRegistry())
-    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
-    owner = services.teams.create_team(admin.id, "Data domain")
-    other = services.teams.create_team(admin.id, "Other domain")
-    dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "", owner.id)
-    yield engine, factory, services, admin, user, owner, other, dataset
-    engine.dispose()
-    if administrative:
-        with administrative.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        administrative.dispose()
-
-
-def state(factory, dataset):
-    with factory() as session:
-        row = session.get(Dataset, dataset.id)
-        return row.owner_team_id, row.updated_at, session.scalar(select(func.count(AuditEvent.id)))
 
 
 @pytest.mark.parametrize("kind", ["viewer", "export_user", "export_team", "owner", "admin"])

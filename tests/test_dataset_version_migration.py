@@ -6,8 +6,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect, select, text
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_versions import setup
+from support import setup
 
 from refrncr.db.base import Base
 from refrncr.models import DatasetVersion
@@ -34,7 +33,7 @@ def previous_schema(c):
 
 
 @pytest.mark.parametrize("populated", [False, True])
-def test_valid_upgrade_and_system_publisher(context, populated):  # noqa: F811
+def test_valid_upgrade_and_system_publisher(context, populated):
     c = context
     setup(c, populated=populated)
     previous_schema(c)
@@ -62,7 +61,7 @@ def test_valid_upgrade_and_system_publisher(context, populated):  # noqa: F811
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 1
 
 
-def test_preflight_all_invalid_and_safe_retry(context):  # noqa: F811
+def test_preflight_all_invalid_and_safe_retry(context):
     c = context
     c.s.datasets.create_dataset(c.a.id, "second", "Second", "", c.owner.id)
     previous_schema(c)
@@ -129,7 +128,7 @@ def test_preflight_all_invalid_and_safe_retry(context):  # noqa: F811
         "0014_ref_145",
     ],
 )
-def test_empty_upgrade_from_every_supported_revision(audit_db, revision):  # noqa: F811
+def test_empty_upgrade_from_every_supported_revision(audit_db, revision):
     engine, _, _ = audit_db
     Base.metadata.drop_all(engine)
     with engine.connect() as connection:
@@ -140,7 +139,7 @@ def test_empty_upgrade_from_every_supported_revision(audit_db, revision):  # noq
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 0
 
 
-def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monkeypatch):  # noqa: F811
+def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monkeypatch):
     from refrncr.version_persistence import SqlAlchemyVersionOperations
 
     c = context
@@ -165,7 +164,7 @@ def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monk
 
 
 @pytest.mark.parametrize("invalid", ["identifier", "required", "datatype", "value"])
-def test_invalid_existing_data_preflight(context, invalid):  # noqa: F811
+def test_invalid_existing_data_preflight(context, invalid):
     c = context
     setup(c)
     previous_schema(c)
@@ -190,8 +189,8 @@ def test_invalid_existing_data_preflight(context, invalid):  # noqa: F811
         assert "dataset_versions" not in inspect(connection).get_table_names()
 
 
-def test_populated_downgrade_preserves_versions_and_schema(context):  # noqa: F811
-    from test_dataset_versions import publish
+def test_populated_downgrade_preserves_versions_and_schema(context):
+    from support import publish
 
     c = context
     setup(c)
@@ -207,7 +206,7 @@ def test_populated_downgrade_preserves_versions_and_schema(context):  # noqa: F8
 
 
 @pytest.mark.parametrize("valid", [False, True])
-def test_cli_publication_preflight_and_upgrade(context, valid, capsys):  # noqa: F811
+def test_cli_publication_preflight_and_upgrade(context, valid, capsys):
     import json
 
     from refrncr.cli import main
@@ -233,7 +232,7 @@ def test_cli_publication_preflight_and_upgrade(context, valid, capsys):  # noqa:
             assert "dataset_versions" not in inspect(connection).get_table_names()
 
 
-def test_migrated_snapshot_constraints_match_current_models(context):  # noqa: F811
+def test_migrated_snapshot_constraints_match_current_models(context):
     from sqlalchemy import CheckConstraint, UniqueConstraint
 
     c = context

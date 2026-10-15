@@ -2,8 +2,7 @@
 
 import pytest
 from sqlalchemy import select
-from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_versions import content, publish, setup
+from support import content, publish, setup, snapshot
 
 from refrncr.models import AuditEvent, DatasetConcept, DatasetRecord
 from refrncr.record_import import ImportValidationError
@@ -31,7 +30,7 @@ def confirm(c, state, **kwargs):
     )
 
 
-def test_complete_import_and_unchanged_revision(context):  # noqa: F811
+def test_complete_import_and_unchanged_revision(context):
     c = context
     first, _ = clean(c)
     before = content(c, first)
@@ -68,7 +67,7 @@ def test_complete_import_and_unchanged_revision(context):  # noqa: F811
         }
 
 
-def test_deletion_acknowledgement_retention_undo_and_publication(context):  # noqa: F811
+def test_deletion_acknowledgement_retention_undo_and_publication(context):
     c = context
     first, concept = clean(c)
     state, result = preview(c, b"code,label\nb,New\n")
@@ -100,7 +99,7 @@ def test_deletion_acknowledgement_retention_undo_and_publication(context):  # no
 
 
 @pytest.mark.parametrize("mutation", ["add", "edit", "delete", "restore", "create_import"])
-def test_record_mutations_block_all_new_import_steps(context, mutation):  # noqa: F811
+def test_record_mutations_block_all_new_import_steps(context, mutation):
     c = context
     _, concept = clean(c)
     state, _ = preview(c)
@@ -135,7 +134,7 @@ def test_record_mutations_block_all_new_import_steps(context, mutation):  # noqa
             operation()
 
 
-def test_field_only_and_legacy_eligibility(context):  # noqa: F811
+def test_field_only_and_legacy_eligibility(context):
     c = context
     clean(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Renamed", "string", False, False)
@@ -150,7 +149,7 @@ def test_field_only_and_legacy_eligibility(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("source", [b"code,label\na,One\na,Two\n", b"code,label\n,Missing\n"])
-def test_invalid_file_never_applies(context, source):  # noqa: F811
+def test_invalid_file_never_applies(context, source):
     c = context
     clean(c)
     state, result = preview(c, source)
@@ -161,7 +160,7 @@ def test_invalid_file_never_applies(context, source):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(context):  # noqa: F811
+def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(context):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import text
@@ -201,7 +200,7 @@ def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(c
     assert c.s.record_imports.eligibility(c.a.id, c.d.key) is None
 
 
-def test_complete_diff_pagination_search_and_no_preview_writes(context):  # noqa: F811
+def test_complete_diff_pagination_search_and_no_preview_writes(context):
     c = context
     setup(c)
     removed = c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "gone", "label": "Old"})
@@ -241,7 +240,7 @@ def test_complete_diff_pagination_search_and_no_preview_writes(context):  # noqa
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_new_version_failure_rolls_back_all_content_marker_and_audit(context, monkeypatch, failure):  # noqa: F811
+def test_new_version_failure_rolls_back_all_content_marker_and_audit(context, monkeypatch, failure):
     from sqlalchemy.orm import Session
 
     from refrncr.persistence import SqlAlchemyUnitOfWork
@@ -267,7 +266,7 @@ def test_new_version_failure_rolls_back_all_content_marker_and_audit(context, mo
     assert confirm(c, state, acknowledge_deletions=True) == 1
 
 
-def test_stale_schema_and_confirmation_require_review_and_fresh_ack(context):  # noqa: F811
+def test_stale_schema_and_confirmation_require_review_and_fresh_ack(context):
     c = context
     clean(c)
     state, _ = preview(c, b"code,label\nb,New\n")
@@ -292,7 +291,7 @@ def test_stale_schema_and_confirmation_require_review_and_fresh_ack(context):  #
         (b"code,label\na,New\n", ("code", None)),
     ],
 )
-def test_empty_file_and_missing_optional_field_are_blocked(context, source, mapping):  # noqa: F811
+def test_empty_file_and_missing_optional_field_are_blocked(context, source, mapping):
     c = context
     clean(c)
     before = snapshot(c)
@@ -310,7 +309,7 @@ def test_empty_file_and_missing_optional_field_are_blocked(context, source, mapp
     assert snapshot(c) == before
 
 
-def test_concurrent_independent_staged_confirms_commit_once(context):  # noqa: F811
+def test_concurrent_independent_staged_confirms_commit_once(context):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
@@ -341,7 +340,7 @@ def test_concurrent_independent_staged_confirms_commit_once(context):  # noqa: F
         )
 
 
-def test_composite_identifier_and_xlsx_canonical_source_formats(context):  # noqa: F811
+def test_composite_identifier_and_xlsx_canonical_source_formats(context):
     from io import BytesIO
 
     from openpyxl import Workbook
@@ -375,7 +374,7 @@ def test_composite_identifier_and_xlsx_canonical_source_formats(context):  # noq
     assert c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, original.id).revision == 1
 
 
-def test_unique_values_can_swap_and_be_reused_from_deleted_records(context):  # noqa: F811
+def test_unique_values_can_swap_and_be_reused_from_deleted_records(context):
     c = context
     setup(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Label", "string", False, True)
@@ -401,11 +400,12 @@ def test_unique_values_can_swap_and_be_reused_from_deleted_records(context):  # 
 
 @pytest.mark.parametrize("empty", [True, False])
 @pytest.mark.parametrize("legacy_address", [False, True])
-def test_one_http_import_flow_for_empty_and_populated_tables(context, empty, legacy_address):  # noqa: F811
+def test_one_http_import_flow_for_empty_and_populated_tables(context, empty, legacy_address):
     import io
     import re
 
-    from test_dataset_version_views import client, request
+    from support import dataset_version_client as client
+    from support import request
 
     c = context
     if empty:
@@ -467,8 +467,9 @@ def test_one_http_import_flow_for_empty_and_populated_tables(context, empty, leg
     assert request(browser, "get", root + "?mode=create").status_code == 400
 
 
-def test_http_status_checkboxes_and_all_records(context):  # noqa: F811
-    from test_dataset_version_views import client, request
+def test_http_status_checkboxes_and_all_records(context):
+    from support import dataset_version_client as client
+    from support import request
 
     c = context
     clean(c)
@@ -497,11 +498,12 @@ def test_http_status_checkboxes_and_all_records(context):  # noqa: F811
     assert b"Clear import-results filter" not in unfiltered.data
 
 
-def test_http_security_confirmation_binding_and_undo(context):  # noqa: F811
+def test_http_security_confirmation_binding_and_undo(context):
     import io
     import re
 
-    from test_dataset_version_views import client, request
+    from support import dataset_version_client as client
+    from support import request
     from werkzeug.datastructures import MultiDict
 
     c = context
@@ -584,7 +586,7 @@ def test_http_security_confirmation_binding_and_undo(context):  # noqa: F811
     assert request(browser, "post", restore, data=payload).status_code == 404
 
 
-def test_manual_deleted_added_record_retains_last_concept_values(context):  # noqa: F811
+def test_manual_deleted_added_record_retains_last_concept_values(context):
     c = context
     first, concept = clean(c)
     current = content(c, first)
@@ -603,7 +605,7 @@ def test_manual_deleted_added_record_retains_last_concept_values(context):  # no
     assert content(c, first) == current
 
 
-def test_legacy_marker_survives_field_and_record_changes(context):  # noqa: F811
+def test_legacy_marker_survives_field_and_record_changes(context):
     c = context
     clean(c)
     with c.sessions.begin() as session:
@@ -617,7 +619,7 @@ def test_legacy_marker_survives_field_and_record_changes(context):  # noqa: F811
     )
 
 
-def test_noop_record_edit_does_not_invent_a_mutation(context):  # noqa: F811
+def test_noop_record_edit_does_not_invent_a_mutation(context):
     c = context
     clean(c)
     c.s.dataset_records.update_record(
@@ -626,7 +628,7 @@ def test_noop_record_edit_does_not_invent_a_mutation(context):  # noqa: F811
     assert c.s.record_imports.eligibility(c.a.id, c.d.key) is None
 
 
-def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, monkeypatch):  # noqa: F811
+def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, monkeypatch):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect, text
@@ -685,7 +687,7 @@ def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, m
         ("timestamp", "2026-09-13T12:30:00Z", "2026-09-13T14:30:00+02:00"),
     ],
 )
-def test_typed_identifier_equivalence_is_unchanged(context, data_type, stored, source):  # noqa: F811
+def test_typed_identifier_equivalence_is_unchanged(context, data_type, stored, source):
     c = context
     setup(c, populated=False)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "part", "Part", data_type, True)
@@ -712,7 +714,7 @@ def test_typed_identifier_equivalence_is_unchanged(context, data_type, stored, s
     assert c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, record.id).revision == 1
 
 
-def test_empty_xlsx_and_no_active_concept_are_blocked(context):  # noqa: F811
+def test_empty_xlsx_and_no_active_concept_are_blocked(context):
     from io import BytesIO
 
     from openpyxl import Workbook
@@ -738,7 +740,7 @@ def test_empty_xlsx_and_no_active_concept_are_blocked(context):  # noqa: F811
         preview(c)
 
 
-def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(context):  # noqa: F811
+def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(context):
     from refrncr.record_import import TransientImportStore
 
     c = context
@@ -765,7 +767,7 @@ def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(conte
 
 
 @pytest.mark.parametrize("source", [b"code,label\na,Changed\n", b"code,label\nb,Added\n"])
-def test_mutating_an_exhausted_record_revision_fails_before_writes(context, source):  # noqa: F811
+def test_mutating_an_exhausted_record_revision_fails_before_writes(context, source):
     from refrncr.services import MAX_RECORD_REVISION, ValidationError
 
     c = context

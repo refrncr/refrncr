@@ -8,7 +8,6 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from test_audit_coverage import audit_db  # noqa: F401
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.api_keys import LAST_USED_INTERVAL, LIFETIME, ApiKeyAuthenticationError, ApiKeyService
@@ -21,7 +20,7 @@ from refrncr.web import SESSION_COOKIE, create_flask_app
 
 
 @pytest.fixture
-def keys(audit_db):  # noqa: F811
+def keys(audit_db):
     engine, sessions, services = audit_db
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")

@@ -10,10 +10,8 @@ from threading import Barrier, Event
 import pytest
 from sqlalchemy import event
 from sqlalchemy.orm import Session
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_concept_lifecycle import active
-from test_dataset_version_views import client, request
-from test_dataset_versions import NOW, publish, setup
+from support import NOW, active, audits, publish, request, setup, snapshot
+from support import dataset_version_client as client
 from werkzeug.datastructures import MultiDict
 
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE
@@ -46,7 +44,7 @@ def form(browser, c, csrf):
 
 
 @pytest.mark.parametrize("published", [False, True])
-def test_current_required_preserves_first_metadata(context, published):  # noqa: F811
+def test_current_required_preserves_first_metadata(context, published):
     c = context
     setup(c)
     if published:
@@ -86,7 +84,7 @@ def test_current_required_preserves_first_metadata(context, published):  # noqa:
 @pytest.mark.parametrize(
     "change", ["unchanged", "metadata", "fields", "identifier", "records", "mixed"]
 )
-def test_discard_removes_working_state_preserves_snapshots_and_governance(context, change):  # noqa: F811
+def test_discard_removes_working_state_preserves_snapshots_and_governance(context, change):
     c = context
     prepared(c, extra=change in {"records", "mixed"})
     if change in {"metadata", "mixed"}:
@@ -176,7 +174,7 @@ def test_discard_removes_working_state_preserves_snapshots_and_governance(contex
 
 
 @pytest.mark.parametrize("kind", ["owner", "admin", "viewer", "editor", "export", "outsider"])
-def test_discard_authority(context, kind):  # noqa: F811
+def test_discard_authority(context, kind):
     c = context
     prepared(c)
     actor = c.a if kind == "admin" else c.u
@@ -210,7 +208,7 @@ def test_discard_authority(context, kind):  # noqa: F811
 @pytest.mark.parametrize(
     "state", ["revision", "concept_revision", "actor", "owner", "current", "mutation"]
 )
-def test_stale_identity_never_deletes(context, state):  # noqa: F811
+def test_stale_identity_never_deletes(context, state):
     c = context
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
@@ -234,7 +232,7 @@ def test_stale_identity_never_deletes(context, state):  # noqa: F811
 
 
 @pytest.mark.parametrize("failure", ["values", "records", "fields", "concept", "audit", "commit"])
-def test_discard_rollback(context, monkeypatch, failure):  # noqa: F811
+def test_discard_rollback(context, monkeypatch, failure):
     c = context
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
@@ -276,7 +274,7 @@ def test_discard_rollback(context, monkeypatch, failure):  # noqa: F811
     assert active(c) is None
 
 
-def test_concurrent_discard_at_most_once(context):  # noqa: F811
+def test_concurrent_discard_at_most_once(context):
     c = context
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
@@ -296,7 +294,7 @@ def test_concurrent_discard_at_most_once(context):  # noqa: F811
     assert len([a for a in audits(c) if a.action == "dataset.concept_discarded"]) == 1
 
 
-def test_import_tokens_cannot_attach_to_replacement_concept(context):  # noqa: F811
+def test_import_tokens_cannot_attach_to_replacement_concept(context):
     c = context
     prepared(c)
     imports = c.s.record_imports
@@ -312,7 +310,7 @@ def test_import_tokens_cannot_attach_to_replacement_concept(context):  # noqa: F
     assert snapshot(c) == before
 
 
-def test_dialog_stale_refresh_redirect_and_form_security(context):  # noqa: F811
+def test_dialog_stale_refresh_redirect_and_form_security(context):
     c = context
     prepared(c)
     browser, csrf = client(c)
@@ -365,7 +363,7 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("cancelled", [False, True])
-def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(context, cancelled):  # noqa: F811
+def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(context, cancelled):
     c = context
     current = prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled name", "Scheduled description")
@@ -398,7 +396,7 @@ def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(cont
             assert recreated[name] == before[name]
 
 
-def test_current_activation_requires_new_confirmation(context):  # noqa: F811
+def test_current_activation_requires_new_confirmation(context):
     c = context
     prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled", "")
@@ -416,7 +414,7 @@ def test_current_activation_requires_new_confirmation(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("operation", ["record", "publish", "import"])
-def test_concurrent_operation_and_discard_are_atomic(context, operation):  # noqa: F811
+def test_concurrent_operation_and_discard_are_atomic(context, operation):
     c = context
     prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Publication candidate", "")
@@ -460,7 +458,7 @@ def test_concurrent_operation_and_discard_are_atomic(context, operation):  # noq
 
 
 @pytest.mark.parametrize("removal", ["discard", "dataset_delete"])
-def test_discard_during_export_preparation_returns_no_artifact(context, monkeypatch, removal):  # noqa: F811
+def test_discard_during_export_preparation_returns_no_artifact(context, monkeypatch, removal):
     from refrncr import dataset_export
 
     c = context
@@ -505,7 +503,7 @@ def test_discard_during_export_preparation_returns_no_artifact(context, monkeypa
     assert not [a for a in audits(c) if a.action == "dataset.export_requested"]
 
 
-def test_membership_or_ownership_change_invalidates_confirmation(context):  # noqa: F811
+def test_membership_or_ownership_change_invalidates_confirmation(context):
     c = context
     prepared(c)
     membership = c.s.memberships.create_membership(c.a.id, c.u.id, c.owner.id)
@@ -524,7 +522,7 @@ def test_membership_or_ownership_change_invalidates_confirmation(context):  # no
     assert snapshot(c) == before
 
 
-def test_confirmed_import_proposals_removed_and_old_receipt_rejected(context):  # noqa: F811
+def test_confirmed_import_proposals_removed_and_old_receipt_rejected(context):
     c = context
     prepared(c)
     imports = c.s.record_imports
@@ -544,7 +542,7 @@ def test_confirmed_import_proposals_removed_and_old_receipt_rejected(context):  
 
 
 @pytest.mark.parametrize("size", [0, 1000])
-def test_empty_and_large_mixed_discard_is_set_based(context, size, record_property):  # noqa: F811
+def test_empty_and_large_mixed_discard_is_set_based(context, size, record_property):
     from time import perf_counter
 
     c = context
@@ -631,7 +629,7 @@ def test_empty_and_large_mixed_discard_is_set_based(context, size, record_proper
         "publish",
     ],
 )
-def test_each_mutation_invalidates_open_discard(context, mutation):  # noqa: F811
+def test_each_mutation_invalidates_open_discard(context, mutation):
     c = context
     prepared(c)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "unused", "Unused", "string")
@@ -674,7 +672,7 @@ def test_each_mutation_invalidates_open_discard(context, mutation):  # noqa: F81
     assert snapshot(c) == before
 
 
-def test_old_urls_and_posts_do_not_create_concept(context):  # noqa: F811
+def test_old_urls_and_posts_do_not_create_concept(context):
     c = context
     prepared(c)
     browser, csrf = client(c)
@@ -709,7 +707,7 @@ def test_old_urls_and_posts_do_not_create_concept(context):  # noqa: F811
     assert request(browser, "get", f"/datasets/{c.d.key}/edit").status_code == 200
 
 
-def test_discard_preserves_another_datasets_active_work(context):  # noqa: F811
+def test_discard_preserves_another_datasets_active_work(context):
     from sqlalchemy import select
 
     from refrncr.db.base import Base
@@ -736,7 +734,7 @@ def test_discard_preserves_another_datasets_active_work(context):  # noqa: F811
     assert c.s.dataset_versions.concept_context(c.a.id, other.key).concept.dataset_id == other.id
 
 
-def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeypatch, caplog):  # noqa: F811
+def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeypatch, caplog):
     c = context
     prepared(c)
     browser, csrf = client(c)

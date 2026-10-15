@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import event, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
+from support import NOW, audits, content, publish, revision, setup, snapshot, versions
 
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
@@ -21,54 +21,8 @@ from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.version_contracts import version_states
 from refrncr.version_persistence import SqlAlchemyVersionOperations
 
-NOW = datetime(2026, 9, 10, 12, tzinfo=UTC)
 
-
-def setup(c, *, populated=True):
-    c.service = DatasetVersionService(
-        c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
-    )
-    c.s.dataset_fields.create_field(c.a.id, c.d.key, "code", "Code", "string", True, True, True)
-    c.s.dataset_fields.create_field(c.a.id, c.d.key, "label", "Label", "string")
-    if populated:
-        c.record = c.s.dataset_records.create_record(
-            c.a.id, c.d.key, {"code": "a", "label": "Café"}
-        )
-    return c.service
-
-
-def revision(c):
-    return c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).revision
-
-
-def publish(c, *, day=None, actor=None, expected=None):
-    automatic_day = day is None
-    if automatic_day:
-        active_dates = [v.effective_date for v in versions(c) if v.cancelled_at is None]
-        day = max(active_dates) + timedelta(days=1) if active_dates else NOW.date()
-    result = c.service.publish(
-        actor or c.a.id,
-        c.d.id,
-        day,
-        "Release",
-        revision(c) if expected is None else expected,
-    )
-    if automatic_day:
-        c.service.clock = lambda: NOW + timedelta(days=(day - NOW.date()).days)
-    return result
-
-
-def versions(c):
-    with c.s.datasets.uow() as uow:
-        return uow.versions.list_for_dataset(c.d.id)
-
-
-def content(c, version):
-    with c.s.datasets.uow() as uow:
-        return uow.versions.content(version)
-
-
-def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
+def test_snapshot_lifecycle_and_no_change(context):
     c = context
     setup(c)
     before = snapshot(c)
@@ -122,7 +76,7 @@ def test_snapshot_lifecycle_and_no_change(context):  # noqa: F811
     )
 
 
-def test_publication_rejects_duplicate_effective_date(context):  # noqa: F811
+def test_publication_rejects_duplicate_effective_date(context):
     c = context
     setup(c)
     publish(c)
@@ -138,7 +92,7 @@ def test_publication_rejects_duplicate_effective_date(context):  # noqa: F811
 @pytest.mark.parametrize(
     "kind", ["owner", "admin", "viewer", "editor", "export", "outsider", "inactive", "deleted"]
 )
-def test_authorization(context, kind):  # noqa: F811
+def test_authorization(context, kind):
     c = context
     setup(c)
     actor = c.u
@@ -171,7 +125,7 @@ def test_authorization(context, kind):  # noqa: F811
 
 
 @pytest.mark.parametrize("kind", ["audit", "snapshot", "commit", "constraint"])
-def test_rollback(context, monkeypatch, kind):  # noqa: F811
+def test_rollback(context, monkeypatch, kind):
     c = context
     setup(c)
     before = snapshot(c)
@@ -206,7 +160,7 @@ def test_rollback(context, monkeypatch, kind):  # noqa: F811
     assert publish(c).number == 1
 
 
-def test_concurrent_same_revision(context):  # noqa: F811
+def test_concurrent_same_revision(context):
     c = context
     setup(c)
     expected = revision(c)
@@ -228,7 +182,7 @@ def test_concurrent_same_revision(context):  # noqa: F811
         publish(c, expected=expected)
 
 
-def test_canonical_revert_and_administration_are_not_changes(context):  # noqa: F811
+def test_canonical_revert_and_administration_are_not_changes(context):
     c = context
     setup(c)
     publish(c)
@@ -245,7 +199,7 @@ def test_canonical_revert_and_administration_are_not_changes(context):  # noqa: 
         publish(c)
 
 
-def test_date_boundaries_and_deletion(context):  # noqa: F811
+def test_date_boundaries_and_deletion(context):
     c = context
     setup(c, populated=False)
     with pytest.raises(ValidationError):
@@ -266,7 +220,7 @@ def test_date_boundaries_and_deletion(context):  # noqa: F811
     assert len(audits(c)) == before_audit + 1
 
 
-def test_persisted_snapshot_cannot_be_edited(context):  # noqa: F811
+def test_persisted_snapshot_cannot_be_edited(context):
     c = context
     setup(c)
     v = publish(c)
@@ -294,7 +248,7 @@ def test_persisted_snapshot_cannot_be_edited(context):  # noqa: F811
         ("string", None, None),
     ],
 )
-def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):  # noqa: F811
+def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):
     from refrncr.datatypes import get_datatype
 
     c = context
@@ -316,7 +270,7 @@ def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):  # noq
 @pytest.mark.parametrize(
     "invalid", ["fields", "identifier", "required", "value", "note", "revision"]
 )
-def test_invalid_publication_is_atomic(context, invalid):  # noqa: F811
+def test_invalid_publication_is_atomic(context, invalid):
     from sqlalchemy import delete, update
 
     from refrncr.models import DatasetBusinessKeyField, DatasetRecordValue
@@ -349,7 +303,7 @@ def test_invalid_publication_is_atomic(context, invalid):  # noqa: F811
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_cancellation_rollback_and_retry(context, monkeypatch, failure):  # noqa: F811
+def test_cancellation_rollback_and_retry(context, monkeypatch, failure):
     c = context
     setup(c)
     v = publish(c, day=NOW.date() + timedelta(days=1))
@@ -396,7 +350,7 @@ def observe_writer_lock(engine):
 
 @pytest.mark.parametrize("mutation", ["metadata", "field", "record", "import", "delete"])
 @pytest.mark.parametrize("first", ["publish", "mutate"])
-def test_publication_serializes_with_working_mutations(context, monkeypatch, mutation, first):  # noqa: F811
+def test_publication_serializes_with_working_mutations(context, monkeypatch, mutation, first):
     c = context
     setup(c)
     expected = revision(c)
@@ -484,7 +438,7 @@ def test_publication_serializes_with_working_mutations(context, monkeypatch, mut
 
 
 @pytest.mark.parametrize("first", ["cancel", "publish"])
-def test_cancellation_and_publication_serialize(context, monkeypatch, first):  # noqa: F811
+def test_cancellation_and_publication_serialize(context, monkeypatch, first):
     c = context
     setup(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
@@ -532,7 +486,7 @@ def test_cancellation_and_publication_serialize(context, monkeypatch, first):  #
     assert len([e for e in audits(c) if e.action == "dataset.version_cancelled"]) == 1
 
 
-def test_version_database_constraints(context):  # noqa: F811
+def test_version_database_constraints(context):
     from sqlalchemy import insert
     from sqlalchemy.exc import IntegrityError
 
@@ -562,7 +516,7 @@ def test_version_database_constraints(context):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_clock_uses_utc_calendar_and_rejects_naive_clock(context):  # noqa: F811
+def test_clock_uses_utc_calendar_and_rejects_naive_clock(context):
     from datetime import timezone
 
     c = context
@@ -575,7 +529,7 @@ def test_clock_uses_utc_calendar_and_rejects_naive_clock(context):  # noqa: F811
         c.service.review(c.a.id, c.d.id)
 
 
-def test_persisted_version_timestamps_are_utc(context):  # noqa: F811
+def test_persisted_version_timestamps_are_utc(context):
     c = context
     setup(c)
     version = publish(c, day=NOW.date() + timedelta(days=1))
@@ -587,7 +541,7 @@ def test_persisted_version_timestamps_are_utc(context):  # noqa: F811
     assert loaded.cancelled_at == NOW and loaded.cancelled_at.tzinfo is UTC
 
 
-def test_publication_review_has_bounded_read_queries(context):  # noqa: F811
+def test_publication_review_has_bounded_read_queries(context):
     c = context
     setup(c)
     statements = []

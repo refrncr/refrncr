@@ -11,9 +11,9 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
-from test_audit_coverage import audit_db as audit_db
-from test_audit_history import INSTANT, client, seed, state
-from test_audit_history import history as history
+from support import INSTANT, seed
+from support import audit_history_client as client
+from support import audit_history_state as state
 
 from refrncr.audit import EVENTS, AuditContractError
 from refrncr.audit_history import parse_audit_filters, parse_audit_time

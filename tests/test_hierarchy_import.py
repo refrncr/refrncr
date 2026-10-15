@@ -1,8 +1,7 @@
 """Editable hierarchy workbook import behavior."""
 
 import pytest
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_versions import revision
+from support import revision
 
 from refrncr.dataset_export import generate_export
 from refrncr.hierarchy_contracts import HierarchyNode
@@ -43,7 +42,7 @@ def stored_nodes(c):
         return tuple(uow.hierarchy.list_for_dataset(c.d.id))
 
 
-def test_hierarchy_import_applies_atomic_difference(context):  # noqa: F811
+def test_hierarchy_import_applies_atomic_difference(context):
     c = context
     root = prepare(c)
     new_parent = node(c, "New Parent", root)
@@ -83,7 +82,7 @@ def test_hierarchy_import_applies_atomic_difference(context):  # noqa: F811
     assert saved.name == "Renamed"
 
 
-def test_hierarchy_import_requires_explicit_removal_confirmation(context):  # noqa: F811
+def test_hierarchy_import_requires_explicit_removal_confirmation(context):
     c = context
     root = prepare(c)
     child = node(c, "Child", root)
@@ -109,7 +108,7 @@ def test_hierarchy_import_requires_explicit_removal_confirmation(context):  # no
     assert any(item.id == child.id for item in stored_nodes(c))
 
 
-def test_hierarchy_import_rejects_stale_concept(context):  # noqa: F811
+def test_hierarchy_import_rejects_stale_concept(context):
     c = context
     root = prepare(c)
     state = c.s.hierarchy_imports.begin(

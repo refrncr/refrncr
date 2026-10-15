@@ -4,16 +4,18 @@ import ast
 import html as html_module
 import re
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import event, select, text
+from sqlalchemy import event, text
 from sqlalchemy.exc import OperationalError
-from test_audit_coverage import audit_db as audit_db
+from support import INSTANT, seed
+from support import audit_history_client as client
+from support import audit_history_state as state
 
 from refrncr.audit import EVENTS, AuditContractError
 from refrncr.audit_history import (
@@ -30,96 +32,10 @@ from refrncr.audit_presentation import (
     safe_context,
     safe_name,
 )
-from refrncr.db.base import Base
 from refrncr.models import AuditEvent, Dataset, DatasetField, Team, User
 from refrncr.persistence import SqlAlchemyAuditReadOperations
 from refrncr.ports import AuditFilters
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError
-from refrncr.web import SESSION_COOKIE, create_flask_app
-
-INSTANT = datetime(2026, 3, 29, 0, 59, 59, 123456, tzinfo=UTC)
-
-
-@pytest.fixture
-def history(audit_db):
-    engine, sessions, services = audit_db
-    admin, reader = str(uuid4()), str(uuid4())
-    with sessions.begin() as session:
-        for uid, role in ((admin, "admin"), (reader, "user")):
-            session.add(
-                User(
-                    id=uid,
-                    email=f"{uid}@example.com",
-                    display_name=role.title(),
-                    password_hash="test-only-unused",
-                    role=role,
-                )
-            )
-    return SimpleNamespace(
-        engine=engine,
-        sessions=sessions,
-        s=services,
-        admin=admin,
-        reader=reader,
-        service=services.audit_history,
-    )
-
-
-def seed(
-    h,
-    count,
-    *,
-    first=1,
-    timestamp=INSTANT,
-    actor=None,
-    kind="user",
-    action="created",
-    target=None,
-    details=None,
-):
-    with h.sessions.begin() as session:
-        session.add_all(
-            [
-                AuditEvent(
-                    id=str(UUID(int=i)),
-                    timestamp=timestamp,
-                    actor_user_id=actor or h.admin,
-                    object_type=kind,
-                    object_id=target or h.reader,
-                    action=action,
-                    details=details,
-                )
-                for i in range(first, first + count)
-            ]
-        )
-    return [str(UUID(int=i)) for i in reversed(range(first, first + count))]
-
-
-def state(h):
-    with h.sessions() as session:
-        return {
-            t.name: sorted(repr(tuple(r)) for r in session.execute(select(t)))
-            for t in Base.metadata.sorted_tables
-        }
-
-
-def client(h, uid):
-    app = create_flask_app(
-        h.s.users,
-        h.s.authentication,
-        h.s.sessions,
-        h.s.teams,
-        h.s.memberships,
-        audit_history=h.service,
-    )
-    app.testing = True
-    result = app.test_client()
-    if uid:
-        with h.sessions() as session:
-            user = session.get(User, uid)
-        token, _ = h.s.sessions.create(user)
-        result.set_cookie(SESSION_COOKIE, token, domain="localhost")
-    return result
 
 
 @pytest.mark.parametrize("count", [0, 1, 49, 50, 51, 100, 101, 127, 10000])

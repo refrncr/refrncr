@@ -6,9 +6,7 @@ from decimal import Decimal
 import pytest
 from alembic import command
 from sqlalchemy import select, text, update
-from test_audit_coverage import audit_db as audit_db
-from test_dataset_records import PASSWORD, configured_dataset
-from test_dataset_version_migration import config_for
+from support import PASSWORD, config_for, configured_dataset
 
 from refrncr.models import DatasetRecordValue
 

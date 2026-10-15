@@ -1,8 +1,8 @@
 """REF-31 durable security outcomes and secret-free presentation."""
 
 from sqlalchemy import select
-from test_audit_coverage import audit_db as audit_db
-from test_login_throttling import HTTPS, LoginAttemptLimiter, configured_web, post_login
+from support import SECURITY_HTTPS as HTTPS
+from support import LoginAttemptLimiter, configured_web, post_login
 
 from refrncr.audit import record_security_event, validate_event
 from refrncr.audit_presentation import present_event

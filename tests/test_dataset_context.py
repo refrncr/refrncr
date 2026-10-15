@@ -7,10 +7,10 @@ from pathlib import Path
 import pytest
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import event, select
-from support import body, login, request
-from test_dataset_records import (  # noqa: F401
-    postgresql_record_services,
-    record_services,
+from support import (
+    body,
+    login,
+    request,
 )
 
 from refrncr.models import AuditEvent, Dataset
@@ -239,7 +239,7 @@ def test_bulk_query_count_and_authorization(context_services, monkeypatch):
     assert any("count(dataset_records.id)" in sql for sql, _ in queries)
 
 
-def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
+def test_overview_context_breadcrumbs_and_utc(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = configure(services, admin)
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})

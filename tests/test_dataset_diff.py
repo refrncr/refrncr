@@ -8,8 +8,7 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_dataset_versions import NOW, publish, setup
+from support import NOW, audits, publish, setup, snapshot
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.diff_classification import classify_fields, relative_moves
@@ -31,7 +30,7 @@ def opened(c):
     return c.diff.open_review(c.a.id, c.d.id)
 
 
-def test_summary_details_and_publication_agree(context):  # noqa: F811
+def test_summary_details_and_publication_agree(context):
     c = context
     prepared(c)
     c.s.dataset_records.update_record(
@@ -51,7 +50,7 @@ def test_summary_details_and_publication_agree(context):  # noqa: F811
     ]
 
 
-def test_datatype_replacement_is_only_a_field_change(context):  # noqa: F811
+def test_datatype_replacement_is_only_a_field_change(context):
     c = context
     prepared(c)
     c.s.dataset_records.update_record(c.a.id, c.d.key, c.record.id, 1, {"code": "a"})
@@ -74,7 +73,7 @@ def test_datatype_replacement_is_only_a_field_change(context):  # noqa: F811
     assert [(value.before, value.after) for value in detail.values] == [("a", "b")]
 
 
-def test_schema_changes_do_not_change_records(context):  # noqa: F811
+def test_schema_changes_do_not_change_records(context):
     c = context
     prepared(c)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "new", "New", "integer")
@@ -135,7 +134,7 @@ def test_field_properties_and_corrupt_order():
 @pytest.mark.parametrize(
     "kind", ["owner", "admin", "viewer", "editor", "export", "outsider", "inactive", "deleted"]
 )
-def test_authorization_every_operation(context, kind):  # noqa: F811
+def test_authorization_every_operation(context, kind):
     c = context
     prepared(c)
     c.s.dataset_fields.update_field(
@@ -177,7 +176,7 @@ def test_authorization_every_operation(context, kind):  # noqa: F811
 
 
 @pytest.mark.parametrize("change", ["concept", "publish", "cancel", "activate", "delete"])
-def test_stale_baseline_and_revision(context, change):  # noqa: F811
+def test_stale_baseline_and_revision(context, change):
     c = context
     prepared(c)
     if change in {"cancel", "activate"}:
@@ -208,7 +207,7 @@ def test_stale_baseline_and_revision(context, change):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_audit_once_no_noise_and_no_change(context):  # noqa: F811
+def test_audit_once_no_noise_and_no_change(context):
     c = context
     prepared(c)
     before = len(audits(c))
@@ -241,7 +240,7 @@ def test_audit_once_no_noise_and_no_change(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_open_audit_failure_rolls_back(context, monkeypatch, failure):  # noqa: F811
+def test_open_audit_failure_rolls_back(context, monkeypatch, failure):
     c = context
     prepared(c)
     c.s.dataset_fields.update_field(
@@ -262,7 +261,7 @@ def test_open_audit_failure_rolls_back(context, monkeypatch, failure):  # noqa: 
     assert "private" not in str(error.value) and snapshot(c) == before
 
 
-def test_first_publication_and_cancelled_exclusion(context):  # noqa: F811
+def test_first_publication_and_cancelled_exclusion(context):
     c = context
     setup(c)
     c.diff = DatasetDiffService(c.service)
@@ -288,7 +287,7 @@ def test_first_publication_and_cancelled_exclusion(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("size", [49, 50, 51, 121])
-def test_search_filters_and_keyset_pages(context, size):  # noqa: F811
+def test_search_filters_and_keyset_pages(context, size):
     c = context
     prepared(c)
     source = "code,label\n" + "".join(f"item{i:03},Value\n" for i in range(size))
@@ -317,7 +316,7 @@ def test_search_filters_and_keyset_pages(context, size):  # noqa: F811
     assert not c.diff.review(c.a.id, identity, "Records", DiffCriteria(statuses=("Removed",))).items
 
 
-def test_bounded_query_count_and_no_object_graph(context, monkeypatch):  # noqa: F811
+def test_bounded_query_count_and_no_object_graph(context, monkeypatch):
     from refrncr.persistence import SqlAlchemyDatasetRecordOperations
     from refrncr.version_persistence import SqlAlchemyVersionOperations
 
@@ -366,7 +365,7 @@ def test_bounded_query_count_and_no_object_graph(context, monkeypatch):  # noqa:
         ("string", "text", ""),
     ],
 )
-def test_canonical_changed_values(context, data_type, before, after):  # noqa: F811
+def test_canonical_changed_values(context, data_type, before, after):
     from refrncr.datatypes import get_datatype
 
     c = context
@@ -394,7 +393,7 @@ def test_canonical_changed_values(context, data_type, before, after):  # noqa: F
 
 
 @pytest.mark.parametrize("before,after", [(None, ""), (" Café ", "Cafe\u0301"), ("", " ")])
-def test_canonical_no_change(context, before, after):  # noqa: F811
+def test_canonical_no_change(context, before, after):
     c = context
     setup(c, populated=False)
     record = c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "one", "label": before})
@@ -418,7 +417,7 @@ def test_canonical_no_change(context, before, after):  # noqa: F811
         ("date", ["2026-01-02", "2025-01-01"], ["2025-01-01", "2026-01-02"]),
     ],
 )
-def test_typed_identifier_order(context, data_type, values, expected):  # noqa: F811
+def test_typed_identifier_order(context, data_type, values, expected):
     c = context
     setup(c, populated=False)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "code", "Code", data_type, True, True)
@@ -432,7 +431,7 @@ def test_typed_identifier_order(context, data_type, values, expected):  # noqa: 
     assert [row.after_identifier for row in page.items] == expected
 
 
-def test_deleted_and_recreated_identifier_is_two_records(context):  # noqa: F811
+def test_deleted_and_recreated_identifier_is_two_records(context):
     c = context
     prepared(c)
     c.s.dataset_records.delete_record(c.a.id, c.d.key, c.record.id, 1)
@@ -454,7 +453,7 @@ def test_deleted_and_recreated_identifier_is_two_records(context):  # noqa: F811
     )
 
 
-def test_search_old_and_new_identifier_and_input_bounds(context):  # noqa: F811
+def test_search_old_and_new_identifier_and_input_bounds(context):
     c = context
     prepared(c)
     c.s.dataset_records.update_record(
@@ -482,7 +481,7 @@ def test_search_old_and_new_identifier_and_input_bounds(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("corruption", ["key", "text", "identifier", "count", "identity"])
-def test_corrupt_snapshot_fails_closed(context, corruption):  # noqa: F811
+def test_corrupt_snapshot_fails_closed(context, corruption):
     from sqlalchemy import update
 
     from refrncr.models import DatasetVersion, DatasetVersionRecord, DatasetVersionValue
@@ -519,7 +518,7 @@ def test_corrupt_snapshot_fails_closed(context, corruption):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_wide_record_and_field_pagination(context):  # noqa: F811
+def test_wide_record_and_field_pagination(context):
     c = context
     prepared(c)
     for number in range(101):
@@ -541,7 +540,7 @@ def test_wide_record_and_field_pagination(context):  # noqa: F811
     assert not third.next
 
 
-def test_large_projection_has_constant_queries_and_bounded_memory(context):  # noqa: F811
+def test_large_projection_has_constant_queries_and_bounded_memory(context):
     import tracemalloc
 
     c = context
@@ -593,7 +592,7 @@ def test_large_projection_has_constant_queries_and_bounded_memory(context):  # n
     )
 
 
-def test_stale_open_and_publish_have_no_success_event(context):  # noqa: F811
+def test_stale_open_and_publish_have_no_success_event(context):
     c = context
     prepared(c)
     c.s.dataset_fields.update_field(
@@ -617,7 +616,7 @@ def test_stale_open_and_publish_have_no_success_event(context):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_scheduled_activation_blocks_review_publication(context):  # noqa: F811
+def test_scheduled_activation_blocks_review_publication(context):
     c = context
     prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
@@ -650,7 +649,7 @@ def test_scheduled_activation_blocks_review_publication(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("kind", ["canonical", "identifier"])
-def test_corrupt_concept_open_fails_closed(context, kind):  # noqa: F811
+def test_corrupt_concept_open_fails_closed(context, kind):
     from sqlalchemy import update
 
     from refrncr.models import DatasetRecord, DatasetRecordValue
@@ -668,7 +667,7 @@ def test_corrupt_concept_open_fails_closed(context, kind):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_calendar_change_during_open_rolls_back(context, monkeypatch):  # noqa: F811
+def test_calendar_change_during_open_rolls_back(context, monkeypatch):
     from refrncr.diff_persistence import SqlAlchemyDiffOperations
 
     c = context
@@ -693,7 +692,7 @@ def test_calendar_change_during_open_rolls_back(context, monkeypatch):  # noqa: 
     assert snapshot(c) == before
 
 
-def test_scheduled_activation_during_review_publication_rolls_back(context):  # noqa: F811
+def test_scheduled_activation_during_review_publication_rolls_back(context):
     c = context
     prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)

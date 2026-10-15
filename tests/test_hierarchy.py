@@ -5,7 +5,7 @@ from threading import Barrier
 
 import pytest
 from sqlalchemy.orm import Session
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
+from support import audits, snapshot
 
 from refrncr.hierarchy import hierarchy_snapshot, hierarchy_validation_errors
 from refrncr.persistence import SqlAlchemyUnitOfWork
@@ -19,7 +19,7 @@ from refrncr.services import (
 
 
 @pytest.fixture
-def hierarchy(context):  # noqa: F811
+def hierarchy(context):
     c = context
     c.d = c.s.datasets.create_dataset(
         c.a.id, "hierarchy", "Organization", "", c.owner.id, kind="hierarchy"

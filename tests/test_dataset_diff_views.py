@@ -6,9 +6,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 
 import pytest
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_dataset_version_views import client, configured, payload, request
-from test_dataset_versions import NOW, publish
+from support import NOW, audits, configured, payload, publish, request, snapshot
+from support import dataset_version_client as client
 
 
 def prepared(c):
@@ -33,7 +32,7 @@ def path(base, token, **values):
     return base + "?" + urlencode({"review": token, **values}, doseq=True)
 
 
-def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
+def test_review_navigation_details_and_no_audit_noise(context):
     c = context
     browser, _csrf, base, token = prepared(c)
     before = snapshot(c)
@@ -68,7 +67,7 @@ def test_review_navigation_details_and_no_audit_noise(context):  # noqa: F811
     assert len(events) == 1
 
 
-def test_review_status_badges_keep_added_and_removed_distinct(context):  # noqa: F811
+def test_review_status_badges_keep_added_and_removed_distinct(context):
     c = context
     browser, _csrf, base, _token = prepared(c)
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "added", "label": "Added"})
@@ -84,7 +83,7 @@ def test_review_status_badges_keep_added_and_removed_distinct(context):  # noqa:
     assert sorted(statuses) == sorted([("badge-draft", "Added"), ("badge-removed", "Removed")])
 
 
-def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F811
+def test_entrypoints_and_publication_reuses_revision_csrf(context):
     c = context
     browser, csrf, base, token = prepared(c)
     versions = request(browser, "get", f"/datasets/{c.d.key}/versions")
@@ -105,7 +104,7 @@ def test_entrypoints_and_publication_reuses_revision_csrf(context):  # noqa: F81
     assert len([item for item in audits(c) if item.action == "dataset.version_diff_viewed"]) == 1
 
 
-def test_versions_review_entry_does_not_materialize_publication(context, monkeypatch):  # noqa: F811
+def test_versions_review_entry_does_not_materialize_publication(context, monkeypatch):
     c = context
     browser, _csrf, _base, _token = prepared(c)
     before = snapshot(c)
@@ -120,7 +119,7 @@ def test_versions_review_entry_does_not_materialize_publication(context, monkeyp
     assert snapshot(c) == before
 
 
-def test_first_publication_panel_offers_optional_review(context):  # noqa: F811
+def test_first_publication_panel_offers_optional_review(context):
     c = context
     configured(c)
     browser, csrf = client(c)
@@ -138,7 +137,7 @@ def test_first_publication_panel_offers_optional_review(context):  # noqa: F811
     assert not [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
 
 
-def test_stale_routes_clear_content_and_reload_review(context):  # noqa: F811
+def test_stale_routes_clear_content_and_reload_review(context):
     c = context
     browser, csrf, base, token = prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Later", "string", False, False)
@@ -165,7 +164,7 @@ def test_stale_routes_clear_content_and_reload_review(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("kind", ["viewer", "editor", "export", "outsider", "inactive", "deleted"])
-def test_direct_diff_routes_never_disclose_to_denied_actor(context, kind):  # noqa: F811
+def test_direct_diff_routes_never_disclose_to_denied_actor(context, kind):
     c = context
     _admin, _csrf, base, token = prepared(c)
     if kind in {"viewer", "editor"}:
@@ -204,7 +203,7 @@ def test_direct_diff_routes_never_disclose_to_denied_actor(context, kind):  # no
         "review=bad&q=' OR 1=1 --",
     ],
 )
-def test_malformed_review_links_are_safe(context, query):  # noqa: F811
+def test_malformed_review_links_are_safe(context, query):
     c = context
     browser, _csrf, base, _token = prepared(c)
     response = request(browser, "get", base + "?" + query)
@@ -213,7 +212,7 @@ def test_malformed_review_links_are_safe(context, query):  # noqa: F811
     assert len([item for item in audits(c) if item.action == "dataset.version_diff_viewed"]) == 1
 
 
-def test_forged_ids_session_and_search_bounds(context):  # noqa: F811
+def test_forged_ids_session_and_search_bounds(context):
     c = context
     browser, _csrf, base, token = prepared(c)
     for suffix in (f"/records/{uuid4()}", f"/fields/{uuid4()}"):
@@ -232,7 +231,7 @@ def test_forged_ids_session_and_search_bounds(context):  # noqa: F811
     assert request(browser, "get", path(base, token)).status_code == 409
 
 
-def test_review_signature_shared_workers_and_key_rotation(context):  # noqa: F811
+def test_review_signature_shared_workers_and_key_rotation(context):
     import secrets
 
     from refrncr.web import SESSION_COOKIE, create_flask_app
@@ -275,7 +274,7 @@ def test_review_signature_shared_workers_and_key_rotation(context):  # noqa: F81
     assert snapshot(c) == before
 
 
-def test_review_websecurity_methods_parameters_and_escaping(context):  # noqa: F811
+def test_review_websecurity_methods_parameters_and_escaping(context):
     c = context
     browser, _csrf, base, token = prepared(c)
     before = snapshot(c)
@@ -309,7 +308,7 @@ def test_review_websecurity_methods_parameters_and_escaping(context):  # noqa: F
     assert snapshot(c) == before
 
 
-def test_review_failure_hides_internal_details(context, monkeypatch):  # noqa: F811
+def test_review_failure_hides_internal_details(context, monkeypatch):
     from refrncr.dataset_diff import DatasetDiffService
 
     c = context

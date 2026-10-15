@@ -6,8 +6,7 @@ from html import unescape
 
 import pytest
 from dataset_helpers import create_owned_dataset
-from support import body, login, request, session_csrf
-from test_hierarchy_browser import hierarchy_fixture, panel_revision
+from support import body, hierarchy_fixture, login, panel_revision, request, session_csrf
 from werkzeug.datastructures import MultiDict
 
 

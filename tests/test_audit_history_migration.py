@@ -3,8 +3,7 @@
 import json
 
 from sqlalchemy import inspect, select, text
-from test_audit_coverage import audit_db as audit_db
-from test_dataset_governance_migration import migrate
+from support import migrate
 
 from refrncr.db.base import Base
 from refrncr.models import AuditEvent

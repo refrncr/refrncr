@@ -7,8 +7,7 @@ from fastapi.openapi.models import OpenAPI
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 from sqlalchemy import func, select
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_rest_api import api, get  # noqa: F401
+from support import get
 
 from refrncr.api.contracts import (
     Collection,
@@ -39,7 +38,7 @@ def test_public_readme_has_no_internal_issue_references():
     assert "REF-" not in readme.read_text(encoding="utf-8")
 
 
-def test_public_documentation_has_no_data_or_audit(api):  # noqa: F811
+def test_public_documentation_has_no_data_or_audit(api):
     c = api
     with c.sessions() as session:
         before = session.scalar(select(func.count()).select_from(AuditEvent))
@@ -59,7 +58,7 @@ def test_public_documentation_has_no_data_or_audit(api):  # noqa: F811
     assert get(c).status_code == 200
 
 
-def test_schema_matches_registered_routes_and_contracts(api):  # noqa: F811
+def test_schema_matches_registered_routes_and_contracts(api):
     schema = api.client.get("/api/openapi.json").json()
     OpenAPI.model_validate(schema)
     assert schema["openapi"].startswith("3.")
@@ -160,7 +159,7 @@ def test_schema_matches_registered_routes_and_contracts(api):  # noqa: F811
     references(schema)
 
 
-def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):  # noqa: F811
+def test_documentation_csp_assets_fallback_and_failure(api, monkeypatch):
     response = api.client.get("/api/docs")
     html = response.text
     assert '<html lang="en">' in html

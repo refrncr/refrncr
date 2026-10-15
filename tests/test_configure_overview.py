@@ -23,7 +23,7 @@ def section(page, heading):
 
 @pytest.mark.parametrize("permission", ["viewer", "member", "community_admin"])
 @pytest.mark.parametrize("count", [0, 1, 3])
-def test_overview_structure_permissions_and_order_boundaries(dataset_browser, permission, count):  # noqa: F811
+def test_overview_structure_permissions_and_order_boundaries(dataset_browser, permission, count):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "overview", "Reference data")
     fields = [
@@ -179,7 +179,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     ("tab", "title"),
     [("fields", "Fields"), ("access-management", "Access"), ("dataset-details", "Settings")],
 )
-def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, title):  # noqa: F811
+def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, title):
     _, services, admin, client = dataset_browser
     create_dataset(services, admin, "title-tabs", "Countries")
     login(client)
@@ -188,7 +188,7 @@ def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, t
     assert page.count(">View current version</a>") == 1
 
 
-def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F811
+def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
     _, services, admin, client = dataset_browser
     name = '<script>alert("metadata")</script>' + "N" * 150
     description = '<img src=x onerror="alert(1)">' + "D" * 9000
@@ -213,7 +213,7 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):  # noqa: F8
     assert "f" * 100 in field_section
 
 
-def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monkeypatch):  # noqa: F811
+def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monkeypatch):
     # Defense in depth at the presentation boundary; domain key validation stays unchanged.
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "untrusted-key")
@@ -247,7 +247,7 @@ def test_identifier_template_escapes_untrusted_field_keys(dataset_browser, monke
 @pytest.mark.parametrize("permission", ["viewer", "member", "community_admin"])
 @pytest.mark.parametrize("state", ["empty", "unconfigured", "configured"])
 def test_missing_identifier_warning_only_for_existing_fields(
-    dataset_browser,  # noqa: F811
+    dataset_browser,
     permission,
     state,
 ):

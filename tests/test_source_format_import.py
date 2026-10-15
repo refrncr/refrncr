@@ -4,8 +4,6 @@ import io
 from datetime import datetime, time
 
 import pytest
-import test_import_wizard as wizard_tests
-import test_record_import as imports
 from openpyxl import Workbook
 from sqlalchemy import func, select
 
@@ -16,20 +14,9 @@ from refrncr.services import NotFoundError
 
 @pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
 def context(request):
-    if request.param == "sqlite":
-        yield imports.import_context.__wrapped__()
-    else:
-        yield from imports.postgresql_import_context.__wrapped__()
-
-
-@pytest.fixture
-def import_context():
-    return imports.import_context.__wrapped__()
-
-
-@pytest.fixture
-def wizard(import_context):
-    return wizard_tests.wizard.__wrapped__(import_context)
+    yield request.getfixturevalue(
+        "import_context" if request.param == "sqlite" else "postgresql_import_context"
+    )
 
 
 def start(context, value="1.234,56", session="source-formats", code="A"):

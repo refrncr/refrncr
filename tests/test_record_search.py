@@ -7,9 +7,8 @@ from urllib.parse import urlencode
 
 import pytest
 from sqlalchemy import event
-from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_version_views import client, request
-from test_dataset_versions import NOW, publish, setup
+from support import NOW, publish, request, setup, snapshot
+from support import dataset_version_client as client
 
 from refrncr.datatypes import DATATYPES
 from refrncr.record_search import RecordQueryLogFilter
@@ -32,7 +31,7 @@ def read(c, **kwargs):
     return c.service.read(c.a.id, c.d.key, prefer_concept=True, **kwargs).page
 
 
-def test_general_search_only_string_fields_including_identifiers(context):  # noqa: F811
+def test_general_search_only_string_fields_including_identifiers(context):
     c = context
     setup(c, populated=False)
     values = {"code": "ID-AMS", "label": "Straße Café 100%_literal"}
@@ -52,7 +51,7 @@ def test_general_search_only_string_fields_including_identifiers(context):  # no
     "datatype",
     [kind for kind, info in DATATYPES.items() if kind != "string" and info.identifier_eligible],
 )
-def test_non_string_identifier_is_not_general_search_text(context, datatype):  # noqa: F811
+def test_non_string_identifier_is_not_general_search_text(context, datatype):
     c = context
     setup(c, populated=False)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "code", "Code", datatype, True, True)
@@ -61,7 +60,7 @@ def test_non_string_identifier_is_not_general_search_text(context, datatype):  #
     assert read(c, search=value[:200]).total == 0
 
 
-def test_and_status_pagination_counts_and_url_roundtrip(context):  # noqa: F811
+def test_and_status_pagination_counts_and_url_roundtrip(context):
     c = context
     setup(c, populated=False)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "n", "Number", "integer")
@@ -173,7 +172,7 @@ BAD_QUERIES = (
 
 
 @pytest.mark.parametrize("query", BAD_QUERIES)
-def test_fail_closed_query_envelope_has_no_partial_results(context, query):  # noqa: F811
+def test_fail_closed_query_envelope_has_no_partial_results(context, query):
     c = context
     setup(c)
     browser, _ = client(c)
@@ -189,7 +188,7 @@ def test_fail_closed_query_envelope_has_no_partial_results(context, query):  # n
     assert snapshot(c) == before
 
 
-def test_current_scheduled_concept_and_unauthorized_queries_are_isolated(context):  # noqa: F811
+def test_current_scheduled_concept_and_unauthorized_queries_are_isolated(context):
     c = context
     setup(c)
     current = publish(c)
@@ -219,7 +218,7 @@ def test_current_scheduled_concept_and_unauthorized_queries_are_isolated(context
     assert c.service.read(c.u.id, c.d.key, search="secret").page.total == 0
 
 
-def test_recreated_field_and_old_datatype_never_reinterpret_retained_values(context):  # noqa: F811
+def test_recreated_field_and_old_datatype_never_reinterpret_retained_values(context):
     c = context
     setup(c)
     c.s.dataset_records.delete_record(c.a.id, c.d.key, c.record.id, 1)
@@ -228,7 +227,7 @@ def test_recreated_field_and_old_datatype_never_reinterpret_retained_values(cont
     assert read(c, search="Café", record_status="deleted").total == 0
 
 
-def test_search_query_count_does_not_grow_per_record(context, record_property):  # noqa: F811
+def test_search_query_count_does_not_grow_per_record(context, record_property):
     c = context
     setup(c)
     counts = []
@@ -281,7 +280,7 @@ def test_record_query_values_never_enter_default_access_logs(path):
     assert not RecordQueryLogFilter().filter(malformed)
 
 
-def test_thousand_record_search_query_plan(context, record_property):  # noqa: F811
+def test_thousand_record_search_query_plan(context, record_property):
     c = context
     setup(c, populated=False)
     # Canonically validated fixture rows in one transaction. This measures reads,

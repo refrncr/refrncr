@@ -2,99 +2,29 @@
 
 import io
 import json
-import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
-from types import SimpleNamespace
 
 import pytest
 from openpyxl import Workbook
-from sqlalchemy import select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+from support import audits, snapshot
 
-from refrncr.app import create_community_services
 from refrncr.audit import OPERATIONS, validate_event
-from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, User
 from refrncr.persistence import SqlAlchemyDatasetRecordOperations, SqlAlchemyUnitOfWork
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
     ConflictError,
     NotFoundError,
-    ResourceTypeRegistry,
     StaleDatasetOwnerError,
     StaleFieldOrderError,
     StaleRecordError,
     UserManagementError,
 )
 from refrncr.web import SESSION_COOKIE, create_flask_app
-
-
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def audit_db(request, tmp_path):
-    administration = None
-    if request.param == "postgresql":
-        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        administration = create_database_engine(url)
-        schema = f"audit_{uuid.uuid4().hex}"
-        with administration.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    else:
-        url = f"sqlite:///{tmp_path / 'audit.db'}"
-    engine = create_database_engine(url)
-    Base.metadata.create_all(engine)
-    sessions = create_session_factory(engine)
-    registry = ResourceTypeRegistry()
-    registry.register("document", lambda key: key == "one")
-    services = create_community_services(sessions, registry)
-    yield engine, sessions, services
-    engine.dispose()
-    if administration:
-        with administration.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        administration.dispose()
-
-
-@pytest.fixture
-def context(audit_db):
-    engine, sessions, s = audit_db
-    a = s.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    u = s.users.create_user(a.id, "user@example.com", "User", "valid password")
-    owner = s.teams.create_team(a.id, "Domain")
-    other = s.teams.create_team(a.id, "Other")
-    d = s.datasets.create_dataset(a.id, "audit", "Business name", "Secret description", owner.id)
-    return SimpleNamespace(
-        engine=engine, sessions=sessions, s=s, a=a, u=u, owner=owner, other=other, d=d
-    )
-
-
-def audits(c):
-    with c.sessions() as session:
-        return list(
-            session.scalars(select(AuditEvent).order_by(AuditEvent.timestamp, AuditEvent.id))
-        )
-
-
-def snapshot(c):
-    # Compare persisted business state and domain audits. REF-31 security attempts
-    # are independent evidence and are asserted by dedicated security tests.
-    with c.sessions() as session:
-        return {
-            table.name: sorted(
-                repr(tuple(row))
-                for row in session.execute(
-                    select(table).where(table.c.object_type != "security")
-                    if table.name == "audit_events"
-                    else select(table)
-                )
-            )
-            for table in Base.metadata.sorted_tables
-        }
-
 
 MUTATIONS = (
     "UserService.create_user",

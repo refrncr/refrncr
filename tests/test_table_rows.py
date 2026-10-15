@@ -90,7 +90,7 @@ def test_shared_table_row_controller():
 @pytest.mark.parametrize(
     "kind,columns", [("datasets", 6), ("teams", 3), ("users", 5), ("records", 3)]
 )
-def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):  # noqa: F811
+def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browser, kind, columns):
     _, services, admin, client = dataset_browser
     name = "Long" * 15 + " <img src=x onerror=alert(1)> & 'item'"
     dataset = create_dataset(services, admin, "row-contract", name)
@@ -151,7 +151,7 @@ def test_rendered_lists_share_semantics_destinations_and_escaping(dataset_browse
         assert name in control["aria-label"]
 
 
-def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser):  # noqa: F811
+def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser):
     _, services, admin, client = dataset_browser
     login(client)
     for team in services.teams.list_teams(admin.id):
@@ -182,7 +182,7 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     assert "&lt;script&gt;value&lt;/script&gt;" in preview
 
 
-def test_numeric_identifier_primary_name_includes_visible_formatted_value(dataset_browser):  # noqa: F811
+def test_numeric_identifier_primary_name_includes_visible_formatted_value(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "numeric-rows")
     create_field(services, admin, dataset, "code", "Code", "number", is_required=True)

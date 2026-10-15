@@ -13,7 +13,7 @@ from alembic.config import Config
 from sqlalchemy import event, inspect, select, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
+from support import audits, context_from_audit_db, snapshot
 from werkzeug.datastructures import MultiDict
 
 from refrncr.audit import AuditContractError, validate_event
@@ -86,7 +86,7 @@ def populate(c, records=2):
 
 
 @pytest.mark.parametrize("records", [None, 0, 2])
-def test_atomic_deletion_preserves_history(context, records):  # noqa: F811
+def test_atomic_deletion_preserves_history(context, records):
     c = context
     if records is not None:
         populate(c, records)
@@ -139,7 +139,7 @@ def test_atomic_deletion_preserves_history(context, records):  # noqa: F811
 @pytest.mark.parametrize(
     "name", ["café", "CAFÉ", " Café", "Café ", "Cafe\u0301", "Café\u200b", "", None, 1]
 )
-def test_confirmation_is_exact_codepoints(context, name):  # noqa: F811
+def test_confirmation_is_exact_codepoints(context, name):
     c = context
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Café", "")
     target = deletion(c)
@@ -166,7 +166,7 @@ def test_confirmation_is_exact_codepoints(context, name):  # noqa: F811
         "admin",
     ],
 )
-def test_authorization_and_non_disclosing_targets(context, kind):  # noqa: F811
+def test_authorization_and_non_disclosing_targets(context, kind):
     c = context
     actor = c.u.id
     if kind in {"viewer", "editor", "legacy_admin"}:
@@ -218,7 +218,7 @@ def test_authorization_and_non_disclosing_targets(context, kind):  # noqa: F811
 
 
 @pytest.mark.parametrize("mutation", ["rename", "rename_back", "description", "field", "record"])
-def test_stale_confirmation_cannot_delete(context, mutation):  # noqa: F811
+def test_stale_confirmation_cannot_delete(context, mutation):
     c = context
     populate(c)
     target = deletion(c)
@@ -237,7 +237,7 @@ def test_stale_confirmation_cannot_delete(context, mutation):  # noqa: F811
 
 
 @pytest.mark.parametrize("stage", ["before", "child", "after_delete", "audit", "commit"])
-def test_database_failure_rolls_back_every_row(context, monkeypatch, stage):  # noqa: F811
+def test_database_failure_rolls_back_every_row(context, monkeypatch, stage):
     c = context
     populate(c)
     target = deletion(c)
@@ -284,7 +284,7 @@ def test_database_failure_rolls_back_every_row(context, monkeypatch, stage):  # 
     assert len([e for e in audits(c) if e.action == "dataset.deleted"]) == 1
 
 
-def test_concurrent_deletes_and_replay_commit_one_event(context):  # noqa: F811
+def test_concurrent_deletes_and_replay_commit_one_event(context):
     c = context
     populate(c)
     target = deletion(c)
@@ -319,7 +319,7 @@ def stage_import(c):
 
 
 @pytest.mark.parametrize("operation", ["metadata", "field", "record", "import"])
-def test_delete_serializes_with_mutation(context, monkeypatch, operation):  # noqa: F811
+def test_delete_serializes_with_mutation(context, monkeypatch, operation):
     c = context
     populate(c)
     target = deletion(c)
@@ -359,7 +359,7 @@ def test_delete_serializes_with_mutation(context, monkeypatch, operation):  # no
     assert snapshot(c)["dataset_records"] == []
 
 
-def test_import_claim_cannot_follow_recreated_key(context, monkeypatch):  # noqa: F811
+def test_import_claim_cannot_follow_recreated_key(context, monkeypatch):
     c = context
     populate(c)
     staged = stage_import(c)
@@ -380,7 +380,7 @@ def test_import_claim_cannot_follow_recreated_key(context, monkeypatch):  # noqa
         c.s.record_imports.confirm(c.a.id, "session", c.d.key, staged.token)
 
 
-def test_pending_import_expires_and_export_snapshot_survives(context):  # noqa: F811
+def test_pending_import_expires_and_export_snapshot_survives(context):
     c = context
     populate(c)
     staged = stage_import(c)
@@ -400,7 +400,7 @@ def test_pending_import_expires_and_export_snapshot_survives(context):  # noqa: 
     assert staged.token not in c.s.record_imports.store._states
 
 
-def test_deleted_name_snapshot_and_history_presentation(context):  # noqa: F811
+def test_deleted_name_snapshot_and_history_presentation(context):
     c = context
     name = "<script>alert(1)</script>" + "\u202e" + "😀" * 170
     c.s.datasets.update_dataset(c.a.id, c.d.key, name, "private-description")
@@ -451,7 +451,7 @@ def browser(c, actor=None):
     return client, login.csrf_token
 
 
-def test_web_csrf_exact_confirmation_prg_and_replay(context):  # noqa: F811
+def test_web_csrf_exact_confirmation_prg_and_replay(context):
     c = context
     client, csrf = browser(c)
     path = f"/datasets/id/{c.d.id}/delete"
@@ -489,7 +489,7 @@ def test_web_csrf_exact_confirmation_prg_and_replay(context):  # noqa: F811
     assert snapshot(c) == after
 
 
-def test_web_denied_targets_are_uniform(context):  # noqa: F811
+def test_web_denied_targets_are_uniform(context):
     c = context
     client, csrf = browser(c, c.u)
     responses = []
@@ -507,7 +507,7 @@ def test_web_denied_targets_are_uniform(context):  # noqa: F811
     assert snapshot(c) == before
 
 
-def test_dataset_foreign_key_inventory(context):  # noqa: F811
+def test_dataset_foreign_key_inventory(context):
     schema = inspect(context.engine)
     direct = {
         table
@@ -527,7 +527,7 @@ def test_dataset_foreign_key_inventory(context):  # noqa: F811
     assert all(fk["referred_table"] == "users" for fk in schema.get_foreign_keys("audit_events"))
 
 
-def test_deletion_on_complete_migration_chain(audit_db):  # noqa: F811
+def test_deletion_on_complete_migration_chain(audit_db):
     engine, _, _ = audit_db
     # Replace only this fixture's isolated, still-empty metadata-created schema.
     Base.metadata.drop_all(engine)
@@ -538,7 +538,7 @@ def test_deletion_on_complete_migration_chain(audit_db):  # noqa: F811
     with engine.connect() as connection:
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
-    c = context.__wrapped__(audit_db)
+    c = context_from_audit_db(audit_db)
     populate(c)
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
@@ -563,7 +563,7 @@ def test_deletion_on_complete_migration_chain(audit_db):  # noqa: F811
     assert len(after["audit_events"]) == len(before["audit_events"]) + 1
 
 
-def test_legacy_grant_creation_cannot_outlive_dataset(context, monkeypatch):  # noqa: F811
+def test_legacy_grant_creation_cannot_outlive_dataset(context, monkeypatch):
     c = context
     other_admin = c.s.users.create_user(
         c.a.id, "second-admin@example.com", "Second admin", "valid password", role="admin"
@@ -597,7 +597,7 @@ def test_legacy_grant_creation_cannot_outlive_dataset(context, monkeypatch):  # 
     assert snapshot(c)["grants"] == []
 
 
-def test_committed_mutation_makes_waiting_delete_stale(context, monkeypatch):  # noqa: F811
+def test_committed_mutation_makes_waiting_delete_stale(context, monkeypatch):
     c = context
     target = deletion(c)
     held, release, started = Event(), Event(), Event()
@@ -630,7 +630,7 @@ def test_committed_mutation_makes_waiting_delete_stale(context, monkeypatch):  #
     assert not any(e.action == "dataset.deleted" for e in audits(c))
 
 
-def test_current_export_in_progress_retains_coherent_snapshot_during_delete(context, monkeypatch):  # noqa: F811
+def test_current_export_in_progress_retains_coherent_snapshot_during_delete(context, monkeypatch):
     from refrncr import dataset_export
 
     c = context

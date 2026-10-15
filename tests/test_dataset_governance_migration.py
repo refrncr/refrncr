@@ -7,7 +7,6 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect, text
-from test_dataset_governance import governance  # noqa: F401
 
 from refrncr import cli
 from refrncr.dataset_upgrade import DatasetUpgradeError, ownership_preflight, read_owner_mapping
@@ -71,7 +70,7 @@ def legacy(engine):
         )
 
 
-def test_cli_preflight_and_explicit_upgrade(governance, tmp_path, capsys):  # noqa: F811
+def test_cli_preflight_and_explicit_upgrade(governance, tmp_path, capsys):
     engine = governance[0]
     legacy(engine)
     args = [
@@ -115,7 +114,7 @@ def test_cli_empty_database_preflight(tmp_path, capsys):
 
 
 @pytest.mark.parametrize("memberships", [0, 1, 2])
-def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noqa: F811
+def test_preflight_upgrade_and_downgrade_policy(governance, memberships):
     engine = governance[0]
     legacy(engine)
     with engine.begin() as c:
@@ -165,7 +164,7 @@ def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noq
     migrate(engine, "0012_ref_73")
 
 
-def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch):  # noqa: F811
+def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch):
     engine = governance[0]
     legacy(engine)
     for mapping in ({"unknown": "one"}, {"countries": "deleted"}):
@@ -202,7 +201,7 @@ def test_mapping_file_rejects_duplicates_and_non_objects(tmp_path):
 
 
 @pytest.mark.parametrize("creator_state", ["active", "inactive", "deleted"])
-def test_multiple_datasets_repeated_preflight_preserves_legacy_roles(governance, creator_state):  # noqa: F811
+def test_multiple_datasets_repeated_preflight_preserves_legacy_roles(governance, creator_state):
     engine = governance[0]
     legacy(engine)
     with engine.begin() as c:

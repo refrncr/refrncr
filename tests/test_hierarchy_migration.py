@@ -3,11 +3,10 @@
 import pytest
 from alembic import command
 from sqlalchemy import inspect, text
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_version_migration import config_for
+from support import config_for
 
 
-def test_hierarchy_schema_upgrade_and_downgrade(audit_db):  # noqa: F811
+def test_hierarchy_schema_upgrade_and_downgrade(audit_db):
     engine, _, _ = audit_db
     with engine.connect() as connection:
         config = config_for(connection)
@@ -40,7 +39,7 @@ def test_hierarchy_schema_upgrade_and_downgrade(audit_db):  # noqa: F811
         ]
 
 
-def test_hierarchy_downgrade_refuses_even_empty_hierarchy(context):  # noqa: F811
+def test_hierarchy_downgrade_refuses_even_empty_hierarchy(context):
     with context.engine.begin() as connection:
         connection.execute(
             text("UPDATE datasets SET kind = 'hierarchy' WHERE id = :id"), {"id": context.d.id}

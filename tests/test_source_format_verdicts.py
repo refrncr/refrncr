@@ -4,10 +4,7 @@ from html.parser import HTMLParser
 from types import SimpleNamespace
 
 import pytest
-from test_import_wizard import optional_field
-from test_source_format_components import Controls
-from test_source_format_import import import_context as import_context
-from test_source_format_import import wizard as wizard
+from support import Controls, optional_field
 
 from refrncr import source_formats
 from refrncr.record_import import DatasetRecordImportService, ParsedSource, SourceRow

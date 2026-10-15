@@ -6,102 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
 import pytest
-import test_record_import as import_tests
 from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
-from sqlalchemy import func, select
-from test_record_import import PASSWORD
-from werkzeug.datastructures import MultiDict
+from support import PASSWORD
 
-from refrncr.models import DatasetRecord
 from refrncr.record_import import TransientImportStore
 from refrncr.services import NotFoundError
-from refrncr.web import create_flask_app
-
-
-@pytest.fixture
-def import_context():
-    return import_tests.import_context.__wrapped__()
-
-
-@pytest.fixture
-def wizard(import_context):
-    factory, services, admin, dataset = import_context
-    # Wizard defaults describe the complete two-field schema; tests needing optional
-    # fields add them explicitly alongside the corresponding source columns.
-    for key in ("active", "day"):
-        services.dataset_fields.delete_field(admin.id, dataset.key, key)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-    )
-    app.testing = True
-    client = app.test_client()
-    login = client.get("/login", base_url="https://localhost")
-    csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
-    client.post(
-        "/login",
-        base_url="https://localhost",
-        data={
-            "email": admin.email,
-            "password": PASSWORD,
-            "csrf_token": csrf,
-        },
-    )
-    root = f"/datasets/{dataset.key}/records/import"
-    page = client.get(root, base_url="https://localhost")
-    csrf = re.search("name='csrf_token' value='([^']+)'", page.text)[1]
-
-    class Browser:
-        def get(self, path):
-            page = client.get(path, base_url="https://localhost", follow_redirects=True)
-            nonce = re.search("name='confirmation' value='([^']+)'", page.text)
-            if nonce:
-                self.confirmation = nonce[1]
-            return page
-
-        def post(self, path, data=None):
-            values = MultiDict(data.items() if isinstance(data, dict) else data or [])
-            values.setdefault("csrf_token", csrf)
-            if path.endswith("/confirm"):
-                values.setdefault("confirmation", getattr(self, "confirmation", "not-confirmed"))
-            return client.post(
-                path, base_url="https://localhost", data=values, follow_redirects=True
-            )
-
-        def upload(self, content=b"code,amount\nA,1\n", filename="records.csv"):
-            page = self.post(root, {"file": (io.BytesIO(content), filename)})
-            assert page.status_code == 200, page.text
-            self.token = page.request.path.split("/import/")[1].split("/step/")[0]
-            self.path = f"{root}/{self.token}"
-            return page
-
-        def preview(self, mapping=("code", "amount")):
-            return self.post(
-                self.path + "/preview",
-                {
-                    f"mapping_{i}": value if value is not None else "__ignored__"
-                    for i, value in enumerate(mapping)
-                },
-            )
-
-        def count(self):
-            with factory() as session:
-                return session.scalar(select(func.count()).select_from(DatasetRecord))
-
-    browser = Browser()
-    browser.root, browser.client, browser.csrf = root, client, csrf
-    browser.services, browser.admin, browser.dataset = services, admin, dataset
-    return browser
 
 
 def states(page):
