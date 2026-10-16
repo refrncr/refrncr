@@ -169,8 +169,8 @@ def test_field_metadata_full_lifecycle(context):
 @pytest.mark.parametrize(
     ("definition", "unit"), [("x" * 4001, ""), ("", "x" * 65), (123, ""), ("", [])]
 )
-def test_field_metadata_limits_and_rollback(context, definition, unit):
-    c = context
+def test_field_metadata_limits_and_rollback(database_context, definition, unit):
+    c = database_context
     before = snapshot(c)
     with pytest.raises(ValidationError):
         c.s.dataset_fields.create_field(
@@ -318,8 +318,8 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):
     assert "data-generate-key" not in body(request(client, "get", f"/datasets/{d.key}/edit"))
 
 
-def test_metadata_upgrade_preserves_existing_content(context):
-    c = context
+def test_metadata_upgrade_preserves_existing_content(database_context):
+    c = database_context
     setup(c)
     publish(c)
     with c.engine.connect() as connection:
@@ -523,8 +523,8 @@ def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):
     assert rendered_dataset_icon(None) == "table"
 
 
-def test_long_icon_migration_preserves_values_and_refuses_lossy_downgrade(context):
-    c = context
+def test_long_icon_migration_preserves_values_and_refuses_lossy_downgrade(database_context):
+    c = database_context
     name = "align-horizontal-distribute-center"
     c.s.datasets.update_dataset(c.a.id, c.d.key, c.d.name, c.d.description, icon=name)
     with c.engine.connect() as connection:
@@ -840,13 +840,13 @@ def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):
     )
 
 
-def test_simultaneous_dataset_metadata_saves_are_atomic(context):
+def test_simultaneous_dataset_metadata_saves_are_atomic(database_context):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
     from support import audits
 
-    c = context
+    c = database_context
     setup(c)
     first = publish(c)
     baseline = content(c, first)
