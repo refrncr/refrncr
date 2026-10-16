@@ -174,6 +174,7 @@ def test_discard_removes_working_state_preserves_snapshots_and_governance(contex
 
 
 @pytest.mark.parametrize("kind", ["owner", "admin", "viewer", "editor", "export", "outsider"])
+@pytest.mark.slow
 def test_discard_authority(context, kind):
     c = context
     prepared(c)

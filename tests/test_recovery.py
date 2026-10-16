@@ -268,6 +268,7 @@ def postgres_recovery_databases():
 
 
 @pytest.mark.postgres
+@pytest.mark.slow
 def test_postgresql_logical_backup_restore_preserves_complete_database_and_source(
     tmp_path, postgres_recovery_databases, monkeypatch
 ):
