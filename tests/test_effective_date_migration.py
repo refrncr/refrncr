@@ -5,8 +5,8 @@ from sqlalchemy import inspect, text
 from support import config_for
 
 
-def test_effective_date_index_upgrade_and_downgrade(audit_db):
-    engine, _, _ = audit_db
+def test_effective_date_index_upgrade_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")

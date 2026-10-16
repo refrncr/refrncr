@@ -20,11 +20,20 @@ from refrncr.services import (
 
 @pytest.fixture
 def hierarchy(context):
+    return _build_hierarchy(context)
+
+
+def _build_hierarchy(context):
     c = context
     c.d = c.s.datasets.create_dataset(
         c.a.id, "hierarchy", "Organization", "", c.owner.id, kind="hierarchy"
     )
     return c
+
+
+@pytest.fixture
+def database_hierarchy(database_context):
+    return _build_hierarchy(database_context)
 
 
 def revision(c):
@@ -117,8 +126,8 @@ def test_hierarchy_first_structure_and_optional_fields(hierarchy):
     assert not errors(c)
 
 
-def test_parent_constraints_global_node_names_and_stable_subtree(hierarchy):
-    c = hierarchy
+def test_parent_constraints_global_node_names_and_stable_subtree(database_hierarchy):
+    c = database_hierarchy
     root = add(c, "Root")
     sales = add(c, "Sales", root.id)
     engineering = add(c, "Engineering", root.id)
@@ -275,9 +284,9 @@ def test_delete_subtree_removes_descendants_and_values_but_protects_root(hierarc
 )
 @pytest.mark.parametrize("failure", ["audit", "commit"])
 def test_hierarchy_mutations_authorization_stale_cross_dataset_and_atomic_audit(
-    hierarchy, monkeypatch, operation, failure
+    database_hierarchy, monkeypatch, operation, failure
 ):
-    c = hierarchy
+    c = database_hierarchy
     root = add(c, "Root")
     leaf = add(c, "Leaf", root.id)
     field(c)
@@ -359,8 +368,8 @@ def test_hierarchy_writers_serialize_and_reject_stale_revision(hierarchy):
     assert len(content(c).hierarchy_nodes) == 2
 
 
-def test_concurrent_same_name_in_different_branches_cannot_create_duplicates(hierarchy):
-    c = hierarchy
+def test_concurrent_same_name_in_different_branches_cannot_create_duplicates(database_hierarchy):
+    c = database_hierarchy
     root = add(c, "Root")
     parents = (add(c, "Left", root.id), add(c, "Right", root.id))
     expected = revision(c)
@@ -386,8 +395,8 @@ def test_concurrent_same_name_in_different_branches_cannot_create_duplicates(hie
     assert snapshot(c) == before
 
 
-def test_generic_record_import_rejects_hierarchies_but_export_supports_them(hierarchy):
-    c = hierarchy
+def test_generic_record_import_rejects_hierarchies_but_export_supports_them(database_hierarchy):
+    c = database_hierarchy
     root = add(c, "Root")
     add(c, "Leaf", root.id)
     with pytest.raises(ValidationError, match="hierarchy views"):

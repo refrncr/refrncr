@@ -24,6 +24,11 @@ def context_services(request):
     return request.getfixturevalue(request.param)
 
 
+@pytest.fixture
+def database_context_services_matrix(database_record_services):
+    return database_record_services
+
+
 def fresh(services, admin, key="context"):
     dataset = create_owned_dataset(services.datasets, admin.id, key, key, "")
     return dataset
@@ -94,8 +99,10 @@ def test_record_lifecycle_counts_revisions_and_failures(context_services, monkey
 
 
 @pytest.mark.parametrize("operation", ["create", "edit", "delete", "import", "field", "order"])
-def test_commit_failure_rolls_back_timestamp_and_mutation(context_services, monkeypatch, operation):
-    _, factory, services, admin = context_services
+def test_commit_failure_rolls_back_timestamp_and_mutation(
+    database_context_services_matrix, monkeypatch, operation
+):
+    _, factory, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     record = services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
     spare = services.dataset_fields.create_field(admin.id, dataset.key, "spare", "Spare", "string")
@@ -191,8 +198,8 @@ def test_successful_import_updates_once_and_counts_rows(context_services):
     assert context.record_count == 2
 
 
-def test_bulk_query_count_and_authorization(context_services, monkeypatch):
-    engine, _, services, admin = context_services
+def test_bulk_query_count_and_authorization(database_context_services_matrix, monkeypatch):
+    engine, _, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", "valid password")
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
@@ -306,12 +313,12 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):
 
 
 @pytest.mark.slow
-def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services):
+def test_ref_130_migration_backfill_and_downgrade_preserve_data(database_context_services_matrix):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect, text
 
-    engine, factory, services, admin = context_services
+    engine, factory, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
     untouched = fresh(services, admin, "empty")

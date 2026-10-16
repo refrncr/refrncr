@@ -42,8 +42,8 @@ def stored_nodes(c):
         return tuple(uow.hierarchy.list_for_dataset(c.d.id))
 
 
-def test_hierarchy_import_applies_atomic_difference(context):
-    c = context
+def test_hierarchy_import_applies_atomic_difference(database_context):
+    c = database_context
     root = prepare(c)
     new_parent = node(c, "New Parent", root)
     branch = node(c, "Branch", root)
@@ -108,8 +108,8 @@ def test_hierarchy_import_requires_explicit_removal_confirmation(context):
     assert any(item.id == child.id for item in stored_nodes(c))
 
 
-def test_hierarchy_import_rejects_stale_concept(context):
-    c = context
+def test_hierarchy_import_rejects_stale_concept(database_context):
+    c = database_context
     root = prepare(c)
     state = c.s.hierarchy_imports.begin(
         c.a.id,

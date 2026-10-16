@@ -87,9 +87,7 @@ def dataset_browser():
     return _dataset_browser()
 
 
-@pytest.fixture
-def api(context):
-    c = context
+def _build_api(c):
     setup(c)
     with c.sessions.begin() as session:
         session.get(Dataset, c.d.id).updated_at = NOW - timedelta(seconds=1)
@@ -119,6 +117,16 @@ def api(context):
     with TestClient(c.app, base_url="https://localhost", raise_server_exceptions=False) as client:
         c.client = client
         yield c
+
+
+@pytest.fixture
+def api(context):
+    yield from _build_api(context)
+
+
+@pytest.fixture
+def database_api(database_context):
+    yield from _build_api(database_context)
 
 
 @pytest.fixture
@@ -393,9 +401,24 @@ def postgresql_record_services():
         administration_engine.dispose()
 
 
-@pytest.fixture
-def governance(tmp_path):
-    url = f"sqlite:///{tmp_path / 'governance.db'}"
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def database_record_services(request):
+    return request.getfixturevalue(
+        "record_services" if request.param == "sqlite" else "postgresql_record_services"
+    )
+
+
+def _build_governance(database, tmp_path):
+    administration = None
+    if database == "postgresql":
+        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
+        administration = create_database_engine(url)
+        schema = f"governance_{uuid.uuid4().hex}"
+        with administration.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
+    else:
+        url = f"sqlite:///{tmp_path / 'governance.db'}"
     engine = create_database_engine(url)
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
@@ -407,6 +430,20 @@ def governance(tmp_path):
     dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "", owner.id)
     yield engine, factory, services, admin, user, owner, other, dataset
     engine.dispose()
+    if administration:
+        with administration.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        administration.dispose()
+
+
+@pytest.fixture
+def governance(tmp_path):
+    yield from _build_governance("sqlite", tmp_path)
+
+
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def database_governance(request, tmp_path):
+    yield from _build_governance(request.param, tmp_path)
 
 
 def pytest_collection_modifyitems(config, items):

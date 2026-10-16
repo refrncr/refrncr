@@ -9,8 +9,8 @@ from refrncr.db.base import Base
 from refrncr.models import AuditEvent
 
 
-def test_chronology_index_preserves_events(audit_db):
-    engine, _sessions, _services = audit_db
+def test_chronology_index_preserves_events(database_audit_db):
+    engine, _sessions, _services = database_audit_db
     Base.metadata.drop_all(engine)
     migrate(engine, "0012_ref_73")
     with engine.begin() as c:

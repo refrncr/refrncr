@@ -86,8 +86,8 @@ def test_rebuilt_concept_preserves_typed_record_values(context, data_type, raw, 
     assert "Keep" in records_page.text and "Keep" in search.text and "keep" in exported.text
 
 
-def test_duplicate_and_concurrent_creation_one_event(context):
-    c = context
+def test_duplicate_and_concurrent_creation_one_event(database_context):
+    c = database_context
     setup(c)
     publish(c)
     before = len([a for a in audits(c) if a.action == "dataset.concept_created"])
@@ -182,12 +182,14 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context):
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_create_failure_preserves_inactive_content_and_retry(context, monkeypatch, failure):
+def test_create_failure_preserves_inactive_content_and_retry(
+    database_context, monkeypatch, failure
+):
     from sqlalchemy.orm import Session
 
     from refrncr.persistence import SqlAlchemyUnitOfWork
 
-    c = context
+    c = database_context
     setup(c)
     baseline = publish(c)
     before = snapshot(c)
@@ -392,10 +394,12 @@ def test_paged_record_badges_use_stable_identity_and_shared_classification(conte
     assert review.counts.records_removed == 1
 
 
-def test_cancel_audit_failure_rolls_back_staleness_and_preserves_changes(context, monkeypatch):
+def test_cancel_audit_failure_rolls_back_staleness_and_preserves_changes(
+    database_context, monkeypatch
+):
     from refrncr.persistence import SqlAlchemyUnitOfWork
 
-    c = context
+    c = database_context
     setup(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)

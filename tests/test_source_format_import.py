@@ -18,6 +18,12 @@ def context(import_context):
     return import_context
 
 
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def database_context(request):
+    fixture = "import_context" if request.param == "sqlite" else "postgresql_import_context"
+    return request.getfixturevalue(fixture)
+
+
 def start(context, value="1.234,56", session="source-formats", code="A"):
     _, services, admin, dataset = context
     state, _, _ = services.record_imports.begin(
@@ -92,24 +98,24 @@ def test_full_confirmation_remembers_and_preview_uses_canonical_values(context):
 
 
 @pytest.mark.parametrize("end", ["cancel", "expiry", "validation", "rollback", "stale"])
-def test_unsuccessful_paths_do_not_remember(context, monkeypatch, end):
-    _, services, admin, dataset = context
+def test_unsuccessful_paths_do_not_remember(database_context, monkeypatch, end):
+    _, services, admin, dataset = database_context
     clock = [0.0]
     services.record_imports.store = TransientImportStore(clock=lambda: clock[0])
-    state = start(context)
-    assert preview(context, state).valid
+    state = start(database_context)
+    assert preview(database_context, state).valid
     if end == "cancel":
         services.record_imports.cancel(admin.id, "source-formats", dataset.key, state.token)
     elif end == "expiry":
         clock[0] = 901
         with pytest.raises(NotFoundError):
-            confirm(context, state)
+            confirm(database_context, state)
     elif end == "validation":
-        assert not preview(context, state, {"profile_id": "v1-us"}).valid
+        assert not preview(database_context, state, {"profile_id": "v1-us"}).valid
     elif end == "stale":
         services.dataset_records.create_record(admin.id, dataset.key, {"code": "Z", "amount": "5"})
         with pytest.raises(Exception, match="changed"):
-            confirm(context, state)
+            confirm(database_context, state)
     else:
         import refrncr.record_import as module
 
@@ -119,12 +125,12 @@ def test_unsuccessful_paths_do_not_remember(context, monkeypatch, end):
         with monkeypatch.context() as patch:
             patch.setattr(module, "record_audit", fail)
             with pytest.raises(RuntimeError, match="injected"):
-                confirm(context, state)
-        assert saved(context) == {}
-        assert confirm(context, state) == 1
-        assert saved(context)
+                confirm(database_context, state)
+        assert saved(database_context) == {}
+        assert confirm(database_context, state) == 1
+        assert saved(database_context)
         return
-    assert saved(context) == {}
+    assert saved(database_context) == {}
 
 
 def test_full_file_detection_and_validation_beyond_display_examples(context):

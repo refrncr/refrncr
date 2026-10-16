@@ -173,8 +173,8 @@ BAD_QUERIES = (
 
 
 @pytest.mark.parametrize("query", BAD_QUERIES)
-def test_fail_closed_query_envelope_has_no_partial_results(context, query):
-    c = context
+def test_fail_closed_query_envelope_has_no_partial_results(database_context, query):
+    c = database_context
     setup(c)
     browser, _ = client(c)
     before = snapshot(c)
@@ -228,8 +228,8 @@ def test_recreated_field_and_old_datatype_never_reinterpret_retained_values(cont
     assert read(c, search="Café", record_status="deleted").total == 0
 
 
-def test_search_query_count_does_not_grow_per_record(context, record_property):
-    c = context
+def test_search_query_count_does_not_grow_per_record(database_context, record_property):
+    c = database_context
     setup(c)
     counts = []
     for size in (1, 30):
@@ -282,8 +282,8 @@ def test_record_query_values_never_enter_default_access_logs(path):
 
 
 @pytest.mark.slow
-def test_thousand_record_search_query_plan(context, record_property):
-    c = context
+def test_thousand_record_search_query_plan(database_context, record_property):
+    c = database_context
     setup(c, populated=False)
     # Canonically validated fixture rows in one transaction. This measures reads,
     # not the unrelated per-Record mutation/audit workflow.

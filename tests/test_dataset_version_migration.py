@@ -33,8 +33,8 @@ def previous_schema(c):
 
 
 @pytest.mark.parametrize("populated", [False, True])
-def test_valid_upgrade_and_system_publisher(context, populated):
-    c = context
+def test_valid_upgrade_and_system_publisher(database_context, populated):
+    c = database_context
     setup(c, populated=populated)
     previous_schema(c)
     with c.engine.connect() as connection:
@@ -61,8 +61,8 @@ def test_valid_upgrade_and_system_publisher(context, populated):
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 1
 
 
-def test_preflight_all_invalid_and_safe_retry(context):
-    c = context
+def test_preflight_all_invalid_and_safe_retry(database_context):
+    c = database_context
     c.s.datasets.create_dataset(c.a.id, "second", "Second", "", c.owner.id)
     previous_schema(c)
     with c.engine.connect() as connection:
@@ -128,8 +128,8 @@ def test_preflight_all_invalid_and_safe_retry(context):
         "0014_ref_145",
     ],
 )
-def test_empty_upgrade_from_every_supported_revision(audit_db, revision):
-    engine, _, _ = audit_db
+def test_empty_upgrade_from_every_supported_revision(database_audit_db, revision):
+    engine, _, _ = database_audit_db
     Base.metadata.drop_all(engine)
     with engine.connect() as connection:
         config = config_for(connection)
@@ -140,10 +140,10 @@ def test_empty_upgrade_from_every_supported_revision(audit_db, revision):
 
 
 @pytest.mark.slow
-def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monkeypatch):
+def test_migration_copy_failure_rolls_back_schema_and_all_versions(database_context, monkeypatch):
     from refrncr.version_persistence import SqlAlchemyVersionOperations
 
-    c = context
+    c = database_context
     setup(c)
     previous_schema(c)
     original = SqlAlchemyVersionOperations.append
@@ -165,8 +165,8 @@ def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monk
 
 
 @pytest.mark.parametrize("invalid", ["identifier", "required", "datatype", "value"])
-def test_invalid_existing_data_preflight(context, invalid):
-    c = context
+def test_invalid_existing_data_preflight(database_context, invalid):
+    c = database_context
     setup(c)
     previous_schema(c)
     with c.engine.begin() as connection:
@@ -190,10 +190,10 @@ def test_invalid_existing_data_preflight(context, invalid):
         assert "dataset_versions" not in inspect(connection).get_table_names()
 
 
-def test_populated_downgrade_preserves_versions_and_schema(context):
+def test_populated_downgrade_preserves_versions_and_schema(database_context):
     from support import publish
 
-    c = context
+    c = database_context
     setup(c)
     version = publish(c)
     with c.engine.connect() as connection:
@@ -207,12 +207,12 @@ def test_populated_downgrade_preserves_versions_and_schema(context):
 
 
 @pytest.mark.parametrize("valid", [False, True])
-def test_cli_publication_preflight_and_upgrade(context, valid, capsys):
+def test_cli_publication_preflight_and_upgrade(database_context, valid, capsys):
     import json
 
     from refrncr.cli import main
 
-    c = context
+    c = database_context
     if valid:
         setup(c)
     previous_schema(c)
@@ -233,10 +233,10 @@ def test_cli_publication_preflight_and_upgrade(context, valid, capsys):
             assert "dataset_versions" not in inspect(connection).get_table_names()
 
 
-def test_migrated_snapshot_constraints_match_current_models(context):
+def test_migrated_snapshot_constraints_match_current_models(database_context):
     from sqlalchemy import CheckConstraint, UniqueConstraint
 
-    c = context
+    c = database_context
     setup(c)
     previous_schema(c)
     with c.engine.connect() as connection:

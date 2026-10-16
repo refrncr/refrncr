@@ -99,8 +99,8 @@ def test_deletion_acknowledgement_retention_undo_and_publication(context):
 
 
 @pytest.mark.parametrize("mutation", ["add", "edit", "delete", "restore", "create_import"])
-def test_record_mutations_block_all_new_import_steps(context, mutation):
-    c = context
+def test_record_mutations_block_all_new_import_steps(database_context, mutation):
+    c = database_context
     _, concept = clean(c)
     state, _ = preview(c)
     if mutation == "add":
@@ -160,12 +160,12 @@ def test_invalid_file_never_applies(context, source):
     assert snapshot(c) == before
 
 
-def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(context):
+def test_real_migration_preserves_legacy_deletion_and_blocks_only_old_concepts(database_context):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import text
 
-    c = context
+    c = database_context
     first, _ = clean(c)
     original = content(c, first)
     config = Config("alembic.ini")
@@ -240,12 +240,14 @@ def test_complete_diff_pagination_search_and_no_preview_writes(context):
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_new_version_failure_rolls_back_all_content_marker_and_audit(context, monkeypatch, failure):
+def test_new_version_failure_rolls_back_all_content_marker_and_audit(
+    database_context, monkeypatch, failure
+):
     from sqlalchemy.orm import Session
 
     from refrncr.persistence import SqlAlchemyUnitOfWork
 
-    c = context
+    c = database_context
     clean(c)
     state, _ = preview(c, b"code,label\nb,New\n")
     before = snapshot(c)
@@ -291,8 +293,8 @@ def test_stale_schema_and_confirmation_require_review_and_fresh_ack(context):
         (b"code,label\na,New\n", ("code", None)),
     ],
 )
-def test_empty_file_and_missing_optional_field_are_blocked(context, source, mapping):
-    c = context
+def test_empty_file_and_missing_optional_field_are_blocked(database_context, source, mapping):
+    c = database_context
     clean(c)
     before = snapshot(c)
     try:
@@ -309,11 +311,11 @@ def test_empty_file_and_missing_optional_field_are_blocked(context, source, mapp
     assert snapshot(c) == before
 
 
-def test_concurrent_independent_staged_confirms_commit_once(context):
+def test_concurrent_independent_staged_confirms_commit_once(database_context):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
-    c = context
+    c = database_context
     clean(c)
     one, _ = preview(c, session="one")
     two, _ = preview(c, session="two")
@@ -374,8 +376,8 @@ def test_composite_identifier_and_xlsx_canonical_source_formats(context):
     assert c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, original.id).revision == 1
 
 
-def test_unique_values_can_swap_and_be_reused_from_deleted_records(context):
-    c = context
+def test_unique_values_can_swap_and_be_reused_from_deleted_records(database_context):
+    c = database_context
     setup(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Label", "string", False, True)
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b", "label": "Second"})
@@ -629,13 +631,15 @@ def test_noop_record_edit_does_not_invent_a_mutation(context):
     assert c.s.record_imports.eligibility(c.a.id, c.d.key) is None
 
 
-def test_migration_failure_rolls_back_schema_marker_and_retained_rows(context, monkeypatch):
+def test_migration_failure_rolls_back_schema_marker_and_retained_rows(
+    database_context, monkeypatch
+):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect, text
     from sqlalchemy.engine import Connection
 
-    c = context
+    c = database_context
     clean(c)
     config = Config("alembic.ini")
     with c.engine.connect() as connection:
@@ -715,14 +719,14 @@ def test_typed_identifier_equivalence_is_unchanged(context, data_type, stored, s
     assert c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, record.id).revision == 1
 
 
-def test_empty_xlsx_and_no_active_concept_are_blocked(context):
+def test_empty_xlsx_and_no_active_concept_are_blocked(database_context):
     from io import BytesIO
 
     from openpyxl import Workbook
 
     from refrncr.services import ConflictError
 
-    c = context
+    c = database_context
     clean(c)
     book = Workbook()
     book.active.append(["code", "label"])

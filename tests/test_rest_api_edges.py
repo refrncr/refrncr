@@ -111,8 +111,8 @@ def test_dataset_pages_are_bounded_and_permissions_are_bulk(api, monkeypatch):
     assert restricted.json()["data"][0]["key"] == c.d.key
 
 
-def test_concurrent_publication_never_mixes_representations(api, monkeypatch):
-    c = api
+def test_concurrent_publication_never_mixes_representations(database_api, monkeypatch):
+    c = database_api
     if c.engine.dialect.name == "sqlite":
         with c.engine.connect() as connection:
             connection.execute(text("PRAGMA journal_mode=WAL"))

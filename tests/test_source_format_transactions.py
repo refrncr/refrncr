@@ -42,8 +42,8 @@ def snapshot(engine):
         }
 
 
-def test_concurrent_confirmation_has_one_atomic_preference_winner(audit_db):
-    engine, factory, s, a, d = setup(audit_db)
+def test_concurrent_confirmation_has_one_atomic_preference_winner(database_audit_db):
+    engine, factory, s, a, d = setup(database_audit_db)
     states = [
         stage(s, a, d, "one", "same", "1.234", "v1-eu"),
         stage(s, a, d, "two", "same", "1,234", "v1-us"),
@@ -78,8 +78,10 @@ def test_concurrent_confirmation_has_one_atomic_preference_winner(audit_db):
         assert {p.choice["profile_id"] for p in proposals} == {"v1-text", winner}
 
 
-def test_failed_confirmation_preserves_previous_proposal_and_all_tables(audit_db, monkeypatch):
-    engine, factory, s, a, d = setup(audit_db)
+def test_failed_confirmation_preserves_previous_proposal_and_all_tables(
+    database_audit_db, monkeypatch
+):
+    engine, factory, s, a, d = setup(database_audit_db)
     first = stage(s, a, d, "one", "first", "1.234,56", "v1-eu")
     s.record_imports.confirm(a.id, "one", d.key, first.token)
     second = stage(s, a, d, "two", "second", "1,234.56", "v1-us")
@@ -95,8 +97,8 @@ def test_failed_confirmation_preserves_previous_proposal_and_all_tables(audit_db
     assert snapshot(engine) == before
 
 
-def test_import_choice_grants_no_additional_authority(audit_db):
-    engine, factory, s, a, d = setup(audit_db)
+def test_import_choice_grants_no_additional_authority(database_audit_db):
+    engine, factory, s, a, d = setup(database_audit_db)
     member = s.users.create_user(a.id, "member@example.com", "Member", "valid password")
     denied = s.users.create_user(a.id, "reader@example.com", "Reader", "valid password")
     s.memberships.create_membership(a.id, member.id, d.owner_team_id)
@@ -140,12 +142,12 @@ def test_import_choice_grants_no_additional_authority(audit_db):
 
 
 @pytest.mark.slow
-def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
-    engine, _, _ = audit_db
+def test_additive_migration_preserves_business_rows_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     Base.metadata.drop_all(engine)
     migrate(engine, "head")
     # Populate at the current schema, then construct the historical migration fixture.
-    engine, factory, s, a, d = setup(audit_db)
+    engine, factory, s, a, d = setup(database_audit_db)
     s.dataset_records.create_record(a.id, d.key, {"code": "kept", "amount": "123.45"})
     migrate(engine, "0016_ref_84", downgrade=True)
     with engine.connect() as c:
@@ -177,12 +179,12 @@ def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
         assert session.scalar(text("SELECT count(*) FROM dataset_records")) == 2
 
 
-def test_new_concept_preserves_proposal_for_same_field_identity(audit_db):
+def test_new_concept_preserves_proposal_for_same_field_identity(database_audit_db):
     from datetime import UTC, datetime
 
     from refrncr.models import Dataset
 
-    engine, factory, s, a, d = setup(audit_db)
+    engine, factory, s, a, d = setup(database_audit_db)
     state = stage(s, a, d, "first", "A", "1.234,56", "v1-eu")
     s.record_imports.confirm(a.id, "first", d.key, state.token)
     with factory() as session:
@@ -208,13 +210,13 @@ def test_new_concept_preserves_proposal_for_same_field_identity(audit_db):
     )
 
 
-def test_migrated_proposal_constraints_and_field_deletion(audit_db):
+def test_migrated_proposal_constraints_and_field_deletion(database_audit_db):
     from uuid import uuid4
 
-    engine, _, _ = audit_db
+    engine, _, _ = database_audit_db
     Base.metadata.drop_all(engine)
     migrate(engine, "head")
-    engine, factory, s, a, d = setup(audit_db)
+    engine, factory, s, a, d = setup(database_audit_db)
     inspector = inspect(engine)
     table = "dataset_field_source_formats"
     assert inspector.get_pk_constraint(table)["constrained_columns"] == ["field_id"]
@@ -251,10 +253,10 @@ def test_migrated_proposal_constraints_and_field_deletion(audit_db):
 
 
 @pytest.mark.parametrize("ending", ["cancel", "expiry", "validation"])
-def test_unsuccessful_attempt_retains_previous_confirmed_proposal(audit_db, ending):
+def test_unsuccessful_attempt_retains_previous_confirmed_proposal(database_audit_db, ending):
     from refrncr.record_import import TransientImportStore
 
-    engine, factory, s, a, d = setup(audit_db)
+    engine, factory, s, a, d = setup(database_audit_db)
     clock = [0.0]
     s.record_imports.store = TransientImportStore(clock=lambda: clock[0])
     first = stage(s, a, d, "first", "saved", "1.234,56", "v1-eu")

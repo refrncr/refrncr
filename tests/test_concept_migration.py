@@ -18,8 +18,8 @@ def predecessor(c):
 
 
 @pytest.mark.parametrize("state", ["equal", "different", "unpublished"])
-def test_lossless_migration_and_retry(context, state):
-    c = context
+def test_lossless_migration_and_retry(database_context, state):
+    c = database_context
     setup(c)
     baseline = publish(c) if state != "unpublished" else None
     if state == "different":
@@ -61,8 +61,8 @@ def test_lossless_migration_and_retry(context, state):
         assert connection.execute(select(DatasetConcept.__table__)).mappings().all() == rows
 
 
-def test_corrupt_content_preflight_is_atomic(context):
-    c = context
+def test_corrupt_content_preflight_is_atomic(database_context):
+    c = database_context
     setup(c)
     publish(c)
     predecessor(c)
@@ -77,10 +77,10 @@ def test_corrupt_content_preflight_is_atomic(context):
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0015_ref_83"
 
 
-def test_copy_failure_rolls_back_new_schema_and_retry(context, monkeypatch):
+def test_copy_failure_rolls_back_new_schema_and_retry(database_context, monkeypatch):
     from refrncr.concept_persistence import SqlAlchemyConceptOperations
 
-    c = context
+    c = database_context
     setup(c)
     predecessor(c)
     original = SqlAlchemyConceptOperations.create
@@ -104,8 +104,8 @@ def test_copy_failure_rolls_back_new_schema_and_retry(context, monkeypatch):
         assert connection.scalar(text("SELECT count(*) FROM dataset_concepts")) == 1
 
 
-def test_ambiguous_identifier_configuration_preflight(context):
-    c = context
+def test_ambiguous_identifier_configuration_preflight(database_context):
+    c = database_context
     setup(c, populated=False)
     predecessor(c)
     with c.engine.begin() as connection:
@@ -119,12 +119,12 @@ def test_ambiguous_identifier_configuration_preflight(context):
 
 
 @pytest.mark.parametrize("valid", [False, True])
-def test_concept_cli_preflight_and_upgrade(context, valid, capsys):
+def test_concept_cli_preflight_and_upgrade(database_context, valid, capsys):
     import json
 
     from refrncr.cli import main
 
-    c = context
+    c = database_context
     setup(c)
     predecessor(c)
     if not valid:

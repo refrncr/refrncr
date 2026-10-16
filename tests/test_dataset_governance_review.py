@@ -109,8 +109,10 @@ def test_each_service_boundary(governance, kind):
 
 @pytest.mark.parametrize("operation", ["create", "owner", "grant", "revoke"])
 @pytest.mark.parametrize("position", ["audit", "commit"])
-def test_all_governance_writes_rollback_after_flush(governance, monkeypatch, operation, position):
-    _, factory, s, a, u, owner, other, d = governance
+def test_all_governance_writes_rollback_after_flush(
+    database_governance, monkeypatch, operation, position
+):
+    _, factory, s, a, u, owner, other, d = database_governance
     access = (
         s.datasets.grant_export_access(a.id, d.key, "user", u.id) if operation == "revoke" else None
     )
@@ -152,8 +154,8 @@ def test_all_governance_writes_rollback_after_flush(governance, monkeypatch, ope
     assert snapshot() == before
 
 
-def test_export_snapshot_survives_concurrent_revoke(governance, monkeypatch):
-    engine, _, s, a, u, _, _, d = governance
+def test_export_snapshot_survives_concurrent_revoke(database_governance, monkeypatch):
+    engine, _, s, a, u, _, _, d = database_governance
     publish_dataset(s, a.id, d)
     if engine.dialect.name == "sqlite":
         with engine.connect() as connection:
@@ -211,8 +213,8 @@ def test_membership_removal_commits_before_waiting_mutation(governance, operatio
     assert state(factory, d) == before
 
 
-def test_maintenance_listing_query_count_is_bounded(governance):
-    engine, _, s, a, u, owner, _, _ = governance
+def test_maintenance_listing_query_count_is_bounded(database_governance):
+    engine, _, s, a, u, owner, _, _ = database_governance
     s.memberships.create_membership(a.id, u.id, owner.id)
     statements = []
 
@@ -317,12 +319,12 @@ def test_export_team_deletion_cascades_without_removing_other_access(governance)
     assert not s.authorization.datasets.can_maintain_dataset(u.id, d.id)
 
 
-def test_concurrent_revoke_has_one_audit_and_safe_missing_result(governance):
+def test_concurrent_revoke_has_one_audit_and_safe_missing_result(database_governance):
     from threading import Barrier
 
     from refrncr.models import AuditEvent
 
-    _, factory, s, a, u, _, _, d = governance
+    _, factory, s, a, u, _, _, d = database_governance
     access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
     barrier = Barrier(2)
 

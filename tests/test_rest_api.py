@@ -267,12 +267,12 @@ def test_duplicate_expired_revoked_inactive_keys(api):
         "api_key=secret",
     ],
 )
-def test_fail_closed_query(api, query):
+def test_fail_closed_query(database_api, query):
     for suffix in ("", "/audit/records"):
-        response = get(api, suffix + "?" + query)
+        response = get(database_api, suffix + "?" + query)
         assert response.status_code == 400, response.text
         assert response.json() == {"error": "invalid_request"}
-    assert get(api, "/audit?limit=1").status_code == 400
+    assert get(database_api, "/audit?limit=1").status_code == 400
 
 
 def test_pagination_current_only_and_publication(api):
@@ -295,8 +295,8 @@ def test_pagination_current_only_and_publication(api):
     assert current.json()["version"]["number"] == scheduled.number
 
 
-def test_effective_date_version_validation_and_cache_isolation(api):
-    c = api
+def test_effective_date_version_validation_and_cache_isolation(database_api):
+    c = database_api
     first = get(c, "/audit/records")
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
@@ -428,8 +428,8 @@ def test_modified_since_precedence_and_metadata_changes(api):
 
 
 @pytest.mark.slow
-def test_sql_pagination_no_n_plus_one(api, monkeypatch):
-    c = api
+def test_sql_pagination_no_n_plus_one(database_api, monkeypatch):
+    c = database_api
     c.service.create_concept(c.a.id, c.d.id)
     for i in range(110):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"z{i:03}", "label": "value"})

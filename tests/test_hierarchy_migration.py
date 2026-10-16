@@ -6,8 +6,8 @@ from sqlalchemy import inspect, text
 from support import config_for
 
 
-def test_hierarchy_schema_upgrade_and_downgrade(audit_db):
-    engine, _, _ = audit_db
+def test_hierarchy_schema_upgrade_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -39,12 +39,13 @@ def test_hierarchy_schema_upgrade_and_downgrade(audit_db):
         ]
 
 
-def test_hierarchy_downgrade_refuses_even_empty_hierarchy(context):
-    with context.engine.begin() as connection:
+def test_hierarchy_downgrade_refuses_even_empty_hierarchy(database_context):
+    with database_context.engine.begin() as connection:
         connection.execute(
-            text("UPDATE datasets SET kind = 'hierarchy' WHERE id = :id"), {"id": context.d.id}
+            text("UPDATE datasets SET kind = 'hierarchy' WHERE id = :id"),
+            {"id": database_context.d.id},
         )
-    with context.engine.connect() as connection:
+    with database_context.engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
         with pytest.raises(RuntimeError, match="Hierarchy data exists"):

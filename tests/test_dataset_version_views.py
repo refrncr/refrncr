@@ -336,10 +336,10 @@ def test_snapshot_pagination_and_deleted_source_objects(context):
     assert len(rows) == 52 and rows[0] == {"code": "a", "label": "Café"}
 
 
-def test_history_and_record_reads_have_constant_query_count(context):
+def test_history_and_record_reads_have_constant_query_count(database_context):
     from sqlalchemy import event
 
-    c = context
+    c = database_context
     configured(c)
     publish(c)
 

@@ -295,8 +295,8 @@ def test_discard_and_cancel_restore_complete_baseline(context):
     assert not c.service.concept_context(c.a.id, c.d.key).has_changes
 
 
-def test_hierarchy_review_authority_staleness_and_atomic_publication(context, monkeypatch):
-    c = context
+def test_hierarchy_review_authority_staleness_and_atomic_publication(database_context, monkeypatch):
+    c = database_context
     root = prepare(c)
     leaf = node(c, "Leaf", root.id)
     with pytest.raises(NotFoundError):
@@ -429,8 +429,8 @@ def test_historical_duplicate_names_restore_for_sequential_explicit_repair(conte
     assert {item.id for item in content(c, second).hierarchy_nodes} == set(restored)
 
 
-def test_hierarchy_mutation_and_publication_share_one_revision_lock(context):
-    c = context
+def test_hierarchy_mutation_and_publication_share_one_revision_lock(database_context):
+    c = database_context
     root = prepare(c)
     leaf = node(c, "Leaf", root.id)
     expected = revision(c)

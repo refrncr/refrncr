@@ -21,12 +21,21 @@ from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import RecordConflictError, StaleRecordError, ValidationError
 
 
-@pytest.fixture
-def reviewed(audit_db):
+def _build_reviewed(audit_db):
     engine, factory, services = audit_db
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     return engine, factory, services, admin
+
+
+@pytest.fixture
+def reviewed(audit_db):
+    return _build_reviewed(audit_db)
+
+
+@pytest.fixture
+def database_reviewed(database_audit_db):
+    return _build_reviewed(database_audit_db)
 
 
 def state(engine):
@@ -42,9 +51,9 @@ def state(engine):
     "operation", ["field_create", "field_update", "record_create", "record_update"]
 )
 def test_all_datatype_mutations_are_atomic_at_each_failure_stage(
-    reviewed, monkeypatch, stage, operation
+    database_reviewed, monkeypatch, stage, operation
 ):
-    engine, _factory, services, admin = reviewed
+    engine, _factory, services, admin = database_reviewed
     dataset, _fields = setup_dataset(services, admin)
     record = services.dataset_records.create_record(admin.id, dataset.key, {"id": "one"})
     before = state(engine)
@@ -118,8 +127,10 @@ def test_all_datatype_mutations_are_atomic_at_each_failure_stage(
         ("timestamp", ("2024-01-01T01:00:00+01:00", "2024-01-01T00:00:00Z")),
     ],
 )
-def test_concurrent_equivalent_identifiers_commit_exactly_once(reviewed, type_id, variants):
-    _engine, factory, services, admin = reviewed
+def test_concurrent_equivalent_identifiers_commit_exactly_once(
+    database_reviewed, type_id, variants
+):
+    _engine, factory, services, admin = database_reviewed
     dataset, _ = setup_dataset(services, admin, ())
     services.dataset_fields.update_field(admin.id, dataset.key, "id", "ID", type_id, True, False)
     barrier = Barrier(2)
@@ -143,8 +154,8 @@ def test_concurrent_equivalent_identifiers_commit_exactly_once(reviewed, type_id
         assert events[0].action == "created" and events[0].details is None
 
 
-def test_empty_type_change_and_record_write_race_cannot_convert_values(reviewed):
-    _engine, _factory, services, admin = reviewed
+def test_empty_type_change_and_record_write_race_cannot_convert_values(database_reviewed):
+    _engine, _factory, services, admin = database_reviewed
     dataset, _ = setup_dataset(services, admin, ("integer",))
     barrier = Barrier(2)
 
@@ -198,8 +209,8 @@ def test_empty_type_change_and_record_write_race_cannot_convert_values(reviewed)
         ),
     ],
 )
-def test_persisted_values_have_exact_typed_comparison(reviewed, type_id, inputs):
-    _engine, _factory, services, admin = reviewed
+def test_persisted_values_have_exact_typed_comparison(database_reviewed, type_id, inputs):
+    _engine, _factory, services, admin = database_reviewed
     dataset, _ = setup_dataset(services, admin, (type_id,))
     for index, raw in enumerate(reversed(inputs)):
         services.dataset_records.create_record(
@@ -302,8 +313,8 @@ def test_invalid_xlsx_closes_xml_writer_and_removes_temporary_file(monkeypatch):
     assert not Path(sheet._writer.out).exists()
 
 
-def test_database_type_constraint_matches_only_the_public_catalog(reviewed):
-    engine, factory, services, admin = reviewed
+def test_database_type_constraint_matches_only_the_public_catalog(database_reviewed):
+    engine, factory, services, admin = database_reviewed
     dataset, fields = setup_dataset(services, admin)
     assert set(fields) == set(DATATYPES)
     from sqlalchemy.exc import IntegrityError

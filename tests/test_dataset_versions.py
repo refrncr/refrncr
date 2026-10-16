@@ -76,8 +76,8 @@ def test_snapshot_lifecycle_and_no_change(context):
     )
 
 
-def test_publication_rejects_duplicate_effective_date(context):
-    c = context
+def test_publication_rejects_duplicate_effective_date(database_context):
+    c = database_context
     setup(c)
     publish(c)
     c.service.create_concept(c.a.id, c.d.id)
@@ -125,8 +125,8 @@ def test_authorization(context, kind):
 
 
 @pytest.mark.parametrize("kind", ["audit", "snapshot", "commit", "constraint"])
-def test_rollback(context, monkeypatch, kind):
-    c = context
+def test_rollback(database_context, monkeypatch, kind):
+    c = database_context
     setup(c)
     before = snapshot(c)
     original = SqlAlchemyVersionOperations.append
@@ -160,8 +160,8 @@ def test_rollback(context, monkeypatch, kind):
     assert publish(c).number == 1
 
 
-def test_concurrent_same_revision(context):
-    c = context
+def test_concurrent_same_revision(database_context):
+    c = database_context
     setup(c)
     expected = revision(c)
     barrier = Barrier(2)
@@ -220,8 +220,8 @@ def test_date_boundaries_and_deletion(context):
     assert len(audits(c)) == before_audit + 1
 
 
-def test_persisted_snapshot_cannot_be_edited(context):
-    c = context
+def test_persisted_snapshot_cannot_be_edited(database_context):
+    c = database_context
     setup(c)
     v = publish(c)
     before = snapshot(c)
@@ -270,12 +270,12 @@ def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):
 @pytest.mark.parametrize(
     "invalid", ["fields", "identifier", "required", "value", "note", "revision"]
 )
-def test_invalid_publication_is_atomic(context, invalid):
+def test_invalid_publication_is_atomic(database_context, invalid):
     from sqlalchemy import delete, update
 
     from refrncr.models import DatasetBusinessKeyField, DatasetRecordValue
 
-    c = context
+    c = database_context
     c.service = DatasetVersionService(
         c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
     )
@@ -303,8 +303,8 @@ def test_invalid_publication_is_atomic(context, invalid):
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_cancellation_rollback_and_retry(context, monkeypatch, failure):
-    c = context
+def test_cancellation_rollback_and_retry(database_context, monkeypatch, failure):
+    c = database_context
     setup(c)
     v = publish(c, day=NOW.date() + timedelta(days=1))
     before = snapshot(c)
@@ -486,13 +486,13 @@ def test_cancellation_and_publication_serialize(context, monkeypatch, first):
     assert len([e for e in audits(c) if e.action == "dataset.version_cancelled"]) == 1
 
 
-def test_version_database_constraints(context):
+def test_version_database_constraints(database_context):
     from sqlalchemy import insert
     from sqlalchemy.exc import IntegrityError
 
     from refrncr.models import DatasetVersionRecord
 
-    c = context
+    c = database_context
     setup(c)
     v = publish(c)
     before = snapshot(c)
@@ -516,10 +516,10 @@ def test_version_database_constraints(context):
     assert snapshot(c) == before
 
 
-def test_clock_uses_utc_calendar_and_rejects_naive_clock(context):
+def test_clock_uses_utc_calendar_and_rejects_naive_clock(database_context):
     from datetime import timezone
 
-    c = context
+    c = database_context
     setup(c)
     c.service.clock = lambda: datetime(2026, 9, 11, 0, 30, tzinfo=timezone(timedelta(hours=2)))
     v = publish(c)
@@ -529,8 +529,8 @@ def test_clock_uses_utc_calendar_and_rejects_naive_clock(context):
         c.service.review(c.a.id, c.d.id)
 
 
-def test_persisted_version_timestamps_are_utc(context):
-    c = context
+def test_persisted_version_timestamps_are_utc(database_context):
+    c = database_context
     setup(c)
     version = publish(c, day=NOW.date() + timedelta(days=1))
     loaded = versions(c)[0]

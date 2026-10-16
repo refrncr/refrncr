@@ -86,8 +86,8 @@ def populate(c, records=2):
 
 
 @pytest.mark.parametrize("records", [None, 0, 2])
-def test_atomic_deletion_preserves_history(context, records):
-    c = context
+def test_atomic_deletion_preserves_history(database_context, records):
+    c = database_context
     if records is not None:
         populate(c, records)
     other = c.s.datasets.create_dataset(c.a.id, "other", "Other", "", c.owner.id)
@@ -237,8 +237,8 @@ def test_stale_confirmation_cannot_delete(context, mutation):
 
 
 @pytest.mark.parametrize("stage", ["before", "child", "after_delete", "audit", "commit"])
-def test_database_failure_rolls_back_every_row(context, monkeypatch, stage):
-    c = context
+def test_database_failure_rolls_back_every_row(database_context, monkeypatch, stage):
+    c = database_context
     populate(c)
     target = deletion(c)
     before = snapshot(c)
@@ -284,8 +284,8 @@ def test_database_failure_rolls_back_every_row(context, monkeypatch, stage):
     assert len([e for e in audits(c) if e.action == "dataset.deleted"]) == 1
 
 
-def test_concurrent_deletes_and_replay_commit_one_event(context):
-    c = context
+def test_concurrent_deletes_and_replay_commit_one_event(database_context):
+    c = database_context
     populate(c)
     target = deletion(c)
     gate = Barrier(2)
@@ -527,8 +527,8 @@ def test_dataset_foreign_key_inventory(context):
     assert all(fk["referred_table"] == "users" for fk in schema.get_foreign_keys("audit_events"))
 
 
-def test_deletion_on_complete_migration_chain(audit_db):
-    engine, _, _ = audit_db
+def test_deletion_on_complete_migration_chain(database_audit_db):
+    engine, _, _ = database_audit_db
     # Replace only this fixture's isolated, still-empty metadata-created schema.
     Base.metadata.drop_all(engine)
     config = Config()
@@ -538,7 +538,7 @@ def test_deletion_on_complete_migration_chain(audit_db):
     with engine.connect() as connection:
         config.attributes["connection"] = connection
         command.upgrade(config, "head")
-    c = context_from_audit_db(audit_db)
+    c = context_from_audit_db(database_audit_db)
     populate(c)
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"

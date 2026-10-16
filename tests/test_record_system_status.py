@@ -165,8 +165,8 @@ def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):
 
 
 @pytest.mark.slow
-def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(context):
-    c = context
+def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(database_context):
+    c = database_context
     setup(c, populated=False)
     records = [
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"same-{n:03}"})

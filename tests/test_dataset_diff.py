@@ -240,8 +240,8 @@ def test_audit_once_no_noise_and_no_change(context):
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_open_audit_failure_rolls_back(context, monkeypatch, failure):
-    c = context
+def test_open_audit_failure_rolls_back(database_context, monkeypatch, failure):
+    c = database_context
     prepared(c)
     c.s.dataset_fields.update_field(
         c.a.id, c.d.key, "label", "Reviewable draft", "string", False, False
@@ -316,11 +316,11 @@ def test_search_filters_and_keyset_pages(context, size):
     assert not c.diff.review(c.a.id, identity, "Records", DiffCriteria(statuses=("Removed",))).items
 
 
-def test_bounded_query_count_and_no_object_graph(context, monkeypatch):
+def test_bounded_query_count_and_no_object_graph(database_context, monkeypatch):
     from refrncr.persistence import SqlAlchemyDatasetRecordOperations
     from refrncr.version_persistence import SqlAlchemyVersionOperations
 
-    c = context
+    c = database_context
     prepared(c)
     c.s.dataset_records.update_record(c.a.id, c.d.key, c.record.id, 1, {"code": "b"})
     review = opened(c)
@@ -618,8 +618,8 @@ def test_stale_open_and_publish_have_no_success_event(context):
     assert snapshot(c) == before
 
 
-def test_scheduled_activation_blocks_review_publication(context):
-    c = context
+def test_scheduled_activation_blocks_review_publication(database_context):
+    c = database_context
     prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
@@ -669,10 +669,10 @@ def test_corrupt_concept_open_fails_closed(context, kind):
     assert snapshot(c) == before
 
 
-def test_calendar_change_during_open_rolls_back(context, monkeypatch):
+def test_calendar_change_during_open_rolls_back(database_context, monkeypatch):
     from refrncr.diff_persistence import SqlAlchemyDiffOperations
 
-    c = context
+    c = database_context
     prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Future", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))
@@ -694,8 +694,8 @@ def test_calendar_change_during_open_rolls_back(context, monkeypatch):
     assert snapshot(c) == before
 
 
-def test_scheduled_activation_during_review_publication_rolls_back(context):
-    c = context
+def test_scheduled_activation_during_review_publication_rolls_back(database_context):
+    c = database_context
     prepared(c)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Scheduled", "string", False, False)
     publish(c, day=NOW.date() + timedelta(days=1))

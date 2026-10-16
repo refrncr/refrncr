@@ -149,8 +149,8 @@ def test_cursor_direction_tampering_and_truncation(history):
             h.service.list_history(h.admin, cursor=invalid)
 
 
-def test_concurrent_writer_during_page_read_preserves_original_set(history):
-    h = history
+def test_concurrent_writer_during_page_read_preserves_original_set(database_history):
+    h = database_history
     expected = seed(h, 151)
     first = h.service.list_history(h.admin)
     reached, committed = Event(), Event()

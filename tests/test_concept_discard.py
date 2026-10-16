@@ -233,8 +233,8 @@ def test_stale_identity_never_deletes(context, state):
 
 
 @pytest.mark.parametrize("failure", ["values", "records", "fields", "concept", "audit", "commit"])
-def test_discard_rollback(context, monkeypatch, failure):
-    c = context
+def test_discard_rollback(database_context, monkeypatch, failure):
+    c = database_context
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
     before = snapshot(c)
@@ -275,8 +275,8 @@ def test_discard_rollback(context, monkeypatch, failure):
     assert active(c) is None
 
 
-def test_concurrent_discard_at_most_once(context):
-    c = context
+def test_concurrent_discard_at_most_once(database_context):
+    c = database_context
     prepared(c)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
     barrier = Barrier(2)
@@ -370,8 +370,10 @@ def test_dialog_stale_refresh_redirect_and_form_security(context):
 
 
 @pytest.mark.parametrize("cancelled", [False, True])
-def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(context, cancelled):
-    c = context
+def test_scheduled_and_cancelled_baseline_do_not_block_discard_with_current(
+    database_context, cancelled
+):
+    c = database_context
     current = prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Scheduled name", "Scheduled description")
     c.s.dataset_fields.update_field(
@@ -421,8 +423,8 @@ def test_current_activation_requires_new_confirmation(context):
 
 
 @pytest.mark.parametrize("operation", ["record", "publish", "import"])
-def test_concurrent_operation_and_discard_are_atomic(context, operation):
-    c = context
+def test_concurrent_operation_and_discard_are_atomic(database_context, operation):
+    c = database_context
     prepared(c)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Publication candidate", "")
     c.s.dataset_fields.update_field(
@@ -742,8 +744,10 @@ def test_discard_preserves_another_datasets_active_work(context):
     assert c.s.dataset_versions.concept_context(c.a.id, other.key).concept.dataset_id == other.id
 
 
-def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(context, monkeypatch, caplog):
-    c = context
+def test_http_failure_rolls_back_and_logs_only_fixed_diagnostic(
+    database_context, monkeypatch, caplog
+):
+    c = database_context
     prepared(c)
     browser, csrf = client(c)
     payload = form(browser, c, csrf)

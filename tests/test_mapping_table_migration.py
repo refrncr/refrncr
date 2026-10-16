@@ -5,8 +5,8 @@ from sqlalchemy import inspect, text
 from support import config_for
 
 
-def test_mapping_table_columns_upgrade_and_downgrade(audit_db):
-    engine, _, _ = audit_db
+def test_mapping_table_columns_upgrade_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -31,8 +31,8 @@ def test_mapping_table_columns_upgrade_and_downgrade(audit_db):
         } <= columns
 
 
-def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(audit_db):
-    engine, _, _ = audit_db
+def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -49,8 +49,8 @@ def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(audit_db):
         assert {"source_field_key", "target_field_key"} <= columns
 
 
-def test_mapping_field_roles_upgrade(audit_db):
-    engine, _, _ = audit_db
+def test_mapping_field_roles_upgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -73,8 +73,8 @@ def test_mapping_field_roles_upgrade(audit_db):
         }
 
 
-def test_mapping_table_migration_preserves_reference_default(audit_db):
-    engine, _, _ = audit_db
+def test_mapping_table_migration_preserves_reference_default(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
