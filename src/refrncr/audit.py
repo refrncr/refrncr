@@ -531,7 +531,7 @@ _read(
     "DatasetAuthorizationService",
     "active creation_teams can_create_dataset can_view_dataset "
     "maintainable_resources can_maintain_dataset can_export_dataset can_change_dataset_owner "
-    "can_manage_export_access",
+    "can_manage_export_access can_administer_installation",
     "Capability calculation only; the authoritative caller owns "
     "the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
 )

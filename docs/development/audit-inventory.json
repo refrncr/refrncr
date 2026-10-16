@@ -61,6 +61,7 @@
     "refrncr.services.AuthorizationService.has_capability",
     "refrncr.services.DatasetAuthorizationService.active",
     "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
+    "refrncr.services.DatasetAuthorizationService.can_administer_installation",
     "refrncr.services.DatasetAuthorizationService.can_create_dataset",
     "refrncr.services.DatasetAuthorizationService.can_export_dataset",
     "refrncr.services.DatasetAuthorizationService.can_maintain_dataset",
@@ -142,6 +143,7 @@
       "operations": [
         "refrncr.audit_history.AuditHistoryService.list_history",
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -154,6 +156,7 @@
       "operations": [
         "refrncr.audit_history.AuditHistoryService.get_event",
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -1086,6 +1089,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.list_users"
       ]
@@ -1099,6 +1103,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.create_user",
         "refrncr.services.UserService.list_users",
@@ -1113,6 +1118,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.delete_user",
         "refrncr.services.UserService.disable_user",
@@ -1129,6 +1135,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.MembershipService.list_relationships",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.UserService.change_email",
         "refrncr.services.UserService.list_users",
@@ -1158,6 +1165,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.MembershipService.list_eligible_users",
         "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.MembershipService.list_team_members",
@@ -1175,6 +1183,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.MembershipService.list_eligible_users",
         "refrncr.services.MembershipService.list_relationships",
         "refrncr.services.MembershipService.list_team_members",
@@ -1192,6 +1201,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.services.TeamService.delete_team",
         "refrncr.web.require_csrf"
@@ -1205,6 +1215,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.MembershipService.list_eligible_users",
         "refrncr.services.MembershipService.list_team_members",
         "refrncr.services.SessionService.resolve_with_session"
@@ -1218,6 +1229,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.MembershipService.create_membership",
         "refrncr.services.MembershipService.list_eligible_users",
         "refrncr.services.MembershipService.list_relationships",
@@ -1235,6 +1247,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.MembershipService.delete_membership",
         "refrncr.services.MembershipService.list_eligible_users",
         "refrncr.services.MembershipService.list_relationships",
@@ -1538,7 +1551,7 @@
   "notes": [
     "One public service operation is counted once regardless of its Flask/CLI callers. Interface mappings include their shared local helper calls and capability reads.",
     "move_field delegates to replace_order; Dataset context/details reads delegate to their existing read services. Composite writes are described in the matrix, not counted as independent bulk operations.",
-    "GrantService has no current HTTP/CLI administration endpoint; it remains a supported programmatic service for legacy and non-Dataset resources.",
+    "GrantService has no current HTTP/CLI administration endpoint; it is a deprecated programmatic compatibility service. The grants table and data remain until a separate removal decision.",
     "Pure validators, serializers, ORM CRUD ports/adapters and parser helpers are implementation mechanisms, not independent business entrypoints. Their owning service/administrative operation is classified.",
     "No background business worker exists. API credentials, publication/versioning, Dataset deletion and authenticated Current reads are inventoried. Alembic upgrade/downgrade is the operator migration capability, not user history."
   ],

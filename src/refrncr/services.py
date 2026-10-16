@@ -755,6 +755,11 @@ class DatasetAuthorizationService:
     def can_manage_export_access(self, actor_id, dataset_id, *, uow=None):
         return self._decision(actor_id, dataset_id, "manage_export", uow=uow)
 
+    def can_administer_installation(self, actor_id, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            actor = work.users.get(actor_id)
+            return self.active(actor) and actor.role == "admin"
+
 
 class StaleDatasetOwnerError(ConflictError):
     """Persisted ownership no longer matches the form's expected owner."""
@@ -2510,7 +2515,12 @@ class DatasetRecordService:
 
 
 class GrantService:
-    """Administrator-controlled lifecycle for resource Grants."""
+    """Deprecated compatibility service for historical resource Grants.
+
+    Browser and current Community APIs must use ``AuthorizationService`` named
+    capabilities. The grants table and this programmatic compatibility service
+    remain available until a separate deprecation decision authorizes removal.
+    """
 
     def __init__(self, uow: UnitOfWorkFactory, resources: ResourceTypeRegistry) -> None:
         self.uow = uow
@@ -2612,6 +2622,13 @@ class GrantService:
     _add_audit = staticmethod(UserService._add_audit)
 
 
+def create_deprecated_grant_service(
+    uow: UnitOfWorkFactory, resources: ResourceTypeRegistry
+) -> GrantService:
+    """Create the isolated Grant compatibility service for non-web callers."""
+    return GrantService(uow, resources)
+
+
 class AuthorizationService:
     """Single resource-permission engine plus the separate Community admin rule."""
 
@@ -2636,6 +2653,7 @@ class AuthorizationService:
     def check_access(
         self, user_id: str, resource_type: str, resource_id: str, required: str, *, uow=None
     ) -> bool:
+        """Deprecated GrantService compatibility API; use has_capability instead."""
         if resource_type == "dataset":
             if self.datasets is None:
                 return False
@@ -2656,6 +2674,23 @@ class AuthorizationService:
 
     def has_capability(self, user_id: str, capability: str, resource_id=None, *, uow=None) -> bool:
         """Evaluate a named Community capability at one authorization boundary."""
+        installation_capabilities = {
+            "can_administer_installation": (
+                getattr(self.datasets, "can_administer_installation", None)
+                if self.datasets
+                else None
+            ),
+            "can_manage_access": (
+                getattr(self.datasets, "can_administer_installation", None)
+                if self.datasets
+                else None
+            ),
+        }
+        if capability in installation_capabilities:
+            decision = installation_capabilities[capability]
+            if resource_id is not None or decision is None:
+                raise ValidationError(f"Unknown or incomplete capability: {capability}")
+            return decision(user_id, uow=uow)
         dataset_capabilities = {
             "can_view_dataset": self.datasets.can_view_dataset if self.datasets else None,
             "can_maintain_dataset": self.datasets.can_maintain_dataset if self.datasets else None,

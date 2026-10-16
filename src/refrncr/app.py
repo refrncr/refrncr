@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -38,6 +39,7 @@ from refrncr.services import (
     SessionService,
     TeamService,
     UserService,
+    create_deprecated_grant_service,
 )
 from refrncr.web import create_flask_app
 
@@ -52,7 +54,7 @@ class CommunityServices:
     sessions: SessionService
     teams: TeamService
     memberships: MembershipService
-    grants: GrantService
+    _deprecated_grants: Callable[[], GrantService]
     authorization: AuthorizationService
     datasets: DatasetService
     dataset_fields: DatasetFieldService
@@ -61,6 +63,11 @@ class CommunityServices:
     record_imports: DatasetRecordImportService
     hierarchy_imports: HierarchyImportService
     hierarchy: HierarchyService
+
+    @property
+    def grants(self) -> GrantService:
+        """Deprecated test/programmatic compatibility access to historical Grants."""
+        return self._deprecated_grants()
 
 
 def create_community_services(
@@ -84,7 +91,7 @@ def create_community_services(
         sessions=SessionService(sessions),
         teams=TeamService(uow),
         memberships=MembershipService(uow),
-        grants=GrantService(uow, resources),
+        _deprecated_grants=lambda: create_deprecated_grant_service(uow, resources),
         authorization=authorization,
         datasets=DatasetService(uow, authorization, versions=versions),
         dataset_fields=DatasetFieldService(uow, authorization, versions=versions),
