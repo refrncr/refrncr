@@ -6,9 +6,7 @@ from decimal import Decimal
 import pytest
 from alembic import command
 from sqlalchemy import select, text, update
-from test_audit_coverage import audit_db as audit_db
-from test_dataset_records import PASSWORD, configured_dataset
-from test_dataset_version_migration import config_for
+from support import PASSWORD, config_for, configured_dataset
 
 from refrncr.models import DatasetRecordValue
 
@@ -23,8 +21,8 @@ def _stored_values(factory, record_id):
         }
 
 
-def test_upgrade_repairs_only_misplaced_typed_values_and_is_idempotent(audit_db):
-    engine, factory, services = audit_db
+def test_upgrade_repairs_only_misplaced_typed_values_and_is_idempotent(database_audit_db):
+    engine, factory, services = database_audit_db
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     dataset, fields = configured_dataset(services, admin)
     record = services.dataset_records.create_record(
@@ -76,8 +74,8 @@ def test_upgrade_repairs_only_misplaced_typed_values_and_is_idempotent(audit_db)
     assert repeated[fields["day"].id].date_value == date(2026, 10, 14)
 
 
-def test_upgrade_rejects_invalid_repair_candidate_atomically(audit_db):
-    engine, _factory, services = audit_db
+def test_upgrade_rejects_invalid_repair_candidate_atomically(database_audit_db):
+    engine, _factory, services = database_audit_db
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     dataset, fields = configured_dataset(services, admin)
     record = services.dataset_records.create_record(

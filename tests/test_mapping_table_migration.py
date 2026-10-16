@@ -2,12 +2,11 @@
 
 from alembic import command
 from sqlalchemy import inspect, text
-from test_audit_coverage import audit_db  # noqa: F401
-from test_dataset_version_migration import config_for
+from support import config_for
 
 
-def test_mapping_table_columns_upgrade_and_downgrade(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_mapping_table_columns_upgrade_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -32,8 +31,8 @@ def test_mapping_table_columns_upgrade_and_downgrade(audit_db):  # noqa: F811
         } <= columns
 
 
-def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -50,8 +49,8 @@ def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(audit_db):  
         assert {"source_field_key", "target_field_key"} <= columns
 
 
-def test_mapping_field_roles_upgrade(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_mapping_field_roles_upgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")
@@ -74,8 +73,8 @@ def test_mapping_field_roles_upgrade(audit_db):  # noqa: F811
         }
 
 
-def test_mapping_table_migration_preserves_reference_default(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_mapping_table_migration_preserves_reference_default(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")

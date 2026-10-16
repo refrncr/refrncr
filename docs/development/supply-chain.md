@@ -31,6 +31,25 @@ Review direct and transitive version changes, their hashes, upstream release not
 Dependabot proposes weekly pip and GitHub Actions updates; action updates must retain a full 40-byte
 commit SHA and readable version comment.
 
+## Development-tool lock
+
+`requirements/dev.in` is the source of truth for direct development-tool versions. The
+`pyproject.toml` development extra, the hash-pinned `requirements/dev.txt`, the Ruff
+pre-commit revision and shared release-tool pins must agree with it.
+
+`requirements/dev.in` and the generated, hash-pinned `requirements/dev.txt` keep the local and CI
+development tools identical. CI installs the editable project and then installs this lock with
+`--require-hashes`. Update the input deliberately, regenerate with
+`.venv/bin/python tools/compile_dev_lock.py` in the canonical Linux Python 3.12 environment, and
+review direct and transitive changes together with the release lock. The CI policy job regenerates
+the file from an empty output with `.venv/bin/python tools/compile_dev_lock.py --fresh` and fails if
+the committed lock is stale or contains hashes that are not independently resolved.
+
+The test configuration ignores one known third-party warning from Python 3.12's SQLite datetime
+adapter when SQLAlchemy binds datetime values. It is not emitted by Community code, and the same
+database behavior is covered by both the SQLite and PostgreSQL suites; deprecations emitted by
+`refrncr` itself remain errors.
+
 ## Security gates and triage
 
 `security.yml` runs on pull requests, pushes to `main`, and daily. The locked runtime audit is

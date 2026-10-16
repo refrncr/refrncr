@@ -10,10 +10,57 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  test-sqlite:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COVERAGE_FILE: coverage-sqlite.dat
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install project and development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install --require-hashes -r requirements/dev.txt
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Collect SQLite cases
+        run: python -m pytest --collect-only -q -m 'not postgres'
+
+      - name: Test SQLite suite with coverage
+        run: >-
+          python -m pytest -n auto -m 'not postgres and not slow'
+          --durations=30 --timeout=300 --timeout-method=thread -q
+          --cov --cov-report= --cov-fail-under=0
+
+      - name: Test SQLite slow cases without coverage
+        run: >-
+          python -m pytest --run-slow -n auto -m 'not postgres and slow'
+          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-sqlite
+          path: coverage-sqlite.dat
+          if-no-files-found: error
+          retention-days: 1
+
+  test-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       REFRNCR_TEST_POSTGRES_URL: postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test
+      COVERAGE_FILE: coverage-postgres.dat
 
     services:
       postgres:
@@ -42,10 +89,56 @@ jobs:
       - name: Install project and development tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e .
+          python -m pip install --require-hashes -r requirements/dev.txt
 
-      - name: Lint
-        run: python -m ruff check .
+      - name: Collect PostgreSQL cases
+        run: python -m pytest --collect-only -q -m postgres
 
-      - name: Test
-        run: python -m pytest
+      - name: Test PostgreSQL suite with coverage
+        run: >-
+          python -m pytest -n auto -m 'postgres and not slow'
+          --durations=30 --timeout=300 --timeout-method=thread -q
+          --cov --cov-report= --cov-fail-under=0
+
+      - name: Test PostgreSQL slow cases without coverage
+        run: >-
+          python -m pytest --run-slow -n auto -m 'postgres and slow'
+          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-postgres
+          path: coverage-postgres.dat
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --require-hashes -r requirements/dev.txt
+
+      - name: Download coverage data
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: Report combined coverage
+        run: |
+          python -m coverage combine coverage-sqlite.dat coverage-postgres.dat
+          python -m coverage report --fail-under=90

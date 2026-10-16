@@ -6,17 +6,14 @@ from threading import Event
 
 import pytest
 from sqlalchemy import event, text
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_versions import NOW, publish
-from test_rest_api import api, get  # noqa: F401
+from support import NOW, csrf_token, get, publish
 
 from refrncr.published_contracts import decode_identifier
 from refrncr.services import AuthorizedResourceSet
 from refrncr.version_persistence import SqlAlchemyVersionOperations
 
 
-def test_flask_browser_assets_session_csrf_and_errors_alongside_api(api):  # noqa: F811
-    from test_interfaces import csrf_token
+def test_flask_browser_assets_session_csrf_and_errors_alongside_api(api):
 
     c = api
     client = c.client
@@ -46,7 +43,7 @@ def test_flask_browser_assets_session_csrf_and_errors_alongside_api(api):  # noq
     assert client.get("/static/missing.css").status_code == 404
 
 
-def test_empty_records_limits_metadata_and_cookie_rejection(api):  # noqa: F811
+def test_empty_records_limits_metadata_and_cookie_rejection(api):
     c = api
     d = c.s.datasets.create_dataset(c.a.id, "empty", "Empty", "", c.owner.id)
     c.s.dataset_fields.create_field(
@@ -74,7 +71,7 @@ def test_empty_records_limits_metadata_and_cookie_rejection(api):  # noqa: F811
     assert get(c, "?api_key=" + c.key.secret, headers={}).status_code == 401
 
 
-def test_dataset_pages_are_bounded_and_permissions_are_bulk(api, monkeypatch):  # noqa: F811
+def test_dataset_pages_are_bounded_and_permissions_are_bulk(api, monkeypatch):
     c = api
     for number in range(8):
         d = c.s.datasets.create_dataset(c.a.id, f"more_{number}", f"More {number}", "", c.owner.id)
@@ -114,8 +111,8 @@ def test_dataset_pages_are_bounded_and_permissions_are_bulk(api, monkeypatch):  
     assert restricted.json()["data"][0]["key"] == c.d.key
 
 
-def test_concurrent_publication_never_mixes_representations(api, monkeypatch):  # noqa: F811
-    c = api
+def test_concurrent_publication_never_mixes_representations(database_api, monkeypatch):
+    c = database_api
     if c.engine.dialect.name == "sqlite":
         with c.engine.connect() as connection:
             connection.execute(text("PRAGMA journal_mode=WAL"))
@@ -152,7 +149,7 @@ def test_concurrent_publication_never_mixes_representations(api, monkeypatch):  
     assert len(second.json()["data"]) == 2
 
 
-def test_authentication_storage_failure_fails_closed(api, monkeypatch):  # noqa: F811
+def test_authentication_storage_failure_fails_closed(api, monkeypatch):
     def fail(*a, **kw):
         raise RuntimeError("must never escape")
 
@@ -163,7 +160,7 @@ def test_authentication_storage_failure_fails_closed(api, monkeypatch):  # noqa:
     assert "etag" not in response.headers
 
 
-def test_etag_is_specific_to_representation_and_principal(api):  # noqa: F811
+def test_etag_is_specific_to_representation_and_principal(api):
     c = api
     paths = ["", "/audit", "/audit/records", "/audit/records?limit=1", "/audit/records?offset=1"]
     tags = [get(c, path).headers["etag"] for path in paths]

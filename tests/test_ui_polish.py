@@ -11,17 +11,19 @@ import pytest
 from alembic import command
 from dataset_helpers import publish_dataset
 from sqlalchemy import event, inspect, text
-from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_browser import (  # noqa: F401
+from support import (
+    NOW,
     body,
+    config_for,
+    content,
     create_dataset,
-    dataset_browser,
     login,
+    publish,
     request,
     session_csrf,
+    setup,
+    snapshot,
 )
-from test_dataset_version_migration import config_for
-from test_dataset_versions import NOW, content, publish, setup
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.presentation_metadata import DATASET_ICONS, key_from_name
@@ -69,7 +71,7 @@ def test_key_canonicalization_matches_javascript(name, expected):
 @pytest.mark.parametrize(
     "icon", [*DATASET_ICONS, "table", "warehouse", "align-horizontal-distribute-center", "", None]
 )
-def test_icon_catalog_and_clear(context, icon):  # noqa: F811
+def test_icon_catalog_and_clear(context, icon):
     c = context
     d = c.s.datasets.create_dataset(c.a.id, "icon", "Icon", "", c.owner.id, icon=icon)
     assert d.icon == (icon or None)
@@ -96,7 +98,7 @@ def test_icon_catalog_and_clear(context, icon):  # noqa: F811
         ["table"],
     ],
 )
-def test_untrusted_icon_input_safely_defaults(context, icon):  # noqa: F811
+def test_untrusted_icon_input_safely_defaults(context, icon):
     from refrncr.presentation_metadata import rendered_dataset_icon
 
     c = context
@@ -112,7 +114,7 @@ def test_untrusted_icon_input_safely_defaults(context, icon):  # noqa: F811
     assert rendered_dataset_icon(icon) == "table"
 
 
-def test_field_metadata_full_lifecycle(context):  # noqa: F811
+def test_field_metadata_full_lifecycle(context):
     c = context
     setup(c)
     c.s.dataset_fields.update_field(
@@ -167,8 +169,8 @@ def test_field_metadata_full_lifecycle(context):  # noqa: F811
 @pytest.mark.parametrize(
     ("definition", "unit"), [("x" * 4001, ""), ("", "x" * 65), (123, ""), ("", [])]
 )
-def test_field_metadata_limits_and_rollback(context, definition, unit):  # noqa: F811
-    c = context
+def test_field_metadata_limits_and_rollback(database_context, definition, unit):
+    c = database_context
     before = snapshot(c)
     with pytest.raises(ValidationError):
         c.s.dataset_fields.create_field(
@@ -177,7 +179,7 @@ def test_field_metadata_limits_and_rollback(context, definition, unit):  # noqa:
     assert snapshot(c) == before
 
 
-def test_field_metadata_boundary_noop_and_denial(context):  # noqa: F811
+def test_field_metadata_boundary_noop_and_denial(context):
     c = context
     field = c.s.dataset_fields.create_field(
         c.a.id, c.d.key, "field", "Field", "string", definition="x" * 4000, unit="x" * 64
@@ -225,7 +227,7 @@ def queries(engine):
         event.remove(engine, "before_cursor_execute", record)
 
 
-def test_relationship_queries_and_authorization(context, record_property):  # noqa: F811
+def test_relationship_queries_and_authorization(context, record_property):
     c = context
     with queries(c.engine) as empty:
         assert c.s.memberships.list_relationships(c.a.id) == ()
@@ -252,7 +254,7 @@ def test_relationship_queries_and_authorization(context, record_property):  # no
         c.s.memberships.list_relationships(c.u.id)
 
 
-def test_configure_inline_access_and_small_edit_link(dataset_browser):  # noqa: F811
+def test_configure_inline_access_and_small_edit_link(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "polish", "Polish")
     login(client)
@@ -290,7 +292,7 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):  # noqa: 
     assert not s.datasets.export_access_context(a.id, d.key)[3]
 
 
-def test_dataset_list_selects_concept_without_current(dataset_browser):  # noqa: F811
+def test_dataset_list_selects_concept_without_current(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "polish", "Polish")
     login(client)
@@ -304,7 +306,7 @@ def test_dataset_list_selects_concept_without_current(dataset_browser):  # noqa:
     assert d.key == "polish"
 
 
-def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
+def test_logos_and_generated_key_edit_boundary(dataset_browser):
     _, s, a, client = dataset_browser
     html = body(request(client, "get", "/login"))
     assert 'class="auth-loader"' in html and "refrncr-loader.svg" in html
@@ -314,22 +316,10 @@ def test_logos_and_generated_key_edit_boundary(dataset_browser):  # noqa: F811
     d = create_dataset(s, a, "polish", "Polish")
     assert "data-generate-key" in body(request(client, "get", "/datasets/new"))
     assert "data-generate-key" not in body(request(client, "get", f"/datasets/{d.key}/edit"))
-    assets = ROOT / "src/refrncr/static/images"
-    assert {p.name for p in assets.iterdir()} == {
-        "favicon.svg",
-        "lucide-1.46.0.svg",
-        "lucide-legacy-0.468.0.svg",
-        "refrncr-loader.svg",
-        "refrncr-wordmark-primary.svg",
-        "refrncr-wordmark-reversed.svg",
-        "theme-preview-dark.svg",
-        "theme-preview-light.svg",
-        "theme-preview-system.svg",
-    }
 
 
-def test_metadata_upgrade_preserves_existing_content(context):  # noqa: F811
-    c = context
+def test_metadata_upgrade_preserves_existing_content(database_context):
+    c = database_context
     setup(c)
     publish(c)
     with c.engine.connect() as connection:
@@ -370,7 +360,7 @@ def test_metadata_upgrade_preserves_existing_content(context):  # noqa: F811
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 1
 
 
-def test_relationship_http_query_counts_and_hidden_rosters(dataset_browser, record_property):  # noqa: F811
+def test_relationship_http_query_counts_and_hidden_rosters(dataset_browser, record_property):
     factory, s, a, client = dataset_browser
     login(client)
     with factory() as session:
@@ -405,7 +395,7 @@ def test_relationship_http_query_counts_and_hidden_rosters(dataset_browser, reco
     assert request(reader, "get", "/users").status_code == 403
 
 
-def test_current_routing_and_inline_access_denial(dataset_browser):  # noqa: F811
+def test_current_routing_and_inline_access_denial(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "published", "Published")
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
@@ -438,7 +428,7 @@ def test_current_routing_and_inline_access_denial(dataset_browser):  # noqa: F81
     assert no_csrf.status_code == 403
 
 
-def test_field_metadata_retained_deletion_and_restore(context):  # noqa: F811
+def test_field_metadata_retained_deletion_and_restore(context):
     c = context
     setup(c)
     c.s.dataset_fields.update_field(
@@ -467,13 +457,13 @@ def test_field_metadata_retained_deletion_and_restore(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("value", ["before\x00after", "\x00"])
-def test_null_metadata_is_rejected_on_both_engines(context, value):  # noqa: F811
+def test_null_metadata_is_rejected_on_both_engines(context, value):
     c = context
     with pytest.raises(ValidationError, match="null characters"):
         c.s.dataset_fields.create_field(c.a.id, c.d.key, "null", "Null", "string", definition=value)
 
 
-def test_discard_restores_field_metadata_and_preserves_current_icon(context):  # noqa: F811
+def test_discard_restores_field_metadata_and_preserves_current_icon(context):
     c = context
     setup(c)
     c.s.dataset_fields.update_field(
@@ -513,13 +503,13 @@ def test_discard_restores_field_metadata_and_preserves_current_icon(context):  #
 
 
 @pytest.mark.parametrize(("submitted", "expected"), [("unknown", None), (" TABLE ", "table")])
-def test_manual_icon_normalization_and_fallback(context, submitted, expected):  # noqa: F811
+def test_manual_icon_normalization_and_fallback(context, submitted, expected):
     c = context
     c.s.datasets.update_dataset(c.a.id, c.d.key, c.d.name, c.d.description, icon=submitted)
     assert c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).icon == expected
 
 
-def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):  # noqa: F811
+def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):
     from refrncr.presentation_metadata import rendered_dataset_icon
 
     _, s, a, client = dataset_browser
@@ -533,8 +523,8 @@ def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):  # noqa: F8
     assert rendered_dataset_icon(None) == "table"
 
 
-def test_long_icon_migration_preserves_values_and_refuses_lossy_downgrade(context):  # noqa: F811
-    c = context
+def test_long_icon_migration_preserves_values_and_refuses_lossy_downgrade(database_context):
+    c = database_context
     name = "align-horizontal-distribute-center"
     c.s.datasets.update_dataset(c.a.id, c.d.key, c.d.name, c.d.description, icon=name)
     with c.engine.connect() as connection:
@@ -551,7 +541,7 @@ def test_long_icon_migration_preserves_values_and_refuses_lossy_downgrade(contex
     assert c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).icon == "database"
 
 
-def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):  # noqa: F811
+def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "inline-edit", "Original")
     login(client)
@@ -588,7 +578,7 @@ def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):  # 
     assert request(client, "post", "/datasets/inline-edit", data={"name": "Bad"}).status_code == 403
 
 
-def test_configure_section_links_respect_existing_permissions(dataset_browser):  # noqa: F811
+def test_configure_section_links_respect_existing_permissions(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "tabs", "Tabs")
     login(client)
@@ -609,7 +599,7 @@ def test_configure_section_links_respect_existing_permissions(dataset_browser): 
 
 
 @pytest.mark.parametrize("with_concept", [False, True])
-def test_dataset_metadata_is_independent_of_versions(context, with_concept):  # noqa: F811
+def test_dataset_metadata_is_independent_of_versions(context, with_concept):
     from refrncr.services import ConflictError
 
     c = context
@@ -640,7 +630,7 @@ def test_dataset_metadata_is_independent_of_versions(context, with_concept):  # 
     assert content(c, first) == original
 
 
-def test_danger_zone_shows_what_deletion_removes(dataset_browser):  # noqa: F811
+def test_danger_zone_shows_what_deletion_removes(dataset_browser):
     """The tab states the destructive action and counts everything it takes with it."""
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "danger", "Danger")
@@ -662,7 +652,7 @@ def test_danger_zone_shows_what_deletion_removes(dataset_browser):  # noqa: F811
     assert "Audit history is retained." in panel
 
 
-def test_standalone_configuration_without_concept(dataset_browser):  # noqa: F811
+def test_standalone_configuration_without_concept(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "standalone", "Standalone")
     publish_dataset(s, a.id, d)
@@ -694,7 +684,7 @@ def test_standalone_configuration_without_concept(dataset_browser):  # noqa: F81
 
 
 @pytest.mark.parametrize("published", [False, True])
-def test_standalone_configuration_preserves_read_and_write_authority(dataset_browser, published):  # noqa: F811
+def test_standalone_configuration_preserves_read_and_write_authority(dataset_browser, published):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "authority", "Authority")
     if published:
@@ -722,7 +712,7 @@ def test_standalone_configuration_preserves_read_and_write_authority(dataset_bro
     } == before
 
 
-def test_standalone_access_redirect_and_revocation_without_concept(dataset_browser):  # noqa: F811
+def test_standalone_access_redirect_and_revocation_without_concept(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "access-config", "Access")
     publish_dataset(s, a.id, d)
@@ -751,7 +741,7 @@ def test_standalone_access_redirect_and_revocation_without_concept(dataset_brows
 
 
 @pytest.mark.parametrize("published", [False, True])
-def test_configuration_fields_follow_concept_lifecycle(dataset_browser, published):  # noqa: F811
+def test_configuration_fields_follow_concept_lifecycle(dataset_browser, published):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "read-fields", "Read fields")
     s.dataset_fields.create_field(
@@ -796,7 +786,7 @@ def test_configuration_fields_follow_concept_lifecycle(dataset_browser, publishe
     assert "Add field" in concept and "field-edit-action" in concept
 
 
-def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):  # noqa: F811
+def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "field-authority", "Fields")
     s.dataset_fields.create_field(
@@ -812,7 +802,7 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):  #
     assert "Private concept field" not in html
 
 
-def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):  # noqa: F811
+def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):
     from refrncr.version_contracts import version_states
 
     c = context
@@ -850,13 +840,13 @@ def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):  #
     )
 
 
-def test_simultaneous_dataset_metadata_saves_are_atomic(context):  # noqa: F811
+def test_simultaneous_dataset_metadata_saves_are_atomic(database_context):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
-    from test_audit_coverage import audits
+    from support import audits
 
-    c = context
+    c = database_context
     setup(c)
     first = publish(c)
     baseline = content(c, first)

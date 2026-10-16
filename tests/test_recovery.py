@@ -233,8 +233,6 @@ def _postgres_command(arguments, *, url: URL, error: str):
 @pytest.fixture
 def postgres_recovery_databases():
     configured = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not configured:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     for executable in ("pg_dump", "pg_restore"):
         if not shutil.which(executable):
             pytest.fail(f"PostgreSQL recovery prerequisite is unavailable: {executable}")
@@ -269,6 +267,8 @@ def postgres_recovery_databases():
         administration.dispose()
 
 
+@pytest.mark.postgres
+@pytest.mark.slow
 def test_postgresql_logical_backup_restore_preserves_complete_database_and_source(
     tmp_path, postgres_recovery_databases, monkeypatch
 ):
@@ -311,6 +311,7 @@ def test_postgresql_logical_backup_restore_preserves_complete_database_and_sourc
     assert _snapshot(source_url) == before
 
 
+@pytest.mark.postgres
 def test_postgresql_failed_restore_is_secret_free_and_leaves_source_unchanged(
     tmp_path, postgres_recovery_databases
 ):

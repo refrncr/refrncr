@@ -4,10 +4,7 @@ from html.parser import HTMLParser
 from types import SimpleNamespace
 
 import pytest
-from test_import_wizard import optional_field
-from test_source_format_components import Controls
-from test_source_format_import import import_context as import_context
-from test_source_format_import import wizard as wizard
+from support import Controls, html_text, optional_field
 
 from refrncr import source_formats
 from refrncr.record_import import DatasetRecordImportService, ParsedSource, SourceRow
@@ -235,7 +232,7 @@ def test_undecided_guidance_has_one_message_and_retains_description_targets(
     elements = Elements(html).items
     ids = [attrs["id"] for _, attrs in elements if "id" in attrs]
     assert len(ids) == len(set(ids))
-    assert html.count("Choose how this column is interpreted.") == 1
+    assert html_text(html).count("Choose how this column is interpreted.") == 1
     effective = [attrs for _, attrs in elements if "data-effective-format" in attrs]
     assert len(effective) == 1
     assert effective[0]["tabindex"] == "-1" and effective[0]["aria-live"] == "polite"

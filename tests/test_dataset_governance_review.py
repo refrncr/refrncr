@@ -7,7 +7,7 @@ import pytest
 from dataset_helpers import publish_dataset
 from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
-from test_dataset_governance import governance, state  # noqa: F401
+from support import governance_state as state
 
 from refrncr import cli
 from refrncr.models import Dataset, DatasetExportAccess
@@ -18,7 +18,7 @@ from refrncr.services import AuthorizationError, NotFoundError
 @pytest.mark.parametrize(
     "kind", ["ordinary", "export", "owner", "admin", "inactive", "deleted", "anonymous"]
 )
-def test_each_service_boundary(governance, kind):  # noqa: F811
+def test_each_service_boundary(governance, kind):
     _, factory, s, a, u, owner, other, d = governance
     code = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
     spare = s.dataset_fields.create_field(a.id, d.key, "spare", "Spare", "string")
@@ -109,8 +109,10 @@ def test_each_service_boundary(governance, kind):  # noqa: F811
 
 @pytest.mark.parametrize("operation", ["create", "owner", "grant", "revoke"])
 @pytest.mark.parametrize("position", ["audit", "commit"])
-def test_all_governance_writes_rollback_after_flush(governance, monkeypatch, operation, position):  # noqa: F811
-    _, factory, s, a, u, owner, other, d = governance
+def test_all_governance_writes_rollback_after_flush(
+    database_governance, monkeypatch, operation, position
+):
+    _, factory, s, a, u, owner, other, d = database_governance
     access = (
         s.datasets.grant_export_access(a.id, d.key, "user", u.id) if operation == "revoke" else None
     )
@@ -152,8 +154,8 @@ def test_all_governance_writes_rollback_after_flush(governance, monkeypatch, ope
     assert snapshot() == before
 
 
-def test_export_snapshot_survives_concurrent_revoke(governance, monkeypatch):  # noqa: F811
-    engine, _, s, a, u, _, _, d = governance
+def test_export_snapshot_survives_concurrent_revoke(database_governance, monkeypatch):
+    engine, _, s, a, u, _, _, d = database_governance
     publish_dataset(s, a.id, d)
     if engine.dialect.name == "sqlite":
         with engine.connect() as connection:
@@ -185,7 +187,7 @@ def test_export_snapshot_survives_concurrent_revoke(governance, monkeypatch):  #
 
 
 @pytest.mark.parametrize("operation", ["create", "maintain"])
-def test_membership_removal_commits_before_waiting_mutation(governance, operation):  # noqa: F811
+def test_membership_removal_commits_before_waiting_mutation(governance, operation):
     _, factory, s, a, u, owner, _, d = governance
     membership = s.memberships.create_membership(a.id, u.id, owner.id)
     started = Event()
@@ -211,8 +213,8 @@ def test_membership_removal_commits_before_waiting_mutation(governance, operatio
     assert state(factory, d) == before
 
 
-def test_maintenance_listing_query_count_is_bounded(governance):  # noqa: F811
-    engine, _, s, a, u, owner, _, _ = governance
+def test_maintenance_listing_query_count_is_bounded(database_governance):
+    engine, _, s, a, u, owner, _, _ = database_governance
     s.memberships.create_membership(a.id, u.id, owner.id)
     statements = []
 
@@ -244,7 +246,7 @@ def test_preflight_does_not_print_database_error_details(monkeypatch, capsys):
     assert "secret" not in output and "SELECT" not in output
 
 
-def test_admin_creation_zero_one_and_multiple_teams(governance):  # noqa: F811
+def test_admin_creation_zero_one_and_multiple_teams(governance):
     _, factory, s, a, _, owner, other, d = governance
     from refrncr.services import ValidationError
 
@@ -276,7 +278,7 @@ def test_admin_creation_zero_one_and_multiple_teams(governance):  # noqa: F811
         "unowned_dataset",
     ],
 )
-def test_database_relationships_fail_closed(governance, invalid):  # noqa: F811
+def test_database_relationships_fail_closed(governance, invalid):
     import uuid
 
     from sqlalchemy.exc import IntegrityError
@@ -304,7 +306,7 @@ def test_database_relationships_fail_closed(governance, invalid):  # noqa: F811
             session.add(DatasetExportAccess(**values))
 
 
-def test_export_team_deletion_cascades_without_removing_other_access(governance):  # noqa: F811
+def test_export_team_deletion_cascades_without_removing_other_access(governance):
     _, factory, s, a, u, _, other, d = governance
     s.memberships.create_membership(a.id, u.id, other.id)
     team = s.datasets.grant_export_access(a.id, d.key, "team", other.id)
@@ -317,12 +319,12 @@ def test_export_team_deletion_cascades_without_removing_other_access(governance)
     assert not s.authorization.datasets.can_maintain_dataset(u.id, d.id)
 
 
-def test_concurrent_revoke_has_one_audit_and_safe_missing_result(governance):  # noqa: F811
+def test_concurrent_revoke_has_one_audit_and_safe_missing_result(database_governance):
     from threading import Barrier
 
     from refrncr.models import AuditEvent
 
-    _, factory, s, a, u, _, _, d = governance
+    _, factory, s, a, u, _, _, d = database_governance
     access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
     barrier = Barrier(2)
 

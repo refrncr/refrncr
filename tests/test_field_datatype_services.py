@@ -10,10 +10,7 @@ from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from test_dataset_records import PASSWORD
-from test_dataset_records import postgresql_record_services as postgresql_record_services
-from test_dataset_records import record_services as record_services
-from test_field_datatypes import CASES
+from support import CASES, PASSWORD
 
 from refrncr.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.models import AuditEvent, Dataset, DatasetField, DatasetRecord
@@ -28,9 +25,14 @@ from refrncr.services import (
 from refrncr.web import create_flask_app
 
 
-@pytest.fixture(params=["record_services", "postgresql_record_services"])
+@pytest.fixture(params=["record_services"])
 def datatype_services(request):
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def database_datatype_services_matrix(database_record_services):
+    return database_record_services
 
 
 def setup_dataset(services, admin, types=DATATYPES):
@@ -61,8 +63,8 @@ def snapshot(factory):
         )
 
 
-def test_all_types_persist_read_export_and_canonical_noop(datatype_services):
-    _, factory, services, admin = datatype_services
+def test_all_types_persist_read_export_and_canonical_noop(database_datatype_services_matrix):
+    _, factory, services, admin = database_datatype_services_matrix
     dataset, fields = setup_dataset(services, admin)
     submitted = {type_id: raw for type_id, raw, _text, _value in CASES} | {"id": "one"}
     record = services.dataset_records.create_record(admin.id, dataset.key, submitted)
@@ -145,8 +147,10 @@ def test_empty_field_changes_and_populated_field_guards(
 
 
 @pytest.mark.parametrize("type_id,raw,text,value", CASES)
-def test_unique_values_use_canonical_equivalence(datatype_services, type_id, raw, text, value):
-    _, factory, services, admin = datatype_services
+def test_unique_values_use_canonical_equivalence(
+    database_datatype_services_matrix, type_id, raw, text, value
+):
+    _, factory, services, admin = database_datatype_services_matrix
     dataset, _fields = setup_dataset(services, admin, (type_id,))
     services.dataset_records.create_record(admin.id, dataset.key, {"id": "one", type_id: raw})
     before = snapshot(factory)
@@ -218,9 +222,9 @@ def test_identifiers_are_typed_and_equivalent(datatype_services, type_id):
     "operation", ["field_create", "field_update", "record_create", "record_update"]
 )
 def test_audit_insert_failure_rolls_back_all_business_changes(
-    datatype_services, monkeypatch, operation
+    database_datatype_services_matrix, monkeypatch, operation
 ):
-    _, factory, services, admin = datatype_services
+    _, factory, services, admin = database_datatype_services_matrix
     dataset, fields = setup_dataset(services, admin, ("timestamp",))
     record = services.dataset_records.create_record(admin.id, dataset.key, {"id": "one"})
     before = snapshot(factory)

@@ -245,8 +245,6 @@ def import_context():
 @pytest.fixture
 def postgresql_import_context():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"record_import_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:
@@ -1072,6 +1070,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert "Showing 100 of 101 failing data rows" in error_body
 
 
+@pytest.mark.postgres
 def test_postgresql_import_lock_constraints_and_manual_create_race(postgresql_import_context):
     factory, services, admin, dataset = postgresql_import_context
     state, _, _ = services.record_imports.begin(
@@ -1088,6 +1087,7 @@ def test_postgresql_import_lock_constraints_and_manual_create_race(postgresql_im
         assert session.scalar(select(func.count()).select_from(DatasetRecord)) == 1
 
 
+@pytest.mark.postgres
 def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context, monkeypatch):
     from threading import Event
 

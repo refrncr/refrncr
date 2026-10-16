@@ -7,11 +7,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_browser import (  # noqa: F401
+from support import (
     body,
     create_dataset,
-    dataset_browser,
     login,
     request,
     session_csrf,
@@ -29,13 +27,14 @@ from refrncr.presentation_metadata import (
 ROOT = Path(__file__).parents[1]
 
 
-def test_retired_lucide_symbols_keep_their_original_geometry():
-    sprite = ROOT / "src/refrncr/static" / LEGACY_ICON_SPRITE
+def test_retired_lucide_symbols_keep_their_original_geometry(dataset_browser):
+    _, _, _, client = dataset_browser
+    sprite = request(client, "get", f"/static/{LEGACY_ICON_SPRITE}")
     # Frozen subset of the previously shipped 0.468.0 sprite, not newly invented glyphs.
-    assert hashlib.sha256(sprite.read_bytes()).hexdigest() == (
+    assert hashlib.sha256(sprite.data).hexdigest() == (
         "54279ae9585b7deb66c0813dcfb1d1735405a736d3f36b5d75a10b741389f554"
     )
-    symbols = ET.parse(sprite).getroot().findall(".//{http://www.w3.org/2000/svg}symbol")
+    symbols = ET.fromstring(sprite.data).findall(".//{http://www.w3.org/2000/svg}symbol")
     assert len(symbols) == 74
     assert all(ICON_SPRITES[s.attrib["id"]] == LEGACY_ICON_SPRITE for s in symbols)
     assert all(re.fullmatch(r"[a-z0-9-]{1,64}", s.attrib["id"]) for s in symbols)
@@ -45,7 +44,7 @@ def test_retired_lucide_symbols_keep_their_original_geometry():
         assert dataset_icon_sprite(unsafe) == "images/lucide-1.46.0.svg"
 
 
-def test_all_retired_icons_survive_ordinary_metadata_edits(context):  # noqa: F811
+def test_all_retired_icons_survive_ordinary_metadata_edits(context):
     c = context
     for name, sprite in ICON_SPRITES.items():
         if sprite != LEGACY_ICON_SPRITE:
@@ -60,7 +59,7 @@ def test_all_retired_icons_survive_ordinary_metadata_edits(context):  # noqa: F8
         assert dataset_icon_sprite(name) == LEGACY_ICON_SPRITE
 
 
-def test_history_icon_survives_the_browser_metadata_form(dataset_browser):  # noqa: F811
+def test_history_icon_survives_the_browser_metadata_form(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "legacy-icon", "Legacy icon")
     with factory.begin() as session:
@@ -82,7 +81,7 @@ def test_history_icon_survives_the_browser_metadata_form(dataset_browser):  # no
 
 
 @pytest.mark.parametrize("path", ["/configure", "/concept"])
-def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):  # noqa: F811
+def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "fallback", "Fallback")
     services.datasets.grant_export_access(admin.id, dataset.key, "user", admin.id)

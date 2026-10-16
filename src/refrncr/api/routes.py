@@ -333,11 +333,12 @@ def create_api(versions, api_keys):
                     **pagination,
                 )
         elif kind == "hierarchy":
-            records = tuple(_record(r, result.fields) for r in result.records)
-            record_identifiers = {
-                raw.id: record.identifier
-                for raw, record in zip(result.records, records, strict=True)
-            }
+            record_pairs = sorted(
+                ((raw, _record(raw, result.fields)) for raw in result.records),
+                key=lambda pair: pair[1].identifier,
+            )
+            records = tuple(record for _raw, record in record_pairs)
+            record_identifiers = {raw.id: record.identifier for raw, record in record_pairs}
             payload = HierarchyResponse(
                 data=HierarchyData(
                     fields=tuple(

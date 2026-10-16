@@ -4,14 +4,13 @@ import pytest
 from alembic import command
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
-from test_audit_coverage import audit_db  # noqa: F401
-from test_dataset_version_migration import config_for
+from support import config_for
 
 from refrncr.api_keys import ApiKeyService
 
 
-def test_upgrade_preserves_existing_database_and_empty_downgrade(audit_db):  # noqa: F811
-    engine, _, services = audit_db
+def test_upgrade_preserves_existing_database_and_empty_downgrade(database_audit_db):
+    engine, _, services = database_audit_db
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     with engine.connect() as connection:
         config = config_for(connection)
@@ -35,8 +34,8 @@ def test_upgrade_preserves_existing_database_and_empty_downgrade(audit_db):  # n
 
 
 @pytest.mark.parametrize("history", ["key", "anonymous_event"])
-def test_populated_downgrade_preserves_history(audit_db, history):  # noqa: F811
-    engine, _, services = audit_db
+def test_populated_downgrade_preserves_history(database_audit_db, history):
+    engine, _, services = database_audit_db
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     service = ApiKeyService(services.users.uow, pepper=b"test-only-pepper!" * 2)
     if history == "key":
@@ -58,8 +57,8 @@ def test_populated_downgrade_preserves_history(audit_db, history):  # noqa: F811
         assert "api_keys" in inspect(connection).get_table_names()
 
 
-def test_database_rejects_anonymous_domain_actor(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_database_rejects_anonymous_domain_actor(database_audit_db):
+    engine, _, _ = database_audit_db
     with pytest.raises(IntegrityError), engine.begin() as connection:
         connection.execute(
             text(

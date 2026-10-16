@@ -1,4 +1,3 @@
-import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -8,9 +7,9 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
-from sqlalchemy import create_engine, func, select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
+from support import PASSWORD, html_tag_texts
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
@@ -28,44 +27,6 @@ from refrncr.services import (
     parse_expected_revision,
 )
 from refrncr.web import create_flask_app
-
-PASSWORD = "correct horse battery staple"
-
-
-@pytest.fixture
-def record_services():
-    engine = create_database_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    factory = create_session_factory(engine)
-    services = create_community_services(factory, ResourceTypeRegistry())
-    services.users.bootstrap_organisation()
-    admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-    return engine, factory, services, admin
-
-
-@pytest.fixture
-def postgresql_record_services():
-    database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
-    administration_engine = create_engine(database_url)
-    schema = f"dataset_records_{uuid.uuid4().hex}"
-    with administration_engine.begin() as connection:
-        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-    schema_url = make_url(database_url).update_query_dict({"options": f"-csearch_path={schema}"})
-    engine = create_database_engine(schema_url)
-    try:
-        Base.metadata.create_all(engine)
-        factory = create_session_factory(engine)
-        services = create_community_services(factory, ResourceTypeRegistry())
-        services.users.bootstrap_organisation()
-        admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-        yield engine, factory, services, admin
-    finally:
-        engine.dispose()
-        with administration_engine.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
-        administration_engine.dispose()
 
 
 def configured_dataset(services, admin, key="records"):
@@ -658,7 +619,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
     listing = client.get(f"/datasets/{dataset.key}/concept/records", base_url="https://localhost")
     assert "Edit" in listing.get_data(as_text=True)
     assert listing.status_code == 200
-    assert listing.get_data(as_text=True).count(">Added</span>") == 3
+    assert html_tag_texts(listing.get_data(as_text=True), "span").count("Added") == 3
     assert "Incomplete record" not in listing.get_data(as_text=True)
     assert "slegacy" not in listing.get_data(as_text=True)
     edit_url = f"/datasets/{dataset.key}/records/{record.id}/edit"
@@ -771,6 +732,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
         services.dataset_records.get_record_for_edit(admin.id, dataset.key, legacy_delete.id)
 
 
+@pytest.mark.postgres
 def test_postgresql_constraints_order_and_atomicity(postgresql_record_services):
     _, factory, services, admin = postgresql_record_services
     dataset, _ = configured_dataset(services, admin)
@@ -795,6 +757,7 @@ def test_postgresql_constraints_order_and_atomicity(postgresql_record_services):
         )
 
 
+@pytest.mark.postgres
 def test_postgresql_same_revision_update_race_has_one_stale(postgresql_record_services):
     _, _, services, admin = postgresql_record_services
     dataset, _ = configured_dataset(services, admin)

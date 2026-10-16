@@ -4,9 +4,7 @@ import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import event, inspect, select, text
-from test_audit_coverage import audit_db as audit_db
-from test_dataset_governance_migration import migrate
-from test_dataset_records import PASSWORD, configured_dataset
+from support import PASSWORD, configured_dataset, migrate
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
@@ -106,8 +104,8 @@ def type_constraint(engine):
     )
 
 
-def test_populated_upgrade_preserves_all_values_identifiers_audits_and_old_ids(audit_db):
-    engine, _factory, _services = audit_db
+def test_populated_upgrade_preserves_all_values_identifiers_audits_and_old_ids(database_audit_db):
+    engine, _factory, _services = database_audit_db
     services, admin, dataset, fields = old_database(engine)
     before = contents(engine)
     migrate(engine, "0014_ref_145")
@@ -130,8 +128,10 @@ def test_populated_upgrade_preserves_all_values_identifiers_audits_and_old_ids(a
 
 
 @pytest.mark.parametrize("corruption", ["key", "column", "unique", "unknown_type"])
-def test_preflight_failure_leaves_historical_state_and_revision_untouched(audit_db, corruption):
-    engine, _factory, _services = audit_db
+def test_preflight_failure_leaves_historical_state_and_revision_untouched(
+    database_audit_db, corruption
+):
+    engine, _factory, _services = database_audit_db
     _services, _admin, _dataset, fields = old_database(engine)
     if corruption == "unknown_type":
         with engine.begin() as connection:
@@ -172,8 +172,8 @@ def test_preflight_failure_leaves_historical_state_and_revision_untouched(audit_
             assert not connection.exec_driver_sql("PRAGMA foreign_key_check").all()
 
 
-def test_new_type_downgrade_fails_without_rewriting_or_discarding_data(audit_db):
-    engine, _factory, _services = audit_db
+def test_new_type_downgrade_fails_without_rewriting_or_discarding_data(database_audit_db):
+    engine, _factory, _services = database_audit_db
     services, admin, dataset, _fields = old_database(engine)
     migrate(engine, "0014_ref_145")
     from datetime import UTC, datetime
@@ -201,8 +201,8 @@ def test_new_type_downgrade_fails_without_rewriting_or_discarding_data(audit_db)
     assert "timestamp" in type_constraint(engine)
 
 
-def test_ddl_failure_rolls_back_constraint_and_version(audit_db):
-    engine, _factory, _services = audit_db
+def test_ddl_failure_rolls_back_constraint_and_version(database_audit_db):
+    engine, _factory, _services = database_audit_db
     old_database(engine)
     before, constraint = contents(engine), type_constraint(engine)
 
@@ -243,8 +243,8 @@ def test_ddl_failure_rolls_back_constraint_and_version(audit_db):
         "0013_ref_39",
     ],
 )
-def test_every_historical_empty_schema_upgrades_to_exact_nine_types(audit_db, revision):
-    engine, _factory, _services = audit_db
+def test_every_historical_empty_schema_upgrades_to_exact_nine_types(database_audit_db, revision):
+    engine, _factory, _services = database_audit_db
     Base.metadata.drop_all(engine)
     migrate(engine, revision)
     migrate(engine, "0014_ref_145")

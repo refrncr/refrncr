@@ -1,6 +1,6 @@
 """Disposable REF-162 browser fixture; in-memory data only."""
 
-from test_dataset_browser import create_dataset, dataset_browser
+from support import create_dataset, dataset_browser
 
 from refrncr.web import create_flask_app
 

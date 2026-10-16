@@ -23,6 +23,7 @@ from refrncr.audit_guard import discover_service_operations, verify_inventory
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.slow
 def test_inventory_and_coverage_match_current_code():
     operations, routes = verify_inventory(ROOT)
     assert operations == len(OPERATIONS) and routes > 0
@@ -221,8 +222,28 @@ def test_catalog_and_guard_have_no_framework_or_persistence_dependencies():
         }
 
 
+def test_application_template_boundary_has_no_inline_markup_or_unsafe_shared_panel():
+    python_sources = tuple((ROOT / "src/refrncr").rglob("*.py"))
+    source = "\n".join(path.read_text() for path in python_sources)
+    for forbidden in (
+        "render_template_string",
+        "flask_render_template_string",
+        '"<form',
+        '"<dialog',
+        '"{% ',
+        '"{{ ',
+    ):
+        assert forbidden not in source
+
+    side_panel = (ROOT / "src/refrncr/templates/components/side_panel.html").read_text()
+    assert "|safe" not in side_panel
+    assert "record" not in side_panel
+    assert "permission" not in side_panel
+    assert "csrf" not in side_panel
+
+
 def test_every_audited_operation_has_behavior_cases():
-    from test_audit_coverage import MUTATIONS
+    from support import MUTATIONS
 
     behaviors = {
         f"refrncr.services.{name}"
@@ -298,6 +319,7 @@ def test_ci_guard_fails_on_new_service_in_real_repository(monkeypatch):
         ("interface_entrypoints", ["Programmatic caller"]),
     ],
 )
+@pytest.mark.slow
 def test_guard_rejects_inconsistent_or_missing_matrix_decisions(monkeypatch, field, value):
     original = Path.read_text
 

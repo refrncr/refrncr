@@ -2,12 +2,11 @@
 
 from alembic import command
 from sqlalchemy import inspect, text
-from test_audit_coverage import audit_db  # noqa: F401
-from test_dataset_version_migration import config_for
+from support import config_for
 
 
-def test_effective_date_index_upgrade_and_downgrade(audit_db):  # noqa: F811
-    engine, _, _ = audit_db
+def test_effective_date_index_upgrade_and_downgrade(database_audit_db):
+    engine, _, _ = database_audit_db
     with engine.connect() as connection:
         config = config_for(connection)
         command.stamp(config, "head")

@@ -262,7 +262,7 @@ class SqlAlchemyMembershipOperations:
             .where(Membership.team_id == team_id)
             .order_by(User.email)
         )
-        return list(self.session.execute(statement).tuples())
+        return [tuple(row) for row in self.session.execute(statement).all()]
 
     def list_eligible_users(self, team_id: str) -> list[User]:
         existing = select(Membership.user_id).where(Membership.team_id == team_id)
@@ -1486,7 +1486,10 @@ class SqlAlchemyPermissionDataSource:
                     ),
                 )
             )
-            return ResourcePermissionsContext(subject, tuple(permissions.tuples()))
+            return ResourcePermissionsContext(
+                subject,
+                tuple(tuple(row) for row in permissions.all()),
+            )
 
 
 class SqlAlchemyDatasetExportAccessOperations:

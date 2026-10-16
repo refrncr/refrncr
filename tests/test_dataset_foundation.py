@@ -589,10 +589,9 @@ def test_sqlite_concurrent_duplicate_creation_creates_exactly_one(tmp_path):
         )
 
 
+@pytest.mark.postgres
 def test_postgresql_dataset_creation_uniqueness_and_rollback(monkeypatch):
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_database_engine(database_url)
     schema = f"dataset_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:
@@ -644,10 +643,9 @@ def test_postgresql_dataset_creation_uniqueness_and_rollback(monkeypatch):
         administration_engine.dispose()
 
 
+@pytest.mark.postgres
 def test_postgresql_actor_deactivation_serializes_with_dataset_creation():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_database_engine(database_url)
     schema = f"dataset_actor_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

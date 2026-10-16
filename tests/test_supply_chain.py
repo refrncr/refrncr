@@ -7,6 +7,16 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tools.compile_dev_lock import (
+    COMPILE_FLAGS as DEV_COMPILE_FLAGS,
+)
+from tools.compile_dev_lock import (
+    FRESH_COMPILE_FLAGS as DEV_FRESH_COMPILE_FLAGS,
+)
+from tools.compile_dev_lock import (
+    PIP_TOOLS_VERSION as DEV_PIP_TOOLS_VERSION,
+)
+from tools.compile_dev_lock import write_version_constraints
 from tools.compile_release_lock import (
     CANONICAL_PLATFORM,
     CANONICAL_PYTHON,
@@ -109,6 +119,74 @@ def test_release_lock_generator_pins_tool_and_all_relevant_flags():
         step for step in dependency_job["steps"] if "setup-python@" in step.get("uses", "")
     )
     assert setup_python["with"]["python-version"] == "3.12"
+
+
+def test_development_tool_pins_match_project_hooks_and_workflows():
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    dev = metadata["project"]["optional-dependencies"]["dev"]
+    dev_input = parse_pins(ROOT / "requirements/dev.in")
+    dev_lock = parse_pins(ROOT / "requirements/dev.txt")
+    pre_commit = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    release = load_workflow("release.yml")
+
+    for package, pinned in dev_input.items():
+        assert f"{package}=={pinned}" in dev
+        assert dev_lock[package] == pinned
+
+    ruff_hook = next(repo for repo in pre_commit["repos"] if "ruff-pre-commit" in repo["repo"])
+    assert ruff_hook["rev"] == f"v{dev_input['ruff']}"
+    release_install = "\n".join(
+        step["run"]
+        for step in release["jobs"]["build"]["steps"]
+        if "pip install" in step.get("run", "")
+    )
+    release_pins = dict(re.findall(r"([A-Za-z0-9_.-]+)==([0-9][^\s]+)", release_install))
+    for package in ("build", "cyclonedx-bom", "twine"):
+        assert release_pins[package] == dev_input[package]
+
+
+def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
+    assert (
+        f"pip-tools=={DEV_PIP_TOOLS_VERSION}"
+        in (
+            tomllib.loads((ROOT / "pyproject.toml").read_text())["project"][
+                "optional-dependencies"
+            ]["dev"]
+        )
+    )
+    assert set(DEV_COMPILE_FLAGS) >= {
+        "--no-config",
+        "--generate-hashes",
+        "--resolver=backtracking",
+        "--strip-extras",
+        "--allow-unsafe",
+        "--build-isolation",
+        "--no-upgrade",
+        "--reuse-hashes",
+    }
+    assert "--reuse-hashes" not in DEV_FRESH_COMPILE_FLAGS
+    security = (ROOT / ".github/workflows/security.yml").read_text()
+    assert "python tools/compile_dev_lock.py --fresh" in security
+    assert "git diff --exit-code -- requirements/dev.txt" in security
+
+
+def test_fresh_development_lock_constraints_preserve_versions_without_hashes(tmp_path):
+    lock = tmp_path / "dev.txt"
+    lock.write_text("# generated\n\nalpha==1.2.3\n--hash=sha256:old\nbeta==4.5.6\n")
+    constraints = tmp_path / "constraints.txt"
+
+    write_version_constraints(lock, constraints)
+
+    assert constraints.read_text() == "alpha==1.2.3\nbeta==4.5.6\n"
+
+
+def parse_pins(path):
+    pins = {}
+    for line in path.read_text().splitlines():
+        match = re.match(r"^([A-Za-z0-9_.-]+)==([^\s]+)", line)
+        if match:
+            pins[match.group(1)] = match.group(2)
+    return pins
 
 
 def test_exception_register_accepts_valid_exception(tmp_path):

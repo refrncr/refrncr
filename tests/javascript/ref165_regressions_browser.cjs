@@ -1,4 +1,4 @@
-// Run with tests/browser_ref165_app.py; every mutation is confined to its in-memory data.
+// Run with tests/browser_presentation_metadata_app.py; every mutation is confined to its in-memory data.
 const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5165';

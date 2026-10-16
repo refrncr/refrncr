@@ -7,7 +7,6 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect, text
-from test_dataset_governance import governance  # noqa: F401
 
 from refrncr import cli
 from refrncr.dataset_upgrade import DatasetUpgradeError, ownership_preflight, read_owner_mapping
@@ -71,8 +70,8 @@ def legacy(engine):
         )
 
 
-def test_cli_preflight_and_explicit_upgrade(governance, tmp_path, capsys):  # noqa: F811
-    engine = governance[0]
+def test_cli_preflight_and_explicit_upgrade(database_governance, tmp_path, capsys):
+    engine = database_governance[0]
     legacy(engine)
     args = [
         "dataset-ownership-preflight",
@@ -115,8 +114,8 @@ def test_cli_empty_database_preflight(tmp_path, capsys):
 
 
 @pytest.mark.parametrize("memberships", [0, 1, 2])
-def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noqa: F811
-    engine = governance[0]
+def test_preflight_upgrade_and_downgrade_policy(database_governance, memberships):
+    engine = database_governance[0]
     legacy(engine)
     with engine.begin() as c:
         for i, team in enumerate(("one", "two")[:memberships]):
@@ -165,8 +164,8 @@ def test_preflight_upgrade_and_downgrade_policy(governance, memberships):  # noq
     migrate(engine, "0012_ref_73")
 
 
-def test_invalid_mapping_and_late_ddl_failure_are_atomic(governance, monkeypatch):  # noqa: F811
-    engine = governance[0]
+def test_invalid_mapping_and_late_ddl_failure_are_atomic(database_governance, monkeypatch):
+    engine = database_governance[0]
     legacy(engine)
     for mapping in ({"unknown": "one"}, {"countries": "deleted"}):
         with pytest.raises(DatasetUpgradeError):
@@ -202,8 +201,10 @@ def test_mapping_file_rejects_duplicates_and_non_objects(tmp_path):
 
 
 @pytest.mark.parametrize("creator_state", ["active", "inactive", "deleted"])
-def test_multiple_datasets_repeated_preflight_preserves_legacy_roles(governance, creator_state):  # noqa: F811
-    engine = governance[0]
+def test_multiple_datasets_repeated_preflight_preserves_legacy_roles(
+    database_governance, creator_state
+):
+    engine = database_governance[0]
     legacy(engine)
     with engine.begin() as c:
         if creator_state != "active":

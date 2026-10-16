@@ -4,14 +4,13 @@ import re
 
 import pytest
 from sqlalchemy import event
-from test_audit_coverage import audit_db, context, snapshot  # noqa: F401
-from test_dataset_version_views import client, exported_rows, request
-from test_dataset_versions import publish, setup
+from support import dataset_version_client as client
+from support import exported_rows, publish, request, setup, snapshot
 
 from refrncr.services import NotFoundError
 
 
-def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(context):  # noqa: F811
+def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(context):
     c = context
     setup(c)
     for key in ("status", "change", "validation"):
@@ -123,7 +122,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     assert all(row["status"] == "Complete" for row in rows)
 
 
-def test_added_then_deleted_record_is_not_shown_or_counted(context):  # noqa: F811
+def test_added_then_deleted_record_is_not_shown_or_counted(context):
     c = context
     setup(c)
     publish(c)
@@ -138,7 +137,7 @@ def test_added_then_deleted_record_is_not_shown_or_counted(context):  # noqa: F8
     assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_removed == 0
 
 
-def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):  # noqa: F811
+def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):
     c = context
     setup(c, populated=False)
     old = c.s.dataset_records.create_record(
@@ -165,8 +164,9 @@ def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):  #
     assert "OLD" in panel
 
 
-def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(context):  # noqa: F811
-    c = context
+@pytest.mark.slow
+def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(database_context):
+    c = database_context
     setup(c, populated=False)
     records = [
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"same-{n:03}"})
@@ -211,7 +211,7 @@ def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(co
     assert empty.page.total == 0 and empty.context.record_count == 0 and empty.deleted_count == 60
 
 
-def test_field_only_changes_keep_surviving_record_published(context):  # noqa: F811
+def test_field_only_changes_keep_surviving_record_published(context):
     c = context
     setup(c)
     publish(c)
@@ -223,7 +223,7 @@ def test_field_only_changes_keep_surviving_record_published(context):  # noqa: F
     assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_changed == 0
 
 
-def test_recreated_identifier_has_distinct_added_and_deleted_rows(context):  # noqa: F811
+def test_recreated_identifier_has_distinct_added_and_deleted_rows(context):
     c = context
     setup(c)
     assert c.service.read(c.a.id, c.d.key, prefer_concept=True).record_states == {

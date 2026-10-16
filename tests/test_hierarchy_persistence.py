@@ -6,7 +6,6 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from test_audit_coverage import audit_db, context  # noqa: F401
 
 from refrncr.hierarchy_contracts import HierarchyNode, hierarchy_node_paths
 from refrncr.models import (
@@ -57,8 +56,8 @@ def prepare(c):
     return root, child
 
 
-def test_nodes_keep_identity_and_values_through_structure_changes(context):  # noqa: F811
-    c = context
+def test_nodes_keep_identity_and_values_through_structure_changes(database_context):
+    c = database_context
     root, child = prepare(c)
     with c.s.datasets.uow(write=True, serialized=True) as work:
         other = work.hierarchy.create(c.d.id, "Other", root.id)
@@ -71,8 +70,8 @@ def test_nodes_keep_identity_and_values_through_structure_changes(context):  # n
         assert session.scalar(select(func.count()).select_from(DatasetRecord)) == 0
 
 
-def test_database_rejects_second_root_duplicate_sibling_and_foreign_parent(context):  # noqa: F811
-    c = context
+def test_database_rejects_second_root_duplicate_sibling_and_foreign_parent(database_context):
+    c = database_context
     root, child = prepare(c)
     foreign = c.s.datasets.create_dataset(c.a.id, "foreign", "Foreign", "", c.owner.id)
     for dataset_id, name, parent_id in (
@@ -87,8 +86,8 @@ def test_database_rejects_second_root_duplicate_sibling_and_foreign_parent(conte
         assert len(work.hierarchy.list_for_dataset(c.d.id)) == 2
 
 
-def test_snapshot_restores_inactive_values_scopes_and_ids_without_working_records(context):  # noqa: F811
-    c = context
+def test_snapshot_restores_inactive_values_scopes_and_ids_without_working_records(database_context):
+    c = database_context
     root, child = prepare(c)
     with c.s.datasets.uow(write=True, serialized=True) as work:
         field = work.dataset_fields.create(
@@ -159,8 +158,8 @@ def test_snapshot_restores_inactive_values_scopes_and_ids_without_working_record
             session.delete(row)
 
 
-def test_cross_dataset_value_rejected_and_dataset_deletion_clears_tree(context):  # noqa: F811
-    c = context
+def test_cross_dataset_value_rejected_and_dataset_deletion_clears_tree(database_context):
+    c = database_context
     root, _ = prepare(c)
     foreign = c.s.datasets.create_dataset(c.a.id, "foreign", "Foreign", "", c.owner.id)
     with c.s.datasets.uow(write=True, serialized=True) as work:

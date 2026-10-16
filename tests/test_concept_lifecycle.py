@@ -7,9 +7,8 @@ from threading import Barrier
 
 import pytest
 from sqlalchemy import select
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_dataset_version_views import client, request
-from test_dataset_versions import NOW, publish, setup
+from support import NOW, audits, publish, request, setup, snapshot
+from support import dataset_version_client as client
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.models import DatasetConcept, DatasetVersion
@@ -21,7 +20,7 @@ def active(c):
         return uow.concepts.get(c.d.id)
 
 
-def test_first_concept_review_publication_and_closed_mutations(context):  # noqa: F811
+def test_first_concept_review_publication_and_closed_mutations(context):
     c = context
     setup(c)
     initial = active(c)
@@ -56,7 +55,7 @@ def test_first_concept_review_publication_and_closed_mutations(context):  # noqa
         ("date", "2026-10-14", date(2026, 10, 14)),
     ],
 )
-def test_rebuilt_concept_preserves_typed_record_values(context, data_type, raw, expected):  # noqa: F811
+def test_rebuilt_concept_preserves_typed_record_values(context, data_type, raw, expected):
     c = context
     setup(c, populated=False)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "typed", "Typed", data_type)
@@ -87,8 +86,8 @@ def test_rebuilt_concept_preserves_typed_record_values(context, data_type, raw, 
     assert "Keep" in records_page.text and "Keep" in search.text and "keep" in exported.text
 
 
-def test_duplicate_and_concurrent_creation_one_event(context):  # noqa: F811
-    c = context
+def test_duplicate_and_concurrent_creation_one_event(database_context):
+    c = database_context
     setup(c)
     publish(c)
     before = len([a for a in audits(c) if a.action == "dataset.concept_created"])
@@ -110,7 +109,7 @@ def test_duplicate_and_concurrent_creation_one_event(context):  # noqa: F811
     assert set(events[-1].details) == {"baseline_version_number", "concept_revision"}
 
 
-def test_cancelled_basis_is_stale_without_losing_content(context):  # noqa: F811
+def test_cancelled_basis_is_stale_without_losing_content(context):
     c = context
     setup(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
@@ -142,7 +141,7 @@ def test_cancelled_basis_is_stale_without_losing_content(context):  # noqa: F811
         c.service.read(c.u.id, c.d.key)
 
 
-def test_current_and_concept_navigation_preserve_dataset_status_value(context):  # noqa: F811
+def test_current_and_concept_navigation_preserve_dataset_status_value(context):
     c = context
     setup(c)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "status", "Status", "string")
@@ -183,12 +182,14 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context): 
 
 
 @pytest.mark.parametrize("failure", ["audit", "commit"])
-def test_create_failure_preserves_inactive_content_and_retry(context, monkeypatch, failure):  # noqa: F811
+def test_create_failure_preserves_inactive_content_and_retry(
+    database_context, monkeypatch, failure
+):
     from sqlalchemy.orm import Session
 
     from refrncr.persistence import SqlAlchemyUnitOfWork
 
-    c = context
+    c = database_context
     setup(c)
     baseline = publish(c)
     before = snapshot(c)
@@ -211,7 +212,7 @@ def test_create_failure_preserves_inactive_content_and_retry(context, monkeypatc
 @pytest.mark.parametrize(
     "kind", ["owner", "admin", "viewer", "editor", "export", "outsider", "inactive"]
 )
-def test_concept_route_and_service_authority(context, kind):  # noqa: F811
+def test_concept_route_and_service_authority(context, kind):
     from uuid import uuid4
 
     c = context
@@ -266,7 +267,7 @@ def test_concept_route_and_service_authority(context, kind):  # noqa: F811
         c.service.create_concept(actor.id, str(uuid4()))
 
 
-def test_closed_concept_guards_all_content_writers_and_old_urls(context):  # noqa: F811
+def test_closed_concept_guards_all_content_writers_and_old_urls(context):
     c = context
     setup(c)
     fields = c.s.dataset_fields.list_fields(c.a.id, c.d.key)
@@ -309,7 +310,7 @@ def test_closed_concept_guards_all_content_writers_and_old_urls(context):  # noq
     assert result.status_code == 409 and snapshot(c) == before
 
 
-def test_new_concept_restores_latest_snapshot_after_cancel_without_active_concept(context):  # noqa: F811
+def test_new_concept_restores_latest_snapshot_after_cancel_without_active_concept(context):
     c = context
     setup(c)
     first = publish(c)
@@ -328,7 +329,7 @@ def test_new_concept_restores_latest_snapshot_after_cancel_without_active_concep
     assert not c.service.concept_context(c.a.id, c.d.key).has_changes
 
 
-def test_first_review_children_and_snapshot_export_selection(context):  # noqa: F811
+def test_first_review_children_and_snapshot_export_selection(context):
     import json
 
     c = context
@@ -359,7 +360,7 @@ def test_first_review_children_and_snapshot_export_selection(context):  # noqa: 
             artifact.content.close()
 
 
-def test_paged_record_badges_use_stable_identity_and_shared_classification(context):  # noqa: F811
+def test_paged_record_badges_use_stable_identity_and_shared_classification(context):
     c = context
     setup(c)
     rows = [
@@ -393,10 +394,12 @@ def test_paged_record_badges_use_stable_identity_and_shared_classification(conte
     assert review.counts.records_removed == 1
 
 
-def test_cancel_audit_failure_rolls_back_staleness_and_preserves_changes(context, monkeypatch):  # noqa: F811
+def test_cancel_audit_failure_rolls_back_staleness_and_preserves_changes(
+    database_context, monkeypatch
+):
     from refrncr.persistence import SqlAlchemyUnitOfWork
 
-    c = context
+    c = database_context
     setup(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)

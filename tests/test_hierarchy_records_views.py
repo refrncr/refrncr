@@ -6,9 +6,7 @@ from html import unescape
 
 import pytest
 from dataset_helpers import create_owned_dataset
-from test_dataset_browser import body, login, request, session_csrf
-from test_dataset_browser import dataset_browser as dataset_browser
-from test_hierarchy_browser import hierarchy_fixture, panel_revision
+from support import body, hierarchy_fixture, login, panel_revision, request, session_csrf
 from werkzeug.datastructures import MultiDict
 
 

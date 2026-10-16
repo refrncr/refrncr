@@ -1,7 +1,7 @@
 """Disposable REF-160 fixture for real-browser verification."""
 
 from browser_concept_app import admin, app, now, services
-from test_dataset_browser import create_dataset, create_field
+from support import create_dataset, create_field
 
 for width in (320, 768, 1440, "nojs", "empty"):
     dataset = create_dataset(services, admin, f"new-version-{width}", f"New version {width}")

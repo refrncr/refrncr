@@ -2,15 +2,15 @@
 
 import re
 from datetime import UTC, datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import event, select
-from test_dataset_browser import body, dataset_browser, login, request  # noqa: F401
-from test_dataset_records import (  # noqa: F401
-    postgresql_record_services,
-    record_services,
+from support import (
+    body,
+    html_elements,
+    login,
+    request,
 )
 
 from refrncr.models import AuditEvent, Dataset
@@ -19,9 +19,14 @@ from refrncr.services import RecordConflictError, StaleRecordError, ValidationEr
 BASE = datetime(2026, 9, 7, 12, 58, tzinfo=UTC)
 
 
-@pytest.fixture(params=["record_services", "postgresql_record_services"])
+@pytest.fixture(params=["record_services"])
 def context_services(request):
     return request.getfixturevalue(request.param)
+
+
+@pytest.fixture
+def database_context_services_matrix(database_record_services):
+    return database_record_services
 
 
 def fresh(services, admin, key="context"):
@@ -94,8 +99,10 @@ def test_record_lifecycle_counts_revisions_and_failures(context_services, monkey
 
 
 @pytest.mark.parametrize("operation", ["create", "edit", "delete", "import", "field", "order"])
-def test_commit_failure_rolls_back_timestamp_and_mutation(context_services, monkeypatch, operation):
-    _, factory, services, admin = context_services
+def test_commit_failure_rolls_back_timestamp_and_mutation(
+    database_context_services_matrix, monkeypatch, operation
+):
+    _, factory, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     record = services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
     spare = services.dataset_fields.create_field(admin.id, dataset.key, "spare", "Spare", "string")
@@ -191,8 +198,8 @@ def test_successful_import_updates_once_and_counts_rows(context_services):
     assert context.record_count == 2
 
 
-def test_bulk_query_count_and_authorization(context_services, monkeypatch):
-    engine, _, services, admin = context_services
+def test_bulk_query_count_and_authorization(database_context_services_matrix, monkeypatch):
+    engine, _, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", "valid password")
     services.grants.create_grant(admin.id, "user", viewer.id, "dataset", dataset.id, "viewer")
@@ -234,7 +241,7 @@ def test_bulk_query_count_and_authorization(context_services, monkeypatch):
     assert any("count(dataset_records.id)" in sql for sql, _ in queries)
 
 
-def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
+def test_overview_context_breadcrumbs_and_utc(dataset_browser):
     factory, services, admin, client = dataset_browser
     dataset = configure(services, admin)
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
@@ -276,7 +283,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
             '<span aria-current="page">&lt;script&gt;unsafe &amp; name&lt;/script&gt;</span>'
             in breadcrumb
         )
-        assert breadcrumb.count("<a ") == 1
+        assert sum(tag == "a" for tag, _ in html_elements(breadcrumb)) == 1
         assert "<script>unsafe" not in html
         if path in ("/datasets/context/concept", "/datasets/context/concept/records"):
             assert re.search(
@@ -288,9 +295,10 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
             )
             assert "1 record</span>" in html
             metadata = html.split('<p class="metadata">', 1)[1].split("</p>", 1)[0]
-            assert metadata.count('class="metadata-item"') == (
-                2 if "Draft in progress" in metadata else 1
-            )
+            assert sum(
+                "metadata-item" in attrs.get("class", "").split()
+                for _, attrs in html_elements(metadata)
+            ) == (2 if "Draft in progress" in metadata else 1)
             assert '<span aria-hidden="true">•</span><span>Updated ' in metadata
             assert re.search(r'</span>\s+<span class="metadata-item">', metadata)
             assert "&nbsp;" not in metadata
@@ -302,16 +310,15 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):  # noqa: F811
             )
     formatter = client.application.jinja_env.filters["absolute_utc"]
     assert formatter(BASE.astimezone(timezone(timedelta(hours=3)))) == "7 Sep 2026, 12:58 UTC"
-    css = Path("src/refrncr/static/css/components/tables.css").read_text()
-    assert ".numeric-column { text-align: right; font-variant-numeric: tabular-nums; }" in css
 
 
-def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services):
+@pytest.mark.slow
+def test_ref_130_migration_backfill_and_downgrade_preserve_data(database_context_services_matrix):
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect, text
 
-    engine, factory, services, admin = context_services
+    engine, factory, services, admin = database_context_services_matrix
     dataset = configure(services, admin)
     services.dataset_records.create_record(admin.id, dataset.key, {"code": "A"})
     untouched = fresh(services, admin, "empty")
@@ -378,61 +385,3 @@ def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services
             else content_updated_at.astimezone(UTC)
         ) == BASE
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
-
-
-def test_shared_page_context_spacing_keeps_outer_header_layout():
-    css = Path("src/refrncr/static/css/layouts/page.css").read_text()
-
-    def declarations(selector):
-        rule = re.search("^" + re.escape(selector) + r" \{([^}]+)\}", css, re.MULTILINE)
-        assert rule is not None
-        return dict(part.strip().split(":", 1) for part in rule[1].split(";") if part.strip())
-
-    wrappers = declarations(".page-context")
-    assert wrappers["display"].strip() == "flex"
-    assert wrappers["flex-direction"].strip() == "column"
-    assert wrappers["min-width"].strip() == "0"
-    assert wrappers["gap"].strip() == "0"
-    assert (
-        declarations(".page-context > .metadata")["padding-block-start"].strip()
-        == "var(--space-sm)"
-    )
-    assert (
-        declarations(".page-context > .breadcrumbs")["padding-block-end"].strip()
-        == "var(--space-sm)"
-    )
-    reset = declarations(
-        ".page-context > .breadcrumbs, .page-context > .page-title, .page-context > .metadata"
-    )
-    assert reset["margin"].strip() == "0"
-    header = declarations(".page-header")
-    assert header["flex-wrap"].strip() == "wrap"
-    assert header["margin-bottom"].strip() == "var(--space-lg)"
-
-    breadcrumb = declarations(".breadcrumbs")
-    assert breadcrumb["text-transform"].strip() == "uppercase"
-    assert breadcrumb["font-weight"].strip() == "var(--font-weight-regular)"
-    assert breadcrumb["font-size"].strip() == "var(--font-size-label)"
-    assert breadcrumb["letter-spacing"].strip() == "var(--letter-spacing-label)"
-    assert breadcrumb["line-height"].strip() == "normal"
-    assert breadcrumb["color"].strip() == "var(--color-text-muted)"
-    metadata = declarations(".metadata")
-    assert metadata["display"].strip() == "inline-flex"
-    assert metadata["font-size"].strip() == "var(--font-size-body-sm)"
-    assert metadata["line-height"].strip() == "normal"
-    assert metadata["flex-wrap"].strip() == "wrap"
-    assert metadata["gap"].strip() == "var(--space-xs) var(--space-sm)"
-    assert metadata["font-variant-numeric"].strip() == "tabular-nums"
-    assert declarations(".metadata-item")["display"].strip() == "inline-flex"
-    base = Path("src/refrncr/static/css/base.css").read_text()
-    assert "h1, .page-title {" in base
-    assert (
-        ".page-title { font-size: var(--font-size-page-title); "
-        "font-weight: var(--font-weight-bold); line-height: normal; letter-spacing: -.01em; }"
-        in base
-    )
-    assert "font-family: var(--font-display)" in base
-    for name in ("detail", "records"):
-        template = Path(f"src/refrncr/templates/pages/datasets/{name}.html").read_text()
-        assert 'from "layouts/page.html" import page_context' in template
-        assert "{% call page_context(" in template

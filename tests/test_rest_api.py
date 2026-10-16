@@ -7,55 +7,17 @@ from decimal import Decimal
 from urllib.parse import quote
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError as ModelValidationError
 from sqlalchemy import event, select
-from test_audit_coverage import audit_db, context  # noqa: F401
-from test_dataset_versions import NOW, publish, setup
+from support import NOW, publish
 
 from refrncr.api.contracts import PageQuery, Record
 from refrncr.api.routes import create_api
-from refrncr.api_keys import ApiKeyService
-from refrncr.app import create_application
-from refrncr.models import AuditEvent, Dataset
+from refrncr.models import AuditEvent
 from refrncr.operational import LOGGER_NAME, OperationalJSONFormatter
 from refrncr.published_contracts import decode_identifier, encode_identifier
 from refrncr.record_search import RecordQueryLogFilter
 from refrncr.version_persistence import SqlAlchemyVersionOperations
-
-
-@pytest.fixture
-def api(context):  # noqa: F811
-    c = context
-    setup(c)
-    with c.sessions.begin() as session:
-        session.get(Dataset, c.d.id).updated_at = NOW - timedelta(seconds=1)
-    c.version = publish(c)
-    with c.sessions.begin() as session:
-        session.get(Dataset, c.d.id).updated_at = NOW
-    c.now = [NOW]
-    c.keys = ApiKeyService(
-        c.s.users.uow, pepper=b"disposable-ref107-test-pepper!!!!!", clock=lambda: c.now[0]
-    )
-    c.key = c.keys.create_key(c.u.id, "Read integration")
-    c.headers = {"Authorization": "Bearer " + c.key.secret}
-    c.app = create_application(
-        c.s.users,
-        c.s.authentication,
-        c.s.sessions,
-        c.s.teams,
-        c.s.memberships,
-        authorization=c.s.authorization,
-        datasets=c.s.datasets,
-        dataset_fields=c.s.dataset_fields,
-        dataset_business_keys=c.s.dataset_business_keys,
-        dataset_records=c.s.dataset_records,
-        dataset_versions=c.service,
-        api_keys=c.keys,
-    )
-    with TestClient(c.app, base_url="https://localhost", raise_server_exceptions=False) as client:
-        c.client = client
-        yield c
 
 
 @pytest.fixture
@@ -305,12 +267,12 @@ def test_duplicate_expired_revoked_inactive_keys(api):
         "api_key=secret",
     ],
 )
-def test_fail_closed_query(api, query):
+def test_fail_closed_query(database_api, query):
     for suffix in ("", "/audit/records"):
-        response = get(api, suffix + "?" + query)
+        response = get(database_api, suffix + "?" + query)
         assert response.status_code == 400, response.text
         assert response.json() == {"error": "invalid_request"}
-    assert get(api, "/audit?limit=1").status_code == 400
+    assert get(database_api, "/audit?limit=1").status_code == 400
 
 
 def test_pagination_current_only_and_publication(api):
@@ -333,8 +295,8 @@ def test_pagination_current_only_and_publication(api):
     assert current.json()["version"]["number"] == scheduled.number
 
 
-def test_effective_date_version_validation_and_cache_isolation(api):
-    c = api
+def test_effective_date_version_validation_and_cache_isolation(database_api):
+    c = database_api
     first = get(c, "/audit/records")
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
@@ -465,8 +427,9 @@ def test_modified_since_precedence_and_metadata_changes(api):
     assert get(c, "/audit", headers=headers).status_code == 200
 
 
-def test_sql_pagination_no_n_plus_one(api, monkeypatch):
-    c = api
+@pytest.mark.slow
+def test_sql_pagination_no_n_plus_one(database_api, monkeypatch):
+    c = database_api
     c.service.create_concept(c.a.id, c.d.id)
     for i in range(110):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"z{i:03}", "label": "value"})

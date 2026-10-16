@@ -4,32 +4,24 @@ import io
 from datetime import datetime, time
 
 import pytest
-import test_import_wizard as wizard_tests
-import test_record_import as imports
 from openpyxl import Workbook
 from sqlalchemy import func, select
+from support import html_elements
 
 from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
 from refrncr.record_import import ImportValidationError, TransientImportStore, parse_source
 from refrncr.services import NotFoundError
 
 
-@pytest.fixture(params=["sqlite", "postgresql"])
-def context(request):
-    if request.param == "sqlite":
-        yield imports.import_context.__wrapped__()
-    else:
-        yield from imports.postgresql_import_context.__wrapped__()
-
-
 @pytest.fixture
-def import_context():
-    return imports.import_context.__wrapped__()
+def context(import_context):
+    return import_context
 
 
-@pytest.fixture
-def wizard(import_context):
-    return wizard_tests.wizard.__wrapped__(import_context)
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def database_context(request):
+    fixture = "import_context" if request.param == "sqlite" else "postgresql_import_context"
+    return request.getfixturevalue(fixture)
 
 
 def start(context, value="1.234,56", session="source-formats", code="A"):
@@ -106,24 +98,24 @@ def test_full_confirmation_remembers_and_preview_uses_canonical_values(context):
 
 
 @pytest.mark.parametrize("end", ["cancel", "expiry", "validation", "rollback", "stale"])
-def test_unsuccessful_paths_do_not_remember(context, monkeypatch, end):
-    _, services, admin, dataset = context
+def test_unsuccessful_paths_do_not_remember(database_context, monkeypatch, end):
+    _, services, admin, dataset = database_context
     clock = [0.0]
     services.record_imports.store = TransientImportStore(clock=lambda: clock[0])
-    state = start(context)
-    assert preview(context, state).valid
+    state = start(database_context)
+    assert preview(database_context, state).valid
     if end == "cancel":
         services.record_imports.cancel(admin.id, "source-formats", dataset.key, state.token)
     elif end == "expiry":
         clock[0] = 901
         with pytest.raises(NotFoundError):
-            confirm(context, state)
+            confirm(database_context, state)
     elif end == "validation":
-        assert not preview(context, state, {"profile_id": "v1-us"}).valid
+        assert not preview(database_context, state, {"profile_id": "v1-us"}).valid
     elif end == "stale":
         services.dataset_records.create_record(admin.id, dataset.key, {"code": "Z", "amount": "5"})
         with pytest.raises(Exception, match="changed"):
-            confirm(context, state)
+            confirm(database_context, state)
     else:
         import refrncr.record_import as module
 
@@ -133,12 +125,12 @@ def test_unsuccessful_paths_do_not_remember(context, monkeypatch, end):
         with monkeypatch.context() as patch:
             patch.setattr(module, "record_audit", fail)
             with pytest.raises(RuntimeError, match="injected"):
-                confirm(context, state)
-        assert saved(context) == {}
-        assert confirm(context, state) == 1
-        assert saved(context)
+                confirm(database_context, state)
+        assert saved(database_context) == {}
+        assert confirm(database_context, state) == 1
+        assert saved(database_context)
         return
-    assert saved(context) == {}
+    assert saved(database_context) == {}
 
 
 def test_full_file_detection_and_validation_beyond_display_examples(context):
@@ -188,7 +180,7 @@ def form_data(wizard, profile="v1-eu"):
 def test_mapping_progressive_disclosure_and_live_examples(wizard):
     page = wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
     assert "Show all formats" in page.text
-    assert page.text.count("data-format-details open") == 1
+    assert sum(tag == "details" and "open" in attrs for tag, attrs in html_elements(page.text)) == 1
     assert "Choose how this column is interpreted." in page.text
     assert "Ambiguous source format;" not in page.text
     assert "id='source-1-0'" in page.text
@@ -197,7 +189,13 @@ def test_mapping_progressive_disclosure_and_live_examples(wizard):
     response = wizard.post(wizard.path + "/formats", form_data(wizard))
     assert response.status_code == 200
     assert "<code>1234</code>" in response.text and "<code>2345</code>" in response.text
-    assert response.text.count("class='source-format-pair'") == 2
+    assert (
+        sum(
+            "source-format-pair" in attrs.get("class", "").split()
+            for _, attrs in html_elements(response.text)
+        )
+        == 2
+    )
     response = wizard.post(wizard.path + "/preview", form_data(wizard, "v1-plain"))
     assert "1.234" in response.text and "2.345" in response.text
     assert "Proposed Record differences" in response.text
@@ -212,7 +210,13 @@ def test_example_escaping_bounds_and_format_endpoint_csrf_binding(wizard):
     data = form_data(wizard)
     response = wizard.post(wizard.path + "/formats", data)
     # The fixture repeats one row five times, so the distinct-value rule shows it once.
-    assert response.text.count("class='source-format-pair'") == 1
+    assert (
+        sum(
+            "source-format-pair" in attrs.get("class", "").split()
+            for _, attrs in html_elements(response.text)
+        )
+        == 1
+    )
     assert "<script>" not in response.text
     bad = dict(data, csrf_token="forged")
     assert wizard.post(wizard.path + "/formats", bad).status_code == 403

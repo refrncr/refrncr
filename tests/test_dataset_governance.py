@@ -1,19 +1,15 @@
 """REF-73 authority, ownership compare-and-set, and orthogonal export contracts."""
 
-import os
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
 import pytest
 from dataset_helpers import publish_dataset
-from sqlalchemy import func, select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from support import governance_state as state
+from support import html_elements
 
-from refrncr.app import create_community_services
-from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, DatasetExportAccess, DatasetRecord, Grant
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.services import (
@@ -21,48 +17,10 @@ from refrncr.services import (
     ConflictError,
     InvalidLifecycleError,
     NotFoundError,
-    ResourceTypeRegistry,
     StaleDatasetOwnerError,
     ValidationError,
 )
 from refrncr.web import create_flask_app
-
-
-@pytest.fixture(params=["sqlite", "postgresql"])
-def governance(request, tmp_path):
-    administrative = None
-    if request.param == "postgresql":
-        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        if not url:
-            pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
-        administrative = create_database_engine(url)
-        schema = f"governance_{uuid.uuid4().hex}"
-        with administrative.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    else:
-        url = f"sqlite:///{tmp_path / 'governance.db'}"
-    engine = create_database_engine(url)
-    Base.metadata.create_all(engine)
-    factory = create_session_factory(engine)
-    services = create_community_services(factory, ResourceTypeRegistry())
-    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
-    user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
-    owner = services.teams.create_team(admin.id, "Data domain")
-    other = services.teams.create_team(admin.id, "Other domain")
-    dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "", owner.id)
-    yield engine, factory, services, admin, user, owner, other, dataset
-    engine.dispose()
-    if administrative:
-        with administrative.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        administrative.dispose()
-
-
-def state(factory, dataset):
-    with factory() as session:
-        row = session.get(Dataset, dataset.id)
-        return row.owner_team_id, row.updated_at, session.scalar(select(func.count(AuditEvent.id)))
 
 
 @pytest.mark.parametrize("kind", ["viewer", "export_user", "export_team", "owner", "admin"])
@@ -255,8 +213,8 @@ def test_team_lifecycle_and_deleted_target(governance):
 
 
 @pytest.mark.parametrize("failure", ["audit", "persistence"])
-def test_owner_failure_rolls_back_cas(governance, monkeypatch, failure):
-    _, factory, s, a, _, owner, other, d = governance
+def test_owner_failure_rolls_back_cas(database_governance, monkeypatch, failure):
+    _, factory, s, a, _, owner, other, d = database_governance
     before = state(factory, d)
     if failure == "audit":
 
@@ -352,8 +310,8 @@ def test_import_checks_current_membership_at_confirmation(governance):
 
 
 @pytest.mark.parametrize("operation", ["grant", "revoke"])
-def test_export_audit_failure_rolls_back(governance, monkeypatch, operation):
-    _, factory, s, a, u, _, _, d = governance
+def test_export_audit_failure_rolls_back(database_governance, monkeypatch, operation):
+    _, factory, s, a, u, _, _, d = database_governance
     access = None
     if operation == "revoke":
         access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
@@ -372,8 +330,8 @@ def test_export_audit_failure_rolls_back(governance, monkeypatch, operation):
     assert s.authorization.datasets.can_export_dataset(u.id, d.id) == (operation == "revoke")
 
 
-def test_concurrent_export_grants_are_unique(governance):
-    _, factory, s, a, u, _, _, d = governance
+def test_concurrent_export_grants_are_unique(database_governance):
+    _, factory, s, a, u, _, _, d = database_governance
     barrier = Barrier(2)
 
     def grant():
@@ -399,8 +357,8 @@ def test_concurrent_export_grants_are_unique(governance):
         )
 
 
-def test_export_duplicates_constraints_and_cross_dataset_revoke(governance):
-    _, factory, s, a, u, owner, _, d = governance
+def test_export_duplicates_constraints_and_cross_dataset_revoke(database_governance):
+    _, factory, s, a, u, owner, _, d = database_governance
     access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)
     with pytest.raises(ConflictError):
         s.datasets.grant_export_access(a.id, d.key, "user", u.id)
@@ -552,11 +510,17 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert team.status_code == 302
     assert team.location == f"/datasets/{d.key}/configure#access-management"
     populated = access_section(get(concept_url).text)
-    assert populated.count("<tr>") == 3
+    assert sum(tag == "tr" for tag, _ in html_elements(populated)) == 3
     assert "<span class='badge'>User</span>" in populated
     assert "<span class='badge'>Team</span>" in populated
     assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
-    assert populated.count("<time class='access-added' datetime=") == 2
+    assert (
+        sum(
+            tag == "time" and "access-added" in attrs.get("class", "").split()
+            for tag, attrs in html_elements(populated)
+        )
+        == 2
+    )
     assert "<span class='section-count'>2</span>" in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
@@ -587,8 +551,8 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
         response.close()
 
 
-def test_combined_edit_is_atomic_and_rejects_stale_ownership(governance, monkeypatch):
-    _, factory, s, a, u, owner, other, d = governance
+def test_combined_edit_is_atomic_and_rejects_stale_ownership(database_governance, monkeypatch):
+    _, factory, s, a, u, owner, other, d = database_governance
     before = state(factory, d)
     s.datasets.update_dataset(a.id, d.key, d.name, d.description, owner_change=(owner.id, owner.id))
     assert state(factory, d) == before

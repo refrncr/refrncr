@@ -21,6 +21,7 @@ def test_sqlite_database_connection():
         assert result.scalar_one() == 1
 
 
+@pytest.mark.postgres
 def test_postgresql_database_connection():
     engine = create_database_engine(
         os.environ.get(

@@ -6,102 +6,12 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
 import pytest
-import test_record_import as import_tests
 from dataset_helpers import create_owned_dataset
 from openpyxl import Workbook
-from sqlalchemy import func, select
-from test_record_import import PASSWORD
-from werkzeug.datastructures import MultiDict
+from support import PASSWORD, html_elements, html_tag_texts, html_text
 
-from refrncr.models import DatasetRecord
 from refrncr.record_import import TransientImportStore
 from refrncr.services import NotFoundError
-from refrncr.web import create_flask_app
-
-
-@pytest.fixture
-def import_context():
-    return import_tests.import_context.__wrapped__()
-
-
-@pytest.fixture
-def wizard(import_context):
-    factory, services, admin, dataset = import_context
-    # Wizard defaults describe the complete two-field schema; tests needing optional
-    # fields add them explicitly alongside the corresponding source columns.
-    for key in ("active", "day"):
-        services.dataset_fields.delete_field(admin.id, dataset.key, key)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-    )
-    app.testing = True
-    client = app.test_client()
-    login = client.get("/login", base_url="https://localhost")
-    csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
-    client.post(
-        "/login",
-        base_url="https://localhost",
-        data={
-            "email": admin.email,
-            "password": PASSWORD,
-            "csrf_token": csrf,
-        },
-    )
-    root = f"/datasets/{dataset.key}/records/import"
-    page = client.get(root, base_url="https://localhost")
-    csrf = re.search("name='csrf_token' value='([^']+)'", page.text)[1]
-
-    class Browser:
-        def get(self, path):
-            page = client.get(path, base_url="https://localhost", follow_redirects=True)
-            nonce = re.search("name='confirmation' value='([^']+)'", page.text)
-            if nonce:
-                self.confirmation = nonce[1]
-            return page
-
-        def post(self, path, data=None):
-            values = MultiDict(data.items() if isinstance(data, dict) else data or [])
-            values.setdefault("csrf_token", csrf)
-            if path.endswith("/confirm"):
-                values.setdefault("confirmation", getattr(self, "confirmation", "not-confirmed"))
-            return client.post(
-                path, base_url="https://localhost", data=values, follow_redirects=True
-            )
-
-        def upload(self, content=b"code,amount\nA,1\n", filename="records.csv"):
-            page = self.post(root, {"file": (io.BytesIO(content), filename)})
-            assert page.status_code == 200, page.text
-            self.token = page.request.path.split("/import/")[1].split("/step/")[0]
-            self.path = f"{root}/{self.token}"
-            return page
-
-        def preview(self, mapping=("code", "amount")):
-            return self.post(
-                self.path + "/preview",
-                {
-                    f"mapping_{i}": value if value is not None else "__ignored__"
-                    for i, value in enumerate(mapping)
-                },
-            )
-
-        def count(self):
-            with factory() as session:
-                return session.scalar(select(func.count()).select_from(DatasetRecord))
-
-    browser = Browser()
-    browser.root, browser.client, browser.csrf = root, client, csrf
-    browser.services, browser.admin, browser.dataset = services, admin, dataset
-    return browser
 
 
 def states(page):
@@ -274,7 +184,7 @@ def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wiz
         "Field values",
     ]
     assert re.findall("<dt>(.*?)</dt>", table)[:4] == ["Code", "Amount", "Active", "Day"]
-    assert table.count("<tr>") == 13
+    assert sum(tag == "tr" for tag, _ in html_elements(table)) == 13
     assert "C9" in table and "C10" in table
     assert "New value: — (No value)" in table
     assert "12 differences" in preview.text
@@ -305,7 +215,7 @@ def test_error_summary_and_capped_accessible_modal(wizard, count):
     assert "View error report" in outside
     assert "Failing data row" not in outside
     assert "<table>" not in outside
-    assert dialog.count("<section>") == min(100, count)
+    assert sum(tag == "section" for tag, _ in html_elements(dialog)) == min(100, count)
     assert f"Failing data row {min(100, count)} — source file row {min(100, count) + 1}" in dialog
     assert ("Showing 100 of 101" in dialog) == (count == 101)
     assert "aria-labelledby=" in dialog and "aria-describedby=" in dialog
@@ -556,8 +466,8 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     page = wizard.preview(("code", "code"))
     assert "mapping-error-0" in page.text
     assert "mapping-error-1" in page.text
-    assert page.text.count("aria-invalid='true'") == 2
-    assert page.text.count(">Mapping error</summary>") == 2
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page.text)) == 2
+    assert html_tag_texts(page.text, "summary").count("Mapping error") == 2
     assert "data-missing-key='amount'" in page.text
     assert "This field is mapped more than once" in page.text
 
@@ -583,7 +493,7 @@ def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_
     assert "class='mapping-advice'" not in page.text
     tooltip = re.search(r"id='mapping-rationale-0'.*?</div>", page.text, re.S)[0]
     assert "Multiple possible fields — choose one" in tooltip
-    assert page.text.count("Multiple possible fields — choose one") == 1
+    assert html_text(page.text).count("Multiple possible fields — choose one") == 1
 
 
 def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
@@ -591,7 +501,7 @@ def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
     assert "aria-label='About column mapping'" in page.text
     assert "aria-describedby='mapping-instructions'" in page.text
     instruction = "Match each source column to one dataset field, or choose Do not import."
-    assert page.text.count(instruction) == 1
+    assert html_text(page.text).count(instruction) == 1
     info = page.text.split("id='mapping-instructions'", 1)[1].split("</details>", 1)[0]
     assert instruction in info
     assert "File:" in info

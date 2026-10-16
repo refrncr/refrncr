@@ -8,7 +8,6 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from test_audit_coverage import audit_db  # noqa: F401
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.api_keys import LAST_USED_INTERVAL, LIFETIME, ApiKeyAuthenticationError, ApiKeyService
@@ -20,9 +19,8 @@ from refrncr.services import AuthorizationError, ConflictError, NotFoundError, V
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 
-@pytest.fixture
-def keys(audit_db):  # noqa: F811
-    engine, sessions, services = audit_db
+def _make_keys(database):
+    engine, sessions, services = database
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     now = [datetime(2026, 9, 19, 12, tzinfo=UTC)]
@@ -30,6 +28,16 @@ def keys(audit_db):  # noqa: F811
         services.users.uow, pepper=b"test-only-pepper!" * 2, clock=lambda: now[0]
     )
     return engine, sessions, services, admin, user, service, now
+
+
+@pytest.fixture
+def keys(audit_db):
+    return _make_keys(audit_db)
+
+
+@pytest.fixture
+def database_keys(database_audit_db):
+    return _make_keys(database_audit_db)
 
 
 def test_lifecycle_and_secret_redaction(keys, caplog):
@@ -108,8 +116,8 @@ def test_expiry_duplicate_names_limit_and_reuse(keys):
     assert service.create_key(user.id, "Integration").key.status == "Active"
 
 
-def test_owner_isolation_and_confirmation(keys):
-    _, _, _, admin, user, service, _ = keys
+def test_owner_isolation_and_confirmation(database_keys):
+    _, _, _, admin, user, service, _ = database_keys
     created = service.create_key(user.id, "Private name")
     assert service.list_keys(admin.id) == ()
     for target in (created.key.id, str(uuid4()), "malformed", None):
@@ -199,8 +207,8 @@ def test_current_permissions_and_bearer_only(keys):
 
 
 @pytest.mark.parametrize("duplicate", [False, True])
-def test_concurrent_creation(keys, duplicate):
-    _, _, _, _, user, service, _ = keys
+def test_concurrent_creation(database_keys, duplicate):
+    _, _, _, _, user, service, _ = database_keys
     for n in range(4 if not duplicate else 0):
         service.create_key(user.id, str(n))
     barrier = Barrier(2)
@@ -218,8 +226,8 @@ def test_concurrent_creation(keys, duplicate):
     assert len(service.list_keys(user.id)) == (1 if duplicate else 5)
 
 
-def test_creation_replay_and_concurrent_revoke(keys):
-    _, sessions, _, _, user, service, _ = keys
+def test_creation_replay_and_concurrent_revoke(database_keys):
+    _, sessions, _, _, user, service, _ = database_keys
     request_id = str(uuid4())
     key = service.create_key(user.id, "Key", request_id=request_id)
     with pytest.raises(ConflictError):
@@ -249,8 +257,8 @@ def test_creation_replay_and_concurrent_revoke(keys):
         )
 
 
-def test_audit_failure_rolls_back(keys, monkeypatch):
-    _, _, _, _, user, service, _ = keys
+def test_audit_failure_rolls_back(database_keys, monkeypatch):
+    _, _, _, _, user, service, _ = database_keys
     original = SqlAlchemyUnitOfWork.add_audit
 
     def fail(work, **values):
@@ -395,7 +403,7 @@ def test_browser_revoke_validation_idor_and_api_key_cannot_login(keys):
         ("expires_at", "2000-01-01"),
         ("expires_at", "2026-02-30"),
         ("creation_token", "a" * 36 + "." + "\N{SNOWMAN}" * 64),
-        ("creation_token", str(uuid4()) + "." + "0" * 64),
+        ("creation_token", "00000000-0000-4000-8000-000000000000" + "." + "0" * 64),
     ],
 )
 def test_browser_invalid_fields_fail_safely(keys, field, value):
@@ -429,8 +437,8 @@ def test_secret_copy_controller():
     )
 
 
-def test_audit_failure_rolls_back_revoke_and_use(keys, monkeypatch):
-    _, sessions, _, _, user, service, _ = keys
+def test_audit_failure_rolls_back_revoke_and_use(database_keys, monkeypatch):
+    _, sessions, _, _, user, service, _ = database_keys
     created = service.create_key(user.id, "Preserve")
     with sessions() as session:
         before = list(session.execute(select(AuditEvent.id)))
@@ -470,8 +478,8 @@ def test_success_has_no_durable_audit_and_throttles_last_used(keys):
         )
 
 
-def test_last_used_update_failure_rolls_back_and_fails_closed(keys, monkeypatch):
-    _, _, _, _, user, service, _ = keys
+def test_last_used_update_failure_rolls_back_and_fails_closed(database_keys, monkeypatch):
+    _, _, _, _, user, service, _ = database_keys
     created = service.create_key(user.id, "Rollback use")
 
     def fail(*args, **kwargs):
@@ -483,8 +491,8 @@ def test_last_used_update_failure_rolls_back_and_fails_closed(keys, monkeypatch)
     assert service.get_key(user.id, created.key.id).last_used_at is None
 
 
-def test_concurrent_authentication_refreshes_last_used_once(keys, monkeypatch):
-    _, _, _, _, user, service, _ = keys
+def test_concurrent_authentication_refreshes_last_used_once(database_keys, monkeypatch):
+    _, _, _, _, user, service, _ = database_keys
     created = service.create_key(user.id, "Concurrent use")
     barrier = Barrier(2)
     outcomes = []

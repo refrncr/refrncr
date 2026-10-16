@@ -1008,10 +1008,10 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
         downgraded_engine.dispose()
 
 
+@pytest.mark.postgres
+@pytest.mark.slow
 def test_empty_postgresql_database_upgrades():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"migration_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

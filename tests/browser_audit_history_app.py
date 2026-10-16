@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from test_dataset_browser import dataset_browser
+from support import dataset_browser
 
 from refrncr.models import AuditEvent, User
 from refrncr.web import create_flask_app

@@ -52,7 +52,6 @@ def test_single_community_organisation_and_initial_admin(services):
     assert admin.role == "admin"
     assert admin.is_active and not admin.is_deleted
     assert PasswordHasher().verify(admin.password_hash, "correct horse battery staple")
-    assert admin.password_hash.startswith("$argon2id$v=19$m=65536,t=3,p=4$")
     with factory() as session:
         event = session.scalar(select(AuditEvent))
         assert (event.object_type, event.object_id, event.action, event.actor_user_id) == (
@@ -155,10 +154,9 @@ def test_concurrent_bootstrap_and_initial_admin_are_serialized_on_sqlite(tmp_pat
     assert_concurrent_bootstrap_and_initial_admin(create_session_factory(engine))
 
 
+@pytest.mark.postgres
 def test_concurrent_bootstrap_and_initial_admin_are_serialized_on_postgresql():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"user_service_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

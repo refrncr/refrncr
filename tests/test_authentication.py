@@ -150,7 +150,7 @@ def test_success_rehashes_and_atomically_persists(authentication_services):
     with sessions() as session:
         replacement = session.get(User, admin.id).password_hash
     assert replacement != old_hash
-    assert not PASSWORD_HASHER.check_needs_rehash(replacement)
+    assert not AuthenticationService(uow).hasher.check_needs_rehash(replacement)
     assert PASSWORD_HASHER.verify(replacement, VALID_PASSWORD)
 
 
@@ -273,8 +273,6 @@ def test_account_creation_preserves_spaces_and_unicode_without_rewriting(
 @pytest.fixture
 def postgresql_authentication_services():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"authentication_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:
@@ -296,6 +294,7 @@ def postgresql_authentication_services():
         administration_engine.dispose()
 
 
+@pytest.mark.postgres
 def test_postgresql_authentication_rehash_and_compare_and_set(
     postgresql_authentication_services,
 ):
@@ -314,7 +313,7 @@ def test_postgresql_authentication_rehash_and_compare_and_set(
     with sessions() as session:
         rehashed = session.get(User, admin.id).password_hash
     assert rehashed != old_hash
-    assert not PASSWORD_HASHER.check_needs_rehash(rehashed)
+    assert not AuthenticationService(uow).hasher.check_needs_rehash(rehashed)
 
     _prepare_old_hash(sessions, admin)
     concurrent_hash = PASSWORD_HASHER.hash(VALID_PASSWORD)

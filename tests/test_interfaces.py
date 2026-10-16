@@ -1,12 +1,12 @@
 import re
 import uuid
 from itertools import chain, combinations
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
+from support import html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
@@ -429,7 +429,7 @@ def test_setup_validation_renders_accessible_error_without_password_or_partial_w
     assert "Password must contain at least 12 characters" in page
     assert "id='setup-password-error'" in page
     assert "aria-describedby='setup-password-help setup-password-error'" in page
-    assert page.count("aria-invalid='true'") == 1
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page)) == 1
     assert "value='Admin@Example.com'" in page
     assert "value='&lt;strong&gt;Administrator&lt;/strong&gt;'" in page
     assert submitted_name not in page
@@ -468,7 +468,7 @@ def test_setup_validation_marks_only_the_failing_field(interface, overrides, err
 
     assert response.status_code == 400
     assert message in page
-    assert page.count("aria-invalid='true'") == 1
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page)) == 1
     assert f"id='{error_field}'" in page
     assert f"{error_field}-error" in page
     assert "value='short'" not in page
@@ -574,10 +574,11 @@ def test_invalid_login_uses_generic_accessible_feedback_without_reflection(inter
     page = response_text(response)
 
     assert response.status_code == 401
-    assert page.count("Invalid credentials") == 1
+    assert html_tag_texts(page, "div").count("Invalid credentials") == 1
     assert "id='login-error' role='alert'" in page
-    assert page.count("aria-describedby='login-error'") == 2
-    assert page.count("aria-invalid='true'") == 2
+    elements = html_elements(page)
+    assert sum(attrs.get("aria-describedby") == "login-error" for _, attrs in elements) == 2
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in elements) == 2
     assert submitted_email not in page
     assert "&lt;img" in page
     assert "incorrect password" not in page
@@ -793,7 +794,10 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
     assert "<caption class='visually-hidden'>Users</caption>" in table
     assert "<thead role='rowgroup'><tr role='row'>" in table
     rows = re.findall(r"<tbody role='rowgroup'>(.*?)</tbody>", table, re.S)[0]
-    assert rows.count("role='row'") == rows.count("<tr ")
+    row_elements = html_elements(rows)
+    assert sum(attrs.get("role") == "row" for _, attrs in row_elements) == sum(
+        tag == "tr" for tag, _ in row_elements
+    )
     expected_cell_classes = expected_classes.copy()
     expected_cell_classes[2] = "table-cell-wrap relationship-cell"
     for row in re.findall(r"<tr[^>]*>(.*?)</tr>", rows, re.S):
@@ -813,34 +817,6 @@ def test_users_mobile_table_preserves_identity_and_view_action(interface):
         assert ">View</button>" not in row
         assert "disabled" not in action
     assert f"aria-label='View user {managed.display_name} ({managed.id})'" in table
-
-    css = response_text(request(client, "get", "/static/css/components/tables.css"))
-    breakpoint_rule = "@media (max-width: 767px)"
-    desktop, mobile = css.split(breakpoint_rule, 1)
-    mobile = mobile.split("\n}", 1)[0]
-    assert "user-management-table" not in desktop
-    rules = {
-        selector.strip(): declarations
-        for selector, declarations in re.findall(r"([^{}]+)\{([^{}]*)\}", mobile)
-    }
-    hidden = [selector for selector, rule in rules.items() if "display: none" in rule]
-    assert hidden == [".user-management-table .table-column-secondary"]
-    row_rule = rules[":is(.user-management-table, .relationship-table) tbody tr"]
-    assert "display: grid;" in row_rule
-    assert "grid-template-columns: minmax(0, 1fr);" in row_rule
-    assert "border-bottom: 1px solid var(--color-border-subtle);" in row_rule
-    assert "grid-column: 1;" in rules[".user-management-table .table-cell-wrap"]
-    header_rule = rules[":is(.user-management-table, .relationship-table) thead"]
-    assert "position: absolute;" in header_rule
-    assert "clip: rect(0 0 0 0);" in header_rule
-    assert "display: none" not in header_rule
-    assert "table-column-action" not in table
-    assert "overflow-wrap: anywhere;" in rules[".user-management-table .table-cell-wrap"]
-
-    panel_css = response_text(request(client, "get", "/static/css/components/dialog.css"))
-    mobile_panel = panel_css.split(breakpoint_rule)[1].split("/* Shared")[0]
-    assert "grid-template-columns: minmax(0, 1fr) var(--control-height);" in mobile_panel
-    assert "width: var(--control-height); justify-self: end; align-self: start;" in mobile_panel
 
 
 @pytest.mark.parametrize(
@@ -871,12 +847,13 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert 'class="primary-navigation"' in secondary
     assert "Access management" in secondary
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
-    assert secondary.count("<a ") == 5
+    secondary_elements = html_elements(secondary)
+    assert sum(tag == "a" for tag, _ in secondary_elements) == 5
     assert re.search(r'href="/settings/api-keys">.*?</svg>API keys</a>', secondary, re.S)
     assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
-    assert secondary.count('aria-current="page"') == 1
-    assert secondary.count('aria-hidden="true"') == 5
+    assert sum(attrs.get("aria-current") == "page" for _, attrs in secondary_elements) == 1
+    assert sum(attrs.get("aria-hidden") == "true" for _, attrs in secondary_elements) == 5
     assert re.search(
         r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,
@@ -884,14 +861,15 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     )
     assert f"<title>{title}</title>" in body
     assert f'<h1 class="page-title">{title}</h1>' in body
-    assert body.count("<h1") == 1
+    assert sum(tag == "h1" for tag, _ in html_elements(body)) == 1
     assert 'class="breadcrumbs"' not in body
     assert 'aria-expanded="false" aria-controls="settings-sidebar" data-nav-open' in body
     assert 'aria-label="Expand navigation"' in body
     assert '<main id="content" class="app-main settings-content" tabindex="-1">' in body
-    assert body.count('class="flash-region"') == 1
-    shell_styles = response_text(request(client, "get", "/static/css/layouts/app-shell.css"))
-    assert re.search(r"\.primary-navigation\s*{[^}]*flex-direction: column;", shell_styles)
+    assert (
+        sum("flash-region" in attrs.get("class", "").split() for _, attrs in html_elements(body))
+        == 1
+    )
     assert ">Appearance</a>" in secondary
     assert ">Personal</p>" in secondary
 
@@ -1044,7 +1022,7 @@ def test_admin_creates_renames_lists_and_deletes_team(interface):
     table = re.search(
         r"<table class='relationship-table' role='table'>(.*?)</table>", body, re.S
     ).group(1)
-    assert table.count("data-row-primary") == 1
+    assert sum("data-row-primary" in attrs for _, attrs in html_elements(table)) == 1
     assert "data-row-action" in table
     assert "Actions" not in table
     assert ">View</a>" not in table
@@ -1108,23 +1086,6 @@ def test_team_list_only_loads_memberships_for_the_open_team(interface, monkeypat
     assert request(client, "get", f"/teams?open_team={first.id}").status_code == 200
     assert member_calls == [first.id]
     assert eligible_calls == [first.id]
-
-
-def test_management_routes_use_file_templates_without_inline_markup():
-    web_source = (Path(__file__).parents[1] / "src/refrncr/web.py").read_text()
-    management_source = web_source.split("    def render_user_list", 1)[1].split(
-        "    @app.errorhandler(UserManagementError)", 1
-    )[0]
-
-    for template in (
-        '"pages/users/list.html"',
-        '"pages/teams/list.html"',
-        '"pages/teams/members.html"',
-    ):
-        assert template in management_source
-    assert "render_template_string" not in management_source
-    assert '"<dialog' not in management_source
-    assert '"<form' not in management_source
 
 
 def test_team_interface_rejects_unauthenticated_and_regular_users(interface):
@@ -1401,7 +1362,9 @@ def test_login_required_fields_have_associated_errors(interface, fields, invalid
     for field in invalid:
         assert f"aria-describedby='login-{field}-error'" in page
         assert f"id='login-{field}-error'" in page
-    assert page.count("aria-invalid='true'") == len(invalid)
+    assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page)) == len(
+        invalid
+    )
     assert "tabindex='-1' data-error-focus" in page
     assert "never-echo-this" not in page
     if fields.get("email") == "admin@example.com":

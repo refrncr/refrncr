@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 from sqlalchemy.pool import StaticPool
+from support import html_text
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
@@ -42,7 +43,7 @@ def csrf(response) -> str:
 
 def generic_login_failure_body(response) -> str:
     body = response.get_data(as_text=True)
-    assert body.count(GENERIC_LOGIN_FAILURE) == 1
+    assert html_text(body).count(GENERIC_LOGIN_FAILURE) == 1
     body = re.sub(r"(name='email' type='email' value=')[^']*", r"\1EMAIL", body)
     return re.sub(r"name='csrf_token' value='[^']+'", "name='csrf_token' value='TOKEN'", body)
 

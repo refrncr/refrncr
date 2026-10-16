@@ -1,7 +1,7 @@
 """Disposable REF-154 browser fixture. Never points at an application database."""
 
 from dataset_helpers import create_owned_dataset
-from test_dataset_browser import dataset_browser
+from support import dataset_browser
 
 from refrncr.web import create_flask_app
 

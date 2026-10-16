@@ -29,6 +29,10 @@ jobs:
         run: |
           python tools/compile_release_lock.py
           git diff --exit-code -- requirements/release.txt
+      - name: Verify reproducible development lock
+        run: |
+          python tools/compile_dev_lock.py --fresh
+          git diff --exit-code -- requirements/dev.txt
       - name: Prove hash-verified runtime installation
         run: python -m pip install --require-hashes -r requirements/release.txt
       - name: Validate exception register

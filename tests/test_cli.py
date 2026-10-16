@@ -561,10 +561,9 @@ def test_create_admin_reuses_explicit_database_url(tmp_path):
     assert len(_stored_users(database)) == 1
 
 
+@pytest.mark.postgres
 def test_create_admin_postgresql_compatibility():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-    if not database_url:
-        pytest.skip("REFRNCR_TEST_POSTGRES_URL is not configured")
     administration_engine = create_engine(database_url)
     schema = f"cli_bootstrap_{uuid.uuid4().hex}"
     with administration_engine.begin() as connection:

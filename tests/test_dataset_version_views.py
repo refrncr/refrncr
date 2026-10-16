@@ -1,55 +1,31 @@
 """REF-83 coherent published reads, route security and immutable exports on both engines."""
 
-import csv
-import io
-import json
 import re
 from datetime import timedelta
 from uuid import uuid4
 
 import pytest
-from openpyxl import load_workbook
-from test_audit_coverage import audit_db, audits, context, snapshot  # noqa: F401
-from test_dataset_versions import NOW, publish, setup
+from support import (
+    NOW,
+    audits,
+    configured,
+    exported_rows,
+    payload,
+    publish,
+    request,
+    snapshot,
+)
+from support import (
+    dataset_version_client as client,
+)
 
 from refrncr.services import NotFoundError
-from refrncr.web import SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
 
 
-def configured(c):
-    setup(c)
-    c.service = c.s.dataset_versions
-    c.service.clock = lambda: NOW
-
-
-def client(c, actor=None):
-    actor = actor or c.a
-    browser = create_flask_app(
-        c.s.users,
-        c.s.authentication,
-        c.s.sessions,
-        c.s.teams,
-        c.s.memberships,
-        authorization=c.s.authorization,
-        datasets=c.s.datasets,
-        dataset_fields=c.s.dataset_fields,
-        dataset_business_keys=c.s.dataset_business_keys,
-        dataset_records=c.s.dataset_records,
-        dataset_versions=c.service,
-    ).test_client()
-    token, session = c.s.sessions.create(actor)
-    browser.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
-    return browser, session.csrf_token
-
-
-def request(browser, method, path, **kwargs):
-    return getattr(browser, method)(path, base_url=HTTPS, **kwargs)
-
-
 @pytest.mark.parametrize("baseline_index", [0, 1])
-def test_history_places_concept_before_scheduled_and_current_versions(context, baseline_index):  # noqa: F811
+def test_history_places_concept_before_scheduled_and_current_versions(context, baseline_index):
     from refrncr.models import DatasetConcept
 
     c = context
@@ -78,17 +54,6 @@ def test_history_places_concept_before_scheduled_and_current_versions(context, b
     assert names == ["Draft", "Version 3", "Version 2", "Version 1"]
 
 
-def payload(c, csrf, *, day=None, note="Release"):
-    return {
-        "csrf_token": csrf,
-        "dataset_id": c.d.id,
-        "confirmed": "yes",
-        "expected_revision": str(c.s.datasets.get_dataset(c.a.id, c.d.key).revision),
-        "effective_date": (day or NOW.date()).isoformat(),
-        "release_note": note,
-    }
-
-
 def mutate_concept(c):
     c.service.create_concept(c.a.id, c.d.id)
     c.s.datasets.update_dataset(
@@ -103,7 +68,7 @@ def mutate_concept(c):
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b", "label": "Private addition"})
 
 
-def test_no_current_never_exposes_concept(context):  # noqa: F811
+def test_no_current_never_exposes_concept(context):
     c = context
     configured(c)
     browser, _csrf = client(c, c.u)
@@ -130,7 +95,7 @@ def test_no_current_never_exposes_concept(context):  # noqa: F811
     assert not c.s.datasets.list_datasets(c.u.id)
 
 
-def test_current_and_historical_pages_use_only_snapshot_content(context):  # noqa: F811
+def test_current_and_historical_pages_use_only_snapshot_content(context):
     c = context
     configured(c)
     version = publish(c)
@@ -166,25 +131,9 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):  # noq
     assert "Private" not in historical.text and "Edit" not in historical.text
 
 
-def exported_rows(artifact):
-    try:
-        if artifact.extension == "json":
-            return json.load(artifact.content)
-        if artifact.extension == "csv":
-            return list(csv.DictReader(io.StringIO(artifact.content.read().decode("utf-8-sig"))))
-        workbook = load_workbook(artifact.content, read_only=True, data_only=False)
-        try:
-            rows = list(workbook.active.values)
-            return [dict(zip(rows[0], row, strict=True)) for row in rows[1:]]
-        finally:
-            workbook.close()
-    finally:
-        artifact.content.close()
-
-
 @pytest.mark.parametrize("format_name", ["csv", "xlsx", "json"])
 @pytest.mark.parametrize("expired", [False, True])
-def test_snapshot_exports_all_formats(context, format_name, expired):  # noqa: F811
+def test_snapshot_exports_all_formats(context, format_name, expired):
     c = context
     configured(c)
     first = publish(c)
@@ -213,7 +162,7 @@ def test_snapshot_exports_all_formats(context, format_name, expired):  # noqa: F
     response.close()
 
 
-def test_scheduled_cancelled_visibility_and_export_denial(context):  # noqa: F811
+def test_scheduled_cancelled_visibility_and_export_denial(context):
     c = context
     configured(c)
     first = publish(c)
@@ -249,7 +198,7 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):  # noqa: F81
         c.s.dataset_records.export_dataset(c.u.id, c.d.key, "json", version_id=first.id)
 
 
-def test_publish_form_csrf_confirmation_stale_revision_and_escaping(context):  # noqa: F811
+def test_publish_form_csrf_confirmation_stale_revision_and_escaping(context):
     c = context
     configured(c)
     browser, csrf = client(c)
@@ -281,7 +230,7 @@ def test_publish_form_csrf_confirmation_stale_revision_and_escaping(context):  #
     assert all("secret release" not in str(event.details) for event in audits(c))
 
 
-def test_cancel_form_rechecks_activation_and_csrf(context):  # noqa: F811
+def test_cancel_form_rechecks_activation_and_csrf(context):
     c = context
     configured(c)
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
@@ -300,7 +249,7 @@ def test_cancel_form_rechecks_activation_and_csrf(context):  # noqa: F811
 
 
 @pytest.mark.parametrize("role", ["owner", "admin", "viewer", "editor", "export", "outsider"])
-def test_version_routes_retain_ref73_authority(context, role):  # noqa: F811
+def test_version_routes_retain_ref73_authority(context, role):
     c = context
     configured(c)
     actor = c.a if role == "admin" else c.u
@@ -345,7 +294,8 @@ def test_version_routes_retain_ref73_authority(context, role):  # noqa: F811
         assert snapshot(c) == before
 
 
-def test_snapshot_pagination_and_deleted_source_objects(context):  # noqa: F811
+@pytest.mark.slow
+def test_snapshot_pagination_and_deleted_source_objects(context):
     c = context
     configured(c)
     concept_records = [c.record]
@@ -386,10 +336,10 @@ def test_snapshot_pagination_and_deleted_source_objects(context):  # noqa: F811
     assert len(rows) == 52 and rows[0] == {"code": "a", "label": "Café"}
 
 
-def test_history_and_record_reads_have_constant_query_count(context):  # noqa: F811
+def test_history_and_record_reads_have_constant_query_count(database_context):
     from sqlalchemy import event
 
-    c = context
+    c = database_context
     configured(c)
     publish(c)
 
@@ -423,7 +373,7 @@ def test_history_and_record_reads_have_constant_query_count(context):  # noqa: F
 
 
 @pytest.mark.parametrize("state", ["inactive", "deleted"])
-def test_current_permissions_revoke_historical_reads_and_exports(context, state):  # noqa: F811
+def test_current_permissions_revoke_historical_reads_and_exports(context, state):
     c = context
     configured(c)
     version = publish(c)
@@ -450,7 +400,7 @@ def test_current_permissions_revoke_historical_reads_and_exports(context, state)
     assert snapshot(c) == before
 
 
-def test_cross_dataset_and_unknown_version_are_non_disclosing(context):  # noqa: F811
+def test_cross_dataset_and_unknown_version_are_non_disclosing(context):
     c = context
     configured(c)
     version = publish(c)
@@ -474,7 +424,7 @@ def test_cross_dataset_and_unknown_version_are_non_disclosing(context):  # noqa:
 
 
 @pytest.mark.parametrize("operation", ["read", "export"])
-def test_database_read_failure_is_bounded_and_has_no_success_event(context, monkeypatch, operation):  # noqa: F811
+def test_database_read_failure_is_bounded_and_has_no_success_event(context, monkeypatch, operation):
     from sqlalchemy.exc import OperationalError
 
     from refrncr.ports import PersistenceConflictError

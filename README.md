@@ -93,11 +93,35 @@ python -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 ```
 
-The fast local test run uses SQLite:
+For the exact CI-matching tool versions, install the editable project and the hash-pinned
+development lock instead:
+
+```shell
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m pip install --require-hashes -r requirements/dev.txt
+```
+
+The default local test run uses SQLite and excludes tests marked `slow`:
 
 ```shell
 .venv/bin/python -m pytest -m "not postgres"
 ```
+
+Run the complete SQLite suite, including slow tests, with:
+
+```shell
+.venv/bin/python -m pytest --run-slow -m "not postgres"
+```
+
+The CI-equivalent parallel run uses all available workers:
+
+```shell
+.venv/bin/python -m pytest --run-slow -n auto --durations=50 -m "not postgres"
+```
+
+CI prints collection counts for each database and reports the slowest 50 cases. A call that
+takes more than two seconds should be marked `slow`; CI reports unmarked cases above that
+threshold as warnings without making timing alone fail the build.
 
 The full database matrix also runs the tests marked `postgres`. PostgreSQL 16 is the supported
 CI version. Start a local PostgreSQL 16 container, set `REFRNCR_TEST_POSTGRES_URL`, and run:
@@ -108,6 +132,23 @@ export REFRNCR_TEST_POSTGRES_URL='postgresql+psycopg://refrncr:refrncr@127.0.0.1
 .venv/bin/python -m pytest
 ```
 
+To run the suite with branch coverage locally, use the installed development extra:
+
+```shell
+.venv/bin/python -m pytest --cov
+```
+
+The configured coverage floor is 90%; migration files are excluded because Alembic owns their
+execution. The optional quality tools can be installed and run with:
+
+```shell
+.venv/bin/python -m pip install -e ".[quality]"
+.venv/bin/python -m radon cc src/refrncr -s -a
+.venv/bin/python -m bandit -r src/refrncr
+.venv/bin/python -m vulture src/refrncr
+.venv/bin/python -m pip_audit
+```
+
 The repository checks are:
 
 | Check | Command | Local use |
@@ -116,6 +157,8 @@ The repository checks are:
 | Ruff lint | `.venv/bin/python -m ruff check .` | Required |
 | Ruff format | `.venv/bin/python -m ruff format --check .` | Required |
 | Pre-commit | `.venv/bin/python -m pre_commit run --all-files` | Required before review |
+| Coverage | `.venv/bin/python -m pytest --cov` | Branch coverage; fails below 90% |
+| Optional quality tools | `.venv/bin/python -m pip install -e ".[quality]"` | Radon, Bandit, Vulture and pip-audit; not a CI gate |
 | CI-only security/release jobs | GitHub Actions | Run by CI |
 
 Without `REFRNCR_TEST_POSTGRES_URL`, PostgreSQL-marked tests are skipped with an explicit reason;
