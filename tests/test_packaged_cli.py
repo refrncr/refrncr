@@ -124,6 +124,7 @@ def free_loopback_port():
         return listener.getsockname()[1]
 
 
+@pytest.mark.slow
 def test_wheel_contains_migration_runtime(installed_artifact):
     with zipfile.ZipFile(installed_artifact.wheel) as archive:
         files = set(archive.namelist())
@@ -221,6 +222,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
     assert not any(name.endswith((".db", ".pyc")) or "__pycache__" in name for name in files)
 
 
+@pytest.mark.slow
 def test_sdist_contains_ui_runtime_and_licenses(installed_artifact):
     with tarfile.open(installed_artifact.sdist) as archive:
         files = {name.split("/", 1)[-1] for name in archive.getnames()}
@@ -237,6 +239,7 @@ def test_sdist_contains_ui_runtime_and_licenses(installed_artifact):
     } <= files
 
 
+@pytest.mark.slow
 def test_installed_console_help_and_http_startup(installed_artifact):
     for arguments in (
         ["--help"],

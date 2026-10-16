@@ -352,6 +352,7 @@ def test_ref154_catalogue_is_preserved_exactly():
 
 
 @pytest.mark.parametrize("ambiguous", [False, True])
+@pytest.mark.slow
 def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambiguous):
     from refrncr.record_import import MAX_COLUMNS
 

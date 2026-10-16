@@ -139,6 +139,7 @@ def test_import_choice_grants_no_additional_authority(audit_db):
         s.datasets.grant_export_access(member.id, d.key, "user", denied.id)
 
 
+@pytest.mark.slow
 def test_additive_migration_preserves_business_rows_and_downgrade(audit_db):
     engine, _, _ = audit_db
     Base.metadata.drop_all(engine)

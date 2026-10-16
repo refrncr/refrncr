@@ -465,6 +465,7 @@ def test_invalid_hierarchy_view_is_rejected(dataset_browser, view):
     )
 
 
+@pytest.mark.slow
 def test_deep_hierarchy_renders_without_recursive_templates(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_owned_dataset(

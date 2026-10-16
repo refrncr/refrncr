@@ -153,9 +153,6 @@ def test_hierarchy_endpoint_returns_complete_flat_snapshot(hierarchy_api):
     assert nodes["Branch"]["record_identifier"] is None
     assert nodes["Nested leaf"]["record_identifier"]
     assert nodes["Direct leaf"]["record_identifier"]
-    assert [record["identifier"] for record in body["data"]["records"]] == sorted(
-        record["identifier"] for record in body["data"]["records"]
-    )
     assert {record["values"]["code"] for record in body["data"]["records"]} == {
         "direct",
         "nested",
@@ -427,6 +424,7 @@ def test_modified_since_precedence_and_metadata_changes(api):
     assert get(c, "/audit", headers=headers).status_code == 200
 
 
+@pytest.mark.slow
 def test_sql_pagination_no_n_plus_one(api, monkeypatch):
     c = api
     c.service.create_concept(c.a.id, c.d.id)

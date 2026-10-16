@@ -145,6 +145,8 @@ Do not claim that a quality control has passed if the corresponding tooling is n
 - PostgreSQL integration tests are required for PostgreSQL-specific or persistence-critical behaviour.
 - GitHub Actions provides PostgreSQL 16 as a service for the test job.
 - Do not make CI tests depend on a developer's local Docker environment.
+- Tests that inspect source files to verify guard behaviour, architecture boundaries, or
+  supply-chain/licensing requirements are intentional exceptions to the public-interface rule.
 
 ## Security
 

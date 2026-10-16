@@ -33,6 +33,7 @@ dev = [
     "cyclonedx-bom==7.4.0",
     "httpx==0.28.1",
     "pytest-cov==6.2.1",
+    "pytest-xdist==3.8.0",
     "pip-tools==7.6.1",
     "pre-commit==4.6.2",
     "pytest==8.4.2",
@@ -82,6 +83,7 @@ filterwarnings = [
 ]
 markers = [
     "postgres: tests that require the configured PostgreSQL test database",
+    "slow: tests that are intentionally excluded from the default local run",
 ]
 
 [tool.coverage.run]

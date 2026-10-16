@@ -498,6 +498,7 @@ def test_http_status_checkboxes_and_all_records(context):
     assert b"Clear import-results filter" not in unfiltered.data
 
 
+@pytest.mark.slow
 def test_http_security_confirmation_binding_and_undo(context):
     import io
     import re

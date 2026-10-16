@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from argon2 import PasswordHasher
+from argon2.low_level import Type
 from dataset_helpers import create_owned_dataset
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, text
@@ -25,6 +27,61 @@ from refrncr.services import ResourceTypeRegistry
 from refrncr.web import create_flask_app
 
 POSTGRES_SKIP_REASON = "PostgreSQL tests require REFRNCR_TEST_POSTGRES_URL"
+SLOW_NODEIDS = set()
+UNMARKED_SLOW_TESTS = []
+TEST_PASSWORD_HASHER = PasswordHasher(
+    time_cost=1,
+    memory_cost=8 * 1024,
+    parallelism=1,
+    hash_len=32,
+    salt_len=16,
+    type=Type.ID,
+)
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        help="include tests marked slow (CI includes them automatically)",
+    )
+
+
+@pytest.fixture(autouse=True)
+def fast_password_hasher(monkeypatch):
+    """Keep ordinary tests cheap while production parameters remain tested explicitly."""
+    monkeypatch.setattr("refrncr.services.PASSWORD_HASHER", TEST_PASSWORD_HASHER)
+
+
+def pytest_runtest_makereport(item, call):
+    if call.when != "call" or call.duration <= 2 or item.get_closest_marker("slow"):
+        return
+    _record_unmarked_slow_test(item.nodeid, call.duration)
+
+
+def pytest_runtest_logreport(report):
+    """Collect call durations forwarded from xdist workers in the controller process."""
+    if report.when == "call" and report.duration > 2 and "slow" not in report.keywords:
+        _record_unmarked_slow_test(report.nodeid, report.duration)
+
+
+def _record_unmarked_slow_test(nodeid, duration):
+    if not any(existing_nodeid == nodeid for existing_nodeid, _ in UNMARKED_SLOW_TESTS):
+        UNMARKED_SLOW_TESTS.append((nodeid, duration))
+
+
+def pytest_sessionfinish(session, exitstatus):
+    del exitstatus
+    offenders = UNMARKED_SLOW_TESTS
+    if not offenders:
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.write_sep("!", "unmarked tests exceeding 2 seconds")
+        for nodeid, duration in sorted(offenders, key=lambda entry: entry[1], reverse=True):
+            reporter.write_line(f"{duration:.2f}s {nodeid}")
+    if os.environ.get("CI", "").lower() == "true":
+        session.exitstatus = 1
 
 
 @pytest.fixture
@@ -341,10 +398,15 @@ def governance(request, tmp_path):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip explicitly marked PostgreSQL cases when no database is configured."""
-    del config
+    """Apply local slow-test policy and skip PostgreSQL without a configured database."""
+    run_slow = config.getoption("--run-slow") or os.environ.get("CI", "").lower() == "true"
+    SLOW_NODEIDS.update(
+        item.nodeid for item in items if item.get_closest_marker("slow") is not None
+    )
     postgres_configured = bool(os.environ.get("REFRNCR_TEST_POSTGRES_URL"))
     for item in items:
+        if item.get_closest_marker("slow") and not run_slow:
+            item.add_marker(pytest.mark.skip(reason="slow tests require --run-slow or CI"))
         if item.get_closest_marker("postgres") is None:
             continue
         if not postgres_configured:

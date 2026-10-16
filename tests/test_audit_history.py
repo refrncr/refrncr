@@ -39,6 +39,7 @@ from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 
 
 @pytest.mark.parametrize("count", [0, 1, 49, 50, 51, 100, 101, 127, 10000])
+@pytest.mark.slow
 def test_complete_history_and_cursor_round_trip(history, count):
     h = history
     expected = seed(h, count)

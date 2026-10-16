@@ -60,6 +60,7 @@ def test_non_string_identifier_is_not_general_search_text(context, datatype):
     assert read(c, search=value[:200]).total == 0
 
 
+@pytest.mark.slow
 def test_and_status_pagination_counts_and_url_roundtrip(context):
     c = context
     setup(c, populated=False)
@@ -280,6 +281,7 @@ def test_record_query_values_never_enter_default_access_logs(path):
     assert not RecordQueryLogFilter().filter(malformed)
 
 
+@pytest.mark.slow
 def test_thousand_record_search_query_plan(context, record_property):
     c = context
     setup(c, populated=False)

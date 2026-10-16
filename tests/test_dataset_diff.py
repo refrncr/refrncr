@@ -518,6 +518,7 @@ def test_corrupt_snapshot_fails_closed(context, corruption):
     assert snapshot(c) == before
 
 
+@pytest.mark.slow
 def test_wide_record_and_field_pagination(context):
     c = context
     prepared(c)
@@ -540,6 +541,7 @@ def test_wide_record_and_field_pagination(context):
     assert not third.next
 
 
+@pytest.mark.slow
 def test_large_projection_has_constant_queries_and_bounded_memory(context):
     import tracemalloc
 

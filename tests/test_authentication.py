@@ -150,7 +150,7 @@ def test_success_rehashes_and_atomically_persists(authentication_services):
     with sessions() as session:
         replacement = session.get(User, admin.id).password_hash
     assert replacement != old_hash
-    assert not PASSWORD_HASHER.check_needs_rehash(replacement)
+    assert not AuthenticationService(uow).hasher.check_needs_rehash(replacement)
     assert PASSWORD_HASHER.verify(replacement, VALID_PASSWORD)
 
 
@@ -313,7 +313,7 @@ def test_postgresql_authentication_rehash_and_compare_and_set(
     with sessions() as session:
         rehashed = session.get(User, admin.id).password_hash
     assert rehashed != old_hash
-    assert not PASSWORD_HASHER.check_needs_rehash(rehashed)
+    assert not AuthenticationService(uow).hasher.check_needs_rehash(rehashed)
 
     _prepare_old_hash(sessions, admin)
     concurrent_hash = PASSWORD_HASHER.hash(VALID_PASSWORD)

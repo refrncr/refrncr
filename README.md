@@ -101,11 +101,27 @@ development lock instead:
 .venv/bin/python -m pip install --require-hashes -r requirements/dev.txt
 ```
 
-The fast local test run uses SQLite:
+The default local test run uses SQLite and excludes tests marked `slow`:
 
 ```shell
 .venv/bin/python -m pytest -m "not postgres"
 ```
+
+Run the complete SQLite suite, including slow tests, with:
+
+```shell
+.venv/bin/python -m pytest --run-slow -m "not postgres"
+```
+
+The CI-equivalent parallel run uses all available workers:
+
+```shell
+.venv/bin/python -m pytest --run-slow -n auto --durations=50 -m "not postgres"
+```
+
+CI prints collection counts for each database and reports the slowest 50 cases. A call that
+takes more than two seconds must be marked `slow`; CI fails when an unmarked case exceeds that
+threshold.
 
 The full database matrix also runs the tests marked `postgres`. PostgreSQL 16 is the supported
 CI version. Start a local PostgreSQL 16 container, set `REFRNCR_TEST_POSTGRES_URL`, and run:

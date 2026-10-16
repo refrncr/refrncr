@@ -548,6 +548,7 @@ def test_confirmed_import_proposals_removed_and_old_receipt_rejected(context):
 
 
 @pytest.mark.parametrize("size", [0, 1000])
+@pytest.mark.slow
 def test_empty_and_large_mixed_discard_is_set_based(context, size, record_property):
     from time import perf_counter
 

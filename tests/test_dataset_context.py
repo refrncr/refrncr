@@ -310,6 +310,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):
     assert formatter(BASE.astimezone(timezone(timedelta(hours=3)))) == "7 Sep 2026, 12:58 UTC"
 
 
+@pytest.mark.slow
 def test_ref_130_migration_backfill_and_downgrade_preserve_data(context_services):
     from alembic import command
     from alembic.config import Config

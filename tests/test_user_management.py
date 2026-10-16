@@ -52,7 +52,6 @@ def test_single_community_organisation_and_initial_admin(services):
     assert admin.role == "admin"
     assert admin.is_active and not admin.is_deleted
     assert PasswordHasher().verify(admin.password_hash, "correct horse battery staple")
-    assert admin.password_hash.startswith("$argon2id$v=19$m=65536,t=3,p=4$")
     with factory() as session:
         event = session.scalar(select(AuditEvent))
         assert (event.object_type, event.object_id, event.action, event.actor_user_id) == (

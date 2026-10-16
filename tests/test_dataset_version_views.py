@@ -294,6 +294,7 @@ def test_version_routes_retain_ref73_authority(context, role):
         assert snapshot(c) == before
 
 
+@pytest.mark.slow
 def test_snapshot_pagination_and_deleted_source_objects(context):
     c = context
     configured(c)

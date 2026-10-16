@@ -1009,6 +1009,7 @@ def test_ref_72_sqlite_downgrade_fails_closed_for_dataset_state(tmp_path):
 
 
 @pytest.mark.postgres
+@pytest.mark.slow
 def test_empty_postgresql_database_upgrades():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
     administration_engine = create_engine(database_url)

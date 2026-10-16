@@ -23,6 +23,7 @@ from refrncr.audit_guard import discover_service_operations, verify_inventory
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.slow
 def test_inventory_and_coverage_match_current_code():
     operations, routes = verify_inventory(ROOT)
     assert operations == len(OPERATIONS) and routes > 0
@@ -318,6 +319,7 @@ def test_ci_guard_fails_on_new_service_in_real_repository(monkeypatch):
         ("interface_entrypoints", ["Programmatic caller"]),
     ],
 )
+@pytest.mark.slow
 def test_guard_rejects_inconsistent_or_missing_matrix_decisions(monkeypatch, field, value):
     original = Path.read_text
 

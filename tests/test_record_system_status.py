@@ -164,6 +164,7 @@ def test_tombstone_old_fields_and_identifier_survive_schema_changes(context):
     assert "OLD" in panel
 
 
+@pytest.mark.slow
 def test_tombstone_query_count_is_constant_and_search_paginates_combined_rows(context):
     c = context
     setup(c, populated=False)
