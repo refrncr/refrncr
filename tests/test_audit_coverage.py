@@ -222,8 +222,8 @@ def prepare(c, operation):
 
 
 @pytest.mark.parametrize("operation", MUTATIONS)
-def test_declared_event_actor_target_and_safe_context(context, operation):
-    c = context
+def test_declared_event_actor_target_and_safe_context(database_context, operation):
+    c = database_context
     call, expected = prepare(c, operation)
     before = {event.id for event in audits(c)}
     result = call(c.a.id)
@@ -261,8 +261,10 @@ def test_declared_event_actor_target_and_safe_context(context, operation):
 @pytest.mark.parametrize(
     "failure", ["after_business_flush", "after_audit_flush", "before_commit", "database_constraint"]
 )
-def test_every_mutation_rolls_back_business_and_audit(context, monkeypatch, operation, failure):
-    c = context
+def test_every_mutation_rolls_back_business_and_audit(
+    database_context, monkeypatch, operation, failure
+):
+    c = database_context
     call, _ = prepare(c, operation)
     before = snapshot(c)
     original = SqlAlchemyUnitOfWork.add_audit
@@ -302,8 +304,8 @@ def test_every_mutation_rolls_back_business_and_audit(context, monkeypatch, oper
 
 
 @pytest.mark.parametrize("operation", MUTATIONS)
-def test_every_mutation_denies_untrusted_or_missing_actor(context, operation):
-    c = context
+def test_every_mutation_denies_untrusted_or_missing_actor(database_context, operation):
+    c = database_context
     call, _ = prepare(c, operation)
     before = snapshot(c)
     for actor in (str(uuid.uuid4()), c.u.id):
@@ -313,8 +315,8 @@ def test_every_mutation_denies_untrusted_or_missing_actor(context, operation):
 
 
 @pytest.mark.parametrize("operation", MUTATIONS)
-def test_repeated_submission_cannot_add_event_without_change(context, operation):
-    c = context
+def test_repeated_submission_cannot_add_event_without_change(database_context, operation):
+    c = database_context
     call, _ = prepare(c, operation)
     call(c.a.id)
     before = snapshot(c)
@@ -355,8 +357,8 @@ def test_initial_admin_success_failure_and_duplicate(audit_db, monkeypatch):
         )
 
 
-def test_all_normalized_noops_preserve_timestamps_revisions_and_events(context):
-    c = context
+def test_all_normalized_noops_preserve_timestamps_revisions_and_events(database_context):
+    c = database_context
     s, a, u, d = c.s, c.a, c.u, c.d
     s.teams.rename_team(a.id, c.other.id, "Café")
     grant = s.grants.create_grant(a.id, "user", u.id, "document", "one", "viewer")
@@ -389,8 +391,8 @@ def test_all_normalized_noops_preserve_timestamps_revisions_and_events(context):
     assert snapshot(c) == before
 
 
-def test_stale_same_value_is_rejected_before_noop(context):
-    c = context
+def test_stale_same_value_is_rejected_before_noop(database_context):
+    c = database_context
     s, a, d = c.s, c.a, c.d
     f = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
     s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
@@ -408,8 +410,10 @@ def test_stale_same_value_is_rejected_before_noop(context):
 
 
 @pytest.mark.parametrize("format_name", ["csv", "xlsx", "json"])
-def test_export_prepared_then_audit_committed_before_return(context, monkeypatch, format_name):
-    c = context
+def test_export_prepared_then_audit_committed_before_return(
+    database_context, monkeypatch, format_name
+):
+    c = database_context
     original = SqlAlchemyUnitOfWork.__exit__
     stages = []
 
@@ -442,9 +446,9 @@ def test_export_prepared_then_audit_committed_before_return(context, monkeypatch
     "failure", ["generation", "readability", "snapshot_close", "audit_insert", "audit_commit"]
 )
 def test_export_preparation_or_audit_failure_closes_artifact_without_event(
-    context, monkeypatch, failure
+    database_context, monkeypatch, failure
 ):
-    c = context
+    c = database_context
     from refrncr import dataset_export
 
     before = snapshot(c)
@@ -502,8 +506,8 @@ def browser(c):
     return app.test_client()
 
 
-def test_export_authentication_authorization_format_and_trusted_browser_actor(context):
-    c = context
+def test_export_authentication_authorization_format_and_trusted_browser_actor(database_context):
+    c = database_context
     client = browser(c)
     url = f"/datasets/{c.d.key}/concept/records/export"
     before = {e.id for e in audits(c)}
@@ -526,9 +530,9 @@ def test_export_authentication_authorization_format_and_trusted_browser_actor(co
 
 
 def test_post_stream_failure_retains_one_request_event_and_logs_safely(
-    context, monkeypatch, caplog
+    database_context, monkeypatch, caplog
 ):
-    c = context
+    c = database_context
     client = browser(c)
     token, _ = c.s.sessions.create(c.a)
     client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
@@ -569,8 +573,8 @@ def test_post_stream_failure_retains_one_request_event_and_logs_safely(
 
 
 @pytest.mark.parametrize("format_name", ["csv", "xlsx"])
-def test_bulk_import_exactly_one_summary_and_cancel_or_failure_none(context, format_name):
-    c = context
+def test_bulk_import_exactly_one_summary_and_cancel_or_failure_none(database_context, format_name):
+    c = database_context
     s, a, d = c.s, c.a, c.d
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
     s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
@@ -614,8 +618,8 @@ def test_bulk_import_exactly_one_summary_and_cancel_or_failure_none(context, for
     assert snapshot(c) == before
 
 
-def test_concurrent_same_email_has_one_committed_change(context):
-    c = context
+def test_concurrent_same_email_has_one_committed_change(database_context):
+    c = database_context
     barrier = Barrier(2)
     before = {e.id for e in audits(c)}
 
@@ -631,8 +635,8 @@ def test_concurrent_same_email_has_one_committed_change(context):
     assert len(events) == 1 and events[0].action == "email_changed"
 
 
-def test_export_snapshot_remains_coherent_during_writes(context, monkeypatch):
-    c = context
+def test_export_snapshot_remains_coherent_during_writes(database_context, monkeypatch):
+    c = database_context
     if c.engine.dialect.name == "sqlite":
         with c.engine.connect() as connection:
             connection.exec_driver_sql("PRAGMA journal_mode=WAL")
@@ -670,8 +674,8 @@ def test_export_snapshot_remains_coherent_during_writes(context, monkeypatch):
 
 
 @pytest.mark.parametrize("operation", MUTATIONS)
-def test_invalid_input_or_lifecycle_never_creates_success_event(context, operation):
-    c = context
+def test_invalid_input_or_lifecycle_never_creates_success_event(database_context, operation):
+    c = database_context
     s, a, u, d = c.s, c.a, c.u, c.d
     _call, expected = prepare(c, operation)
     target = expected[-1][2]
@@ -772,8 +776,8 @@ def test_invalid_input_or_lifecycle_never_creates_success_event(context, operati
     assert snapshot(c) == before
 
 
-def test_composite_events_and_team_cascade_contract(context):
-    c = context
+def test_composite_events_and_team_cascade_contract(database_context):
+    c = database_context
     s, a, d = c.s, c.a, c.d
     before = {e.id for e in audits(c)}
     f = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, False, True)
@@ -813,8 +817,8 @@ def test_composite_events_and_team_cascade_contract(context):
         assert session.get(DatasetExportAccess, access.id) is None
 
 
-def test_ordinary_service_reads_and_preview_do_not_write_domain_history(context):
-    c = context
+def test_ordinary_service_reads_and_preview_do_not_write_domain_history(database_context):
+    c = database_context
     s, a, d = c.s, c.a, c.d
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
     s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
@@ -853,7 +857,7 @@ def test_ordinary_service_reads_and_preview_do_not_write_domain_history(context)
     assert {e.id for e in audits(c)} == before
 
 
-def test_browser_route_inventory_matches_real_registration(context):
+def test_browser_route_inventory_matches_real_registration(database_context):
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
@@ -868,16 +872,18 @@ def test_browser_route_inventory_matches_real_registration(context):
         expected[(row["symbol"].split(".")[-1], row["path"])] = methods
     actual = {
         (rule.endpoint, rule.rule): rule.methods
-        for rule in browser(context).application.url_map.iter_rules()
+        for rule in browser(database_context).application.url_map.iter_rules()
         if rule.endpoint != "static"
     }
     assert actual == expected
 
 
-def test_response_construction_failure_keeps_request_and_closes_artifact(context, monkeypatch):
+def test_response_construction_failure_keeps_request_and_closes_artifact(
+    database_context, monkeypatch
+):
     from refrncr import dataset_export, web
 
-    c = context
+    c = database_context
     client = browser(c)
     client.application.testing = True
     token, _ = c.s.sessions.create(c.a)
@@ -907,8 +913,8 @@ def test_response_construction_failure_keeps_request_and_closes_artifact(context
 
 
 @pytest.mark.parametrize("method", ["HEAD", "OPTIONS"])
-def test_export_head_and_options_have_explicit_audit_semantics(context, method):
-    c = context
+def test_export_head_and_options_have_explicit_audit_semantics(database_context, method):
+    c = database_context
     client = browser(c)
     token, _ = c.s.sessions.create(c.a)
     client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)

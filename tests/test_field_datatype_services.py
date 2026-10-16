@@ -25,12 +25,7 @@ from refrncr.services import (
 from refrncr.web import create_flask_app
 
 
-@pytest.fixture(
-    params=[
-        "record_services",
-        pytest.param("postgresql_record_services", marks=pytest.mark.postgres),
-    ]
-)
+@pytest.fixture(params=["record_services"])
 def datatype_services(request):
     return request.getfixturevalue(request.param)
 

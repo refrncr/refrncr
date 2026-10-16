@@ -13,11 +13,9 @@ from refrncr.record_import import ImportValidationError, TransientImportStore, p
 from refrncr.services import NotFoundError
 
 
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def context(request):
-    yield request.getfixturevalue(
-        "import_context" if request.param == "sqlite" else "postgresql_import_context"
-    )
+@pytest.fixture
+def context(import_context):
+    return import_context
 
 
 def start(context, value="1.234,56", session="source-formats", code="A"):

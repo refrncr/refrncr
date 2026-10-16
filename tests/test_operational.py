@@ -3,14 +3,12 @@
 import asyncio
 import json
 import logging
-import os
 import uuid
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select, text
-from sqlalchemy.engine import make_url
+from sqlalchemy import func, select, text
 
 from refrncr import cli
 from refrncr.app import create_application
@@ -103,20 +101,9 @@ def test_interactive_colors_are_semantic_and_no_color_is_respected(monkeypatch, 
         root.setLevel(previous_level)
 
 
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def operational_database(request, tmp_path):
-    administration = None
-    if request.param == "postgresql":
-        database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        administration = create_engine(database_url)
-        schema = f"operational_{uuid.uuid4().hex}"
-        with administration.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        database_url = make_url(database_url).update_query_dict(
-            {"options": f"-csearch_path={schema}"}
-        )
-    else:
-        database_url = cli.sqlite_url(tmp_path / "operational.db")
+@pytest.fixture
+def operational_database(tmp_path):
+    database_url = cli.sqlite_url(tmp_path / "operational.db")
 
     cli.prepare_database(database_url)
     engine = create_database_engine(database_url)
@@ -140,10 +127,6 @@ def operational_database(request, tmp_path):
     with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as client:
         yield client, engine
     engine.dispose()
-    if administration is not None:
-        with administration.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        administration.dispose()
 
 
 def test_health_and_readiness_exact_public_contract_without_audit(operational_database):

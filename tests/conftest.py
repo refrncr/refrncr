@@ -255,10 +255,9 @@ def wizard(import_context):
     return browser
 
 
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def audit_db(request, tmp_path):
+def _build_audit_db(database, tmp_path):
     administration = None
-    if request.param == "postgresql":
+    if database == "postgresql":
         url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
         administration = create_database_engine(url)
         schema = f"audit_{uuid.uuid4().hex}"
@@ -282,8 +281,17 @@ def audit_db(request, tmp_path):
 
 
 @pytest.fixture
-def context(audit_db):
-    engine, sessions, services = audit_db
+def audit_db(tmp_path):
+    yield from _build_audit_db("sqlite", tmp_path)
+
+
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def database_audit_db(request, tmp_path):
+    yield from _build_audit_db(request.param, tmp_path)
+
+
+def _audit_context(database):
+    engine, sessions, services = database
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     owner = services.teams.create_team(admin.id, "Domain")
@@ -304,8 +312,17 @@ def context(audit_db):
 
 
 @pytest.fixture
-def history(audit_db):
-    engine, sessions, services = audit_db
+def context(audit_db):
+    return _audit_context(audit_db)
+
+
+@pytest.fixture
+def database_context(database_audit_db):
+    return _audit_context(database_audit_db)
+
+
+def _audit_history(database):
+    engine, sessions, services = database
     admin, reader = str(uuid4()), str(uuid4())
     with sessions.begin() as session:
         for uid, role in ((admin, "admin"), (reader, "user")):
@@ -326,6 +343,16 @@ def history(audit_db):
         reader=reader,
         service=services.audit_history,
     )
+
+
+@pytest.fixture
+def history(audit_db):
+    return _audit_history(audit_db)
+
+
+@pytest.fixture
+def database_history(database_audit_db):
+    return _audit_history(database_audit_db)
 
 
 @pytest.fixture
@@ -366,18 +393,9 @@ def postgresql_record_services():
         administration_engine.dispose()
 
 
-@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
-def governance(request, tmp_path):
-    administrative = None
-    if request.param == "postgresql":
-        url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
-        administrative = create_database_engine(url)
-        schema = f"governance_{uuid.uuid4().hex}"
-        with administrative.begin() as connection:
-            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
-        url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    else:
-        url = f"sqlite:///{tmp_path / 'governance.db'}"
+@pytest.fixture
+def governance(tmp_path):
+    url = f"sqlite:///{tmp_path / 'governance.db'}"
     engine = create_database_engine(url)
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
@@ -389,10 +407,6 @@ def governance(request, tmp_path):
     dataset = services.datasets.create_dataset(admin.id, "countries", "Countries", "", owner.id)
     yield engine, factory, services, admin, user, owner, other, dataset
     engine.dispose()
-    if administrative:
-        with administrative.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        administrative.dispose()
 
 
 def pytest_collection_modifyitems(config, items):

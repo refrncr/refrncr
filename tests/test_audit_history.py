@@ -40,8 +40,8 @@ from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 
 @pytest.mark.parametrize("count", [0, 1, 49, 50, 51, 100, 101, 127, 10000])
 @pytest.mark.slow
-def test_complete_history_and_cursor_round_trip(history, count):
-    h = history
+def test_complete_history_and_cursor_round_trip(database_history, count):
+    h = database_history
     expected = seed(h, count)
     before = state(h)
     page = h.service.list_history(h.admin)
@@ -61,8 +61,8 @@ def test_complete_history_and_cursor_round_trip(history, count):
     assert state(h) == before
 
 
-def test_insert_during_pagination_does_not_skip_or_duplicate(history):
-    h = history
+def test_insert_during_pagination_does_not_skip_or_duplicate(database_history):
+    h = database_history
     expected = seed(h, 125)
     first = h.service.list_history(h.admin)
     seed(h, 10, first=1000, timestamp=INSTANT + timedelta(seconds=1))
@@ -74,8 +74,8 @@ def test_insert_during_pagination_does_not_skip_or_duplicate(history):
     assert h.service.list_history(h.admin).items[0].id == str(UUID(int=1009))
 
 
-def test_filters_and_inclusive_exclusive_boundaries(history):
-    h = history
+def test_filters_and_inclusive_exclusive_boundaries(database_history):
+    h = database_history
     seed(h, 1, timestamp=INSTANT - timedelta(microseconds=1))
     wanted = seed(h, 1, first=2, actor=h.reader, kind="team", action="renamed")
     seed(h, 1, first=3, timestamp=INSTANT + timedelta(microseconds=1))
@@ -119,8 +119,8 @@ def test_invalid_filters_are_never_broadened(pairs):
         parse_audit_filters(pairs)
 
 
-def test_cursor_integrity_expiry_and_filter_binding(history):
-    h = history
+def test_cursor_integrity_expiry_and_filter_binding(database_history):
+    h = database_history
     seed(h, 51)
     now = INSTANT
     service = AuditHistoryService(h.s.users.uow, cursor_key=b"test-key" * 4, clock=lambda: now)
@@ -139,8 +139,8 @@ def test_cursor_integrity_expiry_and_filter_binding(history):
         service.list_history(h.admin, cursor=cursor)
 
 
-def test_service_authorization_and_read_only(history):
-    h = history
+def test_service_authorization_and_read_only(database_history):
+    h = database_history
     event_id = seed(h, 1)[0]
     before = state(h)
     for actor in (None, "", "invalid", str(uuid4()), h.reader):
@@ -165,8 +165,8 @@ def test_service_authorization_and_read_only(history):
 
 
 @pytest.mark.parametrize("permission", ["viewer", "editor", "admin"])
-def test_dataset_and_team_grants_do_not_authorize(history, permission):
-    h = history
+def test_dataset_and_team_grants_do_not_authorize(database_history, permission):
+    h = database_history
     team = h.s.teams.create_team(h.admin, "Owners")
     dataset = h.s.datasets.create_dataset(h.admin, "sample", "Sample", "Secret", team.id)
     h.s.memberships.create_membership(h.admin, h.reader, team.id)
@@ -186,8 +186,8 @@ def test_dataset_and_team_grants_do_not_authorize(history, permission):
         assert browser.get(path, base_url="https://localhost").status_code == 403
 
 
-def test_all_contracts_have_safe_presentations(history):
-    h = history
+def test_all_contracts_have_safe_presentations(database_history):
+    h = database_history
     require_complete_presentation()
     assert len(EVENTS) == len(ACTION_LABELS) == 51
     assert ACTION_LABELS[("dataset", "dataset.version_diff_viewed")] == "Dataset changes reviewed"
@@ -234,8 +234,8 @@ def test_all_contracts_have_safe_presentations(history):
         assert len(view.context) == len(contract.context)
 
 
-def test_historical_api_key_success_keeps_owner_presentation(history):
-    h = history
+def test_historical_api_key_success_keeps_owner_presentation(database_history):
+    h = database_history
     event_id = seed(
         h,
         1,
@@ -265,8 +265,8 @@ def test_unsafe_context_fails_closed(value):
     assert safe_context(row) == ()
 
 
-def test_privacy_current_names_and_html_escaping(history):
-    h = history
+def test_privacy_current_names_and_html_escaping(database_history):
+    h = database_history
     payload = '<img src=x onerror="alert(1)"> Café\u202e\x01'
     with h.sessions.begin() as session:
         session.get(User, h.reader).display_name = payload
@@ -312,8 +312,8 @@ def test_privacy_current_names_and_html_escaping(history):
     assert safe_name("\u202e\x00", "fallback") == "fallback"
 
 
-def test_bounded_queries_many_actors_and_types(history):
-    h = history
+def test_bounded_queries_many_actors_and_types(database_history):
+    h = database_history
     with h.sessions.begin() as session:
         for i in range(60):
             uid = str(uuid4())
@@ -360,8 +360,8 @@ def test_bounded_queries_many_actors_and_types(history):
         event.remove(h.engine, "before_cursor_execute", record)
 
 
-def test_object_resolvers_use_only_current_safe_names(history):
-    h = history
+def test_object_resolvers_use_only_current_safe_names(database_history):
+    h = database_history
     team = h.s.teams.create_team(h.admin, "Current team")
     dataset = h.s.datasets.create_dataset(
         h.admin, "current", "Current Dataset", "Secret description", team.id
@@ -387,8 +387,8 @@ def test_object_resolvers_use_only_current_safe_names(history):
     assert state(h)["audit_events"] == before
 
 
-def test_unknown_contract_and_context_are_not_disclosed(history):
-    h = history
+def test_unknown_contract_and_context_are_not_disclosed(database_history):
+    h = database_history
     eid = seed(
         h,
         1,
@@ -417,8 +417,8 @@ def test_unknown_contract_and_context_are_not_disclosed(history):
     assert view.context == (("Format", "CSV"), ("Records imported", "2"), ("Rows rejected", "0"))
 
 
-def test_http_filters_errors_and_no_audit_writes(history, monkeypatch):
-    h = history
+def test_http_filters_errors_and_no_audit_writes(database_history, monkeypatch):
+    h = database_history
     ids = seed(h, 51)
     browser = client(h, h.admin)
     before = state(h)
@@ -456,8 +456,8 @@ def test_http_filters_errors_and_no_audit_writes(history, monkeypatch):
     assert browser.get("/settings/audit-log", base_url="https://localhost").status_code == 302
 
 
-def test_database_failure_is_neutral(history, monkeypatch):
-    h = history
+def test_database_failure_is_neutral(database_history, monkeypatch):
+    h = database_history
     browser = client(h, h.admin)
 
     def broken(*args, **kwargs):
@@ -480,8 +480,8 @@ def test_read_boundary_has_no_framework_or_database_imports():
             assert not any(n and n.startswith("flask") for n in imports)
 
 
-def test_chronology_query_plan(history):
-    h = history
+def test_chronology_query_plan(database_history):
+    h = database_history
     seed(h, 10000)
     query = (
         "SELECT id,timestamp,actor_user_id,object_type,object_id,action,NULL AS details "
