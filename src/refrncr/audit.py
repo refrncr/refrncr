@@ -524,14 +524,14 @@ _register(
 )
 _read(
     "AuthorizationService",
-    "effective_permission check_access authorized_resources",
+    "effective_permission check_access authorized_resources has_capability",
     "Pure policy/read decision; denied or suspicious requests are REF-31 security logging.",
 )
 _read(
     "DatasetAuthorizationService",
-    "active creation_teams can_create_dataset can_view_dataset "
+    "active creation_teams can_create_dataset can_access_community can_view_dataset "
     "maintainable_resources can_maintain_dataset can_export_dataset can_change_dataset_owner "
-    "can_manage_export_access",
+    "can_manage_export_access can_administer_installation",
     "Capability calculation only; the authoritative caller owns "
     "the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
 )

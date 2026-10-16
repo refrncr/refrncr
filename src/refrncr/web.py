@@ -102,6 +102,59 @@ GENERIC_LOGIN_FAILURE = "Invalid credentials"
 MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
 
 
+def public_route(view):
+    """Mark a browser route that may be reached without an active session."""
+    view.public_route = True
+    return view
+
+
+def anonymous_csrf_route(view):
+    """Mark a route whose state changes use the anonymous CSRF cookie."""
+    view.anonymous_csrf_route = True
+    return view
+
+
+def concept_route(view):
+    """Mark a route that needs concept context and no-store response headers."""
+    view.concept_route = True
+    return view
+
+
+def capability_route(capability):
+    """Declare the capability required by a browser route."""
+
+    def decorate(view):
+        view.required_capability = capability
+        return view
+
+    return decorate
+
+
+def authenticated_route(view):
+    """Declare the capability shared by every authenticated browser route."""
+    return capability_route("can_access_community")(view)
+
+
+def no_store_route(view):
+    view.no_store_route = True
+    return view
+
+
+def upload_limit_route(view):
+    view.upload_limit_route = True
+    return view
+
+
+def bounded_import_route(view):
+    view.bounded_import_route = True
+    return view
+
+
+def dataset_not_found_route(view):
+    view.dataset_not_found_route = True
+    return view
+
+
 def is_safe_login_target(target: str | None) -> bool:
     """Return whether a login target is a safe root-relative path."""
     if not target:
@@ -217,12 +270,10 @@ def create_flask_app(
 
     @app.before_request
     def import_upload_limit():
-        if request.endpoint == "import_dataset_records" and request.method == "POST":
+        view = app.view_functions.get(request.endpoint)
+        if getattr(view, "upload_limit_route", False) and request.method == "POST":
             request.max_content_length = MAX_UPLOAD_BYTES + 64 * 1024
-        elif (
-            request.endpoint in {"review_source_formats", "preview_record_import"}
-            and request.method == "POST"
-        ):
+        elif getattr(view, "bounded_import_route", False) and request.method == "POST":
             # Six bounded controls per column, plus CSRF and optional navigation.
             # Multipart framing must fit the existing 250-column upload contract.
             request.max_content_length = MAX_COLUMNS * 1024
@@ -342,12 +393,86 @@ def create_flask_app(
     @app.before_request
     def redirect_anonymous_browser_request():
         # Only registered browser endpoints participate; API/health is owned by FastAPI.
-        if request.endpoint and request.endpoint not in {"static", "setup", "login", "logout"}:
+        view = app.view_functions.get(request.endpoint)
+        if (
+            request.endpoint
+            and request.endpoint != "static"
+            and not getattr(view, "public_route", False)
+        ):
             if authenticated() is None:
                 target = (
                     safe_login_target(request.path) if request.method in {"GET", "HEAD"} else "/"
                 )
                 return redirect(url_for("login", next=target))
+
+    @app.before_request
+    def enforce_csrf_for_state_changes():
+        """Protect every browser state change independently of endpoint names."""
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        view = app.view_functions.get(request.endpoint)
+        if request.endpoint is None or view is None:
+            return None
+        settings = cookie_settings()
+        if not getattr(view, "anonymous_csrf_route", False) and (
+            settings is None or request.cookies.get(settings.session_name) is None
+        ):
+            return None
+        resolved = authenticated()
+        expected = (
+            request.cookies.get(settings.anonymous_csrf_name)
+            if getattr(view, "anonymous_csrf_route", False) and settings
+            else resolved[1].csrf_token
+            if resolved is not None
+            else request.cookies.get(settings.anonymous_csrf_name)
+            if settings
+            else None
+        )
+        require_csrf(expected)
+        return None
+
+    @app.before_request
+    def enforce_route_capability():
+        view = app.view_functions.get(request.endpoint)
+        capability = getattr(view, "required_capability", None)
+        if capability is None:
+            return None
+        resolved = authenticated()
+        if resolved is None:
+            return None
+        if capability in {
+            "can_access_community",
+            "can_administer_installation",
+            "can_manage_access",
+            "can_create_dataset",
+        }:
+            require_capability(capability)
+            return None
+        if capability not in {
+            "can_view_dataset",
+            "can_maintain_dataset",
+            "can_export_dataset",
+            "can_create_dataset",
+            "can_manage_export_access",
+        }:
+            abort(500)
+        key = (request.view_args or {}).get("key")
+        dataset_id = (request.view_args or {}).get("dataset_id")
+        if key is None and dataset_id is None:
+            return None
+        if authorization is None or datasets is None:
+            abort(404)
+        with datasets.uow() as uow:
+            dataset = (
+                uow.datasets.get(dataset_id)
+                if dataset_id is not None
+                else uow.datasets.find_by_key(key)
+            )
+        if dataset is None or not authorization.has_capability(
+            resolved[0].id, capability, dataset.id
+        ):
+            abort(404)
+        return None
 
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
@@ -383,44 +508,14 @@ def create_flask_app(
             return "teams"
         return ""
 
-    concept_endpoints = {
-        "move_dataset_field",
-        "new_dataset_field",
-        "create_dataset_field",
-        "edit_dataset_field",
-        "update_dataset_field",
-        "delete_dataset_field",
-        "new_dataset_record",
-        "create_dataset_record",
-        "edit_dataset_record",
-        "delete_dataset_record",
-        "restore_dataset_record",
-        "import_dataset_records",
-        "dataset_import_step",
-        "select_import_worksheet",
-        "review_import_mapping",
-        "review_source_formats",
-        "preview_record_import",
-        "confirm_record_import",
-        "cancel_record_import",
-        "dataset_version_review",
-        "dataset_version_record_diff",
-        "dataset_version_field_diff",
-        "dataset_version_publish",
-        "dataset_concept_discard",
-        "dataset_hierarchy_node_create",
-        "dataset_hierarchy_node_delete",
-        "dataset_hierarchy_node_edit",
-        "dataset_hierarchy_node_values",
-    }
-
     @app.before_request
     def bind_concept_context():
         values = request.view_args or {}
+        view = app.view_functions.get(request.endpoint)
         if (
             dataset_ui_enabled
             and values.get("key")
-            and (request.endpoint in concept_endpoints or values.get("concept"))
+            and (getattr(view, "concept_route", False) or values.get("concept"))
         ):
             actor, session = require_authenticated()
             if request.method == "POST":
@@ -454,9 +549,16 @@ def create_flask_app(
         context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
         return render_template(template_name, **context)
 
-    def require_admin():
+    def require_capability(capability: str):
         resolved = authenticated()
-        if resolved is None or resolved[0].role != "admin":
+        allowed = resolved is not None and (
+            authorization.has_capability(resolved[0].id, capability)
+            if authorization is not None
+            else capability == "can_access_community"
+            or capability in {"can_administer_installation", "can_manage_access"}
+            and resolved[0].role == "admin"
+        )
+        if not allowed:
             audit_security(
                 "security.authorization_denied",
                 actor_user_id=resolved[0].id if resolved else None,
@@ -473,22 +575,12 @@ def create_flask_app(
     @app.after_request
     def protect_audit_response(response):
         endpoint = request.endpoint or ""
-        if endpoint == "dataset_records_view" or endpoint.startswith("api_key_"):
+        view = app.view_functions.get(endpoint)
+        if getattr(view, "no_store_route", False):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = "no-referrer"
             return response
-        if (
-            endpoint.startswith("audit_")
-            or endpoint in concept_endpoints
-            or (request.view_args or {}).get("concept", False)
-            or endpoint
-            in {
-                "dataset_version_review",
-                "dataset_version_record_diff",
-                "dataset_version_field_diff",
-            }
-            or (endpoint == "dataset_version_publish" and "review" in request.args)
-        ):
+        if getattr(view, "concept_route", False) or (request.view_args or {}).get("concept", False):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = (
                 "no-referrer" if "review" in request.args else "same-origin"
@@ -507,6 +599,8 @@ def create_flask_app(
         return api_keys
 
     @app.get("/settings/api-keys")
+    @authenticated_route
+    @no_store_route
     def api_key_list():
         actor, _session = require_authenticated()
         if api_keys is None:
@@ -526,6 +620,8 @@ def create_flask_app(
         ), status
 
     @app.route("/settings/api-keys/new", methods=["GET", "POST"])
+    @authenticated_route
+    @no_store_route
     def api_key_create():
         actor, session = require_authenticated()
         api_key_service = require_api_keys()
@@ -577,6 +673,8 @@ def create_flask_app(
         return api_key_page("secret", created=created), 201
 
     @app.route("/settings/api-keys/<key_id>/revoke", methods=["GET", "POST"])
+    @authenticated_route
+    @no_store_route
     def api_key_revoke(key_id):
         actor, session = require_authenticated()
         api_key_service = require_api_keys()
@@ -586,7 +684,6 @@ def create_flask_app(
             return "API key not found", 404
         error = None
         if request.method == "POST":
-            require_csrf(session.csrf_token)
             try:
                 revision = parse_expected_revision(request.form.get("revision"))
                 if len(request.form.getlist("revision")) != 1 or request.form.getlist(
@@ -603,8 +700,10 @@ def create_flask_app(
         return api_key_page("revoke", key=key, error=error), 400 if error else 200
 
     @app.get("/settings/audit-log")
+    @capability_route("can_administer_installation")
+    @no_store_route
     def audit_list():
-        actor, _session = require_admin()
+        actor, _session = require_capability("can_administer_installation")
         try:
             if len(request.query_string) > 4096:
                 raise ValidationError(
@@ -636,8 +735,10 @@ def create_flask_app(
         )
 
     @app.get("/settings/audit-log/<event_id>")
+    @capability_route("can_administer_installation")
+    @no_store_route
     def audit_detail(event_id):
-        actor, _session = require_admin()
+        actor, _session = require_capability("can_administer_installation")
         try:
             item = audit_history.get_event(actor.id, event_id)
             if request.args:
@@ -663,9 +764,14 @@ def create_flask_app(
             abort(404)
         return authorization, datasets, dataset_fields, dataset_business_keys, dataset_records
 
-    def dataset_route(rule: str, **options):
+    def dataset_route(rule: str, *, capability: str, **options):
         if dataset_ui_enabled:
-            return app.route(rule, **options)
+
+            def decorate(function):
+                function.required_capability = capability
+                return app.route(rule, **options)(function)
+
+            return decorate
         return lambda function: function
 
     def version_errors(function):
@@ -741,6 +847,7 @@ def create_flask_app(
         return response
 
     @app.get("/")
+    @authenticated_route
     def index():
         resolved = authenticated()
         actor = resolved[0] if resolved else None
@@ -770,7 +877,7 @@ def create_flask_app(
             dataset_ui_enabled=dataset_ui_enabled,
         )
 
-    @dataset_route("/datasets", methods=["GET"])
+    @dataset_route("/datasets", capability="can_access_community", methods=["GET"])
     def dataset_list():
         actor, _login_session = require_authenticated()
         _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
@@ -860,7 +967,7 @@ def create_flask_app(
             dataset_ui_enabled=dataset_ui_enabled,
         )
 
-    @dataset_route("/datasets/new", methods=["GET"])
+    @dataset_route("/datasets/new", capability="can_create_dataset", methods=["GET"])
     def new_dataset():
         require_dataset_dependencies()
         initial_kind = request.args.get("kind")
@@ -868,7 +975,7 @@ def create_flask_app(
             abort(404)
         return render_dataset_create_form(initial_kind=initial_kind)
 
-    @dataset_route("/datasets", methods=["POST"])
+    @dataset_route("/datasets", capability="can_create_dataset", methods=["POST"])
     def create_dataset():
         actor, login_session = require_authenticated()
         _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
@@ -922,10 +1029,23 @@ def create_flask_app(
             return redirect(url_for("dataset_records_view", key=dataset.key, concept=True))
         return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
 
-    @dataset_route("/datasets/<key>/concept", methods=["GET"], defaults={"concept": True})
-    @dataset_route("/datasets/<key>", methods=["GET"], defaults={"concept": False})
     @dataset_route(
-        "/datasets/<key>/versions/<version_id>", methods=["GET"], defaults={"concept": False}
+        "/datasets/<key>/concept",
+        capability="can_view_dataset",
+        methods=["GET"],
+        defaults={"concept": True},
+    )
+    @dataset_route(
+        "/datasets/<key>",
+        capability="can_view_dataset",
+        methods=["GET"],
+        defaults={"concept": False},
+    )
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>",
+        capability="can_view_dataset",
+        methods=["GET"],
+        defaults={"concept": False},
     )
     @version_errors
     def dataset_detail(key: str, version_id=None, concept=False):
@@ -933,7 +1053,7 @@ def create_flask_app(
             key, version_id=version_id, concept=concept, edit_mode=request.args.get("edit") == "1"
         )
 
-    @dataset_route("/datasets/<key>/configure", methods=["GET"])
+    @dataset_route("/datasets/<key>/configure", capability="can_view_dataset", methods=["GET"])
     @version_errors
     def dataset_configuration(key):
         return render_dataset_configuration(
@@ -1115,7 +1235,9 @@ def create_flask_app(
             version_state=state,
         )
 
-    @dataset_route("/datasets/<key>/concept/new", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/new", capability="can_maintain_dataset", methods=["POST"]
+    )
     @version_errors
     def dataset_concept_create(key):
         actor, session = require_authenticated()
@@ -1132,8 +1254,13 @@ def create_flask_app(
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
-    @dataset_route("/datasets/<key>/concept/discard", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/discard",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_concept_discard(key):
         actor, session = require_authenticated()
         dataset = datasets.get_dataset_for_edit(actor.id, key)
@@ -1174,7 +1301,7 @@ def create_flask_app(
             error=error,
         ), status
 
-    @dataset_route("/datasets/<key>/versions", methods=["GET"])
+    @dataset_route("/datasets/<key>/versions", capability="can_view_dataset", methods=["GET"])
     @version_errors
     def dataset_versions_view(key):
         actor, _session = require_authenticated()
@@ -1252,8 +1379,11 @@ def create_flask_app(
         values.update(changes)
         return url_for("dataset_version_review", key=key, **values)
 
-    @dataset_route("/datasets/<key>/versions/review", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/versions/review", capability="can_view_dataset", methods=["GET"]
+    )
     @version_errors
+    @concept_route
     def dataset_version_review(key):
         actor, session = require_authenticated()
         dataset = datasets.get_dataset_for_edit(actor.id, key)
@@ -1334,18 +1464,33 @@ def create_flask_app(
         except ValidationError as error:
             return review_error(key, str(error), 400)
 
-    @dataset_route("/datasets/<key>/versions/review/records/<object_id>", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/versions/review/records/<object_id>",
+        capability="can_view_dataset",
+        methods=["GET"],
+    )
     @version_errors
+    @concept_route
     def dataset_version_record_diff(key, object_id):
         return render_diff_detail(key, object_id, "record")
 
-    @dataset_route("/datasets/<key>/versions/review/fields/<object_id>", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/versions/review/fields/<object_id>",
+        capability="can_view_dataset",
+        methods=["GET"],
+    )
     @version_errors
+    @concept_route
     def dataset_version_field_diff(key, object_id):
         return render_diff_detail(key, object_id, "field")
 
-    @dataset_route("/datasets/<key>/versions/publish", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/versions/publish",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_version_publish(key):
         actor, session = require_authenticated()
         dataset = datasets.get_dataset_for_edit(actor.id, key)
@@ -1419,7 +1564,11 @@ def create_flask_app(
             or bool(concept_summary and concept_summary.can_review),
         ), status
 
-    @dataset_route("/datasets/<key>/versions/<version_id>/cancel", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>/cancel",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
     def dataset_version_cancel(key, version_id):
         actor, session = require_authenticated()
@@ -1467,7 +1616,10 @@ def create_flask_app(
             url_for(endpoint, key=key, _anchor="access-management", **options),
         )
 
-    @dataset_route("/datasets/<key>/export-access", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/export-access", capability="can_manage_export_access", methods=["POST"]
+    )
+    @dataset_not_found_route
     def dataset_export_access(key):
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
@@ -1500,7 +1652,12 @@ def create_flask_app(
             return response, 409 if isinstance(error, ConflictError) else 400
         return redirect(target)
 
-    @dataset_route("/datasets/<key>/export-access/<access_id>/revoke", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/export-access/<access_id>/revoke",
+        capability="can_manage_export_access",
+        methods=["POST"],
+    )
+    @dataset_not_found_route
     def revoke_dataset_export_access(key, access_id):
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
@@ -1508,7 +1665,10 @@ def create_flask_app(
         service.revoke_export_access(actor.id, key, access_id)
         return redirect(access_management_target(key)[2])
 
-    @dataset_route("/datasets/<key>/fields/order", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/fields/order", capability="can_maintain_dataset", methods=["POST"]
+    )
+    @concept_route
     def move_dataset_field(key: str):
         actor, login_session = require_authenticated()
         _authorization, _datasets, field_service, _business_keys, _records = (
@@ -1857,8 +2017,13 @@ def create_flask_app(
             abort(400, description="Choose a valid return view.")
         return selected[0], searches[0], sorts[0], directions[0]
 
-    @dataset_route("/datasets/<key>/concept/nodes/new", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/nodes/new",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_hierarchy_node_create(key):
         actor, view, rows, _row = hierarchy_edit_context(key)
         if request.method == "POST":
@@ -1877,8 +2042,13 @@ def create_flask_app(
             return redirect(url_for("dataset_records_view", key=key, concept=True))
         return render_hierarchy_node_form(view, rows)
 
-    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/edit", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/nodes/<node_id>/edit",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_hierarchy_node_edit(key, node_id):
         actor, view, rows, row = hierarchy_edit_context(key, node_id)
         if request.method == "POST":
@@ -1918,8 +2088,13 @@ def create_flask_app(
             )
         return render_hierarchy_node_form(view, rows, row)
 
-    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/delete", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/nodes/<node_id>/delete",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_hierarchy_node_delete(key, node_id):
         actor, view, rows, row = hierarchy_edit_context(key, node_id)
         if row["node"].parent_id is None:
@@ -1957,8 +2132,13 @@ def create_flask_app(
         )
         return (response, status) if status != 200 else response
 
-    @dataset_route("/datasets/<key>/concept/nodes/<node_id>/values", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/nodes/<node_id>/values",
+        capability="can_view_dataset",
+        methods=["GET", "POST"],
+    )
     @version_errors
+    @concept_route
     def dataset_hierarchy_node_values(key, node_id):
         actor, view, rows, row = hierarchy_edit_context(key, node_id)
         return_view, return_q, return_sort, return_direction = hierarchy_return_view()
@@ -2020,14 +2200,26 @@ def create_flask_app(
             )
         return render_hierarchy_node_form(view, rows, row, mode="values")
 
-    @dataset_route("/datasets/<key>/concept/records", methods=["GET"], defaults={"concept": True})
-    @dataset_route("/datasets/<key>/records", methods=["GET"], defaults={"concept": False})
+    @dataset_route(
+        "/datasets/<key>/concept/records",
+        capability="can_view_dataset",
+        methods=["GET"],
+        defaults={"concept": True},
+    )
+    @dataset_route(
+        "/datasets/<key>/records",
+        capability="can_view_dataset",
+        methods=["GET"],
+        defaults={"concept": False},
+    )
     @dataset_route(
         "/datasets/<key>/versions/<version_id>/records",
+        capability="can_view_dataset",
         methods=["GET"],
         defaults={"concept": False},
     )
     @version_errors
+    @no_store_route
     def dataset_records_view(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
@@ -2248,11 +2440,20 @@ def create_flask_app(
         )
 
     @dataset_route(
-        "/datasets/<key>/concept/records/export", methods=["GET"], defaults={"concept": True}
+        "/datasets/<key>/concept/records/export",
+        capability="can_export_dataset",
+        methods=["GET"],
+        defaults={"concept": True},
     )
-    @dataset_route("/datasets/<key>/records/export", methods=["GET"], defaults={"concept": False})
+    @dataset_route(
+        "/datasets/<key>/records/export",
+        capability="can_export_dataset",
+        methods=["GET"],
+        defaults={"concept": False},
+    )
     @dataset_route(
         "/datasets/<key>/versions/<version_id>/records/export",
+        capability="can_export_dataset",
         methods=["GET"],
         defaults={"concept": False},
     )
@@ -2311,10 +2512,11 @@ def create_flask_app(
         response.call_on_close(artifact.content.close)
         return response
 
-    def import_route(rule, **options):
+    def import_route(rule, *, capability: str, **options):
         def decorate(function):
+            function.required_capability = capability
             if getattr(function, "_secured_import", False):
-                return dataset_route(rule, **options)(function)
+                return dataset_route(rule, capability=capability, **options)(function)
 
             @wraps(function)
             def secured_import(*args, **kwargs):
@@ -2357,7 +2559,7 @@ def create_flask_app(
                     ), 400
 
             secured_import._secured_import = True
-            return dataset_route(rule, **options)(secured_import)
+            return dataset_route(rule, capability=capability, **options)(secured_import)
 
         return decorate
 
@@ -2528,9 +2730,14 @@ def create_flask_app(
 
     @import_route(
         "/datasets/<key>/concept/records/import-new-version",
+        capability="can_maintain_dataset",
         methods=["GET", "POST"],
     )
-    @import_route("/datasets/<key>/records/import", methods=["GET", "POST"])
+    @import_route(
+        "/datasets/<key>/records/import", capability="can_maintain_dataset", methods=["GET", "POST"]
+    )
+    @upload_limit_route
+    @concept_route
     def import_dataset_records(key: str):
         mode = "new_version"
         actor, login_session = require_authenticated()
@@ -2578,14 +2785,26 @@ def create_flask_app(
             return render_import_wizard(dataset, login_session, state, error=str(error), status=400)
         return import_redirect(key, state)
 
-    @import_route("/datasets/<key>/records/import/<token>/step/<int:step>", methods=["GET"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/step/<int:step>",
+        capability="can_maintain_dataset",
+        methods=["GET"],
+    )
+    @bounded_import_route
+    @concept_route
     def dataset_import_step(key: str, token: str, step: int):
         actor, login_session = require_authenticated()
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
         state = record_imports.navigate(actor.id, login_session.id, key, token, step)
         return render_import_wizard(dataset, login_session, state, step=step)
 
-    @import_route("/datasets/<key>/records/import/<token>/worksheet", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/worksheet",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @bounded_import_route
+    @concept_route
     def select_import_worksheet(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -2655,7 +2874,13 @@ def create_flask_app(
             request.form
         )
 
-    @import_route("/datasets/<key>/records/import/<token>/formats", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/formats",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @bounded_import_route
+    @concept_route
     def review_source_formats(key: str, token: str):
         actor, login_session = require_authenticated()
         dataset_records.get_dataset_for_add(actor.id, key)
@@ -2691,11 +2916,23 @@ def create_flask_app(
             "pages/datasets/import/source_format_fragments.html", format_columns=columns
         )
 
-    @import_route("/datasets/<key>/records/import/<token>/mapping", methods=["GET"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/mapping",
+        capability="can_maintain_dataset",
+        methods=["GET"],
+    )
+    @bounded_import_route
+    @concept_route
     def review_import_mapping(key: str, token: str):
         return dataset_import_step(key, token, 3)
 
-    @import_route("/datasets/<key>/records/import/<token>/preview", methods=["GET", "POST"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/preview",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
+    @bounded_import_route
+    @concept_route
     def preview_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
@@ -2781,7 +3018,12 @@ def create_flask_app(
             state = record_imports.navigate(actor.id, login_session.id, key, token, 5)
         return import_redirect(key, state)
 
-    @import_route("/datasets/<key>/records/import/<token>/confirm", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/confirm",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @concept_route
     def confirm_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -2838,7 +3080,12 @@ def create_flask_app(
             )
         return import_redirect(key, record_imports.state(actor.id, login_session.id, key, token))
 
-    @import_route("/datasets/<key>/records/import/<token>/cancel", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/records/import/<token>/cancel",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @concept_route
     def cancel_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -2847,7 +3094,11 @@ def create_flask_app(
         record_imports.cancel(actor.id, login_session.id, key, token)
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
-    @import_route("/datasets/<key>/concept/hierarchy-import", methods=["GET", "POST"])
+    @import_route(
+        "/datasets/<key>/concept/hierarchy-import",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     def import_hierarchy_file(key: str):
         if hierarchy_imports is None:
             abort(404)
@@ -2903,7 +3154,11 @@ def create_flask_app(
             ), 400
         return redirect(url_for("hierarchy_import_preview", key=key, token=state.token), code=303)
 
-    @import_route("/datasets/<key>/concept/hierarchy-import/<token>", methods=["GET"])
+    @import_route(
+        "/datasets/<key>/concept/hierarchy-import/<token>",
+        capability="can_maintain_dataset",
+        methods=["GET"],
+    )
     def hierarchy_import_preview(key: str, token: str):
         if hierarchy_imports is None:
             abort(404)
@@ -2919,7 +3174,11 @@ def create_flask_app(
             current_csrf=login_session.csrf_token,
         )
 
-    @import_route("/datasets/<key>/concept/hierarchy-import/<token>/confirm", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/concept/hierarchy-import/<token>/confirm",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
     def confirm_hierarchy_import(key: str, token: str):
         if hierarchy_imports is None:
             abort(404)
@@ -2955,7 +3214,11 @@ def create_flask_app(
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
-    @import_route("/datasets/<key>/concept/hierarchy-import/<token>/cancel", methods=["POST"])
+    @import_route(
+        "/datasets/<key>/concept/hierarchy-import/<token>/cancel",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
     def cancel_hierarchy_import(key: str, token: str):
         if hierarchy_imports is None:
             abort(404)
@@ -2993,7 +3256,10 @@ def create_flask_app(
         )
         return (response, status) if status != 200 else response
 
-    @dataset_route("/datasets/<key>/records/new", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/records/new", capability="can_maintain_dataset", methods=["GET"]
+    )
+    @concept_route
     def new_dataset_record(key: str):
         actor, login_session = require_authenticated()
         _authorization, dataset_service, field_service, _business_keys, record_service = (
@@ -3010,7 +3276,8 @@ def create_flask_app(
             abort(404)
         return render_record_form(dataset, fields, csrf=login_session.csrf_token)
 
-    @dataset_route("/datasets/<key>/records", methods=["POST"])
+    @dataset_route("/datasets/<key>/records", capability="can_maintain_dataset", methods=["POST"])
+    @concept_route
     def create_dataset_record(key: str):
         actor, login_session = require_authenticated()
         _authorization, dataset_service, field_service, _business_keys, record_service = (
@@ -3105,7 +3372,12 @@ def create_flask_app(
             raise ValidationError("Submit exactly one expected revision")
         return parse_expected_revision(values[0])
 
-    @dataset_route("/datasets/<key>/records/<record_id>/edit", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/records/<record_id>/edit",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
+    @concept_route
     def edit_dataset_record(key: str, record_id: str):
         actor, login_session = require_authenticated()
         _authorization, _datasets, field_service, _business_keys, record_service = (
@@ -3177,7 +3449,12 @@ def create_flask_app(
             abort(404)
         return redirect(url_for("dataset_records_view", key=key, concept=True))
 
-    @dataset_route("/datasets/<key>/concept/records/<record_id>/restore", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/concept/records/<record_id>/restore",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @concept_route
     def restore_dataset_record(key: str, record_id: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -3202,7 +3479,12 @@ def create_flask_app(
             abort(404)
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
-    @dataset_route("/datasets/<key>/records/<record_id>/delete", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/<key>/records/<record_id>/delete",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
+    @concept_route
     def delete_dataset_record(key: str, record_id: str):
         actor, login_session = require_authenticated()
         _authorization, _datasets, _fields, business_keys, record_service = (
@@ -3251,7 +3533,7 @@ def create_flask_app(
         )
         return (response, status) if status != 200 else response
 
-    @dataset_route("/datasets/<key>/edit", methods=["GET"])
+    @dataset_route("/datasets/<key>/edit", capability="can_maintain_dataset", methods=["GET"])
     def edit_dataset(key: str):
         actor, login_session = require_authenticated()
         _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
@@ -3263,7 +3545,7 @@ def create_flask_app(
             abort(404)
         return render_dataset_configuration(dataset.key, standalone=True, edit_mode=True)
 
-    @dataset_route("/datasets/<key>", methods=["POST"])
+    @dataset_route("/datasets/<key>", capability="can_maintain_dataset", methods=["POST"])
     def update_dataset(key: str):
         actor, login_session = require_authenticated()
         _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
@@ -3326,7 +3608,11 @@ def create_flask_app(
             )
         return redirect(url_for("dataset_configuration", key=dataset.key))
 
-    @dataset_route("/datasets/id/<dataset_id>/delete", methods=["GET", "POST"])
+    @dataset_route(
+        "/datasets/id/<dataset_id>/delete",
+        capability="can_maintain_dataset",
+        methods=["GET", "POST"],
+    )
     def dataset_delete(dataset_id: str):
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
@@ -3379,7 +3665,7 @@ def create_flask_app(
             dataset = dataset_service.get_dataset(actor_id, key)
         except NotFoundError:
             abort(404)
-        if not authorization_service.check_access(actor_id, "dataset", dataset.id, "admin"):
+        if not authorization_service.has_capability(actor_id, "can_maintain_dataset", dataset.id):
             audit_security("security.authorization_denied", actor_user_id=actor_id)
             abort(404)
         return dataset
@@ -3451,13 +3737,15 @@ def create_flask_app(
             hierarchy_scope=request.form.get("hierarchy_scope", "leaves"),
         )
 
-    @dataset_route("/datasets/<key>/fields/new", methods=["GET"])
+    @dataset_route("/datasets/<key>/fields/new", capability="can_maintain_dataset", methods=["GET"])
+    @concept_route
     def new_dataset_field(key: str):
         actor, login_session = require_authenticated()
         dataset = require_dataset_schema_admin(actor.id, key)
         return render_dataset_field_create_form(dataset, csrf=login_session.csrf_token)
 
-    @dataset_route("/datasets/<key>/fields", methods=["POST"])
+    @dataset_route("/datasets/<key>/fields", capability="can_maintain_dataset", methods=["POST"])
+    @concept_route
     def create_dataset_field(key: str):
         actor, login_session = require_authenticated()
         _authorization, _dataset_service, field_service, _business_key_service, _record_service = (
@@ -3539,7 +3827,12 @@ def create_flask_app(
             hierarchy_scope=request.form.get("hierarchy_scope", field.hierarchy_scope),
         )
 
-    @dataset_route("/datasets/<key>/fields/<field_key>/edit", methods=["GET"])
+    @dataset_route(
+        "/datasets/<key>/fields/<field_key>/edit",
+        capability="can_maintain_dataset",
+        methods=["GET"],
+    )
+    @concept_route
     def edit_dataset_field(key: str, field_key: str):
         actor, login_session = require_authenticated()
         dataset = require_dataset_schema_admin(actor.id, key)
@@ -3565,7 +3858,10 @@ def create_flask_app(
             may_edit_key=may_edit_key,
         )
 
-    @dataset_route("/datasets/<key>/fields/<field_key>", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/fields/<field_key>", capability="can_maintain_dataset", methods=["POST"]
+    )
+    @concept_route
     def update_dataset_field(key: str, field_key: str):
         actor, login_session = require_authenticated()
         _authorization, _dataset_service, field_service, _business_key_service, _record_service = (
@@ -3621,7 +3917,12 @@ def create_flask_app(
             url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
         )
 
-    @dataset_route("/datasets/<key>/fields/<field_key>/delete", methods=["POST"])
+    @dataset_route(
+        "/datasets/<key>/fields/<field_key>/delete",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
+    @concept_route
     def delete_dataset_field(key: str, field_key: str):
         actor, login_session = require_authenticated()
         _authorization, _dataset_service, field_service, business_key_service, record_service = (
@@ -3661,6 +3962,8 @@ def create_flask_app(
         )
 
     @app.route("/setup", methods=["GET", "POST"])
+    @public_route
+    @anonymous_csrf_route
     def setup():
         settings = require_cookie_settings()
         if users.has_users():
@@ -3708,6 +4011,8 @@ def create_flask_app(
         )
 
     @app.route("/login", methods=["GET", "POST"])
+    @public_route
+    @anonymous_csrf_route
     def login():
         settings = require_cookie_settings()
         submitted_target = (
@@ -3796,6 +4101,7 @@ def create_flask_app(
         )
 
     @app.post("/logout")
+    @public_route
     def logout():
         settings = cookie_settings()
         token = request.cookies.get(settings.session_name) if settings else None
@@ -3815,6 +4121,7 @@ def create_flask_app(
         return response
 
     @app.post("/settings/theme")
+    @authenticated_route
     def theme_preference():
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -3825,6 +4132,7 @@ def create_flask_app(
         return redirect(url_for("appearance_settings"), code=303)
 
     @app.get("/settings/appearance")
+    @authenticated_route
     def appearance_settings():
         actor, login_session = require_authenticated()
         return render_authenticated_template(
@@ -3836,7 +4144,7 @@ def create_flask_app(
         )
 
     def render_user_list(*, form_error=None, form_target_id=None, form_data=None, status=200):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         managed_users = users.list_users(actor.id)
         user_teams = {}
         for relationship in memberships.list_relationships(actor.id):
@@ -3859,12 +4167,14 @@ def create_flask_app(
         ), status
 
     @app.get("/users")
+    @capability_route("can_manage_access")
     def user_list():
         return render_user_list()
 
     @app.post("/users")
+    @capability_route("can_manage_access")
     def create_user():
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             users.create_user(
@@ -3883,8 +4193,9 @@ def create_flask_app(
         return redirect(url_for("user_list"))
 
     @app.post("/users/<target_id>/<action>")
+    @capability_route("can_manage_access")
     def change_user_state(target_id: str, action: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         operations = {
             "disable": users.disable_user,
@@ -3901,8 +4212,9 @@ def create_flask_app(
         return redirect(url_for("user_list"))
 
     @app.post("/users/<target_id>/email")
+    @capability_route("can_manage_access")
     def change_user_email(target_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             users.change_email(actor.id, target_id, request.form.get("email", ""))
@@ -3960,12 +4272,14 @@ def create_flask_app(
         ), status
 
     @app.get("/teams")
+    @authenticated_route
     def team_list():
         return render_team_list()
 
     @app.post("/teams")
+    @capability_route("can_manage_access")
     def create_team():
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.create_team(actor.id, request.form.get("name", ""))
@@ -3978,8 +4292,9 @@ def create_flask_app(
         return redirect(url_for("team_list"))
 
     @app.post("/teams/<team_id>/rename")
+    @capability_route("can_manage_access")
     def rename_team(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.rename_team(actor.id, team_id, request.form.get("name", ""))
@@ -3995,8 +4310,9 @@ def create_flask_app(
         return redirect(url_for("team_list"))
 
     @app.post("/teams/<team_id>/delete")
+    @capability_route("can_manage_access")
     def delete_team(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.delete_team(actor.id, team_id)
@@ -4005,8 +4321,9 @@ def create_flask_app(
         return redirect(url_for("team_list"))
 
     @app.get("/teams/<team_id>/members")
+    @capability_route("can_manage_access")
     def team_members(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         managed_members = memberships.list_team_members(actor.id, team_id)
         eligible_users = memberships.list_eligible_users(actor.id, team_id)
         return render_template(
@@ -4021,8 +4338,9 @@ def create_flask_app(
         )
 
     @app.post("/teams/<team_id>/members")
+    @capability_route("can_manage_access")
     def create_membership(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             memberships.create_membership(actor.id, request.form["user_id"], team_id)
@@ -4037,8 +4355,9 @@ def create_flask_app(
         return redirect(url_for("team_list", open_team=team_id))
 
     @app.post("/teams/<team_id>/members/<membership_id>/delete")
+    @capability_route("can_manage_access")
     def delete_membership(team_id: str, membership_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             memberships.delete_membership(actor.id, team_id, membership_id)
@@ -4054,10 +4373,8 @@ def create_flask_app(
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):
-        if isinstance(error, NotFoundError) and request.endpoint in {
-            "dataset_export_access",
-            "revoke_dataset_export_access",
-        }:
+        view = app.view_functions.get(request.endpoint)
+        if isinstance(error, NotFoundError) and getattr(view, "dataset_not_found_route", False):
             return "Dataset not found", 404
         if isinstance(error, NotFoundError):
             abort(404)
@@ -4071,5 +4388,16 @@ def create_flask_app(
             return str(error), 409
         status = 403 if isinstance(error, AuthorizationError) else 400
         return str(error), status
+
+    missing_capabilities = [
+        rule.endpoint
+        for rule in app.url_map.iter_rules()
+        if rule.endpoint != "static"
+        and not getattr(app.view_functions.get(rule.endpoint), "public_route", False)
+        and getattr(app.view_functions.get(rule.endpoint), "required_capability", None) is None
+    ]
+    if missing_capabilities:
+        routes = ", ".join(sorted(set(missing_capabilities)))
+        raise RuntimeError("Browser routes without a capability declaration: " + routes)
 
     return app

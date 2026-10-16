@@ -77,6 +77,13 @@ query strings and fragments are rejected. Login, logout and setup targets also f
 Query parameters are deliberately not copied from protected requests, avoiding propagation of
 credentials or other sensitive parameters. The destination still enforces its own authorization.
 
+All registered browser state-changing methods (`POST`, `PUT`, `PATCH` and `DELETE`) are checked
+for CSRF before the route runs. This check is based on the HTTP method and the active session (or
+the anonymous setup/login cookie), not on an endpoint-name allowlist. Browser authorization uses
+named capabilities at the route/service boundary; dataset mutations use
+`can_maintain_dataset`, while installation administration uses
+`can_administer_installation`/`can_manage_access`.
+
 Missing login fields receive associated English validation errors (400), independent of any
 account lookup, and still consume failed-attempt limiter history. Credential/account failures
 and throttled attempts continue to share the generic 401 response. Only the escaped submitted

@@ -4,7 +4,7 @@ import pytest
 
 from refrncr.authorization import highest_permission, permits
 from refrncr.ports import AuthorizationSubject, PermissionContext
-from refrncr.services import AuthorizationService, ResourceTypeRegistry
+from refrncr.services import AuthorizationService, ResourceTypeRegistry, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -93,3 +93,58 @@ def test_authorization_service_preserves_default_deny_and_admin_override():
         is None
     )
     assert AuthorizationService(admin, resources).check_access("admin", "document", "1", "admin")
+
+
+@dataclass
+class FakeDatasetCapabilities:
+    allowed: set[tuple[str, str, str]]
+
+    def can_view_dataset(self, user_id, dataset_id, *, uow=None):
+        return (user_id, "can_view_dataset", dataset_id) in self.allowed
+
+    def can_maintain_dataset(self, user_id, dataset_id, *, uow=None):
+        return (user_id, "can_maintain_dataset", dataset_id) in self.allowed
+
+    def can_export_dataset(self, user_id, dataset_id, *, uow=None):
+        return (user_id, "can_export_dataset", dataset_id) in self.allowed
+
+    def can_change_dataset_owner(self, user_id, dataset_id, *, uow=None):
+        return (user_id, "can_change_dataset_owner", dataset_id) in self.allowed
+
+    def can_manage_export_access(self, user_id, dataset_id, *, uow=None):
+        return (user_id, "can_manage_export_access", dataset_id) in self.allowed
+
+    def can_administer_installation(self, user_id, *, uow=None):
+        return (user_id, "can_administer_installation", "installation") in self.allowed
+
+
+def test_named_dataset_capabilities_are_the_service_boundary():
+    datasets = FakeDatasetCapabilities({("user-1", "can_maintain_dataset", "dataset-1")})
+    authorization = AuthorizationService(
+        FakePermissionDataSource(
+            PermissionContext(AuthorizationSubject(True, True, False, False), ()), []
+        ),
+        ResourceTypeRegistry(),
+        datasets=datasets,
+    )
+
+    assert authorization.has_capability("user-1", "can_maintain_dataset", "dataset-1")
+    assert not authorization.has_capability("user-1", "can_view_dataset", "dataset-1")
+
+    with pytest.raises(ValidationError):
+        authorization.has_capability("user-1", "editor", "dataset-1")
+
+
+def test_installation_capabilities_share_the_same_service_boundary():
+    datasets = FakeDatasetCapabilities({("admin-1", "can_administer_installation", "installation")})
+    authorization = AuthorizationService(
+        FakePermissionDataSource(
+            PermissionContext(AuthorizationSubject(True, True, False, False), ()), []
+        ),
+        ResourceTypeRegistry(),
+        datasets=datasets,
+    )
+
+    assert authorization.has_capability("admin-1", "can_administer_installation")
+    assert authorization.has_capability("admin-1", "can_manage_access")
+    assert not authorization.has_capability("user-1", "can_administer_installation")

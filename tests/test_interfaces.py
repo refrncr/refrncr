@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 from itertools import chain, combinations
@@ -6,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
-from support import html_elements, html_tag_texts
+from support import create_dataset, html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
@@ -144,6 +145,308 @@ def test_theme_preference_is_csrf_protected_and_server_rendered(interface):
 
     response = request(client, "post", "/settings/theme", data={"theme_preference": "dark"})
     assert response.status_code == 403
+
+
+def test_every_browser_route_declares_a_known_capability_or_public_access(interface):
+    client = interface[-1]
+    known = {
+        "can_access_community",
+        "can_administer_installation",
+        "can_manage_access",
+        "can_view_dataset",
+        "can_maintain_dataset",
+        "can_export_dataset",
+        "can_create_dataset",
+        "can_manage_export_access",
+    }
+    for rule in client.application.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = client.application.view_functions[rule.endpoint]
+        if getattr(view, "public_route", False):
+            continue
+        assert getattr(view, "required_capability", None) in known, rule.endpoint
+
+
+def test_renamed_views_keep_csrf_and_capability_checks():
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+        dataset_fields,
+        dataset_business_keys,
+    ) = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+    )
+    app.add_url_rule(
+        "/renamed-teams/<team_id>",
+        endpoint="renamed_team_view",
+        view_func=app.view_functions["rename_team"],
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/renamed-datasets/<key>/fields",
+        endpoint="renamed_dataset_field_view",
+        view_func=app.view_functions["create_dataset_field"],
+        methods=["POST"],
+    )
+    client = app.test_client()
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    team = teams.create_team(admin.id, "Before rename")
+    dataset = datasets.create_dataset(admin.id, "renamed-dataset", "Renamed dataset", "")
+
+    for path in (
+        f"/renamed-teams/{team.id}",
+        f"/renamed-datasets/{dataset.key}/fields",
+    ):
+        response = request(client, "post", path, data={"name": "After rename"})
+        assert response.status_code == 403
+
+    regular = users.create_user(
+        admin.id, "renamed-regular@example.com", "Regular", "valid password"
+    )
+    assert login(client, regular.email, "valid password").status_code == 302
+    token = sessions.resolve_with_session(client.get_cookie(SESSION_COOKIE).value)[1].csrf_token
+    response = request(
+        client,
+        "post",
+        f"/renamed-teams/{team.id}",
+        data={"name": "After rename", "csrf_token": token},
+    )
+    assert response.status_code == 403
+    response = request(
+        client,
+        "post",
+        f"/renamed-datasets/{dataset.key}/fields",
+        data={"name": "Field", "csrf_token": token},
+    )
+    assert response.status_code == 404
+
+
+def _route_matrix_expectations():
+    community = {
+        "api_key_list",
+        "api_key_create",
+        "api_key_revoke",
+        "appearance_settings",
+        "dataset_list",
+        "index",
+        "team_list",
+        "theme_preference",
+    }
+    installation_admin = {"audit_list", "audit_detail"}
+    access_admin = {
+        "user_list",
+        "create_user",
+        "change_user_state",
+        "change_user_email",
+        "create_team",
+        "rename_team",
+        "delete_team",
+        "team_members",
+        "create_membership",
+        "delete_membership",
+    }
+    dataset_view = {
+        "dataset_detail",
+        "dataset_configuration",
+        "dataset_versions_view",
+        "dataset_version_review",
+        "dataset_version_record_diff",
+        "dataset_version_field_diff",
+        "dataset_hierarchy_node_values",
+        "dataset_records_view",
+    }
+    dataset_export = {"export_dataset_records"}
+    dataset_export_admin = {"dataset_export_access", "revoke_dataset_export_access"}
+    dataset_maintain = {
+        "dataset_concept_create",
+        "dataset_concept_discard",
+        "dataset_version_publish",
+        "dataset_version_cancel",
+        "move_dataset_field",
+        "dataset_hierarchy_node_create",
+        "dataset_hierarchy_node_edit",
+        "dataset_hierarchy_node_delete",
+        "import_dataset_records",
+        "dataset_import_step",
+        "select_import_worksheet",
+        "review_source_formats",
+        "review_import_mapping",
+        "preview_record_import",
+        "confirm_record_import",
+        "cancel_record_import",
+        "import_hierarchy_file",
+        "hierarchy_import_preview",
+        "confirm_hierarchy_import",
+        "cancel_hierarchy_import",
+        "new_dataset_record",
+        "create_dataset_record",
+        "edit_dataset_record",
+        "restore_dataset_record",
+        "delete_dataset_record",
+        "edit_dataset",
+        "update_dataset",
+        "dataset_delete",
+        "new_dataset_field",
+        "create_dataset_field",
+        "edit_dataset_field",
+        "update_dataset_field",
+        "delete_dataset_field",
+    }
+    expected = {}
+    expected.update(dict.fromkeys(community, "can_access_community"))
+    expected["new_dataset"] = "can_create_dataset"
+    expected["create_dataset"] = "can_create_dataset"
+    expected.update(dict.fromkeys(installation_admin, "can_administer_installation"))
+    expected.update(dict.fromkeys(access_admin, "can_manage_access"))
+    expected.update(dict.fromkeys(dataset_view, "can_view_dataset"))
+    expected.update(dict.fromkeys(dataset_export, "can_export_dataset"))
+    expected.update(dict.fromkeys(dataset_export_admin, "can_manage_export_access"))
+    expected.update(dict.fromkeys(dataset_maintain, "can_maintain_dataset"))
+    return expected
+
+
+def _route_probe_path(rule, *, dataset, team, user, field_key="missing-field"):
+    team_id = getattr(team, "id", team)
+    values = {
+        "access_id": "missing-access",
+        "action": "disable",
+        "event_id": "missing-event",
+        "field_key": field_key,
+        "int:step": "1",
+        "key": dataset.key,
+        "key_id": "missing-api-key",
+        "membership_id": "missing-membership",
+        "node_id": "missing-node",
+        "object_id": "missing-object",
+        "record_id": "missing-record",
+        "target_id": user.id,
+        "team_id": team_id,
+        "token": "missing-token",
+        "version_id": "1",
+        "dataset_id": dataset.id,
+    }
+    path = rule.rule
+    for variable in re.findall(r"<([^>]+)>", path):
+        path = path.replace(f"<{variable}>", values[variable])
+    return path
+
+
+@pytest.mark.parametrize(
+    "database_backend",
+    [
+        "sqlite",
+        pytest.param(
+            "postgresql",
+            marks=pytest.mark.skipif(
+                not os.environ.get("REFRNCR_TEST_POSTGRES_URL"),
+                reason="REFRNCR_TEST_POSTGRES_URL is not configured",
+            ),
+        ),
+    ],
+)
+def test_route_authorization_matrix(database_backend, request, monkeypatch):
+    services_fixture = request.getfixturevalue(
+        "record_services" if database_backend == "sqlite" else "postgresql_record_services"
+    )
+    _, _, services, admin = services_fixture
+    viewer = services.users.create_user(
+        admin.id, "matrix-viewer@example.com", "Viewer", "valid password"
+    )
+    maintainer = services.users.create_user(
+        admin.id, "matrix-maintainer@example.com", "Maintainer", "valid password"
+    )
+    exporter = services.users.create_user(
+        admin.id, "matrix-exporter@example.com", "Exporter", "valid password"
+    )
+    dataset = create_dataset(services, admin, "matrix-dataset")
+    owner_team_id = dataset.owner_team_id
+    services.memberships.create_membership(admin.id, maintainer.id, owner_team_id)
+    services.datasets.grant_export_access(admin.id, dataset.key, "user", exporter.id)
+    app = create_flask_app(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+    )
+    expectations = _route_matrix_expectations()
+    rules = [
+        rule
+        for rule in app.url_map.iter_rules()
+        if rule.endpoint != "static"
+        and not getattr(app.view_functions[rule.endpoint], "public_route", False)
+    ]
+    assert {rule.endpoint for rule in rules} == set(expectations)
+
+    original_has_capability = services.authorization.has_capability
+    calls = []
+
+    def traced_has_capability(user_id, capability, resource_id=None, *, uow=None):
+        calls.append((user_id, capability, resource_id))
+        return original_has_capability(user_id, capability, resource_id, uow=uow)
+
+    monkeypatch.setattr(services.authorization, "has_capability", traced_has_capability)
+    users_by_capability = {
+        "can_access_community": viewer,
+        "can_create_dataset": viewer,
+        "can_administer_installation": admin,
+        "can_manage_access": admin,
+        "can_view_dataset": viewer,
+        "can_maintain_dataset": maintainer,
+        "can_export_dataset": exporter,
+        "can_manage_export_access": admin,
+    }
+    lower_user = viewer
+    denied_for_lower = {
+        "can_administer_installation",
+        "can_manage_access",
+        "can_maintain_dataset",
+        "can_export_dataset",
+        "can_manage_export_access",
+    }
+    for rule in rules:
+        expected = expectations[rule.endpoint]
+        allowed_user = users_by_capability[expected]
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            for actor in (allowed_user, lower_user):
+                session_token, login_session = services.sessions.create(actor)
+                client = app.test_client()
+                client.set_cookie(SESSION_COOKIE, session_token, domain="localhost")
+                calls.clear()
+                path = _route_probe_path(rule, dataset=dataset, team=owner_team_id, user=viewer)
+                response = getattr(client, method.lower())(
+                    path,
+                    base_url=HTTPS,
+                    data={"csrf_token": login_session.csrf_token},
+                )
+                if not calls:
+                    assert response.status_code in {302, 400, 404, 405}
+                    continue
+                assert calls[0][1] == expected, f"{method} {rule.rule}"
+                if actor is lower_user and expected in denied_for_lower:
+                    assert response.status_code in {403, 404}, f"{method} {rule.rule}"
 
 
 def authenticated_csrf(client):

@@ -755,6 +755,15 @@ class DatasetAuthorizationService:
     def can_manage_export_access(self, actor_id, dataset_id, *, uow=None):
         return self._decision(actor_id, dataset_id, "manage_export", uow=uow)
 
+    def can_administer_installation(self, actor_id, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            actor = work.users.get(actor_id)
+            return self.active(actor) and actor.role == "admin"
+
+    def can_access_community(self, actor_id, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            return self.active(work.users.get(actor_id))
+
 
 class StaleDatasetOwnerError(ConflictError):
     """Persisted ownership no longer matches the form's expected owner."""
@@ -898,8 +907,8 @@ class DatasetService:
                 if not source_dataset_id:
                     raise ValidationError("Choose a source table for a linked mapping table.")
                 linked = uow.datasets.get(source_dataset_id)
-                visible = linked is not None and self.authorization.check_access(
-                    actor_id, "dataset", linked.id, "viewer", uow=uow
+                visible = linked is not None and self.authorization.has_capability(
+                    actor_id, "can_view_dataset", linked.id, uow=uow
                 )
                 if not visible or linked.kind != "reference":
                     raise ValidationError("Choose an available reference source table.")
@@ -1223,15 +1232,13 @@ class DatasetService:
             return DatasetConfiguration(dataset, maintain, govern, may_edit_key)
 
     def get_dataset_for_edit(self, actor_id: str, key: str) -> DatasetRecord:
-        return self._get_dataset_with_access(actor_id, key, "editor")
+        return self._get_dataset_with_access(actor_id, key, "can_maintain_dataset")
 
     def _get_dataset_with_access(
         self, actor_id: str, key: str, required_permission: str
     ) -> DatasetRecord:
         dataset = self._find_by_key(key)
-        if not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, required_permission
-        ):
+        if not self.authorization.has_capability(actor_id, required_permission, dataset.id):
             raise NotFoundError("Dataset not found")
         return dataset
 
@@ -1254,8 +1261,8 @@ class DatasetService:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             if owner_change is not None:
                 self._change_owner(uow, actor_id, dataset, *owner_change)
-            if dataset is None or not self.authorization.check_access(
-                actor_id, "dataset", dataset.id, "editor", uow=uow
+            if dataset is None or not self.authorization.has_capability(
+                actor_id, "can_maintain_dataset", dataset.id, uow=uow
             ):
                 raise NotFoundError("Dataset not found")
             validated_icon = dataset.icon if icon is None else validate_dataset_icon(icon)
@@ -1353,7 +1360,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             from refrncr.hierarchy import validate_hierarchy_scope
 
             hierarchy_scope = validate_hierarchy_scope(hierarchy_scope, dataset.kind)
@@ -1579,7 +1586,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -1670,7 +1677,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -1812,7 +1819,7 @@ class DatasetFieldService:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
@@ -1856,7 +1863,7 @@ class DatasetFieldService:
             raise ValidationError("Field order contains duplicate fields")
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             current = tuple(field.id for field in fields)
             if expected_order != current:
@@ -1903,11 +1910,11 @@ class DatasetFieldService:
     def _require_dataset_access(
         self, actor_id: str, dataset: DatasetRecord | None, required_permission: str, *, uow=None
     ) -> None:
-        if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, required_permission, uow=uow
+        if dataset is None or not self.authorization.has_capability(
+            actor_id, required_permission, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
-        if required_permission in {"admin", "editor"}:
+        if required_permission == "can_maintain_dataset":
             if uow is not None:
                 _require_concept(uow, dataset.id)
             else:
@@ -1995,7 +2002,7 @@ class DatasetBusinessKeyService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_dataset_access(actor_id, dataset, "admin", uow=uow)
+            self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if not isinstance(field_keys, tuple) or not field_keys:
                 raise ValidationError("At least one business-key field is required")
             if any(not isinstance(field_key, str) for field_key in field_keys):
@@ -2042,11 +2049,11 @@ class DatasetBusinessKeyService:
     def _require_dataset_access(
         self, actor_id: str, dataset: DatasetRecord | None, required_permission: str, *, uow=None
     ) -> None:
-        if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, required_permission, uow=uow
+        if dataset is None or not self.authorization.has_capability(
+            actor_id, required_permission, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
-        if required_permission in {"admin", "editor"}:
+        if required_permission == "can_maintain_dataset":
             if uow is not None:
                 _require_concept(uow, dataset.id)
             else:
@@ -2072,7 +2079,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor", uow=uow)
+            self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if dataset.kind == "mapping" and dataset.mapping_mode == "linked":
                 raise ValidationError("Linked mapping records are populated from the source table")
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
@@ -2120,7 +2127,7 @@ class DatasetRecordService:
             return StoredRecord(record.id, dataset.id, tuple(values), 1)
 
     def get_record_for_edit(self, actor_id: str, dataset_key: str, record_id: str) -> StoredRecord:
-        dataset = self._find_dataset(actor_id, dataset_key, "editor")
+        dataset = self._find_dataset(actor_id, dataset_key, "can_maintain_dataset")
         with self.uow() as uow:
             record = uow.dataset_records.get(dataset.id, record_id)
         if record is None:
@@ -2142,7 +2149,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor", uow=uow)
+            self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             existing = uow.dataset_records.get(dataset.id, record_id)
             if existing is None:
                 raise NotFoundError("Record not found")
@@ -2197,7 +2204,7 @@ class DatasetRecordService:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-            self._require_access(actor_id, dataset, "editor", uow=uow)
+            self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             uow.concepts.record_mutation(dataset.id)
@@ -2217,7 +2224,7 @@ class DatasetRecordService:
         key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(key, for_update=True)
-            self._require_access(actor_id, dataset, "editor", uow=uow)
+            self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if _require_concept(uow, dataset.id).id != concept_id:
                 raise NotFoundError("Record not found")
             deleted = next(
@@ -2361,7 +2368,7 @@ class DatasetRecordService:
             with self.uow(translate_errors=True) as uow:
                 uow.begin_export_snapshot()
                 dataset = uow.datasets.find_by_key(validated_key)
-                self._require_access(actor_id, dataset, "export", uow=uow)
+                self._require_access(actor_id, dataset, "can_export_dataset", uow=uow)
                 dataset_id = dataset.id
                 _dataset, selected, _maintain = _version_reads(self)._selection(
                     uow, actor_id, validated_key, version_id, prefer_concept=prefer_concept
@@ -2482,7 +2489,7 @@ class DatasetRecordService:
         return incomplete, tuple(result), record.id
 
     def get_dataset_for_add(self, actor_id: str, dataset_key: str) -> DatasetRecord:
-        return self._find_dataset(actor_id, dataset_key, "editor")
+        return self._find_dataset(actor_id, dataset_key, "can_maintain_dataset")
 
     def _find_dataset(self, actor_id: str, key: str, permission: str) -> DatasetRecord:
         validated = DatasetFieldService._validated_dataset_lookup_key(key)
@@ -2494,16 +2501,16 @@ class DatasetRecordService:
     def _require_access(
         self, actor_id: str, dataset: DatasetRecord | None, permission: str, *, uow=None
     ) -> None:
-        if dataset is None or not self.authorization.check_access(
-            actor_id, "dataset", dataset.id, permission, uow=uow
+        if dataset is None or not self.authorization.has_capability(
+            actor_id, permission, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
-        if dataset.kind == "hierarchy" and permission != "export":
+        if dataset.kind == "hierarchy" and permission != "can_export_dataset":
             raise ValidationError(
                 "Use the hierarchy views to maintain this table. "
                 "Hierarchy import is not available yet."
             )
-        if permission in {"admin", "editor"}:
+        if permission == "can_maintain_dataset":
             if uow is not None:
                 _require_concept(uow, dataset.id)
             else:
@@ -2512,7 +2519,12 @@ class DatasetRecordService:
 
 
 class GrantService:
-    """Administrator-controlled lifecycle for resource Grants."""
+    """Deprecated compatibility service for historical resource Grants.
+
+    Browser and current Community APIs must use ``AuthorizationService`` named
+    capabilities. The grants table and this programmatic compatibility service
+    remain available until a separate deprecation decision authorizes removal.
+    """
 
     def __init__(self, uow: UnitOfWorkFactory, resources: ResourceTypeRegistry) -> None:
         self.uow = uow
@@ -2614,6 +2626,13 @@ class GrantService:
     _add_audit = staticmethod(UserService._add_audit)
 
 
+def create_deprecated_grant_service(
+    uow: UnitOfWorkFactory, resources: ResourceTypeRegistry
+) -> GrantService:
+    """Create the isolated Grant compatibility service for non-web callers."""
+    return GrantService(uow, resources)
+
+
 class AuthorizationService:
     """Single resource-permission engine plus the separate Community admin rule."""
 
@@ -2638,6 +2657,7 @@ class AuthorizationService:
     def check_access(
         self, user_id: str, resource_type: str, resource_id: str, required: str, *, uow=None
     ) -> bool:
+        """Deprecated GrantService compatibility API; use has_capability instead."""
         if resource_type == "dataset":
             if self.datasets is None:
                 return False
@@ -2655,6 +2675,47 @@ class AuthorizationService:
         if context.subject.exists and context.subject.active and not context.subject.deleted:
             self.resources.require_existing(resource_type, resource_id)
         return permits(context.subject, context.permissions, required)
+
+    def has_capability(self, user_id: str, capability: str, resource_id=None, *, uow=None) -> bool:
+        """Evaluate a named Community capability at one authorization boundary."""
+        installation_capabilities = {
+            "can_access_community": (
+                getattr(self.datasets, "can_access_community", None) if self.datasets else None
+            ),
+            "can_administer_installation": (
+                getattr(self.datasets, "can_administer_installation", None)
+                if self.datasets
+                else None
+            ),
+            "can_manage_access": (
+                getattr(self.datasets, "can_administer_installation", None)
+                if self.datasets
+                else None
+            ),
+            "can_create_dataset": (
+                getattr(self.datasets, "can_create_dataset", None) if self.datasets else None
+            ),
+        }
+        if capability in installation_capabilities:
+            decision = installation_capabilities[capability]
+            if resource_id is not None or decision is None:
+                raise ValidationError(f"Unknown or incomplete capability: {capability}")
+            return decision(user_id, uow=uow)
+        dataset_capabilities = {
+            "can_view_dataset": self.datasets.can_view_dataset if self.datasets else None,
+            "can_maintain_dataset": self.datasets.can_maintain_dataset if self.datasets else None,
+            "can_export_dataset": self.datasets.can_export_dataset if self.datasets else None,
+            "can_change_dataset_owner": (
+                self.datasets.can_change_dataset_owner if self.datasets else None
+            ),
+            "can_manage_export_access": (
+                self.datasets.can_manage_export_access if self.datasets else None
+            ),
+        }
+        decision = dataset_capabilities.get(capability)
+        if decision is None or resource_id is None:
+            raise ValidationError(f"Unknown or incomplete capability: {capability}")
+        return decision(user_id, resource_id, uow=uow)
 
     def authorized_resources(
         self, user_id: str, resource_type: str, required: str

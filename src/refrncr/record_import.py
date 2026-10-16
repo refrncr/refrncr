@@ -1259,7 +1259,7 @@ class DatasetRecordImportService:
             target = read_uow.datasets.find_by_key(validated_key)
         if target is None:
             raise NotFoundError("Dataset not found")
-        self.records._require_access(actor_id, target, "editor")
+        self.records._require_access(actor_id, target, "can_maintain_dataset")
         state = self._bound_state(token, actor_id, session_id, target.id)
         if (
             state.busy
@@ -1273,7 +1273,7 @@ class DatasetRecordImportService:
         try:
             with self.uow(write=True, serialized=True) as uow:
                 dataset = uow.datasets.find_by_key(validated_key, for_update=True)
-                self.records._require_access(actor_id, dataset, "editor", uow=uow)
+                self.records._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
                 if dataset.id != state.dataset_id:
                     raise NotFoundError("Import not found")
                 concept = uow.concepts.get(dataset.id)
@@ -1460,7 +1460,7 @@ class DatasetRecordImportService:
         with self.uow() as uow:
             uow.begin_export_snapshot()
             dataset = uow.datasets.get(dataset_id)
-            self.records._require_access(actor_id, dataset, "editor", uow=uow)
+            self.records._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             concept = uow.concepts.get(dataset_id)
             if concept is None or concept.id != concept_id:
                 raise NotFoundError("Import not found")

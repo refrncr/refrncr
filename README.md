@@ -218,7 +218,9 @@ export it. Team deletion requires reassignment of every owned Dataset first.
 Every active Community user can discover and read all Datasets and create a Dataset for one of
 their teams. Administrators can create for any team and manage ownership and additional user/team
 export access. Read access alone does not permit export. Historical Dataset viewer/editor/admin
-Grants and creator metadata confer no Dataset rights.
+Grants and creator metadata confer no Dataset rights. Grants are deprecated
+programmatic compatibility data; browser and current Community APIs use named
+capabilities instead.
 
 Existing installations must resolve ambiguous ownership before upgrading. See
 [Dataset governance and operator preflight](docs/development/dataset-governance.md) for the
@@ -240,7 +242,8 @@ transactional mutation events, import summaries and prepared export request sema
 
 Published Dataset versions are immutable complete snapshots with UTC effective dates. Ordinary users read the
 Current snapshot; active owning-team members and Community administrators manage the concept,
-publish and cancel Scheduled versions. Historical Grants grant no editing or publication rights.
+publish and cancel Scheduled versions. Historical Grants grant no editing or publication rights
+and are not exposed through the browser or current Community API.
 See [Dataset versions and upgrade preflight](docs/development/dataset-versions.md) before upgrading
 an existing installation: every Dataset must have valid Fields, an identifier and valid values.
 The controlled upgrade creates one System-published Version 1 per valid Dataset and fails closed
