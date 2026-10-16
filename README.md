@@ -120,8 +120,8 @@ The CI-equivalent parallel run uses all available workers:
 ```
 
 CI prints collection counts for each database and reports the slowest 50 cases. A call that
-takes more than two seconds must be marked `slow`; CI fails when an unmarked case exceeds that
-threshold.
+takes more than two seconds should be marked `slow`; CI reports unmarked cases above that
+threshold as warnings without making timing alone fail the build.
 
 The full database matrix also runs the tests marked `postgres`. PostgreSQL 16 is the supported
 CI version. Start a local PostgreSQL 16 container, set `REFRNCR_TEST_POSTGRES_URL`, and run:

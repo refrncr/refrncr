@@ -232,6 +232,7 @@ def test_retained_values_survive_publication_and_conflicts_remain_reviewable(con
     assert {r.id for r in content(c, second).records} == {former_leaf.id, other.id, child.id}
 
 
+@pytest.mark.slow
 def test_branch_values_and_scope_changes_are_versioned_and_reviewed(context):
     c = context
     root = prepare(c)

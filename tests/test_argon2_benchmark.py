@@ -38,6 +38,13 @@ def test_profile_is_read_from_the_application_password_hasher():
     }
 
 
+def test_application_hashes_use_the_production_profile():
+    password_hash = PASSWORD_HASHER.hash("synthetic production-profile password")
+
+    assert password_hash.startswith("$argon2id$v=19$m=65536,t=3,p=4$")
+    assert PASSWORD_HASHER.verify(password_hash, "synthetic production-profile password")
+
+
 def test_benchmark_produces_structured_output_without_wall_clock_assumptions(monkeypatch, capsys):
     ticks = iter(range(0, 13_000_000, 1_000_000))
     monkeypatch.setattr(argon2_benchmark, "PASSWORD_HASHER", FakeHasher())

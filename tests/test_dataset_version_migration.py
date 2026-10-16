@@ -139,6 +139,7 @@ def test_empty_upgrade_from_every_supported_revision(audit_db, revision):
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 0
 
 
+@pytest.mark.slow
 def test_migration_copy_failure_rolls_back_schema_and_all_versions(context, monkeypatch):
     from refrncr.version_persistence import SqlAlchemyVersionOperations
 

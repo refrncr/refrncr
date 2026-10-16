@@ -153,6 +153,9 @@ def test_hierarchy_endpoint_returns_complete_flat_snapshot(hierarchy_api):
     assert nodes["Branch"]["record_identifier"] is None
     assert nodes["Nested leaf"]["record_identifier"]
     assert nodes["Direct leaf"]["record_identifier"]
+    assert [record["identifier"] for record in body["data"]["records"]] == sorted(
+        record["identifier"] for record in body["data"]["records"]
+    )
     assert {record["values"]["code"] for record in body["data"]["records"]} == {
         "direct",
         "nested",

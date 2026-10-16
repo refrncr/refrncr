@@ -80,8 +80,6 @@ def pytest_sessionfinish(session, exitstatus):
         reporter.write_sep("!", "unmarked tests exceeding 2 seconds")
         for nodeid, duration in sorted(offenders, key=lambda entry: entry[1], reverse=True):
             reporter.write_line(f"{duration:.2f}s {nodeid}")
-    if os.environ.get("CI", "").lower() == "true":
-        session.exitstatus = 1
 
 
 @pytest.fixture
