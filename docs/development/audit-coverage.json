@@ -3074,11 +3074,7 @@
       "operation": "check_access",
       "service": "refrncr.services.AuthorizationService.check_access",
       "interface_entrypoints": [
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6390,6 +6386,118 @@
       "implementation_status": "Implemented for REF-207 N+1 lookup reduction.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing DatasetField read boundary; no new domain persistence."
+    },
+    {
+      "capability": "AuthorizationService",
+      "operation": "has_capability",
+      "service": "refrncr.services.AuthorizationService.has_capability",
+      "interface_entrypoints": [
+        "refrncr.web.audit_list GET /settings/audit-log",
+        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.user_list GET /users",
+        "refrncr.web.create_user POST /users",
+        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.create_team POST /teams",
+        "refrncr.web.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.delete_team POST /teams/<team_id>/delete",
+        "refrncr.web.team_members GET /teams/<team_id>/members",
+        "refrncr.web.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "Internal capability predicate; the authoritative route boundary owns denial logging and the documented HTTP response.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, credentials or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use only trusted stable identifiers in security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Returns an authorization decision without changing business state.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; the route boundary rejects without committed business state changes.",
+      "stale_input": "No mutation CAS; decision uses the current authorization snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_interfaces.py::test_route_authorization_matrix"
+      ],
+      "implementation_status": "Implemented for REF-220 centralized route capability enforcement.",
+      "exclusion_reason": "Pure policy/read decision; denied or suspicious requests are REF-31 security logging.",
+      "persistence_scope": "Existing authorization service boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetAuthorizationService",
+      "operation": "can_access_community",
+      "service": "refrncr.services.DatasetAuthorizationService.can_access_community",
+      "interface_entrypoints": [
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "Internal dataset capability predicate; the authoritative route boundary owns denial logging and the documented HTTP response.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, credentials or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use only trusted dataset identifiers in security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Returns a dataset authorization decision without changing business state.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; the route boundary rejects without committed business state changes.",
+      "stale_input": "No mutation CAS; decision uses the current authorization snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_interfaces.py::test_route_authorization_matrix"
+      ],
+      "implementation_status": "Implemented for REF-220 centralized route capability enforcement.",
+      "exclusion_reason": "Capability calculation only; the authoritative caller owns the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
+      "persistence_scope": "Existing dataset authorization service boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetAuthorizationService",
+      "operation": "can_administer_installation",
+      "service": "refrncr.services.DatasetAuthorizationService.can_administer_installation",
+      "interface_entrypoints": [
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "Internal installation capability predicate; the authoritative route boundary owns denial logging and the documented HTTP response.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, credentials or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use only trusted installation identifiers in security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Returns an installation authorization decision without changing business state.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; the route boundary rejects without committed business state changes.",
+      "stale_input": "No mutation CAS; decision uses the current authorization snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_interfaces.py::test_route_authorization_matrix"
+      ],
+      "implementation_status": "Implemented for REF-220 centralized route capability enforcement.",
+      "exclusion_reason": "Capability calculation only; the authoritative caller owns the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
+      "persistence_scope": "Existing dataset authorization service boundary; no new domain persistence."
     }
   ]
 }
