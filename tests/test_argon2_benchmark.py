@@ -41,11 +41,12 @@ def test_profile_is_read_from_the_application_password_hasher():
     }
 
 
-def test_application_service_hashes_use_the_production_profile():
+def test_application_service_hashes_use_the_production_profile(monkeypatch):
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     sessions = create_session_factory(engine)
-    users = UserService(SqlAlchemyUnitOfWorkFactory(sessions), hasher=PASSWORD_HASHER)
+    monkeypatch.setattr("refrncr.services.PASSWORD_HASHER", PASSWORD_HASHER)
+    users = UserService(SqlAlchemyUnitOfWorkFactory(sessions))
     users.bootstrap_organisation()
     admin = users.create_initial_admin(
         "argon2@example.com", "Argon2 test", "synthetic production-profile password"
