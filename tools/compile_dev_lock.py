@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from argparse import ArgumentParser
 from importlib.metadata import version
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 PIP_TOOLS_VERSION = "7.6.1"
 CANONICAL_PLATFORM = "linux"
@@ -36,6 +38,7 @@ COMPILE_FLAGS = (
     str(INPUT.relative_to(ROOT)),
 )
 FRESH_COMPILE_FLAGS = tuple(flag for flag in COMPILE_FLAGS if flag != "--reuse-hashes")
+PINNED_REQUIREMENT = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s\\;]+)")
 
 
 def is_canonical_environment(
@@ -50,6 +53,15 @@ def is_canonical_environment(
         and github_actions == "true"
         and image_os == "ubuntu24"
     )
+
+
+def write_version_constraints(lock: Path, destination: Path) -> None:
+    constraints = [
+        f"{match.group(1)}=={match.group(2)}"
+        for line in lock.read_text().splitlines()
+        if (match := PINNED_REQUIREMENT.match(line))
+    ]
+    destination.write_text("\n".join(constraints) + "\n")
 
 
 def main() -> int:
@@ -83,15 +95,33 @@ def main() -> int:
 
     environment = os.environ.copy()
     environment["CUSTOM_COMPILE_COMMAND"] = "python tools/compile_dev_lock.py"
-    flags = FRESH_COMPILE_FLAGS if arguments.fresh else COMPILE_FLAGS
-    if arguments.fresh:
-        OUTPUT.unlink(missing_ok=True)
-    return subprocess.run(
-        [sys.executable, "-m", "piptools", "compile", *flags],
-        cwd=ROOT,
-        env=environment,
-        check=False,
-    ).returncode
+    if not arguments.fresh:
+        return subprocess.run(
+            [sys.executable, "-m", "piptools", "compile", *COMPILE_FLAGS],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+        ).returncode
+
+    if not OUTPUT.exists():
+        print(f"cannot preserve versions: {OUTPUT} does not exist", file=sys.stderr)
+        return 2
+    with TemporaryDirectory() as temporary_directory:
+        constraints = Path(temporary_directory) / "dev-versions.txt"
+        write_version_constraints(OUTPUT, constraints)
+        OUTPUT.unlink()
+        flags = (*FRESH_COMPILE_FLAGS, "--constraint", str(constraints))
+        result = subprocess.run(
+            [sys.executable, "-m", "piptools", "compile", *flags],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+        )
+        if result.returncode == 0:
+            generated = OUTPUT.read_text()
+            generated = generated.replace(f"-c {constraints}, ", "")
+            OUTPUT.write_text(generated)
+        return result.returncode
 
 
 if __name__ == "__main__":

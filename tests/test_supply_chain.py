@@ -16,6 +16,7 @@ from tools.compile_dev_lock import (
 from tools.compile_dev_lock import (
     PIP_TOOLS_VERSION as DEV_PIP_TOOLS_VERSION,
 )
+from tools.compile_dev_lock import write_version_constraints
 from tools.compile_release_lock import (
     CANONICAL_PLATFORM,
     CANONICAL_PYTHON,
@@ -167,6 +168,16 @@ def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
     security = (ROOT / ".github/workflows/security.yml").read_text()
     assert "python tools/compile_dev_lock.py --fresh" in security
     assert "git diff --exit-code -- requirements/dev.txt" in security
+
+
+def test_fresh_development_lock_constraints_preserve_versions_without_hashes(tmp_path):
+    lock = tmp_path / "dev.txt"
+    lock.write_text("# generated\n\nalpha==1.2.3\n--hash=sha256:old\nbeta==4.5.6\n")
+    constraints = tmp_path / "constraints.txt"
+
+    write_version_constraints(lock, constraints)
+
+    assert constraints.read_text() == "alpha==1.2.3\nbeta==4.5.6\n"
 
 
 def parse_pins(path):
