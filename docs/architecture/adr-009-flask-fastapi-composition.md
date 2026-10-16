@@ -19,8 +19,13 @@ Users, sessions, and audit events contain no generic tenant-scoping columns. Clo
 and tenant isolation are separate concerns of `refrncr-cloud`, not extension requirements imposed
 on the Community database model.
 
-The domain and application layers import neither framework. REF-33 does not introduce a public
-user-management REST contract; future FastAPI endpoints will call the same services as Flask.
+The domain and application layers import neither framework. Authorization is exposed to browser
+composition through named capabilities such as `can_view_dataset`, `can_maintain_dataset`,
+`can_manage_export_access` and `can_administer_installation`; Flask does not translate the legacy
+`viewer`/`editor`/`admin` vocabulary at route boundaries. Every state-changing browser method is
+CSRF-protected by the request method, independently of its endpoint name. REF-33 does not
+introduce a public user-management REST contract; future FastAPI endpoints will call the same
+services as Flask.
 
 ## Consequences
 

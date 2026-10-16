@@ -349,6 +349,31 @@ def create_flask_app(
                 )
                 return redirect(url_for("login", next=target))
 
+    @app.before_request
+    def enforce_csrf_for_state_changes():
+        """Protect every browser state change independently of endpoint names."""
+        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+            return None
+        if request.endpoint is None:
+            return None
+        settings = cookie_settings()
+        if request.endpoint == "logout" and (
+            settings is None or request.cookies.get(settings.session_name) is None
+        ):
+            return None
+        resolved = authenticated()
+        expected = (
+            request.cookies.get(settings.anonymous_csrf_name)
+            if request.endpoint in {"setup", "login"} and settings
+            else resolved[1].csrf_token
+            if resolved is not None
+            else request.cookies.get(settings.anonymous_csrf_name)
+            if settings
+            else None
+        )
+        require_csrf(expected)
+        return None
+
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
         if endpoint.startswith("api_key_"):
@@ -454,9 +479,18 @@ def create_flask_app(
         context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
         return render_template(template_name, **context)
 
-    def require_admin():
+    def require_capability(capability: str):
         resolved = authenticated()
-        if resolved is None or resolved[0].role != "admin":
+        allowed = (
+            resolved is not None
+            and capability
+            in {
+                "can_administer_installation",
+                "can_manage_access",
+            }
+            and resolved[0].role == "admin"
+        )
+        if not allowed:
             audit_security(
                 "security.authorization_denied",
                 actor_user_id=resolved[0].id if resolved else None,
@@ -586,7 +620,6 @@ def create_flask_app(
             return "API key not found", 404
         error = None
         if request.method == "POST":
-            require_csrf(session.csrf_token)
             try:
                 revision = parse_expected_revision(request.form.get("revision"))
                 if len(request.form.getlist("revision")) != 1 or request.form.getlist(
@@ -604,7 +637,7 @@ def create_flask_app(
 
     @app.get("/settings/audit-log")
     def audit_list():
-        actor, _session = require_admin()
+        actor, _session = require_capability("can_administer_installation")
         try:
             if len(request.query_string) > 4096:
                 raise ValidationError(
@@ -637,7 +670,7 @@ def create_flask_app(
 
     @app.get("/settings/audit-log/<event_id>")
     def audit_detail(event_id):
-        actor, _session = require_admin()
+        actor, _session = require_capability("can_administer_installation")
         try:
             item = audit_history.get_event(actor.id, event_id)
             if request.args:
@@ -3379,7 +3412,7 @@ def create_flask_app(
             dataset = dataset_service.get_dataset(actor_id, key)
         except NotFoundError:
             abort(404)
-        if not authorization_service.check_access(actor_id, "dataset", dataset.id, "admin"):
+        if not authorization_service.has_capability(actor_id, "can_maintain_dataset", dataset.id):
             audit_security("security.authorization_denied", actor_user_id=actor_id)
             abort(404)
         return dataset
@@ -3836,7 +3869,7 @@ def create_flask_app(
         )
 
     def render_user_list(*, form_error=None, form_target_id=None, form_data=None, status=200):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         managed_users = users.list_users(actor.id)
         user_teams = {}
         for relationship in memberships.list_relationships(actor.id):
@@ -3864,7 +3897,7 @@ def create_flask_app(
 
     @app.post("/users")
     def create_user():
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             users.create_user(
@@ -3884,7 +3917,7 @@ def create_flask_app(
 
     @app.post("/users/<target_id>/<action>")
     def change_user_state(target_id: str, action: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         operations = {
             "disable": users.disable_user,
@@ -3902,7 +3935,7 @@ def create_flask_app(
 
     @app.post("/users/<target_id>/email")
     def change_user_email(target_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             users.change_email(actor.id, target_id, request.form.get("email", ""))
@@ -3965,7 +3998,7 @@ def create_flask_app(
 
     @app.post("/teams")
     def create_team():
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.create_team(actor.id, request.form.get("name", ""))
@@ -3979,7 +4012,7 @@ def create_flask_app(
 
     @app.post("/teams/<team_id>/rename")
     def rename_team(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.rename_team(actor.id, team_id, request.form.get("name", ""))
@@ -3996,7 +4029,7 @@ def create_flask_app(
 
     @app.post("/teams/<team_id>/delete")
     def delete_team(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             teams.delete_team(actor.id, team_id)
@@ -4006,7 +4039,7 @@ def create_flask_app(
 
     @app.get("/teams/<team_id>/members")
     def team_members(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         managed_members = memberships.list_team_members(actor.id, team_id)
         eligible_users = memberships.list_eligible_users(actor.id, team_id)
         return render_template(
@@ -4022,7 +4055,7 @@ def create_flask_app(
 
     @app.post("/teams/<team_id>/members")
     def create_membership(team_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             memberships.create_membership(actor.id, request.form["user_id"], team_id)
@@ -4038,7 +4071,7 @@ def create_flask_app(
 
     @app.post("/teams/<team_id>/members/<membership_id>/delete")
     def delete_membership(team_id: str, membership_id: str):
-        actor, login_session = require_admin()
+        actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
             memberships.delete_membership(actor.id, team_id, membership_id)

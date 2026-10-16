@@ -524,7 +524,7 @@ _register(
 )
 _read(
     "AuthorizationService",
-    "effective_permission check_access authorized_resources",
+    "effective_permission check_access authorized_resources has_capability",
     "Pure policy/read decision; denied or suspicious requests are REF-31 security logging.",
 )
 _read(

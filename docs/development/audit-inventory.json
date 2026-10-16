@@ -58,6 +58,7 @@
     "refrncr.services.AuthorizationService.authorized_resources",
     "refrncr.services.AuthorizationService.check_access",
     "refrncr.services.AuthorizationService.effective_permission",
+    "refrncr.services.AuthorizationService.has_capability",
     "refrncr.services.DatasetAuthorizationService.active",
     "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
     "refrncr.services.DatasetAuthorizationService.can_create_dataset",
@@ -916,7 +917,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.DatasetFieldService.list_fields",
         "refrncr.services.DatasetService.get_dataset",
         "refrncr.services.DatasetService.get_dataset_for_edit",
@@ -933,7 +934,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.DatasetFieldService.create_field",
         "refrncr.services.DatasetFieldService.list_fields",
         "refrncr.services.DatasetService.get_dataset",
@@ -952,7 +953,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.DatasetBusinessKeyService.get_business_key",
         "refrncr.services.DatasetFieldService.get_field",
         "refrncr.services.DatasetService.get_dataset",
@@ -970,7 +971,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.DatasetFieldService.get_field",
         "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
         "refrncr.services.DatasetService.get_dataset",
@@ -989,7 +990,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.AuthorizationService.check_access",
+        "refrncr.services.AuthorizationService.has_capability",
         "refrncr.services.DatasetBusinessKeyService.get_business_key",
         "refrncr.services.DatasetFieldService.delete_field",
         "refrncr.services.DatasetFieldService.get_field",
