@@ -12,6 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       REFRNCR_TEST_POSTGRES_URL: postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test
 
@@ -52,12 +53,12 @@ jobs:
         run: |
           python -m coverage erase
           python -m pytest --collect-only -q -m 'not postgres'
-          python -m pytest --run-slow -n auto --durations=50 -m 'not postgres' -q --cov --cov-append --cov-report= --cov-fail-under=0
+          python -m pytest --run-slow -n auto --durations=50 --timeout=300 --timeout-method=thread -m 'not postgres' -q --cov --cov-append --cov-report= --cov-fail-under=0
 
       - name: Test PostgreSQL suite
         run: |
           python -m pytest --collect-only -q -m postgres
-          python -m pytest --run-slow -n auto --durations=50 -m postgres -q --cov --cov-append --cov-report= --cov-fail-under=0
+          python -m pytest --run-slow -n auto --durations=50 --timeout=300 --timeout-method=thread -m postgres -q --cov --cov-append --cov-report= --cov-fail-under=0
 
       - name: Report combined coverage
         run: python -m coverage report --fail-under=90
