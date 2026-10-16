@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 from itertools import chain, combinations
@@ -6,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
-from support import html_elements, html_tag_texts
+from support import create_dataset, html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
@@ -166,16 +167,151 @@ def test_every_browser_route_declares_a_known_capability_or_public_access(interf
         assert getattr(view, "required_capability", None) in known, rule.endpoint
 
 
-def test_renamed_team_route_is_csrf_protected(interface):
-    _, _, authentication, _, teams, _, client = interface
+def test_renamed_views_keep_csrf_and_capability_checks():
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+        dataset_fields,
+        dataset_business_keys,
+    ) = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+    )
+    app.add_url_rule(
+        "/renamed-teams/<team_id>",
+        endpoint="renamed_team_view",
+        view_func=app.view_functions["rename_team"],
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/renamed-datasets/<key>/fields",
+        endpoint="renamed_dataset_field_view",
+        view_func=app.view_functions["create_dataset_field"],
+        methods=["POST"],
+    )
+    client = app.test_client()
     setup_admin(client)
     assert login(client).status_code == 302
     admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
     team = teams.create_team(admin.id, "Before rename")
+    dataset = datasets.create_dataset(admin.id, "renamed-dataset", "Renamed dataset", "")
 
-    response = request(client, "post", f"/teams/{team.id}/rename", data={"name": "After rename"})
+    for path in (
+        f"/renamed-teams/{team.id}",
+        f"/renamed-datasets/{dataset.key}/fields",
+    ):
+        response = request(client, "post", path, data={"name": "After rename"})
+        assert response.status_code == 403
 
+    regular = users.create_user(
+        admin.id, "renamed-regular@example.com", "Regular", "valid password"
+    )
+    assert login(client, regular.email, "valid password").status_code == 302
+    token = sessions.resolve_with_session(client.get_cookie(SESSION_COOKIE).value)[1].csrf_token
+    response = request(
+        client,
+        "post",
+        f"/renamed-teams/{team.id}",
+        data={"name": "After rename", "csrf_token": token},
+    )
     assert response.status_code == 403
+    response = request(
+        client,
+        "post",
+        f"/renamed-datasets/{dataset.key}/fields",
+        data={"name": "Field", "csrf_token": token},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "database_backend",
+    [
+        "sqlite",
+        pytest.param(
+            "postgresql",
+            marks=pytest.mark.skipif(
+                not os.environ.get("REFRNCR_TEST_POSTGRES_URL"),
+                reason="REFRNCR_TEST_POSTGRES_URL is not configured",
+            ),
+        ),
+    ],
+)
+def test_route_authorization_matrix(database_backend, request):
+    services_fixture = request.getfixturevalue(
+        "record_services" if database_backend == "sqlite" else "postgresql_record_services"
+    )
+    _, _, services, admin = services_fixture
+    regular = services.users.create_user(
+        admin.id, "matrix-regular@example.com", "Regular", "valid password"
+    )
+    services.users.disable_user(admin.id, regular.id)
+    dataset = create_dataset(services, admin, "matrix-dataset")
+    route_capabilities = {}
+    app = create_flask_app(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+    )
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = app.view_functions[rule.endpoint]
+        if not getattr(view, "public_route", False):
+            route_capabilities[rule.endpoint] = view.required_capability
+
+    known = {
+        "can_access_community",
+        "can_administer_installation",
+        "can_manage_access",
+        "can_view_dataset",
+        "can_maintain_dataset",
+        "can_export_dataset",
+        "can_create_dataset",
+        "can_manage_export_access",
+    }
+    assert route_capabilities
+    assert set(route_capabilities.values()) <= known
+    for capability in route_capabilities.values():
+        installation = capability in {
+            "can_access_community",
+            "can_administer_installation",
+            "can_manage_access",
+            "can_create_dataset",
+        }
+        resource_id = None
+        if not installation:
+            resource_id = dataset.id
+        if capability == "can_create_dataset":
+            admin_access = services.authorization.datasets.can_create_dataset(admin.id)
+            regular_access = services.authorization.datasets.can_create_dataset(regular.id)
+        else:
+            admin_access = services.authorization.has_capability(admin.id, capability, resource_id)
+            regular_access = services.authorization.has_capability(
+                regular.id, capability, resource_id
+            )
+        assert admin_access
+        assert regular_access is False, capability
 
 
 def authenticated_csrf(client):
