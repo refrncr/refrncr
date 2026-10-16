@@ -2692,6 +2692,9 @@ class AuthorizationService:
                 if self.datasets
                 else None
             ),
+            "can_create_dataset": (
+                getattr(self.datasets, "can_create_dataset", None) if self.datasets else None
+            ),
         }
         if capability in installation_capabilities:
             decision = installation_capabilities[capability]

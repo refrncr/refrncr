@@ -444,6 +444,7 @@ def create_flask_app(
             "can_access_community",
             "can_administer_installation",
             "can_manage_access",
+            "can_create_dataset",
         }:
             require_capability(capability)
             return None
