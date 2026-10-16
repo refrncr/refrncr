@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from argparse import ArgumentParser
 from importlib.metadata import version
 from pathlib import Path
 
@@ -34,6 +35,7 @@ COMPILE_FLAGS = (
     f"--output-file={OUTPUT.relative_to(ROOT)}",
     str(INPUT.relative_to(ROOT)),
 )
+FRESH_COMPILE_FLAGS = tuple(flag for flag in COMPILE_FLAGS if flag != "--reuse-hashes")
 
 
 def is_canonical_environment(
@@ -51,6 +53,13 @@ def is_canonical_environment(
 
 
 def main() -> int:
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="remove the existing output and regenerate without reusing its hashes",
+    )
+    arguments = parser.parse_args()
     if not is_canonical_environment(
         sys.platform,
         sys.version_info[:2],
@@ -74,8 +83,11 @@ def main() -> int:
 
     environment = os.environ.copy()
     environment["CUSTOM_COMPILE_COMMAND"] = "python tools/compile_dev_lock.py"
+    flags = FRESH_COMPILE_FLAGS if arguments.fresh else COMPILE_FLAGS
+    if arguments.fresh:
+        OUTPUT.unlink(missing_ok=True)
     return subprocess.run(
-        [sys.executable, "-m", "piptools", "compile", *COMPILE_FLAGS],
+        [sys.executable, "-m", "piptools", "compile", *flags],
         cwd=ROOT,
         env=environment,
         check=False,

@@ -11,6 +11,9 @@ from tools.compile_dev_lock import (
     COMPILE_FLAGS as DEV_COMPILE_FLAGS,
 )
 from tools.compile_dev_lock import (
+    FRESH_COMPILE_FLAGS as DEV_FRESH_COMPILE_FLAGS,
+)
+from tools.compile_dev_lock import (
     PIP_TOOLS_VERSION as DEV_PIP_TOOLS_VERSION,
 )
 from tools.compile_release_lock import (
@@ -120,30 +123,25 @@ def test_release_lock_generator_pins_tool_and_all_relevant_flags():
 def test_development_tool_pins_match_project_hooks_and_workflows():
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text())
     dev = metadata["project"]["optional-dependencies"]["dev"]
-    dev_input = (ROOT / "requirements/dev.in").read_text()
-    dev_lock = (ROOT / "requirements/dev.txt").read_text()
+    dev_input = parse_pins(ROOT / "requirements/dev.in")
+    dev_lock = parse_pins(ROOT / "requirements/dev.txt")
     pre_commit = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
     release = load_workflow("release.yml")
 
-    expected = {
-        "ruff": "0.16.5",
-        "pytest": "8.4.2",
-        "pytest-cov": "6.2.1",
-        "cyclonedx-bom": "7.4.0",
-    }
-    for package, pinned in expected.items():
+    for package, pinned in dev_input.items():
         assert f"{package}=={pinned}" in dev
-        assert f"{package}=={pinned}" in dev_input
-        assert f"{package}=={pinned}" in dev_lock
+        assert dev_lock[package] == pinned
 
     ruff_hook = next(repo for repo in pre_commit["repos"] if "ruff-pre-commit" in repo["repo"])
-    assert ruff_hook["rev"] == "v0.16.5"
-    release_install = next(
+    assert ruff_hook["rev"] == f"v{dev_input['ruff']}"
+    release_install = "\n".join(
         step["run"]
         for step in release["jobs"]["build"]["steps"]
-        if "cyclonedx-bom==" in step.get("run", "")
+        if "pip install" in step.get("run", "")
     )
-    assert "cyclonedx-bom==7.4.0" in release_install
+    release_pins = dict(re.findall(r"([A-Za-z0-9_.-]+)==([0-9][^\s]+)", release_install))
+    for package in ("build", "cyclonedx-bom", "twine"):
+        assert release_pins[package] == dev_input[package]
 
 
 def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
@@ -165,9 +163,19 @@ def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
         "--no-upgrade",
         "--reuse-hashes",
     }
+    assert "--reuse-hashes" not in DEV_FRESH_COMPILE_FLAGS
     security = (ROOT / ".github/workflows/security.yml").read_text()
-    assert "python tools/compile_dev_lock.py" in security
+    assert "python tools/compile_dev_lock.py --fresh" in security
     assert "git diff --exit-code -- requirements/dev.txt" in security
+
+
+def parse_pins(path):
+    pins = {}
+    for line in path.read_text().splitlines():
+        match = re.match(r"^([A-Za-z0-9_.-]+)==([^\s]+)", line)
+        if match:
+            pins[match.group(1)] = match.group(2)
+    return pins
 
 
 def test_exception_register_accepts_valid_exception(tmp_path):
