@@ -146,6 +146,38 @@ def test_theme_preference_is_csrf_protected_and_server_rendered(interface):
     assert response.status_code == 403
 
 
+def test_every_browser_route_declares_a_known_capability_or_public_access(interface):
+    client = interface[-1]
+    known = {
+        "can_access_community",
+        "can_administer_installation",
+        "can_manage_access",
+        "can_view_dataset",
+        "can_maintain_dataset",
+        "can_export_dataset",
+        "can_create_dataset",
+    }
+    for rule in client.application.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = client.application.view_functions[rule.endpoint]
+        if getattr(view, "public_route", False):
+            continue
+        assert getattr(view, "required_capability", None) in known, rule.endpoint
+
+
+def test_renamed_team_route_is_csrf_protected(interface):
+    _, _, authentication, _, teams, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    team = teams.create_team(admin.id, "Before rename")
+
+    response = request(client, "post", f"/teams/{team.id}/rename", data={"name": "After rename"})
+
+    assert response.status_code == 403
+
+
 def authenticated_csrf(client):
     response = request(client, "get", "/users")
     assert response.status_code == 200

@@ -760,6 +760,10 @@ class DatasetAuthorizationService:
             actor = work.users.get(actor_id)
             return self.active(actor) and actor.role == "admin"
 
+    def can_access_community(self, actor_id, *, uow=None):
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            return self.active(work.users.get(actor_id))
+
 
 class StaleDatasetOwnerError(ConflictError):
     """Persisted ownership no longer matches the form's expected owner."""
@@ -2675,6 +2679,9 @@ class AuthorizationService:
     def has_capability(self, user_id: str, capability: str, resource_id=None, *, uow=None) -> bool:
         """Evaluate a named Community capability at one authorization boundary."""
         installation_capabilities = {
+            "can_access_community": (
+                getattr(self.datasets, "can_access_community", None) if self.datasets else None
+            ),
             "can_administer_installation": (
                 getattr(self.datasets, "can_administer_installation", None)
                 if self.datasets

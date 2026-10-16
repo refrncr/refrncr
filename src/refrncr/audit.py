@@ -529,7 +529,7 @@ _read(
 )
 _read(
     "DatasetAuthorizationService",
-    "active creation_teams can_create_dataset can_view_dataset "
+    "active creation_teams can_create_dataset can_access_community can_view_dataset "
     "maintainable_resources can_maintain_dataset can_export_dataset can_change_dataset_owner "
     "can_manage_export_access can_administer_installation",
     "Capability calculation only; the authoritative caller owns "

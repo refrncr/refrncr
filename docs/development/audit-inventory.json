@@ -60,6 +60,7 @@
     "refrncr.services.AuthorizationService.effective_permission",
     "refrncr.services.AuthorizationService.has_capability",
     "refrncr.services.DatasetAuthorizationService.active",
+    "refrncr.services.DatasetAuthorizationService.can_access_community",
     "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
     "refrncr.services.DatasetAuthorizationService.can_administer_installation",
     "refrncr.services.DatasetAuthorizationService.can_create_dataset",

@@ -130,6 +130,16 @@ def capability_route(capability):
     return decorate
 
 
+def authenticated_route(view):
+    """Declare the capability shared by every authenticated browser route."""
+    return capability_route("can_access_community")(view)
+
+
+def no_store_route(view):
+    view.no_store_route = True
+    return view
+
+
 def upload_limit_route(view):
     view.upload_limit_route = True
     return view
@@ -421,6 +431,33 @@ def create_flask_app(
         require_csrf(expected)
         return None
 
+    @app.before_request
+    def enforce_route_capability():
+        view = app.view_functions.get(request.endpoint)
+        capability = getattr(view, "required_capability", None)
+        if capability is None:
+            return None
+        resolved = authenticated()
+        if resolved is None:
+            return None
+        if capability in {
+            "can_access_community",
+            "can_administer_installation",
+            "can_manage_access",
+        }:
+            require_capability(capability)
+            return None
+        if capability not in {
+            "can_view_dataset",
+            "can_maintain_dataset",
+            "can_export_dataset",
+            "can_create_dataset",
+        }:
+            abort(500)
+        # Resource-scoped dataset capabilities are enforced by the existing
+        # Dataset services, which preserve their documented non-disclosing 404s.
+        return None
+
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
         if endpoint.startswith("api_key_"):
@@ -501,7 +538,8 @@ def create_flask_app(
         allowed = resolved is not None and (
             authorization.has_capability(resolved[0].id, capability)
             if authorization is not None
-            else capability in {"can_administer_installation", "can_manage_access"}
+            else capability == "can_access_community"
+            or capability in {"can_administer_installation", "can_manage_access"}
             and resolved[0].role == "admin"
         )
         if not allowed:
@@ -522,22 +560,11 @@ def create_flask_app(
     def protect_audit_response(response):
         endpoint = request.endpoint or ""
         view = app.view_functions.get(endpoint)
-        if endpoint == "dataset_records_view" or endpoint.startswith("api_key_"):
+        if getattr(view, "no_store_route", False):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = "no-referrer"
             return response
-        if (
-            endpoint.startswith("audit_")
-            or getattr(view, "concept_route", False)
-            or (request.view_args or {}).get("concept", False)
-            or endpoint
-            in {
-                "dataset_version_review",
-                "dataset_version_record_diff",
-                "dataset_version_field_diff",
-            }
-            or (endpoint == "dataset_version_publish" and "review" in request.args)
-        ):
+        if getattr(view, "concept_route", False) or (request.view_args or {}).get("concept", False):
             response.headers["Cache-Control"] = "no-store"
             response.headers["Referrer-Policy"] = (
                 "no-referrer" if "review" in request.args else "same-origin"
@@ -556,6 +583,8 @@ def create_flask_app(
         return api_keys
 
     @app.get("/settings/api-keys")
+    @authenticated_route
+    @no_store_route
     def api_key_list():
         actor, _session = require_authenticated()
         if api_keys is None:
@@ -575,6 +604,8 @@ def create_flask_app(
         ), status
 
     @app.route("/settings/api-keys/new", methods=["GET", "POST"])
+    @authenticated_route
+    @no_store_route
     def api_key_create():
         actor, session = require_authenticated()
         api_key_service = require_api_keys()
@@ -626,6 +657,8 @@ def create_flask_app(
         return api_key_page("secret", created=created), 201
 
     @app.route("/settings/api-keys/<key_id>/revoke", methods=["GET", "POST"])
+    @authenticated_route
+    @no_store_route
     def api_key_revoke(key_id):
         actor, session = require_authenticated()
         api_key_service = require_api_keys()
@@ -652,6 +685,7 @@ def create_flask_app(
 
     @app.get("/settings/audit-log")
     @capability_route("can_administer_installation")
+    @no_store_route
     def audit_list():
         actor, _session = require_capability("can_administer_installation")
         try:
@@ -686,6 +720,7 @@ def create_flask_app(
 
     @app.get("/settings/audit-log/<event_id>")
     @capability_route("can_administer_installation")
+    @no_store_route
     def audit_detail(event_id):
         actor, _session = require_capability("can_administer_installation")
         try:
@@ -715,7 +750,18 @@ def create_flask_app(
 
     def dataset_route(rule: str, **options):
         if dataset_ui_enabled:
-            return app.route(rule, **options)
+            methods = set(options.get("methods", ("GET",)))
+            capability = "can_maintain_dataset" if methods - {"GET"} else "can_view_dataset"
+            if rule.endswith("/new") or rule == "/datasets/new":
+                capability = "can_create_dataset"
+            if "/export" in rule:
+                capability = "can_export_dataset"
+
+            def decorate(function):
+                function.required_capability = capability
+                return app.route(rule, **options)(function)
+
+            return decorate
         return lambda function: function
 
     def version_errors(function):
@@ -791,6 +837,7 @@ def create_flask_app(
         return response
 
     @app.get("/")
+    @authenticated_route
     def index():
         resolved = authenticated()
         actor = resolved[0] if resolved else None
@@ -2090,6 +2137,7 @@ def create_flask_app(
         defaults={"concept": False},
     )
     @version_errors
+    @no_store_route
     def dataset_records_view(key: str, version_id=None, concept=False):
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
@@ -2375,6 +2423,7 @@ def create_flask_app(
 
     def import_route(rule, **options):
         def decorate(function):
+            function.required_capability = "can_maintain_dataset"
             if getattr(function, "_secured_import", False):
                 return dataset_route(rule, **options)(function)
 
@@ -3906,6 +3955,7 @@ def create_flask_app(
         return response
 
     @app.post("/settings/theme")
+    @authenticated_route
     def theme_preference():
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
@@ -3916,6 +3966,7 @@ def create_flask_app(
         return redirect(url_for("appearance_settings"), code=303)
 
     @app.get("/settings/appearance")
+    @authenticated_route
     def appearance_settings():
         actor, login_session = require_authenticated()
         return render_authenticated_template(
@@ -3950,6 +4001,7 @@ def create_flask_app(
         ), status
 
     @app.get("/users")
+    @capability_route("can_manage_access")
     def user_list():
         return render_user_list()
 
@@ -4054,6 +4106,7 @@ def create_flask_app(
         ), status
 
     @app.get("/teams")
+    @authenticated_route
     def team_list():
         return render_team_list()
 
@@ -4169,5 +4222,16 @@ def create_flask_app(
             return str(error), 409
         status = 403 if isinstance(error, AuthorizationError) else 400
         return str(error), status
+
+    missing_capabilities = [
+        rule.endpoint
+        for rule in app.url_map.iter_rules()
+        if rule.endpoint != "static"
+        and not getattr(app.view_functions.get(rule.endpoint), "public_route", False)
+        and getattr(app.view_functions.get(rule.endpoint), "required_capability", None) is None
+    ]
+    if missing_capabilities:
+        routes = ", ".join(sorted(set(missing_capabilities)))
+        raise RuntimeError("Browser routes without a capability declaration: " + routes)
 
     return app
