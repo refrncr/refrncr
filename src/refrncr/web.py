@@ -4018,7 +4018,11 @@ def create_flask_app(
         submitted_target = (
             request.form.get("next") if request.method == "POST" else request.args.get("next")
         )
-        return_target = submitted_target if is_safe_login_target(submitted_target) else "/"
+        # Rebuild the target from a constant root: a checked path stays the same, and the
+        # redirect can never leave this origin (CodeQL py/url-redirection).
+        return_target = "/"
+        if submitted_target and is_safe_login_target(submitted_target):
+            return_target = "/" + submitted_target.removeprefix("/")
 
         def invalid_credentials_response():
             return (
