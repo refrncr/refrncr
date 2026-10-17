@@ -5,7 +5,7 @@
     <div class='form-field'>
       <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} <span class='required-mark' aria-hidden='true'>*</span>{% endif %}</label>
       {% if field.data_type == 'boolean' %}
-        <select id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}'{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} disabled aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>
+        <select id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}' data-select{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} disabled aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>
           <option value=''>Choose a value</option>
           <option value='true'{% if values is not none and values.get(field.key) in (true, 'true') %} selected{% endif %}>Yes</option>
           <option value='false'{% if values is not none and values.get(field.key) in (false, 'false') %} selected{% endif %}>No</option>

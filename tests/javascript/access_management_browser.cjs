@@ -15,7 +15,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
   if (output) fs.mkdirSync(output, {recursive: true});
   const shot = async name => { if (output) await page.screenshot({path: `${output}/${name}.png`, fullPage: true}); };
   const tab = () => page.getByRole('tabpanel', {name: 'Access', exact: true});
-  const select = () => tab().getByLabel('User or team', {exact: true});
+  const select = () => tab().getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]');
   const grant = () => tab().getByRole('button', {name: 'Grant access', exact: true});
   const rows = () => tab().locator('.access-table tbody tr');
   const status = async text => {

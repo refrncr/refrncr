@@ -16,11 +16,11 @@
       <span class='mapping-arrow' aria-hidden='true'>→</span>
       <div class='mapping-target'>
         <label class='visually-hidden' for='mapping-{{ index }}'>Target field for {{ advice.header }}</label>
-        <select id='mapping-{{ index }}' name='mapping_{{ index }}' aria-describedby='mapping-examples-{{ index }} mapping-choice-{{ index }}{% if mapping_errors.get(index) %} mapping-error-{{ index }}{% endif %}'{% if mapping_errors.get(index) %} aria-invalid='true'{% endif %}>
+        <select id='mapping-{{ index }}' name='mapping_{{ index }}' data-select='compact' data-noun='fields' aria-describedby='mapping-examples-{{ index }} mapping-choice-{{ index }}{% if mapping_errors.get(index) %} mapping-error-{{ index }}{% endif %}'{% if mapping_errors.get(index) %} aria-invalid='true'{% endif %}>
           <option value=''{% if advice.selected == '' %} selected{% endif %}>{% if advice.warning == 'Multiple possible fields — choose one' %}Multiple matches — choose one{% else %}Choose a field{% endif %}</option>
+          <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Do not import</option>
           <optgroup label='Suggested fields' data-option-group='suggested'>{% for candidate in advice.candidates %}{% if candidate.field_key == advice.selected or candidate.field_key not in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}</optgroup>
           <optgroup label='Available fields' data-option-group='available'>{% for field in fields %}{% if field.key not in advice.candidate_keys and (field.key == advice.selected or field.key not in assistance.mapping) %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
-          <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Do not import</option>
           <optgroup label='Already mapped' data-option-group='used'>{% for candidate in advice.candidates %}{% if candidate.field_key != advice.selected and candidate.field_key in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}{% for field in fields %}{% if field.key not in advice.candidate_keys and field.key != advice.selected and field.key in assistance.mapping %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
         </select>
         <details class='mapping-rationale' data-mapping-tooltip>

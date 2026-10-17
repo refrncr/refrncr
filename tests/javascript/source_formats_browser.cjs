@@ -44,7 +44,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-format-details]').count(),0);
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false,'No inert Show all formats button');
       const mappedReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
-      await page.getByLabel('Target field for unused',{exact:true}).selectOption('amount');
+      await page.getByLabel('Target field for unused',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('amount');
       await mappedReview;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),true);
@@ -52,7 +52,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
       assert.equal(await page.getByLabel('Choose source format for amount',{exact:true}).isVisible(),true);
       const ignoredReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
-      await page.getByLabel('Target field for unused',{exact:true}).selectOption('__ignored__');
+      await page.getByLabel('Target field for unused',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('__ignored__');
       await ignoredReview;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false);
@@ -74,7 +74,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
       const select=page.getByLabel('Choose source format for amount',{exact:true});
       assert.equal(await select.evaluate(e=>document.activeElement===e),true);
-      assert.equal(await select.inputValue(),'v1-eu');
+      assert.equal(await select.locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-eu');
       const pairs=page.locator('[data-source-formats="1"] .source-format-pair');
       assert.deepEqual(await pairs.locator('code').allTextContents(),['1.234,56','1234.56','2.345,67','2345.67']);
       assert.equal(await pairs.first().isVisible(),true,'Individual disclosure shows its examples');
@@ -118,7 +118,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
         try {await route.fulfill({response});} finally {reviewFinished();}
       };
       await page.route('**/formats',holdReview);
-      await page.getByLabel('Source type for stamp',{exact:true}).selectOption('text');
+      await page.getByLabel('Source type for stamp',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('text');
       await reached;
       const zone=page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true});
       await zone.fill('Europe/London');
@@ -132,7 +132,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       const changeControl = async (label, value) => {
         const response = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
         await page.getByLabel(label,{exact:true}).focus();
-        await page.getByLabel(label,{exact:true}).selectOption(value);
+        await page.getByLabel(label,{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption(value);
         const reviewed = await response;
         assert.match(reviewed.request().headers()['content-type'],/^application\/x-www-form-urlencoded/);
         await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
@@ -164,7 +164,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.deepEqual(await page.locator('[data-import-mapping]').evaluate(form=>[...new FormData(form).keys()].filter(k=>['date_2','time_2'].includes(k))),[]);
       assert.equal(await page.locator('[data-source-formats="2"] [data-effective-format]').textContent(),'Native Excel datetime');
       await changeControl('Source type for moment','text');
-      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).inputValue())),textValues);
+      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue())),textValues);
       // Reinitializing the same form twice must not duplicate listeners or requests.
       await page.evaluate(()=>{window.refrncrSourceFormats();window.refrncrSourceFormats();});
       let reviews = 0;
@@ -193,7 +193,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
         await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
         assert.equal(await page.evaluate(()=>document.activeElement.name),'time_2');
       }
-      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).inputValue(),'v1-time-hms');
+      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-time-hms');
       await page.screenshot({path:`/tmp/ref159-regression-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').focus();
       await page.keyboard.press('Enter');
@@ -202,10 +202,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('link',{name:'Back',exact:true}).focus();
       await page.keyboard.press('Enter');
       await page.waitForURL(/\/step\/3$/);
-      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).inputValue())),textValues);
+      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue())),textValues);
       await page.reload();
       await page.waitForURL(/\/step\/3$/);
-      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).inputValue())),textValues);
+      assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue())),textValues);
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       await upload('code;amount;moment\nH;1;01/02/2024 12:34:56\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
@@ -214,8 +214,8 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.locator('input[name="source_2"][value="v1-datetime-dmy-slash-hms"]').check();
       await choiceReview;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
-      assert.equal(await page.getByLabel('Date format for moment',{exact:true}).inputValue(),'v1-date-dmy-slash');
-      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).inputValue(),'v1-time-hms');
+      assert.equal(await page.getByLabel('Date format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-date-dmy-slash');
+      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-time-hms');
       assert.match(await page.locator('[data-source-formats="2"] .source-format-pair').textContent(),/2024-02-01T12:34:56/);
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       assert.deepEqual(errors,[]);
@@ -225,7 +225,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.waitForURL(/\/step\/3$/);
       await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       for(const key of ['day','clock','moment']) {
-        assert.equal(await page.getByLabel('Source type for '+key,{exact:true}).inputValue(),'native');
+        assert.equal(await page.getByLabel('Source type for '+key,{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'native');
         await changeControl('Source type for '+key,'text');
         await changeControl('Source type for '+key,'native');
       }
@@ -237,7 +237,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('button',{name:'Cancel import',exact:true}).click();
       await upload('code;amount;stamp\nZ;1;2024-02-29T12:00:00Z\nOffset;1;2024-02-29T13:00:00+01:00\n');
       await page.getByRole('button',{name:'Show all formats',exact:true}).click();
-      assert.equal(await page.getByLabel('Source type for stamp',{exact:true}).inputValue(),'offset');
+      assert.equal(await page.getByLabel('Source type for stamp',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'offset');
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).isVisible(),false);
       assert.deepEqual(await page.locator('[data-source-formats="2"] .source-format-pair code').allTextContents(),['2024-02-29T12:00:00Z','2024-02-29T12:00:00Z','2024-02-29T13:00:00+01:00','2024-02-29T12:00:00Z']);
       await changeControl('Source type for stamp','text');
@@ -249,7 +249,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       await changeControl('Source type for stamp','offset');
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).inputValue(),'');
-      assert.equal(await page.getByLabel('Repeated local times',{exact:true}).inputValue(),'');
+      assert.equal(await page.getByLabel('Repeated local times',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'');
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).isVisible(),false);
       await page.getByRole('button',{name:'Cancel',exact:true}).click();
       assert.deepEqual(errors,[]);

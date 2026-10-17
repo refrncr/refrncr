@@ -50,6 +50,11 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | `key_icon` | Key Round |
 | `navigation_icon` | Panel Left Close / Panel Left Open |
 
+The Select component (`static/js/select.js`) builds four of these Lucide `0.468.0` glyphs in
+script, with the same geometry and attributes: Chevron Down (trigger), Check (chosen option),
+Search and X (search field). `static/css/components/select.css` uses the same Chevron Down
+geometry as a data URI for the closed select without JavaScript.
+
 `key_icon` is tinted with the accent colour through the `.key-icon` rule. See
 `LICENSE-Lucide.txt` for the upstream ISC/MIT notices.
 

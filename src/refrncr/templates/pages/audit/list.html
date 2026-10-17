@@ -1,5 +1,6 @@
 {% extends "layouts/settings.html" %}
 {% from "components/side_panel.html" import form_side_panel %}
+{% from "components.html" import select_field %}
 {% set settings_title = "Audit log" %}
 
 {% block settings_content %}
@@ -12,25 +13,9 @@
       <label for="audit-end">End date and time<span class="visually-hidden"> (exclusive)</span></label>
       <input id="audit-end" name="end" type="text" value="{{ filters.get('end', '') }}" maxlength="40" aria-describedby="audit-time-help" data-audit-date>
     </div>
-    <div class="form-field">
-      <label for="audit-actor">Actor</label>
-      <select id="audit-actor" name="actor" aria-describedby="audit-actor-help">
-        <option value="">All actors</option>
-        {% for id, label in page.actors %}<option value="{{ id }}"{% if filters.get('actor') == id %} selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-field">
-      <label for="audit-action">Action</label>
-      <select id="audit-action" name="action"><option value="">All actions</option>
-        {% for value, label in actions %}<option value="{{ value }}"{% if filters.get('action') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-field">
-      <label for="audit-type">Object type</label>
-      <select id="audit-type" name="object_type"><option value="">All object types</option>
-        {% for value, label in object_types %}<option value="{{ value }}"{% if filters.get('object_type') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
-    </div>
+    {{ select_field('Actor', 'actor', 'audit-actor', page.actors, selected=filters.get('actor', ''), placeholder='All actors', described_by='audit-actor-help', noun='actors') }}
+    {{ select_field('Action', 'action', 'audit-action', actions, selected=filters.get('action', ''), placeholder='All actions', noun='actions') }}
+    {{ select_field('Object type', 'object_type', 'audit-type', object_types, selected=filters.get('object_type', ''), placeholder='All object types', noun='object types') }}
     <div class="audit-filter-actions"><button class="button button-primary" type="submit">Apply filters</button><a class="button button-secondary" href="{{ url_for('audit_list') }}">Clear filters</a></div>
     <p class="help-text audit-filter-help" id="audit-time-help">Enter ISO date and time with Z for UTC or an explicit offset, for example 2026-09-09T12:00:00Z.</p>
     <p class="help-text audit-filter-help" id="audit-actor-help">Choose an actor from this page. You can also filter by an actor from any event’s details.</p>

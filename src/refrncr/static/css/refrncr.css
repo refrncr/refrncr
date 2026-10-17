@@ -9,6 +9,7 @@
 @import url("layouts/import.css");
 @import url("components/buttons.css");
 @import url("components/forms.css");
+@import url("components/select.css");
 @import url("components/feedback.css");
 @import url("components/cards-badges.css");
 @import url("components/tables.css");

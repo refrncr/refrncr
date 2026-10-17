@@ -49,7 +49,7 @@
 .mapping-warning { color: var(--color-warning-text); }
 @media (max-width: 767px) {
   .mapping-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); padding: var(--space-sm); }
-  .import-mapping .mapping-target select { min-height: var(--control-height); font-size: var(--font-size-body); }
+  .import-mapping .mapping-target :is(select, .select-trigger) { min-height: var(--control-height); font-size: var(--font-size-body); }
   .mapping-arrow { display: none; }
   .mapping-target { grid-template-columns: minmax(0, 1fr); }
 }

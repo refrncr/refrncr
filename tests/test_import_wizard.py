@@ -484,6 +484,14 @@ def test_used_mapping_options_are_grouped_below_available_choices(wizard):
     assert code_select.index("Do not import") < code_select.index("Already mapped")
 
 
+def test_do_not_import_follows_the_placeholder_in_the_compact_select(wizard):
+    page = wizard.upload()
+    code_select = re.search(r"<select id='mapping-0'.*?</select>", page.text, re.S)[0]
+    assert "data-select='compact'" in code_select
+    values = re.findall(r"<option value='([^']*)'", code_select)
+    assert values[:2] == ["", "__ignored__"]
+
+
 def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_context):
     _, services, admin, dataset = import_context
     for key, name in (("dutch_name", "Dutch Name"), ("english_name", "English Name")):
