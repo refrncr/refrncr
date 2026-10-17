@@ -73,7 +73,12 @@ PAGE = """<!doctype html>
     <div style="height: 240px;"></div>
     {{ select_field('Owner team', 'team', 'team', teams) }}
   </div>
+  <label>Data type <select name="data_type" data-select>
+    <option value="string">Text</option><option value="integer">Whole number</option>
+  </select></label>
   <button class="button button-secondary" type="button" id="add-option">Add option</button>
+  <button class="button button-secondary" type="button" id="set-value">Set value</button>
+  <button class="button button-secondary" type="button" id="focus-native">Focus native</button>
   <p id="changes">0</p>
 </main>
 <script>
@@ -82,6 +87,12 @@ PAGE = """<!doctype html>
     option.value = "late";
     option.textContent = "Late team";
     document.getElementById("team").append(option);
+  });
+  document.getElementById("set-value").addEventListener("click", () => {
+    document.getElementById("country").value = "DE";
+  });
+  document.getElementById("focus-native").addEventListener("click", () => {
+    document.getElementById("status").focus();
   });
   document.getElementById("status").addEventListener("change", () => {
     const counter = document.getElementById("changes");

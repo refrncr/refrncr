@@ -1,8 +1,9 @@
+{% from "components.html" import select_field %}
 {% macro create_user_fields(email='', display_name='', role='user') -%}
   <div class='form-field'><label for='new-user-email'>Email address</label><input id='new-user-email' name='email' type='email' value='{{ email }}' required autofocus data-initial-focus></div>
   <div class='form-field'><label for='new-user-name'>Name</label><input id='new-user-name' name='display_name' value='{{ display_name }}' required></div>
   <div class='form-field'><label for='new-user-password'>Password</label><input id='new-user-password' name='password' type='password' required></div>
-  <div class='form-field'><label for='new-user-role'>Role</label><select id='new-user-role' name='role'><option value='user'{% if role == 'user' %} selected{% endif %}>User</option><option value='admin'{% if role == 'admin' %} selected{% endif %}>Administrator</option></select></div>
+  {{ select_field('Role', 'role', 'new-user-role', [('user', 'User'), ('admin', 'Administrator')], selected=role) }}
 {%- endmacro %}
 
 {% macro edit_user_fields(user, email=user.email) -%}

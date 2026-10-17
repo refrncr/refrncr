@@ -78,6 +78,7 @@
     const searchRow = element("div", "select-search");
     const searchInput = element("input", "select-search-input");
     searchInput.type = "text";
+    searchInput.disabled = true;
     searchInput.id = `${select.id}-search`;
     searchInput.autocomplete = "off";
     searchInput.spellcheck = false;
@@ -120,8 +121,9 @@
     select.tabIndex = -1;
     select.setAttribute("aria-hidden", "true");
     select.before(trigger);
-    // A popup inside a wrapping <label> would re-trigger the label; place it after the label.
-    (trigger.closest("label") || trigger).after(popup);
+    // The popup follows the select, so scripts that look for the first control find the select;
+    // inside a wrapping <label> it would re-trigger the label, so it goes after the label.
+    (trigger.closest("label") || select).after(popup);
 
     let rows = [];
     let dirty = true;
@@ -303,6 +305,7 @@
       searchRow.hidden = !search;
       footer.hidden = !search;
       searchInput.value = text;
+      searchInput.disabled = !search;
       popup.classList.add("is-open");
       if (popoverSupported) popup.showPopover();
       isOpen = true;
@@ -327,6 +330,7 @@
       trigger.setAttribute("aria-expanded", "false");
       trigger.removeAttribute("aria-activedescendant");
       searchInput.removeAttribute("aria-activedescendant");
+      searchInput.disabled = true;
       document.removeEventListener("pointerdown", onOutsidePointer, true);
       document.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
@@ -434,6 +438,21 @@
       if (isOpen && event.relatedTarget && !popup.contains(event.relatedTarget)) close(false);
     });
 
+    // Other scripts set value or selectedIndex directly, without an event; follow those writes.
+    for (const property of ["value", "selectedIndex"]) {
+      const native = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, property);
+      Object.defineProperty(select, property, {
+        configurable: true,
+        get() { return native.get.call(this); },
+        set(next) {
+          native.set.call(this, next);
+          syncTrigger();
+          if (isOpen) paintRows(searchInput.value.trim().toLowerCase());
+        },
+      });
+    }
+    // Scripts that focus the select (errors, side panels, autofocus) reach the visible trigger.
+    select.addEventListener("focus", () => trigger.focus());
     select.addEventListener("change", syncTrigger);
     select.addEventListener("invalid", (event) => {
       event.preventDefault();
@@ -456,6 +475,7 @@
     }).observe(select, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled", "selected", "label", "required", "aria-invalid", "aria-describedby"]});
 
     syncTrigger();
+    if (document.activeElement === select) trigger.focus();
     controllers.set(select, {open, close, trigger, popup});
   };
 

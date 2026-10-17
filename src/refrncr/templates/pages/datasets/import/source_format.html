@@ -40,7 +40,7 @@
         {% set components = temporal.components %}
         <div data-source-type-field>
           <label for='source-{{ index }}'>Source type<span class='visually-hidden'> for {{ column.key }}</span></label>
-          <select id='source-{{ index }}' name='source_{{ index }}' data-source-type aria-describedby='source-type-help-{{ index }} {{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
+          <select id='source-{{ index }}' name='source_{{ index }}' data-select data-source-type aria-describedby='source-type-help-{{ index }} {{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
             <option value=''>Choose how it is written</option>
             <option value='text'{% if components.source == 'text' %} selected{% endif %}>As text{% if column.timestamp %}, in local time{% endif %}</option>
             <option value='native'{% if components.source == 'native' %} selected{% endif %}>{{ temporal.native_label }}</option>
@@ -52,7 +52,7 @@
           {% for part, profiles in [('date', temporal.dates), ('time', temporal.times)] %}
           {% if profiles %}<div>
             <label for='{{ part }}-{{ index }}'>{{ part|capitalize }} format<span class='visually-hidden'> for {{ column.key }}</span></label>
-            <select id='{{ part }}-{{ index }}' name='{{ part }}_{{ index }}' aria-describedby='effective-format-{{ index }}{% if column.error %} source-error-{{ index }}{% endif %}'{% if components.source != 'text' %} disabled{% endif %}{% if column.error %} aria-invalid='true'{% endif %}>
+            <select id='{{ part }}-{{ index }}' name='{{ part }}_{{ index }}' data-select data-noun='formats' aria-describedby='effective-format-{{ index }}{% if column.error %} source-error-{{ index }}{% endif %}'{% if components.source != 'text' %} disabled{% endif %}{% if column.error %} aria-invalid='true'{% endif %}>
               {% for profile in profiles %}<option value='{{ profile.id }}'{% if profile.id == components.get(part) %} selected{% endif %}{% if profile.pattern %} data-pattern='{{ profile.pattern }}'{% endif %}>{{ profile.label }}</option>{% endfor %}
             </select>
           </div>{% endif %}
@@ -62,7 +62,7 @@
         <input type='hidden' name='source_{{ index }}' value='{{ column.choice.get("profile_id", "") }}'>
       {% else %}
         <label for='source-{{ index }}'>Choose source format<span class='visually-hidden'> for {{ column.key }}</span></label>
-        <select id='source-{{ index }}' name='source_{{ index }}' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
+        <select id='source-{{ index }}' name='source_{{ index }}' data-select data-noun='formats' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true' data-format-error{% endif %}>
           <option value=''>Choose source format</option>
           {% for profile in column.profiles %}<option value='{{ profile.id }}'{% if profile.id == column.choice.get('profile_id') %} selected{% endif %}>{{ profile.label }}</option>{% endfor %}
         </select>
@@ -72,7 +72,7 @@
           <label for='timezone-{{ index }}'>IANA source timezone (required for local timestamps)</label>
           <input id='timezone-{{ index }}' name='timezone_{{ index }}' value='{{ column.choice.get("timezone", "") }}' maxlength='100' placeholder='Europe/Amsterdam' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
           <label for='fold-{{ index }}'>Repeated local times</label>
-          <select id='fold-{{ index }}' name='fold_{{ index }}' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
+          <select id='fold-{{ index }}' name='fold_{{ index }}' data-select aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
             <option value=''>Require a decision</option>
             <option value='earlier'{% if column.choice.get('fold') == 'earlier' %} selected{% endif %}>Earlier occurrence</option>
             <option value='later'{% if column.choice.get('fold') == 'later' %} selected{% endif %}>Later occurrence</option>

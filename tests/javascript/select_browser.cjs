@@ -141,6 +141,21 @@ async function login(page) {
     assert.equal(await page.locator('#team-listbox').getByText('Late team').count(), 1);
     await page.keyboard.press('Escape');
 
+    // Values and focus set by other scripts reach the trigger.
+    await page.locator('#set-value').click();
+    assert.match(await page.getByRole('combobox', {name: 'Country'}).innerText(), /Germany/);
+    await page.locator('#focus-native').click();
+    assert.equal(await activeId(page), 'status-trigger');
+
+    // A select inside its label: the label names the trigger and clicking the text opens the list.
+    const datatype = page.getByRole('combobox', {name: /^Data type/});
+    assert.equal(await datatype.count(), 1);
+    await page.locator('label', {has: page.locator('select[name=data_type]')}).click({position: {x: 4, y: 6}});
+    assert.equal(await datatype.getAttribute('aria-expanded'), 'true');
+    await page.getByRole('option', {name: 'Whole number'}).click();
+    assert.equal(await page.locator('select[name=data_type]').inputValue(), 'integer');
+    assert.equal(await datatype.getAttribute('aria-expanded'), 'false');
+
     // Required without a value: no submission, the field is marked and focused; a choice clears it.
     await page.goto(base + '/select-fixture');
     await page.getByRole('button', {name: 'Send'}).click();

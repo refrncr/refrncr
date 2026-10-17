@@ -89,7 +89,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           assert.equal(await row(3).locator('[data-format-details]').getAttribute('open'),'');
           const change=row(2).getByRole('button',{name:'Change',exact:true});
           await change.focus();await page.keyboard.press('Enter');
-          assert.equal(await page.evaluate(()=>document.activeElement.id),'source-2');
+          assert.equal(await page.evaluate(()=>document.activeElement.id),'source-2-trigger');
           const done=row(2).getByRole('button',{name:'Done',exact:true});
           assert.equal(await done.getAttribute('aria-expanded'),'true');
           assert.equal(await done.getAttribute('aria-controls'),'source-details-2');
@@ -132,7 +132,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           await row(3).getByRole('button',{name:'Change',exact:true}).click();
           assert.equal(await page.evaluate(()=>document.activeElement.id),'source-3');
           await row(2).getByRole('button',{name:'Change',exact:true}).click();
-          await review(()=>page.getByLabel('Date format for day',{exact:true}).selectOption('v1-date-dmy-slash'));
+          await review(()=>page.getByLabel('Date format for day',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('v1-date-dmy-slash'));
           assert.equal(await row(2).getAttribute('data-state'),'failing');
           assert.match(await row(2).locator('.format-verdict').textContent(),/2 of 2 values do not fit DD\/MM\/YYYY/);
           await page.getByRole('button',{name:'Show all formats',exact:true}).click();
@@ -140,7 +140,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           assert.equal(await row(2).locator('[data-format-details]').getAttribute('open'),'');
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
           await page.screenshot({path:`/tmp/ref159-failing-${width}.png`,fullPage:true});
-          await review(()=>page.getByLabel('Date format for day',{exact:true}).selectOption('v1-date-ymd-dash'));
+          await review(()=>page.getByLabel('Date format for day',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('v1-date-ymd-dash'));
         } else {
           assert.equal(await row(2).locator('[data-format-toggle]').isVisible(),false);
           const summary=row(2).locator('[data-format-details] > summary');
@@ -163,7 +163,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
         if (!javaScriptEnabled) {
           await row(2).locator('[data-format-details] > summary').click();
-          await page.getByLabel('Date format for day',{exact:true}).selectOption('v1-date-dmy-slash');
+          await page.getByLabel('Date format for day',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('v1-date-dmy-slash');
           await page.locator('[data-mapping-continue]').click();
           await page.waitForURL(/\/step\/4$/);
           assert.equal(await page.getByRole('button',{name:'View error report',exact:true}).isVisible(),true);

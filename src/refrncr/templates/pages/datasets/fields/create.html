@@ -16,7 +16,7 @@
     </fieldset>
     {% if dataset.mapping_mode == 'linked' %}
     <div data-mapping-field-panel='source_context'{% if mapping_field_role != 'source_context' %} hidden{% endif %}>
-      <label>Source field <select name='source_field_key'{% if mapping_field_role != 'source_context' %} disabled{% endif %} required><option value=''>Choose a source field</option>{% for field in mapping_source_fields %}<option value='{{ field.key }}'{% if field.key == mapping_source_field_key %} selected{% endif %}>{{ field.name }} · {{ field.data_type|datatype_label }}</option>{% endfor %}</select></label>
+      <label>Source field <select name='source_field_key' data-select data-noun='fields'{% if mapping_field_role != 'source_context' %} disabled{% endif %} required><option value=''>Choose a source field</option>{% for field in mapping_source_fields %}<option value='{{ field.key }}'{% if field.key == mapping_source_field_key %} selected{% endif %}>{{ field.name }} · {{ field.data_type|datatype_label }}</option>{% endfor %}</select></label>
       <p class='help-text'>Adds context while mapping. Values and field properties cannot be changed here.</p>
     </div>
     {% else %}
