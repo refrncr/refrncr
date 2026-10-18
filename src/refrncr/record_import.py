@@ -49,7 +49,7 @@ MAX_ZIP_ENTRIES = 1_000
 MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 MAX_REPORTED_ROWS = 100
-PREVIEW_ROWS = 10
+PREVIEW_ROWS = 50
 IMPORT_TTL_SECONDS = 15 * 60
 MAX_STAGED_BYTES = 50 * 1024 * 1024
 MAX_WORKSHEET_SOURCE_ROWS = 100_001
@@ -67,6 +67,10 @@ UNREADABLE_XLSX_MESSAGE = (
 
 class ImportValidationError(ValidationError):
     """A safe, user-facing import validation failure."""
+
+
+class ImportExpiredError(NotFoundError):
+    """A previously valid staged import expired for its bound session and dataset."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,7 +234,12 @@ class TransientImportStore:
         self.capacity = capacity
         self.max_bytes = max_bytes
         self._states: dict[str, StagedImport] = {}
+        self._expired: dict[str, tuple[str, str, str, float, str]] = {}
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _same_state(current, expected):
+        return current is not None and replace(expected, expires_at=current.expires_at) == current
 
     def create(
         self,
@@ -299,13 +308,20 @@ class TransientImportStore:
                 session_id,
                 dataset_id,
             ):
+                expired = self._expired.get(token)
+                if expired and expired[:3] == (actor_id, session_id, dataset_id):
+                    raise ImportExpiredError("Import expired")
                 raise NotFoundError("Import not found")
+            if not state.busy:
+                state = replace(state, expires_at=self.clock() + self.ttl)
+                self._states[token] = state
             return state
 
     def update(self, state: StagedImport, **changes) -> StagedImport:
         with self._lock:
             self._cleanup()
-            if self._states.get(state.token) != state or state.busy:
+            current = self._states.get(state.token)
+            if not self._same_state(current, state) or state.busy:
                 raise NotFoundError("Import not found")
             if changes.get("source_formats") is not None:
                 changes["source_formats"] = MappingProxyType(
@@ -314,14 +330,14 @@ class TransientImportStore:
                         for key, choice in changes["source_formats"].items()
                     }
                 )
-            updated = replace(state, **changes)
+            updated = replace(state, expires_at=self.clock() + self.ttl, **changes)
             self._states[state.token] = updated
             return updated
 
     def active(self, actor_id, session_id, dataset_id):
         with self._lock:
             self._cleanup()
-            return next(
+            state = next(
                 (
                     state
                     for state in reversed(tuple(self._states.values()))
@@ -331,6 +347,10 @@ class TransientImportStore:
                 ),
                 None,
             )
+            if state is not None:
+                state = replace(state, expires_at=self.clock() + self.ttl)
+                self._states[state.token] = state
+            return state
 
     def claim(self, state):
         return self.update(state, busy=True)
@@ -339,8 +359,9 @@ class TransientImportStore:
         # A concurrent logout/expiry must never resurrect an import.
         with self._lock:
             self._cleanup()
-            if self._states.get(claimed.token) == claimed:
-                self._states[claimed.token] = replace(claimed, busy=False, **changes)
+            current = self._states.get(claimed.token)
+            if self._same_state(current, claimed):
+                self._states[claimed.token] = replace(current, busy=False, **changes)
 
     def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
         with self._lock:
@@ -351,6 +372,9 @@ class TransientImportStore:
                 session_id,
                 dataset_id,
             ):
+                expired = self._expired.get(token)
+                if expired and expired[:3] == (actor_id, session_id, dataset_id):
+                    raise ImportExpiredError("Import expired")
                 raise NotFoundError("Import not found")
             if state.busy:
                 raise NotFoundError("Import not found")
@@ -366,16 +390,31 @@ class TransientImportStore:
                 key for key, value in self._states.items() if value.session_id == session_id
             ]:
                 self._states.pop(token, None)
+            for token in [key for key, value in self._expired.items() if value[1] == session_id]:
+                self._expired.pop(token, None)
 
     def revoke_concept(self, concept_id):
         with self._lock:
             for token in [k for k, state in self._states.items() if state.concept_id == concept_id]:
                 self._states.pop(token, None)
+            for token in [key for key, value in self._expired.items() if value[4] == concept_id]:
+                self._expired.pop(token, None)
 
     def _cleanup(self):
         now = self.clock()
         for token in [key for key, value in self._states.items() if value.expires_at <= now]:
-            self._states.pop(token, None)
+            state = self._states.pop(token)
+            self._expired[token] = (
+                state.actor_id,
+                state.session_id,
+                state.dataset_id,
+                now,
+                state.concept_id,
+            )
+        for token in [key for key, item in self._expired.items() if item[3] + self.ttl <= now]:
+            self._expired.pop(token, None)
+        while len(self._expired) > self.capacity * 10:
+            self._expired.pop(next(iter(self._expired)))
 
 
 def _safe_filename(filename: str) -> str:
@@ -949,7 +988,7 @@ class DatasetRecordImportService:
     def navigate(self, actor_id, session_id, dataset_key, token, step):
         state = self.state(actor_id, session_id, dataset_key, token)
         if state.imported_count is not None:
-            if step != 5:
+            if step != 4:
                 raise NotFoundError("Import not found")
             return state
         source = parse_source(state.filename, state.content, state.worksheet)
@@ -960,8 +999,6 @@ class DatasetRecordImportService:
             reachable.add(3)
         if state.mapping_ready:
             reachable.add(4)
-        if state.validation_valid:
-            reachable.add(5)
         if step not in reachable:
             raise NotFoundError("Import not found")
         return self.store.update(state, step=step)
@@ -1264,7 +1301,7 @@ class DatasetRecordImportService:
         if (
             state.busy
             or state.imported_count is not None
-            or (require_confirmation and (state.step != 5 or not state.validation_valid))
+            or (require_confirmation and (state.step != 4 or not state.validation_valid))
         ):
             raise NotFoundError("Import not found")
         if not state.mapping_ready:
@@ -1543,6 +1580,9 @@ class DatasetRecordImportService:
                     else "Map every required and identifier field",
                 )
             )
+        mapping_errors.extend(
+            self._source_format_issues(mapping, source, field_by_key, source_formats)
+        )
         fingerprint = (
             uow.datasets.get(dataset_id).revision,
             tuple(
@@ -1559,17 +1599,6 @@ class DatasetRecordImportService:
             identifier.field_keys,
             (concept.id, concept.start_revision, concept.updated_at.isoformat()),
         )
-        source_formats = source_formats or {}
-        for index, key in enumerate(mapping):
-            if key in field_by_key and not source_formats.get(key, {}).get("profile_id"):
-                mapping_errors.append(
-                    ImportIssue(
-                        None,
-                        source.headers[index] if index < len(source.headers) else None,
-                        field_by_key[key].name,
-                        "Choose an unambiguous source format for this field.",
-                    )
-                )
         if mapping_errors:
             return ImportPreview(
                 filename,
@@ -1750,6 +1779,10 @@ class DatasetRecordImportService:
             sample,
             fingerprint,
         )
+        if mode != "new_version":
+            preview = self._add_create_preview(
+                preview, accepted, fields, mapping, identifier, search, page
+            )
         if mode == "new_version":
             counts = dict.fromkeys(("Added", "Changed", "Unchanged", "Deleted", "Error"), 0)
             counts["Error"] = preview.invalid_rows + len(preview.non_row_errors)
@@ -1802,8 +1835,28 @@ class DatasetRecordImportService:
                                 get_datatype(new.data_type).text(new.value) if new else None,
                             )
                         )
+                    current_values = (
+                        tuple(
+                            (
+                                field.name,
+                                get_datatype(before[field.id].data_type).text(
+                                    before[field.id].value
+                                )
+                                if field.id in before
+                                else None,
+                            )
+                            for field in fields
+                        )
+                        if status == "Changed"
+                        else ()
+                    )
                     differences.append(
-                        dict(status=status, identifier=label, changes=tuple(changes))
+                        dict(
+                            status=status,
+                            identifier=label,
+                            changes=tuple(changes),
+                            current_values=current_values,
+                        )
                     )
             counts["matching"] = matched
             preview = replace(
@@ -1813,6 +1866,53 @@ class DatasetRecordImportService:
                 difference_digest=digest.hexdigest(),
             )
         return preview, accepted
+
+    @staticmethod
+    def _source_format_issues(mapping, source, field_by_key, source_formats):
+        source_formats = source_formats or {}
+        return [
+            ImportIssue(
+                None,
+                source.headers[index] if index < len(source.headers) else None,
+                field_by_key[key].name,
+                "Choose an unambiguous source format for this field.",
+            )
+            for index, key in enumerate(mapping)
+            if key in field_by_key and not source_formats.get(key, {}).get("profile_id")
+        ]
+
+    @staticmethod
+    def _add_create_preview(preview, accepted, fields, mapping, identifier, search, page):
+        term = unicodedata.normalize("NFC", search).casefold()
+        filtered = []
+        for values, _encoded in accepted:
+            by_key = {value.field_key: value for value in values}
+            label = " · ".join(
+                get_datatype(by_key[key].data_type).text(by_key[key].value)
+                for key in identifier.field_keys
+            )
+            if term in unicodedata.normalize("NFC", label).casefold():
+                filtered.append(values)
+        sample = tuple(
+            tuple(
+                next(
+                    (
+                        get_datatype(value.data_type).text(value.value)
+                        for value in values
+                        if value.field_key == field.key
+                    ),
+                    "",
+                )
+                for field in fields
+                if field.key in mapping
+            )
+            for values in filtered[(page - 1) * 50 : page * 50]
+        )
+        counts = dict.fromkeys(("Added", "Changed", "Unchanged", "Deleted", "Error"), 0)
+        counts["Added"] = len(accepted)
+        counts["Error"] = preview.invalid_rows + len(preview.non_row_errors)
+        counts["matching"] = len(filtered)
+        return replace(preview, sample=sample, counts=counts)
 
     def _differences(self, uow, dataset_id, accepted):
         proposed = {encoded: values for values, encoded in accepted}

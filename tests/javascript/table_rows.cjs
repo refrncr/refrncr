@@ -33,7 +33,7 @@ const document = {
   addEventListener(type, callback, capture = false) { listeners.push({type, callback, capture}); },
 };
 const source = fs.readFileSync(process.argv[2], 'utf8');
-const context = {document, window: {getSelection: () => ({isCollapsed: !selected})}};
+const context = {document, window: {getSelection: () => ({isCollapsed: !selected, toString: () => selected ? 'selected text' : ''})}};
 vm.runInNewContext(source, context);
 const count = listeners.length;
 vm.runInNewContext(source, context);
@@ -88,8 +88,9 @@ fire(target({matches: selector => selector.includes("td[role='cell']")}));
 assert.equal(primary.clicks, 2, 'explicit semantic cells remain usable row space');
 fire({closest: () => null});
 assert.equal(primary.clicks, 2, 'headers and non-navigable rows are ignored');
-assert.equal(listeners.filter(l => l.type === 'keydown').length, 1, 'no extra row keyboard handler is registered');
-const keydown = listeners.find(l => l.type === 'keydown').callback;
+const keydowns = listeners.filter(l => l.type === 'keydown');
+assert.equal(keydowns.length, 2, 'global Escape and row keyboard handlers are registered');
+const keydown = keydowns.at(-1).callback;
 exportMenu.open = true;
 keydown({key: 'Enter'});
 assert.equal(exportMenu.open, true, 'other keys leave export menus open');

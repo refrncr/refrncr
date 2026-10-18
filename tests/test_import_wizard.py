@@ -15,7 +15,7 @@ from refrncr.services import NotFoundError
 
 
 def states(page):
-    return re.findall("data-step='([1-5])' data-step-status='([^']+)'", page.text)
+    return re.findall("data-step='([1-4])' data-step-status='([^']+)'", page.text)
 
 
 def optional_field(wizard, key):
@@ -41,13 +41,12 @@ def workbook(sheets=("First", "Second"), headers=("code", "amount")):
     return output.getvalue()
 
 
-def test_five_steps_confirmation_refresh_success_and_replay(wizard):
+def test_four_steps_confirm_on_preview_and_replay(wizard):
     assert states(wizard.get(wizard.root)) == [
         ("1", "active"),
         ("2", "remaining"),
         ("3", "remaining"),
         ("4", "remaining"),
-        ("5", "remaining"),
     ]
     mapped = wizard.upload()
     assert states(mapped) == [
@@ -55,7 +54,6 @@ def test_five_steps_confirmation_refresh_success_and_replay(wizard):
         ("2", "completed"),
         ("3", "active"),
         ("4", "remaining"),
-        ("5", "remaining"),
     ]
     assert "Completed automatically" in mapped.text
     assert wizard.get(wizard.path + "/step/2").status_code == 404
@@ -65,25 +63,20 @@ def test_five_steps_confirmation_refresh_success_and_replay(wizard):
     preview = wizard.preview()
     assert states(preview)[3] == ("4", "active")
     assert wizard.count() == 0
-    assert wizard.post(wizard.path + "/confirm").status_code == 404
-    final = wizard.get(wizard.path + "/step/5")
-    assert states(final)[4] == ("5", "active")
-    for text in (
-        "records.csv",
-        "Not applicable",
-        "Source records",
-        "Mapped fields",
-        "complete difference is applied atomically",
-        "Import records",
-    ):
-        assert text in final.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 409
+    final = wizard.get(wizard.path + "/step/4")
+    assert states(final)[3] == ("4", "active")
+    summary = re.sub(r"\s+", " ", html_text(final.text))
+    assert "File: records.csv" in summary
+    assert "First import: 1 record will be added to the draft." in summary
+    assert "Import records" in final.text
     assert wizard.count() == 0
-    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
     success = wizard.post(wizard.path + "/confirm")
     assert "Import results" in success.text and "Added: 1" in success.text
     assert "import_results=1" in success.request.url
     assert wizard.count() == 1
-    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert (
         wizard.post(
@@ -111,9 +104,9 @@ def test_worksheet_skip_or_explicit_selection_and_invalidation(wizard, sheets):
         assert states(page)[2] == ("3", "active")
         wizard.preview()
         wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
-        assert wizard.get(wizard.path + "/step/5").status_code == 200
+        assert wizard.get(wizard.path + "/step/5").status_code == 404
         changed = wizard.post(wizard.path + "/worksheet", {"worksheet": "Second"})
-        assert states(changed)[3:] == [("4", "remaining"), ("5", "remaining")]
+        assert states(changed)[3:] == [("4", "remaining")]
         assert wizard.get(wizard.path + "/step/5").status_code == 404
 
 
@@ -123,7 +116,7 @@ def test_back_navigation_saves_choices_and_invalidates_only_dependents(wizard):
     wizard.preview(("code", "amount", "active"))
     upload = wizard.get(wizard.path + "/step/1")
     assert "Current file:" in upload.text
-    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    assert wizard.get(wizard.path + "/step/5").status_code == 404
     wizard.get(wizard.path + "/mapping")
     back = wizard.post(
         wizard.path + "/preview",
@@ -181,13 +174,18 @@ def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wiz
     assert re.findall("<th scope='col'>(.*?)</th>", table) == [
         "Identifier",
         "Status",
-        "Field values",
+        "Changed fields",
     ]
-    assert re.findall("<dt>(.*?)</dt>", table)[:4] == ["Code", "Amount", "Active", "Day"]
+    assert re.findall("<dt>(.*?)</dt>", preview.text)[:4] == ["Code", "Amount", "Active", "Day"]
+    assert "This record will be added." in html_text(preview.text)
     assert sum(tag == "tr" for tag, _ in html_elements(table)) == 13
     assert "C9" in table and "C10" in table
-    assert "New value: — (No value)" in table
-    assert "12 differences" in preview.text
+    assert "—" in table
+    assert "No value" in preview.text
+    assert "First import: 12 records will be added to the draft." in re.sub(
+        r"\s+", " ", html_text(preview.text)
+    )
+    assert "Page 1 of 1" not in preview.text
     assert wizard.count() == 0
 
 
@@ -234,7 +232,7 @@ def test_resume_cancel_expiry_and_new_session(wizard):
     wizard.get(wizard.path + "/step/1")
     assert states(wizard.get(wizard.root))[3] == ("4", "active")
     resumed = wizard.get(wizard.root).text
-    assert "Proposed Record differences" in resumed and "1 differences" in resumed
+    assert "Changes in this import" in resumed and "First import: 1 record will be added" in resumed
     assert "Upload corrected file" not in resumed
     assert "You can return to this import" not in resumed
     assert wizard.post(wizard.path + "/cancel").status_code == 200
@@ -243,7 +241,10 @@ def test_resume_cancel_expiry_and_new_session(wizard):
     wizard.upload()
     wizard.preview()
     clock[0] += 901
-    assert wizard.get(wizard.path + "/step/4").status_code == 404
+    expired = wizard.get(wizard.path + "/step/4")
+    assert expired.status_code == 410
+    assert "expired after 15 minutes without activity" in expired.text
+    assert "Upload the file again" in expired.text
     assert states(wizard.get(wizard.root))[0] == ("1", "active")
     wizard.upload()
     wizard.preview()
@@ -327,7 +328,7 @@ def test_all_routes_reauthorize_and_reject_cross_session_dataset_and_csrf(wizard
 def test_technical_failure_is_safe_and_retryable(wizard, monkeypatch):
     wizard.upload()
     wizard.preview()
-    wizard.get(wizard.path + "/step/5")
+    wizard.get(wizard.path + "/step/4")
     importer = wizard.services.record_imports
     original = importer.uow
 
@@ -349,7 +350,7 @@ def test_technical_failure_is_safe_and_retryable(wizard, monkeypatch):
 def test_conflict_after_preview_requires_new_validation(wizard):
     wizard.upload()
     wizard.preview()
-    wizard.get(wizard.path + "/step/5")
+    wizard.get(wizard.path + "/step/4")
     wizard.services.dataset_records.create_record(
         wizard.admin.id, wizard.dataset.key, {"code": "A", "amount": "1"}
     )
@@ -420,7 +421,7 @@ def test_changed_mapping_invalidates_old_confirmation_even_when_validation_fails
     optional_field(wizard, "active")
     wizard.upload(b"code,amount,active\nA,1,true\n")
     wizard.preview(("code", "amount", "active"))
-    wizard.get(wizard.path + "/step/5")
+    wizard.get(wizard.path + "/step/4")
     original = wizard.services.record_imports._validate
 
     def fail(*args, **kwargs):
@@ -458,7 +459,6 @@ def test_compact_mapping_discloses_full_escaped_examples_and_short_options(wizar
     assert "role='tooltip'" in page.text
     assert re.search(r"<option value='code' selected[^>]*>Code</option>", page.text)
     assert "mapping-examples-0 mapping-choice-0" in page.text
-    assert "(identifier)" in page.text
 
 
 def test_compact_mapping_errors_keep_control_associations(wizard):
@@ -468,20 +468,20 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     assert "mapping-error-1" in page.text
     assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page.text)) == 2
     assert html_tag_texts(page.text, "summary").count("Mapping error") == 2
-    assert "data-missing-key='amount'" in page.text
+    assert "1 field not mapped: Amount" in html_text(page.text)
     assert "This field is mapped more than once" in page.text
 
 
-def test_used_mapping_options_are_grouped_below_available_choices(wizard):
+def test_mapping_options_are_flat_ordered_and_reserved_selections_are_hidden(wizard):
     optional_field(wizard, "active")
     page = wizard.upload()
     code_select = re.search(r"<select id='mapping-0'.*?</select>", page.text, re.S)[0]
-    used = code_select.split("label='Already mapped'", 1)[1]
-    assert "value='amount'" in used
-    assert "value='code'" not in used
+    assert "optgroup" not in code_select
+    assert "value='amount'" in code_select
+    assert "value='code' selected" in code_select
     assert " disabled" not in code_select
-    assert "value='active'" in code_select.split("label='Already mapped'", 1)[0]
-    assert code_select.index("Do not import") < code_select.index("Already mapped")
+    assert "value='active'" in code_select
+    assert code_select.index("— Choose a field —") < code_select.index("— Do not import —")
 
 
 def test_do_not_import_follows_the_placeholder_in_the_compact_select(wizard):
@@ -490,6 +490,7 @@ def test_do_not_import_follows_the_placeholder_in_the_compact_select(wizard):
     assert "data-select='compact'" in code_select
     values = re.findall(r"<option value='([^']*)'", code_select)
     assert values[:2] == ["", "__ignored__"]
+    assert ">— Do not import —</option>" in code_select
 
 
 def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_context):
@@ -497,27 +498,87 @@ def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_
     for key, name in (("dutch_name", "Dutch Name"), ("english_name", "English Name")):
         services.dataset_fields.create_field(admin.id, dataset.key, key, name, "string")
     page = wizard.upload(b"name,code,amount\nExample,A,1\n")
-    assert "selected>Multiple matches — choose one</option>" in page.text
+    assert "selected>— Choose a field —</option>" in page.text
     assert "class='mapping-advice'" not in page.text
     tooltip = re.search(r"id='mapping-rationale-0'.*?</div>", page.text, re.S)[0]
     assert "Multiple possible fields — choose one" in tooltip
     assert html_text(page.text).count("Multiple possible fields — choose one") == 1
 
 
-def test_mapping_instruction_is_in_heading_information_tooltip(wizard):
-    page = wizard.upload()
-    assert "aria-label='About column mapping'" in page.text
-    assert "aria-describedby='mapping-instructions'" in page.text
-    instruction = "Match each source column to one dataset field, or choose Do not import."
-    assert html_text(page.text).count(instruction) == 1
-    info = page.text.split("id='mapping-instructions'", 1)[1].split("</details>", 1)[0]
-    assert instruction in info
-    assert "File:" in info
-    assert "Mapping completeness" in info
-    assert "data-mapping-status" in info
-    form = page.text.split("id='import-step-form'", 1)[1].split("</form>", 1)[0]
-    assert "mapping-metadata" not in form
-    assert "data-mapping-summary" not in form
-    assert "data-mapping-status" not in form
-    assert "File:" in page.text
-    assert "Mapping completeness" in page.text
+def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
+    def status(page):
+        match = re.search(r"<p class='mapping-status'([^>]*)>(.*?)</p>", page.text, re.S)
+        assert match
+        return match.group(1), html_text(match.group(2)).strip()
+
+    pending = wizard.upload()
+    pending = wizard.preview(("", "amount"))
+    attributes, message = status(pending)
+    assert message == "1 column still needs a choice · 1 field not mapped: Code"
+    assert "data-state='pending'" in attributes
+    assert "alert-warning" not in attributes
+    reason = re.search(r"<p class='mapping-reason help-text'([^>]*)>", pending.text)
+    assert reason and "hidden" not in reason.group(1)
+    assert "data-mapping-jump" in pending.text
+    jump = re.search(r"<button\b(?=[^>]*data-mapping-jump)([^>]*)>", pending.text)
+    assert jump
+    jump_classes = re.search(r"class='([^']*)'", jump.group(1)).group(1).split()
+    assert "mapping-jump" in jump_classes
+    assert "button-link" not in jump_classes
+    assert pending.text.index("Back") < pending.text.index("Cancel import")
+    assert pending.text.index("mapping-status") < pending.text.index("Continue to preview")
+
+    optional_field(wizard, "function")
+    missing = wizard.upload()
+    attributes, message = status(missing)
+    assert message == "1 field not mapped: Function"
+    assert "data-state='pending'" in attributes
+    assert "hidden" not in re.search(
+        r"<p class='mapping-reason help-text'([^>]*)>", missing.text
+    ).group(1)
+
+    wizard.upload(b"code,amount,function,unknown\nA,1,fn,x\n")
+    ready = wizard.preview(("code", "amount", "function", "__ignored__"))
+    attributes, message = status(ready)
+    assert message == "Ready to continue · 3 fields mapped, 1 column not imported"
+    assert "data-state='ready'" in attributes
+    assert "hidden" in re.search(r"<p class='mapping-reason help-text'([^>]*)>", ready.text).group(
+        1
+    )
+    assert "data-mapping-jump" not in ready.text
+
+    visible = html_text(ready.text)
+    assert "Match each source column to a dataset field, or choose Do not import." in visible
+    assert "File:" in visible and "records.csv" in visible
+    assert "unmapped fields are omitted" not in visible
+    assert "required fields mapped" not in visible
+    assert "data-mapping-summary" not in ready.text
+    assert "data-mapping-missing" not in ready.text
+    assert "data-mapping-status" in ready.text
+    assert ready.text.index("data-mapping-status") > ready.text.index("</form>")
+    assert ready.text.index("data-mapping-status") < ready.text.index("data-mapping-continue")
+
+
+def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions(wizard):
+    for key in ("active", "subgroup", "region", "category"):
+        optional_field(wizard, key)
+    page = wizard.upload(b"code,amount\nA,1\n")
+    page = wizard.preview(("", ""))
+    status_text = html_text(
+        re.search(r"<span class='mapping-status-line'.*?</span>", page.text, re.S).group()
+    )
+    missing_count = int(re.search(r"(\d+) fields not mapped:", status_text).group(1))
+    assert missing_count > 3
+    field_names = re.findall(r"<code class='mapping-field-name'>(.*?)</code>", page.text)
+    assert field_names == ["Code", "Amount", "Active"]
+    assert f"and {missing_count - 3} more" in status_text
+    assert page.text.count("data-mapping-jump") == 1
+    assert page.text.index("class='import-actions-back'") < page.text.index(
+        "class='import-actions-forward"
+    )
+    assert (
+        page.text.count(
+            "This import replaces all records in the draft, so every field must be mapped."
+        )
+        == 2
+    )

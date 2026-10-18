@@ -246,7 +246,7 @@
       const query = searchInput.value.trim().toLowerCase();
       let shown = 0;
       rows.forEach((item) => {
-        item.row.hidden = Boolean(query) && !item.text.includes(query);
+        item.row.hidden = item.option.hidden || (Boolean(query) && !item.text.includes(query));
         if (!item.row.hidden) shown += 1;
       });
       listbox.querySelectorAll(".select-group").forEach((heading) => {
@@ -472,7 +472,7 @@
         render();
         filter();
       }
-    }).observe(select, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled", "selected", "label", "required", "aria-invalid", "aria-describedby"]});
+    }).observe(select, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["disabled", "hidden", "selected", "label", "required", "aria-invalid", "aria-describedby"]});
 
     syncTrigger();
     if (document.activeElement === select) trigger.focus();

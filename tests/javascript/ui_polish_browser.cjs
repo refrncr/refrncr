@@ -89,8 +89,10 @@ async function layout(page, label) {
       await page.goto(base + '/datasets');
       await row.locator('[data-row-primary]').click();
       await page.waitForURL(base + `/datasets/polish-${width}/concept/records`);
-      await page.getByText('About Code', {exact: true}).click();
+      const metadataButton = page.getByRole('button', {name: 'About E_NUMBER', exact: true});
+      await metadataButton.click();
       assert(await page.getByText('A readable identifier', {exact: false}).isVisible());
+      assert.equal(await metadataButton.getAttribute('aria-expanded'), 'true');
       await layout(page, `record metadata ${width}`);
       await page.getByRole('link', {name: 'Configure', exact: true}).click();
       const tabs = page.getByRole('tablist', {name: 'Configure dataset sections'});

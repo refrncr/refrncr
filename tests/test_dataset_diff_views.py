@@ -67,7 +67,16 @@ def test_review_navigation_details_and_no_audit_noise(context):
     assert len(events) == 1
 
 
-def test_review_status_badges_keep_added_and_removed_distinct(context):
+def test_legacy_edited_review_filter_selects_changed(context):
+    c = context
+    browser, _csrf, base, token = prepared(c)
+    response = request(browser, "get", path(base, token, section="Records", status="Edited"))
+    assert response.status_code == 200
+    assert "Changed" in response.text
+    assert "status=Changed" in response.text
+
+
+def test_review_status_badges_use_added_changed_and_deleted(context):
     c = context
     browser, _csrf, base, _token = prepared(c)
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "added", "label": "Added"})
@@ -79,8 +88,11 @@ def test_review_status_badges_keep_added_and_removed_distinct(context):
     assert re.search(r"<th scope='row'>Records</th><td>1</td><td>0</td><td>1</td>", summary.text)
     response = request(browser, "get", path(base, token, section="Records"))
     assert response.status_code == 200
-    statuses = re.findall(r"<span class='badge ([^']+)'>(Added|Removed)</span>", response.text)
-    assert sorted(statuses) == sorted([("badge-draft", "Added"), ("badge-removed", "Removed")])
+    statuses = re.findall(
+        r"<span class='badge ([^']+)'>(Added|Changed|Deleted)</span>",
+        response.text,
+    )
+    assert sorted(statuses) == sorted([("badge-draft", "Added"), ("badge-removed", "Deleted")])
 
 
 def test_entrypoints_and_publication_reuses_revision_csrf(context):

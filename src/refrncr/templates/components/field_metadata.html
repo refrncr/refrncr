@@ -1,8 +1,32 @@
-{% macro field_metadata(field, disclosure=false) -%}
-{% if field.definition or field.unit %}
-{% if disclosure %}<details class='field-metadata'><summary>About {{ field.name }}</summary>{% else %}<div class='field-metadata'>{% endif %}
-{% if field.definition %}<p><span class='field-metadata-label'>Definition:</span> {{ field.definition }}</p>{% endif %}
-{% if field.unit %}<p><span class='field-metadata-label'>Unit:</span> {{ field.unit }}</p>{% endif %}
-{% if disclosure %}</details>{% else %}</div>{% endif %}
+{% from "components/icons.html" import info_icon, key_icon %}
+{% macro field_metadata(field, disclosure=false, is_identifier=false) -%}
+{% if (field.definition or field.unit) or (disclosure and (is_identifier or field.is_required is defined or field.is_unique is defined or field.data_type is defined)) %}
+{% if disclosure %}
+  <div class='field-metadata field-metadata-disclosure'>
+    <button class='field-metadata-trigger' type='button' aria-label='About {{ field.name }}' aria-controls='field-metadata-{{ field.key }}' aria-describedby='field-metadata-{{ field.key }}' aria-expanded='false' data-field-metadata-trigger>{{ info_icon() }}</button>
+    <div id='field-metadata-{{ field.key }}' class='field-metadata-popover' popover='manual' data-field-metadata-panel>
+      <div class='fmp-head'>
+        <span class='fmp-title'>{{ field.name }}{% if field.key != field.name %} <code class='fmp-key'>{{ field.key }}</code>{% endif %}</span>
+        {% if field.data_type is defined %}<span class='fmp-type'>{{ field.data_type|datatype_label }}</span>{% endif %}
+      </div>
+      {% if field.definition or field.unit %}<div class='fmp-body'>
+        {% if field.definition %}<p class='fmp-definition'>{{ field.definition }}</p>{% endif %}
+        {% if field.unit %}<p class='fmp-unit'>Unit: {{ field.unit }}</p>{% endif %}
+      </div>{% endif %}
+      {% set flags = [] %}
+      {% if is_identifier %}{% set _ = flags.append('identifier') %}{% endif %}
+      {% if field.is_required %}{% set _ = flags.append('required') %}{% endif %}
+      {% if field.is_unique %}{% set _ = flags.append('unique') %}{% endif %}
+      <div class='fmp-foot'>
+        {% for flag in flags %}<span class='fmp-chip{% if flag == "identifier" %} fmp-chip-identifier{% endif %}'>{% if flag == 'identifier' %}{{ key_icon() }}{% endif %}{{ flag|capitalize }}</span>{% else %}<span class='fmp-optional'>Optional</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class='field-metadata'>
+    {% if field.definition %}<p><span class='field-metadata-label'>Definition:</span> {{ field.definition }}</p>{% endif %}
+    {% if field.unit %}<p><span class='field-metadata-label'>Unit:</span> {{ field.unit }}</p>{% endif %}
+  </div>
+{% endif %}
 {% endif %}
 {%- endmacro %}

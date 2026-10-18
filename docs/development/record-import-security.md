@@ -1,10 +1,10 @@
 # Record import security
 
-The REF-160 section below defines current product behavior: one complete-file Import flow
+The REF-160/259 sections below define current product behavior: one complete-file Import flow
 for empty and populated tables. Earlier REF-81/134/149 descriptions document the retained
-create-only service contract where they differ (ten-row preview, append persistence,
-success-page navigation and `dataset.records_imported` audit). Product imports now use
-the paged difference preview, results redirect and `dataset.new_version_imported` summary.
+create-only service contract where they differ (append persistence and `dataset.records_imported`
+audit). Product imports use a four-step wizard, paged compact preview, results redirect and
+`dataset.new_version_imported` summary.
 
 Community Record imports stage at most 10 MiB in a bounded, process-local transient store. An
 opaque token binds the bytes, mapping, worksheet, actor, login session, and Dataset for 15 minutes.
@@ -65,7 +65,7 @@ state in the import feature.
 
 ## Guided wizard (REF-134)
 
-The five-step browser wizard is rendered by `pages/datasets/import/wizard.html` and its step
+The four-step browser wizard is rendered by `pages/datasets/import/wizard.html` and its step
 includes. `DatasetRecordImportService.navigate()` checks reachability against the secured
 transient state. URL parameters and hidden/form controls never establish completion. CSV and
 single-visible-worksheet XLSX imports automatically complete the worksheet step; multi-worksheet
@@ -86,21 +86,22 @@ and source-header matches, and always require mapping review and fresh validatio
 manual target takes precedence over a new automatic suggestion. Removed/renamed headers and removed
 target fields cannot retain stale mappings. Store capacity and optimistic state comparisons also
 apply to replacements, including concurrent requests. Cancel and logout revoke the relevant state;
-expiry is checked on store access and updates. Navigating does not extend the original TTL.
+expiry is checked on store access and updates. Activity refreshes the 15-minute idle TTL;
+an expired import reports the timeout and links to that Dataset's upload entry point.
 
-Preview revalidates without writes, displays ten canonical records with mapped fields in dataset
-order, and uses the normal em-dash marker for empty cells. Invalid previews display only a summary;
+Preview revalidates without writes, displays up to 50 compact record rows per page, and opens
+read-only record details on demand. Invalid previews display only a summary;
 a large named native dialog contains the existing capped report (first 100 failing **source rows**,
 all messages for each reported row). Submitted values and readable identifiers are escaped;
 formula expressions and cached formula values are never exposed. Correct the source externally.
 
-The browser confirmation endpoint requires the reachable final confirmation step as well as valid
+The browser confirmation endpoint requires reachable Preview & import (step 4) as well as valid
 validation state. The service's direct `confirm()` call remains the explicit confirmation entry
 point for non-browser callers; the browser additionally passes `require_confirmation=True`.
 Confirmation atomically claims the transient state before entering the existing serialized dataset
 transaction. Other requests cannot update, cancel, replace or confirm an in-flight claim. A domain
 conflict rolls back and clears validation; a technical failure releases the claim for an explicit
-retry within the original TTL. Logout/expiry during processing cannot resurrect state. After success,
+retry within the refreshed idle TTL. Logout/expiry during processing cannot resurrect state. After success,
 the store retains only the bound completion receipt (count and display metadata) until expiry,
 removes source bytes/mapping/schema data, and rejects any further mutation using that token.
 This receipt supports refresh of the success page; it is not an executable import token or a durable
@@ -110,7 +111,7 @@ Record/rejected-row counts; it emits no per-Record events. Failures/cancellation
 successful summary. See [audit policy](audit-policy.md).
 
 `tests/test_import_wizard.py` covers navigation, manipulated requests, exact replacement compatibility,
-resume/cancel/expiry/logout, ten-row previews, report boundaries, explicit confirmation, replay,
+resume/cancel/sliding expiry/logout, paged previews, report boundaries, explicit confirmation, replay,
 conflict recovery and safe retry. The existing REF-81 tests retain parser/security, atomic rollback,
 audit and PostgreSQL concurrency coverage. `tests/test_import_wizard_javascript.py` exercises mapping
 completion, duplicate submission and the report dialog's keyboard/focus behavior using Node.
@@ -248,6 +249,36 @@ action, not a separate import mode. Without JavaScript, detected temporal choice
 can reach Preview; an explicit message explains how to enable corrections/live
 examples or replace the source file. See the REF-158 report for current evidence.
 
+
+## Import usability and idle expiry (REF-259)
+
+The browser flow has four steps: Upload file, Select worksheet, Map columns, and Preview & import.
+The preview is the confirmation surface; `/step/5` is no longer a supported wizard endpoint.
+Mapping guidance, source filename/worksheet, completeness and the live blocker message are visible
+beside the mapping action. Dataset fields appear in one flat select, with suggested fields first,
+then the remaining Configure-order fields. A field selected by another source column is hidden
+until released. The existing source-column **Do not import** choice remains supported; REF-260's
+separate destination-field skip behavior is not part of this flow.
+
+The preview keeps summary counts and compact Identifier/Status rows, with changed field names as
+the only third-column content. Opening a row displays escaped read-only values in a keyboard-
+accessible side panel. Search applies automatically; a status selector appears only when multiple
+change statuses exist. Pagination and filtering revalidate from the staged source and perform no
+writes. The Import records action confirms directly from Preview & import. Deletion acknowledgement
+remains unchecked by default and both the exact confirmation token and acknowledgement are checked
+again by the server before the serialized write transaction.
+
+The staged 15-minute timeout is an idle timeout: successful reads and state updates refresh it.
+This includes wizard navigation, source-format review, preview, and its search/status/page requests.
+No upload bytes are persisted, logout and Concept/session revocation still invalidate state, and the
+existing cleanup model is unchanged. An expired token known to its bound actor/session/Dataset gets
+a 410 response with the configured idle duration and a link to upload again for that Dataset; an
+unknown or differently bound token remains indistinguishable from an unavailable token.
+
+Record-table Field metadata uses a compact, accessible info-button popover in the sticky header;
+the header does not expand when details open, and inline metadata elsewhere is unchanged. No database
+migration or public route contract is added. Existing confirmation, authorization, CSRF and atomicity
+checks remain authoritative.
 
 ### REF-159 presentation and form-envelope preservation
 

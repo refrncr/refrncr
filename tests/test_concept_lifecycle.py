@@ -170,7 +170,9 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context):
         {"code": "Betaling", "label": "After", "status": "Complete"},
     )
     response = request(browser, "get", created.location)
-    assert response.status_code == 200 and "Edited" in response.text and "Complete" in response.text
+    assert (
+        response.status_code == 200 and "Changed" in response.text and "Complete" in response.text
+    )
     assert "You’re working on a draft" in response.text
     state = snapshot(c)
     assert "Before" in request(browser, "get", f"/datasets/{c.d.key}/records").text
@@ -380,7 +382,7 @@ def test_paged_record_badges_use_stable_identity_and_shared_classification(conte
     assert first.deleted_count == second.deleted_count == 1
     assert first.record_states[added.id] == "Added"
     assert first.record_states[rows[5].id] == "Deleted"
-    assert second.record_states[c.record.id] == "Edited"
+    assert second.record_states[c.record.id] == "Changed"
     ids = [r.id for page in (first, second) for r in page.page.records]
     assert len(ids) == len(set(ids)) == 52
     assert rows[5].id in ids

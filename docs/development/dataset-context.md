@@ -131,7 +131,7 @@ Published Dataset detail/Records pages show `Version N` first in the shared cont
 metadata line, before Record count and Updated time. The separate version/status/read-only
 line is removed; snapshot authorization and concept banners retain their behavior.
 
-Record pages now expose one system Status column (Published/Edited/Added/Deleted).
+Record pages now expose one system Status column (Published/Changed/Added/Deleted).
 Concept result pagination includes baseline tombstones, but `context.record_count` always
 counts surviving working Records. `deleted_count` is separate and dataset-wide; `page.total`
 counts matching displayed rows, including tombstones. Record identifier search is explicit

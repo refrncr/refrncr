@@ -198,7 +198,7 @@ def test_mapping_progressive_disclosure_and_live_examples(wizard):
     )
     response = wizard.post(wizard.path + "/preview", form_data(wizard, "v1-plain"))
     assert "1.234" in response.text and "2.345" in response.text
-    assert "Proposed Record differences" in response.text
+    assert "Changes in this import" in response.text
 
 
 def test_example_escaping_bounds_and_format_endpoint_csrf_binding(wizard):

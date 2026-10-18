@@ -850,7 +850,7 @@ def test_ordinary_service_reads_and_preview_do_not_write_domain_history(database
     s.record_imports.mapping_assistance(a.id, "trusted", d.key, state.token)
     assert s.record_imports.preview(a.id, "trusted", d.key, state.token, ("code", None)).valid
     s.record_imports.saved_preview(a.id, "trusted", d.key, state.token)
-    s.record_imports.navigate(a.id, "trusted", d.key, state.token, 5)
+    s.record_imports.navigate(a.id, "trusted", d.key, state.token, 4)
     s.record_imports.state(a.id, "trusted", d.key, state.token)
     s.record_imports.active(a.id, "trusted", d.key)
     s.record_imports.cancel(a.id, "trusted", d.key, state.token)

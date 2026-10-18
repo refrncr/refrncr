@@ -192,7 +192,11 @@ def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
     cached = get(c, "/audit", headers={**c.headers, "If-None-Match": first.headers["etag"]})
     assert cached.status_code == 304
 
-    record = next(record for record in caplog.records if record.event == "http.request_completed")
+    record = next(
+        record
+        for record in caplog.records
+        if getattr(record, "event", None) == "http.request_completed"
+    )
     payload = json.loads(OperationalJSONFormatter().format(record))
     assert payload["authentication"] == "api_key"
     assert set(payload) == {

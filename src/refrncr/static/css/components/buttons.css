@@ -10,6 +10,7 @@
 .button-link { min-height: auto; padding: var(--space-sm) 0; background: transparent; color: var(--color-action-primary-hover); text-decoration: underline; }
 .button:active { transform: translateY(1px); }
 .button:disabled, .button[aria-disabled="true"] { cursor: not-allowed; opacity: var(--color-action-disabled-opacity); }
+.button-primary:disabled, .button-primary[aria-disabled="true"] { opacity: 1; background: var(--color-action-secondary); border-color: var(--color-button-border); color: var(--color-text-muted); }
 .button-icon-only { width: var(--space-lg); height: var(--space-lg); min-height: var(--space-lg); padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--color-text-secondary); flex-shrink: 0; }
 .button-icon-only:hover:not(:disabled) { color: var(--color-link-hover); }
 .button-icon-only .button-icon { margin: 0; }

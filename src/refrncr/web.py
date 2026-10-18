@@ -59,6 +59,7 @@ from refrncr.record_import import (
     MAX_UPLOAD_BYTES,
     PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
+    ImportExpiredError,
     ImportValidationError,
     distinct_samples,
     parse_source,
@@ -95,6 +96,13 @@ from refrncr.services import (
 )
 from refrncr.source_formats import SourceFormatError, compose_format, formats_for
 from refrncr.version_contracts import mapping_incomplete_message
+
+STATUS_LABELS = {"Removed": "Deleted", "Edited": "Changed"}
+
+
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
@@ -224,6 +232,7 @@ def create_flask_app(
     app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
+    app.jinja_env.filters["status_label"] = status_label
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -1137,7 +1146,7 @@ def create_flask_app(
             overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
-                change.id: "Edited" if change.status == "Changed" else change.status
+                change.id: change.status
                 for change in (g.concept_ui.field_changes if concept else ())
                 if change.status != "Added"
             }
@@ -1357,7 +1366,11 @@ def create_flask_app(
         ) not in {"0", "1"}:
             raise ValidationError("Choose valid review parameters.")
         criteria = DiffCriteria(
-            tuple(request.args.getlist("status")) or STATUSES,
+            tuple(
+                "Changed" if value == "Edited" else value
+                for value in request.args.getlist("status")
+            )
+            or STATUSES,
             request.args.get("q", ""),
             request.args.get("anchor", ""),
             request.args.get("backwards", "0") == "1",
@@ -2362,7 +2375,7 @@ def create_flask_app(
         selected_changes = set() if record_status == "all" else set(record_status.split(","))
         record_change_options = []
         for label, value, count in zip(
-            ("Added", "Edited", "Deleted"),
+            ("Added", "Changed", "Deleted"),
             change_order,
             view.status_counts,
             strict=True,
@@ -2398,7 +2411,7 @@ def create_flask_app(
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,
-            result_statuses=request.args.getlist("status"),
+            result_statuses=selected_statuses,
             may_edit=may_edit,
             may_add_record=may_add_record,
             may_export=view.may_export,
@@ -2536,6 +2549,22 @@ def create_flask_app(
                         ),
                         403,
                     )
+                except ImportExpiredError:
+                    resolved = getattr(g, "authenticated_resolution", None)
+                    if resolved is not None:
+                        audit_security(
+                            "security.workflow_token_rejected",
+                            actor_user_id=resolved[0].id,
+                        )
+                    minutes = max(1, (record_imports.store.ttl + 59) // 60)
+                    return render_authenticated_template(
+                        "pages/datasets/import/unavailable.html",
+                        error=(
+                            f"This import expired after {minutes} minutes without activity. "
+                            "Upload the file again to continue."
+                        ),
+                        return_url=url_for("import_dataset_records", key=kwargs.get("key", "")),
+                    ), 410
                 except NotFoundError:
                     resolved = getattr(g, "authenticated_resolution", None)
                     if resolved is not None:
@@ -2588,7 +2617,7 @@ def create_flask_app(
                         dataset.key,
                         state.token,
                         page=parse_page_parameter(),
-                        statuses=tuple(request.args.getlist("status")),
+                        statuses=tuple(value for value in request.args.getlist("status") if value),
                         search=request.args.get("q", ""),
                     )
                 except (NotFoundError, ImportValidationError):
@@ -2604,7 +2633,7 @@ def create_flask_app(
                 if preview.non_row_errors:
                     step = 3
                     error = " ".join(item.message for item in preview.non_row_errors)
-                elif step == 5 and not preview.valid:
+                elif step == 4 and not preview.valid:
                     step = 4
                 if step != state.step:
                     state = record_imports.navigate(
@@ -2657,9 +2686,8 @@ def create_flask_app(
             2: bool(source and source.headers),
             3: bool(state and state.mapping_ready),
             4: bool(state and state.validation_valid),
-            5: success,
         }
-        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & validate", "Import")
+        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & import")
         steps = []
         for number, label in enumerate(labels, 1):
             done = success or completed[number]
@@ -2693,7 +2721,7 @@ def create_flask_app(
                 report_rows.append(
                     dict(number=number, identifier=" · ".join(identifier_values), errors=details)
                 )
-        back_step = 3 if step == 4 else 4 if step == 5 else 1 if automatic else step - 1
+        back_step = 3 if step == 4 else 1 if automatic else step - 1
         return render_authenticated_template(
             "pages/datasets/import/wizard.html",
             mode=mode,
@@ -2721,6 +2749,9 @@ def create_flask_app(
             back_step=back_step,
             error=error,
             current_csrf=login_session.csrf_token,
+            mapping_reason_text=(
+                "This import replaces all records in the draft, so every field must be mapped."
+            ),
         ), status
 
     def import_redirect(key, state):
@@ -2953,7 +2984,7 @@ def create_flask_app(
             expected |= submitted_component_names(len(source.headers))
         target_step = request.form.get("go_step")
         if target_step is not None:
-            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4", "5"}:
+            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4"}:
                 abort(400)
             # Check the original state before accepting a navigation request.
             record_imports.navigate(actor.id, login_session.id, key, token, int(target_step))
@@ -3014,8 +3045,6 @@ def create_flask_app(
                 error=" ".join(item.message for item in preview.non_row_errors),
                 status=400,
             )
-        if target_step == "5" and preview.valid:
-            state = record_imports.navigate(actor.id, login_session.id, key, token, 5)
         return import_redirect(key, state)
 
     @import_route(
@@ -3068,7 +3097,7 @@ def create_flask_app(
                 dataset,
                 login_session,
                 state,
-                step=5,
+                step=4,
                 error=(
                     "The import could not be completed. No records have been imported. Try again."
                 ),
