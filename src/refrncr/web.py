@@ -2411,7 +2411,7 @@ def create_flask_app(
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,
-            result_statuses=request.args.getlist("status"),
+            result_statuses=selected_statuses,
             may_edit=may_edit,
             may_add_record=may_add_record,
             may_export=view.may_export,

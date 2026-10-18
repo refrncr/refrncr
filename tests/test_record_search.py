@@ -113,7 +113,7 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):
         assert f"{key}={value}" in response.text or key.startswith("f")
     legacy_status = request(browser, "get", path + "?import_results=1&status=Edited")
     assert legacy_status.status_code == 200
-    assert "status=Changed" in legacy_status.text and "Changed" in legacy_status.text
+    assert "name='status' value='Changed' checked" in legacy_status.text
     roundtrip = request(browser, "get", path + "?" + urlencode(params | {"page": 2}))
     assert "Page 2 of 2" in roundtrip.text and "of 66" in roundtrip.text
     reset = request(browser, "get", path + "?" + urlencode(params | {"page": 2, "action": "apply"}))
