@@ -117,16 +117,16 @@
 .import-row-detail { padding: 0; border: 0; background: none; color: var(--color-link); font: inherit; text-align: start; cursor: pointer; text-decoration: underline; text-underline-offset: .15em; }
 .import-row-detail:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .import-preview-panel .record-details dd, .import-preview-panel .diff-value { font-family: var(--font-data); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
-.import-field-diffs { margin: 0; }
-.import-field-diff { padding-block: var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
-.import-field-diff:first-child { padding-top: 0; }
-.import-field-diff:last-child { border-bottom: 0; }
-.import-field-diff dt { margin-bottom: var(--space-xs); }
-.import-field-diff dd { display: grid; gap: var(--space-xs); margin: 0; }
-.import-diff-before, .import-diff-after { display: flex; align-items: flex-start; gap: var(--space-xs); min-width: 0; padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
-.import-diff-before { color: var(--color-status-removed); background: var(--color-status-removed-surface); }
-.import-diff-after { color: var(--color-status-published); background: var(--color-status-published-surface); }
-.import-diff-sign { flex: 0 0 1em; font-weight: var(--font-weight-bold); }
+.import-change-list { margin: 0; }
+.import-change { padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-border); }
+.import-change:first-child { padding-top: 0; }
+.import-change:last-child { border-bottom: 0; }
+.import-change dt { margin-bottom: var(--space-xs); }
+.import-change dd { display: grid; gap: var(--space-2xs); margin: 0; }
+.import-change-row { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); align-items: baseline; color: var(--color-text-secondary); font-family: var(--font-data); overflow-wrap: anywhere; }
+.import-change-row .diff-value { min-width: 0; color: inherit; font: inherit; overflow-wrap: anywhere; }
+.import-change-new { color: var(--color-text); font-weight: var(--font-weight-semibold); }
+.import-change-label { color: var(--color-text-muted); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-regular); }
 .import-unchanged-fields { margin-top: var(--space-lg); border-top: 1px solid var(--color-border-subtle); padding-top: var(--space-md); }
 .import-unchanged-fields summary { color: var(--color-link); cursor: pointer; }
 .deletion-acknowledgement { display: flex; align-items: flex-start; gap: var(--space-xs); max-width: 26rem; margin: 0; font-size: var(--font-size-body-sm); }

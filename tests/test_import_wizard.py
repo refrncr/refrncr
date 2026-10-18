@@ -176,9 +176,8 @@ def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wiz
         "Status",
         "Changed fields",
     ]
-    assert re.findall("<dt><code class='mapping-field-name'>(.*?)</code></dt>", preview.text)[
-        :4
-    ] == ["Code", "Amount", "Active", "Day"]
+    assert re.findall("<dt>(.*?)</dt>", preview.text)[:4] == ["Code", "Amount", "Active", "Day"]
+    assert "This record will be added." in html_text(preview.text)
     assert sum(tag == "tr" for tag, _ in html_elements(table)) == 13
     assert "C9" in table and "C10" in table
     assert "—" in table

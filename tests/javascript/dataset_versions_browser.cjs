@@ -202,6 +202,15 @@ async function closedWithFocus(page, opener) {
     await importer.getByRole('button', {name: 'Continue', exact: true}).click();
     await importer.locator('[data-import-mapping]').waitFor();
     await importer.getByRole('button', {name: 'Continue to preview', exact: true}).click();
+    const deletedRow = importer.getByRole('row').filter({hasText: 'Deleted'});
+    await deletedRow.locator('td').first().click();
+    const deletedPanel = importer.locator('dialog[open]');
+    await deletedPanel.waitFor();
+    assert.match(await deletedPanel.innerText(), /This record will be marked as deleted\./);
+    assert.equal(await deletedPanel.getByText('Current', {exact: true}).count(), 0);
+    assert.equal(await deletedPanel.getByText('New', {exact: true}).count(), 0);
+    assert(await deletedPanel.locator('.record-details > div').count() >= 2);
+    await importer.keyboard.press('Escape');
     await importer.getByRole('link', {name: 'Continue', exact: true}).click();
     await importer.getByRole('checkbox', {name: 'I understand that 1 Records will be marked as deleted.'}).check();
     await importer.getByRole('button', {name: 'Import records', exact: true}).click();
