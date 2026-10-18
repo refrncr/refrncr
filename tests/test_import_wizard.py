@@ -518,6 +518,11 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     reason = re.search(r"<p class='mapping-reason help-text'([^>]*)>", pending.text)
     assert reason and "hidden" not in reason.group(1)
     assert "data-mapping-jump" in pending.text
+    jump = re.search(r"<button\b(?=[^>]*data-mapping-jump)([^>]*)>", pending.text)
+    assert jump
+    jump_classes = re.search(r"class='([^']*)'", jump.group(1)).group(1).split()
+    assert "mapping-jump" in jump_classes
+    assert "button-link" not in jump_classes
     assert pending.text.index("Back") < pending.text.index("Cancel import")
     assert pending.text.index("mapping-status") < pending.text.index("Continue to preview")
 

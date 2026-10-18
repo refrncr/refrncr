@@ -273,7 +273,7 @@
       if (result.unselected) {
         const jump = document.createElement("button");
         jump.type = "button";
-        jump.className = "button-link mapping-jump";
+        jump.className = "mapping-jump";
         jump.dataset.mappingJump = "";
         jump.textContent = `${result.unselected} ${result.unselected === 1 ? "column" : "columns"}`;
         line.append(jump, document.createTextNode(` still ${result.unselected === 1 ? "needs" : "need"} a choice`));

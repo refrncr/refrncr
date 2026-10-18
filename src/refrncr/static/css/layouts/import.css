@@ -18,6 +18,7 @@
 .import-cancel:hover { color: var(--color-text); }
 .import-mapping-forward { display: grid; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "status continue" "reason continue"; align-items: center; column-gap: var(--space-sm); row-gap: var(--space-2xs, .25rem); width: auto; }
 .import-mapping-forward .mapping-status { grid-area: status; justify-self: end; text-align: end; }
+.import-mapping-forward:not(:has(.mapping-reason:not([hidden]))) .mapping-status { grid-row: 1 / span 2; align-self: center; }
 .import-mapping-forward .mapping-reason { grid-area: reason; justify-self: end; margin: 0; text-align: end; color: var(--color-text-muted); font-size: var(--font-size-body-xs, .8rem); }
 .import-mapping-forward > [data-mapping-continue] { grid-area: continue; align-self: center; }
 .mapping-status { display: inline-flex; align-items: center; gap: var(--space-2xs, .25rem); margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); }
@@ -26,7 +27,9 @@
 .mapping-status-icons { align-self: flex-start; translate: 0 .125em; }
 .mapping-status svg { width: .875rem; height: .875rem; margin: 0; flex: none; }
 .mapping-field-name { font-family: var(--font-technical); font-size: .9em; background: none; padding: 0; color: inherit; }
-.mapping-jump { display: inline; min-height: 0; padding: 0; font: inherit; }
+.mapping-jump { display: inline; border: 0; background: none; padding: 0; min-height: 0; font: inherit; line-height: inherit; color: var(--color-link); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.mapping-jump:hover { color: var(--color-link-hover); }
+.mapping-jump:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: 2px; }
 .mapping-status[data-state="pending"] .mapping-status-icon-ready, .mapping-status[data-state="ready"] .mapping-status-icon-pending { display: none; }
 .mapping-status[data-state="pending"] .mapping-status-icon-pending { color: var(--color-status-draft); }
 .mapping-status[data-state="ready"] .mapping-status-icon-ready { color: var(--color-status-published); }
