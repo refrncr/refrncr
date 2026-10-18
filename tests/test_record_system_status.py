@@ -63,12 +63,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     html = response.text
     assert "3 records" in html and "1 marked for deletion" in html
 
-    headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
-    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headers[-4:-1]] == [
-        "Status",
-        "Change",
-        "Validation",
-    ]
+    field_headers = re.findall(r"<span class='column-heading-label'>(.*?)</span>", html, re.S)
+    assert field_headers[-3:] == ["Status", "Change", "Validation"]
     assert "Status (application metadata)" in html
     assert "Complete" in html and "badge-success" not in html
     assert "Old &lt;identifier&gt;" in html and "Old <identifier>" not in html
@@ -107,12 +103,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         html = response.text
         assert "record-system-status" not in html
         assert "Status (application metadata)" not in html
-        content_headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
-        assert [re.sub(r"<[^>]+>", "", h).strip() for h in content_headers[2:5]] == [
-            "Status",
-            "Change",
-            "Validation",
-        ]
+        field_headers = re.findall(r"<span class='column-heading-label'>(.*?)</span>", html, re.S)
+        assert field_headers[2:5] == ["Status", "Change", "Validation"]
         assert ">Complete</span>" in html
     rows = exported_rows(
         c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", version_id=first.id)

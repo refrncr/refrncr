@@ -17,11 +17,13 @@
   let fieldMetadataCloseTimer = null;
   const positionFieldMetadata = (trigger, panel) => {
     const rect = trigger.getBoundingClientRect();
-    const width = Math.min(448, window.innerWidth - 16);
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    panel.style.width = `${width}px`;
+    panel.style.width = "";
+    const {width, height} = panel.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left - 8, window.innerWidth - width - 8));
+    const below = rect.bottom + 6;
+    const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - height - 6) : below;
     panel.style.left = `${left}px`;
-    panel.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - panel.offsetHeight - 8)}px`;
+    panel.style.top = `${top}px`;
   };
   const closeFieldMetadata = () => {
     if (!openFieldMetadata) return;
