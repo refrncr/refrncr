@@ -688,6 +688,25 @@ def test_expired_transient_token(import_context):
         importer.preview(admin.id, "one", dataset.key, state.token, ("code", "amount"))
 
 
+def test_staged_import_activity_slides_expiry_and_idle_import_expires(import_context):
+    _, services, admin, dataset = import_context
+    now = [0.0]
+    importer = DatasetRecordImportService(
+        services.dataset_records, TransientImportStore(clock=lambda: now[0], ttl=900)
+    )
+    state, _, _ = importer.begin(
+        admin.id, "active", dataset.key, "valid.csv", b"code,amount\nZ,9\n"
+    )
+    now[0] = 840
+    touched = importer.state(admin.id, "active", dataset.key, state.token)
+    assert touched.expires_at == 1740
+    now[0] = 1500
+    assert importer.state(admin.id, "active", dataset.key, state.token).token == state.token
+    now[0] = 2400
+    with pytest.raises(NotFoundError):
+        importer.state(admin.id, "active", dataset.key, state.token)
+
+
 def test_preview_error_cap_authorization_and_session_revocation(import_context):
     _, services, admin, dataset = import_context
     viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", PASSWORD)
@@ -821,7 +840,8 @@ def test_transient_capacity_is_atomic_and_does_not_evict_existing_state():
     states = [result for result in results if not isinstance(result, Exception)]
     assert len(states) == 1
     assert sum(isinstance(result, ImportValidationError) for result in results) == 1
-    assert store.get(states[0].token, "actor", states[0].session_id, "dataset") == states[0]
+    touched = store.get(states[0].token, "actor", states[0].session_id, "dataset")
+    assert touched.expires_at > states[0].expires_at
 
 
 @pytest.mark.parametrize("failure_target", ["values", "audit"])
@@ -974,8 +994,8 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert mapping.status_code == 200
     assert "&lt;file&gt;.csv" in body
     assert "High confidence" in body
-    assert "2 of 2 required fields mapped" in body
-    assert "0 choices remaining · 0 columns ignored" in body
+    assert "2 of 2 required and identifier fields mapped" in body
+    assert "0 columns still need a choice" in body
     assert "Examples:" in body
     assert "&lt;script&gt;" in body
     assert "internal score" not in body.casefold()
@@ -995,7 +1015,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": ""},
     )
     assert incomplete.status_code == 400
-    assert "Missing required fields:" in incomplete.get_data(as_text=True)
+    assert "1 field not mapped: Amount" in incomplete.get_data(as_text=True)
     assert "data-missing-key='amount'" in incomplete.get_data(as_text=True)
     reopened = client.get(
         f"/datasets/{dataset.key}/records/import/{token}/mapping",
@@ -1013,7 +1033,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert preview.status_code == 200
     assert "&lt;script&gt;" in preview.get_data(as_text=True)
     final = client.get(
-        f"/datasets/{dataset.key}/records/import/{token}/step/5", base_url="https://localhost"
+        f"/datasets/{dataset.key}/records/import/{token}/step/4", base_url="https://localhost"
     )
     assert final.status_code == 200
     confirmed = client.post(

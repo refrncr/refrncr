@@ -13,6 +13,50 @@
   });
   document.querySelector("[data-error-focus]")?.focus();
 
+  let openFieldMetadata = null;
+  const positionFieldMetadata = (trigger, panel) => {
+    const rect = trigger.getBoundingClientRect();
+    const width = Math.min(448, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+    panel.style.width = `${width}px`;
+    panel.style.left = `${left}px`;
+    panel.style.top = `${Math.min(rect.bottom + 8, window.innerHeight - panel.offsetHeight - 8)}px`;
+  };
+  const closeFieldMetadata = () => {
+    if (!openFieldMetadata) return;
+    const {trigger, panel} = openFieldMetadata;
+    panel.hidePopover();
+    trigger.setAttribute("aria-expanded", "false");
+    openFieldMetadata = null;
+  };
+  document.querySelectorAll("[data-field-metadata-trigger]").forEach((trigger) => {
+    const panel = document.getElementById(trigger.getAttribute("aria-controls"));
+    if (!panel || typeof panel.showPopover !== "function") return;
+    trigger.addEventListener("click", () => {
+      if (openFieldMetadata?.trigger === trigger) { closeFieldMetadata(); return; }
+      closeFieldMetadata();
+      panel.showPopover();
+      positionFieldMetadata(trigger, panel);
+      trigger.setAttribute("aria-expanded", "true");
+      openFieldMetadata = {trigger, panel};
+    });
+    panel.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { closeFieldMetadata(); trigger.focus(); }
+    });
+    window.addEventListener("resize", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); });
+    window.addEventListener("scroll", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); }, true);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (openFieldMetadata && !openFieldMetadata.panel.contains(event.target) && event.target !== openFieldMetadata.trigger) closeFieldMetadata();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && openFieldMetadata) {
+      const {trigger} = openFieldMetadata;
+      closeFieldMetadata();
+      trigger.focus();
+    }
+  });
+
   const selectionForms = new WeakSet();
   const initializeSelectionForms = (root) => {
     root.querySelectorAll("form[data-requires-selection]").forEach((form) => {
@@ -174,11 +218,7 @@
 
   document.querySelectorAll("[data-import-mapping]").forEach((form) => {
     const selects = [...form.querySelectorAll("select[name^='mapping_']")];
-    const optionLists = selects.map((select) => ({
-      select,
-      options: [...select.querySelectorAll("option[data-option-group]")].sort((a, b) => Number(a.dataset.optionOrder) - Number(b.dataset.optionOrder)),
-      groups: Object.fromEntries([...select.querySelectorAll("optgroup[data-option-group]")].map((group) => [group.dataset.optionGroup, group])),
-    }));
+    const options = selects.map((select) => [...select.querySelectorAll("option[data-option-group]")]);
     const required = JSON.parse(form.dataset.requiredKeys);
     const button = document.querySelector("[data-mapping-continue]");
     const panel = form.closest(".import-wizard") || form;
@@ -188,17 +228,10 @@
       const mapped = values.filter((value) => value && value !== "__ignored__");
       const valid = !values.includes("") && new Set(mapped).size === mapped.length && required.every((key) => mapped.includes(key));
       button.disabled = !valid;
-      optionLists.forEach(({select, options, groups}) => {
-        const selected = select.value;
-        options.forEach((option) => {
-          const used = option.value !== selected && mapped.includes(option.value);
-          const group = groups[used ? "used" : option.dataset.optionGroup];
-          option.textContent = option.dataset.optionLabel;
-          group.append(option);
+      options.forEach((items, index) => {
+        items.forEach((option) => {
+          option.hidden = option.value !== selects[index].value && mapped.includes(option.value);
         });
-        Object.values(groups).forEach((group) => { group.hidden = !group.children.length; });
-        // Moving native options must not change the user's selection or submitted value.
-        select.value = selected;
       });
       const summary = panel.querySelector("[data-mapping-summary]");
       if (summary) {
@@ -214,9 +247,35 @@
           badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
         });
       }
-      status.textContent = valid ? "All required and identifier fields are mapped. Ready to continue." : "Map every required and identifier field once, and choose a field or Do not import for each column.";
+      const missing = required.filter((key) => !mapped.includes(key));
+      if (missing.length) {
+        const labels = missing.map((key) => panel.querySelector(`[data-missing-key='${key}']`)?.textContent || key);
+        status.textContent = `${missing.length} field${missing.length === 1 ? "" : "s"} not mapped: ${labels.join(", ")}`;
+      } else {
+        const unselected = values.filter((value) => !value).length;
+        status.textContent = unselected ? `${unselected} column${unselected === 1 ? "" : "s"} still need a choice` : "Ready to continue";
+      }
     };
     form.addEventListener("change", update);
+    update();
+  });
+  document.querySelectorAll("form[data-auto-filter]").forEach((form) => {
+    const search = form.querySelector("input[type='search']");
+    let timer;
+    search?.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => form.requestSubmit(), 250);
+    });
+    form.querySelectorAll("select, input[type='checkbox']").forEach((control) => {
+      control.addEventListener("change", () => form.requestSubmit());
+    });
+  });
+  document.querySelectorAll("form[data-import-confirm]").forEach((form) => {
+    const acknowledgement = form.querySelector("[name='acknowledge_deletions']");
+    const submit = form.querySelector("button[type='submit']");
+    if (!acknowledgement || !submit) return;
+    const update = () => { submit.disabled = !acknowledgement.checked; };
+    acknowledgement.addEventListener("change", update);
     update();
   });
   const initializeSourceFormats = (root = document) => root.querySelectorAll("[data-source-formats-url]").forEach((form) => {

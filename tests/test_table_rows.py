@@ -172,11 +172,27 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
     assert "aria-label='Move Code up'" not in html
     env = client.application.jinja_env
     preview = env.get_template("pages/datasets/import/preview.html").render(
-        state={"filename": "example.csv"},
+        state={"filename": "example.csv", "token": "token"},
         source={"rows": [["value"]]},
-        preview={"valid": True},
+        preview={
+            "valid": True,
+            "counts": {
+                "Added": 1,
+                "Changed": 0,
+                "Unchanged": 0,
+                "Deleted": 0,
+                "Error": 0,
+                "matching": 1,
+            },
+        },
         preview_rows=[["<script>value</script>"]],
-        preview_fields=[{"name": "Code"}],
+        preview_fields=[{"key": "code", "name": "Code"}],
+        identifier_keys=("code",),
+        difference_page=1,
+        difference_search="",
+        difference_statuses=(),
+        dataset={"key": "empty-rows"},
+        mode="create",
     )
     assert "data-row-action" not in preview and "row-chevron" not in preview
     assert "&lt;script&gt;value&lt;/script&gt;" in preview

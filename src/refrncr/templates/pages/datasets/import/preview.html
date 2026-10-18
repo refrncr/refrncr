@@ -2,9 +2,7 @@
 {% if preview.valid and mode == 'new_version' %}
   {% include 'pages/datasets/import/differences.html' %}
 {% elif preview.valid %}
-  <div class='alert alert-success' role='status'>Validation successful. {{ source.rows|length }} records are ready to import.</div>
-  <p>No records have been imported. Showing the first {{ preview_rows|length }} of {{ source.rows|length }} records.</p>
-  <div class='table-scroll' tabindex='0' role='region' aria-label='Import preview table'><table><caption class='visually-hidden'>First ten records, in dataset field order</caption><thead><tr>{% for field in preview_fields %}<th scope='col'>{{ field.name }}</th>{% endfor %}</tr></thead><tbody>{% for row in preview_rows %}<tr>{% for value in row %}<td>{{ value if value|trim else '—' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  {% include 'pages/datasets/import/differences.html' %}
 {% else %}
   <div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ preview.invalid_rows }} source rows failed validation. No records have been imported.</div>
   <p>Correct the errors in your source file, then upload the corrected file. Records cannot be edited here.</p>

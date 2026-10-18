@@ -1,5 +1,5 @@
 .import-wizard { display: flex; flex-direction: column; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-.import-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg) var(--space-lg) 0; list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.import-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); margin: 0; padding: var(--space-lg) var(--space-lg) 0; list-style: none; border-bottom: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .import-steps li > a, .import-steps li > span, .import-steps li > button { display: flex; gap: var(--space-sm); align-items: flex-start; height: 100%; padding: var(--space-sm) var(--space-sm) var(--space-md); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text-muted); font-size: var(--font-size-body-sm); overflow-wrap: anywhere; }
 .import-steps small { display: block; margin-top: var(--space-xs); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); }
 /* The active step is underlined, not filled: the numbered circles carry the progress. */
@@ -91,6 +91,25 @@
 .mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); color: var(--color-text-muted); }
 .mapping-info summary .button-icon { width: 1.125rem; height: 1.125rem; margin: 0; }
 .mapping-info summary:hover { color: var(--color-text); }
+.mapping-intro { margin-bottom: var(--space-md); }
+.mapping-intro > :last-child { margin-bottom: 0; }
+.mapping-completeness { display: grid; gap: var(--space-xs); }
+.mapping-completeness .help-text { margin: 0; }
+.import-result-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.import-difference-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-block: var(--space-md); }
+.import-difference-filters label { margin: 0; }
+.import-difference-filters input, .import-difference-filters select { width: auto; min-width: 10rem; margin: 0; }
+.import-differences table { min-width: 100%; }
+.import-differences th, .import-differences td { padding: var(--space-sm) var(--space-md); }
+.import-row-detail { padding: 0; border: 0; background: none; color: var(--color-link); font: inherit; text-align: start; cursor: pointer; text-decoration: underline; text-underline-offset: .15em; }
+.import-row-detail:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.deletion-acknowledgement { display: flex; align-items: flex-start; gap: var(--space-xs); max-width: 26rem; margin: 0; font-size: var(--font-size-body-sm); }
+.deletion-acknowledgement input { flex: 0 0 auto; }
+.import-actions-forward form[data-import-confirm] { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-md); }
+.record-side-panel { position: fixed; inset: 0 0 0 auto; width: min(34rem, 100vw); max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; padding: var(--space-lg); overflow: auto; border: 0; border-inline-start: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-lg); }
+.record-side-panel::backdrop { background: rgb(0 0 0 / 35%); }
+.record-side-panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-md); margin-bottom: var(--space-lg); }
+.record-side-panel-header h2 { overflow-wrap: anywhere; }
 
 /* Drop zone: centred icon, label and file control; the native picker button reads as a secondary button. */
 .import-upload-zone { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-xl) var(--space-lg); border-width: 1.5px; text-align: center; }

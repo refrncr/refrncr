@@ -446,7 +446,7 @@ def test_one_http_import_flow_for_empty_and_populated_tables(context, empty, leg
         },
     )
     assert mapped.status_code == 303
-    final = request(browser, "get", staged + "/step/5")
+    final = request(browser, "get", staged + "/step/4")
     assert final.status_code == 200
     assert "name='acknowledge_deletions'" not in final.text
     confirmation = re.search("name='confirmation' value='([^']+)'", final.text)[1]
@@ -544,10 +544,9 @@ def test_http_security_confirmation_binding_and_undo(context):
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "label"},
     )
     assert mapped.status_code == 303
-    page = request(browser, "get", staged + "/step/5")
-    assert (
-        page.status_code == 200 and "&lt;script&gt;" not in page.text
-    )  # final summary contains no Field values
+    page = request(browser, "get", staged + "/step/4")
+    assert page.status_code == 200 and "import-record-" in page.text
+    assert "&lt;script&gt;" in page.text and "<script>" not in page.text
     nonce = re.search("name='confirmation' value='([^']+)'", page.text)[1]
     other_session, other_csrf = client(c)
     before = snapshot(c)
@@ -567,9 +566,9 @@ def test_http_security_confirmation_binding_and_undo(context):
     duplicate.add("confirmation", nonce)
     assert request(browser, "post", staged + "/confirm", data=duplicate).status_code == 400
     assert snapshot(c) == before
-    # A rejected confirmation invalidates validation; refresh the final summary.
+    # A rejected confirmation invalidates validation; refresh the preview.
     request(browser, "get", staged + "/step/4")
-    page = request(browser, "get", staged + "/step/5")
+    page = request(browser, "get", staged + "/step/4")
     confirmation["confirmation"] = re.search("name='confirmation' value='([^']+)'", page.text)[1]
     result = request(browser, "post", staged + "/confirm", data=confirmation)
     assert result.status_code == 303 and "import_results=1" in result.location

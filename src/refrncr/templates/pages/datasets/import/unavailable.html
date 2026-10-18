@@ -3,4 +3,5 @@
 {% block content %}
 <h1>Import unavailable</h1>
 {{ feedback(error, id='import-error', focus=true) }}
+{% if return_url %}<p><a class='button button-primary' href='{{ return_url }}'>Upload the file again</a></p>{% endif %}
 {% endblock %}

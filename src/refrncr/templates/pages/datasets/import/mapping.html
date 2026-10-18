@@ -1,7 +1,8 @@
-{% macro mapping_option(key, name, selected, group, order) -%}
-<option value='{{ key }}'{% if selected == key %} selected{% endif %} data-option-label='{{ name }}' data-option-group='{{ group }}' data-option-order='{{ order }}'>{{ name }}</option>
+{% macro mapping_option(key, name, selected, group, order, unavailable=false) -%}
+<option value='{{ key }}'{% if selected == key %} selected{% endif %}{% if unavailable and selected != key %} hidden{% endif %} data-option-label='{{ name }}' data-option-group='{{ group }}' data-option-order='{{ order }}'>{{ name }}</option>
 {%- endmacro %}
 <form id='import-step-form' class='form import-mapping' data-import-mapping data-source-formats-url='{{ url_for("review_source_formats", key=dataset.key, token=state.token) }}' data-required-keys='{{ required_keys|tojson }}' method='post' action='{{ url_for("preview_record_import", key=dataset.key, token=state.token) }}' novalidate>
+  {% include "pages/datasets/import/mapping_info.html" %}
   <noscript><p class='help-text'>JavaScript is disabled. You can preview the detected choices or select a candidate reading. Use Change format to inspect the controls. Enable JavaScript to change mappings or source types and refresh examples, or correct your source file and upload it again.</p></noscript>
   <p class='visually-hidden' data-format-status role='status' aria-live='polite' aria-atomic='true'></p>
   <ul class='mapping-list' role='list'>
@@ -17,11 +18,10 @@
       <div class='mapping-target'>
         <label class='visually-hidden' for='mapping-{{ index }}'>Target field for {{ advice.header }}</label>
         <select id='mapping-{{ index }}' name='mapping_{{ index }}' data-select='compact' data-noun='fields' aria-describedby='mapping-examples-{{ index }} mapping-choice-{{ index }}{% if mapping_errors.get(index) %} mapping-error-{{ index }}{% endif %}'{% if mapping_errors.get(index) %} aria-invalid='true'{% endif %}>
-          <option value=''{% if advice.selected == '' %} selected{% endif %}>{% if advice.warning == 'Multiple possible fields — choose one' %}Multiple matches — choose one{% else %}Choose a field{% endif %}</option>
+          <option value=''{% if advice.selected == '' %} selected{% endif %}>— Choose a field —</option>
           <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Do not import</option>
-          <optgroup label='Suggested fields' data-option-group='suggested'>{% for candidate in advice.candidates %}{% if candidate.field_key == advice.selected or candidate.field_key not in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}</optgroup>
-          <optgroup label='Available fields' data-option-group='available'>{% for field in fields %}{% if field.key not in advice.candidate_keys and (field.key == advice.selected or field.key not in assistance.mapping) %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
-          <optgroup label='Already mapped' data-option-group='used'>{% for candidate in advice.candidates %}{% if candidate.field_key != advice.selected and candidate.field_key in assistance.mapping %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0) }}{% endif %}{% endfor %}{% for field in fields %}{% if field.key not in advice.candidate_keys and field.key != advice.selected and field.key in assistance.mapping %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0) }}{% endif %}{% endfor %}</optgroup>
+          {% for candidate in advice.candidates %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0, candidate.field_key in assistance.mapping) }}{% endfor %}
+          {% for field in fields %}{% if field.key not in advice.candidate_keys %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0, field.key in assistance.mapping) }}{% endif %}{% endfor %}
         </select>
         <details class='mapping-rationale' data-mapping-tooltip>
           <summary aria-describedby='mapping-rationale-{{ index }}' id='mapping-choice-{{ index }}' data-mapping-choice class='badge mapping-choice {% if mapping_errors.get(index) %}badge-error{% elif advice.selected == "" %}badge-warning{% elif advice.selected is not none %}badge-success{% endif %}'>{% if mapping_errors.get(index) %}Mapping error{% elif advice.selected == '' %}Needs a choice{% elif advice.selected is none %}Do not import{% else %}Mapped{% endif %}</summary>

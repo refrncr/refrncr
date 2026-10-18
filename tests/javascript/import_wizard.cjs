@@ -14,19 +14,11 @@ function element(extra = {}) {
 }
 const badges = [element(), element(), element()];
 const selects = ['code', '', '__ignored__'].map((value, index) => {
-  const groups = Object.fromEntries(['suggested', 'available', 'used'].map(key => [key, {
-    dataset:{optionGroup:key}, children:[],
-    append(option) {
-      if (option.parent) option.parent.children.splice(option.parent.children.indexOf(option), 1);
-      this.children.push(option); option.parent = this;
-    },
-  }]));
   const options = ['code', 'amount', 'active'].map((key, order) => ({value:key,
-    dataset:{optionLabel:key, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
+    hidden:false, dataset:{optionLabel:key, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
   }));
-  options.forEach(option => groups[option.dataset.optionGroup].append(option));
-  return element({value, groups, options,
-    querySelectorAll: selector => selector.startsWith('option[') ? options : Object.values(groups),
+  return element({value, options,
+    querySelectorAll: selector => selector.startsWith('option[') ? options : [],
     closest: () => ({querySelector: () => badges[index]})});
 });
 const summary = element();
@@ -71,15 +63,15 @@ vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {document,window:{i
 assert.equal(advance.disabled,true);
 assert.equal(badges[0].textContent, 'Mapped');
 assert.equal(selects[0].value, 'code');
-assert.equal(selects[0].options[0].parent, selects[0].groups.suggested);
-assert.equal(selects[1].options[0].parent, selects[1].groups.used);
-assert.equal(selects[1].groups.suggested.hidden, true);
+assert.equal(selects[0].options[0].hidden, false);
+assert.equal(selects[1].options[0].hidden, true);
 assert.equal(badges[1].textContent, 'Needs a choice');
 assert.equal(badges[2].textContent, 'Do not import');
 assert.equal(missing.hidden, false);
 assert.equal(missingLabels[0].hidden, true);
 assert.equal(missingLabels[1].hidden, false);
-assert.match(summary.textContent, /1 of 2 required fields mapped · 1 choices remaining · 1 columns ignored/);
+assert.match(summary.textContent, /1 of 2 required fields mapped/);
+assert.match(status.textContent, /1 field not mapped/);
 selects[1].value='amount'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
 assert.equal(missing.hidden, true);
@@ -88,11 +80,10 @@ assert.equal(badges[1].textContent, 'Mapping error');
 assert.match(badges[2].className, /badge-error/);
 assert.equal(advance.disabled,true);
 selects[2].value='__ignored__'; selects[0].value=''; mapping.handlers.change();
-assert.equal(selects[1].options[0].parent, selects[1].groups.suggested);
-assert.equal(selects[1].groups.suggested.hidden, false);
+assert.equal(selects[1].options[0].hidden, false);
 assert.equal(selects[1].value, 'amount');
 assert.equal(selects[2].value, '__ignored__');
-assert.equal(selects[2].options[1].parent, selects[2].groups.used);
+assert.equal(selects[2].options[1].hidden, true);
 assert.equal(advance.disabled,true);
 selects[0].value='code'; mapping.handlers.change();
 assert.equal(advance.disabled,false);

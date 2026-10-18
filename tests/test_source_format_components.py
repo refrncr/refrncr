@@ -216,7 +216,7 @@ def test_offset_rejects_timezone_and_local_timestamp_retains_dst_decisions(wizar
 def test_changed_format_invalidates_prior_confirmation(wizard):
     data = Controls(temporal_upload(wizard).text).data
     assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
-    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    assert wizard.get(wizard.path + "/step/4").status_code == 200
     data["time_2"] = "v1-time-hm"
     assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
@@ -298,7 +298,7 @@ def test_float_column_mixed_notation_confirms_canonical_values(wizard, import_co
     assert "Finite decimal or scientific number" in page.text
     assert "102.1059" in page.text and "67000000.0" in page.text
     assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
-    assert wizard.get(wizard.path + "/step/5").status_code == 200
+    assert wizard.get(wizard.path + "/step/4").status_code == 200
     assert "Added: 4" in wizard.post(wizard.path + "/confirm").text
     assert wizard.count() == 4
     from sqlalchemy import select

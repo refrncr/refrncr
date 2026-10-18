@@ -1,8 +1,9 @@
+{% from "components/icons.html" import info_icon %}
 {% macro field_metadata(field, disclosure=false) -%}
 {% if field.definition or field.unit %}
-{% if disclosure %}<details class='field-metadata'><summary>About {{ field.name }}</summary>{% else %}<div class='field-metadata'>{% endif %}
+{% if disclosure %}<div class='field-metadata field-metadata-disclosure'><button class='field-metadata-trigger' type='button' aria-label='About {{ field.name }}' aria-controls='field-metadata-{{ field.key }}' aria-describedby='field-metadata-{{ field.key }}' aria-expanded='false' data-field-metadata-trigger>{{ info_icon() }}</button><div id='field-metadata-{{ field.key }}' class='field-metadata-popover' popover='manual' data-field-metadata-panel><span class='field-metadata-popover-title'>{{ field.name }}</span>{% else %}<div class='field-metadata'>{% endif %}
 {% if field.definition %}<p><span class='field-metadata-label'>Definition:</span> {{ field.definition }}</p>{% endif %}
 {% if field.unit %}<p><span class='field-metadata-label'>Unit:</span> {{ field.unit }}</p>{% endif %}
-{% if disclosure %}</details>{% else %}</div>{% endif %}
+{% if disclosure %}{% if field.is_required is defined %}<p><span class='field-metadata-label'>Required:</span> {{ 'Yes' if field.is_required else 'No' }}</p>{% endif %}{% if field.is_unique is defined %}<p><span class='field-metadata-label'>Unique:</span> {{ 'Yes' if field.is_unique else 'No' }}</p>{% endif %}{% if field.data_type is defined %}<p><span class='field-metadata-label'>Data type:</span> {{ field.data_type }}</p>{% endif %}</div></div>{% else %}</div>{% endif %}
 {% endif %}
 {%- endmacro %}
