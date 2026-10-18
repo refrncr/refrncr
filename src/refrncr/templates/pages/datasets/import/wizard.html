@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/icons.html" import circle_alert_icon, circle_check_icon %}
 {% from "components.html" import feedback %}
-{% from "pages/datasets/import/_mapping_status.html" import mapping_status_text %}
+{% from "pages/datasets/import/_mapping_status.html" import mapping_status_text, mapping_missing_fields %}
 {% block content %}
 <header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>{{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
 <section class='import-wizard' aria-label='Record import wizard'>
@@ -28,7 +28,9 @@
     {% endif %}
   </div>
   <footer class='import-actions'>
-    <div>{% if not success and step in (2, 3) %}<button class='button button-secondary' type='submit' form='import-step-form' name='go_step' value='{{ back_step }}'>Back</button>{% elif not success and step > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=back_step) }}'>Back</a>{% endif %}</div>
+    <div class='import-actions-back'>{% if not success and step in (2, 3) %}<button class='button button-secondary' type='submit' form='import-step-form' name='go_step' value='{{ back_step }}'>Back</button>{% elif not success and step > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=back_step) }}'>Back</a>{% endif %}
+      {% if not success and state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-link import-cancel' type='submit'>Cancel import</button></form>{% elif not success %}<a class='button button-link import-cancel' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel import</a>{% endif %}
+    </div>
     <div class='import-actions-forward{% if step == 3 %} import-mapping-forward{% endif %}'>
       {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>View records</a>
       {% else %}
@@ -40,11 +42,10 @@
           {% set mapping_ready = not unselected_columns and not missing_labels %}
           <p class='mapping-status' data-mapping-status data-state='{{ "ready" if mapping_ready else "pending" }}' role='status' aria-live='polite' aria-atomic='true'>
             <span class='mapping-status-icons' aria-hidden='true'><span class='mapping-status-icon-pending'>{{ circle_alert_icon() }}</span><span class='mapping-status-icon-ready'>{{ circle_check_icon() }}</span></span>
-            <span data-mapping-status-text>{{ mapping_status_text(unselected_columns, missing_labels, assistance.completeness.ignored_columns, mapped_keys|length) }}</span>
+            <span class='mapping-status-copy'><span class='mapping-status-line' data-mapping-status-text>{% if unselected_columns %}<button type='button' class='button-link mapping-jump' data-mapping-jump>{{ unselected_columns }} {{ 'column' if unselected_columns == 1 else 'columns' }}</button> still {{ 'needs' if unselected_columns == 1 else 'need' }} a choice{% if missing_labels %} · {% endif %}{% endif %}{% if missing_labels %}{{ mapping_status_text(0, missing_labels, 0, 0) }} {{ mapping_missing_fields(missing_labels) }}{% endif %}{% if mapping_ready %}{{ mapping_status_text(0, [], assistance.completeness.ignored_columns, mapped_keys|length) }}{% endif %}</span></span>
           </p>
-          <p class='mapping-reason help-text' data-mapping-reason{% if not missing_fields %} hidden{% endif %}>This import replaces all records in the draft, so every field must be mapped.</p>
+          <p class='mapping-reason help-text' data-mapping-reason{% if not missing_fields %} hidden{% endif %}>{{ mapping_reason_text }}</p>
         {% endif %}
-        {% if state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>{{ 'Cancel import' if step == 4 else 'Cancel' }}</button></form>{% else %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>{% endif %}
         {% if step == 4 %}<form id='import-step-form' data-import-confirm method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>{% if mode == 'new_version' %}<input type='hidden' name='confirmation' value='{{ state.confirmation }}'>{% if preview.counts.Deleted %}<label class='deletion-acknowledgement'><input type='checkbox' name='acknowledge_deletions' value='yes' required aria-describedby='deletion-acknowledgement'><span id='deletion-acknowledgement'>I understand that {{ preview.counts.Deleted }} records will be marked as deleted.</span></label>{% endif %}{% endif %}<button class='button button-primary' type='submit'{% if not preview.valid %} disabled{% endif %}>Import records</button></form>
         {% else %}<button class='button button-primary' type='submit' form='import-step-form'{% if step == 3 %} data-mapping-continue{% endif %}>{{ 'Continue to preview' if step == 3 else 'Continue' }}</button>{% endif %}
       {% endif %}

@@ -2737,6 +2737,9 @@ def create_flask_app(
             back_step=back_step,
             error=error,
             current_csrf=login_session.csrf_token,
+            mapping_reason_text=(
+                "This import replaces all records in the draft, so every field must be mapped."
+            ),
         ), status
 
     def import_redirect(key, state):

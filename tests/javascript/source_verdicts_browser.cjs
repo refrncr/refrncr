@@ -177,7 +177,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         }
         assert.deepEqual(errors,[]);
         console.log(JSON.stringify({width,javaScriptEnabled,choiceBoxes,overflow:false,errors}));
-        await page.getByRole('button',{name:'Cancel',exact:true}).click();
+        await page.getByRole('button',{name:'Cancel import',exact:true}).click();
         await context.close();
       }
     }

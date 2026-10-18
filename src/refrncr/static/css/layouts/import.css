@@ -13,14 +13,20 @@
 .import-content .form { max-width: none; }
 .import-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .import-actions-forward { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
-.import-mapping-forward { display: grid; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "status cancel continue" "reason cancel continue"; align-items: center; column-gap: var(--space-sm); row-gap: var(--space-2xs, .25rem); width: auto; }
-.import-actions:has(.import-mapping-forward) > div:first-child { align-self: center; }
+.import-actions-back { display: flex; align-items: center; gap: var(--space-md); }
+.import-cancel { color: var(--color-text-muted); text-decoration: underline; text-underline-offset: 2px; }
+.import-cancel:hover { color: var(--color-text); }
+.import-mapping-forward { display: grid; flex: 1 1 auto; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "status continue" "reason continue"; align-items: center; column-gap: var(--space-sm); row-gap: var(--space-2xs, .25rem); width: auto; }
 .import-mapping-forward .mapping-status { grid-area: status; justify-self: end; text-align: end; }
-.import-mapping-forward .mapping-reason { grid-area: reason; justify-self: end; margin: 0; text-align: end; }
-.import-mapping-forward > form { grid-area: cancel; align-self: center; }
+.import-mapping-forward .mapping-reason { grid-area: reason; justify-self: end; margin: 0; text-align: end; color: var(--color-text-muted); font-size: var(--font-size-body-xs, .8rem); }
 .import-mapping-forward > [data-mapping-continue] { grid-area: continue; align-self: center; }
-.mapping-status { display: inline-flex; align-items: center; gap: var(--space-2xs, .25rem); margin: 0; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.mapping-status { display: inline-flex; align-items: center; gap: var(--space-2xs, .25rem); margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); }
+.mapping-status-copy { display: inline-flex; flex-direction: column; line-height: var(--line-height-body); }
+.mapping-status-line { display: block; }
+.mapping-status-icons { align-self: flex-start; translate: 0 .125em; }
 .mapping-status svg { width: .875rem; height: .875rem; margin: 0; flex: none; }
+.mapping-field-name { font-family: var(--font-technical); font-size: .9em; background: none; padding: 0; color: inherit; }
+.mapping-jump { display: inline; min-height: 0; padding: 0; font: inherit; }
 .mapping-status[data-state="pending"] .mapping-status-icon-ready, .mapping-status[data-state="ready"] .mapping-status-icon-pending { display: none; }
 .mapping-status[data-state="pending"] .mapping-status-icon-pending { color: var(--color-status-draft); }
 .mapping-status[data-state="ready"] .mapping-status-icon-ready { color: var(--color-status-published); }
@@ -133,9 +139,13 @@
   .source-format-parts { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
 }
 @media (max-width: 47.99rem) {
-  .import-mapping-forward { grid-template-columns: 1fr 1fr; grid-template-areas: "status status" "reason reason" "cancel continue"; }
+  .import-actions { display: grid; grid-template-columns: 1fr; }
+  .import-actions-back { grid-row: 2; justify-self: start; }
+  .import-actions-forward { grid-row: 1; width: 100%; }
+  .import-mapping-forward { grid-template-columns: 1fr; grid-template-areas: "status" "reason" "continue"; }
   .import-mapping-forward .mapping-status, .import-mapping-forward .mapping-reason { justify-self: start; text-align: start; }
-  .import-actions:has(.import-mapping-forward) > div:first-child { align-self: flex-end; }
+  .import-mapping-forward > [data-mapping-continue] { width: 100%; }
+  .import-actions-back { align-self: flex-end; flex-wrap: wrap; gap: var(--space-sm); }
 }
 .source-format-details > label { display: block; margin-block-start: var(--space-md); }
 .source-format-details > select, .source-format-details > input { width: 100%; max-width: 100%; }

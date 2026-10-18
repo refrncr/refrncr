@@ -1,7 +1,7 @@
 {% macro mapping_option(key, name, selected, group, order, unavailable=false) -%}
 <option value='{{ key }}'{% if selected == key %} selected{% endif %}{% if unavailable and selected != key %} hidden{% endif %} data-option-label='{{ name }}' data-option-group='{{ group }}' data-option-order='{{ order }}'>{{ name }}</option>
 {%- endmacro %}
-<form id='import-step-form' class='form import-mapping' data-import-mapping data-source-formats-url='{{ url_for("review_source_formats", key=dataset.key, token=state.token) }}' data-required-keys='{{ required_keys|tojson }}' method='post' action='{{ url_for("preview_record_import", key=dataset.key, token=state.token) }}' novalidate>
+<form id='import-step-form' class='form import-mapping' data-import-mapping data-source-formats-url='{{ url_for("review_source_formats", key=dataset.key, token=state.token) }}' data-required-keys='{{ required_keys|tojson }}' data-mapping-reason-text='{{ mapping_reason_text }}' method='post' action='{{ url_for("preview_record_import", key=dataset.key, token=state.token) }}' novalidate>
   {% include "pages/datasets/import/mapping_info.html" %}
   <noscript><p class='help-text'>JavaScript is disabled. You can preview the detected choices or select a candidate reading. Use Change format to inspect the controls. Enable JavaScript to change mappings or source types and refresh examples, or correct your source file and upload it again.</p></noscript>
   <p class='visually-hidden' data-format-status role='status' aria-live='polite' aria-atomic='true'></p>

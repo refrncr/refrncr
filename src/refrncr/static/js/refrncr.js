@@ -259,10 +259,46 @@
     const statusText = ({unselected, missingLabels, ignored, mappedCount}) => {
       const parts = [];
       if (unselected) parts.push(`${plural(unselected, "column", "columns")} still ${unselected === 1 ? "needs" : "need"} a choice`);
-      if (missingLabels.length) parts.push(`${plural(missingLabels.length, "field", "fields")} not mapped: ${missingLabels.join(", ")}`);
-      if (parts.length) return {ready: false, text: parts.join(" · ")};
+      if (missingLabels.length) {
+        const labels = missingLabels.slice(0, 3).join(", ");
+        const more = missingLabels.length > 3 ? ` and ${missingLabels.length - 3} more` : "";
+        parts.push(`${plural(missingLabels.length, "field", "fields")} not mapped: ${labels}${more}`);
+      }
+      if (parts.length) return {ready: false, text: parts.join(" · "), unselected, missingLabels};
       return {ready: true, text: `Ready to continue · ${plural(mappedCount, "field", "fields")} mapped, ${plural(ignored, "column", "columns")} not imported`};
     };
+    const renderStatus = (result) => {
+      const line = status.querySelector("[data-mapping-status-text]");
+      line.replaceChildren();
+      if (result.unselected) {
+        const jump = document.createElement("button");
+        jump.type = "button";
+        jump.className = "button-link mapping-jump";
+        jump.dataset.mappingJump = "";
+        jump.textContent = `${result.unselected} ${result.unselected === 1 ? "column" : "columns"}`;
+        line.append(jump, document.createTextNode(` still ${result.unselected === 1 ? "needs" : "need"} a choice`));
+      }
+      if (result.missingLabels?.length) {
+        if (result.unselected) line.append(document.createTextNode(" · "));
+        line.append(document.createTextNode(`${plural(result.missingLabels.length, "field", "fields")} not mapped: `));
+        result.missingLabels.slice(0, 3).forEach((label, index) => {
+          const code = document.createElement("code");
+          code.className = "mapping-field-name";
+          code.textContent = label;
+          line.append(code);
+          if (index < Math.min(result.missingLabels.length, 3) - 1) line.append(document.createTextNode(", "));
+        });
+        if (result.missingLabels.length > 3) line.append(document.createTextNode(` and ${result.missingLabels.length - 3} more`));
+      }
+      if (result.ready) line.textContent = result.text;
+    };
+    status.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-mapping-jump]")) return;
+      const firstOpen = selects.find((select) => !select.value);
+      if (!firstOpen) return;
+      firstOpen.focus({preventScroll: false});
+      firstOpen.scrollIntoView({block: "center"});
+    });
     const update = () => {
       const values = selects.map((select) => select.value);
       const mapped = values.filter((value) => value && value !== "__ignored__");
@@ -289,7 +325,8 @@
         mappedCount: new Set(mapped).size,
       });
       status.dataset.state = result.ready ? "ready" : "pending";
-      status.querySelector("[data-mapping-status-text]").textContent = result.text;
+      renderStatus(result);
+      if (reason) reason.textContent = form.dataset.mappingReasonText;
       if (reason) reason.hidden = missingLabels.length === 0;
     };
     form.addEventListener("change", update);

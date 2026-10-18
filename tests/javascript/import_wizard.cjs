@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 function element(extra = {}) {
-  return Object.assign({
+  const item = Object.assign({
     handlers: {}, attributes: {}, isConnected: true,
     addEventListener(type, callback) { this.handlers[type] = callback; },
     setAttribute(name, value) { this.attributes[name] = value; },
@@ -10,7 +10,11 @@ function element(extra = {}) {
     hasAttribute(name) { return name in this.attributes; },
     closest() { return null; }, getClientRects() { return [{}]; },
     matches() { return false; }, focus() { document.activeElement = this; },
+    replaceChildren(...children) { this.children = children; this.textContent = children.map(child => child.textContent || '').join(''); },
+    append(...children) { this.children ||= []; this.children.push(...children); this.textContent = this.children.map(child => child.textContent || '').join(''); },
+    scrollIntoView(options) { this.scrollOptions = options; },
   }, extra);
+  return item;
 }
 const badges = [element(), element(), element()];
 const labels = {code:'Code', amount:'Amount', active:'Active', subgroup:'Subgroup', subgroup_range:'Subgroup range', function:'Function'};
@@ -57,6 +61,8 @@ const document = {
       '[data-dialog-close]':[close]})[selector] || [];
   },
   querySelector: selector => selector === '[data-mapping-continue]' ? advance : null,
+  createElement: tag => element({tagName:tag.toUpperCase(), dataset:{}}),
+  createTextNode: text => ({textContent:text}),
   getElementById: id => id === 'report' ? dialog : null,
   addEventListener(type, callback) { (this.handlers[type] ||= []).push(callback); },
 };
@@ -72,6 +78,10 @@ assert.equal(statusText.textContent, '1 column still needs a choice · 1 field n
 assert.equal(status.dataset.state, 'pending');
 assert.equal(reason.hidden, false);
 assert.equal(status.hidden, undefined);
+selects[1].scrollIntoView = options => { selects[1].scrollOptions = options; };
+status.handlers.click({target:{closest:() => ({})}});
+assert.equal(selects[1].scrollOptions.block, 'center');
+assert.equal(document.activeElement, selects[1]);
 selects[1].value='amount'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
 assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
@@ -84,7 +94,10 @@ selects[0].value='__ignored__'; selects[1].value='__ignored__'; selects[2].value
 requiredKeys.push('active'); mapping.handlers.change();
 assert.equal(statusText.textContent, '3 fields not mapped: Code, Amount, Active');
 assert.equal(reason.hidden,false);
-requiredKeys.pop(); selects[0].value='code'; selects[1].value='amount'; selects[2].value='__ignored__'; mapping.handlers.change();
+requiredKeys.push('subgroup', 'subgroup_range'); mapping.handlers.change();
+assert.equal(statusText.textContent, '5 fields not mapped: Code, Amount, Active and 2 more');
+assert.equal(statusText.children.filter(child => child.tagName === 'CODE').length, 3);
+requiredKeys.pop(); requiredKeys.pop(); requiredKeys.pop(); selects[0].value='code'; selects[1].value='amount'; selects[2].value='__ignored__'; mapping.handlers.change();
 selects[2].value='amount'; mapping.handlers.change();
 assert.equal(badges[1].textContent, 'Mapping error');
 assert.match(badges[2].className, /badge-error/);
@@ -98,6 +111,7 @@ assert.equal(advance.disabled,true);
 selects[0].value='code'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
 assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(statusText.children.some(child => child.dataset?.mappingJump !== undefined), false);
 tip.handlers.mouseenter();
 assert.equal(tip.open,true);
 assert.equal(tipBody.style.left,'62px');

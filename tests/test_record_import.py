@@ -1014,7 +1014,9 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": ""},
     )
     assert incomplete.status_code == 400
-    assert "1 field not mapped: Amount" in incomplete.get_data(as_text=True)
+    incomplete_body = incomplete.get_data(as_text=True)
+    assert "1 field not mapped:" in incomplete_body
+    assert "<code class='mapping-field-name'>Amount</code>" in incomplete_body
     reopened = client.get(
         f"/datasets/{dataset.key}/records/import/{token}/mapping",
         base_url="https://localhost",

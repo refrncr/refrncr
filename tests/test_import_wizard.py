@@ -517,6 +517,9 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     assert "alert-warning" not in attributes
     reason = re.search(r"<p class='mapping-reason help-text'([^>]*)>", pending.text)
     assert reason and "hidden" not in reason.group(1)
+    assert "data-mapping-jump" in pending.text
+    assert pending.text.index("Back") < pending.text.index("Cancel import")
+    assert pending.text.index("mapping-status") < pending.text.index("Continue to preview")
 
     optional_field(wizard, "function")
     missing = wizard.upload()
@@ -535,6 +538,7 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     assert "hidden" in re.search(r"<p class='mapping-reason help-text'([^>]*)>", ready.text).group(
         1
     )
+    assert "data-mapping-jump" not in ready.text
 
     visible = html_text(ready.text)
     assert "Match each source column to a dataset field, or choose Do not import." in visible
@@ -546,3 +550,28 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     assert "data-mapping-status" in ready.text
     assert ready.text.index("data-mapping-status") > ready.text.index("</form>")
     assert ready.text.index("data-mapping-status") < ready.text.index("data-mapping-continue")
+
+
+def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions(wizard):
+    for key in ("active", "subgroup", "region", "category"):
+        optional_field(wizard, key)
+    page = wizard.upload(b"code,amount\nA,1\n")
+    page = wizard.preview(("", ""))
+    status_text = html_text(
+        re.search(r"<span class='mapping-status-line'.*?</span>", page.text, re.S).group()
+    )
+    missing_count = int(re.search(r"(\d+) fields not mapped:", status_text).group(1))
+    assert missing_count > 3
+    field_names = re.findall(r"<code class='mapping-field-name'>(.*?)</code>", page.text)
+    assert field_names == ["Code", "Amount", "Active"]
+    assert f"and {missing_count - 3} more" in status_text
+    assert page.text.count("data-mapping-jump") == 1
+    assert page.text.index("class='import-actions-back'") < page.text.index(
+        "class='import-actions-forward"
+    )
+    assert (
+        page.text.count(
+            "This import replaces all records in the draft, so every field must be mapped."
+        )
+        == 2
+    )
