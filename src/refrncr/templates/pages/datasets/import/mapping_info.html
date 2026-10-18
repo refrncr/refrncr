@@ -1,8 +1,4 @@
 <div class='mapping-intro'>
-  <p>Match every source column to a field. Required and identifier fields must be mapped; unmapped fields are omitted from this complete draft replacement.</p>
+  <p>Match each source column to a dataset field, or choose Do not import.</p>
   <p class='mapping-metadata'>File: <strong>{{ state.filename }}</strong>{% if source.worksheet %} · Worksheet: {{ source.worksheet }}{% endif %}</p>
-  <section aria-label='Mapping completeness' id='mapping-completeness' class='mapping-completeness'>
-    <p data-mapping-summary>{{ required_keys|select("in", assistance.mapping)|list|length }} of {{ required_keys|length }} required and identifier fields mapped · {{ assistance.completeness.unmapped_columns }} columns still need a choice</p>
-    <div class='mapping-missing' data-mapping-missing hidden>{% for field in fields if field.key in required_keys %}<span data-missing-key='{{ field.key }}'{% if field.key in assistance.mapping %} hidden{% endif %}>{{ field.name }}</span>{% endfor %}</div>
-  </section>
 </div>

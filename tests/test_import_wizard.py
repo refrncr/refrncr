@@ -466,7 +466,7 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     assert "mapping-error-1" in page.text
     assert sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(page.text)) == 2
     assert html_tag_texts(page.text, "summary").count("Mapping error") == 2
-    assert "data-missing-key='amount'" in page.text
+    assert "1 field not mapped: Amount" in html_text(page.text)
     assert "This field is mapped more than once" in page.text
 
 
@@ -504,14 +504,45 @@ def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_
 
 
 def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
-    page = wizard.upload()
-    instruction = "Required and identifier fields must be mapped; unmapped fields are omitted"
-    assert html_text(page.text).count(instruction) == 1
-    assert "File:" in html_text(page.text) and "records.csv" in html_text(page.text)
-    assert "data-mapping-summary" in page.text
-    assert "data-mapping-status" in page.text
-    form = page.text.split("id='import-step-form'", 1)[1].split("</form>", 1)[0]
-    assert "data-mapping-summary" in form
-    assert page.text.index("data-mapping-status") > page.text.index("</form>")
-    assert page.text.index("data-mapping-status") < page.text.index("data-mapping-continue")
-    assert "Ready to continue" in page.text
+    def status(page):
+        match = re.search(r"<p class='mapping-status'([^>]*)>(.*?)</p>", page.text, re.S)
+        assert match
+        return match.group(1), html_text(match.group(2)).strip()
+
+    pending = wizard.upload()
+    pending = wizard.preview(("", "amount"))
+    attributes, message = status(pending)
+    assert message == "1 column still needs a choice · 1 field not mapped: Code"
+    assert "data-state='pending'" in attributes
+    assert "alert-warning" not in attributes
+    reason = re.search(r"<p class='mapping-reason help-text'([^>]*)>", pending.text)
+    assert reason and "hidden" not in reason.group(1)
+
+    optional_field(wizard, "function")
+    missing = wizard.upload()
+    attributes, message = status(missing)
+    assert message == "1 field not mapped: Function"
+    assert "data-state='pending'" in attributes
+    assert "hidden" not in re.search(
+        r"<p class='mapping-reason help-text'([^>]*)>", missing.text
+    ).group(1)
+
+    wizard.upload(b"code,amount,function,unknown\nA,1,fn,x\n")
+    ready = wizard.preview(("code", "amount", "function", "__ignored__"))
+    attributes, message = status(ready)
+    assert message == "Ready to continue · 3 fields mapped, 1 column not imported"
+    assert "data-state='ready'" in attributes
+    assert "hidden" in re.search(r"<p class='mapping-reason help-text'([^>]*)>", ready.text).group(
+        1
+    )
+
+    visible = html_text(ready.text)
+    assert "Match each source column to a dataset field, or choose Do not import." in visible
+    assert "File:" in visible and "records.csv" in visible
+    assert "unmapped fields are omitted" not in visible
+    assert "required fields mapped" not in visible
+    assert "data-mapping-summary" not in ready.text
+    assert "data-mapping-missing" not in ready.text
+    assert "data-mapping-status" in ready.text
+    assert ready.text.index("data-mapping-status") > ready.text.index("</form>")
+    assert ready.text.index("data-mapping-status") < ready.text.index("data-mapping-continue")

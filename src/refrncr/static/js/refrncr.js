@@ -251,6 +251,16 @@
     const button = document.querySelector("[data-mapping-continue]");
     const panel = form.closest(".import-wizard") || form;
     const status = panel.querySelector("[data-mapping-status]");
+    const reason = panel.querySelector("[data-mapping-reason]");
+    const fieldLabels = new Map(options.flat().map((option) => [option.value, option.dataset.optionLabel]));
+    const plural = (count, singular, many) => `${count} ${count === 1 ? singular : many}`;
+    const statusText = ({unselected, missingLabels, ignored, mappedCount}) => {
+      const parts = [];
+      if (unselected) parts.push(`${plural(unselected, "column", "columns")} still ${unselected === 1 ? "needs" : "need"} a choice`);
+      if (missingLabels.length) parts.push(`${plural(missingLabels.length, "field", "fields")} not mapped: ${missingLabels.join(", ")}`);
+      if (parts.length) return {ready: false, text: parts.join(" · ")};
+      return {ready: true, text: `Ready to continue · ${plural(mappedCount, "field", "fields")} mapped, ${plural(ignored, "column", "columns")} not imported`};
+    };
     const update = () => {
       const values = selects.map((select) => select.value);
       const mapped = values.filter((value) => value && value !== "__ignored__");
@@ -261,31 +271,24 @@
           option.hidden = option.value !== selects[index].value && mapped.includes(option.value);
         });
       });
-      const summary = panel.querySelector("[data-mapping-summary]");
-      if (summary) {
-        summary.textContent = `${required.filter((key) => mapped.includes(key)).length} of ${required.length} required fields mapped · ${values.filter((value) => !value).length} choices remaining · ${values.filter((value) => value === "__ignored__").length} columns ignored`;
-        const missing = panel.querySelector("[data-mapping-missing]");
-        missing.hidden = required.every((key) => mapped.includes(key));
-        missing.querySelectorAll("[data-missing-key]").forEach((label) => { label.hidden = mapped.includes(label.dataset.missingKey); });
-        selects.forEach((select) => {
-          const badge = select.closest(".mapping-target").querySelector("[data-mapping-choice]");
-          const duplicate = select.value && select.value !== "__ignored__" && mapped.filter((value) => value === select.value).length > 1;
-          const error = duplicate || select.getAttribute("aria-invalid") === "true";
-          badge.textContent = error ? "Mapping error" : !select.value ? "Needs a choice" : select.value === "__ignored__" ? "Do not import" : "Mapped";
-          badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
-        });
-      }
-      const missing = required.filter((key) => !mapped.includes(key));
+      selects.forEach((select) => {
+        const badge = select.closest(".mapping-target").querySelector("[data-mapping-choice]");
+        const duplicate = select.value && select.value !== "__ignored__" && mapped.filter((value) => value === select.value).length > 1;
+        const error = duplicate || select.getAttribute("aria-invalid") === "true";
+        badge.textContent = error ? "Mapping error" : !select.value ? "Needs a choice" : select.value === "__ignored__" ? "Do not import" : "Mapped";
+        badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
+      });
+      const missingLabels = required.filter((key) => !mapped.includes(key)).map((key) => fieldLabels.get(key) || key);
       const unselected = values.filter((value) => !value).length;
-      const warning = missing.length > 0 || unselected > 0;
-      status.hidden = !warning;
-      status.className = `mapping-status${warning ? " alert alert-warning" : ""}`;
-      if (missing.length) {
-        const labels = missing.map((key) => panel.querySelector(`[data-missing-key='${key}']`)?.textContent || key);
-        status.textContent = `${missing.length} field${missing.length === 1 ? "" : "s"} not mapped: ${labels.join(", ")}`;
-      } else {
-        status.textContent = unselected ? `${unselected} column${unselected === 1 ? "" : "s"} still need a choice` : "Ready to continue";
-      }
+      const result = statusText({
+        unselected,
+        missingLabels,
+        ignored: values.filter((value) => value === "__ignored__").length,
+        mappedCount: new Set(mapped).size,
+      });
+      status.dataset.state = result.ready ? "ready" : "pending";
+      status.querySelector("[data-mapping-status-text]").textContent = result.text;
+      if (reason) reason.hidden = missingLabels.length === 0;
     };
     form.addEventListener("change", update);
     update();
@@ -424,6 +427,8 @@
       const data = new URLSearchParams(new FormData(form));
       pending?.abort();
       pending = new AbortController();
+      const formatFeedback = form.closest(".import-wizard")?.querySelector("[data-format-error-status]");
+      if (formatFeedback) formatFeedback.textContent = "";
       form.setAttribute("aria-busy", "true");
       try {
         const response = await fetch(form.dataset.sourceFormatsUrl, {method: "POST", body: data, credentials: "same-origin", signal: pending.signal});
@@ -448,8 +453,8 @@
         else if (affected) affected.focus();
       } catch (error) {
         if (error.name !== "AbortError" && current === generation) {
-          const status = form.closest(".import-wizard").querySelector("[data-mapping-status]");
-          status.textContent = "Format examples could not be refreshed. Continue to validate your current choices.";
+          const formatFeedback = form.closest(".import-wizard")?.querySelector("[data-format-error-status]");
+          if (formatFeedback) formatFeedback.textContent = "Format examples could not be refreshed. Continue to validate your current choices.";
         }
       } finally {
         if (current === generation) form.removeAttribute("aria-busy");

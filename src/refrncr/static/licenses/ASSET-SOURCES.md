@@ -45,6 +45,7 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | `download_icon` / `upload_icon` | Download / Upload |
 | `plus_icon` | Plus |
 | `lock_icon` | Lock |
+| `circle_alert_icon` / `circle_check_icon` | [Circle Alert](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/circle-alert.svg) / [Circle Check](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/circle-check.svg) — Import mapping status |
 | `info_icon` | Info |
 | `close_icon` | X |
 | `key_icon` | Key Round |

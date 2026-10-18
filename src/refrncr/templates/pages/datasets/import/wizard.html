@@ -1,6 +1,7 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import info_icon %}
+{% from "components/icons.html" import circle_alert_icon, circle_check_icon %}
 {% from "components.html" import feedback %}
+{% from "pages/datasets/import/_mapping_status.html" import mapping_status_text %}
 {% block content %}
 <header class='page-header'><div class='page-context'>{% include "pages/datasets/_breadcrumbs.html" %}<h1 class='page-title'>Import records</h1><p class='metadata'>{{ dataset.name }}</p></div></header>{% include 'pages/datasets/concepts/_banner.html' %}
 <section class='import-wizard' aria-label='Record import wizard'>
@@ -31,7 +32,18 @@
     <div class='import-actions-forward{% if step == 3 %} import-mapping-forward{% endif %}'>
       {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>View records</a>
       {% else %}
-        {% if step == 3 %}{% set missing_fields = fields|rejectattr('key', 'in', assistance.mapping)|selectattr('key', 'in', required_keys)|list %}{% set has_mapping_warning = missing_fields or assistance.completeness.unmapped_columns %}<p class='mapping-status{% if has_mapping_warning %} alert alert-warning{% endif %}' data-mapping-status role='status' aria-live='polite' aria-atomic='true'{% if not has_mapping_warning %} hidden{% endif %}>{% if missing_fields %}{{ missing_fields|length }} field{{ '' if missing_fields|length == 1 else 's' }} not mapped: {{ missing_fields|map(attribute='name')|join(', ') }}{% elif assistance.completeness.unmapped_columns %}{{ assistance.completeness.unmapped_columns }} columns still need a choice{% else %}Ready to continue{% endif %}</p>{% endif %}
+        {% if step == 3 %}
+          {% set mapped_keys = assistance.mapping|select|unique|list %}
+          {% set missing_fields = fields|selectattr('key', 'in', required_keys)|rejectattr('key', 'in', mapped_keys)|list %}
+          {% set missing_labels = missing_fields|map(attribute='name')|list %}
+          {% set unselected_columns = assistance.completeness.unmapped_columns %}
+          {% set mapping_ready = not unselected_columns and not missing_labels %}
+          <p class='mapping-status' data-mapping-status data-state='{{ "ready" if mapping_ready else "pending" }}' role='status' aria-live='polite' aria-atomic='true'>
+            <span class='mapping-status-icons' aria-hidden='true'><span class='mapping-status-icon-pending'>{{ circle_alert_icon() }}</span><span class='mapping-status-icon-ready'>{{ circle_check_icon() }}</span></span>
+            <span data-mapping-status-text>{{ mapping_status_text(unselected_columns, missing_labels, assistance.completeness.ignored_columns, mapped_keys|length) }}</span>
+          </p>
+          <p class='mapping-reason help-text' data-mapping-reason{% if not missing_fields %} hidden{% endif %}>This import replaces all records in the draft, so every field must be mapped.</p>
+        {% endif %}
         {% if state %}<form method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-secondary' type='submit'>{{ 'Cancel import' if step == 4 else 'Cancel' }}</button></form>{% else %}<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>{% endif %}
         {% if step == 4 %}<form id='import-step-form' data-import-confirm method='post' action='{{ url_for("confirm_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>{% if mode == 'new_version' %}<input type='hidden' name='confirmation' value='{{ state.confirmation }}'>{% if preview.counts.Deleted %}<label class='deletion-acknowledgement'><input type='checkbox' name='acknowledge_deletions' value='yes' required aria-describedby='deletion-acknowledgement'><span id='deletion-acknowledgement'>I understand that {{ preview.counts.Deleted }} records will be marked as deleted.</span></label>{% endif %}{% endif %}<button class='button button-primary' type='submit'{% if not preview.valid %} disabled{% endif %}>Import records</button></form>
         {% else %}<button class='button button-primary' type='submit' form='import-step-form'{% if step == 3 %} data-mapping-continue{% endif %}>{{ 'Continue to preview' if step == 3 else 'Continue' }}</button>{% endif %}

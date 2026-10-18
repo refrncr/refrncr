@@ -994,8 +994,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert mapping.status_code == 200
     assert "&lt;file&gt;.csv" in body
     assert "High confidence" in body
-    assert "2 of 2 required and identifier fields mapped" in body
-    assert "0 columns still need a choice" in body
+    assert "Ready to continue · 2 fields mapped, 0 columns not imported" in body
     assert "Examples:" in body
     assert "&lt;script&gt;" in body
     assert "internal score" not in body.casefold()
@@ -1016,7 +1015,6 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     )
     assert incomplete.status_code == 400
     assert "1 field not mapped: Amount" in incomplete.get_data(as_text=True)
-    assert "data-missing-key='amount'" in incomplete.get_data(as_text=True)
     reopened = client.get(
         f"/datasets/{dataset.key}/records/import/{token}/mapping",
         base_url="https://localhost",

@@ -13,9 +13,17 @@
 .import-content .form { max-width: none; }
 .import-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .import-actions-forward { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
-.import-mapping-forward { flex-direction: column; align-items: stretch; width: min(100%, 38rem); }
-.mapping-status { margin: 0; max-width: 100%; box-sizing: border-box; font-size: var(--font-size-body-sm); }
-.import-mapping-forward > .button, .import-mapping-forward > form, .import-mapping-forward > a { align-self: flex-end; }
+.import-mapping-forward { display: grid; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "status cancel continue" "reason cancel continue"; align-items: center; column-gap: var(--space-sm); row-gap: var(--space-2xs, .25rem); width: auto; }
+.import-actions:has(.import-mapping-forward) > div:first-child { align-self: center; }
+.import-mapping-forward .mapping-status { grid-area: status; justify-self: end; text-align: end; }
+.import-mapping-forward .mapping-reason { grid-area: reason; justify-self: end; margin: 0; text-align: end; }
+.import-mapping-forward > form { grid-area: cancel; align-self: center; }
+.import-mapping-forward > [data-mapping-continue] { grid-area: continue; align-self: center; }
+.mapping-status { display: inline-flex; align-items: center; gap: var(--space-2xs, .25rem); margin: 0; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.mapping-status svg { width: .875rem; height: .875rem; margin: 0; flex: none; }
+.mapping-status[data-state="pending"] .mapping-status-icon-ready, .mapping-status[data-state="ready"] .mapping-status-icon-pending { display: none; }
+.mapping-status[data-state="pending"] .mapping-status-icon-pending { color: var(--color-status-draft); }
+.mapping-status[data-state="ready"] .mapping-status-icon-ready { color: var(--color-status-published); }
 .import-actions form { margin: 0; }
 .import-upload-zone { padding: var(--space-xl); border: 2px dashed var(--color-control-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
 .import-upload-zone label { margin-top: 0; }
@@ -25,10 +33,6 @@
 .mapping-intro { margin-bottom: var(--space-md); }
 .mapping-intro p { margin: 0 0 var(--space-sm); }
 .mapping-metadata, .mapping-examples, .mapping-details { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
-.mapping-completeness { margin-bottom: var(--space-md); font-size: var(--font-size-body-sm); }
-.mapping-completeness p { margin: 0; }
-.mapping-missing { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); margin-top: var(--space-sm); }
-.mapping-missing[hidden], .mapping-missing [hidden] { display: none; }
 .mapping-list { padding: 0; margin: 0; list-style: none; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
 .mapping-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.3fr); align-items: center; gap: var(--space-sm); min-height: var(--record-row-min-height); padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-body-sm); line-height: 1.4; }
 .mapping-row + .mapping-row { border-top: 1px solid var(--color-border); }
@@ -91,13 +95,6 @@
 .mapping-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-lg); }
 .mapping-heading h2 { margin: 0; }
 .mapping-format-toggle { margin-inline-start: auto; }
-.mapping-info summary { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); color: var(--color-text-muted); }
-.mapping-info summary .button-icon { width: 1.125rem; height: 1.125rem; margin: 0; }
-.mapping-info summary:hover { color: var(--color-text); }
-.mapping-intro { margin-bottom: var(--space-md); }
-.mapping-intro > :last-child { margin-bottom: 0; }
-.mapping-completeness { display: grid; gap: var(--space-xs); }
-.mapping-completeness .help-text { margin: 0; }
 .import-result-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
 .import-difference-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-block: var(--space-md); }
 .import-difference-filters label { margin: 0; }
@@ -134,6 +131,11 @@
 .source-format-controls [hidden] { display: none; }
 @media (max-width: 767px) {
   .source-format-parts { grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); }
+}
+@media (max-width: 47.99rem) {
+  .import-mapping-forward { grid-template-columns: 1fr 1fr; grid-template-areas: "status status" "reason reason" "cancel continue"; }
+  .import-mapping-forward .mapping-status, .import-mapping-forward .mapping-reason { justify-self: start; text-align: start; }
+  .import-actions:has(.import-mapping-forward) > div:first-child { align-self: flex-end; }
 }
 .source-format-details > label { display: block; margin-block-start: var(--space-md); }
 .source-format-details > select, .source-format-details > input { width: 100%; max-width: 100%; }

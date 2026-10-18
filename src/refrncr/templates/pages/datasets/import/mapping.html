@@ -5,6 +5,7 @@
   {% include "pages/datasets/import/mapping_info.html" %}
   <noscript><p class='help-text'>JavaScript is disabled. You can preview the detected choices or select a candidate reading. Use Change format to inspect the controls. Enable JavaScript to change mappings or source types and refresh examples, or correct your source file and upload it again.</p></noscript>
   <p class='visually-hidden' data-format-status role='status' aria-live='polite' aria-atomic='true'></p>
+  <p class='visually-hidden' data-format-error-status role='status' aria-live='polite' aria-atomic='true'></p>
   <ul class='mapping-list' role='list'>
   {% for advice in assistance.columns %}{% set index = loop.index0 %}
     <li class='mapping-row'>

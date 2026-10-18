@@ -13,21 +13,22 @@ function element(extra = {}) {
   }, extra);
 }
 const badges = [element(), element(), element()];
+const labels = {code:'Code', amount:'Amount', active:'Active', subgroup:'Subgroup', subgroup_range:'Subgroup range', function:'Function'};
+const requiredKeys = ['code','amount'];
 const selects = ['code', '', '__ignored__'].map((value, index) => {
-  const options = ['code', 'amount', 'active'].map((key, order) => ({value:key,
-    hidden:false, dataset:{optionLabel:key, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
+  const options = Object.entries(labels).map(([key, name], order) => ({value:key,
+    hidden:false, dataset:{optionLabel:name, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
   }));
   return element({value, options,
     querySelectorAll: selector => selector.startsWith('option[') ? options : [],
     closest: () => ({querySelector: () => badges[index]})});
 });
-const summary = element();
-const missingLabels = ['code', 'amount'].map(key => element({dataset:{missingKey:key}}));
-const missing = element({querySelectorAll: () => missingLabels});
 const advance = element({disabled:false});
-const status = element();
+const statusText = element();
+const status = element({dataset:{},querySelector:selector => selector === '[data-mapping-status-text]' ? statusText : null});
+const reason = element({hidden:true});
 const mapping = element({dataset:{requiredKeys:'["code","amount"]'},
-  querySelectorAll: () => selects, querySelector: selector => ({"[data-mapping-status]":status, "[data-mapping-summary]":summary, "[data-mapping-missing]":missing})[selector]});
+  querySelectorAll: () => selects, querySelector: selector => ({"[data-mapping-status]":status, "[data-mapping-reason]":reason})[selector]});
 const submit = element({type:'submit',disabled:false});
 const confirm = element({elements:[submit]});
 const close = element();
@@ -59,7 +60,7 @@ const document = {
   getElementById: id => id === 'report' ? dialog : null,
   addEventListener(type, callback) { (this.handlers[type] ||= []).push(callback); },
 };
-vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {document,window:{innerWidth:320,innerHeight:480,addEventListener(){}}});
+vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {document,JSON:{parse:() => requiredKeys},window:{innerWidth:320,innerHeight:480,addEventListener(){}}});
 assert.equal(advance.disabled,true);
 assert.equal(badges[0].textContent, 'Mapped');
 assert.equal(selects[0].value, 'code');
@@ -67,18 +68,23 @@ assert.equal(selects[0].options[0].hidden, false);
 assert.equal(selects[1].options[0].hidden, true);
 assert.equal(badges[1].textContent, 'Needs a choice');
 assert.equal(badges[2].textContent, 'Do not import');
-assert.equal(missing.hidden, false);
-assert.equal(missingLabels[0].hidden, true);
-assert.equal(missingLabels[1].hidden, false);
-assert.match(summary.textContent, /1 of 2 required fields mapped/);
-assert.match(status.textContent, /1 field not mapped/);
-assert.equal(status.hidden, false);
-assert.match(status.className, /alert-warning/);
+assert.equal(statusText.textContent, '1 column still needs a choice · 1 field not mapped: Amount');
+assert.equal(status.dataset.state, 'pending');
+assert.equal(reason.hidden, false);
+assert.equal(status.hidden, undefined);
 selects[1].value='amount'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.equal(status.hidden,true);
-assert.doesNotMatch(status.className, /alert-warning/);
-assert.equal(missing.hidden, true);
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(status.dataset.state, 'ready');
+assert.equal(reason.hidden,true);
+selects[0].value=''; selects[2].value=''; mapping.handlers.change();
+assert.equal(statusText.textContent, '2 columns still need a choice · 1 field not mapped: Code');
+assert.equal(status.dataset.state, 'pending');
+selects[0].value='__ignored__'; selects[1].value='__ignored__'; selects[2].value='__ignored__';
+requiredKeys.push('active'); mapping.handlers.change();
+assert.equal(statusText.textContent, '3 fields not mapped: Code, Amount, Active');
+assert.equal(reason.hidden,false);
+requiredKeys.pop(); selects[0].value='code'; selects[1].value='amount'; selects[2].value='__ignored__'; mapping.handlers.change();
 selects[2].value='amount'; mapping.handlers.change();
 assert.equal(badges[1].textContent, 'Mapping error');
 assert.match(badges[2].className, /badge-error/);
@@ -91,7 +97,7 @@ assert.equal(selects[2].options[1].hidden, true);
 assert.equal(advance.disabled,true);
 selects[0].value='code'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.match(status.textContent,/Ready to continue/);
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
 tip.handlers.mouseenter();
 assert.equal(tip.open,true);
 assert.equal(tipBody.style.left,'62px');
