@@ -665,7 +665,7 @@ class DatasetVersionService:
                 or tuple(change for change in change_order if change in selected_changes)
                 != selected_changes
             ):
-                raise RecordSearchError("Choose Added, Edited or Deleted filters.")
+                raise RecordSearchError("Choose Added, Changed or Deleted filters.")
             if (
                 not isinstance(statuses, tuple)
                 or any(status not in {"Added", "Changed", "Deleted"} for status in statuses)
@@ -805,7 +805,7 @@ class DatasetVersionService:
                 for record in record_page.records
                 if raw_states.get(record.id) is not None
             }
-            statuses = {"Changed": "Edited", "Added": "Added", "Removed": "Deleted"}
+            statuses = {"Changed": "Changed", "Added": "Added", "Removed": "Deleted"}
             export = self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
             return VersionRead(
                 context,

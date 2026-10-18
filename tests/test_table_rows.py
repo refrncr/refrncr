@@ -194,7 +194,8 @@ def test_empty_and_configuration_tables_do_not_adopt_row_actions(dataset_browser
         dataset={"key": "empty-rows"},
         mode="create",
     )
-    assert "data-row-action" not in preview and "row-chevron" not in preview
+    assert "data-row-action" in preview and "row-chevron" not in preview
+    assert "data-dialog-open='import-new-record-1'" in preview
     assert "&lt;script&gt;value&lt;/script&gt;" in preview
 
 

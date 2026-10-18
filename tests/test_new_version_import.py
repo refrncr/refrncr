@@ -239,6 +239,65 @@ def test_complete_diff_pagination_search_and_no_preview_writes(context):
     assert c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, c.record.id).revision == 2
 
 
+def test_same_changed_record_uses_changed_label_in_table_import_and_review(context):
+    import re
+    from io import BytesIO
+    from urllib.parse import parse_qs, urlsplit
+
+    from support import dataset_version_client as client
+    from support import request
+
+    c = context
+    clean(c)
+    browser, csrf = client(c)
+    root = f"/datasets/{c.d.key}/records/import"
+    entrypoint = request(browser, "get", root)
+    assert entrypoint.status_code == 200, entrypoint.text
+    upload = request(
+        browser,
+        "post",
+        root,
+        data={
+            "csrf_token": csrf,
+            "file": (BytesIO(b"code,label\na,Changed draft\n"), "records.csv"),
+        },
+    )
+    assert upload.status_code == 303, upload.text
+    token = upload.location.split("/import/")[1].split("/")[0]
+    staged = f"/datasets/{c.d.key}/records/import/{token}"
+    mapped = request(
+        browser,
+        "post",
+        staged + "/preview",
+        data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "label"},
+    )
+    assert mapped.status_code == 303
+    preview_html = request(browser, "get", staged + "/step/4")
+    assert preview_html.status_code == 200
+    assert "<span class='badge badge-draft'>Changed</span>" in preview_html.text
+    assert "Changed draft" in preview_html.text
+    confirmation = re.search("name='confirmation' value='([^']+)'", preview_html.text)[1]
+    imported = request(
+        browser,
+        "post",
+        staged + "/confirm",
+        data={"csrf_token": csrf, "confirmation": confirmation},
+    )
+    assert imported.status_code == 303
+
+    records = request(browser, "get", f"/datasets/{c.d.key}/concept/records?record_status=all")
+    assert "<span class='badge badge-draft'>Changed</span>" in records.text
+    entry = request(browser, "get", f"/datasets/{c.d.key}/versions/review")
+    review_token = parse_qs(urlsplit(entry.location).query)["review"][0]
+    review = request(
+        browser,
+        "get",
+        f"/datasets/{c.d.key}/versions/review?review={review_token}&section=Records",
+    )
+    assert review.status_code == 200
+    assert "<span class='badge badge-draft'>Changed</span>" in review.text
+
+
 @pytest.mark.parametrize("failure", ["audit", "commit"])
 def test_new_version_failure_rolls_back_all_content_marker_and_audit(
     database_context, monkeypatch, failure

@@ -30,7 +30,7 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await page.locator('#import-file').setInputFiles({name:'initial.csv',mimeType:'text/csv',buffer:Buffer.from('code,label\nfirst,First\nsecond,Second\n')});
   await enter(page,page.getByRole('button',{name:'Continue',exact:true}));
   await enter(page,page.getByRole('button',{name:'Continue to preview',exact:true}));
-  assert.equal(await page.getByRole('table',{name:'Proposed Record differences',exact:true}).locator('tbody tr').count(),2);
+  assert.equal(await page.getByRole('table',{name:'Changes in this import',exact:true}).locator('tbody tr').count(),2);
   await evidence(page,'empty-preview');
   await enter(page,page.getByRole('link',{name:'Continue',exact:true}));
   assert.equal(await page.locator('input[name="acknowledge_deletions"]').count(),0);
@@ -73,7 +73,7 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await page.getByRole('button',{name:'Continue to preview',exact:true}).waitFor();
   await evidence(page,width+'-mapping');
   await enter(page,page.getByRole('button',{name:'Continue to preview',exact:true}));
-  await page.getByRole('table',{name:'Proposed record differences',exact:true}).waitFor();
+  await page.getByRole('table',{name:'Changes in this import',exact:true}).waitFor();
   assert.equal(await page.locator('table tbody tr').count(),50);
   await evidence(page,width+'-preview');
   await enter(page,page.getByRole('link',{name:'Next',exact:true}));
@@ -81,7 +81,17 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await evidence(page,width+'-page2');
   await page.getByLabel('Search identifier').fill('changed');
   await page.waitForTimeout(350);
-  assert.match(await page.getByRole('table',{name:'Proposed record differences'}).textContent(),/Changed fields/);
+  assert.match(await page.getByRole('table',{name:'Changes in this import'}).textContent(),/Changed fields/);
+  const changedRow=page.getByRole('row').filter({hasText:'changed'});
+  await changedRow.locator('td').first().click();
+  const previewPanel=page.locator('dialog[open]');
+  await previewPanel.waitFor();
+  assert.equal(await previewPanel.locator('.import-field-diff').count(),1);
+  assert.match(await previewPanel.innerText(),/Before:.*Old value/s);
+  assert.match(await previewPanel.innerText(),/After:.*New value/s);
+  assert.equal(await page.evaluate(()=>window.getSelection().toString()),'');
+  await page.keyboard.press('Escape');
+  await previewPanel.waitFor({state:'hidden'});
   const ack=page.getByRole('checkbox',{name:'I understand that 1 Records will be marked as deleted.'});
   assert.equal(await ack.isChecked(),false);
   await evidence(page,width+'-confirm');

@@ -1835,8 +1835,28 @@ class DatasetRecordImportService:
                                 get_datatype(new.data_type).text(new.value) if new else None,
                             )
                         )
+                    current_values = (
+                        tuple(
+                            (
+                                field.name,
+                                get_datatype(before[field.id].data_type).text(
+                                    before[field.id].value
+                                )
+                                if field.id in before
+                                else None,
+                            )
+                            for field in fields
+                        )
+                        if status == "Changed"
+                        else ()
+                    )
                     differences.append(
-                        dict(status=status, identifier=label, changes=tuple(changes))
+                        dict(
+                            status=status,
+                            identifier=label,
+                            changes=tuple(changes),
+                            current_values=current_values,
+                        )
                     )
             counts["matching"] = matched
             preview = replace(

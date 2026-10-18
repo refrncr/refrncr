@@ -66,12 +66,10 @@ def test_four_steps_confirm_on_preview_and_replay(wizard):
     assert wizard.post(wizard.path + "/confirm").status_code == 409
     final = wizard.get(wizard.path + "/step/4")
     assert states(final)[3] == ("4", "active")
-    for text in (
-        "records.csv",
-        "First import: 1 records will be added to the draft.",
-        "Import records",
-    ):
-        assert text in final.text
+    summary = re.sub(r"\s+", " ", html_text(final.text))
+    assert "File: records.csv" in summary
+    assert "First import: 1 record will be added to the draft." in summary
+    assert "Import records" in final.text
     assert wizard.count() == 0
     assert wizard.get(wizard.path + "/step/5").status_code == 404
     success = wizard.post(wizard.path + "/confirm")
@@ -178,12 +176,17 @@ def test_difference_preview_all_mapped_fields_dataset_order_and_empty_marker(wiz
         "Status",
         "Changed fields",
     ]
-    assert re.findall("<dt>(.*?)</dt>", preview.text)[:4] == ["Code", "Amount", "Active", "Day"]
+    assert re.findall("<dt><code class='mapping-field-name'>(.*?)</code></dt>", preview.text)[
+        :4
+    ] == ["Code", "Amount", "Active", "Day"]
     assert sum(tag == "tr" for tag, _ in html_elements(table)) == 13
     assert "C9" in table and "C10" in table
     assert "—" in table
-    assert "— (No value)" in preview.text
-    assert "12 differences" in preview.text
+    assert "No value" in preview.text
+    assert "First import: 12 records will be added to the draft." in re.sub(
+        r"\s+", " ", html_text(preview.text)
+    )
+    assert "Page 1 of 1" not in preview.text
     assert wizard.count() == 0
 
 
@@ -230,7 +233,7 @@ def test_resume_cancel_expiry_and_new_session(wizard):
     wizard.get(wizard.path + "/step/1")
     assert states(wizard.get(wizard.root))[3] == ("4", "active")
     resumed = wizard.get(wizard.root).text
-    assert "Proposed Record differences" in resumed and "1 differences" in resumed
+    assert "Changes in this import" in resumed and "First import: 1 record will be added" in resumed
     assert "Upload corrected file" not in resumed
     assert "You can return to this import" not in resumed
     assert wizard.post(wizard.path + "/cancel").status_code == 200

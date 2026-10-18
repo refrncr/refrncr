@@ -33,7 +33,7 @@ const document = {
   addEventListener(type, callback, capture = false) { listeners.push({type, callback, capture}); },
 };
 const source = fs.readFileSync(process.argv[2], 'utf8');
-const context = {document, window: {getSelection: () => ({isCollapsed: !selected})}};
+const context = {document, window: {getSelection: () => ({isCollapsed: !selected, toString: () => selected ? 'selected text' : ''})}};
 vm.runInNewContext(source, context);
 const count = listeners.length;
 vm.runInNewContext(source, context);

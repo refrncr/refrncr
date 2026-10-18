@@ -97,6 +97,13 @@ from refrncr.services import (
 from refrncr.source_formats import SourceFormatError, compose_format, formats_for
 from refrncr.version_contracts import mapping_incomplete_message
 
+STATUS_LABELS = {"Removed": "Deleted", "Edited": "Changed"}
+
+
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
+
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
 GENERIC_LOGIN_FAILURE = "Invalid credentials"
@@ -225,6 +232,7 @@ def create_flask_app(
     app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
+    app.jinja_env.filters["status_label"] = status_label
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -1138,7 +1146,7 @@ def create_flask_app(
             overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
-                change.id: "Edited" if change.status == "Changed" else change.status
+                change.id: change.status
                 for change in (g.concept_ui.field_changes if concept else ())
                 if change.status != "Added"
             }
@@ -1358,7 +1366,11 @@ def create_flask_app(
         ) not in {"0", "1"}:
             raise ValidationError("Choose valid review parameters.")
         criteria = DiffCriteria(
-            tuple(request.args.getlist("status")) or STATUSES,
+            tuple(
+                "Changed" if value == "Edited" else value
+                for value in request.args.getlist("status")
+            )
+            or STATUSES,
             request.args.get("q", ""),
             request.args.get("anchor", ""),
             request.args.get("backwards", "0") == "1",
@@ -2363,7 +2375,7 @@ def create_flask_app(
         selected_changes = set() if record_status == "all" else set(record_status.split(","))
         record_change_options = []
         for label, value, count in zip(
-            ("Added", "Edited", "Deleted"),
+            ("Added", "Changed", "Deleted"),
             change_order,
             view.status_counts,
             strict=True,

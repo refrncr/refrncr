@@ -144,7 +144,7 @@ def test_detected_components_submit_and_survive_back_navigation(wizard):
     assert data["time_2"] == "v1-time-hms"
     assert "v1-datetime-ymd-dash-hms" not in page.text
     response = wizard.post(wizard.path + "/preview", data)
-    assert "Proposed Record differences" in response.text
+    assert "Changes in this import" in response.text
     back = Controls(wizard.get(wizard.path + "/step/3").text).data
     assert back == data
     assert wizard.count() == 0
@@ -215,10 +215,10 @@ def test_offset_rejects_timezone_and_local_timestamp_retains_dst_decisions(wizar
 
 def test_changed_format_invalidates_prior_confirmation(wizard):
     data = Controls(temporal_upload(wizard).text).data
-    assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" in wizard.post(wizard.path + "/preview", data).text
     assert wizard.get(wizard.path + "/step/4").status_code == 200
     data["time_2"] = "v1-time-hm"
-    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert wizard.count() == 0
 
@@ -282,7 +282,7 @@ def test_native_excel_controls_preview_and_textual_rejection(wizard):
     assert "2024-02-29T12:34:56" in wizard.post(wizard.path + "/preview", data).text
     data["source_2"] = "text"
     data["date_2"], data["time_2"] = "v1-date-ymd-dash", "v1-time-hms"
-    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.count() == 0
 
 
@@ -297,7 +297,7 @@ def test_float_column_mixed_notation_confirms_canonical_values(wizard, import_co
     assert data["source_2"] == "v1-float"
     assert "Finite decimal or scientific number" in page.text
     assert "102.1059" in page.text and "67000000.0" in page.text
-    assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" in wizard.post(wizard.path + "/preview", data).text
     assert wizard.get(wizard.path + "/step/4").status_code == 200
     assert "Added: 4" in wizard.post(wizard.path + "/confirm").text
     assert wizard.count() == 4
@@ -394,7 +394,7 @@ def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambi
             assert data[f"source_{index}"] == ""
             data[f"source_{index}"] = "v1-datetime-dmy-slash-hms"
     assert all(len(data.getlist(key)) == 1 for key in data)
-    assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" in wizard.post(wizard.path + "/preview", data).text
     assert wizard.count() == 0
 
 

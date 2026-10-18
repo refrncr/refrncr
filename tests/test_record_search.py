@@ -111,6 +111,9 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):
     assert response.headers["Referrer-Policy"] == "no-referrer"
     for key, value in params.items():
         assert f"{key}={value}" in response.text or key.startswith("f")
+    legacy_status = request(browser, "get", path + "?import_results=1&status=Edited")
+    assert legacy_status.status_code == 200
+    assert "status=Changed" in legacy_status.text and "Changed" in legacy_status.text
     roundtrip = request(browser, "get", path + "?" + urlencode(params | {"page": 2}))
     assert "Page 2 of 2" in roundtrip.text and "of 66" in roundtrip.text
     reset = request(browser, "get", path + "?" + urlencode(params | {"page": 2, "action": "apply"}))
@@ -126,12 +129,12 @@ def test_and_status_pagination_counts_and_url_roundtrip(context):
     assert "of 66" in default.text
     toggles = default.text.split("data-record-status-form>")[1].split("</form>")[0]
     assert sum(attrs.get("aria-pressed") == "false" for _, attrs in html_elements(toggles)) == 3
-    for label, value in (("Added", "added"), ("Edited", "edited"), ("Deleted", "deleted")):
+    for label, value in (("Added", "added"), ("Changed", "edited"), ("Deleted", "deleted")):
         assert f"name='record_status' value='{value}'>\n    {label}" in toggles
     edited = request(browser, "get", path + "?record_status=edited").text
     toggles = edited.split("data-record-status-form>")[1].split("</form>")[0]
     edited_button = (
-        "aria-pressed='true'\n    type='submit' name='record_status' value='all'>\n    Edited"
+        "aria-pressed='true'\n    type='submit' name='record_status' value='all'>\n    Changed"
     )
     assert edited_button in toggles
     assert "name='record_status' value='edited,deleted'>\n    Deleted" in toggles

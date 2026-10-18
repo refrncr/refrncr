@@ -12,9 +12,10 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro status_badge(label) -%}
-{%- set variant = 'badge-published' if label in ('Published', 'Current') else 'badge-draft' if label in ('Added', 'Changed', 'Edited') else 'badge-removed' if label in ('Deleted', 'Removed') else '' -%}
-<span class='badge{% if variant %} {{ variant }}{% endif %}'>{{ label }}</span>
+{% macro status_badge(label, count=none) -%}
+{%- set display_label = label|status_label -%}
+{%- set variant = 'badge-published' if display_label in ('Published', 'Current') else 'badge-draft' if display_label in ('Added', 'Changed') else 'badge-removed' if display_label == 'Deleted' else 'badge-error' if display_label == 'Error' else '' -%}
+<span class='badge{% if variant %} {{ variant }}{% endif %}'>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</span>
 {%- endmacro %}
 
 {% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false, min_value=none, max_length=none) -%}

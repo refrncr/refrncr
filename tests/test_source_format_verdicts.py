@@ -155,12 +155,12 @@ def test_radio_envelope_keeps_one_empty_key_until_explicit_choice(wizard):
     assert set(data) == expected
     assert all(len(data.getlist(key)) == 1 for key in expected)
     assert wizard.post(wizard.path + "/formats", data).status_code == 200
-    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     data["source_1"], data["source_2"] = "v1-eu", "v1-date-dmy-slash"
-    assert "Proposed Record differences" in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" in wizard.post(wizard.path + "/preview", data).text
     data["source_2"] = "v1-date-ymd-dash"
-    assert "Proposed Record differences" not in wizard.post(wizard.path + "/preview", data).text
+    assert "Changes in this import" not in wizard.post(wizard.path + "/preview", data).text
     assert wizard.post(wizard.path + "/confirm").status_code == 404
     assert wizard.count() == 0
 

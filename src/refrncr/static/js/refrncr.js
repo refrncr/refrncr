@@ -872,7 +872,8 @@
         event.target.closest("[data-row-primary]")) event.preventDefault();
   }, true);
   document.addEventListener("click", (event) => {
-    if (event.defaultPrevented || modifiedRowClick(event) || hasRowSelection()) return;
+    if (event.defaultPrevented || modifiedRowClick(event) || event.detail > 1 ||
+        window.getSelection?.()?.toString()) return;
     const row = event.target.closest("tbody tr[data-row-action]");
     if (!row || row.hidden || row.closest("[inert]")) return;
     // Cell/row semantics (e.g. role='cell') are not nested controls.
