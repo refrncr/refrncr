@@ -1117,7 +1117,7 @@ def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context
         admin.id, "parallel", dataset.key, "parallel.csv", b"code,amount\nA,1\nB,2\n"
     )
     importer.preview(admin.id, "parallel", dataset.key, state.token, ("code", "amount"))
-    importer.navigate(admin.id, "parallel", dataset.key, state.token, 5)
+    importer.navigate(admin.id, "parallel", dataset.key, state.token, 4)
     claimed, release = Event(), Event()
     original = importer.store.claim
 
