@@ -14,6 +14,7 @@
   document.querySelector("[data-error-focus]")?.focus();
 
   let openFieldMetadata = null;
+  let fieldMetadataCloseTimer = null;
   const positionFieldMetadata = (trigger, panel) => {
     const rect = trigger.getBoundingClientRect();
     const width = Math.min(448, window.innerWidth - 16);
@@ -24,22 +25,49 @@
   };
   const closeFieldMetadata = () => {
     if (!openFieldMetadata) return;
+    window.clearTimeout(fieldMetadataCloseTimer);
     const {trigger, panel} = openFieldMetadata;
     panel.hidePopover();
     trigger.setAttribute("aria-expanded", "false");
     openFieldMetadata = null;
   };
+  const openTransientFieldMetadata = (trigger, panel) => {
+    if (openFieldMetadata?.trigger === trigger) return;
+    closeFieldMetadata();
+    panel.showPopover();
+    positionFieldMetadata(trigger, panel);
+    trigger.setAttribute("aria-expanded", "true");
+    openFieldMetadata = {trigger, panel, pinned: false};
+  };
+  const scheduleFieldMetadataClose = () => {
+    window.clearTimeout(fieldMetadataCloseTimer);
+    fieldMetadataCloseTimer = window.setTimeout(() => {
+      if (openFieldMetadata && !openFieldMetadata.pinned) closeFieldMetadata();
+    }, 120);
+  };
   document.querySelectorAll("[data-field-metadata-trigger]").forEach((trigger) => {
     const panel = document.getElementById(trigger.getAttribute("aria-controls"));
     if (!panel || typeof panel.showPopover !== "function") return;
     trigger.addEventListener("click", () => {
-      if (openFieldMetadata?.trigger === trigger) { closeFieldMetadata(); return; }
-      closeFieldMetadata();
-      panel.showPopover();
-      positionFieldMetadata(trigger, panel);
-      trigger.setAttribute("aria-expanded", "true");
-      openFieldMetadata = {trigger, panel};
+      if (openFieldMetadata?.trigger === trigger) {
+        if (openFieldMetadata.pinned) closeFieldMetadata();
+        else openFieldMetadata.pinned = true;
+        return;
+      }
+      openTransientFieldMetadata(trigger, panel);
+      openFieldMetadata.pinned = true;
     });
+    trigger.addEventListener("pointerenter", () => {
+      window.clearTimeout(fieldMetadataCloseTimer);
+      openTransientFieldMetadata(trigger, panel);
+    });
+    trigger.addEventListener("pointerleave", scheduleFieldMetadataClose);
+    trigger.addEventListener("focus", () => openTransientFieldMetadata(trigger, panel));
+    trigger.addEventListener("blur", scheduleFieldMetadataClose);
+    panel.addEventListener("pointerenter", () => window.clearTimeout(fieldMetadataCloseTimer));
+    panel.addEventListener("pointerleave", scheduleFieldMetadataClose);
+    panel.addEventListener("focusin", () => window.clearTimeout(fieldMetadataCloseTimer));
+    panel.addEventListener("focusout", scheduleFieldMetadataClose);
     panel.addEventListener("keydown", (event) => {
       if (event.key === "Escape") { closeFieldMetadata(); trigger.focus(); }
     });
@@ -248,11 +276,14 @@
         });
       }
       const missing = required.filter((key) => !mapped.includes(key));
+      const unselected = values.filter((value) => !value).length;
+      const warning = missing.length > 0 || unselected > 0;
+      status.hidden = !warning;
+      status.className = `mapping-status${warning ? " alert alert-warning" : ""}`;
       if (missing.length) {
         const labels = missing.map((key) => panel.querySelector(`[data-missing-key='${key}']`)?.textContent || key);
         status.textContent = `${missing.length} field${missing.length === 1 ? "" : "s"} not mapped: ${labels.join(", ")}`;
       } else {
-        const unselected = values.filter((value) => !value).length;
         status.textContent = unselected ? `${unselected} column${unselected === 1 ? "" : "s"} still need a choice` : "Ready to continue";
       }
     };

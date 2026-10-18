@@ -13,6 +13,9 @@
 .import-content .form { max-width: none; }
 .import-actions { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .import-actions-forward { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
+.import-mapping-forward { flex-direction: column; align-items: stretch; width: min(100%, 38rem); }
+.mapping-status { margin: 0; max-width: 100%; box-sizing: border-box; font-size: var(--font-size-body-sm); }
+.import-mapping-forward > .button, .import-mapping-forward > form, .import-mapping-forward > a { align-self: flex-end; }
 .import-actions form { margin: 0; }
 .import-upload-zone { padding: var(--space-xl); border: 2px dashed var(--color-control-border); border-radius: var(--radius-lg); background: var(--color-surface-subtle); }
 .import-upload-zone label { margin-top: 0; }

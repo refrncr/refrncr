@@ -4,7 +4,5 @@
   <section aria-label='Mapping completeness' id='mapping-completeness' class='mapping-completeness'>
     <p data-mapping-summary>{{ required_keys|select("in", assistance.mapping)|list|length }} of {{ required_keys|length }} required and identifier fields mapped · {{ assistance.completeness.unmapped_columns }} columns still need a choice</p>
     <div class='mapping-missing' data-mapping-missing hidden>{% for field in fields if field.key in required_keys %}<span data-missing-key='{{ field.key }}'{% if field.key in assistance.mapping %} hidden{% endif %}>{{ field.name }}</span>{% endfor %}</div>
-    {% set missing_fields = fields|rejectattr('key', 'in', assistance.mapping)|selectattr('key', 'in', required_keys)|list %}
-    <p class='help-text' data-mapping-status role='status' aria-live='polite' aria-atomic='true'>{% if missing_fields %}{{ missing_fields|length }} field{{ '' if missing_fields|length == 1 else 's' }} not mapped: {{ missing_fields|map(attribute='name')|join(', ') }}{% elif assistance.completeness.unmapped_columns %}{{ assistance.completeness.unmapped_columns }} columns still need a choice{% else %}Ready to continue{% endif %}</p>
   </section>
 </div>

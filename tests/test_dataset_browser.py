@@ -242,6 +242,11 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         re.DOTALL,
     )
     assert re.search(
+        r"<div class='column-heading'>.*mapping-field-heading",
+        page,
+        re.DOTALL,
+    )
+    assert re.search(
         r"mapping-system-name[^>]*>Salesforce &amp; CRM</span>.*"
         r"mapping-field-role[^>]*>Target",
         page,
@@ -637,7 +642,11 @@ def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
 
     page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
 
-    assert re.search(r"<th scope='col' class='numeric-column'>\s*Amount", page)
+    assert re.search(
+        r"<th scope='col' class='numeric-column'>\s*<div class='column-heading'>\s*"
+        r"<span class='column-heading-label'>Amount</span>",
+        page,
+    )
     for value in ("1.200", "3.456", "0.000", "-2.500"):
         assert re.search(rf"<td class='numeric-column'>\s*{re.escape(value)}\s*</td>", page)
     persisted = {
@@ -650,6 +659,38 @@ def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
         zero.id: Decimal("0.00"),
         negative.id: Decimal("-2.5"),
     }
+
+
+def test_record_table_header_groups_label_identifier_and_metadata_button(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "header-metadata")
+    field_name = "A very long identifier field name"
+    services.dataset_fields.create_field(
+        admin.id,
+        dataset.key,
+        "code",
+        field_name,
+        "string",
+        True,
+        False,
+        definition="The identifier description.",
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "A-1"})
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
+
+    header = re.search(r"<thead>.*?</thead>", page, re.DOTALL)[0]
+    assert re.search(
+        rf"<div class='column-heading'>\s*<span class='column-heading-label'>{field_name}</span>"
+        rf"\s*<svg class=\"key-icon\".*?<button class='field-metadata-trigger'"
+        rf" type='button' aria-label='About {field_name}'",
+        header,
+        re.DOTALL,
+    )
+    visible_header_text = re.sub(r"<[^>]*>", "", header)
+    assert f"About {field_name}" not in visible_header_text
 
 
 def test_record_table_displays_hyphen_for_empty_cells(dataset_browser):

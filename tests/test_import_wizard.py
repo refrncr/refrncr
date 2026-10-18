@@ -479,7 +479,7 @@ def test_mapping_options_are_flat_ordered_and_reserved_selections_are_hidden(wiz
     assert "value='code' selected" in code_select
     assert " disabled" not in code_select
     assert "value='active'" in code_select
-    assert code_select.index("— Choose a field —") < code_select.index("Do not import")
+    assert code_select.index("— Choose a field —") < code_select.index("— Do not import —")
 
 
 def test_do_not_import_follows_the_placeholder_in_the_compact_select(wizard):
@@ -488,6 +488,7 @@ def test_do_not_import_follows_the_placeholder_in_the_compact_select(wizard):
     assert "data-select='compact'" in code_select
     values = re.findall(r"<option value='([^']*)'", code_select)
     assert values[:2] == ["", "__ignored__"]
+    assert ">— Do not import —</option>" in code_select
 
 
 def test_ambiguous_mapping_hint_is_in_dropdown_and_badge_tooltip(wizard, import_context):
@@ -511,4 +512,6 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     assert "data-mapping-status" in page.text
     form = page.text.split("id='import-step-form'", 1)[1].split("</form>", 1)[0]
     assert "data-mapping-summary" in form
+    assert page.text.index("data-mapping-status") > page.text.index("</form>")
+    assert page.text.index("data-mapping-status") < page.text.index("data-mapping-continue")
     assert "Ready to continue" in page.text

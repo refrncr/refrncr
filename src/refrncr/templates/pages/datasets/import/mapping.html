@@ -19,7 +19,7 @@
         <label class='visually-hidden' for='mapping-{{ index }}'>Target field for {{ advice.header }}</label>
         <select id='mapping-{{ index }}' name='mapping_{{ index }}' data-select='compact' data-noun='fields' aria-describedby='mapping-examples-{{ index }} mapping-choice-{{ index }}{% if mapping_errors.get(index) %} mapping-error-{{ index }}{% endif %}'{% if mapping_errors.get(index) %} aria-invalid='true'{% endif %}>
           <option value=''{% if advice.selected == '' %} selected{% endif %}>— Choose a field —</option>
-          <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>Do not import</option>
+          <option value='__ignored__'{% if advice.selected is none %} selected{% endif %}>— Do not import —</option>
           {% for candidate in advice.candidates %}{{ mapping_option(candidate.field_key, candidate.field_name, advice.selected, 'suggested', loop.index0, candidate.field_key in assistance.mapping) }}{% endfor %}
           {% for field in fields %}{% if field.key not in advice.candidate_keys %}{{ mapping_option(field.key, field.name, advice.selected, 'available', loop.index0, field.key in assistance.mapping) }}{% endif %}{% endfor %}
         </select>
