@@ -355,9 +355,12 @@ def _route_probe_path(rule, *, dataset, team, user, field_key="missing-field"):
         "sqlite",
         pytest.param(
             "postgresql",
-            marks=pytest.mark.skipif(
-                not os.environ.get("REFRNCR_TEST_POSTGRES_URL"),
-                reason="REFRNCR_TEST_POSTGRES_URL is not configured",
+            marks=(
+                pytest.mark.postgres,
+                pytest.mark.skipif(
+                    not os.environ.get("REFRNCR_TEST_POSTGRES_URL"),
+                    reason="REFRNCR_TEST_POSTGRES_URL is not configured",
+                ),
             ),
         ),
     ],
