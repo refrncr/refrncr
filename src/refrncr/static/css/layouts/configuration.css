@@ -18,7 +18,7 @@
 .configuration-table { position: relative; }
 .configuration-table table { min-width: 44rem; table-layout: fixed; }
 /* Fields: order | field (name + key) | optional mapping role | type | constraints | actions */
-.configuration-table .field-order-column { width: 2.5rem; padding-inline: var(--space-sm); text-align: center; }
+.configuration-table .field-order-column { width: 2.5rem; padding-inline: 0; text-align: left; }
 .configuration-table-editable .field-order-column { width: var(--space-xxl); }
 .configuration-table .field-identity-column { width: 32%; }
 .configuration-table .field-mapping-column { width: 22%; }

@@ -234,7 +234,16 @@ async function layout(page, label) {
       // Fields reorder with the keyboard on the drag handle and save right away.
       const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
       const fieldOrder = await fieldNames();
-      assert(await page.locator('#fields .field-drag-handle').first().isVisible());
+      const dragHandle = page.locator('#fields .field-drag-handle').first();
+      assert(await dragHandle.isVisible());
+      const dragAlignment = await dragHandle.evaluate(handle => {
+        const cell = handle.closest('td').getBoundingClientRect();
+        const row = handle.closest('tr').getBoundingClientRect();
+        const box = handle.getBoundingClientRect();
+        return {leftOffset: box.left - cell.left, centerOffset: box.top + box.height / 2 - row.top - row.height / 2};
+      });
+      assert(Math.abs(dragAlignment.leftOffset) <= 1, JSON.stringify({width, dragAlignment}));
+      assert(Math.abs(dragAlignment.centerOffset) <= 1, JSON.stringify({width, dragAlignment}));
       assert.equal(await page.locator('#fields .button-stack').count(), 0);
       const reorder = async (name, key) => {
         await page.getByRole('button', {name: `Reorder ${name}`, exact: true}).focus();
