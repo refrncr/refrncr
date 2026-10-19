@@ -472,6 +472,17 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     assert "This field is mapped more than once" in page.text
 
 
+def test_preview_keeps_required_and_source_format_errors_together(wizard):
+    wizard.services.dataset_fields.create_field(
+        wizard.admin.id, wizard.dataset.key, "stamp", "Stamp", "timestamp"
+    )
+    wizard.upload(b"code,amount,stamp\nA,1,2024-10-27 02:30:00\n")
+    page = wizard.preview(("code", "", "stamp"))
+    text = html_text(page.text)
+    assert "Map every active Field exactly once." in text
+    assert "Choose an unambiguous source format for this field." in text
+
+
 def test_mapping_options_are_flat_ordered_and_reserved_selections_are_hidden(wizard):
     optional_field(wizard, "active")
     page = wizard.upload()

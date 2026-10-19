@@ -250,6 +250,7 @@ def test_timezone_and_fold_decisions_remain_in_mapping(import_context):
     assert not result.valid
     assert len(result.non_row_errors) == 1
     assert result.non_row_errors[0].field == "Stamp"
+    assert result.non_row_errors[0].code == "source_format_ambiguous"
     assert s.record_imports.state(a.id, "time", d.key, state.token).step == 3
     choices["stamp"]["fold"] = "later"
     result = s.record_imports.preview(

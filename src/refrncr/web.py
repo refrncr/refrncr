@@ -98,13 +98,26 @@ from refrncr.version_contracts import mapping_incomplete_message
 
 STATUS_LABELS = {"Removed": "Deleted", "Edited": "Changed"}
 IMPORT_MAPPING_ERROR_TEXT = {
+    "mapping_count_mismatch": "Submit exactly one mapping for every source column.",
     "column_unmapped": "Choose a field or Do not import.",
     "field_mapped_twice": (
         "This field is mapped more than once. Choose a different field or Do not import."
     ),
     "field_unknown": "Choose a field from this dataset.",
     "source_format_incomplete": "Choose a valid source type and its required format components.",
+    "source_format_ambiguous": "Choose an unambiguous source format for this field.",
+    "required_field_unmapped": "Map every required and identifier field.",
 }
+
+
+def import_mapping_error_text(issue, default_mode):
+    if issue.code == "required_field_unmapped" and (issue.mode or default_mode) == "new_version":
+        return "Map every active Field exactly once."
+    return IMPORT_MAPPING_ERROR_TEXT.get(issue.code)
+
+
+def merge_error_messages(*messages):
+    return " ".join(dict.fromkeys(message for message in messages if message))
 
 
 def status_label(status: str) -> str:
@@ -2623,20 +2636,19 @@ def create_flask_app(
         if state and state.imported_count is None:
             if step >= 3:
                 state, source, assistance = record_imports.mapping_assistance(
-                    actor.id, login_session.id, dataset.key, state.token, selected_mapping
+                    actor.id,
+                    login_session.id,
+                    dataset.key,
+                    state.token,
+                    selected_mapping,
+                    include_formats=True,
                 )
                 fields = assistance.fields
                 required_keys = assistance.required_keys
                 identifier_keys = assistance.identifier_keys
-                if error:
+                if error or source_format_issues:
                     for issue in assistance.errors:
-                        message = IMPORT_MAPPING_ERROR_TEXT.get(issue.code)
-                        if issue.code == "required_field_unmapped":
-                            message = (
-                                "Map every active Field exactly once."
-                                if mode == "new_version"
-                                else "Map every required and identifier field."
-                            )
+                        message = import_mapping_error_text(issue, mode)
                         if issue.column_index is None:
                             if message:
                                 step_mapping_errors.append(message)
@@ -2667,7 +2679,11 @@ def create_flask_app(
                 state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
                 if preview.non_row_errors:
                     step = 3
-                    error = " ".join(item.message for item in preview.non_row_errors)
+                    preview_messages = [
+                        import_mapping_error_text(item, mode) or item.message
+                        for item in preview.non_row_errors
+                    ]
+                    error = " ".join(dict.fromkeys(preview_messages))
                 elif step == 4 and not preview.valid:
                     step = 4
                 if step != state.step:
@@ -2684,26 +2700,17 @@ def create_flask_app(
                 )
                 mapping_samples.append(distinct_samples(samples))
         if assistance:
-            format_columns = record_imports.format_assistance(
-                actor.id,
-                login_session.id,
-                dataset.key,
-                state.token,
-                assistance.mapping,
-            )
+            format_columns = list(assistance.format_columns)
+        format_columns = show_source_format_issues(format_columns, source_format_issues)
         for issue in source_format_issues:
-            if issue.column_index is not None and issue.column_index < len(format_columns):
-                column = format_columns[issue.column_index]
-                if column is not None:
-                    message = IMPORT_MAPPING_ERROR_TEXT[issue.code]
-                    format_columns[issue.column_index] = {
-                        **column,
-                        "state": "failing",
-                        "verdict": message,
-                        "error": message,
-                    }
+            message = import_mapping_error_text(issue, mode)
+            if not message:
+                continue
+            step_mapping_errors.append(message)
+            if issue.column_index is not None:
+                mapping_errors[issue.column_index] = message
         if step_mapping_errors:
-            error = " ".join(dict.fromkeys(step_mapping_errors))
+            error = merge_error_messages(error, *step_mapping_errors)
         success = state is not None and state.imported_count is not None
         automatic = source is not None and (source.kind == "csv" or len(source.worksheets) == 1)
         completed = {
@@ -2941,7 +2948,7 @@ def create_flask_app(
         dataset_records.get_dataset_for_add(actor.id, key)
         require_csrf(login_session.csrf_token)
         _state, source, _advice = record_imports.mapping_assistance(
-            actor.id, login_session.id, key, token
+            actor.id, login_session.id, key, token, include_formats=True
         )
         expected = {
             f"{prefix}_{index}"
@@ -2959,18 +2966,16 @@ def create_flask_app(
             else request.form[f"mapping_{index}"]
             for index in range(len(source.headers))
         )
-        choices, issues = record_imports.submitted_source_formats(
+        _state, source, assistance, issues = record_imports.submitted_source_format_assistance(
             actor.id,
             login_session.id,
             key,
             token,
             mapping,
             submitted_source_format_components(mapping),
+            prepared=(_state, source, _advice),
         )
-        columns = record_imports.format_assistance(
-            actor.id, login_session.id, key, token, mapping, choices if not issues else None
-        )
-        columns = show_source_format_issues(columns, issues)
+        columns = show_source_format_issues(assistance.format_columns, issues)
         return render_template(
             "pages/datasets/import/source_format_fragments.html", format_columns=columns
         )
@@ -3043,6 +3048,7 @@ def create_flask_app(
                 token,
                 mapping,
                 submitted_source_format_components(mapping),
+                assistance=_assistance,
             )
             if format_issues:
                 return render_import_wizard(
@@ -3085,7 +3091,12 @@ def create_flask_app(
                 login_session,
                 state,
                 step=3,
-                error=" ".join(item.message for item in preview.non_row_errors),
+                error=merge_error_messages(
+                    *(
+                        import_mapping_error_text(item, state.mode) or item.message
+                        for item in preview.non_row_errors
+                    )
+                ),
                 status=400,
             )
         return import_redirect(key, state)

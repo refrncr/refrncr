@@ -854,12 +854,48 @@ def test_mapping_errors_are_non_row_errors_and_do_not_consume_row_limit(import_c
         admin.id, "mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
     )
     preview = services.record_imports.preview(
-        admin.id, "mapping", dataset.key, state.token, ("code", "code")
+        admin.id,
+        "mapping",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+        {"code": {"profile_id": "v1-text"}},
     )
     assert preview.invalid_rows == 0
     assert preview.row_error_groups == ()
     assert preview.non_row_errors == preview.errors
+    assert [(issue.code, issue.column_index) for issue in preview.non_row_errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
     assert not preview.row_report_truncated
+
+
+def test_preview_uses_the_same_coded_mapping_rules_as_assistance(import_context):
+    _, services, admin, dataset = import_context
+    state, _, _ = services.record_imports.begin(
+        admin.id, "coded-mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    _, _, assistance = services.record_imports.mapping_assistance(
+        admin.id, "coded-mapping", dataset.key, state.token, ("unknown", "")
+    )
+    preview = services.record_imports.preview(
+        admin.id,
+        "coded-mapping",
+        dataset.key,
+        state.token,
+        ("unknown", ""),
+        {},
+    )
+    expected = {(issue.code, issue.column_index) for issue in assistance.errors}
+    actual = {(issue.code, issue.column_index) for issue in preview.non_row_errors}
+    assert {"field_unknown", "column_unmapped", "required_field_unmapped"} <= {
+        code for code, _column in actual
+    }
+    assert expected <= actual
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
 
 
 def test_wrong_token_binding_does_not_consume_other_sessions_import(import_context):
