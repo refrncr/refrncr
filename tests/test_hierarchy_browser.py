@@ -120,6 +120,16 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
     )
 
 
+def test_hierarchy_delete_page_keeps_its_draft_notice(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset, _hierarchy, _root, branch, _child, _sibling = hierarchy_fixture(services, admin)
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/nodes/{branch.id}/delete"))
+
+    assert "class='concept-banner'" in page
+
+
 def test_export_validation_error_uses_a_handling_screen(dataset_browser, monkeypatch):
     _, services, admin, client = dataset_browser
     dataset, _hierarchy, _root, _branch, _child, _sibling = hierarchy_fixture(services, admin)

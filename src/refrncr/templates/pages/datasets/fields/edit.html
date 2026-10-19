@@ -5,7 +5,7 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Edit field</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Edit field' data-panel-eyebrow='Configure · {{ dataset.name }}'>
-    <div class='side-panel-body'>{% include 'pages/datasets/concepts/_banner.html' %}
+    <div class='side-panel-body'>
       {% if not may_edit_key %}{{ readonly_field("Key", field.key, technical=true) }}{% endif %}
       {% if error %}<div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ error }}</div>{% endif %}
       <form id='field-edit-form' class='form' {{ non_login_form_attrs() }} novalidate method='post' action='{{ url_for("update_dataset_field", key=dataset.key, field_key=field.key) }}'>

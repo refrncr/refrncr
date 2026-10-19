@@ -621,10 +621,37 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     panel = page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[0]
     assert ">View current version</a>" not in panel
-    assert "concept-banner-line" in panel and "concept-banner-note" in panel
+    assert "concept-banner" not in panel
+    assert page.count("class='concept-banner'") == 1
     assert "value='1'" in page
     assert "You can Undo delete while this Draft remains active." in page
     assert "name='confirm' value='yes'" in page
+
+
+def test_draft_notice_is_not_duplicated_in_field_or_record_panels(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "panel-draft-notice")
+    field = create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    record = services.dataset_records.create_record(admin.id, dataset.key, {field.key: "A"})
+    login(client)
+
+    records_page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records"))
+    assert records_page.count("class='concept-banner'") == 1
+    record_panel = records_page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[
+        0
+    ]
+    assert "concept-banner" not in record_panel
+
+    create_panel = body(request(client, "get", f"/datasets/{dataset.key}/fields/new"))
+    edit_panel = body(request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit"))
+    assert "concept-banner" not in create_panel
+    assert "concept-banner" not in edit_panel
+
+    delete_page = body(
+        request(client, "get", f"/datasets/{dataset.key}/records/{record.id}/delete")
+    )
+    assert "class='concept-banner'" in delete_page
 
 
 def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):
