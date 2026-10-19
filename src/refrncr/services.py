@@ -1427,7 +1427,7 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required")
+                raise ValidationError("A Record identifier field must be required.")
             if uow.dataset_records.count(dataset.id) and (
                 validated_required or validated_component
             ):
@@ -1730,7 +1730,7 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required")
+                raise ValidationError("A Record identifier field must be required.")
 
             current_key = uow.dataset_business_keys.get(dataset.id)
             currently_component = field.key in current_key.field_keys

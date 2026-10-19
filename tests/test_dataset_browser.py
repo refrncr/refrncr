@@ -2534,7 +2534,10 @@ def test_add_field_rejects_identifier_membership_without_required(dataset_browse
 
     assert response.status_code == 400
     page = body(response)
-    assert "Record identifier field must be required" in page
+    message = "A Record identifier field must be required."
+    assert message in page
+    assert page.count(message) == 1
+    assert "class='alert alert-error' role='alert'" in page
     assert "name='is_business_key_component' data-identifier-toggle checked" in page
     required = next(
         attrs
@@ -2631,7 +2634,11 @@ def test_identifier_membership_requires_field_to_remain_required(dataset_browser
         },
     )
     assert response.status_code == 400
-    assert "Record identifier field must be required" in body(response)
+    page = body(response)
+    message = "A Record identifier field must be required."
+    assert message in page
+    assert page.count(message) == 1
+    assert "class='alert alert-error' role='alert'" in page
     assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()
 
 

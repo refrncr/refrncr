@@ -7,7 +7,7 @@
   <div class='side-panel-view' data-side-panel-content data-panel-title='Edit field' data-panel-eyebrow='Configure · {{ dataset.name }}'>
     <div class='side-panel-body'>{% include 'pages/datasets/concepts/_banner.html' %}
       {% if not may_edit_key %}{{ readonly_field("Key", field.key, technical=true) }}{% endif %}
-      {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
+      {% if error %}<div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ error }}</div>{% endif %}
       <form id='field-edit-form' class='form' {{ non_login_form_attrs() }} novalidate method='post' action='{{ url_for("update_dataset_field", key=dataset.key, field_key=field.key) }}'>
         {{ field_form_fields(key_value, name, data_type, is_required, is_unique, is_business_key_component, type_choices, may_edit_key, definition=definition, unit=unit, lock_constraints=field.mapping_role == 'source_identifier', lock_identifier=dataset.kind == 'mapping' and field.mapping_role != 'source_identifier', hierarchy=dataset.kind == 'hierarchy', hierarchy_scope=hierarchy_scope) }}
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
