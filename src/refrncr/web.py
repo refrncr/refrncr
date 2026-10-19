@@ -1077,9 +1077,15 @@ def create_flask_app(
             return response, 409 if isinstance(error, ConflictError) else 400
         if dataset.kind == "mapping":
             return redirect(url_for("dataset_configuration", key=dataset.key) + "#mapping")
-        if dataset.kind == "hierarchy":
-            return redirect(url_for("dataset_records_view", key=dataset.key, concept=True))
-        return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
+        return redirect(
+            url_for(
+                "dataset_detail",
+                key=dataset.key,
+                concept=True,
+                tab="fields",
+                _anchor="fields",
+            )
+        )
 
     @dataset_route(
         "/datasets/<key>/concept",

@@ -1009,7 +1009,9 @@ def test_admin_create_flow_persists_owner_and_audit_without_grant(dataset_browse
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/reference-data/concept")
+    assert response.headers["Location"].endswith(
+        "/datasets/reference-data/concept?tab=fields#fields"
+    )
     assert "reference-data" in body(request(client, "get", "/datasets"))
     with factory() as session:
         dataset = session.scalar(select(Dataset).where(Dataset._key == "reference-data"))
@@ -1065,6 +1067,51 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert "Target identifier" not in page
     assert "Target table" not in page
     assert "Source system" not in page and "Target system" not in page
+
+
+@pytest.mark.parametrize(
+    ("kind", "mapping_data", "expected_location"),
+    [
+        ("reference", {}, "/datasets/created-reference/concept?tab=fields#fields"),
+        ("hierarchy", {}, "/datasets/created-hierarchy/concept?tab=fields#fields"),
+        (
+            "mapping",
+            {"mapping_mode": "standalone", "source_system": "Legacy", "target_system": "New"},
+            "/datasets/created-mapping/configure#mapping",
+        ),
+    ],
+)
+def test_create_redirects_each_dataset_type_to_its_next_step(
+    dataset_browser, kind, mapping_data, expected_location
+):
+    _, _, _, client = dataset_browser
+    login(client)
+    form = request(client, "get", f"/datasets/new?kind={kind}")
+    owner_team_id = re.search(r"<option value='([^']+)' selected", body(form))[1]
+
+    response = request(
+        client,
+        "post",
+        "/datasets",
+        data={
+            "key": f"created-{kind}",
+            "name": f"Created {kind}",
+            "description": "",
+            "kind": kind,
+            "owner_team_id": owner_team_id,
+            "csrf_token": form_csrf(form),
+            **mapping_data,
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == expected_location
+    destination = request(client, "get", expected_location.split("#", 1)[0])
+    assert destination.status_code == 200
+    if kind in {"reference", "hierarchy"}:
+        page = body(destination)
+        assert "Draft in progress" in page
+        assert "Add field" in page
 
 
 def test_dataset_list_loads_mapping_form_behaviour_for_create_panel(dataset_browser):

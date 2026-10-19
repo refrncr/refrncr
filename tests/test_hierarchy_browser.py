@@ -40,7 +40,7 @@ def panel_revision(response):
     return re.search(r"name='expected_revision' value='(\d+)'", body(response)).group(1)
 
 
-def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
+def test_hierarchy_creation_opens_fields_after_create(dataset_browser):
     _, services, admin, client = dataset_browser
     login(client)
     form = request(client, "get", "/datasets/new?kind=hierarchy")
@@ -59,12 +59,13 @@ def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("/datasets/structure/concept/records")
+    assert response.location.endswith("/datasets/structure/concept?tab=fields#fields")
+    page = body(request(client, "get", response.location.split("#", 1)[0]))
+    assert "Draft in progress" in page
+    assert "Add field" in page
     page = request(client, "get", response.location)
     assert page.status_code == 200
-    assert "Start with the root" in body(page)
-    assert "Add root" in body(page)
-    assert "Hierarchy views" in body(page)
+    assert "Add field" in body(page)
     assert not services.dataset_fields.list_fields(admin.id, "structure")
 
     panel = request(client, "get", "/datasets/structure/concept/nodes/new")
