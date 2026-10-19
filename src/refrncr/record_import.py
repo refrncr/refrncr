@@ -70,6 +70,12 @@ class ImportValidationError(ValidationError):
     """A safe, user-facing import validation failure."""
 
 
+class SourceFormatComponentsError(ImportValidationError):
+    def __init__(self, issues):
+        self.issues = tuple(issues)
+        super().__init__("Choose a valid source type and its required format components.")
+
+
 class ImportExpiredError(NotFoundError):
     """A previously valid staged import expired for its bound session and dataset."""
 
@@ -1149,7 +1155,9 @@ class DatasetRecordImportService:
             )
         else:
             state = self.store.update(state, step=3)
-        return state, source, self._assistance(dataset.id, source, state.mapping, mode=state.mode)
+        assistance = self._assistance(dataset.id, source, state.mapping, mode=state.mode)
+        state = self.store.update(state, mapping=assistance.mapping, step=3)
+        return state, source, assistance
 
     def mapping_assistance(
         self,
@@ -1359,7 +1367,7 @@ class DatasetRecordImportService:
             )
         return columns
 
-    def preview(self, actor_id, session_id, dataset_key, token, mapping, source_formats=None):
+    def preview(self, actor_id, session_id, dataset_key, token, mapping, format_components=None):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
@@ -1368,27 +1376,44 @@ class DatasetRecordImportService:
         if not source.headers:
             raise NotFoundError("Import not found")
         mapping = tuple(mapping)
-        if mapping != state.mapping:
+        mapping_changed = mapping != state.mapping
+        retained_formats = {
+            key: choice
+            for key, choice in (state.source_formats or {}).items()
+            if key in mapping
+            and state.mapping
+            and key in state.mapping
+            and mapping.index(key) == state.mapping.index(key)
+        }
+        assistance = self._assistance(
+            dataset.id,
+            source,
+            mapping,
+            mode=state.mode,
+            include_formats=True,
+            choices=retained_formats,
+        )
+        if format_components is not None:
+            state, source, assistance, issues = self._submitted_source_format_assistance(
+                state, source, assistance, mapping, format_components
+            )
+            if issues:
+                raise SourceFormatComponentsError(issues)
+        if mapping_changed:
             state = self.store.update(
                 state,
                 mapping=mapping,
-                source_formats={
-                    key: choice
-                    for key, choice in (state.source_formats or {}).items()
-                    if key in mapping
-                    and state.mapping
-                    and key in state.mapping
-                    and mapping.index(key) == state.mapping.index(key)
-                },
+                source_formats=retained_formats,
                 mapping_ready=False,
                 validation_valid=False,
                 schema_fingerprint=None,
                 step=3,
             )
-        columns = self.format_assistance(
-            actor_id, session_id, dataset_key, token, mapping, source_formats
-        )
-        choices = {column["key"]: column["choice"] for column in columns if column is not None}
+        choices = {
+            column["key"]: column["choice"]
+            for column in assistance.format_columns
+            if column is not None
+        }
         if choices != state.source_formats:
             state = self.store.update(
                 state,

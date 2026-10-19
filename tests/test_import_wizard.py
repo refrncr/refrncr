@@ -102,6 +102,20 @@ def test_worksheet_skip_or_explicit_selection_and_invalidation(wizard, sheets):
         assert wizard.post(wizard.path + "/worksheet", {"worksheet": ""}).status_code == 400
         page = wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
         assert states(page)[2] == ("3", "active")
+        format_review = wizard.post(
+            wizard.path + "/formats",
+            {
+                "mapping_0": "code",
+                "mapping_1": "amount",
+                "source_0": "v1-text",
+                "source_1": "v1-plain",
+                "timezone_0": "",
+                "timezone_1": "",
+                "fold_0": "",
+                "fold_1": "",
+            },
+        )
+        assert format_review.status_code == 200
         wizard.preview()
         wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
         assert wizard.get(wizard.path + "/step/5").status_code == 404

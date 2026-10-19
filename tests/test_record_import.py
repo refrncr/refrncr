@@ -333,6 +333,49 @@ def test_submitted_format_helpers_require_a_bound_import_state(import_context):
         )
 
 
+def test_submitted_format_methods_bind_valid_token_to_user_and_session(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id, "format-owner-session", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    mapping = state.mapping
+    components = ({"source": "v1-text"}, {"source": "v1-plain"})
+    editor = services.users.create_user(admin.id, "editor@example.com", "Editor", PASSWORD)
+    services.grants.create_grant(admin.id, "user", editor.id, "dataset", dataset.id, "editor")
+
+    for method in (
+        service.submitted_source_formats,
+        service.submitted_source_format_assistance,
+    ):
+        method(
+            admin.id,
+            "format-owner-session",
+            dataset.key,
+            state.token,
+            mapping,
+            components,
+        )
+        with pytest.raises(NotFoundError):
+            method(
+                admin.id,
+                "another-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
+        with pytest.raises(NotFoundError):
+            method(
+                editor.id,
+                "format-owner-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
+
+
 @pytest.fixture
 def postgresql_import_context():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")
@@ -820,7 +863,10 @@ def test_preview_error_cap_authorization_and_session_revocation(import_context):
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert len(preview.errors) == 100
     assert preview.total_errors == 120
@@ -846,7 +892,10 @@ def test_failed_row_report_groups_all_errors_and_limits_rows(import_context, fai
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert preview.invalid_rows == failed_rows
     assert len(preview.row_error_groups) == min(failed_rows, 100)
@@ -876,7 +925,7 @@ def test_mapping_errors_are_non_row_errors_and_do_not_consume_row_limit(import_c
         dataset.key,
         state.token,
         ("code", "code"),
-        {"code": {"profile_id": "v1-text"}},
+        format_components=({"source": "v1-text"}, {"source": "v1-text"}),
     )
     assert preview.invalid_rows == 0
     assert preview.row_error_groups == ()

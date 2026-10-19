@@ -61,6 +61,7 @@ from refrncr.record_import import (
     DatasetRecordImportService,
     ImportExpiredError,
     ImportValidationError,
+    SourceFormatComponentsError,
     distinct_samples,
     mapping_issue_message,
     parse_source,
@@ -2929,18 +2930,17 @@ def create_flask_app(
     @concept_route
     def review_source_formats(key: str, token: str):
         actor, login_session = require_authenticated()
-        dataset_records.get_dataset_for_add(actor.id, key)
         require_csrf(login_session.csrf_token)
-        prepared = record_imports.mapping_assistance(
-            actor.id, login_session.id, key, token, include_formats=True
-        )
-        _state, source, advice = prepared
+        state = record_imports.state(actor.id, login_session.id, key, token)
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        column_count = len(state.mapping)
         expected = {
             f"{prefix}_{index}"
             for prefix in ("mapping", "source", "timezone", "fold")
-            for index in range(len(source.headers))
+            for index in range(column_count)
         } | {"csrf_token"}
-        expected |= submitted_component_names(len(source.headers))
+        expected |= submitted_component_names(column_count)
         if set(request.form) != expected or any(
             len(request.form.getlist(name)) != 1 for name in expected
         ):
@@ -2949,12 +2949,13 @@ def create_flask_app(
             None
             if request.form[f"mapping_{index}"] == "__ignored__"
             else request.form[f"mapping_{index}"]
-            for index in range(len(source.headers))
+            for index in range(column_count)
         )
-        _state, source, assistance, issues = record_imports._submitted_source_format_assistance(
-            _state,
-            source,
-            advice,
+        _state, _source, assistance, issues = record_imports.submitted_source_format_assistance(
+            actor.id,
+            login_session.id,
+            key,
+            token,
             mapping,
             submitted_source_format_components(mapping),
         )
@@ -2982,22 +2983,23 @@ def create_flask_app(
     @concept_route
     def preview_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
+        state = record_imports.state(actor.id, login_session.id, key, token)
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        state, source, _assistance = record_imports.mapping_assistance(
-            actor.id, login_session.id, key, token
-        )
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        column_count = len(state.mapping)
         if request.method == "GET":
             return dataset_import_step(key, token, 4)
         require_csrf(login_session.csrf_token)
-        expected = {f"mapping_{index}" for index in range(len(source.headers))} | {"csrf_token"}
+        expected = {f"mapping_{index}" for index in range(column_count)} | {"csrf_token"}
         format_names = {
             f"{prefix}_{index}"
             for prefix in ("source", "timezone", "fold")
-            for index in range(len(source.headers))
+            for index in range(column_count)
         }
         if set(request.form) & format_names:
             expected |= format_names
-            expected |= submitted_component_names(len(source.headers))
+            expected |= submitted_component_names(column_count)
         target_step = request.form.get("go_step")
         if target_step is not None:
             if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4"}:
@@ -3020,28 +3022,31 @@ def create_flask_app(
             None
             if request.form[f"mapping_{index}"] == "__ignored__"
             else request.form[f"mapping_{index}"]
-            for index in range(len(source.headers))
+            for index in range(column_count)
         )
-        choices = None
-        if set(request.form) & format_names:
-            choices, format_issues = record_imports._submitted_source_formats(
-                _assistance,
-                mapping,
-                submitted_source_format_components(mapping),
-            )
-            if format_issues:
-                return render_import_wizard(
-                    dataset,
-                    login_session,
-                    state,
-                    step=3,
-                    status=400,
-                    selected_mapping=mapping,
-                    source_format_issues=format_issues,
-                )
+        format_components = (
+            submitted_source_format_components(mapping)
+            if set(request.form) & format_names
+            else None
+        )
         try:
             preview = record_imports.preview(
-                actor.id, login_session.id, key, token, mapping, choices
+                actor.id,
+                login_session.id,
+                key,
+                token,
+                mapping,
+                format_components=format_components,
+            )
+        except SourceFormatComponentsError as error:
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=3,
+                status=400,
+                selected_mapping=mapping,
+                source_format_issues=error.issues,
             )
         except NotFoundError:
             raise

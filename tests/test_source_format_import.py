@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from sqlalchemy import func, select
 from support import html_elements
 
+import refrncr.record_import as record_import_module
 from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
 from refrncr.record_import import ImportValidationError, TransientImportStore, parse_source
 from refrncr.services import NotFoundError
@@ -34,13 +35,20 @@ def start(context, value="1.234,56", session="source-formats", code="A"):
 
 def preview(context, state, choice=None, session="source-formats"):
     _, services, admin, dataset = context
+    components = None
+    if choice is not None:
+        components = (
+            {"source": "v1-text"},
+            {"source": choice.get("profile_id", "v1-eu")}
+            | {key: value for key, value in choice.items() if key in {"timezone", "fold"}},
+        )
     return services.record_imports.preview(
         admin.id,
         session,
         dataset.key,
         state.token,
         ("code", "amount"),
-        None if choice is None else {"amount": choice},
+        format_components=components,
     )
 
 
@@ -177,6 +185,22 @@ def form_data(wizard, profile="v1-eu"):
     }
 
 
+def test_format_fragment_parses_source_once(wizard, monkeypatch):
+    wizard.upload(b"code;amount\nA;1.234\n")
+    parse = record_import_module.parse_source
+    calls = []
+
+    def counted_parse(*args, **kwargs):
+        calls.append(args)
+        return parse(*args, **kwargs)
+
+    monkeypatch.setattr(record_import_module, "parse_source", counted_parse)
+    response = wizard.post(wizard.path + "/formats", form_data(wizard))
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+
+
 def test_mapping_progressive_disclosure_and_live_examples(wizard):
     page = wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
     assert "Show all formats" in page.text
@@ -245,7 +269,16 @@ def test_timezone_and_fold_decisions_remain_in_mapping(import_context):
     )
     choices = {"stamp": {"profile_id": "v1-datetime-ymd-dash-hms", "timezone": "Europe/Amsterdam"}}
     result = s.record_imports.preview(
-        a.id, "time", d.key, state.token, ("code", "amount", "stamp"), choices
+        a.id,
+        "time",
+        d.key,
+        state.token,
+        ("code", "amount", "stamp"),
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-eu"},
+            {"source": choices["stamp"]["profile_id"], "timezone": choices["stamp"]["timezone"]},
+        ),
     )
     assert not result.valid
     assert len(result.non_row_errors) == 1
@@ -254,7 +287,20 @@ def test_timezone_and_fold_decisions_remain_in_mapping(import_context):
     assert s.record_imports.state(a.id, "time", d.key, state.token).step == 3
     choices["stamp"]["fold"] = "later"
     result = s.record_imports.preview(
-        a.id, "time", d.key, state.token, ("code", "amount", "stamp"), choices
+        a.id,
+        "time",
+        d.key,
+        state.token,
+        ("code", "amount", "stamp"),
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-eu"},
+            {
+                "source": choices["stamp"]["profile_id"],
+                "timezone": choices["stamp"]["timezone"],
+                "fold": choices["stamp"]["fold"],
+            },
+        ),
     )
     assert result.valid
     assert result.sample[0][-1] == "2024-10-27T01:30:00Z"
@@ -262,12 +308,13 @@ def test_timezone_and_fold_decisions_remain_in_mapping(import_context):
 
 def test_nonlocal_choices_cannot_persist_arbitrary_timezone_content(import_context):
     state = start(import_context)
-    with pytest.raises(ImportValidationError, match="local Timestamp"):
+    with pytest.raises(ImportValidationError, match="valid source type") as error:
         preview(
             import_context,
             state,
             {"profile_id": "v1-eu", "timezone": "arbitrary text", "fold": "ignored"},
         )
+    assert error.value.issues[0].code == "source_format_incomplete"
     assert saved(import_context) == {}
 
 
