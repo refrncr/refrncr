@@ -3,10 +3,11 @@
 from logging import Filter
 from unicodedata import normalize
 
+from refrncr.change_status import DISPLAY_STATUSES, LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
 from refrncr.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
 
 MAX_QUERY_BYTES = 32 * 1024
-RECORD_CHANGE_FILTERS = ("added", "edited", "deleted")
+RECORD_CHANGE_FILTERS = tuple(RECORD_STATUS_FILTERS)
 
 
 class RecordSearchError(ValueError):
@@ -72,8 +73,8 @@ def parse_parameters(items):
         if not isinstance(value, str) or len(value) > MAX_INPUT_LENGTH:
             raise RecordSearchError("Record criteria exceed the input limit.")
         if name == "status":
-            value = "Changed" if value == "Edited" else value
-            if value not in {"Added", "Changed", "Deleted"} or value in statuses:
+            value = LEGACY_STATUS_ALIASES.get(value, value)
+            if value not in DISPLAY_STATUSES or value in statuses:
                 raise RecordSearchError("Choose distinct valid import statuses.")
             statuses.append(value)
         elif name not in allowed or name in values:

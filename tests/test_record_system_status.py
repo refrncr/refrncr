@@ -69,6 +69,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     assert "Complete" in html and "badge-success" not in html
     assert "Old &lt;identifier&gt;" in html and "Old <identifier>" not in html
     panel = html.split(f"id='record-panel-{deleted.id}'", 1)[1].split("</dialog>", 1)[0]
+    assert "<span class='badge badge-removed'>Deleted</span>" in panel
     assert "This Record will be removed when you publish" in panel
     assert "data-panel-mode=" not in panel and "data-panel-view='edit'" not in panel
     assert "Content change" in panel and "Content validation" in panel

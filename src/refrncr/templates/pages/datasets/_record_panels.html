@@ -1,3 +1,4 @@
+{% from "components.html" import status_badge %}
 {% from "components/icons.html" import key_icon, lock_icon %}
 {% from "components/side_panel.html" import side_panel %}
 {% from "pages/datasets/_record_form_fields.html" import record_form_fields %}
@@ -27,7 +28,7 @@
     <div class='side-panel-view' data-panel-host>
     <section class='side-panel-view' data-panel-view='view'{% if record_may_edit %} hidden{% endif %}>
       <div class='side-panel-body'>{% if may_edit %}{% with actions=false, show_current=false %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
-        {% if deleted %}<p class='record-deletion-notice'><span class='badge badge-removed'>Deleted</span><br>This Record will be removed when you publish. These are the retained values from deletion.</p>{% endif %}
+        {% if deleted %}<p class='record-deletion-notice'>{{ status_badge(ChangeStatus.REMOVED) }}<br>This Record will be removed when you publish. These are the retained values from deletion.</p>{% endif %}
         {% if version_state %}<p class='panel-context'>{{ lock_icon() }}Version {{ version_state.version.number }} · published, read only</p>{% endif %}
         <dl class='record-details'>
           {% for field, value in record_details[record.id] %}<div><dt>{{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}<span class='visually-hidden'> (record identifier)</span>{% endif %}</dt><dd>{{ display_record_value(field, value) if value is not none else '—' }}</dd></div>{% endfor %}

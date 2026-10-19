@@ -16,14 +16,14 @@
         {% if item.record.before_identifier is not none %}<div><dt>Before identifier</dt><dd>{{ value(item.record.before_identifier) }}</dd></div>{% endif %}
         {% if item.record.after_identifier is not none %}<div><dt>After identifier</dt><dd>{{ value(item.record.after_identifier) }}</dd></div>{% endif %}
       </dl>
-      <p>{{ item.total }} {{ 'changed values' if item.record.status == 'Changed' else 'Fields' }} · Page {{ item.page }} · Up to 50 values per page.</p>
+      <p>{{ item.total }} {{ 'changed values' if item.record.status == ChangeStatus.CHANGED else 'Fields' }} · Page {{ item.page }} · Up to 50 values per page.</p>
       <div class='table-scroll' role='region' aria-label='Record value changes' tabindex='0'>
         <table class='diff-table'><caption class='visually-hidden'>{{ item.record.status|status_label }} Record values</caption>
           <thead><tr><th scope='col'>Field</th><th scope='col'>Before</th><th scope='col'>After</th></tr></thead>
           <tbody>{% for change in item.values %}<tr>
             <th scope='row'>{{ change.field_name }}<span class='help-text'><br>{% if change.before_type and change.after_type and change.before_type != change.after_type %}Before: {{ change.before_type|datatype_label }} · After: {{ change.after_type|datatype_label }}{% else %}{{ (change.after_type or change.before_type)|datatype_label }}{% endif %}</span></th>
-            <td>{{ value(change.before, absent=item.record.status == 'Added') }}</td>
-            <td>{{ value(change.after, absent=item.record.status == 'Removed') }}</td>
+            <td>{{ value(change.before, absent=item.record.status == ChangeStatus.ADDED) }}</td>
+            <td>{{ value(change.after, absent=item.record.status == ChangeStatus.REMOVED) }}</td>
           </tr>{% endfor %}</tbody>
         </table>
       </div>

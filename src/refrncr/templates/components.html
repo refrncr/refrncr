@@ -14,7 +14,8 @@
 
 {% macro status_badge(label, count=none) -%}
 {%- set display_label = label|status_label -%}
-{%- set variant = 'badge-published' if display_label in ('Published', 'Current') else 'badge-draft' if display_label in ('Added', 'Changed') else 'badge-removed' if display_label == 'Deleted' else 'badge-error' if display_label == 'Error' else '' -%}
+{%- set change_variant = label|status_badge_variant -%}
+{%- set variant = 'badge-published' if display_label in ('Published', 'Current') else 'badge-error' if display_label == 'Error' else change_variant -%}
 <span class='badge{% if variant %} {{ variant }}{% endif %}'>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</span>
 {%- endmacro %}
 

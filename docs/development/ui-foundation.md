@@ -73,6 +73,15 @@ new component is justified when the interaction or semantic structure is
 reused in more than one workflow. Keep component markup in templates and
 macros, not in Python strings.
 
+### Change-status language
+
+The shared change-status vocabulary is **Added**, **Changed**, and **Deleted**.
+The domain enum and its presentation mapping own the labels and lifecycle badge
+variants; templates should render change badges through `status_badge`. The
+persisted `Removed` value maps to the visible label Deleted. The former filter
+value `Edited` is accepted only for backward-compatible links and is presented
+as Changed. Do not introduce a second translation or hand-built change badge.
+
 ## Forms and error handling
 
 Server-side validation is authoritative. A failed submission must return the

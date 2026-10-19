@@ -6,7 +6,7 @@
 {% if import_results %}
 <section aria-label='Import results'>
 <h2>Import results</h2>
-{% if import_totals %}<p>{% for status in ('Added', 'Changed', 'Unchanged', 'Deleted', 'Error') %}{{ status }}: {{ import_totals[status] }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% if import_totals %}<p>{% for status in DISPLAY_STATUSES + ('Unchanged', 'Error') %}{{ status }}: {{ import_totals[status] }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
 </section>
 {% endif %}
 <div class='record-toolbar record-toolbar-search' role='group' aria-label='Record results'>
@@ -38,7 +38,7 @@
       <tbody>
         {% for record, values, incomplete in rows %}
           {% set status = record_states.get(record.id) if record_states.get(record.id) != 'Published' else none %}
-          {% call table_row('record-row record-tombstone' if status == 'Deleted' else 'record-row', panel=true) %}
+          {% call table_row('record-row record-tombstone' if status == status_label(ChangeStatus.REMOVED) else 'record-row', panel=true) %}
             {% set row_direction = namespace(rendered=false) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
@@ -54,8 +54,8 @@
                 {% endif %}
                 {% endset %}
                 {% if field.key == identifier.field_keys[0] %}
-                  {% set primary_label = record_labels.get(record.id) if status == "Deleted" else (display_record_value(field, cell_value) if cell_value is not none else "No value") %}
-                  {% call row_action(panel="record-panel-" ~ record.id, accessible_name=("Edit " if may_edit and status != "Deleted" else "View ") ~ ('deleted ' if status == 'Deleted' else '') ~ "record " ~ primary_label ~ " (" ~ record.id ~ ")") %}{% if status == 'Deleted' %}<span class='cell-content'>{{ primary_label }}</span>{% else %}{{ value_content }}{% endif %}{% endcall %}
+                  {% set primary_label = record_labels.get(record.id) if status == status_label(ChangeStatus.REMOVED) else (display_record_value(field, cell_value) if cell_value is not none else "No value") %}
+                  {% call row_action(panel="record-panel-" ~ record.id, accessible_name=("Edit " if may_edit and status != status_label(ChangeStatus.REMOVED) else "View ") ~ ('deleted ' if status == status_label(ChangeStatus.REMOVED) else '') ~ "record " ~ primary_label ~ " (" ~ record.id ~ ")") %}{% if status == status_label(ChangeStatus.REMOVED) %}<span class='cell-content'>{{ primary_label }}</span>{% else %}{{ value_content }}{% endif %}{% endcall %}
                 {% else %}{{ value_content }}{% endif %}
               </td>
             {% endfor %}

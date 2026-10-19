@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass
 
+from refrncr.change_status import STATUSES, ChangeStatus
 from refrncr.version_contracts import SummaryCounts
 
 PAGE_SIZE = 50
 MAX_SEARCH = 200
-STATUSES = ("Added", "Changed", "Removed")
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +31,7 @@ class PropertyChange:
 class FieldChange:
     id: str
     name: str
-    status: str
+    status: ChangeStatus
     properties: tuple[PropertyChange, ...]
     moved: bool = False
     datatype_changed: bool = False
@@ -56,7 +56,7 @@ class DiffSummary:
 
 @dataclass(frozen=True, slots=True)
 class DiffCriteria:
-    statuses: tuple[str, ...] = STATUSES
+    statuses: tuple[str | ChangeStatus, ...] = STATUSES
     search: str = ""
     anchor: str = ""
     backwards: bool = False
@@ -65,7 +65,7 @@ class DiffCriteria:
 @dataclass(frozen=True, slots=True)
 class RecordChange:
     id: str
-    status: str
+    status: ChangeStatus
     before_identifier: str | None
     after_identifier: str | None
     changed_values: int
@@ -75,7 +75,7 @@ class RecordChange:
 @dataclass(frozen=True, slots=True)
 class RecordProjection:
     id: str
-    status: str
+    status: ChangeStatus
     before_identifier: bytes | None
     after_identifier: bytes | None
     changed_values: int

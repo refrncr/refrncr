@@ -61,7 +61,7 @@ DDL, conversion and Alembic revision roll back together; retry is safe on SQLite
 
 The UI can show a selectable Draft row even before the first edit. The shared
 banner identifies all concept content pages. One final system Status column shows
-Published, Changed, Added or Deleted using the shared classifier. Its explicit System
+Published, Changed, Added or Deleted using the shared change-status mapping. Its explicit System
 sublabel, accessible header and visual boundary distinguish it from Dataset Fields named
 Status, Change or Validation; those Fields keep their real values. Deleted rows load only
 the matching baseline Records selected by the same diff projection. They have read-only

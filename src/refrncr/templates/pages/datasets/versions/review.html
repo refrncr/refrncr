@@ -47,7 +47,7 @@
         <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
         <label for='diff-search'>Search old or new identifier</label>
         <input id='diff-search' type='search' name='q' value='{{ criteria.search }}' maxlength='200'>
-        <fieldset><legend>Change status</legend>{% for status in ['Added', 'Changed', 'Removed'] %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses or (status == 'Removed' and 'Deleted' in criteria.statuses) %} checked{% endif %}> {{ status|status_label }}</label>{% endfor %}</fieldset>
+        <fieldset><legend>Change status</legend>{% for status in (ChangeStatus.ADDED, ChangeStatus.CHANGED, ChangeStatus.REMOVED) %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses %} checked{% endif %}> {{ status|status_label }}</label>{% endfor %}</fieldset>
         <div class='form-actions'><button class='button button-primary' type='submit'>Apply filters</button><a class='button button-secondary' href='{{ sections.Records }}'>Clear filters</a></div>
       </form>
       <p class='help-text'>{{ result.total }} matching changes · 50 per page. Search checks identifiers only; no selected statuses means all statuses.</p>
@@ -57,8 +57,8 @@
         <tbody>{% for item in result.items %}<tr class='interactive-row record-row' data-record-row data-row-action>
           <td>{{ status_badge(item.status) }}</td>
           <td><a class='row-action' data-row-primary data-panel-url data-dialog-open='review-panel' href='{{ detail_url("record", item.id) }}'><span class='visually-hidden'>Review record </span><span class='row-action-label'>{{ item.after_identifier or item.before_identifier }}</span></a></td>
-          <td>{% if item.status == 'Changed' and item.before_identifier != item.after_identifier %}{{ item.before_identifier }}{% else %}—{% endif %}</td>
-          <td>{{ item.changed_values if item.status == 'Changed' else '—' }}</td>
+          <td>{% if item.status == ChangeStatus.CHANGED and item.before_identifier != item.after_identifier %}{{ item.before_identifier }}{% else %}—{% endif %}</td>
+          <td>{{ item.changed_values if item.status == ChangeStatus.CHANGED else '—' }}</td>
         </tr>{% endfor %}</tbody></table>
       </div>{% endif %}
     {% else %}

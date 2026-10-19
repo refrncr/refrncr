@@ -8,6 +8,11 @@ from types import MappingProxyType
 from unicodedata import normalize
 
 from refrncr.audit import record_audit
+from refrncr.change_status import (
+    DISPLAY_STATUSES,
+    RECORD_STATUS_FILTERS,
+    status_label,
+)
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
@@ -659,7 +664,7 @@ class DatasetVersionService:
             )
             search = search_term(search)
             selected_changes = tuple(record_status.split(",")) if record_status != "all" else ()
-            change_order = ("added", "edited", "deleted")
+            change_order = tuple(RECORD_STATUS_FILTERS)
             if (
                 any(change not in change_order for change in selected_changes)
                 or tuple(change for change in change_order if change in selected_changes)
@@ -668,7 +673,7 @@ class DatasetVersionService:
                 raise RecordSearchError("Choose Added, Changed or Deleted filters.")
             if (
                 not isinstance(statuses, tuple)
-                or any(status not in {"Added", "Changed", "Deleted"} for status in statuses)
+                or any(status not in DISPLAY_STATUSES for status in statuses)
                 or len(set(statuses)) != len(statuses)
                 or (state is not None and (statuses or selected_changes))
             ):
@@ -780,14 +785,13 @@ class DatasetVersionService:
                 for record in matching
             }
             status_counts = tuple(
-                sum(raw_states[record.id] == raw for record in matching)
-                for raw in ("Added", "Changed", "Deleted")
+                sum(raw_states[record.id] == label for record in matching)
+                for label in DISPLAY_STATUSES
             )
             ordered = matching
             if selected_changes:
                 selected_raw = {
-                    {"added": "Added", "edited": "Changed", "deleted": "Deleted"}[change]
-                    for change in selected_changes
+                    status_label(RECORD_STATUS_FILTERS[change]) for change in selected_changes
                 }
                 ordered = [record for record in ordered if raw_states[record.id] in selected_raw]
             if statuses and state is None:
@@ -805,7 +809,6 @@ class DatasetVersionService:
                 for record in record_page.records
                 if raw_states.get(record.id) is not None
             }
-            statuses = {"Changed": "Changed", "Added": "Added", "Removed": "Deleted"}
             export = self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
             return VersionRead(
                 context,
@@ -821,7 +824,9 @@ class DatasetVersionService:
                         r.id: (
                             "Deleted"
                             if r.id in deleted_ids
-                            else statuses.get(states.get(r.id), "Published")
+                            else status_label(states[r.id])
+                            if r.id in states
+                            else "Published"
                         )
                         for r in record_page.records
                     }

@@ -4,6 +4,7 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Centralize change statuses in a domain enum and map them to the Added/Changed/Deleted UI labels.
 - Give incomplete and oversized Record identifiers distinct, actionable validation messages.
 - Build the return address after sign-in from the application root, so the redirect can never
   leave refrncr; the accepted paths are unchanged.

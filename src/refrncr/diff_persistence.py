@@ -2,6 +2,7 @@
 
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
+from refrncr.change_status import STATUSES, ChangeStatus
 from refrncr.datatypes import get_datatype
 from refrncr.diff_contracts import PAGE_SIZE, RecordProjection, ValueChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
@@ -85,7 +86,11 @@ class SqlAlchemyDiffOperations:
             if before is None or after is None or changed or structural:
                 yield RecordProjection(
                     identity,
-                    "Added" if before is None else "Removed" if after is None else "Changed",
+                    ChangeStatus.ADDED
+                    if before is None
+                    else ChangeStatus.REMOVED
+                    if after is None
+                    else ChangeStatus.CHANGED,
                     b"hierarchy:" + identity.encode() if before else None,
                     b"hierarchy:" + identity.encode() if after else None,
                     changed,
@@ -109,10 +114,10 @@ class SqlAlchemyDiffOperations:
             return datatype.text(datatype.from_key(value.canonical_key))
 
         changes = []
-        for field in old_fields if status == "Removed" else fields:
+        for field in old_fields if status == ChangeStatus.REMOVED else fields:
             before, after = left.get(field.id), right.get(field.id)
             old_field = old_by_id.get(field.id)
-            if status == "Changed" and (
+            if status == ChangeStatus.CHANGED and (
                 old_field is None
                 or old_field.data_type != field.data_type
                 or (before.canonical_key if before else None)
@@ -123,10 +128,10 @@ class SqlAlchemyDiffOperations:
                 ValueChange(
                     field.id,
                     field.name,
-                    old_field.data_type if old_field and status != "Added" else None,
-                    field.data_type if status != "Removed" else None,
-                    rendered(before) if status != "Added" else None,
-                    rendered(after) if status != "Removed" else None,
+                    old_field.data_type if old_field and status != ChangeStatus.ADDED else None,
+                    field.data_type if status != ChangeStatus.REMOVED else None,
+                    rendered(before) if status != ChangeStatus.ADDED else None,
+                    rendered(after) if status != ChangeStatus.REMOVED else None,
                 )
             )
         start = (page - 1) * PAGE_SIZE
@@ -208,7 +213,9 @@ class SqlAlchemyDiffOperations:
         current = (
             select(
                 new.c.id,
-                case((old.c.id.is_(None), "Added"), else_="Changed").label("status"),
+                case((old.c.id.is_(None), ChangeStatus.ADDED), else_=ChangeStatus.CHANGED).label(
+                    "status"
+                ),
                 old.c.identifier_key.label("before_identifier"),
                 new.c.identifier_key.label("after_identifier"),
                 func.coalesce(changes.c.count, 0).label("changed_values"),
@@ -221,7 +228,13 @@ class SqlAlchemyDiffOperations:
             .where(or_(old.c.id.is_(None), changes.c.count > 0))
         )
         removed = (
-            select(old.c.id, literal("Removed"), old.c.identifier_key, literal(None), literal(0))
+            select(
+                old.c.id,
+                literal(ChangeStatus.REMOVED),
+                old.c.identifier_key,
+                literal(None),
+                literal(0),
+            )
             .select_from(old.outerjoin(new, new.c.id == old.c.id))
             .where(new.c.id.is_(None))
         )
@@ -253,14 +266,14 @@ class SqlAlchemyDiffOperations:
             return
 
         rows = self._records(dataset_id, version.id)
-        ids = select(rows.c.id).where(rows.c.status == "Removed")
+        ids = select(rows.c.id).where(rows.c.status == ChangeStatus.REMOVED)
         yield from SqlAlchemyVersionOperations(self.session).iterate_records(
             version, record_ids=ids
         )
 
     def counts(self, dataset_id, version_id):
         if self._is_hierarchy(dataset_id):
-            counts = {status: 0 for status in ("Added", "Changed", "Removed")}
+            counts = {status: 0 for status in STATUSES}
             for row in self._hierarchy_records(dataset_id, version_id):
                 counts[row.status] += 1
             return tuple(counts.values())
@@ -268,7 +281,7 @@ class SqlAlchemyDiffOperations:
         counts = dict(
             self.session.execute(select(rows.c.status, func.count()).group_by(rows.c.status)).all()
         )
-        return tuple(counts.get(status, 0) for status in ("Added", "Changed", "Removed"))
+        return tuple(counts.get(status, 0) for status in STATUSES)
 
     def records(self, dataset_id, version_id, statuses, record_id=None):
         if self._is_hierarchy(dataset_id):
@@ -282,7 +295,7 @@ class SqlAlchemyDiffOperations:
             statement = statement.where(rows.c.id == record_id)
         # Scalar identifiers and counts only. Memory never depends on Record width.
         for row in self.session.execute(statement.execution_options(yield_per=100)):
-            yield RecordProjection(*row)
+            yield RecordProjection(row[0], ChangeStatus(row[1]), *row[2:])
 
     def validate_snapshot(self, version):
         """Validate stored content and identifiers, including the hierarchy leaf projection."""
@@ -515,7 +528,7 @@ class SqlAlchemyDiffOperations:
             )
             .subquery()
         )
-        if status == "Removed":
+        if status == ChangeStatus.REMOVED:
             query = select(
                 old.c.id,
                 old.c.name,
@@ -530,11 +543,11 @@ class SqlAlchemyDiffOperations:
                 new.c.id,
                 new.c.name,
                 old.c.data_type.label("before_type")
-                if status == "Changed"
+                if status == ChangeStatus.CHANGED
                 else literal(None).label("before_type"),
                 new.c.data_type.label("after_type"),
                 ov.c.value.label("before")
-                if status == "Changed"
+                if status == ChangeStatus.CHANGED
                 else literal(None).label("before"),
                 nv.c.value.label("after"),
                 new.c.display_position,
@@ -543,7 +556,7 @@ class SqlAlchemyDiffOperations:
                 .outerjoin(nv, nv.c.field_id == new.c.id)
                 .outerjoin(ov, ov.c.field_id == new.c.id)
             )
-            if status == "Changed":
+            if status == ChangeStatus.CHANGED:
                 query = query.where(
                     old.c.id.is_not(None),
                     new.c.data_type == old.c.data_type,

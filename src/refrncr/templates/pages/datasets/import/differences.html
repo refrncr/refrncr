@@ -26,13 +26,13 @@
 </p>
 
 {% set available_statuses = namespace(count=0) %}
-{% for status in ('Added', 'Changed', 'Deleted') if preview.counts[status] %}{% set available_statuses.count = available_statuses.count + 1 %}{% endfor %}
+{% for status in DISPLAY_STATUSES if preview.counts[status] %}{% set available_statuses.count = available_statuses.count + 1 %}{% endfor %}
 {% set difference_total = preview.counts.Added + preview.counts.Changed + preview.counts.Deleted %}
 {% if mode == 'new_version' %}
   {% if difference_total > 10 or difference_search %}
     <form method='get' class='record-toolbar import-difference-filters' aria-label='Filter import differences' data-auto-filter>
       {{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=200) }}
-      {% if available_statuses.count > 1 %}<label class='visually-hidden' for='difference-status'>Status</label><select id='difference-status' name='status' data-select='compact'><option value=''>All statuses</option>{% for status in ('Added', 'Changed', 'Deleted') if preview.counts[status] %}<option value='{{ status }}'{% if status in difference_statuses %} selected{% endif %}>{{ status }}</option>{% endfor %}</select>{% endif %}
+      {% if available_statuses.count > 1 %}<label class='visually-hidden' for='difference-status'>Status</label><select id='difference-status' name='status' data-select='compact'><option value=''>All statuses</option>{% for status in DISPLAY_STATUSES if preview.counts[status] %}<option value='{{ status }}'{% if status in difference_statuses %} selected{% endif %}>{{ status }}</option>{% endfor %}</select>{% endif %}
     </form>
   {% endif %}
   {% set page_count = ((preview.counts.matching + 49) // 50) %}
@@ -42,7 +42,7 @@
       {% call table_row(kind='import-difference-row', panel=true) %}
         <th scope='row'><button class='import-row-detail row-action' data-row-primary type='button' data-dialog-open='{{ panel_id }}' aria-haspopup='dialog' aria-controls='{{ panel_id }}' aria-label='View {{ item.identifier }} — {{ item.status }}'>{{ item.identifier }}</button></th>
         <td>{{ status_badge(item.status) }}</td>
-        <td>{% if item.status == 'Changed' %}{% for name, old, new in item.changes %}<code class='mapping-field-name'>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
+        <td>{% if item.status == ChangeStatus.CHANGED %}{% for name, old, new in item.changes %}<code class='mapping-field-name'>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
       {% endcall %}
     {% else %}<tr><td colspan='3'>No matching changes.</td></tr>{% endfor %}
     </tbody></table>
@@ -52,7 +52,7 @@
     {% set title_id = panel_id ~ '-title' %}
     {% call side_panel(panel_id, item.identifier, title_id, eyebrow='Import preview', title_suffix=status_badge(item.status)) %}
       <div class='side-panel-body import-preview-panel'>
-        {% if item.status == 'Changed' %}
+        {% if item.status == ChangeStatus.CHANGED %}
           <dl class='record-details import-change-list'>
             {% for name, old, new in item.changes %}<div class='import-change'><dt>{{ name }}</dt><dd><div class='import-change-row'><span class='import-change-label'>Current</span>{{ value(old) }}</div><div class='import-change-row import-change-new'><span class='import-change-label'>New</span>{{ value(new) }}</div></dd></div>{% endfor %}
           </dl>
@@ -60,8 +60,8 @@
           {% set unchanged = item.current_values|rejectattr('0', 'in', changed_keys)|list %}
           {% if unchanged %}<details class='import-unchanged-fields'><summary>{{ unchanged|length }} unchanged field{{ '' if unchanged|length == 1 else 's' }}</summary><dl class='record-details'>{% for name, current in unchanged %}<div><dt>{{ name }}</dt><dd>{{ value(current) }}</dd></div>{% endfor %}</dl></details>{% endif %}
         {% else %}
-          <p class='help-text'>{% if item.status == 'Added' %}This record will be added.{% else %}This record will be marked as deleted.{% endif %}</p>
-          <dl class='record-details'>{% for name, old, new in item.changes %}<div><dt>{{ name }}</dt><dd>{{ value(new if item.status == 'Added' else old) }}</dd></div>{% endfor %}</dl>
+          <p class='help-text'>{% if item.status == ChangeStatus.ADDED %}This record will be added.{% else %}This record will be marked as deleted.{% endif %}</p>
+          <dl class='record-details'>{% for name, old, new in item.changes %}<div><dt>{{ name }}</dt><dd>{{ value(new if item.status == ChangeStatus.ADDED else old) }}</dd></div>{% endfor %}</dl>
         {% endif %}
       </div>
     {% endcall %}
