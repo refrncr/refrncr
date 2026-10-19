@@ -54,6 +54,8 @@
     "refrncr.record_import.DatasetRecordImportService.saved_preview",
     "refrncr.record_import.DatasetRecordImportService.select_worksheet",
     "refrncr.record_import.DatasetRecordImportService.state",
+    "refrncr.record_import.DatasetRecordImportService.submitted_source_format_assistance",
+    "refrncr.record_import.DatasetRecordImportService.submitted_source_formats",
     "refrncr.services.AuthenticationService.authenticate",
     "refrncr.services.AuthorizationService.authorized_resources",
     "refrncr.services.AuthorizationService.check_access",
@@ -629,10 +631,8 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.record_import.DatasetRecordImportService.format_assistance",
-        "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
-        "refrncr.services.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.record_import.DatasetRecordImportService.submitted_source_format_assistance",
+        "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -646,12 +646,10 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
-        "refrncr.services.DatasetFieldService.list_fields",
         "refrncr.services.DatasetRecordService.get_dataset_for_add",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
@@ -667,13 +665,11 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.record_import.DatasetRecordImportService.format_assistance",
         "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.preview",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
-        "refrncr.services.DatasetFieldService.list_fields",
         "refrncr.services.DatasetRecordService.get_dataset_for_add",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session",

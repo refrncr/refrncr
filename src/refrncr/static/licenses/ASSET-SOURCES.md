@@ -45,10 +45,16 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | `download_icon` / `upload_icon` | Download / Upload |
 | `plus_icon` | Plus |
 | `lock_icon` | Lock |
+| `circle_alert_icon` / `circle_check_icon` | [Circle Alert](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/circle-alert.svg) / [Circle Check](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/circle-check.svg) — Import mapping status |
 | `info_icon` | Info |
 | `close_icon` | X |
 | `key_icon` | Key Round |
 | `navigation_icon` | Panel Left Close / Panel Left Open |
+
+The Select component (`static/js/select.js`) builds four of these Lucide `0.468.0` glyphs in
+script, with the same geometry and attributes: Chevron Down (trigger), Check (chosen option),
+Search and X (search field). `static/css/components/select.css` uses the same Chevron Down
+geometry as a data URI for the closed select without JavaScript.
 
 `key_icon` is tinted with the accent colour through the `.key-icon` rule. See
 `LICENSE-Lucide.txt` for the upstream ISC/MIT notices.

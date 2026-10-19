@@ -60,14 +60,14 @@
       <div data-linked-mapping{% if mapping_mode != 'linked' %} hidden{% endif %}>
         <div class='form-field'>
           <label for='mapping-source-table'>Source table</label>
-          <select id='mapping-source-table' name='source_dataset_id' required{% if table_kind != 'mapping' or mapping_mode != 'linked' %} disabled{% endif %}>
+          <select id='mapping-source-table' name='source_dataset_id' data-select data-noun='reference tables' required{% if table_kind != 'mapping' or mapping_mode != 'linked' %} disabled{% endif %}>
             <option value=''>Choose a reference table</option>
             {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == source_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
           </select>
         </div>
         <div class='form-field' data-source-identifier-select{% if not source_dataset_id %} hidden{% endif %}>
           <label for='mapping-source-field'>Source identifier</label>
-          <select id='mapping-source-field' name='source_field_key' data-field-select data-selected='{{ source_field_key }}' required{% if table_kind != 'mapping' or mapping_mode != 'linked' or not source_dataset_id %} disabled{% endif %}>
+          <select id='mapping-source-field' name='source_field_key' data-select data-noun='fields' data-field-select data-selected='{{ source_field_key }}' required{% if table_kind != 'mapping' or mapping_mode != 'linked' or not source_dataset_id %} disabled{% endif %}>
             <option value=''>Choose a source table first</option>
             {% for table in available_reference_tables %}{% for field in reference_table_fields[table.id] %}<option value='{{ field.key }}' data-table-id='{{ table.id }}'{% if table.id == source_dataset_id and field.key == source_field_key %} selected{% endif %}>{{ field.name }}</option>{% endfor %}{% endfor %}
           </select>

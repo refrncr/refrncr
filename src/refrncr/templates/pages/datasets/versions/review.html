@@ -31,28 +31,28 @@
     {% if result.metadata %}{{ properties(result.metadata, 'Dataset metadata changes') }}{% endif %}
     {% if result.hierarchy_changes %}
     <section aria-labelledby='hierarchy-changes-heading'><h3 id='hierarchy-changes-heading'>Hierarchy changes</h3>
-      {% for item in result.hierarchy_changes %}<section><h4>{{ item.name }} <span class='badge'>{{ item.status }}</span></h4>{{ properties(item.properties, 'Node changes: ' ~ item.name) }}</section>{% endfor %}
+      {% for item in result.hierarchy_changes %}<section><h4>{{ item.name }} {{ status_badge(item.status) }}</h4>{{ properties(item.properties, 'Node changes: ' ~ item.name) }}</section>{% endfor %}
     </section>
     {% endif %}
     <div class='table-scroll' role='region' aria-label='Change counts' tabindex='0'>
-      <table><caption>Change counts</caption><thead><tr><th scope='col'>Content</th><th scope='col'>Added</th><th scope='col'>Changed</th><th scope='col'>Removed</th></tr></thead>
+      <table><caption>Change counts</caption><thead><tr><th scope='col'>Content</th><th scope='col'>Added</th><th scope='col'>Changed</th><th scope='col'>Deleted</th></tr></thead>
       <tbody><tr><th scope='row'>Fields</th><td>{{ result.counts.fields_added }}</td><td>{{ result.counts.fields_changed }}</td><td>{{ result.counts.fields_removed }}</td></tr>
       <tr><th scope='row'>Records</th><td>{{ result.counts.records_added }}</td><td>{{ result.counts.records_changed }}</td><td>{{ result.counts.records_removed }}</td></tr></tbody></table>
     </div>
     {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The Draft matches this published version.</p></div>{% endif %}
   {% else %}
-    <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Removed</p>
+    <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</p>
     {% if section == 'Records' %}
       <form class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
         <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
         <label for='diff-search'>Search old or new identifier</label>
         <input id='diff-search' type='search' name='q' value='{{ criteria.search }}' maxlength='200'>
-        <fieldset><legend>Change status</legend>{% for status in ['Added', 'Changed', 'Removed'] %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses %} checked{% endif %}> {{ status }}</label>{% endfor %}</fieldset>
+        <fieldset><legend>Change status</legend>{% for status in ['Added', 'Changed', 'Removed'] %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses or (status == 'Removed' and 'Deleted' in criteria.statuses) %} checked{% endif %}> {{ status|status_label }}</label>{% endfor %}</fieldset>
         <div class='form-actions'><button class='button button-primary' type='submit'>Apply filters</button><a class='button button-secondary' href='{{ sections.Records }}'>Clear filters</a></div>
       </form>
       <p class='help-text'>{{ result.total }} matching changes · 50 per page. Search checks identifiers only; no selected statuses means all statuses.</p>
       {% if result.items %}<div class='table-scroll management-table' role='region' aria-label='Record changes' tabindex='0'>
-        <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Removed</caption>
+        <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Deleted</caption>
         <thead><tr><th scope='col'>Status</th><th scope='col'>Identifier</th><th scope='col'>Old identifier</th><th scope='col'>Changed values</th></tr></thead>
         <tbody>{% for item in result.items %}<tr class='interactive-row record-row' data-record-row data-row-action>
           <td>{{ status_badge(item.status) }}</td>

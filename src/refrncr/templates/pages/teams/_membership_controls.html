@@ -6,6 +6,6 @@
   {% else %}<p>This team has no members.</p>{% endif %}
   {% if eligible_users or standalone %}
     {% set select_id = 'team-user' if standalone else 'team-user-' ~ team_id %}
-    <form class='add-member-form' method='post' action='{{ url_for("create_membership", team_id=team_id) }}'><label for='{{ select_id }}'>{{ 'User' if standalone else 'Add user' }}</label><select id='{{ select_id }}' name='user_id'>{% for user in eligible_users %}<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-primary' type='submit'>Add member</button></form>
+    <form class='add-member-form' method='post' action='{{ url_for("create_membership", team_id=team_id) }}'><label for='{{ select_id }}'>{{ 'User' if standalone else 'Add user' }}</label><select id='{{ select_id }}' name='user_id' data-select data-noun='users'>{% for user in eligible_users %}<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-primary' type='submit'>Add member</button></form>
   {% else %}<p class='help-text'>All eligible users are already members.</p>{% endif %}
 {%- endmacro %}

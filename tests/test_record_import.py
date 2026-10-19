@@ -30,6 +30,7 @@ from refrncr.record_import import (
     parse_source,
     profile_source_columns,
     rank_mapping_candidates,
+    validate_source_format_components,
 )
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
@@ -179,6 +180,41 @@ def test_auto_selection_requires_unique_strong_match_and_resolves_duplicate_targ
     assert advice.columns[1].warning is not None
 
 
+def test_mapping_assistance_returns_coded_issues_for_each_column_and_missing_field():
+    source = ParsedSource(
+        "csv",
+        ("first", "second", "unknown", "blank"),
+        (SourceRow(2, ("A", "B", "C", "D")),),
+        0,
+    )
+    fields = (field("code", "Code", required=True), field("amount", "Amount", required=True))
+    advice = build_mapping_assistance(
+        source,
+        fields,
+        SimpleNamespace(field_keys=("code",)),
+        ("code", "code", "missing", ""),
+    )
+    assert [(item.code, item.column_index, item.field_key) for item in advice.errors] == [
+        ("field_mapped_twice", 0, "code"),
+        ("field_mapped_twice", 1, "code"),
+        ("field_unknown", 2, "missing"),
+        ("column_unmapped", 3, None),
+        ("required_field_unmapped", None, "amount"),
+    ]
+
+
+def test_source_format_component_validation_returns_a_column_issue():
+    choices, errors = validate_source_format_components(
+        (field("day", "Day", "date"),),
+        ("day",),
+        ({"source": "text"},),
+    )
+    assert choices == {}
+    assert [(item.code, item.column_index, item.field_key) for item in errors] == [
+        ("source_format_incomplete", 0, "day")
+    ]
+
+
 @pytest.mark.parametrize("header", ["country_code", "Country-Code", "countryCode", "Country code"])
 def test_separator_variants_strongly_select_unique_display_name(header):
     source = ParsedSource("csv", (header,), (SourceRow(2, ("NL",)),), 0)
@@ -240,6 +276,104 @@ def import_context():
         )
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code", "amount"))
     return factory, services, admin, dataset
+
+
+def test_import_service_exposes_mapping_and_source_format_error_codes(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        "records.csv",
+        b"code,amount\nA,1\n",
+    )
+    _, _, assistance = service.mapping_assistance(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+    )
+    assert [(issue.code, issue.column_index) for issue in assistance.errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    _, issues = service.submitted_source_formats(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "amount"),
+        (
+            {"source": "v1-text", "timezone": "", "fold": ""},
+            {"source": "v1-eu", "date": "unexpected", "timezone": "", "fold": ""},
+        ),
+    )
+    assert [(issue.code, issue.column_index) for issue in issues] == [
+        ("source_format_incomplete", 1)
+    ]
+
+
+def test_submitted_format_helpers_require_a_bound_import_state(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    components = ({"source": "v1-text", "timezone": "", "fold": ""},)
+    mapping = ("code",)
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_formats(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_format_assistance(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+
+def test_submitted_format_methods_bind_valid_token_to_user_and_session(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id, "format-owner-session", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    mapping = state.mapping
+    components = ({"source": "v1-text"}, {"source": "v1-plain"})
+    editor = services.users.create_user(admin.id, "editor@example.com", "Editor", PASSWORD)
+    services.grants.create_grant(admin.id, "user", editor.id, "dataset", dataset.id, "editor")
+
+    for method in (
+        service.submitted_source_formats,
+        service.submitted_source_format_assistance,
+    ):
+        method(
+            admin.id,
+            "format-owner-session",
+            dataset.key,
+            state.token,
+            mapping,
+            components,
+        )
+        with pytest.raises(NotFoundError):
+            method(
+                admin.id,
+                "another-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
+        with pytest.raises(NotFoundError):
+            method(
+                editor.id,
+                "format-owner-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
 
 
 @pytest.fixture
@@ -688,6 +822,25 @@ def test_expired_transient_token(import_context):
         importer.preview(admin.id, "one", dataset.key, state.token, ("code", "amount"))
 
 
+def test_staged_import_activity_slides_expiry_and_idle_import_expires(import_context):
+    _, services, admin, dataset = import_context
+    now = [0.0]
+    importer = DatasetRecordImportService(
+        services.dataset_records, TransientImportStore(clock=lambda: now[0], ttl=900)
+    )
+    state, _, _ = importer.begin(
+        admin.id, "active", dataset.key, "valid.csv", b"code,amount\nZ,9\n"
+    )
+    now[0] = 840
+    touched = importer.state(admin.id, "active", dataset.key, state.token)
+    assert touched.expires_at == 1740
+    now[0] = 1500
+    assert importer.state(admin.id, "active", dataset.key, state.token).token == state.token
+    now[0] = 2400
+    with pytest.raises(NotFoundError):
+        importer.state(admin.id, "active", dataset.key, state.token)
+
+
 def test_preview_error_cap_authorization_and_session_revocation(import_context):
     _, services, admin, dataset = import_context
     viewer = services.users.create_user(admin.id, "viewer@example.com", "Viewer", PASSWORD)
@@ -710,7 +863,10 @@ def test_preview_error_cap_authorization_and_session_revocation(import_context):
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert len(preview.errors) == 100
     assert preview.total_errors == 120
@@ -736,7 +892,10 @@ def test_failed_row_report_groups_all_errors_and_limits_rows(import_context, fai
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert preview.invalid_rows == failed_rows
     assert len(preview.row_error_groups) == min(failed_rows, 100)
@@ -761,12 +920,48 @@ def test_mapping_errors_are_non_row_errors_and_do_not_consume_row_limit(import_c
         admin.id, "mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
     )
     preview = services.record_imports.preview(
-        admin.id, "mapping", dataset.key, state.token, ("code", "code")
+        admin.id,
+        "mapping",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+        format_components=({"source": "v1-text"}, {"source": "v1-text"}),
     )
     assert preview.invalid_rows == 0
     assert preview.row_error_groups == ()
     assert preview.non_row_errors == preview.errors
+    assert [(issue.code, issue.column_index) for issue in preview.non_row_errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
     assert not preview.row_report_truncated
+
+
+def test_preview_uses_the_same_coded_mapping_rules_as_assistance(import_context):
+    _, services, admin, dataset = import_context
+    state, _, _ = services.record_imports.begin(
+        admin.id, "coded-mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    _, _, assistance = services.record_imports.mapping_assistance(
+        admin.id, "coded-mapping", dataset.key, state.token, ("unknown", "")
+    )
+    preview = services.record_imports.preview(
+        admin.id,
+        "coded-mapping",
+        dataset.key,
+        state.token,
+        ("unknown", ""),
+        {},
+    )
+    expected = {(issue.code, issue.column_index) for issue in assistance.errors}
+    actual = {(issue.code, issue.column_index) for issue in preview.non_row_errors}
+    assert {"field_unknown", "column_unmapped", "required_field_unmapped"} <= {
+        code for code, _column in actual
+    }
+    assert expected <= actual
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
 
 
 def test_wrong_token_binding_does_not_consume_other_sessions_import(import_context):
@@ -821,7 +1016,8 @@ def test_transient_capacity_is_atomic_and_does_not_evict_existing_state():
     states = [result for result in results if not isinstance(result, Exception)]
     assert len(states) == 1
     assert sum(isinstance(result, ImportValidationError) for result in results) == 1
-    assert store.get(states[0].token, "actor", states[0].session_id, "dataset") == states[0]
+    touched = store.get(states[0].token, "actor", states[0].session_id, "dataset")
+    assert touched.expires_at > states[0].expires_at
 
 
 @pytest.mark.parametrize("failure_target", ["values", "audit"])
@@ -974,8 +1170,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert mapping.status_code == 200
     assert "&lt;file&gt;.csv" in body
     assert "High confidence" in body
-    assert "2 of 2 required fields mapped" in body
-    assert "0 choices remaining · 0 columns ignored" in body
+    assert "Ready to continue · 2 fields mapped, 0 columns not imported" in body
     assert "Examples:" in body
     assert "&lt;script&gt;" in body
     assert "internal score" not in body.casefold()
@@ -995,8 +1190,9 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": ""},
     )
     assert incomplete.status_code == 400
-    assert "Missing required fields:" in incomplete.get_data(as_text=True)
-    assert "data-missing-key='amount'" in incomplete.get_data(as_text=True)
+    incomplete_body = incomplete.get_data(as_text=True)
+    assert "1 field not mapped:" in incomplete_body
+    assert "<code class='mapping-field-name'>Amount</code>" in incomplete_body
     reopened = client.get(
         f"/datasets/{dataset.key}/records/import/{token}/mapping",
         base_url="https://localhost",
@@ -1013,7 +1209,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     assert preview.status_code == 200
     assert "&lt;script&gt;" in preview.get_data(as_text=True)
     final = client.get(
-        f"/datasets/{dataset.key}/records/import/{token}/step/5", base_url="https://localhost"
+        f"/datasets/{dataset.key}/records/import/{token}/step/4", base_url="https://localhost"
     )
     assert final.status_code == 200
     confirmed = client.post(
@@ -1097,7 +1293,7 @@ def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context
         admin.id, "parallel", dataset.key, "parallel.csv", b"code,amount\nA,1\nB,2\n"
     )
     importer.preview(admin.id, "parallel", dataset.key, state.token, ("code", "amount"))
-    importer.navigate(admin.id, "parallel", dataset.key, state.token, 5)
+    importer.navigate(admin.id, "parallel", dataset.key, state.token, 4)
     claimed, release = Event(), Event()
     original = importer.store.claim
 

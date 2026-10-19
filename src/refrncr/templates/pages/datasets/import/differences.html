@@ -1,25 +1,92 @@
-<p>Identifier: {% for field in fields if field.key in identifier_keys %}{{ field.name }}{% if not loop.last %} + {% endif %}{% endfor %}</p>
-<p>{{ source.rows|length }} source Records. No Records have been imported.</p>
-<dl class='import-summary'>
-{% for status in ('Added', 'Changed', 'Unchanged', 'Deleted', 'Error') %}<dt>{{ status }}</dt><dd>{{ preview.counts[status] }}</dd>{% endfor %}
-</dl>
-{% if preview.counts.Deleted %}<p class='alert alert-warning'>{{ preview.counts.Deleted }} Records are absent from the file and will be marked as deleted.</p>{% endif %}
-{% if step == 4 %}
-<form method='get' class='form' aria-label='Filter import differences'>
-  <label for='difference-search'>Search complete identifier</label>
-  <input id='difference-search' type='search' name='q' value='{{ difference_search }}' maxlength='200'>
-  <fieldset><legend>Change status</legend>{% for status in ('Added', 'Changed', 'Deleted') %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in difference_statuses %} checked{% endif %}>{{ status }}</label>{% endfor %}</fieldset>
-  <button class='button button-secondary' type='submit'>Apply filters</button>
-</form>
-<div class='table-scroll' tabindex='0' role='region' aria-label='Import differences'>
-<table><caption>Proposed Record differences</caption><thead><tr><th scope='col'>Identifier</th><th scope='col'>Status</th><th scope='col'>Field values</th></tr></thead><tbody>
-{% for item in preview.differences %}<tr><th scope='row'>{{ item.identifier }}</th><td>{{ item.status }}</td><td><dl class='record-details'>
-{% for name, old, new in item.changes %}<div><dt>{{ name }}</dt><dd>{% if item.status != 'Added' %}<p>Old value: {{ old if old is not none else '— (No value)' }}</p>{% endif %}{% if item.status != 'Deleted' %}<p>New value: {{ new if new is not none else '— (No value)' }}</p>{% endif %}</dd></div>{% endfor %}
-</dl></td></tr>{% else %}<tr><td colspan='3'>No matching differences.</td></tr>{% endfor %}
-</tbody></table></div>
-<nav class='pagination' aria-label='Difference pages'>
-{% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search, status=difference_statuses) }}'>Previous</a>{% endif %}
-<span>Page {{ difference_page }} · {{ preview.counts.matching }} differences</span>
-{% if difference_page * 50 < preview.counts.matching %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
-</nav>
+{% from "components.html" import status_badge %}
+{% from "components/search_field.html" import search_field %}
+{% from "components/table_row.html" import table_row %}
+{% from "components/side_panel.html" import side_panel %}
+{% from "components/version_diff.html" import value %}
+
+<p class='import-result-summary'>
+  <span class='import-file-name' title='{{ state.filename }}'>File: {{ state.filename }}</span>
+  {% if mode == 'new_version' and preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted and not preview.counts.Unchanged %}
+    · First import: {{ preview.counts.Added }} {{ 'record' if preview.counts.Added == 1 else 'records' }} will be added to the draft.
+  {% elif mode == 'new_version' and not preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted %}
+    · No changes. The file matches the draft.
+  {% elif mode == 'new_version' %}
+    {% if preview.counts.Added or preview.counts.Deleted %}
+      {% set summary_parts = [] %}
+      {% if preview.counts.Added %}{% set _ = summary_parts.append(preview.counts.Added ~ ' added') %}{% endif %}
+      {% if preview.counts.Changed %}{% set _ = summary_parts.append(preview.counts.Changed ~ ' changed') %}{% endif %}
+      {% if preview.counts.Deleted %}{% set _ = summary_parts.append(preview.counts.Deleted ~ ' deleted') %}{% endif %}
+      · {{ summary_parts|join(', ') }}
+    {% endif %}
+    · {{ preview.counts.Added + preview.counts.Changed + preview.counts.Deleted }} {{ 'record' if preview.counts.Added + preview.counts.Changed + preview.counts.Deleted == 1 else 'records' }} will change in the draft
+    {% if preview.counts.Error %} · {{ status_badge('Error', preview.counts.Error) }}{% endif %}
+  {% else %}
+    · First import: {{ preview.counts.Added }} {{ 'record' if preview.counts.Added == 1 else 'records' }} will be added to the draft.
+  {% endif %}
+</p>
+
+{% set available_statuses = namespace(count=0) %}
+{% for status in ('Added', 'Changed', 'Deleted') if preview.counts[status] %}{% set available_statuses.count = available_statuses.count + 1 %}{% endfor %}
+{% set difference_total = preview.counts.Added + preview.counts.Changed + preview.counts.Deleted %}
+{% if mode == 'new_version' %}
+  {% if difference_total > 10 or difference_search %}
+    <form method='get' class='record-toolbar import-difference-filters' aria-label='Filter import differences' data-auto-filter>
+      {{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=200) }}
+      {% if available_statuses.count > 1 %}<label class='visually-hidden' for='difference-status'>Status</label><select id='difference-status' name='status' data-select='compact'><option value=''>All statuses</option>{% for status in ('Added', 'Changed', 'Deleted') if preview.counts[status] %}<option value='{{ status }}'{% if status in difference_statuses %} selected{% endif %}>{{ status }}</option>{% endfor %}</select>{% endif %}
+    </form>
+  {% endif %}
+  {% set page_count = ((preview.counts.matching + 49) // 50) %}
+  <div class='table-scroll import-differences' tabindex='0' role='region' aria-label='Changes in this import'>
+    <table><caption>Changes in this import</caption><thead><tr><th scope='col'>Identifier</th><th scope='col'>Status</th><th scope='col'>Changed fields</th></tr></thead><tbody>
+    {% for item in preview.differences %}{% set panel_id = 'import-record-' ~ loop.index %}
+      {% call table_row(kind='import-difference-row', panel=true) %}
+        <th scope='row'><button class='import-row-detail row-action' data-row-primary type='button' data-dialog-open='{{ panel_id }}' aria-haspopup='dialog' aria-controls='{{ panel_id }}' aria-label='View {{ item.identifier }} — {{ item.status }}'>{{ item.identifier }}</button></th>
+        <td>{{ status_badge(item.status) }}</td>
+        <td>{% if item.status == 'Changed' %}{% for name, old, new in item.changes %}<code class='mapping-field-name'>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}—{% endif %}</td>
+      {% endcall %}
+    {% else %}<tr><td colspan='3'>No matching changes.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  {% for item in preview.differences %}
+    {% set panel_id = 'import-record-' ~ loop.index %}
+    {% set title_id = panel_id ~ '-title' %}
+    {% call side_panel(panel_id, item.identifier, title_id, eyebrow='Import preview', title_suffix=status_badge(item.status)) %}
+      <div class='side-panel-body import-preview-panel'>
+        {% if item.status == 'Changed' %}
+          <dl class='record-details import-change-list'>
+            {% for name, old, new in item.changes %}<div class='import-change'><dt>{{ name }}</dt><dd><div class='import-change-row'><span class='import-change-label'>Current</span>{{ value(old) }}</div><div class='import-change-row import-change-new'><span class='import-change-label'>New</span>{{ value(new) }}</div></dd></div>{% endfor %}
+          </dl>
+          {% set changed_keys = item.changes|map(attribute=0)|list %}
+          {% set unchanged = item.current_values|rejectattr('0', 'in', changed_keys)|list %}
+          {% if unchanged %}<details class='import-unchanged-fields'><summary>{{ unchanged|length }} unchanged field{{ '' if unchanged|length == 1 else 's' }}</summary><dl class='record-details'>{% for name, current in unchanged %}<div><dt>{{ name }}</dt><dd>{{ value(current) }}</dd></div>{% endfor %}</dl></details>{% endif %}
+        {% else %}
+          <p class='help-text'>{% if item.status == 'Added' %}This record will be added.{% else %}This record will be marked as deleted.{% endif %}</p>
+          <dl class='record-details'>{% for name, old, new in item.changes %}<div><dt>{{ name }}</dt><dd>{{ value(new if item.status == 'Added' else old) }}</dd></div>{% endfor %}</dl>
+        {% endif %}
+      </div>
+    {% endcall %}
+  {% endfor %}
+  {% if page_count > 1 %}<nav class='pagination' aria-label='Difference pages'>
+    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search, status=difference_statuses) }}'>Previous</a>{% endif %}
+    <span>Page {{ difference_page }} of {{ page_count }} · {{ preview.counts.matching }} {{ 'change' if preview.counts.matching == 1 else 'changes' }}</span>
+    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
+  </nav>{% endif %}
+{% else %}
+  {% if difference_total > 10 or difference_search %}<form method='get' class='record-toolbar import-difference-filters' aria-label='Search import preview' data-auto-filter>{{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=200) }}</form>{% endif %}
+  {% set page_count = ((preview.counts.matching + 49) // 50) %}
+  <div class='table-scroll import-differences' tabindex='0' role='region' aria-label='Changes in this import'>
+    <table><caption>Changes in this import</caption><thead><tr><th scope='col'>Identifier</th><th scope='col'>Status</th></tr></thead><tbody>
+    {% for row in preview_rows %}{% set id_values = [] %}{% for field in preview_fields if field.key in identifier_keys %}{% set cell_value = row[preview_fields.index(field)] %}{% if id_values.append(cell_value) %}{% endif %}{% endfor %}{% set panel_id = 'import-new-record-' ~ loop.index %}
+      {% call table_row(kind='import-difference-row', panel=true) %}<th scope='row'><button class='import-row-detail row-action' data-row-primary type='button' data-dialog-open='{{ panel_id }}' aria-haspopup='dialog' aria-controls='{{ panel_id }}' aria-label='View {{ id_values|join(" · ") }} — Added'>{{ id_values|join(' · ') }}</button></th><td>{{ status_badge('Added') }}</td>{% endcall %}
+    {% else %}<tr><td colspan='2'>No matching changes.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  {% for row in preview_rows %}{% set id_values = [] %}{% for field in preview_fields if field.key in identifier_keys %}{% set cell_value = row[preview_fields.index(field)] %}{% if id_values.append(cell_value) %}{% endif %}{% endfor %}{% set panel_id = 'import-new-record-' ~ loop.index %}{% set title_id = panel_id ~ '-title' %}
+    {% call side_panel(panel_id, id_values|join(' · '), title_id, eyebrow='Import preview', title_suffix=status_badge('Added')) %}<div class='side-panel-body import-preview-panel'><p class='help-text'>This record will be added.</p><dl class='record-details'>{% for field in preview_fields %}<div><dt>{{ field.name }}</dt><dd>{{ value(row[loop.index0] if row[loop.index0]|trim else none) }}</dd></div>{% endfor %}</dl></div>{% endcall %}
+  {% endfor %}
+  {% if page_count > 1 %}<nav class='pagination' aria-label='Import preview pages'>
+    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search) }}'>Previous</a>{% endif %}
+    <span>Page {{ difference_page }} of {{ page_count }} · {{ preview.counts.matching }} {{ 'change' if preview.counts.matching == 1 else 'changes' }}</span>
+    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search) }}'>Next</a>{% endif %}
+  </nav>{% endif %}
 {% endif %}

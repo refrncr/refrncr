@@ -13,6 +13,80 @@
   });
   document.querySelector("[data-error-focus]")?.focus();
 
+  let openFieldMetadata = null;
+  let fieldMetadataCloseTimer = null;
+  const positionFieldMetadata = (trigger, panel) => {
+    const rect = trigger.getBoundingClientRect();
+    panel.style.width = "";
+    const {width, height} = panel.getBoundingClientRect();
+    const left = Math.max(8, Math.min(rect.left - 8, window.innerWidth - width - 8));
+    const below = rect.bottom + 6;
+    const top = below + height > window.innerHeight - 8 ? Math.max(8, rect.top - height - 6) : below;
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  };
+  const closeFieldMetadata = () => {
+    if (!openFieldMetadata) return;
+    window.clearTimeout(fieldMetadataCloseTimer);
+    const {trigger, panel} = openFieldMetadata;
+    panel.hidePopover();
+    trigger.setAttribute("aria-expanded", "false");
+    openFieldMetadata = null;
+  };
+  const openTransientFieldMetadata = (trigger, panel) => {
+    if (openFieldMetadata?.trigger === trigger) return;
+    closeFieldMetadata();
+    panel.showPopover();
+    positionFieldMetadata(trigger, panel);
+    trigger.setAttribute("aria-expanded", "true");
+    openFieldMetadata = {trigger, panel, pinned: false};
+  };
+  const scheduleFieldMetadataClose = () => {
+    window.clearTimeout(fieldMetadataCloseTimer);
+    fieldMetadataCloseTimer = window.setTimeout(() => {
+      if (openFieldMetadata && !openFieldMetadata.pinned) closeFieldMetadata();
+    }, 120);
+  };
+  document.querySelectorAll("[data-field-metadata-trigger]").forEach((trigger) => {
+    const panel = document.getElementById(trigger.getAttribute("aria-controls"));
+    if (!panel || typeof panel.showPopover !== "function") return;
+    trigger.addEventListener("click", () => {
+      if (openFieldMetadata?.trigger === trigger) {
+        if (openFieldMetadata.pinned) closeFieldMetadata();
+        else openFieldMetadata.pinned = true;
+        return;
+      }
+      openTransientFieldMetadata(trigger, panel);
+      openFieldMetadata.pinned = true;
+    });
+    trigger.addEventListener("pointerenter", () => {
+      window.clearTimeout(fieldMetadataCloseTimer);
+      openTransientFieldMetadata(trigger, panel);
+    });
+    trigger.addEventListener("pointerleave", scheduleFieldMetadataClose);
+    trigger.addEventListener("focus", () => openTransientFieldMetadata(trigger, panel));
+    trigger.addEventListener("blur", scheduleFieldMetadataClose);
+    panel.addEventListener("pointerenter", () => window.clearTimeout(fieldMetadataCloseTimer));
+    panel.addEventListener("pointerleave", scheduleFieldMetadataClose);
+    panel.addEventListener("focusin", () => window.clearTimeout(fieldMetadataCloseTimer));
+    panel.addEventListener("focusout", scheduleFieldMetadataClose);
+    panel.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { closeFieldMetadata(); trigger.focus(); }
+    });
+    window.addEventListener("resize", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); });
+    window.addEventListener("scroll", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); }, true);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (openFieldMetadata && !openFieldMetadata.panel.contains(event.target) && event.target !== openFieldMetadata.trigger) closeFieldMetadata();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && openFieldMetadata) {
+      const {trigger} = openFieldMetadata;
+      closeFieldMetadata();
+      trigger.focus();
+    }
+  });
+
   const selectionForms = new WeakSet();
   const initializeSelectionForms = (root) => {
     root.querySelectorAll("form[data-requires-selection]").forEach((form) => {
@@ -174,49 +248,107 @@
 
   document.querySelectorAll("[data-import-mapping]").forEach((form) => {
     const selects = [...form.querySelectorAll("select[name^='mapping_']")];
-    const optionLists = selects.map((select) => ({
-      select,
-      options: [...select.querySelectorAll("option[data-option-group]")].sort((a, b) => Number(a.dataset.optionOrder) - Number(b.dataset.optionOrder)),
-      groups: Object.fromEntries([...select.querySelectorAll("optgroup[data-option-group]")].map((group) => [group.dataset.optionGroup, group])),
-    }));
+    const options = selects.map((select) => [...select.querySelectorAll("option[data-option-group]")]);
     const required = JSON.parse(form.dataset.requiredKeys);
     const button = document.querySelector("[data-mapping-continue]");
     const panel = form.closest(".import-wizard") || form;
     const status = panel.querySelector("[data-mapping-status]");
+    const reason = panel.querySelector("[data-mapping-reason]");
+    const fieldLabels = new Map(options.flat().map((option) => [option.value, option.dataset.optionLabel]));
+    const plural = (count, singular, many) => `${count} ${count === 1 ? singular : many}`;
+    const statusText = ({unselected, missingLabels, ignored, mappedCount}) => {
+      const parts = [];
+      if (unselected) parts.push(`${plural(unselected, "column", "columns")} still ${unselected === 1 ? "needs" : "need"} a choice`);
+      if (missingLabels.length) {
+        const labels = missingLabels.slice(0, 3).join(", ");
+        const more = missingLabels.length > 3 ? ` and ${missingLabels.length - 3} more` : "";
+        parts.push(`${plural(missingLabels.length, "field", "fields")} not mapped: ${labels}${more}`);
+      }
+      if (parts.length) return {ready: false, text: parts.join(" · "), unselected, missingLabels};
+      return {ready: true, text: `Ready to continue · ${plural(mappedCount, "field", "fields")} mapped, ${plural(ignored, "column", "columns")} not imported`};
+    };
+    const renderStatus = (result) => {
+      const line = status.querySelector("[data-mapping-status-text]");
+      line.replaceChildren();
+      if (result.unselected) {
+        const jump = document.createElement("button");
+        jump.type = "button";
+        jump.className = "mapping-jump";
+        jump.dataset.mappingJump = "";
+        jump.textContent = `${result.unselected} ${result.unselected === 1 ? "column" : "columns"}`;
+        line.append(jump, document.createTextNode(` still ${result.unselected === 1 ? "needs" : "need"} a choice`));
+      }
+      if (result.missingLabels?.length) {
+        if (result.unselected) line.append(document.createTextNode(" · "));
+        line.append(document.createTextNode(`${plural(result.missingLabels.length, "field", "fields")} not mapped: `));
+        result.missingLabels.slice(0, 3).forEach((label, index) => {
+          const code = document.createElement("code");
+          code.className = "mapping-field-name";
+          code.textContent = label;
+          line.append(code);
+          if (index < Math.min(result.missingLabels.length, 3) - 1) line.append(document.createTextNode(", "));
+        });
+        if (result.missingLabels.length > 3) line.append(document.createTextNode(` and ${result.missingLabels.length - 3} more`));
+      }
+      if (result.ready) line.textContent = result.text;
+    };
+    status.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-mapping-jump]")) return;
+      const firstOpen = selects.find((select) => !select.value);
+      if (!firstOpen) return;
+      firstOpen.focus({preventScroll: false});
+      firstOpen.scrollIntoView({block: "center"});
+    });
     const update = () => {
       const values = selects.map((select) => select.value);
       const mapped = values.filter((value) => value && value !== "__ignored__");
       const valid = !values.includes("") && new Set(mapped).size === mapped.length && required.every((key) => mapped.includes(key));
       button.disabled = !valid;
-      optionLists.forEach(({select, options, groups}) => {
-        const selected = select.value;
-        options.forEach((option) => {
-          const used = option.value !== selected && mapped.includes(option.value);
-          const group = groups[used ? "used" : option.dataset.optionGroup];
-          option.textContent = option.dataset.optionLabel;
-          group.append(option);
+      options.forEach((items, index) => {
+        items.forEach((option) => {
+          option.hidden = option.value !== selects[index].value && mapped.includes(option.value);
         });
-        Object.values(groups).forEach((group) => { group.hidden = !group.children.length; });
-        // Moving native options must not change the user's selection or submitted value.
-        select.value = selected;
       });
-      const summary = panel.querySelector("[data-mapping-summary]");
-      if (summary) {
-        summary.textContent = `${required.filter((key) => mapped.includes(key)).length} of ${required.length} required fields mapped · ${values.filter((value) => !value).length} choices remaining · ${values.filter((value) => value === "__ignored__").length} columns ignored`;
-        const missing = panel.querySelector("[data-mapping-missing]");
-        missing.hidden = required.every((key) => mapped.includes(key));
-        missing.querySelectorAll("[data-missing-key]").forEach((label) => { label.hidden = mapped.includes(label.dataset.missingKey); });
-        selects.forEach((select) => {
-          const badge = select.closest(".mapping-target").querySelector("[data-mapping-choice]");
-          const duplicate = select.value && select.value !== "__ignored__" && mapped.filter((value) => value === select.value).length > 1;
-          const error = duplicate || select.getAttribute("aria-invalid") === "true";
-          badge.textContent = error ? "Mapping error" : !select.value ? "Needs a choice" : select.value === "__ignored__" ? "Do not import" : "Mapped";
-          badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
-        });
-      }
-      status.textContent = valid ? "All required and identifier fields are mapped. Ready to continue." : "Map every required and identifier field once, and choose a field or Do not import for each column.";
+      selects.forEach((select) => {
+        const badge = select.closest(".mapping-target").querySelector("[data-mapping-choice]");
+        const duplicate = select.value && select.value !== "__ignored__" && mapped.filter((value) => value === select.value).length > 1;
+        const error = duplicate || select.getAttribute("aria-invalid") === "true";
+        badge.textContent = error ? "Mapping error" : !select.value ? "Needs a choice" : select.value === "__ignored__" ? "Do not import" : "Mapped";
+        badge.className = `badge mapping-choice${error ? " badge-error" : !select.value ? " badge-warning" : select.value !== "__ignored__" ? " badge-success" : ""}`;
+      });
+      const missingLabels = required.filter((key) => !mapped.includes(key)).map((key) => fieldLabels.get(key) || key);
+      const unselected = values.filter((value) => !value).length;
+      const result = statusText({
+        unselected,
+        missingLabels,
+        ignored: values.filter((value) => value === "__ignored__").length,
+        mappedCount: new Set(mapped).size,
+      });
+      status.dataset.state = result.ready ? "ready" : "pending";
+      renderStatus(result);
+      if (reason) reason.textContent = form.dataset.mappingReasonText;
+      if (reason) reason.hidden = missingLabels.length === 0;
     };
     form.addEventListener("change", update);
+    update();
+  });
+  document.querySelectorAll("form[data-auto-filter]").forEach((form) => {
+    const search = form.querySelector("input[type='search']");
+    let timer;
+    search?.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => form.requestSubmit(), 250);
+    });
+    form.querySelectorAll("select, input[type='checkbox']").forEach((control) => {
+      control.addEventListener("change", () => form.requestSubmit());
+    });
+  });
+  document.querySelectorAll("form[data-import-confirm]").forEach((form) => {
+    const acknowledgement = form.querySelector("[name='acknowledge_deletions']");
+    const submit = form.querySelector("button[type='submit']");
+    if (!acknowledgement || !submit) return;
+    const update = () => { submit.disabled = !acknowledgement.checked; };
+    acknowledgement.addEventListener("change", update);
     update();
   });
   const initializeSourceFormats = (root = document) => root.querySelectorAll("[data-source-formats-url]").forEach((form) => {
@@ -334,6 +466,8 @@
       const data = new URLSearchParams(new FormData(form));
       pending?.abort();
       pending = new AbortController();
+      const formatFeedback = form.closest(".import-wizard")?.querySelector("[data-format-error-status]");
+      if (formatFeedback) formatFeedback.textContent = "";
       form.setAttribute("aria-busy", "true");
       try {
         const response = await fetch(form.dataset.sourceFormatsUrl, {method: "POST", body: data, credentials: "same-origin", signal: pending.signal});
@@ -358,8 +492,8 @@
         else if (affected) affected.focus();
       } catch (error) {
         if (error.name !== "AbortError" && current === generation) {
-          const status = form.closest(".import-wizard").querySelector("[data-mapping-status]");
-          status.textContent = "Format examples could not be refreshed. Continue to validate your current choices.";
+          const formatFeedback = form.closest(".import-wizard")?.querySelector("[data-format-error-status]");
+          if (formatFeedback) formatFeedback.textContent = "Format examples could not be refreshed. Continue to validate your current choices.";
         }
       } finally {
         if (current === generation) form.removeAttribute("aria-busy");
@@ -738,7 +872,8 @@
         event.target.closest("[data-row-primary]")) event.preventDefault();
   }, true);
   document.addEventListener("click", (event) => {
-    if (event.defaultPrevented || modifiedRowClick(event) || hasRowSelection()) return;
+    if (event.defaultPrevented || modifiedRowClick(event) || event.detail > 1 ||
+        window.getSelection?.()?.toString()) return;
     const row = event.target.closest("tbody tr[data-row-action]");
     if (!row || row.hidden || row.closest("[inert]")) return;
     // Cell/row semantics (e.g. role='cell') are not nested controls.

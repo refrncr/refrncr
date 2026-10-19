@@ -1719,6 +1719,27 @@ def test_login_rejects_unsafe_return_targets_on_get_and_post(interface, target):
     assert ADMIN_PASSWORD not in response.headers["Location"]
 
 
+@pytest.mark.parametrize("target", ["/", "/settings/audit-log", "/datasets/records/import"])
+def test_safe_nested_return_target_is_kept_exactly(interface, target):
+    *_, client = interface
+    setup_admin(client)
+    form = request(client, "get", "/login", query_string={"next": target})
+    assert f"name='next' value='{target}'" in response_text(form)
+    response = request(
+        client,
+        "post",
+        "/login",
+        data={
+            "email": "admin@example.com",
+            "password": ADMIN_PASSWORD,
+            "csrf_token": csrf_token(form),
+            "next": target,
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == target
+
+
 def test_safe_return_target_survives_failure_and_success(interface):
     *_, client = interface
     setup_admin(client)

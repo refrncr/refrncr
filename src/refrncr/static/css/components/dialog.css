@@ -70,6 +70,8 @@ main > [data-side-panel-content] > .side-panel-body, main > .side-panel-body[dat
 
 /* Header: the mode label reads as an eyebrow above the title; the close control is a quiet icon button. */
 .side-panel-header > div { display: flex; flex-direction: column-reverse; gap: .125rem; }
+.side-panel-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); }
+.side-panel-title-row h2 { min-width: 0; overflow-wrap: anywhere; }
 .side-panel-close { width: var(--control-height-compact); min-width: var(--control-height-compact); min-height: var(--control-height-compact); margin-block: -.125rem; border-radius: var(--radius-md); color: var(--color-text-muted); font-size: 1.375rem; line-height: 1; }
 .side-panel-close:hover { color: var(--color-text); }
 /* Record panels show Field values in the data face, as in the record table. */

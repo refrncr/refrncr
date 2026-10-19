@@ -1,0 +1,66 @@
+/* Select: one styled single-choice list in every browser (REF-246). The native select stays the
+   source of truth and the no-JavaScript control; select.js adds the trigger and the popup. */
+
+/* Closed state without JavaScript: the native select looks like the trigger. */
+select[data-select] { appearance: none; padding-right: 2.5rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233a4640' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .75rem center; background-size: 1rem; }
+select[data-select="compact"] { min-height: var(--control-height-compact); padding: var(--space-xs) 2.25rem var(--space-xs) var(--space-sm); background-position: right .625rem center; }
+:root[data-theme="dark"] select[data-select] { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b6c8be' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) select[data-select] { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b6c8be' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); } }
+
+/* Enhanced: the native select stays in the form but out of sight and out of the tab order. */
+select.select-native { position: absolute; width: 1px; height: 1px; min-height: 0; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; pointer-events: none; }
+
+.select-trigger { box-sizing: border-box; display: flex; width: 100%; min-height: var(--control-height); margin-top: var(--space-xs); padding: 0 .75rem; align-items: center; gap: var(--space-sm); border: 1px solid var(--color-control-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font: inherit; font-weight: var(--font-weight-regular); text-align: left; cursor: pointer; }
+.select-trigger:hover { border-color: var(--color-text-secondary); }
+.select-trigger:focus-visible, .select-trigger[aria-expanded="true"] { border-color: var(--color-action-primary-hover); box-shadow: 0 0 0 3px var(--color-focus-shadow); outline: 0; }
+.select-trigger[aria-invalid="true"] { border: 2px solid var(--color-error); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 18%, transparent); }
+:root[data-theme="dark"] .select-trigger[aria-invalid="true"] { box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .select-trigger[aria-invalid="true"] { box-shadow: none; } }
+.select-trigger:disabled { background: var(--color-action-secondary); color: color-mix(in srgb, var(--color-text) 55%, transparent); cursor: not-allowed; }
+.select-trigger:disabled:hover { border-color: var(--color-control-border); }
+.select-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-placeholder { color: var(--color-text-muted); }
+.select-chevron { flex: none; width: 1rem; height: 1rem; color: var(--color-text-secondary); }
+.select-trigger[aria-expanded="true"] .select-chevron { transform: rotate(180deg); }
+.select-trigger.is-compact { min-height: var(--control-height-compact); margin-top: 0; padding: 0 .625rem; font-size: var(--font-size-body-sm); }
+
+/* Popup: in the top layer when the browser supports popover, so no parent clips it. */
+.select-popup { position: fixed; inset: auto; box-sizing: border-box; display: none; flex-direction: column; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-md); z-index: var(--layer-menu); font-family: var(--font-interface); font-size: var(--font-size-body); }
+.select-popup.is-open { display: flex; }
+.select-popup [hidden] { display: none; }
+.select-search { display: flex; flex: none; min-height: var(--control-height); padding: 0 .75rem; align-items: center; gap: var(--space-sm); border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); }
+.select-search input.select-search-input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--color-text); }
+.select-search input.select-search-input:focus { box-shadow: none; outline: 0; }
+.select-search-icon, .select-clear-icon { flex: none; width: 1rem; height: 1rem; }
+.select-clear { display: inline-flex; flex: none; width: 1.75rem; height: 1.75rem; padding: 0; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.select-clear:hover { background: var(--color-action-secondary); }
+.select-clear:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 1px; }
+.select-listbox { flex: 1 1 auto; min-height: 0; margin: 0; padding: var(--space-xs); overflow-y: auto; list-style: none; }
+.select-option { display: flex; box-sizing: border-box; min-height: 2.5rem; padding: var(--space-sm) .75rem; align-items: center; gap: .625rem; border-radius: var(--radius-sm); cursor: pointer; }
+.select-option:hover { background: var(--color-action-secondary); }
+.select-option.is-active { background: var(--color-action-secondary); box-shadow: inset 0 0 0 2px var(--color-focus-ring); }
+.select-option[aria-selected="true"] { background: var(--color-row-selected); color: var(--color-success-text); font-weight: var(--font-weight-semibold); }
+.select-option[aria-selected="true"].is-active { box-shadow: inset 0 0 0 2px var(--color-focus-ring); }
+.select-option[aria-disabled="true"] { color: var(--color-text-muted); cursor: not-allowed; }
+.select-option[aria-disabled="true"]:hover { background: transparent; }
+.select-option[aria-disabled="true"] > * { opacity: .6; }
+.select-option-label { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.select-option mark { background: transparent; color: inherit; font-weight: var(--font-weight-semibold); text-decoration: underline; text-decoration-color: var(--color-navigation-selected-text); text-underline-offset: 3px; }
+.select-code { flex: none; min-width: 1.75rem; font-family: var(--font-data); font-size: .8125rem; color: var(--color-text-muted); }
+.select-option[aria-selected="true"] .select-code { color: inherit; }
+.select-check { flex: none; width: 1rem; height: 1rem; margin-left: auto; color: var(--color-navigation-selected-text); }
+.select-group { padding: .625rem .75rem var(--space-xs); font-family: var(--font-technical); font-size: var(--font-size-label); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; color: var(--color-text-muted); }
+.select-empty { display: grid; gap: var(--space-xs); padding: 1.25rem var(--space-md); }
+.select-empty strong { font-size: var(--font-size-body-sm); }
+.select-empty span { font-size: .8125rem; color: var(--color-text-muted); }
+.select-footer { display: flex; flex: none; padding: var(--space-sm) .75rem; justify-content: space-between; gap: var(--space-sm); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); font-family: var(--font-technical); font-size: var(--font-size-label); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; color: var(--color-text-muted); }
+
+/* Compact variant for dense tables. */
+.select-popup.is-compact { font-size: var(--font-size-body-sm); }
+.select-popup.is-compact .select-option { min-height: 2rem; padding: .375rem .625rem; }
+.select-popup.is-compact .select-search { min-height: var(--control-height-compact); padding: 0 .625rem; }
+
+@media (forced-colors: active) {
+  .select-option.is-active { outline: 2px solid Highlight; outline-offset: -2px; }
+  .select-option[aria-selected="true"] { outline: 1px solid CanvasText; outline-offset: -1px; }
+}

@@ -89,8 +89,10 @@ async function layout(page, label) {
       await page.goto(base + '/datasets');
       await row.locator('[data-row-primary]').click();
       await page.waitForURL(base + `/datasets/polish-${width}/concept/records`);
-      await page.getByText('About Code', {exact: true}).click();
+      const metadataButton = page.getByRole('button', {name: 'About E_NUMBER', exact: true});
+      await metadataButton.click();
       assert(await page.getByText('A readable identifier', {exact: false}).isVisible());
+      assert.equal(await metadataButton.getAttribute('aria-expanded'), 'true');
       await layout(page, `record metadata ${width}`);
       await page.getByRole('link', {name: 'Configure', exact: true}).click();
       const tabs = page.getByRole('tablist', {name: 'Configure dataset sections'});
@@ -255,11 +257,11 @@ async function layout(page, label) {
       assert.equal(await page.getByRole('link', {name: 'Edit field Amount', exact: true}).evaluate(e => e === document.activeElement), true);
       await page.goto(base + `/datasets/polish-${width}/configure#access-management`);
       let access = page.locator('#access-management');
-      await access.getByLabel('User or team').selectOption({label: 'Reader (reader@example.com)'});
+      await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
       await access.getByRole('button', {name: 'Grant access', exact: true}).click();
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).waitFor();
       assert.equal(await page.locator('[data-panel-status]:not([hidden])').textContent(), 'Export access granted.');
-      await access.getByLabel('User or team').selectOption({label: 'Reader (reader@example.com)'});
+      await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
       await access.getByRole('button', {name: 'Grant access', exact: true}).click();
       await access.getByRole('alert').waitFor();
       assert.equal(await access.getByLabel('User or team').getAttribute('aria-invalid'), 'true');

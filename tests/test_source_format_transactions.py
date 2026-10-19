@@ -28,7 +28,12 @@ def stage(s, a, d, session, code, value, profile):
         a.id, session, d.key, "values.csv", f"code;amount\n{code};{value}\n".encode()
     )
     result = s.record_imports.preview(
-        a.id, session, d.key, state.token, ("code", "amount"), {"amount": {"profile_id": profile}}
+        a.id,
+        session,
+        d.key,
+        state.token,
+        ("code", "amount"),
+        format_components=({"source": "v1-text"}, {"source": profile}),
     )
     assert result.valid
     return state
@@ -276,7 +281,7 @@ def test_unsuccessful_attempt_retains_previous_confirmed_proposal(database_audit
             d.key,
             second.token,
             ("code", "amount"),
-            {"amount": {"profile_id": "v1-eu"}},
+            format_components=({"source": "v1-text"}, {"source": "v1-eu"}),
         )
         assert not result.valid
     assert snapshot(engine) == before

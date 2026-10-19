@@ -166,6 +166,8 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/static/css/layouts/auth.css",
         "refrncr/static/css/components/buttons.css",
         "refrncr/static/css/components/forms.css",
+        "refrncr/static/css/components/select.css",
+        "refrncr/static/js/select.js",
         "refrncr/static/css/components/feedback.css",
         "refrncr/static/css/components/cards-badges.css",
         "refrncr/static/css/components/tables.css",

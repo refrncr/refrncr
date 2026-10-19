@@ -59,8 +59,11 @@ from refrncr.record_import import (
     MAX_UPLOAD_BYTES,
     PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
+    ImportExpiredError,
     ImportValidationError,
+    SourceFormatComponentsError,
     distinct_samples,
+    mapping_issue_message,
     parse_source,
 )
 from refrncr.record_search import (
@@ -93,8 +96,18 @@ from refrncr.services import (
     ValidationError,
     parse_expected_revision,
 )
-from refrncr.source_formats import SourceFormatError, compose_format, formats_for
 from refrncr.version_contracts import mapping_incomplete_message
+
+STATUS_LABELS = {"Removed": "Deleted", "Edited": "Changed"}
+
+
+def merge_error_messages(*messages):
+    return " ".join(dict.fromkeys(message for message in messages if message))
+
+
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
@@ -224,6 +237,7 @@ def create_flask_app(
     app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
+    app.jinja_env.filters["status_label"] = status_label
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -1137,7 +1151,7 @@ def create_flask_app(
             overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
-                change.id: "Edited" if change.status == "Changed" else change.status
+                change.id: change.status
                 for change in (g.concept_ui.field_changes if concept else ())
                 if change.status != "Added"
             }
@@ -1357,7 +1371,11 @@ def create_flask_app(
         ) not in {"0", "1"}:
             raise ValidationError("Choose valid review parameters.")
         criteria = DiffCriteria(
-            tuple(request.args.getlist("status")) or STATUSES,
+            tuple(
+                "Changed" if value == "Edited" else value
+                for value in request.args.getlist("status")
+            )
+            or STATUSES,
             request.args.get("q", ""),
             request.args.get("anchor", ""),
             request.args.get("backwards", "0") == "1",
@@ -2362,7 +2380,7 @@ def create_flask_app(
         selected_changes = set() if record_status == "all" else set(record_status.split(","))
         record_change_options = []
         for label, value, count in zip(
-            ("Added", "Edited", "Deleted"),
+            ("Added", "Changed", "Deleted"),
             change_order,
             view.status_counts,
             strict=True,
@@ -2398,7 +2416,7 @@ def create_flask_app(
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,
-            result_statuses=request.args.getlist("status"),
+            result_statuses=selected_statuses,
             may_edit=may_edit,
             may_add_record=may_add_record,
             may_export=view.may_export,
@@ -2536,6 +2554,22 @@ def create_flask_app(
                         ),
                         403,
                     )
+                except ImportExpiredError:
+                    resolved = getattr(g, "authenticated_resolution", None)
+                    if resolved is not None:
+                        audit_security(
+                            "security.workflow_token_rejected",
+                            actor_user_id=resolved[0].id,
+                        )
+                    minutes = max(1, (record_imports.store.ttl + 59) // 60)
+                    return render_authenticated_template(
+                        "pages/datasets/import/unavailable.html",
+                        error=(
+                            f"This import expired after {minutes} minutes without activity. "
+                            "Upload the file again to continue."
+                        ),
+                        return_url=url_for("import_dataset_records", key=kwargs.get("key", "")),
+                    ), 410
                 except NotFoundError:
                     resolved = getattr(g, "authenticated_resolution", None)
                     if resolved is not None:
@@ -2563,21 +2597,48 @@ def create_flask_app(
 
         return decorate
 
-    def render_import_wizard(dataset, login_session, state=None, *, step=1, error=None, status=200):
+    def render_import_wizard(
+        dataset,
+        login_session,
+        state=None,
+        *,
+        step=1,
+        error=None,
+        status=200,
+        selected_mapping=None,
+        source_format_issues=(),
+    ):
         actor, _session = require_authenticated()
         mode = state.mode if state else "new_version"
-        fields = dataset_fields.list_fields(actor.id, dataset.key)
+        fields = ()
         source = assistance = preview = None
         required_keys = ()
         identifier_keys = ()
         mapping_errors = {}
+        step_mapping_errors = []
         mapping_samples = []
         format_columns = []
         if state and state.imported_count is None:
             if step >= 3:
                 state, source, assistance = record_imports.mapping_assistance(
-                    actor.id, login_session.id, dataset.key, state.token
+                    actor.id,
+                    login_session.id,
+                    dataset.key,
+                    state.token,
+                    selected_mapping,
+                    include_formats=True,
                 )
+                fields = assistance.fields
+                required_keys = assistance.required_keys
+                identifier_keys = assistance.identifier_keys
+                if error or source_format_issues:
+                    for issue in assistance.errors:
+                        message = mapping_issue_message(issue, mode)
+                        if issue.column_index is None:
+                            if message:
+                                step_mapping_errors.append(message)
+                        elif message:
+                            mapping_errors[issue.column_index] = message
             else:
                 source = parse_source(state.filename, state.content, state.worksheet)
             if step >= 4:
@@ -2588,7 +2649,7 @@ def create_flask_app(
                         dataset.key,
                         state.token,
                         page=parse_page_parameter(),
-                        statuses=tuple(request.args.getlist("status")),
+                        statuses=tuple(value for value in request.args.getlist("status") if value),
                         search=request.args.get("q", ""),
                     )
                 except (NotFoundError, ImportValidationError):
@@ -2603,27 +2664,17 @@ def create_flask_app(
                 state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
                 if preview.non_row_errors:
                     step = 3
-                    error = " ".join(item.message for item in preview.non_row_errors)
-                elif step == 5 and not preview.valid:
+                    preview_messages = [
+                        mapping_issue_message(item, mode) or item.message
+                        for item in preview.non_row_errors
+                    ]
+                    error = " ".join(dict.fromkeys(preview_messages))
+                elif step == 4 and not preview.valid:
                     step = 4
                 if step != state.step:
                     state = record_imports.navigate(
                         actor.id, login_session.id, dataset.key, state.token, step
                     )
-            if source.headers:
-                with record_imports.uow() as uow:
-                    identifier = uow.dataset_business_keys.get(dataset.id)
-                identifier_keys = identifier.field_keys
-                required_keys = tuple(
-                    dict.fromkeys(
-                        [
-                            field.key
-                            for field in fields
-                            if field.is_required or mode == "new_version"
-                        ]
-                        + list(identifier.field_keys)
-                    )
-                )
         if assistance:
             # Full versions of the same bounded display examples, for accessible disclosure.
             for index in range(len(source.headers)):
@@ -2634,22 +2685,17 @@ def create_flask_app(
                 )
                 mapping_samples.append(distinct_samples(samples))
         if assistance:
-            format_columns = record_imports.format_assistance(
-                actor.id, login_session.id, dataset.key, state.token
-            )
-        if assistance and error:
-            choices = assistance.mapping
-            keys = {field.key for field in fields}
-            for index, choice in enumerate(choices):
-                if choice == "":
-                    mapping_errors[index] = "Choose a field or Do not import."
-                elif choice is not None and choice not in keys:
-                    mapping_errors[index] = "Choose a field from this dataset."
-                elif choice and choices.count(choice) > 1:
-                    mapping_errors[index] = (
-                        "This field is mapped more than once. Choose a different field or "
-                        "Do not import."
-                    )
+            format_columns = list(assistance.format_columns)
+        format_columns = show_source_format_issues(format_columns, source_format_issues)
+        for issue in source_format_issues:
+            message = mapping_issue_message(issue, mode)
+            if not message:
+                continue
+            step_mapping_errors.append(message)
+            if issue.column_index is not None:
+                mapping_errors[issue.column_index] = message
+        if step_mapping_errors:
+            error = merge_error_messages(error, *step_mapping_errors)
         success = state is not None and state.imported_count is not None
         automatic = source is not None and (source.kind == "csv" or len(source.worksheets) == 1)
         completed = {
@@ -2657,9 +2703,8 @@ def create_flask_app(
             2: bool(source and source.headers),
             3: bool(state and state.mapping_ready),
             4: bool(state and state.validation_valid),
-            5: success,
         }
-        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & validate", "Import")
+        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & import")
         steps = []
         for number, label in enumerate(labels, 1):
             done = success or completed[number]
@@ -2681,7 +2726,7 @@ def create_flask_app(
                 identifier_values = [
                     row.values[preview.mapping.index(key)]
                     for key in required_keys
-                    if key in identifier.field_keys and key in preview.mapping
+                    if key in identifier_keys and key in preview.mapping
                 ]
                 details = []
                 for item in errors:
@@ -2693,7 +2738,7 @@ def create_flask_app(
                 report_rows.append(
                     dict(number=number, identifier=" · ".join(identifier_values), errors=details)
                 )
-        back_step = 3 if step == 4 else 4 if step == 5 else 1 if automatic else step - 1
+        back_step = 3 if step == 4 else 1 if automatic else step - 1
         return render_authenticated_template(
             "pages/datasets/import/wizard.html",
             mode=mode,
@@ -2721,6 +2766,9 @@ def create_flask_app(
             back_step=back_step,
             error=error,
             current_csrf=login_session.csrf_token,
+            mapping_reason_text=(
+                "This import replaces all records in the draft, so every field must be mapped."
+            ),
         ), status
 
     def import_redirect(key, state):
@@ -2836,37 +2884,36 @@ def create_flask_app(
             state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
         return import_redirect(key, state)
 
-    def submitted_source_formats(mapping, actor, key):
-        fields = {field.key: field.data_type for field in dataset_fields.list_fields(actor.id, key)}
-        choices = {}
-        for index, target in enumerate(mapping):
-            profile = request.form.get(f"source_{index}", "")
-            components = {"source": profile}
-            for part in ("date", "time"):
-                name = f"{part}_{index}"
-                if name in request.form:
-                    components[part] = request.form[name]
-            timezone = request.form.get(f"timezone_{index}", "")
-            fold = request.form.get(f"fold_{index}", "")
-            datatype = fields.get(target)
-            if profile in {"text", "native", "offset"}:
-                try:
-                    profile = compose_format(datatype, components)
-                except SourceFormatError:
-                    abort(400)
-            elif len(components) != 1:
-                abort(400)
-            if profile and profile not in {p.id for p in formats_for(datatype)}:
-                abort(400)
-            if (timezone or fold) and (
-                datatype != "timestamp" or profile == "v1-offset" or not profile
-            ):
-                abort(400)
-            if fold not in {"", "earlier", "later"}:
-                abort(400)
-            if target:
-                choices[target] = {"profile_id": profile, "timezone": timezone, "fold": fold}
-        return choices
+    def submitted_source_format_components(mapping):
+        return tuple(
+            {
+                "source": request.form.get(f"source_{index}", ""),
+                **{
+                    part: request.form[f"{part}_{index}"]
+                    for part in ("date", "time")
+                    if f"{part}_{index}" in request.form
+                },
+                "timezone": request.form.get(f"timezone_{index}", ""),
+                "fold": request.form.get(f"fold_{index}", ""),
+            }
+            for index, _target in enumerate(mapping)
+        )
+
+    def show_source_format_issues(columns, issues):
+        columns = list(columns)
+        for issue in issues:
+            if issue.column_index is None or issue.column_index >= len(columns):
+                continue
+            column = columns[issue.column_index]
+            if column is not None:
+                message = mapping_issue_message(issue)
+                columns[issue.column_index] = {
+                    **column,
+                    "state": "failing",
+                    "verdict": message,
+                    "error": message,
+                }
+        return columns
 
     def submitted_component_names(count):
         # Components are optional only for the unchanged canonical-identifier contract.
@@ -2883,17 +2930,17 @@ def create_flask_app(
     @concept_route
     def review_source_formats(key: str, token: str):
         actor, login_session = require_authenticated()
-        dataset_records.get_dataset_for_add(actor.id, key)
         require_csrf(login_session.csrf_token)
-        _state, source, _advice = record_imports.mapping_assistance(
-            actor.id, login_session.id, key, token
-        )
+        state = record_imports.state(actor.id, login_session.id, key, token)
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        column_count = len(state.mapping)
         expected = {
             f"{prefix}_{index}"
             for prefix in ("mapping", "source", "timezone", "fold")
-            for index in range(len(source.headers))
+            for index in range(column_count)
         } | {"csrf_token"}
-        expected |= submitted_component_names(len(source.headers))
+        expected |= submitted_component_names(column_count)
         if set(request.form) != expected or any(
             len(request.form.getlist(name)) != 1 for name in expected
         ):
@@ -2902,16 +2949,17 @@ def create_flask_app(
             None
             if request.form[f"mapping_{index}"] == "__ignored__"
             else request.form[f"mapping_{index}"]
-            for index in range(len(source.headers))
+            for index in range(column_count)
         )
-        columns = record_imports.format_assistance(
+        _state, _source, assistance, issues = record_imports.submitted_source_format_assistance(
             actor.id,
             login_session.id,
             key,
             token,
             mapping,
-            submitted_source_formats(mapping, actor, key),
+            submitted_source_format_components(mapping),
         )
+        columns = show_source_format_issues(assistance.format_columns, issues)
         return render_template(
             "pages/datasets/import/source_format_fragments.html", format_columns=columns
         )
@@ -2935,25 +2983,26 @@ def create_flask_app(
     @concept_route
     def preview_record_import(key: str, token: str):
         actor, login_session = require_authenticated()
+        state = record_imports.state(actor.id, login_session.id, key, token)
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        state, source, _assistance = record_imports.mapping_assistance(
-            actor.id, login_session.id, key, token
-        )
+        if state.mapping is None:
+            raise NotFoundError("Import not found")
+        column_count = len(state.mapping)
         if request.method == "GET":
             return dataset_import_step(key, token, 4)
         require_csrf(login_session.csrf_token)
-        expected = {f"mapping_{index}" for index in range(len(source.headers))} | {"csrf_token"}
+        expected = {f"mapping_{index}" for index in range(column_count)} | {"csrf_token"}
         format_names = {
             f"{prefix}_{index}"
             for prefix in ("source", "timezone", "fold")
-            for index in range(len(source.headers))
+            for index in range(column_count)
         }
         if set(request.form) & format_names:
             expected |= format_names
-            expected |= submitted_component_names(len(source.headers))
+            expected |= submitted_component_names(column_count)
         target_step = request.form.get("go_step")
         if target_step is not None:
-            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4", "5"}:
+            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4"}:
                 abort(400)
             # Check the original state before accepting a navigation request.
             record_imports.navigate(actor.id, login_session.id, key, token, int(target_step))
@@ -2973,16 +3022,31 @@ def create_flask_app(
             None
             if request.form[f"mapping_{index}"] == "__ignored__"
             else request.form[f"mapping_{index}"]
-            for index in range(len(source.headers))
+            for index in range(column_count)
         )
-        choices = (
-            submitted_source_formats(mapping, actor, key)
+        format_components = (
+            submitted_source_format_components(mapping)
             if set(request.form) & format_names
             else None
         )
         try:
             preview = record_imports.preview(
-                actor.id, login_session.id, key, token, mapping, choices
+                actor.id,
+                login_session.id,
+                key,
+                token,
+                mapping,
+                format_components=format_components,
+            )
+        except SourceFormatComponentsError as error:
+            return render_import_wizard(
+                dataset,
+                login_session,
+                state,
+                step=3,
+                status=400,
+                selected_mapping=mapping,
+                source_format_issues=error.issues,
             )
         except NotFoundError:
             raise
@@ -3011,11 +3075,14 @@ def create_flask_app(
                 login_session,
                 state,
                 step=3,
-                error=" ".join(item.message for item in preview.non_row_errors),
+                error=merge_error_messages(
+                    *(
+                        mapping_issue_message(item, state.mode) or item.message
+                        for item in preview.non_row_errors
+                    )
+                ),
                 status=400,
             )
-        if target_step == "5" and preview.valid:
-            state = record_imports.navigate(actor.id, login_session.id, key, token, 5)
         return import_redirect(key, state)
 
     @import_route(
@@ -3068,7 +3135,7 @@ def create_flask_app(
                 dataset,
                 login_session,
                 state,
-                step=5,
+                step=4,
                 error=(
                     "The import could not be completed. No records have been imported. Try again."
                 ),
@@ -4018,7 +4085,11 @@ def create_flask_app(
         submitted_target = (
             request.form.get("next") if request.method == "POST" else request.args.get("next")
         )
-        return_target = submitted_target if is_safe_login_target(submitted_target) else "/"
+        # Rebuild the target from a constant root: a checked path stays the same, and the
+        # redirect can never leave this origin (CodeQL py/url-redirection).
+        return_target = "/"
+        if submitted_target and is_safe_login_target(submitted_target):
+            return_target = "/" + submitted_target.removeprefix("/")
 
         def invalid_credentials_response():
             return (

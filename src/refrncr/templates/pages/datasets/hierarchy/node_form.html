@@ -21,7 +21,7 @@
       {% if mode != 'values' %}
         <label for='hierarchy-node-name'>Name</label><input id='hierarchy-node-name' name='name' value='{{ name }}' required maxlength='200'>
         {% if (node and node.parent_id) or (not node and parent_options) %}
-        <label for='hierarchy-node-parent'>Parent</label><select id='hierarchy-node-parent' name='parent_id' required>{% for row in parent_options %}<option value='{{ row.node.id }}'{% if row.node.id == parent_id %} selected{% endif %}>{{ row.path }}</option>{% endfor %}</select>
+        <label for='hierarchy-node-parent'>Parent</label><select id='hierarchy-node-parent' name='parent_id' data-select data-noun='nodes' required>{% for row in parent_options %}<option value='{{ row.node.id }}'{% if row.node.id == parent_id %} selected{% endif %}>{{ row.path }}</option>{% endfor %}</select>
         <p class='help-text'>Moving a node also moves its descendants. Their identities and values are preserved.</p>
         {% else %}<input type='hidden' name='parent_id' value=''><p class='help-text'>This is the hierarchy’s single root.</p>{% endif %}
         <p class='help-text'>Names must be unique across the whole hierarchy. A node with children retains its leaves-only values as inactive.</p>

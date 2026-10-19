@@ -72,6 +72,7 @@ def parse_parameters(items):
         if not isinstance(value, str) or len(value) > MAX_INPUT_LENGTH:
             raise RecordSearchError("Record criteria exceed the input limit.")
         if name == "status":
+            value = "Changed" if value == "Edited" else value
             if value not in {"Added", "Changed", "Deleted"} or value in statuses:
                 raise RecordSearchError("Choose distinct valid import statuses.")
             statuses.append(value)
@@ -97,7 +98,7 @@ def parse_parameters(items):
         or tuple(change for change in RECORD_CHANGE_FILTERS if change in selected_changes)
         != selected_changes
     ):
-        raise RecordSearchError("Choose Added, Edited or Deleted filters.")
+        raise RecordSearchError("Choose Added, Changed or Deleted filters.")
     page = values.get("page", "1")
     if not page.isascii() or not page.isdecimal() or page.startswith("0") or len(page) > 9:
         raise RecordSearchError("Page must be a canonical positive integer.")
