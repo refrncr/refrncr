@@ -316,6 +316,23 @@ def test_import_service_exposes_mapping_and_source_format_error_codes(import_con
     ]
 
 
+def test_submitted_format_helpers_require_a_bound_import_state(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    components = ({"source": "v1-text", "timezone": "", "fold": ""},)
+    mapping = ("code",)
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_formats(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_format_assistance(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+
 @pytest.fixture
 def postgresql_import_context():
     database_url = os.environ.get("REFRNCR_TEST_POSTGRES_URL")

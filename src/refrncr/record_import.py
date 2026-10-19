@@ -254,7 +254,7 @@ class ImportIssue:
     mode: str | None = None
 
 
-def mapping_issue_message(issue: MappingIssue) -> str:
+def mapping_issue_message(issue: MappingIssue | ImportIssue, default_mode="create") -> str:
     return {
         "mapping_count_mismatch": "Submit exactly one mapping for every source column.",
         "column_unmapped": "Choose a field or Do not import.",
@@ -264,14 +264,14 @@ def mapping_issue_message(issue: MappingIssue) -> str:
         ),
         "required_field_unmapped": (
             "Map every active Field exactly once."
-            if issue.mode == "new_version"
+            if (issue.mode or default_mode) == "new_version"
             else "Map every required and identifier field."
         ),
         "source_format_incomplete": (
             "Choose a valid source type and its required format components."
         ),
         "source_format_ambiguous": "Choose an unambiguous source format for this field.",
-    }.get(issue.code, "Import mapping could not be validated.")
+    }.get(issue.code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1196,20 +1196,28 @@ class DatasetRecordImportService:
         return self._format_columns(source, fields, mapping, selected, remembered)
 
     def submitted_source_formats(
-        self, actor_id, session_id, dataset_key, token, mapping, components, *, assistance=None
+        self, actor_id, session_id, dataset_key, token, mapping, components
     ):
-        if assistance is None:
-            _state, _source, assistance = self.mapping_assistance(
-                actor_id, session_id, dataset_key, token, mapping
-            )
+        _state, _source, assistance = self.mapping_assistance(
+            actor_id, session_id, dataset_key, token, mapping
+        )
+        return self._submitted_source_formats(assistance, mapping, components)
+
+    @staticmethod
+    def _submitted_source_formats(assistance, mapping, components):
         return validate_source_format_components(assistance.fields, mapping, components)
 
     def submitted_source_format_assistance(
-        self, actor_id, session_id, dataset_key, token, mapping, components, *, prepared=None
+        self, actor_id, session_id, dataset_key, token, mapping, components
     ):
-        state, source, assistance = prepared or self.mapping_assistance(
+        state, source, assistance = self.mapping_assistance(
             actor_id, session_id, dataset_key, token, mapping, include_formats=True
         )
+        return self._submitted_source_format_assistance(
+            state, source, assistance, mapping, components
+        )
+
+    def _submitted_source_format_assistance(self, state, source, assistance, mapping, components):
         choices, issues = validate_source_format_components(assistance.fields, mapping, components)
         if not issues:
             assistance = replace(
@@ -1749,7 +1757,7 @@ class DatasetRecordImportService:
                 if issue.column_index is not None and issue.column_index < len(source.headers)
                 else None,
                 field_by_key[issue.field_key].name if issue.field_key in field_by_key else None,
-                mapping_issue_message(issue),
+                mapping_issue_message(issue) or issue.message,
                 issue.code,
                 issue.column_index,
                 issue.field_key,
