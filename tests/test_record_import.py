@@ -17,7 +17,7 @@ import refrncr.record_import as record_import_module
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue
+from refrncr.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
 from refrncr.record_import import (
     MAX_COMPRESSION_RATIO,
     DatasetRecordImportService,
@@ -708,6 +708,68 @@ def test_mapping_table_uses_existing_preview_and_atomic_import_flow(import_conte
             )
             == 2
         )
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_import_rejects_stored_record_with_missing_identifier_component(request, context_fixture):
+    import_context = request.getfixturevalue(context_fixture)
+    factory, services, admin, dataset = import_context
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "A", "amount": "1"})
+    with factory() as session:
+        row = session.scalar(
+            select(DatasetRecordValue)
+            .join(DatasetRecord, DatasetRecord.id == DatasetRecordValue.record_id)
+            .join(DatasetField, DatasetField.id == DatasetRecordValue.field_id)
+            .where(DatasetRecord.dataset_id == dataset.id, DatasetField.key == "amount")
+        )
+        session.delete(row)
+        session.commit()
+    with services.datasets.uow() as work:
+        persisted = list(work.dataset_records.iterate_all(dataset.id))
+    assert len(persisted) == 1 and {value.field_key for value in persisted[0].values} == {"code"}
+
+    with pytest.raises(
+        ImportValidationError,
+        match="^Stored Record identifiers are inconsistent\\. Import unavailable\\.$",
+    ):
+        with services.datasets.uow() as work:
+            tuple(services.record_imports._differences(work, dataset.id, ()))
+
+
+def test_import_rejects_oversized_stored_identifier_component(import_context):
+    factory, services, admin, dataset = import_context
+    services.dataset_fields.create_field(
+        admin.id, dataset.key, "extra", "Extra", "string", is_required=True
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code", "extra"))
+    services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "A", "amount": "1", "extra": "B"}
+    )
+    with factory() as session:
+        rows = session.scalars(
+            select(DatasetRecordValue)
+            .join(DatasetRecord, DatasetRecord.id == DatasetRecordValue.record_id)
+            .join(DatasetField, DatasetField.id == DatasetRecordValue.field_id)
+            .where(
+                DatasetRecord.dataset_id == dataset.id,
+                DatasetField.key.in_(("code", "extra")),
+            )
+        ).all()
+        assert len(rows) == 2
+        for row in rows:
+            row.canonical_value_key = b"s" + b"x" * 999
+            row.string_value = "x" * 999
+        session.commit()
+
+    with pytest.raises(
+        ImportValidationError,
+        match="^Stored Record identifiers are inconsistent\\. Import unavailable\\.$",
+    ):
+        with services.datasets.uow() as work:
+            tuple(services.record_imports._differences(work, dataset.id, ()))
 
 
 def test_manual_mapping_and_ignored_choice_survive_validation_errors(import_context):

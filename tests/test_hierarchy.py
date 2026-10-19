@@ -243,6 +243,16 @@ def test_optional_composite_identifier_and_field_scope_are_independent(hierarchy
         values(c, first, code="A", region="North", external="ONE")
 
 
+def test_hierarchy_identifier_uses_field_level_required_error(hierarchy):
+    c = hierarchy
+    root = add(c, "Root")
+    leaf = add(c, "Leaf", root.id)
+    field(c, "code", scope="all_nodes", required=True, identifier=True)
+    with pytest.raises(RecordValidationError) as error:
+        values(c, leaf, code="")
+    assert error.value.errors == {"code": "A value is required"}
+
+
 def test_delete_subtree_removes_descendants_and_values_but_protects_root(hierarchy):
     c = hierarchy
     root = add(c, "Root")

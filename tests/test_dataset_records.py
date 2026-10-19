@@ -16,6 +16,7 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.record_identity import decode_record_identifier
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,
@@ -102,7 +103,13 @@ def test_create_normalized_record_values_identifier_and_audit(record_services):
                 select(DatasetRecordValue).where(DatasetRecordValue.record_id == record.id)
             )
         )
-        assert persisted.identifier_key.startswith(len(b"n1").to_bytes(4, "big") + b"n1")
+        assert decode_record_identifier(persisted.identifier_key) == tuple(
+            value.canonical_key
+            for value in sorted(
+                (value for value in record.values if value.field_key in {"code", "amount"}),
+                key=lambda value: value.field_key,
+            )
+        )
         assert persisted.revision == 1
         assert len(values) == 4
         assert {value.field_id for value in values} == set(fields[field].id for field in fields)
@@ -115,6 +122,29 @@ def test_create_normalized_record_values_identifier_and_audit(record_services):
             )
         )
         assert [event.action for event in events] == ["created"]
+
+
+def test_business_key_order_matches_identifier_encoding_on_each_database(
+    database_record_services,
+):
+    _, _, services, admin = database_record_services
+    dataset = create_owned_dataset(services.datasets, admin.id, "sort-keys", "Sort keys", "")
+    for key in ("a_z", "ab"):
+        services.dataset_fields.create_field(
+            admin.id, dataset.key, key, key, "string", is_required=True
+        )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("ab", "a_z"))
+
+    with services.datasets.uow() as work:
+        business_key = work.dataset_business_keys.get(dataset.id)
+    record = services.dataset_records.create_record(
+        admin.id, dataset.key, {"a_z": "underscore", "ab": "letters"}
+    )
+
+    assert business_key.field_keys == ("a_z", "ab")
+    with services.datasets.uow() as work:
+        persisted = work.session.get(DatasetRecord, record.id)
+    assert decode_record_identifier(persisted.identifier_key) == (b"sunderscore", b"sletters")
 
 
 @pytest.mark.parametrize("raw", ["", "0", "01", "+1", "-1", " 1", "1 ", "1.0", "x"])
@@ -292,6 +322,9 @@ def test_required_unknown_duplicate_identifier_and_unique_value(record_services)
     with pytest.raises(RecordValidationError) as missing:
         services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
     assert missing.value.errors == {"amount": "A value is required"}
+    with pytest.raises(RecordValidationError) as incomplete:
+        services.dataset_records.create_record(admin.id, dataset.key, {"amount": "1"})
+    assert incomplete.value.errors == {"code": "A value is required"}
     with pytest.raises(RecordValidationError) as unknown:
         services.dataset_records.create_record(
             admin.id, dataset.key, {"code": "one", "amount": "1", "foreign": "x"}

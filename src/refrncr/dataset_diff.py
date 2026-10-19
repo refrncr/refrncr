@@ -19,6 +19,7 @@ from refrncr.diff_contracts import (
     ReviewIdentity,
 )
 from refrncr.ports import PersistenceConflictError
+from refrncr.record_identity import RecordIdentifierError, decode_record_identifier
 from refrncr.services import ConflictError, NotFoundError, ValidationError, _valid_identity
 from refrncr.version_contracts import SnapshotField, version_states
 
@@ -251,16 +252,15 @@ class DatasetDiffService:
     def _identifier(encoded, fields):
         if encoded is None:
             return None, ()
-        if not isinstance(encoded, bytes) or not 1 <= len(encoded) <= 2000:
+        try:
+            components = decode_record_identifier(encoded)
+        except RecordIdentifierError:
+            raise ValidationError("Invalid stored Record identifier") from None
+        identifier_fields = sorted((f for f in fields if f.is_identifier), key=lambda f: f.key)
+        if len(components) != len(identifier_fields):
             raise ValidationError("Invalid stored Record identifier")
-        offset, labels, ordering = 0, [], []
-        for field in sorted((f for f in fields if f.is_identifier), key=lambda f: f.key):
-            if offset + 4 > len(encoded):
-                raise ValidationError("Invalid stored Record identifier")
-            length = int.from_bytes(encoded[offset : offset + 4], "big")
-            offset += 4
-            key = encoded[offset : offset + length]
-            offset += length
+        labels, ordering = [], []
+        for field, key in zip(identifier_fields, components, strict=True):
             datatype = get_datatype(field.data_type)
             if not datatype.identifier_eligible:
                 raise ValidationError("Invalid stored Record identifier")
@@ -268,7 +268,7 @@ class DatasetDiffService:
             labels.append(datatype.text(value))
             # Status groups have one schema each: Changed uses the new identifier.
             ordering.append(datatype.ordering_key(value))
-        if not labels or offset != len(encoded):
+        if not labels:
             raise ValidationError("Invalid stored Record identifier")
         return " · ".join(labels), tuple(ordering)
 

@@ -19,6 +19,7 @@ from refrncr.models import (
     new_id,
 )
 from refrncr.ports import PersistenceConflictError, RecordValue, StoredRecord
+from refrncr.record_identity import encode_record_identifier
 from refrncr.version_contracts import (
     PublishedVersion,
     SnapshotContent,
@@ -318,8 +319,13 @@ class SqlAlchemyVersionOperations:
         self.session.flush()
         for record in content.records:
             by_key = {v.field_key: v.canonical_key for v in record.values}
-            encoded = b"".join(
-                len(by_key[k]).to_bytes(4, "big") + by_key[k] for k in content.identifier_keys
+            encoded = (
+                encode_record_identifier(
+                    {key: by_key.get(key) for key in content.identifier_keys},
+                    expected_keys=content.identifier_keys,
+                )
+                if content.identifier_keys
+                else b""
             )
             if content.hierarchy_nodes and not content.identifier_keys:
                 encoded = b"hierarchy:" + record.id.encode("ascii")

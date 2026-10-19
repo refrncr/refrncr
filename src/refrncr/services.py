@@ -21,6 +21,7 @@ from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
+from refrncr.errors import UserManagementError, ValidationError
 from refrncr.models import LoginSession, User, utc_now
 from refrncr.ports import (
     AuditEntry,
@@ -48,6 +49,7 @@ from refrncr.presentation_metadata import (
     dataset_icon,
     optional_plain_text,
 )
+from refrncr.record_identity import encode_record_identifier
 from refrncr.version_contracts import mapping_incomplete_message
 
 SUBJECT_TYPES = {"user", "team"}
@@ -73,10 +75,6 @@ _DUMMY_PASSWORD_HASH = (
 )
 
 
-class UserManagementError(Exception):
-    pass
-
-
 class AuthorizationError(UserManagementError):
     pass
 
@@ -90,10 +88,6 @@ class InvalidLifecycleError(UserManagementError):
 
 
 class NotFoundError(UserManagementError):
-    pass
-
-
-class ValidationError(UserManagementError, ValueError):
     pass
 
 
@@ -983,9 +977,9 @@ class DatasetService:
                         )
                         if source_value is None:
                             continue
-                        encoded = (
-                            len(source_value.canonical_key).to_bytes(4, "big")
-                            + source_value.canonical_key
+                        encoded = encode_record_identifier(
+                            {source_field.key: source_value.canonical_key},
+                            expected_keys=(source_field.key,),
                         )
                         record = uow.dataset_records.create(
                             dataset_id=dataset.id, identifier_key=encoded
@@ -1495,9 +1489,9 @@ class DatasetFieldService:
                     )
                     if identifier_value is None or context_value is None:
                         continue
-                    encoded = (
-                        len(identifier_value.canonical_key).to_bytes(4, "big")
-                        + identifier_value.canonical_key
+                    encoded = encode_record_identifier(
+                        {dataset.source_field_key: identifier_value.canonical_key},
+                        expected_keys=(dataset.source_field_key,),
                     )
                     record_id = mapping_records.get(encoded)
                     if record_id:
@@ -2323,12 +2317,10 @@ class DatasetRecordService:
         if errors:
             raise RecordValidationError(errors)
         value_by_key = {value.field_key: value for value in values}
-        components = [value_by_key[key].canonical_key for key in identifier.field_keys]
-        encoded_identifier = b"".join(
-            len(component).to_bytes(4, "big") + component for component in components
+        encoded_identifier = encode_record_identifier(
+            {key: value_by_key[key].canonical_key for key in identifier.field_keys},
+            expected_keys=identifier.field_keys,
         )
-        if len(encoded_identifier) > 2000:
-            raise ValidationError("Encoded Record identifier must not exceed 2000 UTF-8 bytes")
         return tuple(values), encoded_identifier
 
     def list_records(self, actor_id: str, dataset_key: str, page: int = 1) -> RecordPage:

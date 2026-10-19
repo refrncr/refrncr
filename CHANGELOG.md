@@ -4,6 +4,7 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Give incomplete and oversized Record identifiers distinct, actionable validation messages.
 - Build the return address after sign-in from the application root, so the redirect can never
   leave refrncr; the accepted paths are unchanged.
 - Add the Select component: a styled single-choice list with keyboard support, search from
