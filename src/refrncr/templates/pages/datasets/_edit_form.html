@@ -2,11 +2,12 @@
 {% from 'components.html' import feedback, form_field %}
 {% from 'pages/datasets/_team_choice.html' import team_choice %}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}
-  <form id='dataset-edit-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <form id='dataset-edit-form' class='form dataset-edit-form' {{ non_login_form_attrs() }} novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
     {{ form_field(
       "Name",
-      "name",
+      "dataset_label",
       "dataset-name",
+      key_source=true,
       value=name,
       error_id="dataset-edit-error" if error_field == "name" else none
     ) }}

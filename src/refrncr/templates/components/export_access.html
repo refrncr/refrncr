@@ -32,7 +32,7 @@
       <section class='access-grant' aria-labelledby='grant-export-heading'>
         <h3 id='grant-export-heading'>Give export access</h3>
         {{ feedback(error, id='governance-error', focus=true) }}
-        <form class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.'>
+        <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.'>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <div class='form-field'>
             <label class='visually-hidden' for='export-subject'>User or team</label>
@@ -64,7 +64,7 @@
                   <td><span class='badge'>{{ 'Team' if is_team else 'User' }}</span></td>
                   <td><time class='access-added' datetime='{{ entry.created_at.isoformat() }}'>{{ entry.created_at|absolute_utc }}</time></td>
                   <td>
-                    <form method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-inline-refresh='{{ fallback }}' data-panel-success='Export access removed.'>
+                    <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-inline-refresh='{{ fallback }}' data-panel-success='Export access removed.'>
                       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
                       <button class='button button-secondary button-table-action button-remove' type='submit' aria-label='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}'>Remove</button>
                     </form>

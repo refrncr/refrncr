@@ -12,7 +12,7 @@
     <p class='help-text'>{{ status_badge('Draft') }} Saved to the draft. Consumers see it after you publish.</p>
     {% if node_row %}<p class='hierarchy-path'>{{ node_row.path }}</p>{% endif %}
     {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-    <form id='hierarchy-node-form' class='form' method='post' novalidate action='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>
+    <form id='hierarchy-node-form' class='form' {{ non_login_form_attrs() }} method='post' novalidate action='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
       <input type='hidden' name='return_view' value='{{ return_view }}'>
@@ -20,7 +20,7 @@
       <input type='hidden' name='return_sort' value='{{ return_sort }}'>
       <input type='hidden' name='return_direction' value='{{ return_direction }}'>
       {% if mode != 'values' %}
-        <label for='hierarchy-node-name'>Name</label><input id='hierarchy-node-name' name='name' value='{{ name }}' required maxlength='{{ MAX_HIERARCHY_NODE_NAME }}'>
+        <label for='hierarchy-node-name'>Name</label><input id='hierarchy-node-name' name='node_label' autocomplete='off' {{ non_login_field_attrs() }} value='{{ name }}' required maxlength='{{ MAX_HIERARCHY_NODE_NAME }}'>
         {% if (node and node.parent_id) or (not node and parent_options) %}
         <label for='hierarchy-node-parent'>Parent</label><select id='hierarchy-node-parent' name='parent_id' data-select data-noun='nodes' required>{% for row in parent_options %}<option value='{{ row.node.id }}'{% if row.node.id == parent_id %} selected{% endif %}>{{ row.path }}</option>{% endfor %}</select>
         <p class='help-text'>Moving a node also moves its descendants. Their identities and values are preserved.</p>

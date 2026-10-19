@@ -2,10 +2,10 @@
   <h3>Team members</h3>
   {% if error %}<div class='alert alert-error' role='alert'>{{ error }}</div>{% endif %}
   {% if members %}
-    <ul class='member-list'>{% for membership, user in members %}<li><div><strong>{{ user.display_name }}</strong><span>{{ user.email }}</span></div><form method='post' action='{{ url_for("delete_membership", team_id=team_id, membership_id=membership.id) }}'><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-secondary' type='submit'>{{ 'Remove member' if standalone else 'Remove' }}</button></form></li>{% endfor %}</ul>
+    <ul class='member-list'>{% for membership, user in members %}<li><div><strong>{{ user.display_name }}</strong><span>{{ user.email }}</span></div><form {{ non_login_form_attrs() }} method='post' action='{{ url_for("delete_membership", team_id=team_id, membership_id=membership.id) }}'><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-secondary' type='submit'>{{ 'Remove member' if standalone else 'Remove' }}</button></form></li>{% endfor %}</ul>
   {% else %}<p>This team has no members.</p>{% endif %}
   {% if eligible_users or standalone %}
     {% set select_id = 'team-user' if standalone else 'team-user-' ~ team_id %}
-    <form class='add-member-form' method='post' action='{{ url_for("create_membership", team_id=team_id) }}'><label for='{{ select_id }}'>{{ 'User' if standalone else 'Add user' }}</label><select id='{{ select_id }}' name='user_id' data-select data-noun='users'>{% for user in eligible_users %}<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-primary' type='submit'>Add member</button></form>
+    <form class='add-member-form' {{ non_login_form_attrs() }} method='post' action='{{ url_for("create_membership", team_id=team_id) }}'><label for='{{ select_id }}'>{{ 'User' if standalone else 'Add user' }}</label><select id='{{ select_id }}' name='user_id' autocomplete='off' {{ non_login_field_attrs() }} data-select data-noun='users'>{% for user in eligible_users %}<option value='{{ user.id }}'>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ csrf }}'><button class='button button-primary' type='submit'>Add member</button></form>
   {% else %}<p class='help-text'>All eligible users are already members.</p>{% endif %}
 {%- endmacro %}

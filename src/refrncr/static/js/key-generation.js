@@ -7,7 +7,7 @@
   const states = new WeakMap();
   const initialize = (root = document) => {
     root.querySelectorAll("form[data-generate-key]").forEach((form) => {
-      const pairs = [...form.querySelectorAll('[name="name"]')].map((name) => {
+      const pairs = [...form.querySelectorAll("[data-key-source]")].map((name) => {
         const scope = name.closest("[data-mapping-field-panel]") || form;
         return {name, key: scope.querySelector('[name="key"]')};
       }).filter(({key}) => key);

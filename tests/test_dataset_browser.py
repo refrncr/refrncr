@@ -545,7 +545,8 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     )
     assert "name='csrf_token'" in page
     assert "for='new-record-code'" in page
-    assert "id='new-record-code' name='code' type='text' required autofocus" in page
+    assert "id='new-record-code' name='code' type='text' autocomplete='off'" in page
+    assert "data-bwignore='true'" in page
     assert "id='new-record-active' name='active'" in page
     assert "role='search' aria-label='Search records'" in page
     assert "name='q'" in page
@@ -616,7 +617,7 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
     assert "data-panel-mode='edit'" in page
     assert "data-panel-view='view' hidden" in page
-    assert "data-panel-view='edit' method='post'" in page
+    assert "data-panel-view='edit' autocomplete='off'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     panel = page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[0]
     assert ">View current version</a>" not in panel
@@ -1045,18 +1046,21 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
     assert "<title>New dataset · REFRNCR</title>" in page
     assert '<header class="page-header">' in page
     assert (
-        "<form class='form' data-generate-key data-mapping-table-form novalidate "
+        "<form class='form' autocomplete='off' data-form-type='other' data-1p-ignore "
+        "data-lpignore='true' data-bwignore='true' data-generate-key "
+        "data-mapping-table-form novalidate "
         "method='post' action='/datasets'>" in page
     )
     assert "<label for='dataset-key'>Key</label>" in page
-    assert "id='dataset-key' name='key' type='text' value='' required" in page
+    assert "id='dataset-key' name='key' type='text' value='' autocomplete='off'" in page
     assert "aria-describedby='dataset-key-help'" in page
     assert "id='dataset-key-help'>Generated from the name until you edit it. " in page
     assert "A permanent technical identifier.</p>" in page
     assert "<label for='dataset-name'>Name</label>" in page
-    assert "id='dataset-name' name='name' type='text' value='' required" in page
+    assert "id='dataset-name' name='dataset_label' type='text' value='' autocomplete='off'" in page
+    assert "data-key-source" in page
     assert "<label for='dataset-description'>Description</label>" in page
-    assert "<textarea id='dataset-description' name='description'></textarea>" in page
+    assert "<textarea id='dataset-description' name='description' autocomplete='off'" in page
     assert (
         "<a class='button button-secondary' data-panel-cancel href='/datasets'>Cancel</a>" in page
     )
@@ -1095,7 +1099,7 @@ def test_create_redirects_each_dataset_type_to_its_next_step(
         "/datasets",
         data={
             "key": f"created-{kind}",
-            "name": f"Created {kind}",
+            "dataset_label": f"Created {kind}",
             "description": "",
             "kind": kind,
             "owner_team_id": owner_team_id,
@@ -1455,7 +1459,9 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert "<code data-icon-preview-name>table</code>" in page
     assert "name='key'" not in page
     assert (
-        "<form id='dataset-edit-form' class='form dataset-edit-form' novalidate "
+        "<form id='dataset-edit-form' class='form dataset-edit-form' autocomplete='off' "
+        "data-form-type='other' data-1p-ignore data-lpignore='true' "
+        "data-bwignore='true' novalidate "
         "method='post' action='/datasets/edit-form'>" in page
     )
     assert "<label for='dataset-name'>Name</label>" in page
@@ -1882,7 +1888,7 @@ def test_admin_create_field_browser_flow_accepts_supported_types(dataset_browser
         "/datasets/create-field/fields",
         data={
             "key": data_type,
-            "name": data_type.title(),
+            "field_label": data_type.title(),
             "data_type": data_type,
             "csrf_token": form_csrf(form),
         },
@@ -2079,7 +2085,8 @@ def test_admin_edit_field_flow_allows_key_change_only_before_first_publication(d
 
     assert form.status_code == 200
     assert "stable_key" in body(form)
-    assert "name='key' value='stable_key'" in body(form)
+    assert "name='key' autocomplete='off'" in body(form)
+    assert "value='stable_key'" in body(form)
     response = request(
         client,
         "post",
@@ -3009,8 +3016,9 @@ def test_user_email_error_reopens_edit_panel_with_submitted_value(dataset_browse
     assert f"id='user-panel-{user.id}'" in page
     assert "Email already exists in this installation" in page
     assert (
-        f"id='edit-user-email-{user.id}' name='email' type='email' value='taken@example.com'"
-        in page
+        f"id='edit-user-email-{user.id}' name='email' type='email' autocomplete='email' "
+        f"data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' "
+        f"value='taken@example.com'" in page
     )
     assert f"id='user-panel-{user.id}'" in page and "data-auto-open='edit'" in page
 

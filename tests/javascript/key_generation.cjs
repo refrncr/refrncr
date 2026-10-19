@@ -9,8 +9,8 @@ class Control {
 }
 function form(name = '', key = '') {
   const f = new Control(); f.name = new Control(name); f.key = new Control(key);
-  f.querySelector = selector => selector === '[name="name"]' ? f.name : f.key;
-  f.querySelectorAll = selector => selector === '[name="name"]' ? [f.name] : [];
+  f.querySelector = selector => selector === '[name="key"]' ? f.key : f.name;
+  f.querySelectorAll = selector => selector === '[data-key-source]' ? [f.name] : [];
   return f;
 }
 const first = form();

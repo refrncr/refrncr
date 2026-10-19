@@ -140,7 +140,7 @@
       </div>
       {% if field_context_label %}
       <div class='context-notice'>{{ lock_icon() }}<span>{{ field_context_label }}</span>
-        {%- if may_start_concept %}<form method='post' action='{{ url_for("dataset_concept_create", key=dataset.key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='context-notice-action' type='submit'>Create a draft to change fields</button></form>{% endif %}
+        {%- if may_start_concept %}<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("dataset_concept_create", key=dataset.key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='context-notice-action' type='submit'>Create a draft to change fields</button></form>{% endif %}
       </div>
       {% endif %}
       {% if fields %}

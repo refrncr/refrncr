@@ -3,7 +3,7 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>{{ 'Edit record' if record else 'Add record' }}</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='{{ ("Edit " if record else "New ") ~ record_type ~ " record" }}' data-panel-eyebrow='{{ "Edit record" if record else "Add record" }}'>
-    <form class='side-panel-form' method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) if record else url_for("create_dataset_record", key=dataset.key) }}'>
+    <form {{ non_login_form_attrs() }} class='side-panel-form' method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) if record else url_for("create_dataset_record", key=dataset.key) }}'>
       <div class='side-panel-body'>
         {% include 'pages/datasets/concepts/_banner.html' %}
         {% if errors.get('_record') %}<p role='alert' tabindex='-1' data-error-focus>{{ errors['_record'] }}</p>{% endif %}

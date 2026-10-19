@@ -21,6 +21,7 @@ from flask import (
     send_file,
     url_for,
 )
+from markupsafe import Markup
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
@@ -260,6 +261,13 @@ def create_flask_app(
     audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
+    app.jinja_env.globals["non_login_form_attrs"] = lambda: Markup(
+        "autocomplete='off' data-form-type='other' data-1p-ignore "
+        "data-lpignore='true' data-bwignore='true'"
+    )
+    app.jinja_env.globals["non_login_field_attrs"] = lambda: Markup(
+        "data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true'"
+    )
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
     app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
@@ -1042,7 +1050,7 @@ def create_flask_app(
         )
         require_csrf(login_session.csrf_token)
         key = request.form.get("key", "")
-        name = request.form.get("name", "")
+        name = request.form.get("dataset_label", request.form.get("name", ""))
         description = request.form.get("description", "")
         try:
             submitted_teams = request.form.getlist("owner_team_id")
@@ -2031,7 +2039,9 @@ def create_flask_app(
             ),
             parent_options=[entry for entry in rows if entry["node"].id not in excluded],
             parent_id=parent_id,
-            name=request.form.get("name", node.name if node else ""),
+            name=request.form.get(
+                "node_label", request.form.get("name", node.name if node else "")
+            ),
             values=(
                 {
                     key.removeprefix("field:"): value
@@ -2089,7 +2099,7 @@ def create_flask_app(
                 hierarchy.create_node(
                     actor.id,
                     key,
-                    request.form.get("name", ""),
+                    request.form.get("node_label", request.form.get("name", "")),
                     request.form.get("parent_id") or None,
                     expected_revision=exact_expected_revision(),
                 )
@@ -2124,7 +2134,7 @@ def create_flask_app(
                     actor.id,
                     key,
                     node_id,
-                    request.form.get("name", ""),
+                    request.form.get("node_label", request.form.get("name", "")),
                     request.form.get("parent_id") or None,
                     submitted,
                     expected_revision=exact_expected_revision(),
@@ -3644,7 +3654,7 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
-        name = request.form.get("name", "")
+        name = request.form.get("dataset_label", request.form.get("name", ""))
         description = request.form.get("description", "")
         technical_key = request.form.get("technical_key")
         try:
@@ -3838,7 +3848,7 @@ def create_flask_app(
         )
         require_csrf(login_session.csrf_token)
         field_key = request.form.get("key", "")
-        name = request.form.get("name", "")
+        name = request.form.get("field_label", request.form.get("name", ""))
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
@@ -3953,7 +3963,7 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
-        name = request.form.get("name", "")
+        name = request.form.get("field_label", request.form.get("name", ""))
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
@@ -4239,8 +4249,10 @@ def create_flask_app(
             open_user=form_target_id or request.args.get("open_user"),
             form_error=form_error,
             form_target_id=form_target_id,
-            form_email=form_data.get("email", ""),
-            form_display_name=form_data.get("display_name", ""),
+            form_email=form_data.get("invitee_email", form_data.get("email", "")),
+            form_display_name=form_data.get(
+                "invitee_display_name", form_data.get("display_name", "")
+            ),
             form_role=form_data.get("role", "user"),
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -4261,9 +4273,9 @@ def create_flask_app(
         try:
             users.create_user(
                 actor.id,
-                request.form.get("email", ""),
-                request.form.get("display_name", ""),
-                request.form.get("password", ""),
+                request.form.get("invitee_email", request.form.get("email", "")),
+                request.form.get("invitee_display_name", request.form.get("display_name", "")),
+                request.form.get("invitee_password", request.form.get("password", "")),
                 request.form.get("role", "user"),
             )
         except (ValidationError, ConflictError) as error:
@@ -4364,11 +4376,12 @@ def create_flask_app(
         actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
-            teams.create_team(actor.id, request.form.get("name", ""))
+            team_name = request.form.get("team_label", request.form.get("name", ""))
+            teams.create_team(actor.id, team_name)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
                 form_error=str(error),
-                form_name=request.form.get("name", ""),
+                form_name=request.form.get("team_label", request.form.get("name", "")),
                 status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))
@@ -4379,14 +4392,15 @@ def create_flask_app(
         actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
-            teams.rename_team(actor.id, team_id, request.form.get("name", ""))
+            team_name = request.form.get("team_label", request.form.get("name", ""))
+            teams.rename_team(actor.id, team_id, team_name)
         except NotFoundError:
             abort(404)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
                 form_error=str(error),
                 form_target_id=team_id,
-                form_name=request.form.get("name", ""),
+                form_name=request.form.get("team_label", request.form.get("name", "")),
                 status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))

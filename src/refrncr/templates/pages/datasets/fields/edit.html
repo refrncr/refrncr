@@ -8,11 +8,11 @@
     <div class='side-panel-body'>{% include 'pages/datasets/concepts/_banner.html' %}
       {% if not may_edit_key %}{{ readonly_field("Key", field.key, technical=true) }}{% endif %}
       {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-      <form id='field-edit-form' class='form' novalidate method='post' action='{{ url_for("update_dataset_field", key=dataset.key, field_key=field.key) }}'>
+      <form id='field-edit-form' class='form' {{ non_login_form_attrs() }} novalidate method='post' action='{{ url_for("update_dataset_field", key=dataset.key, field_key=field.key) }}'>
         {{ field_form_fields(key_value, name, data_type, is_required, is_unique, is_business_key_component, type_choices, may_edit_key, definition=definition, unit=unit, lock_constraints=field.mapping_role == 'source_identifier', lock_identifier=dataset.kind == 'mapping' and field.mapping_role != 'source_identifier', hierarchy=dataset.kind == 'hierarchy', hierarchy_scope=hierarchy_scope) }}
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       </form>
-      <form id='field-delete-form' method='post' action='{{ url_for("delete_dataset_field", key=dataset.key, field_key=field.key) }}'>
+      <form id='field-delete-form' {{ non_login_form_attrs() }} method='post' action='{{ url_for("delete_dataset_field", key=dataset.key, field_key=field.key) }}'>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       </form>
     </div>

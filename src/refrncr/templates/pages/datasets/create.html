@@ -16,11 +16,12 @@
     <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>
     <a class='button button-secondary' href='{{ url_for("team_list") }}'>Go to Teams</a>
   {% else %}
-  <form class='form' data-generate-key data-mapping-table-form novalidate method='post' action='{{ url_for("create_dataset") }}'>
+  <form class='form' {{ non_login_form_attrs() }} data-generate-key data-mapping-table-form novalidate method='post' action='{{ url_for("create_dataset") }}'>
     {{ form_field(
       "Name",
-      "name",
+      "dataset_label",
       "dataset-name",
+      key_source=true,
       required=true,
       value=name,
       error=error if error_field == "name" else none

@@ -11,7 +11,7 @@
 {# Change filters are independent toggles. With none selected all Records are shown.
    Counts follow the applied search term and the controls work without JavaScript. #}
 {% macro record_status_toggles() %}
-<form id='record-status-form' class='record-status-toggles' method='get' action='{{ request.path }}' role='group' aria-label='Record status' data-record-status-form>
+<form {{ non_login_form_attrs() }} id='record-status-form' class='record-status-toggles' method='get' action='{{ request.path }}' role='group' aria-label='Record status' data-record-status-form>
   {{ hidden_criteria(criteria_parameters, ['record_status']) }}
   <input type='hidden' name='action' value='apply'>
   {% for label, count, selected, target in record_change_options %}
@@ -26,7 +26,7 @@
 {% macro record_search_controls() %}
 <section class='record-criteria' aria-label='Search Records' data-record-criteria>
   <div class='record-criteria-toolbar'>
-  <form id='record-search-form' method='get' role='search' aria-label='Search records' class='record-search-form'>
+  <form {{ non_login_form_attrs() }} id='record-search-form' method='get' role='search' aria-label='Search records' class='record-search-form'>
     {{ hidden_criteria(criteria_parameters, ['q', 'import_results', 'status']) }}
     {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=MAX_SEARCH, clear_url=clear_url) }}
     {% if import_results or import_totals %}{{ record_status_filter(dataset.key, record_search, import_results, result_statuses, import_totals, clear_import_url) }}{% endif %}

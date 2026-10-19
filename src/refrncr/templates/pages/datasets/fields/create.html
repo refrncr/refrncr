@@ -3,7 +3,7 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Add field</h1>
   <div class='side-panel-body' data-side-panel-content data-panel-title='Add field' data-panel-eyebrow='Configure · {{ dataset.name }}'>{% include 'pages/datasets/concepts/_banner.html' %}{% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-  <form class='form' data-generate-key{% if dataset.kind == 'mapping' %} data-mapping-field-form{% endif %} novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>
+  <form {{ non_login_form_attrs() }} class='form' data-generate-key{% if dataset.kind == 'mapping' %} data-mapping-field-form{% endif %} novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>
     {% if dataset.kind == 'mapping' %}
     <fieldset class='field-role-choices'><legend>Field role</legend>
       {% if dataset.mapping_mode == 'linked' %}

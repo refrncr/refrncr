@@ -1,13 +1,13 @@
 {% from "components.html" import select_field %}
 {% macro create_user_fields(email='', display_name='', role='user') -%}
-  <div class='form-field'><label for='new-user-email'>Email address</label><input id='new-user-email' name='email' type='email' value='{{ email }}' required autofocus data-initial-focus></div>
-  <div class='form-field'><label for='new-user-name'>Name</label><input id='new-user-name' name='display_name' value='{{ display_name }}' required></div>
-  <div class='form-field'><label for='new-user-password'>Password</label><input id='new-user-password' name='password' type='password' required></div>
+  <div class='form-field'><label for='new-user-email'>Email address</label><input id='new-user-email' name='invitee_email' type='email' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ email }}' required autofocus data-initial-focus></div>
+  <div class='form-field'><label for='new-user-name'>Name</label><input id='new-user-name' name='invitee_display_name' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ display_name }}' required></div>
+  <div class='form-field'><label for='new-user-password'>Password</label><input id='new-user-password' name='invitee_password' type='password' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' required></div>
   {{ select_field('Role', 'role', 'new-user-role', [('user', 'User'), ('admin', 'Administrator')], selected=role) }}
 {%- endmacro %}
 
 {% macro edit_user_fields(user, email=user.email) -%}
   <div class='form-field'><label for='edit-user-name-{{ user.id }}'>Name</label><input id='edit-user-name-{{ user.id }}' value='{{ user.display_name }}' disabled></div>
-  <div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label><input id='edit-user-email-{{ user.id }}' name='email' type='email' value='{{ email }}' required></div>
+  <div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label><input id='edit-user-email-{{ user.id }}' name='email' type='email' autocomplete='email' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ email }}' required></div>
   <div class='form-field'><label for='edit-user-role-{{ user.id }}'>Role</label><input id='edit-user-role-{{ user.id }}' value='{{ "Administrator" if user.role == "admin" else "User" }}' disabled></div>
 {%- endmacro %}

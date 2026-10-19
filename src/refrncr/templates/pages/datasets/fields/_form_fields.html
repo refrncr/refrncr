@@ -1,10 +1,10 @@
 {% macro field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, include_key=false, definition='', unit='', lock_constraints=false, lock_identifier=false, hierarchy=false, hierarchy_scope='leaves') -%}
   {% set selected_type = type_choices|selectattr('id', 'equalto', data_type)|first %}
-  <label>Name <input name='name' value='{{ name }}'></label>
-  {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can be changed until the first version is published.</p>{% endif %}
-  <label>Definition <textarea name='definition' maxlength='{{ MAX_FIELD_DEFINITION }}' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
+  <label>Name <input name='field_label' autocomplete='off' {{ non_login_field_attrs() }} data-key-source value='{{ name }}'></label>
+  {% if include_key %}<label>Key <input name='key' autocomplete='off' {{ non_login_field_attrs() }} value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can be changed until the first version is published.</p>{% endif %}
+  <label>Definition <textarea name='definition' autocomplete='off' {{ non_login_field_attrs() }} maxlength='{{ MAX_FIELD_DEFINITION }}' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
   <p class='help-text' id='field-definition-help'>Optional explanation of meaning and intended use. Maximum 4000 characters.</p>
-  <label>Unit <input name='unit' value='{{ unit or "" }}' maxlength='{{ MAX_FIELD_UNIT }}' aria-describedby='field-unit-help'></label>
+  <label>Unit <input name='unit' autocomplete='off' {{ non_login_field_attrs() }} value='{{ unit or "" }}' maxlength='{{ MAX_FIELD_UNIT }}' aria-describedby='field-unit-help'></label>
   <p class='help-text' id='field-unit-help'>Optional label such as EUR, kg, % or days. Maximum 64 characters; no conversion or calculation.</p>
   <label>Data type <select name='data_type' data-select data-noun='data types' data-field-datatype>{% for choice in type_choices %}<option value='{{ choice.id }}' data-identifier-eligible='{{ 'true' if choice.identifier_eligible else 'false' }}'{% if choice.id == data_type %} selected{% endif %}>{{ choice.label }}</option>{% endfor %}</select></label>
   {% if hierarchy %}

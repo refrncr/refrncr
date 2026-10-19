@@ -43,7 +43,7 @@
   {% else %}
     <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</p>
     {% if section == 'Records' %}
-      <form class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
+      <form {{ non_login_form_attrs() }} class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
         <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
         <label for='diff-search'>Search old or new identifier</label>
         <input id='diff-search' type='search' name='q' value='{{ criteria.search }}' maxlength='{{ MAX_SEARCH }}'>
