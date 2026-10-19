@@ -20,6 +20,7 @@ from refrncr.audit_presentation import (
     safe_name,
     valid_id,
 )
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.ports import (
     AUDIT_NAMED_OBJECT_TYPES,
     AuditFilters,
@@ -103,11 +104,7 @@ def validate_filters(filters):
 
 
 def position(event):
-    timestamp = event.timestamp
-    return AuditPosition(
-        timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC),
-        event.id,
-    )
+    return AuditPosition(event.timestamp, event.id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,12 +116,12 @@ class AuditPage:
 
 
 class AuditHistoryService:
-    def __init__(self, uow: UnitOfWorkFactory, *, cursor_key=None, clock=None):
+    def __init__(self, uow: UnitOfWorkFactory, *, cursor_key=None, clock: Clock | None = None):
         self.uow = uow
         self._key = cursor_key if cursor_key is not None else secrets.token_bytes(32)
         if not isinstance(self._key, bytes) or len(self._key) < 32:
             raise ValueError("Audit cursor signing key requires at least 32 bytes")
-        self._clock = clock or (lambda: datetime.now(UTC))
+        self.clock = clock or getattr(uow, "clock", SYSTEM_CLOCK)
 
     def list_history(self, actor_id, filters=None, cursor=None):
         with self.uow() as work:
@@ -136,7 +133,12 @@ class AuditHistoryService:
                 start=filters.start.astimezone(UTC) if filters.start else None,
                 end=filters.end.astimezone(UTC) if filters.end else None,
             )
-            boundary, ceiling, newer, issued = None, None, False, int(self._clock().timestamp())
+            boundary, ceiling, newer, issued = (
+                None,
+                None,
+                False,
+                int(self.clock.now().timestamp()),
+            )
             if cursor is not None:
                 boundary, ceiling, newer, issued = self._decode(cursor, actor_id, filters)
             records = work.audit_history.page(
@@ -260,7 +262,7 @@ class AuditHistoryService:
                 raise ValueError
             if type(data["issued"]) is not int or type(data["newer"]) is not bool:
                 raise ValueError
-            if not 0 <= int(self._clock().timestamp()) - data["issued"] < CURSOR_LIFETIME:
+            if not 0 <= int(self.clock.now().timestamp()) - data["issued"] < CURSOR_LIFETIME:
                 raise ValueError
             positions = []
             for key in ("boundary", "ceiling"):

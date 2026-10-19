@@ -68,7 +68,7 @@ def _seed_representative_data(database_url) -> RecoveryFixture:
         )
         current = services.datasets.get_dataset_for_edit(admin.id, dataset.key)
         services.dataset_versions.publish(
-            admin.id, dataset.id, services.dataset_versions._today().date(), "", current.revision
+            admin.id, dataset.id, services.dataset_versions.clock.today(), "", current.revision
         )
         services.dataset_versions.create_concept(member.id, dataset.id)
         services.dataset_records.update_record(

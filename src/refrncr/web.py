@@ -40,6 +40,7 @@ from refrncr.change_status import (
     status_badge_variant,
     status_label,
 )
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
@@ -219,8 +220,12 @@ def create_flask_app(
     dataset_versions: DatasetVersionService | None = None,
     review_signing_key: bytes | None = None,
     api_keys: ApiKeyService | None = None,
+    clock: Clock | None = None,
 ) -> Flask:
     app = Flask(__name__)
+    clock = clock or getattr(
+        api_keys, "clock", getattr(getattr(users, "uow", None), "clock", SYSTEM_CLOCK)
+    )
     security_uow = getattr(users, "uow", None)
 
     def audit_security(action, *, actor_user_id=None):
@@ -232,7 +237,7 @@ def create_flask_app(
     review_secret = (
         review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
     )
-    audit_history = audit_history or AuditHistoryService(users.uow)
+    audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
@@ -251,7 +256,9 @@ def create_flask_app(
 
     @app.template_filter("absolute_utc")
     def absolute_utc(value):
-        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+        if value.utcoffset() is None:
+            raise ValueError("Database timestamps must be timezone-aware")
+        value = value.astimezone(UTC)
         months = (
             "Jan",
             "Feb",
@@ -299,7 +306,7 @@ def create_flask_app(
             request.max_content_length = MAX_COLUMNS * 1024
             request.max_form_parts = MAX_COLUMNS * 6 + 2
 
-    login_limiter = login_limiter or LoginAttemptLimiter()
+    login_limiter = login_limiter or LoginAttemptLimiter(clock=clock)
     source_resolver = source_resolver or SourceIdentityResolver()
     authentication_admission = authentication_admission or BrowserAuthenticationAdmissionGuard()
     existing_dataset_dependencies = (
@@ -635,7 +642,7 @@ def create_flask_app(
         return api_key_page(
             "create",
             creation_token=identity + "." + signature,
-            default_expiry=(datetime.now(UTC) + LIFETIME).date().isoformat(),
+            default_expiry=(clock.today() + LIFETIME).isoformat(),
             error=error,
         ), status
 
@@ -676,7 +683,7 @@ def create_flask_app(
             except ValueError:
                 raise ValidationError("Choose a valid expiry date") from None
             # The displayed default date means exactly 90 days, not midnight.
-            if value == (datetime.now(UTC) + LIFETIME).date().isoformat():
+            if value == (clock.today() + LIFETIME).isoformat():
                 expiry = None
             created = api_key_service.create_key(
                 actor.id, request.form["name"], expiry, request_id=identity
@@ -1573,7 +1580,7 @@ def create_flask_app(
                 return review_error(key)
         except (ValidationError, ConflictError) as failure:
             error, status = error or str(failure), 409
-        today = dataset_versions._today().date().isoformat()
+        today = dataset_versions.clock.today().isoformat()
         concept_summary = dataset_versions.history(actor.id, key).concept_summary
         return render_authenticated_template(
             "pages/datasets/versions/publish.html",

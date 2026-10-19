@@ -35,8 +35,9 @@ from refrncr.api.contracts import (
     VersionMetadata,
 )
 from refrncr.api.documentation import CONDITIONAL_PARAMETERS, DESCRIPTION, RESPONSE_HEADERS
-from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead, utc
+from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead
 from refrncr.api_keys import ApiKeyAuthenticationError
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import get_datatype
 from refrncr.published_contracts import encode_identifier, record_identifier
 from refrncr.services import AuthenticatedPrincipal, NotFoundError, ValidationError
@@ -46,7 +47,7 @@ def _version(publication):
     version = publication.version
     return VersionMetadata(
         number=version.number,
-        published_at=get_datatype("timestamp").text(utc(version.published_at)),
+        published_at=get_datatype("timestamp").text(version.published_at),
         effective_from=version.effective_date.isoformat(),
     )
 
@@ -176,7 +177,7 @@ def _pagination(page, total, path, effective_date=None, version_number=None):
     )
 
 
-def create_api(versions, api_keys):
+def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
     app = FastAPI(
         title="refrncr Published data API",
         version="1",
@@ -252,6 +253,7 @@ def create_api(versions, api_keys):
             page=page,
             effective_date=effective_date,
             version_number=version_number,
+            clock=clock,
         )
         result = versions.read_current(
             actor.id,

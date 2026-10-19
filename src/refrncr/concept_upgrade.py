@@ -3,11 +3,12 @@
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields
 from refrncr.diff_persistence import SqlAlchemyDiffOperations
-from refrncr.models import Dataset, utc_now
+from refrncr.models import Dataset
 from refrncr.persistence import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
@@ -98,7 +99,7 @@ def migrate_concepts(connection):
     invalid, active = _decisions(connection)
     if invalid:
         raise ConceptUpgradeError(invalid)
-    now = utc_now()
+    now = SYSTEM_CLOCK.now()
     with Session(bind=connection) as session:
         concepts = SqlAlchemyConceptOperations(session, legacy_schema=True)
         for dataset_id, baseline_id, revision in active:

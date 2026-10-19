@@ -7,6 +7,7 @@ import pytest
 from dataset_helpers import create_owned_dataset, downgrade_historical_fixture, publish_dataset
 from sqlalchemy import event, select
 from support import (
+    MutableClock,
     body,
     html_elements,
     login,
@@ -62,20 +63,20 @@ def test_creation_fallback_and_settings_do_not_change_freshness(context_services
     assert stamp(services, admin) == BASE
 
 
-def test_record_lifecycle_counts_revisions_and_failures(context_services, monkeypatch):
+def test_record_lifecycle_counts_revisions_and_failures(context_services):
     _, factory, services, admin = context_services
     configure(services, admin)
+    services.users.uow.clock = MutableClock(BASE)
     previous = stamp(services, admin)
-    monkeypatch.setattr("refrncr.services._now", lambda: BASE)
     first = services.dataset_records.create_record(admin.id, "context", {"code": "A"})
     assert stamp(services, admin) == BASE != previous
     overview = services.datasets.list_dataset_overview(admin.id)[0]
     assert overview.no_current and overview.record_count == 0
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
-    monkeypatch.setattr("refrncr.services._now", lambda: BASE + timedelta(minutes=1))
+    services.users.uow.clock.set(BASE + timedelta(minutes=1))
     second = services.dataset_records.create_record(admin.id, "context", {"code": "B"})
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 2
-    monkeypatch.setattr("refrncr.services._now", lambda: BASE + timedelta(minutes=2))
+    services.users.uow.clock.set(BASE + timedelta(minutes=2))
     edited = services.dataset_records.update_record(admin.id, "context", first.id, 1, {"code": "C"})
     assert stamp(services, admin) == BASE + timedelta(minutes=2)
     assert edited.revision == 2
@@ -88,7 +89,7 @@ def test_record_lifecycle_counts_revisions_and_failures(context_services, monkey
     with pytest.raises(StaleRecordError):
         services.dataset_records.delete_record(admin.id, "context", first.id, 1)
     assert stamp(services, admin) == BASE + timedelta(minutes=2)
-    monkeypatch.setattr("refrncr.services._now", lambda: BASE + timedelta(minutes=3))
+    services.users.uow.clock.set(BASE + timedelta(minutes=3))
     services.dataset_records.delete_record(admin.id, "context", first.id, 2)
     assert stamp(services, admin) == BASE + timedelta(minutes=3)
     assert services.datasets.get_dataset_context(admin.id, "context").record_count == 1
@@ -144,34 +145,41 @@ def test_commit_failure_rolls_back_timestamp_and_mutation(
     assert tuple(f.id for f in services.dataset_fields.list_fields(admin.id, dataset.key)) == order
 
 
-def test_all_existing_schema_mutations_and_noops(context_services, monkeypatch):
+def test_all_existing_schema_mutations_and_noops(context_services):
     _, _, services, admin = context_services
+    services.users.uow.clock = MutableClock(BASE)
     fresh(services, admin)
     moment = BASE
-    monkeypatch.setattr("refrncr.services._now", lambda: moment)
+    services.users.uow.clock.set(moment)
     fields = services.dataset_fields
     field = fields.create_field(admin.id, "context", "code", "Code", "string", True)
     assert stamp(services, admin) == moment
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     fields.update_field(admin.id, "context", "code", "Renamed", "string", True, True)
     assert stamp(services, admin) == moment
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     services.dataset_business_keys.set_business_key(admin.id, "context", ("code",))
     assert stamp(services, admin) == moment
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     fields.update_field_and_business_key_membership(
         admin.id, "context", "code", "Renamed", "string", True, True, False
     )
     assert stamp(services, admin) == moment
     spare = fields.create_field(admin.id, "context", "spare", "Spare", "string")
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     fields.move_field(admin.id, "context", spare.id, "up", (field.id, spare.id))
     assert stamp(services, admin) == moment
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     fields.delete_field(admin.id, "context", "spare")
     assert stamp(services, admin) == moment
     previous = moment
     moment += timedelta(minutes=1)
+    services.users.uow.clock.set(moment)
     fields.update_field(admin.id, "context", "code", "Renamed", "string", True, True)
     fields.update_field_and_business_key_membership(
         admin.id, "context", "code", "Renamed", "string", True, True, False
@@ -192,6 +200,7 @@ def test_successful_import_updates_once_and_counts_rows(context_services):
     )
     importer.preview(admin.id, "test", dataset.key, state.token, ("code", None))
     assert stamp(services, admin) == before
+    services.users.uow.clock = MutableClock(before + timedelta(microseconds=1))
     assert importer.confirm(admin.id, "test", dataset.key, state.token) == 2
     context = services.datasets.get_dataset_context(admin.id, dataset.key)
     assert context.last_updated > before

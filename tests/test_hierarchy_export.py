@@ -400,7 +400,7 @@ def test_reporting_exports_all_supported_datatypes_through_existing_serializers(
     assert values_by_key["count"] == 7
     assert values_by_key["ratio"] == 1.25
     assert values_by_key["clock"] == time(9, 30).isoformat()
-    assert values_by_key["local"] == datetime(2026, 10, 14, 9, 30).isoformat()
+    assert values_by_key["local"] == datetime(2026, 10, 14, 9, 30).isoformat()  # noqa: DTZ001
     assert values_by_key["instant"] == datetime(
         2026, 10, 14, 7, 30, tzinfo=UTC
     ).isoformat().replace("+00:00", "Z")

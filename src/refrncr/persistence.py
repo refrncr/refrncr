@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.models import (
     AuditEvent,
@@ -44,7 +45,6 @@ from refrncr.models import (
     Team,
     User,
     new_id,
-    utc_now,
 )
 from refrncr.ports import (
     AuditObjectRecord,
@@ -70,6 +70,10 @@ def _locked(statement, session: Session, for_update: bool):
     if for_update and session.get_bind().dialect.name != "sqlite":
         return statement.with_for_update().execution_options(populate_existing=True)
     return statement
+
+
+def _clock_now(session: Session):
+    return session.info.get("clock", SYSTEM_CLOCK).now()
 
 
 def _safe_constraint_name(error: IntegrityError) -> str | None:
@@ -158,7 +162,7 @@ class SqlAlchemyUserOperations:
             result = self.session.execute(
                 update(User)
                 .where(User.id == user_id, User.password_hash == expected_hash)
-                .values(password_hash=replacement_hash, updated_at=utc_now())
+                .values(password_hash=replacement_hash, updated_at=_clock_now(self.session))
             )
             self.session.flush()
         except SQLAlchemyError:
@@ -367,7 +371,7 @@ class SqlAlchemyDatasetOperations:
         result = self.session.execute(
             update(Dataset)
             .where(Dataset.id == dataset_id, Dataset.owner_team_id == expected_owner_team_id)
-            .values(owner_team_id=owner_team_id, updated_at=utc_now())
+            .values(owner_team_id=owner_team_id, updated_at=_clock_now(self.session))
         )
         if result.rowcount == 1:
             self.session.scalar(
@@ -593,7 +597,7 @@ class SqlAlchemyDatasetFieldOperations:
         if not self._has_display_position():
             values.pop("display_position", None)
             values["id"] = new_id()
-            values["created_at"] = values["updated_at"] = utc_now()
+            values["created_at"] = values["updated_at"] = _clock_now(self.session)
             key = values.pop("key")
             self.session.execute(
                 text(
@@ -635,7 +639,7 @@ class SqlAlchemyDatasetFieldOperations:
             result = self.session.execute(
                 update(DatasetField)
                 .where(DatasetField.dataset_id == dataset_id, DatasetField.id == field_id)
-                .values(_key=key, updated_at=utc_now())
+                .values(_key=key, updated_at=_clock_now(self.session))
                 .execution_options(synchronize_session=False)
             )
         except IntegrityError as exc:
@@ -771,7 +775,7 @@ class SqlAlchemyDatasetRecordOperations:
                 .values(
                     identifier_key=identifier_key,
                     revision=DatasetRecord.revision + 1,
-                    updated_at=utc_now(),
+                    updated_at=_clock_now(self.session),
                 )
             )
         except IntegrityError as exc:
@@ -824,7 +828,11 @@ class SqlAlchemyDatasetRecordOperations:
                 DatasetRecord.revision == expected_revision,
                 self._active_records,
             )
-            .values(deleted_content=payload, revision=expected_revision + 1, updated_at=utc_now())
+            .values(
+                deleted_content=payload,
+                revision=expected_revision + 1,
+                updated_at=_clock_now(self.session),
+            )
         )
         if result.rowcount:
             self.session.execute(
@@ -898,7 +906,7 @@ class SqlAlchemyDatasetRecordOperations:
                     deleted_content=None,
                     identifier_key=identifier_key,
                     revision=expected_revision + 1,
-                    updated_at=utc_now(),
+                    updated_at=_clock_now(self.session),
                 )
             )
         except IntegrityError as exc:
@@ -1324,14 +1332,17 @@ class SqlAlchemyUnitOfWork:
         write: bool = False,
         serialized: bool = False,
         translate_errors: bool = False,
+        clock: Clock = SYSTEM_CLOCK,
     ) -> None:
         self.sessions = sessions
         self.write = write
         self.serialized = serialized
         self.translate_errors = translate_errors
+        self.clock = clock
 
     def __enter__(self) -> SqlAlchemyUnitOfWork:
         self.session = self.sessions()
+        self.session.info["clock"] = self.clock
         try:
             if self.write:
                 if self.serialized and self.session.get_bind().dialect.name == "sqlite":
@@ -1404,6 +1415,12 @@ class SqlAlchemyUnitOfWork:
         except IntegrityError as exc:
             raise PersistenceConflictError(_safe_constraint_name(exc)) from None
 
+    def now(self):
+        return self.clock.now()
+
+    def today(self):
+        return self.clock.today()
+
     def begin_export_snapshot(self) -> None:
         """Start the engine-appropriate read snapshot before any export query."""
         bind = self.session.get_bind()
@@ -1421,14 +1438,19 @@ class SqlAlchemyUnitOfWork:
 
 
 class SqlAlchemyUnitOfWorkFactory:
-    def __init__(self, sessions: sessionmaker[Session]) -> None:
+    def __init__(self, sessions: sessionmaker[Session], clock: Clock = SYSTEM_CLOCK) -> None:
         self.sessions = sessions
+        self.clock = clock
 
     def __call__(
         self, *, write: bool = False, serialized: bool = False, translate_errors: bool = False
     ) -> SqlAlchemyUnitOfWork:
         return SqlAlchemyUnitOfWork(
-            self.sessions, write=write, serialized=serialized, translate_errors=translate_errors
+            self.sessions,
+            write=write,
+            serialized=serialized,
+            translate_errors=translate_errors,
+            clock=self.clock,
         )
 
 

@@ -238,7 +238,7 @@ def test_remembered_datetime_initializes_all_components(profile):
     from refrncr.record_import import DatasetRecordImportService, ParsedSource, SourceRow
 
     if profile.kind == "native":
-        value = datetime(2024, 2, 29, 21, 5)
+        value = datetime(2024, 2, 29, 21, 5)  # noqa: DTZ001 - native Excel local value
     else:
         parts = {"y": "2024", "m": "02", "d": "29"}
         value = profile.date_separator.join(parts[part] for part in profile.date_order)
@@ -279,7 +279,7 @@ def test_native_excel_controls_preview_and_textual_rejection(wizard):
     )
     book = Workbook()
     book.active.append(["code", "amount", "moment"])
-    book.active.append(["A", 1, datetime(2024, 2, 29, 12, 34, 56)])
+    book.active.append(["A", 1, datetime(2024, 2, 29, 12, 34, 56)])  # noqa: DTZ001
     output = io.BytesIO()
     book.save(output)
     book.close()

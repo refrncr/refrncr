@@ -12,7 +12,7 @@ import unicodedata
 import zipfile
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from datetime import time as datetime_time
 from pathlib import PurePath
 from types import MappingProxyType
@@ -1627,7 +1627,7 @@ class DatasetRecordImportService:
                         result["records"] = imported_states
                     uow.concepts.record_mutation(dataset.id, import_result=result)
                     _advance_concept(uow, dataset)
-                    dataset.content_updated_at = datetime.now(UTC)
+                    dataset.content_updated_at = uow.now()
                     if state.mode == "new_version":
                         record_audit(
                             uow,

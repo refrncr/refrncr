@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.engine import make_url
 
 from refrncr.app import create_community_services
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import (
@@ -17,7 +18,6 @@ from refrncr.models import (
     DatasetField,
     Grant,
     ImmutableDatasetFieldKeyError,
-    utc_now,
 )
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import (
@@ -66,7 +66,7 @@ def test_sqlite_database_defaults_round_trip_as_false(field_services):
     _, factory, services, admin = field_services
     dataset = create_dataset(services, admin)
     field_id = str(uuid.uuid4())
-    now = utc_now()
+    now = SYSTEM_CLOCK.now()
     with factory.begin() as session:
         session.execute(
             text(
@@ -602,7 +602,7 @@ def test_postgresql_field_creation_duplicate_rollback_and_race(monkeypatch):
             )
 
         default_field_id = str(uuid.uuid4())
-        now = utc_now()
+        now = SYSTEM_CLOCK.now()
         with factory.begin() as session:
             session.execute(
                 text(

@@ -13,7 +13,7 @@ from support import dataset_version_client as client
 def prepared(c):
     configured(c)
     publish(c)
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 1, {"code": "new", "label": "<b>draft</b>"}

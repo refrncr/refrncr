@@ -159,16 +159,16 @@ def test_excel_native_temporals_survive_staging():
     workbook = Workbook()
     workbook.active.append(["date", "time", "datetime", "blank"])
     workbook.active.append(
-        [datetime(2024, 2, 29), time(12, 34, 56), datetime(2024, 2, 29, 15, 45, 12), None]
+        [datetime(2024, 2, 29), time(12, 34, 56), datetime(2024, 2, 29, 15, 45, 12), None]  # noqa: DTZ001
     )
     output = io.BytesIO()
     workbook.save(output)
     workbook.close()
     parsed = parse_source("native.xlsx", output.getvalue(), "Sheet")
     row = parsed.rows[0]
-    assert row.source_value(0) == datetime(2024, 2, 29)
+    assert row.source_value(0) == datetime(2024, 2, 29)  # noqa: DTZ001
     assert row.source_value(1) == time(12, 34, 56)
-    assert row.source_value(2) == datetime(2024, 2, 29, 15, 45, 12)
+    assert row.source_value(2) == datetime(2024, 2, 29, 15, 45, 12)  # noqa: DTZ001
     assert row.source_value(3) == ""
 
 

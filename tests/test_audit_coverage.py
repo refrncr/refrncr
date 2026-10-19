@@ -70,11 +70,11 @@ def prepare(c, operation):
     if cls == "DatasetVersionService":
         from datetime import timedelta
 
-        from refrncr.models import utc_now
+        from refrncr.clock import SYSTEM_CLOCK
 
         s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
         revision = s.datasets.get_dataset(a.id, d.key).revision
-        day = utc_now().date() + timedelta(days=1)
+        day = SYSTEM_CLOCK.today() + timedelta(days=1)
         if method == "publish":
             return lambda actor: s.dataset_versions.publish(actor, d.id, day, "", revision), [
                 ("dataset", "dataset.version_published", d.id)

@@ -23,7 +23,6 @@ from refrncr.services import (
     StaleRecordError,
     ValidationError,
     _advance_concept,
-    _now,
     _require_concept,
     canonicalize_record_value,
 )
@@ -394,7 +393,7 @@ class HierarchyImportService:
                     changed += 1
             if changed:
                 _advance_concept(work, dataset)
-                dataset.content_updated_at = _now()
+                dataset.content_updated_at = work.now()
                 work.concepts.record_mutation(dataset.id)
                 record_audit(
                     work,

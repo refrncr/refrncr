@@ -99,14 +99,6 @@ class PublishedVersion:
     cancelled_at: datetime | None = None
     cancelling_actor_id: str | None = None
 
-    def __post_init__(self):
-        # As for DatasetOverview, SQLite timestamps are stored as UTC without tzinfo.
-        for attribute in ("published_at", "cancelled_at"):
-            value = getattr(self, attribute)
-            if value is not None:
-                value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-                object.__setattr__(self, attribute, value)
-
     @property
     def system_published(self):
         return self.publisher_id is None

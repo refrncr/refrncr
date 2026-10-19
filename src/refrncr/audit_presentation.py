@@ -3,7 +3,6 @@
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import UTC
 from types import MappingProxyType
 from typing import Literal
 from uuid import UUID
@@ -360,9 +359,6 @@ def present_event(event, actor_names, objects):
                 obj.status, name + (" (deleted)" if obj.status == "deleted" else "")
             )
     timestamp = event.timestamp
-    timestamp = (
-        timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp.astimezone(UTC)
-    )
 
     # Historical unknown contracts remain traversable, without displaying arbitrary
     # technical strings or unapproved context as though they were supported events.

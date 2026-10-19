@@ -33,7 +33,7 @@ CASES = [
         "datetime",
         "2024-02-29T01:02:03.000001",
         "2024-02-29T01:02:03.000001",
-        datetime(2024, 2, 29, 1, 2, 3, 1),
+        datetime(2024, 2, 29, 1, 2, 3, 1),  # noqa: DTZ001 - naive local value fixture
     ),
     (
         "timestamp",

@@ -19,6 +19,7 @@ from werkzeug.datastructures import MultiDict
 
 from refrncr import login_security
 from refrncr.app import create_community_services
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
@@ -28,12 +29,32 @@ from refrncr.hierarchy import HierarchyService
 from refrncr.models import AuditEvent, Dataset, User
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.services import ResourceTypeRegistry
+from refrncr.version_contracts import APPLICATION_TIMEZONE
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
 SECURITY_HTTPS = "https://community.example"
 PASSWORD = "correct horse battery staple"
 LoginAttemptLimiter = login_security.LoginAttemptLimiter
+
+
+class MutableClock:
+    def __init__(self, value: datetime | None = None):
+        self.value = SYSTEM_CLOCK.now() if value is None else value
+
+    def now(self) -> datetime:
+        return self.value
+
+    def today(self) -> date:
+        return self.value.astimezone(APPLICATION_TIMEZONE).date()
+
+    def set(self, value: datetime) -> None:
+        self.value = value
+
+    def advance(self, **kwargs) -> None:
+        self.value += timedelta(**kwargs)
+
+
 MUTATIONS = (
     "UserService.create_user",
     "UserService.change_email",
@@ -398,7 +419,7 @@ NOW = datetime(2026, 9, 10, 12, tzinfo=UTC)
 
 def setup(c, *, populated=True):
     c.service = DatasetVersionService(
-        c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
+        c.s.datasets.uow, c.s.authorization.datasets, clock=MutableClock(NOW)
     )
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "code", "Code", "string", True, True, True)
     c.s.dataset_fields.create_field(c.a.id, c.d.key, "label", "Label", "string")
@@ -426,7 +447,7 @@ def publish(c, *, day=None, actor=None, expected=None):
         revision(c) if expected is None else expected,
     )
     if automatic_day:
-        c.service.clock = lambda: NOW + timedelta(days=(day - NOW.date()).days)
+        c.service.clock.set(NOW + timedelta(days=(day - NOW.date()).days))
     return result
 
 
@@ -443,7 +464,7 @@ def content(c, version):
 def configured(c):
     setup(c)
     c.service = c.s.dataset_versions
-    c.service.clock = lambda: NOW
+    c.service.clock = MutableClock(NOW)
 
 
 def dataset_version_client(c, actor=None):
@@ -534,7 +555,7 @@ def prepare(c):
         c.a.id, "hierarchy", "Hierarchy", "", c.owner.id, kind="hierarchy"
     )
     c.service = DatasetVersionService(
-        c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
+        c.s.datasets.uow, c.s.authorization.datasets, clock=MutableClock(NOW)
     )
     c.diff = DatasetDiffService(c.service)
     return node(c, "Root")
@@ -696,7 +717,7 @@ CASES = [
         "datetime",
         "2024-02-29T01:02:03.000001",
         "2024-02-29T01:02:03.000001",
-        datetime(2024, 2, 29, 1, 2, 3, 1),
+        datetime(2024, 2, 29, 1, 2, 3, 1),  # noqa: DTZ001 - naive local Excel value fixture
     ),
     (
         "timestamp",

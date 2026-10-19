@@ -15,7 +15,7 @@ from dataset_helpers import create_owned_dataset
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
-from support import NOW, _dataset_browser, publish, setup
+from support import NOW, MutableClock, _dataset_browser, publish, setup
 from werkzeug.datastructures import MultiDict
 
 from refrncr.api_keys import ApiKeyService
@@ -94,10 +94,9 @@ def _build_api(c):
     c.version = publish(c)
     with c.sessions.begin() as session:
         session.get(Dataset, c.d.id).updated_at = NOW
-    c.now = [NOW]
-    c.keys = ApiKeyService(
-        c.s.users.uow, pepper=b"disposable-ref107-test-pepper!!!!!", clock=lambda: c.now[0]
-    )
+    c.now = MutableClock(NOW)
+    c.s.users.uow.clock = c.now
+    c.keys = ApiKeyService(c.s.users.uow, pepper=b"disposable-ref107-test-pepper!!!!!", clock=c.now)
     c.key = c.keys.create_key(c.u.id, "Read integration")
     c.headers = {"Authorization": "Bearer " + c.key.secret}
     c.app = create_application(

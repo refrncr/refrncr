@@ -4,7 +4,7 @@ import uvicorn
 from browser_api_keys_app import admin, keys, services
 
 from refrncr.app import create_application
-from refrncr.models import utc_now
+from refrncr.clock import SYSTEM_CLOCK
 
 team = services.teams.create_team(admin.id, "Synthetic domain")
 d = services.datasets.create_dataset(
@@ -15,7 +15,7 @@ services.dataset_records.create_record(admin.id, d.key, {"code": "NL"})
 services.dataset_versions.publish(
     admin.id,
     d.id,
-    utc_now().date(),
+    SYSTEM_CLOCK.today(),
     "",
     services.datasets.get_dataset_for_edit(admin.id, d.key).revision,
 )

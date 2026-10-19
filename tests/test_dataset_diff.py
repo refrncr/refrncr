@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
-from support import NOW, audits, publish, setup, snapshot
+from support import NOW, MutableClock, audits, publish, setup, snapshot
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.diff_classification import classify_fields, relative_moves
@@ -188,7 +188,7 @@ def test_stale_baseline_and_revision(context, change):
     )
     review = opened(c)
     if change == "activate":
-        c.service.clock = lambda: NOW + timedelta(days=1)
+        c.service.clock.set(NOW + timedelta(days=1))
     elif change == "cancel":
         c.service.cancel(c.a.id, c.d.id, scheduled.id)
     elif change == "delete":
@@ -223,7 +223,9 @@ def test_audit_once_no_noise_and_no_change(context):
     for section in ("Summary", "Fields", "Records"):
         c.diff.review(c.a.id, review.identity, section)
     assert len(audits(c)) == before + 1
-    event = audits(c)[-1]
+    event = next(
+        event for event in reversed(audits(c)) if event.action == "dataset.version_diff_viewed"
+    )
     assert event.action == "dataset.version_diff_viewed"
     assert event.actor_user_id == c.a.id and event.object_id == c.d.id
     assert set(event.details) == {
@@ -626,7 +628,7 @@ def test_scheduled_activation_blocks_review_publication(database_context):
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Next", "string", False, False)
     review = opened(c)
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     before = snapshot(c)
     with pytest.raises(ConflictError):
         c.service.publish(
@@ -684,7 +686,7 @@ def test_calendar_change_during_open_rolls_back(database_context, monkeypatch):
 
     def cross_boundary(*args):
         result = original(*args)
-        c.service.clock = lambda: NOW + timedelta(days=1)
+        c.service.clock.set(NOW + timedelta(days=1))
         return result
 
     monkeypatch.setattr(SqlAlchemyDiffOperations, "counts", cross_boundary)
@@ -702,8 +704,19 @@ def test_scheduled_activation_during_review_publication_rolls_back(database_cont
     c.service.create_concept(c.a.id, c.d.id)
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Next", "string", False, False)
     review = opened(c)
-    calls = iter([NOW, NOW + timedelta(days=1), NOW + timedelta(days=1)])
-    c.service.clock = lambda: next(calls)
+
+    class AdvancingClock(MutableClock):
+        def __init__(self):
+            super().__init__(NOW)
+            self.reads = 0
+
+        def today(self):
+            self.reads += 1
+            if self.reads > 1:
+                self.set(NOW + timedelta(days=1))
+            return super().today()
+
+    c.service.clock = AdvancingClock()
     before = snapshot(c)
     with pytest.raises(ConflictError):
         c.service.publish(

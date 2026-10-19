@@ -13,11 +13,11 @@ from refrncr.change_status import (
     RECORD_STATUS_FILTERS,
     status_label,
 )
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.hierarchy_contracts import hierarchy_node_paths
-from refrncr.models import utc_now
 from refrncr.ports import (
     DatasetBusinessKey,
     DatasetOverview,
@@ -43,7 +43,6 @@ from refrncr.services import (
     validate_field_metadata,
 )
 from refrncr.version_contracts import (
-    APPLICATION_TIMEZONE,
     MAX_RELEASE_NOTE,
     PublishedDataset,
     SnapshotContent,
@@ -157,10 +156,10 @@ def _validated_snapshot(uow, dataset):
 
 
 class DatasetVersionService:
-    def __init__(self, uow, authorization, *, clock=utc_now):
+    def __init__(self, uow, authorization, *, clock: Clock | None = None):
         self.uow = uow
         self.authorization = authorization
-        self.clock = clock
+        self.clock = clock or getattr(uow, "clock", SYSTEM_CLOCK)
 
     def read_current(
         self,
@@ -216,7 +215,7 @@ class DatasetVersionService:
                     )
                 else:
                     pairs, total = uow.versions.current_page(
-                        self._today().date(),
+                        self.clock.today(),
                         offset=offset,
                         limit=limit,
                         dataset_ids=dataset_ids,
@@ -248,7 +247,7 @@ class DatasetVersionService:
                     )
                 else:
                     version = uow.versions.current_for_datasets(
-                        (dataset.id,), self._today().date()
+                        (dataset.id,), self.clock.today()
                     ).get(dataset.id)
                 if version is None:
                     raise NotFoundError("Dataset not found")
@@ -302,7 +301,7 @@ class DatasetVersionService:
         from refrncr.services import _require_concept
 
         concept = _require_concept(uow, dataset.id)
-        current = uow.versions.current_for_datasets((dataset.id,), self._today().date()).get(
+        current = uow.versions.current_for_datasets((dataset.id,), self.clock.today()).get(
             dataset.id
         )
         if current is None:
@@ -345,7 +344,7 @@ class DatasetVersionService:
                 # Calendar activation has no writer/revision bump. Recheck after
                 # computing counts, immediately before the destructive statements.
                 current_now = uow.versions.current_for_datasets(
-                    (dataset.id,), self._today().date()
+                    (dataset.id,), self.clock.today()
                 ).get(dataset.id)
                 if current_now is None or current_now.id != expected.current_id:
                     raise ConflictError("Current changed. Review and confirm discard again.")
@@ -379,7 +378,7 @@ class DatasetVersionService:
                 if work.concepts.get(dataset.id) is not None:
                     raise ConflictError("This Dataset already has an active concept.")
                 baseline = work.versions.latest_non_cancelled(dataset.id)
-                now = self._today()
+                now = self.clock.now()
                 if baseline is not None:
                     baseline_fields = work.versions.fields(baseline)
                     if len(
@@ -436,12 +435,6 @@ class DatasetVersionService:
         except PersistenceConflictError:
             raise ConflictError("Concept could not be started. Reload and try again.") from None
 
-    def _today(self):
-        instant = self.clock()
-        if instant.tzinfo is None or instant.utcoffset() is None:
-            raise ValueError("Version clock must return an aware instant")
-        return instant.astimezone(APPLICATION_TIMEZONE)
-
     def _target(self, uow, actor_id, dataset_id, *, write=False):
         dataset = (
             uow.datasets.get(dataset_id, for_update=write) if _valid_identity(dataset_id) else None
@@ -487,7 +480,7 @@ class DatasetVersionService:
                 if maintenance.all_resources
                 else set(maintenance.resource_ids)
             )
-            current = uow.versions.current_for_datasets(None, self._today().date())
+            current = uow.versions.current_for_datasets(None, self.clock.today())
             hierarchy_counts = uow.versions.hierarchy_node_counts(
                 tuple(
                     current[row.dataset.id].id
@@ -534,7 +527,7 @@ class DatasetVersionService:
         maintain = self.authorization.can_maintain_dataset(actor_id, dataset.id, uow=uow)
         if prefer_concept and maintain and version_id is None and uow.concepts.get(dataset.id):
             return dataset, None, maintain
-        today = self._today().date()
+        today = self.clock.today()
         states = version_states(uow.versions.list_for_dataset(dataset.id), today)
         state = next(
             (
@@ -592,7 +585,7 @@ class DatasetVersionService:
             )
             concept = uow.concepts.get(dataset.id) if maintain else None
             concept_view = self._concept_context(uow, actor_id, dataset) if concept else None
-            today = self._today().date()
+            today = self.clock.today()
             entries = tuple(
                 self._visible_state(state, maintain, today)
                 for state in version_states(uow.versions.list_for_dataset(dataset.id), today)
@@ -634,7 +627,7 @@ class DatasetVersionService:
             names.get(concept.creator_id, "Deleted user")
             if concept.creator_id
             else "System (migration)",
-            dataset.id in uow.versions.current_for_datasets((dataset.id,), self._today().date()),
+            dataset.id in uow.versions.current_for_datasets((dataset.id,), self.clock.today()),
         )
 
     def concept_context(self, actor_id, key):
@@ -845,7 +838,7 @@ class DatasetVersionService:
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             dataset = self._target(uow, actor_id, dataset_id)
-            content, summary, number = self._prepare(uow, dataset, self._today().date())
+            content, summary, number = self._prepare(uow, dataset, self.clock.today())
             return dataset.revision, number, content, summary
 
     def _prepare(self, uow, dataset, today):
@@ -908,12 +901,13 @@ class DatasetVersionService:
 
                     diff = DatasetDiffService(self)
                     review_state = diff._load(uow, actor_id, dataset_id, expected_review)[2]
-                now = self._today()
-                if type(effective_date) is not date or effective_date < now.date():
+                now = self.clock.now()
+                today = self.clock.today()
+                if type(effective_date) is not date or effective_date < today:
                     raise ValidationError("Effective date must be today or a future calendar date")
                 if not isinstance(release_note, str) or len(release_note) > MAX_RELEASE_NOTE:
                     raise ValidationError("Release note must not exceed 2000 characters")
-                content, summary, number = self._prepare(uow, dataset, now.date())
+                content, summary, number = self._prepare(uow, dataset, today)
                 if any(
                     version.cancelled_at is None and version.effective_date == effective_date
                     for version in uow.versions.list_for_dataset(dataset.id)
@@ -952,12 +946,13 @@ class DatasetVersionService:
                 )
                 if version is None:
                     raise NotFoundError("Dataset not found")
-                now = self._today()
-                if version.cancelled_at is not None or version.effective_date <= now.date():
+                now = self.clock.now()
+                today = self.clock.today()
+                if version.cancelled_at is not None or version.effective_date <= today:
                     raise ConflictError(
                         "Only a Scheduled version can be cancelled before its effective date"
                     )
-                uow.versions.cancel(dataset.id, version.id, actor_id, now, now.date())
+                uow.versions.cancel(dataset.id, version.id, actor_id, now, today)
                 dataset.revision += 1
                 self._audit(uow, actor_id, version, "dataset.version_cancelled")
                 return replace(version, cancelled_at=now, cancelling_actor_id=actor_id)
