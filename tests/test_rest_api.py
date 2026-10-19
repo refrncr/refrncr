@@ -416,6 +416,15 @@ def test_conditional_headers_and_no_content_reload(api, monkeypatch):
     assert missing.status_code == 404
 
 
+def test_invalid_and_missing_record_identifiers_keep_uniform_not_found(api):
+    c = api
+    missing = get(c, "/audit/records/" + quote(encode_identifier(b"not-present"), safe=""))
+    malformed = get(c, "/audit/records/not-an-encoded-identifier")
+
+    assert missing.status_code == malformed.status_code == 404
+    assert missing.content == malformed.content == b'{"error":"not_found"}'
+
+
 def test_modified_since_precedence_and_metadata_changes(api):
     c = api
     first = get(c, "/audit")

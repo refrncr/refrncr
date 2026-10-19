@@ -5,14 +5,24 @@ from collections.abc import Iterable, Mapping
 from refrncr.errors import ValidationError
 
 MAX_RECORD_IDENTIFIER_BYTES = 2000
-RECORD_IDENTIFIER_ERROR = "Record identifier must be complete and at most 2000 bytes"
+RECORD_IDENTIFIER_MESSAGES = {
+    "too_long": (
+        "Record identifier is too long: the identifier fields together may be at most "
+        "2,000 bytes. Shorten one of them."
+    ),
+    "incomplete": "Record identifier is incomplete: every identifier field needs a value.",
+}
 
 
 class RecordIdentifierError(ValidationError):
     """An identifier is incomplete, malformed, or exceeds its storage limit."""
 
-    def __init__(self) -> None:
-        super().__init__(RECORD_IDENTIFIER_ERROR)
+    def __init__(self, reason: str = "incomplete") -> None:
+        if reason not in RECORD_IDENTIFIER_MESSAGES:
+            reason = "incomplete"
+        self.reason = reason
+        self.code = reason
+        super().__init__(RECORD_IDENTIFIER_MESSAGES[reason])
 
 
 def encode_record_identifier(
@@ -34,16 +44,18 @@ def encode_record_identifier(
             or set(expected) != {key for key, _ in items}
         ):
             raise RecordIdentifierError
+    if not all(isinstance(value, bytes) for _, value in items):
+        raise RecordIdentifierError
+    if sum(len(value) + 4 for _, value in items) > MAX_RECORD_IDENTIFIER_BYTES:
+        raise RecordIdentifierError("too_long")
 
     encoded = bytearray()
     try:
         for _key, value in sorted(items, key=lambda item: item[0]):
-            if not isinstance(value, bytes):
-                raise RecordIdentifierError
             encoded.extend(len(value).to_bytes(4, "big"))
             encoded.extend(value)
             if len(encoded) > MAX_RECORD_IDENTIFIER_BYTES:
-                raise RecordIdentifierError
+                raise RecordIdentifierError("too_long")
     except (OverflowError, TypeError):
         raise RecordIdentifierError from None
     return bytes(encoded)
@@ -51,8 +63,10 @@ def encode_record_identifier(
 
 def decode_record_identifier(encoded: bytes) -> tuple[bytes, ...]:
     """Decode and structurally validate a complete encoded identifier."""
-    if not isinstance(encoded, bytes) or not encoded or len(encoded) > MAX_RECORD_IDENTIFIER_BYTES:
+    if not isinstance(encoded, bytes) or not encoded:
         raise RecordIdentifierError
+    if len(encoded) > MAX_RECORD_IDENTIFIER_BYTES:
+        raise RecordIdentifierError("too_long")
     components = []
     offset = 0
     while offset < len(encoded):
@@ -66,15 +80,3 @@ def decode_record_identifier(encoded: bytes) -> tuple[bytes, ...]:
         components.append(encoded[offset:end])
         offset = end
     return tuple(components)
-
-
-def validate_record_identifier(
-    encoded: bytes, *, expected_component_count: int | None = None
-) -> tuple[bytes, ...]:
-    """Validate the encoded structure and, when known, its required component count."""
-    components = decode_record_identifier(encoded)
-    if expected_component_count is not None and (
-        expected_component_count < 1 or len(components) != expected_component_count
-    ):
-        raise RecordIdentifierError
-    return components

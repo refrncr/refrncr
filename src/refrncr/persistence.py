@@ -684,10 +684,13 @@ class SqlAlchemyDatasetBusinessKeyOperations:
         self.session = session
 
     def get(self, dataset_id: str) -> DatasetBusinessKey:
+        field_key = DatasetBusinessKeyField.field_key
+        if self.session.get_bind().dialect.name == "postgresql":
+            field_key = field_key.collate("C")
         keys = self.session.scalars(
             select(DatasetBusinessKeyField.field_key)
             .where(DatasetBusinessKeyField.dataset_id == dataset_id)
-            .order_by(DatasetBusinessKeyField.field_key)
+            .order_by(field_key)
         )
         return DatasetBusinessKey(dataset_id=dataset_id, field_keys=tuple(keys))
 

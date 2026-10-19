@@ -339,6 +339,8 @@ class HierarchyService:
         active_ids = {field.id for field in active}
         values = [value for value in target_node.values if value.field_id not in active_ids]
         errors = {}
+        missing_identifier_component = False
+        identifier = work.dataset_business_keys.get(dataset.id)
         for field in active:
             try:
                 canonical = canonicalize_record_value(field.data_type, submitted.get(field.key))
@@ -346,7 +348,9 @@ class HierarchyService:
                 errors[field.key] = str(error)
                 continue
             if canonical is None:
-                if field.is_required:
+                if field.key in identifier.field_keys:
+                    missing_identifier_component = True
+                elif field.is_required:
                     errors[field.key] = "A value is required"
                 continue
             value, key = canonical
@@ -364,7 +368,8 @@ class HierarchyService:
             )
         if errors:
             raise RecordValidationError(errors)
-        identifier = work.dataset_business_keys.get(dataset.id)
+        if missing_identifier_component:
+            raise RecordIdentifierError("incomplete")
         if (
             identifier.field_keys
             and target_node.parent_id is not None

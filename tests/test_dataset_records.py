@@ -16,7 +16,11 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.record_identity import decode_record_identifier
+from refrncr.record_identity import (
+    RECORD_IDENTIFIER_MESSAGES,
+    RecordIdentifierError,
+    decode_record_identifier,
+)
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,
@@ -122,6 +126,29 @@ def test_create_normalized_record_values_identifier_and_audit(record_services):
             )
         )
         assert [event.action for event in events] == ["created"]
+
+
+def test_business_key_order_matches_identifier_encoding_on_each_database(
+    database_record_services,
+):
+    _, _, services, admin = database_record_services
+    dataset = create_owned_dataset(services.datasets, admin.id, "sort-keys", "Sort keys", "")
+    for key in ("a_z", "ab"):
+        services.dataset_fields.create_field(
+            admin.id, dataset.key, key, key, "string", is_required=True
+        )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("ab", "a_z"))
+
+    with services.datasets.uow() as work:
+        business_key = work.dataset_business_keys.get(dataset.id)
+    record = services.dataset_records.create_record(
+        admin.id, dataset.key, {"a_z": "underscore", "ab": "letters"}
+    )
+
+    assert business_key.field_keys == ("a_z", "ab")
+    with services.datasets.uow() as work:
+        persisted = work.session.get(DatasetRecord, record.id)
+    assert decode_record_identifier(persisted.identifier_key) == (b"sunderscore", b"sletters")
 
 
 @pytest.mark.parametrize("raw", ["", "0", "01", "+1", "-1", " 1", "1 ", "1.0", "x"])
@@ -296,9 +323,12 @@ def test_audit_failure_rolls_back_record_update_and_delete(record_services, monk
 def test_required_unknown_duplicate_identifier_and_unique_value(record_services):
     _, _, services, admin = record_services
     dataset, _ = configured_dataset(services, admin)
-    with pytest.raises(RecordValidationError) as missing:
+    with pytest.raises(RecordIdentifierError) as missing:
         services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
-    assert missing.value.errors == {"amount": "A value is required"}
+    assert str(missing.value) == RECORD_IDENTIFIER_MESSAGES["incomplete"]
+    with pytest.raises(RecordIdentifierError) as incomplete:
+        services.dataset_records.create_record(admin.id, dataset.key, {"amount": "1"})
+    assert str(incomplete.value) == RECORD_IDENTIFIER_MESSAGES["incomplete"]
     with pytest.raises(RecordValidationError) as unknown:
         services.dataset_records.create_record(
             admin.id, dataset.key, {"code": "one", "amount": "1", "foreign": "x"}
@@ -710,7 +740,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
         data={"amount": "8", "expected_revision": "1", "csrf_token": csrf},
     )
     assert blocked.status_code == 400
-    assert "A value is required" in blocked.get_data(as_text=True)
+    assert "Record identifier is incomplete" in blocked.get_data(as_text=True)
     repaired = client.post(
         legacy_edit_url,
         base_url="https://localhost",

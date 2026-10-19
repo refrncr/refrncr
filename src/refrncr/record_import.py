@@ -24,7 +24,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from refrncr.audit import record_audit
 from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.ports import PersistenceConflictError
-from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
+from refrncr.record_identity import encode_record_identifier
 from refrncr.services import (
     MAX_RECORD_REVISION,
     DatasetFieldService,
@@ -1989,7 +1989,7 @@ class DatasetRecordImportService:
             len(source.rows) - len(invalid_rows),
             len(invalid_rows),
             reported_errors,
-            len(errors),
+            len(invalid_rows) + sum(error.row is None for error in errors),
             len(invalid_rows) > MAX_REPORTED_ROWS,
             sample,
             fingerprint,
@@ -2139,13 +2139,14 @@ class DatasetRecordImportService:
         seen = set()
         for record in uow.dataset_records.iterate_all(dataset_id):
             by_key = {v.field_key: v for v in record.values}
-            try:
-                encoded = encode_record_identifier(
-                    {key: by_key.get(key).canonical_key for key in identifier.field_keys},
-                    expected_keys=identifier.field_keys,
+            if any(key not in by_key for key in identifier.field_keys):
+                raise ImportValidationError(
+                    "Stored Record identifiers are inconsistent. Import unavailable."
                 )
-            except AttributeError:
-                raise RecordIdentifierError from None
+            encoded = encode_record_identifier(
+                {key: by_key[key].canonical_key for key in identifier.field_keys},
+                expected_keys=identifier.field_keys,
+            )
             if encoded in seen or stored_keys.get(record.id) != encoded:
                 raise ImportValidationError(
                     "Stored Record identifiers are inconsistent. Import unavailable."
