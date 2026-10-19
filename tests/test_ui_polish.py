@@ -299,7 +299,9 @@ def test_dataset_list_selects_concept_without_current(dataset_browser):
     html = body(request(client, "get", "/datasets"))
     assert "href='/datasets/polish/concept/records'" in html
     version_cell = re.search(r"<td>\s*<a class='badge badge-draft badge-link'.*?</td>", html)
-    assert version_cell and "title='Draft in progress'>Draft</a>" in version_cell.group()
+    assert version_cell and "href='/datasets/polish/versions'>Draft in progress</a>" in (
+        version_cell.group()
+    )
     assert "dataset-configuration-link" not in html
     assert request(client, "get", "/datasets/polish/concept/records").status_code == 200
     assert request(client, "get", "/datasets/missing/concept/records").status_code == 404

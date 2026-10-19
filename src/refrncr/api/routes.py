@@ -39,6 +39,7 @@ from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRea
 from refrncr.api_keys import ApiKeyAuthenticationError
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import get_datatype
+from refrncr.hierarchy import hierarchy_order, hierarchy_paths
 from refrncr.published_contracts import encode_identifier, record_identifier
 from refrncr.services import AuthenticatedPrincipal, NotFoundError, ValidationError
 
@@ -97,19 +98,6 @@ def _hierarchy_node(node, fields, record_identifiers):
         values=_values(node.values, fields),
         record_identifier=record_identifiers.get(node.id),
     )
-
-
-def _hierarchy_paths(nodes):
-    by_id = {node.id: node for node in nodes}
-    paths = {}
-    for node in nodes:
-        path, current, visited = [], node, set()
-        while current is not None and current.id not in visited:
-            visited.add(current.id)
-            path.append(current)
-            current = by_id.get(current.parent_id)
-        paths[node.id] = tuple(reversed(path))
-    return paths
 
 
 def _hierarchy_record(record, fields, nodes_by_id, paths):
@@ -299,7 +287,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
                     depth=max(
                         (
                             max(len(path) - 1, 0)
-                            for path in _hierarchy_paths(result.hierarchy_nodes).values()
+                            for path in hierarchy_paths(result.hierarchy_nodes).values()
                         ),
                         default=0,
                     )
@@ -319,7 +307,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
             )
             if result.publications[0].kind == "hierarchy":
                 nodes_by_id = {node.id: node for node in result.hierarchy_nodes}
-                paths = _hierarchy_paths(result.hierarchy_nodes)
+                paths = hierarchy_paths(result.hierarchy_nodes)
                 payload = HierarchyRecordCollection(
                     data=tuple(
                         _hierarchy_record(r, result.fields, nodes_by_id, paths)
@@ -359,7 +347,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
                     ),
                     nodes=tuple(
                         _hierarchy_node(node, result.fields, record_identifiers)
-                        for node in result.hierarchy_nodes
+                        for node in hierarchy_order(result.hierarchy_nodes)
                     ),
                     records=records,
                 ),

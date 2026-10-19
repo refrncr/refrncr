@@ -29,11 +29,56 @@ from refrncr.services import (
 )
 from refrncr.version_contracts import SnapshotContent, SnapshotField
 
+MAX_HIERARCHY_NODE_NAME = 200
+HIERARCHY_VIEW_ALIASES = {"hierarchy": "tree", "hybrid": "tree", "records": "table"}
+
+
+def canonical_hierarchy_view(view):
+    """Map supported legacy view names to their canonical presentation once."""
+    return HIERARCHY_VIEW_ALIASES.get(view, view)
+
+
+def hierarchy_sibling_sort_key(node):
+    """Stable display order shared by hierarchy UI, API, and exports."""
+    return node.name.casefold(), node.name, node.id
+
+
+def hierarchy_order(nodes):
+    """Return a deterministic depth-first order with siblings sorted consistently."""
+    by_parent = {}
+    for node in nodes:
+        by_parent.setdefault(node.parent_id, []).append(node)
+    for siblings in by_parent.values():
+        siblings.sort(key=hierarchy_sibling_sort_key)
+    ordered = []
+    pending = list(reversed(by_parent.get(None, ())))
+    while pending:
+        node = pending.pop()
+        ordered.append(node)
+        pending.extend(reversed(by_parent.get(node.id, ())))
+    ordered.extend(node for node in nodes if node not in ordered)
+    return tuple(ordered)
+
+
+def hierarchy_paths(nodes):
+    """Return node paths without recursion, including finite paths for invalid graphs."""
+    nodes = tuple(nodes)
+    by_id = {node.id: node for node in nodes}
+    paths = {}
+    for node in nodes:
+        path, current, visited = [], node, set()
+        while current is not None and current.id not in visited:
+            visited.add(current.id)
+            path.append(current)
+            current = by_id.get(current.parent_id)
+        paths[node.id] = tuple(reversed(path))
+    return paths
+
 
 def validate_hierarchy_scope(scope, kind):
     if kind != "hierarchy":
         if scope is not None:
-            raise ValidationError("Field scope is only available for hierarchy tables")
+            raise ValidationError("Field scope is only available for hierarchy datasets")
         return None
     if scope not in {"leaves", "all_nodes"}:
         raise ValidationError("Choose Leaves only or All nodes for the field scope")
@@ -42,7 +87,7 @@ def validate_hierarchy_scope(scope, kind):
 
 def _node_name(name):
     name = name.strip() if isinstance(name, str) else ""
-    if not name or len(name) > 200:
+    if not name or len(name) > MAX_HIERARCHY_NODE_NAME:
         raise ValidationError("Node name must contain between 1 and 200 characters")
     return name
 

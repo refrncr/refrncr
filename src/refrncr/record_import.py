@@ -23,7 +23,9 @@ from openpyxl.utils.exceptions import InvalidFileException
 
 from refrncr.audit import record_audit
 from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
+from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.ports import PersistenceConflictError
+from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     MAX_RECORD_REVISION,
@@ -35,6 +37,7 @@ from refrncr.services import (
     ValidationError,
 )
 from refrncr.source_formats import (
+    MAX_SOURCE_TIMEZONE_LENGTH,
     SourceFormatError,
     canonical_source,
     compose_format,
@@ -43,6 +46,7 @@ from refrncr.source_formats import (
     source_format_label,
     temporal_controls,
 )
+from refrncr.upload_names import safe_upload_filename
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_DATA_ROWS = 10_000
@@ -198,7 +202,13 @@ def validate_source_format_components(fields, mapping, components):
         if (
             not isinstance(raw, Mapping)
             or set(raw) - {"source", "date", "time", "timezone", "fold"}
-            or any(not isinstance(value, str) or len(value) > 100 for value in raw.values())
+            or any(
+                not isinstance(value, str) or len(value) > 100
+                for name, value in raw.items()
+                if name != "timezone"
+            )
+            or not isinstance(raw.get("timezone", ""), str)
+            or len(raw.get("timezone", "")) > MAX_SOURCE_TIMEZONE_LENGTH
         ):
             errors.append(MappingIssue("source_format_incomplete", index, target or None))
             continue
@@ -535,11 +545,6 @@ class TransientImportStore:
             self._expired.pop(token, None)
         while len(self._expired) > self.capacity * 10:
             self._expired.pop(next(iter(self._expired)))
-
-
-def _safe_filename(filename: str) -> str:
-    name = PurePath(filename.replace("\\", "/")).name.strip()
-    return name[:255] or "import"
 
 
 def normalize_mapping_name(value: str) -> str:
@@ -1065,7 +1070,7 @@ class DatasetRecordImportService:
             raise ImportValidationError(
                 "Cancel the active import before choosing another import mode"
             )
-        safe_name = _safe_filename(filename)
+        safe_name = safe_upload_filename(filename)
         source = parse_source(safe_name, content)
         if source.kind == "xlsx":
             worksheet = None
@@ -1260,8 +1265,12 @@ class DatasetRecordImportService:
                 not isinstance(raw_choice, Mapping)
                 or set(raw_choice) - {"profile_id", "timezone", "fold"}
                 or any(
-                    not isinstance(value, str) or len(value) > 100 for value in raw_choice.values()
+                    not isinstance(value, str) or len(value) > 100
+                    for name, value in raw_choice.items()
+                    if name != "timezone"
                 )
+                or not isinstance(raw_choice.get("timezone", ""), str)
+                or len(raw_choice.get("timezone", "")) > MAX_SOURCE_TIMEZONE_LENGTH
             ):
                 raise ImportValidationError("Submit a valid bounded source-format choice.")
             choice = dict(raw_choice)
@@ -1454,7 +1463,7 @@ class DatasetRecordImportService:
             or page < 1
             or set(statuses) - {"Added", "Changed", "Deleted"}
             or not isinstance(search, str)
-            or len(search) > 200
+            or len(search) > MAX_SEARCH
         ):
             raise ImportValidationError("Choose valid difference filters")
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
@@ -2022,7 +2031,7 @@ class DatasetRecordImportService:
                     continue
                 shown = values if status != "Deleted" else record.values
                 by_key = {v.field_key: v for v in shown}
-                label = " · ".join(
+                label = record_label(
                     get_datatype(by_key[k].data_type).text(by_key[k].value)
                     for k in identifier.field_keys
                 )
@@ -2105,7 +2114,7 @@ class DatasetRecordImportService:
         filtered = []
         for values, _encoded in accepted:
             by_key = {value.field_key: value for value in values}
-            label = " · ".join(
+            label = record_label(
                 get_datatype(by_key[key].data_type).text(by_key[key].value)
                 for key in identifier.field_keys
             )

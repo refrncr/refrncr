@@ -164,6 +164,54 @@ def test_hierarchy_endpoint_returns_complete_flat_snapshot(hierarchy_api):
         nodes["Nested leaf"]["record_identifier"],
         nodes["Direct leaf"]["record_identifier"],
     }
+
+
+def test_hierarchy_endpoint_sorts_sibling_names_casefold_then_name_then_id(database_api):
+    c = database_api
+    dataset = c.s.datasets.create_dataset(
+        c.a.id, "ordered-hierarchy", "Ordered hierarchy", "", c.owner.id, kind="hierarchy"
+    )
+    root = c.s.hierarchy.create_node(
+        c.a.id, dataset.key, "Root", expected_revision=dataset.revision
+    )
+    revision = c.s.datasets.get_dataset_for_edit(c.a.id, dataset.key).revision
+    lower = c.s.hierarchy.create_node(
+        c.a.id, dataset.key, "alpha", root.id, expected_revision=revision
+    )
+    revision = c.s.datasets.get_dataset_for_edit(c.a.id, dataset.key).revision
+    upper = c.s.hierarchy.create_node(
+        c.a.id, dataset.key, "Alpha", root.id, expected_revision=revision
+    )
+    field = c.s.dataset_fields.create_field(
+        c.a.id,
+        dataset.key,
+        "code",
+        "Code",
+        "string",
+        True,
+        False,
+        True,
+        hierarchy_scope="leaves",
+    )
+    for node, value in ((lower, "lower"), (upper, "upper")):
+        c.s.hierarchy.update_values(
+            c.a.id,
+            dataset.key,
+            node.id,
+            {field.key: value},
+            expected_revision=c.s.datasets.get_dataset_for_edit(c.a.id, dataset.key).revision,
+        )
+    dataset = c.s.datasets.get_dataset_for_edit(c.a.id, dataset.key)
+    c.service.publish(c.a.id, dataset.id, NOW.date(), "Ordering", dataset.revision)
+
+    response = get(c, f"/{dataset.key}/hierarchy")
+
+    assert response.status_code == 200, response.text
+    assert [node["name"] for node in response.json()["data"]["nodes"]] == [
+        "Root",
+        "Alpha",
+        "alpha",
+    ]
     assert "dataset_version_hierarchy_nodes" not in response.text
 
 

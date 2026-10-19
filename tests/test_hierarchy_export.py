@@ -63,6 +63,21 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     artifact.content.close()
 
 
+def test_hierarchy_export_sorts_sibling_names_casefold_then_name_then_id():
+    nodes = (
+        node("root", "Root"),
+        node("zeta", "zeta", "root"),
+        node("lower", "alpha", "root"),
+        node("upper", "Alpha", "root"),
+    )
+
+    artifact = generate_export("csv", (), (), "hierarchy", hierarchy_nodes=nodes)
+    rows = read_csv(artifact)
+
+    assert [row[0] for row in rows[1:]] == ["root", "upper", "lower", "zeta"]
+    artifact.content.close()
+
+
 def test_hierarchy_csv_bundle_contains_both_variants():
     fields = (field("f1", "code", "leaves"),)
     nodes = (node("root", "Root"), node("leaf", "Leaf", "root", (value("f1", "code", "L"),)))

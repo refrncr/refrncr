@@ -7,11 +7,11 @@
   <form class="audit-filters" action="{{ url_for('audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
     <div class="form-field">
       <label for="audit-start">Start date and time<span class="visually-hidden"> (inclusive)</span></label>
-      <input id="audit-start" name="start" type="text" value="{{ filters.get('start', '') }}" maxlength="40" aria-describedby="audit-time-help" data-audit-date>
+      <input id="audit-start" name="start" type="text" value="{{ filters.get('start', '') }}" maxlength="{{ MAX_AUDIT_DATETIME_LENGTH }}" aria-describedby="audit-time-help" data-audit-date>
     </div>
     <div class="form-field">
       <label for="audit-end">End date and time<span class="visually-hidden"> (exclusive)</span></label>
-      <input id="audit-end" name="end" type="text" value="{{ filters.get('end', '') }}" maxlength="40" aria-describedby="audit-time-help" data-audit-date>
+      <input id="audit-end" name="end" type="text" value="{{ filters.get('end', '') }}" maxlength="{{ MAX_AUDIT_DATETIME_LENGTH }}" aria-describedby="audit-time-help" data-audit-date>
     </div>
     {{ select_field('Actor', 'actor', 'audit-actor', page.actors, selected=filters.get('actor', ''), placeholder='All actors', described_by='audit-actor-help', noun='actors') }}
     {{ select_field('Action', 'action', 'audit-action', actions, selected=filters.get('action', ''), placeholder='All actions', noun='actions') }}

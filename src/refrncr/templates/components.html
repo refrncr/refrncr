@@ -12,11 +12,11 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro status_badge(label, count=none) -%}
+{% macro status_badge(label, count=none, href=none, title=none) -%}
 {%- set display_label = label|status_label -%}
 {%- set change_variant = label|status_badge_variant -%}
-{%- set variant = 'badge-published' if display_label in ('Published', 'Current') else 'badge-error' if display_label == 'Error' else change_variant -%}
-<span class='badge{% if variant %} {{ variant }}{% endif %}'>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</span>
+{%- set variant = change_variant -%}
+{% if href %}<a class='badge{% if variant %} {{ variant }}{% endif %} badge-link' href='{{ href }}'{% if title %} title='{{ title }}'{% endif %}>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</a>{% else %}<span class='badge{% if variant %} {{ variant }}{% endif %}'>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</span>{% endif %}
 {%- endmacro %}
 
 {% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false, min_value=none, max_length=none) -%}
@@ -71,8 +71,8 @@
 {%- endmacro %}
 
 {% macro content_metadata(count, updated, version_number=none, deleted_count=0, status=none, record_label='records', secondary_count=none, secondary_label='', draft_in_progress=false) -%}
-  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}<span class="badge {{ 'badge-published' if status == 'Current' else 'badge-info' if status == 'Scheduled' else '' }}">{{ status }}</span>{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ record_label[:-1] if count == 1 and record_label.endswith('s') else record_label }}</span>{% if secondary_count is not none %}<span aria-hidden="true"> · </span><span>{{ secondary_count }} {{ secondary_label[:-1] if secondary_count == 1 and secondary_label.endswith('s') else secondary_label }}</span>{% endif %}
-    {% if draft_in_progress %}<span class="metadata-item"><span aria-hidden="true">•</span><span class="badge badge-draft">Draft in progress</span></span>{% endif %}
+  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}{{ status_badge(status) }}{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ record_label|pluralize(count) }}</span>{% if secondary_count is not none %}<span aria-hidden="true"> · </span><span>{{ secondary_count }} {{ secondary_label|pluralize(secondary_count) }}</span>{% endif %}
+    {% if draft_in_progress %}<span class="metadata-item"><span aria-hidden="true">•</span>{{ status_badge('Draft in progress') }}</span>{% endif %}
     {% if deleted_count %}<span class="metadata-item metadata-warning"><span aria-hidden="true">•</span><span>{{ deleted_count }} marked for deletion</span></span>{% endif %}
     <span class="metadata-item"><span aria-hidden="true">•</span><span>Updated <time datetime="{{ updated.isoformat() }}">{{ updated|absolute_utc }}</time></span></span>
   </p>

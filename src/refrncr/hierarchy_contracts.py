@@ -15,6 +15,11 @@ class HierarchyNode:
     revision: int = 1
 
 
+def hierarchy_path_label(names):
+    """Format a hierarchy path with the shared visible path separator."""
+    return " / ".join(names)
+
+
 def hierarchy_node_paths(nodes):
     """Return node paths without recursion, including finite labels for invalid graphs."""
     nodes = tuple(nodes)
@@ -32,6 +37,6 @@ def hierarchy_node_paths(nodes):
             current = ancestor.parent_id
         prefix = paths.get(current, "Invalid hierarchy") if current is not None else ""
         for ancestor in reversed(pending):
-            prefix = f"{prefix} / {ancestor.name}" if prefix else ancestor.name
+            prefix = hierarchy_path_label((prefix, ancestor.name)) if prefix else ancestor.name
             paths[ancestor.id] = prefix
     return paths
