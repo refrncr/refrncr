@@ -150,11 +150,11 @@ and do not enter Record counts or Changed value details. Relative Field moves us
 inserting/removing a Field does not mark its neighbours moved. Identifier membership
 is versioned; component order remains immutable Field-key order.
 
-Record lists support combined Added/Changed/Removed filters and a literal, NFC/casefolded
+Record lists support combined Added/Changed/Deleted filters and a literal, NFC/casefolded
 search of old/new identifiers (maximum 200 characters). Values are not searchable.
 Sort is status, datatype-aware identifier (new for Changed), then UUID. Field sort is
 status, casefolded name, UUID. Lists and value details have 50 entries per page. Changed
-details contain only changed surviving values; Added/Removed show all relevant Fields,
+details contain only changed surviving values; Added/Deleted show all relevant Fields,
 including explicit nulls. Scrollable tables support keyboard navigation, and long values
 remain available through native disclosure controls. Shared sidepanels preserve the list
 state and opener focus, including when paging values; Escape and Close dismiss them.
@@ -203,7 +203,7 @@ The shared full-width banner appears on concept Records/configuration, Field and
 forms, import and review/publication pages. **View current version** only changes selection;
 it preserves edits. Current and Expired remain read-only, with no Configure/Import/Add
 record. Content Fields named Status, Change or Validation are never repurposed. A final
-system Status column shows Published, Edited, Added or Deleted. Configure uses the same Field classification for quiet badges.
+system Status column shows Published, Changed, Added or Deleted. Configure uses the same Field classification for quiet badges.
 
 Publication closes the concept only after successful snapshot/audit commit. A Scheduled
 result also closes it; New concept may bind Scheduled but cannot publish a second Scheduled
@@ -223,7 +223,7 @@ restore the matching pre-upgrade backup if rollback is required.
 
 ## Record system Status and Deleted rows
 
-Status uses the same REF-83/84 classifier: Changed maps to Edited, Removed to Deleted,
+Status uses the same REF-83/84 classifier: Changed remains Changed, Removed displays as Deleted,
 Added remains Added, and a surviving unchanged Record is Published. Published snapshot
 pages show Published. There is no Complete/Incomplete system badge; existing publication
 validation still applies. Configure Field badges retain their existing classifier.
@@ -231,7 +231,7 @@ validation still applies. Configure Field badges retain their existing classifie
 The concept table includes read-only Deleted rows from its pinned baseline. Deleted rows
 are muted with a text badge; opening one shows all original baseline Fields/values and
 explains that publication removes it. They cannot be edited, and ordinary users cannot
-access this concept representation. Removed/recreated identifiers remain distinct UUID rows.
+access this concept representation. Deleted/recreated identifiers remain distinct UUID rows.
 Deleted data never re-enters working content or the next published snapshot.
 
 The header counts surviving concept Records separately, for example `24 records · 1 marked

@@ -32,7 +32,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           await page.getByText('You are not a member of any team.').waitFor();
           assert.equal(await page.getByRole('button',{name:'Create team',exact:true}).count(),0);
         } else {
-          const selector=panel.getByLabel('Owning team',{exact:true});
+          const selector=panel.getByLabel('Owning team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]');
           if (kind==='single') {
             assert(await selector.inputValue());
             assert.equal(await selector.locator('option').count(),1);

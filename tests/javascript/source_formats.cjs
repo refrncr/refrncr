@@ -37,9 +37,10 @@ const details=node({id:'source-details-0',open:false,closest:()=>row,querySelect
   return {'summary':summary,'select:not([disabled])':source,'input:not([type="hidden"]):not([hidden]):not([disabled]), select:not([disabled])':source,'[data-effective-format]':effective,'[data-format-toggle]':toggle}[selector] || null;
 }});
 const advanced=node();
-const status=node();
+const mappingStatus=node({textContent:'1 field not mapped: Code'});
+const formatErrorStatus=node({textContent:''});
 const form=node({dataset:{sourceFormatsUrl:'/formats'},elements:{namedItem:name=>({source_0:source,date_0:date,time_0:time})[name]},
-  closest:()=>({querySelector:selector=>({'[data-advanced-formats]':advanced,'[data-mapping-status]':status}[selector] ?? status)}),
+  closest:()=>({querySelector:selector=>({'[data-advanced-formats]':advanced,'[data-format-error-status]':formatErrorStatus}[selector] ?? mappingStatus)}),
   querySelectorAll:selector=>selector==='[data-format-details]'?[details]:selector==='[data-state="undecided"]' && row.dataset.state==='undecided'?[row]:[],
   querySelector(selector){return {'[data-advanced-formats]':advanced,'[data-source-formats="0"]':row}[selector] || null;},
 });
@@ -77,7 +78,8 @@ const emit=async(element,event,target=element)=>{
   time.value='v1-time-hm';await emit(form,'change',time);
   assert.equal(effective.textContent,'Day first · DD/MM/YYYY + 24-hour, minutes · HH:mm');
   assert.equal(requests.length,1);
-  assert.match(status.textContent,/could not be refreshed/);
+  assert.equal(mappingStatus.textContent,'1 field not mapped: Code');
+  assert.match(formatErrorStatus.textContent,/could not be refreshed/);
   source.value='native';await emit(form,'change',source);
   assert.equal(parts.hidden,true);assert.equal(date.disabled,true);assert.equal(time.disabled,true);
   assert.equal(effective.textContent,'Native Excel datetime');

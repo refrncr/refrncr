@@ -12,9 +12,10 @@
   {% endif %}
 {%- endmacro %}
 
-{% macro status_badge(label) -%}
-{%- set variant = 'badge-published' if label in ('Published', 'Current') else 'badge-draft' if label in ('Added', 'Changed', 'Edited') else 'badge-removed' if label in ('Deleted', 'Removed') else '' -%}
-<span class='badge{% if variant %} {{ variant }}{% endif %}'>{{ label }}</span>
+{% macro status_badge(label, count=none) -%}
+{%- set display_label = label|status_label -%}
+{%- set variant = 'badge-published' if display_label in ('Published', 'Current') else 'badge-draft' if display_label in ('Added', 'Changed') else 'badge-removed' if display_label == 'Deleted' else 'badge-error' if display_label == 'Error' else '' -%}
+<span class='badge{% if variant %} {{ variant }}{% endif %}'>{% if count is not none %}{{ count }} {% endif %}{{ display_label }}</span>
 {%- endmacro %}
 
 {% macro form_field(label, name, id, type='text', autocomplete=none, required=false, value=none, help_text=none, error=none, disabled=false, error_id=none, control='input', password_toggle=false, min_value=none, max_length=none) -%}
@@ -28,6 +29,33 @@
     {% if password_toggle and type == 'password' %}
       <button class="button button-secondary" type="button" aria-controls="{{ id }}" data-password-toggle hidden>Show password</button>
     {% endif %}
+    {% if help_text %}<p class='help-text' id='{{ id }}-help'>{{ help_text }}</p>{% endif %}
+    {% if error %}<p class='error-text' id='{{ id }}-error' role='alert'>{{ error }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{#- A labelled single-choice list. The native select works without JavaScript; select.js turns
+    it into the styled refrncr Select. `options` holds (value, label) pairs or mappings with
+    value, label and optional code, badge and disabled. `searchable` forces the search field on
+    or off; by default it appears from 10 options. `noun` names the options in the search count. -#}
+{% macro select_field(label, name, id, options, selected=none, placeholder=none, help_text=none, error=none, error_id=none, described_by=none, required=false, disabled=false, compact=false, searchable=none, noun=none) -%}
+  {%- set describers = [] -%}
+  {%- if help_text %}{% set _ = describers.append(id ~ '-help') %}{% endif -%}
+  {%- if error %}{% set _ = describers.append(id ~ '-error') %}{% elif error_id %}{% set _ = describers.append(error_id) %}{% endif -%}
+  {%- if described_by %}{% set _ = describers.append(described_by) %}{% endif -%}
+  <div class='form-field'>
+    <label for='{{ id }}'>{{ label }}</label>
+    <select id='{{ id }}' name='{{ name }}' data-select='{{ 'compact' if compact else '' }}'{% if searchable is not none %} data-searchable='{{ 'true' if searchable else 'false' }}'{% endif %}{% if noun %} data-noun='{{ noun }}'{% endif %}{% if required %} required{% endif %}{% if disabled %} disabled{% endif %}{% if describers %} aria-describedby='{{ describers|join(' ') }}'{% endif %}{% if error or error_id %} aria-invalid='true'{% endif %}>
+      {%- if placeholder is not none %}<option value=''>{{ placeholder }}</option>{% endif -%}
+      {%- for option in options -%}
+        {%- if option is mapping -%}
+          {%- set value = option.value -%}{%- set text = option.label -%}
+        {%- else -%}
+          {%- set value = option[0] -%}{%- set text = option[1] -%}
+        {%- endif -%}
+        <option value='{{ value }}'{% if selected is not none and value|string == selected|string %} selected{% endif %}{% if option is mapping and option.code %} data-code='{{ option.code }}'{% endif %}{% if option is mapping and option.badge %} data-badge='{{ option.badge }}'{% endif %}{% if option is mapping and option.disabled %} disabled{% endif %}>{{ text }}</option>
+      {%- endfor -%}
+    </select>
     {% if help_text %}<p class='help-text' id='{{ id }}-help'>{{ help_text }}</p>{% endif %}
     {% if error %}<p class='error-text' id='{{ id }}-error' role='alert'>{{ error }}</p>{% endif %}
   </div>

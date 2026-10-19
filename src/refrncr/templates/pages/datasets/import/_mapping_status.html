@@ -1,0 +1,24 @@
+{% macro count_label(count, singular, plural) -%}
+  {{- count }} {{ singular if count == 1 else plural -}}
+{%- endmacro %}
+
+{% macro mapping_status_text(unselected, missing_labels, ignored, mapped_count) -%}
+  {%- set parts = [] -%}
+  {%- if unselected -%}
+    {%- set verb = 'needs' if unselected == 1 else 'need' -%}
+    {%- set _ = parts.append(count_label(unselected, 'column', 'columns') ~ ' still ' ~ verb ~ ' a choice') -%}
+  {%- endif -%}
+  {%- if missing_labels -%}
+    {%- set _ = parts.append(count_label(missing_labels|length, 'field', 'fields') ~ ' not mapped:') -%}
+  {%- endif -%}
+  {%- if parts -%}
+    {{- parts|join(' · ') -}}
+  {%- else -%}
+    Ready to continue · {{ count_label(mapped_count, 'field', 'fields') }} mapped, {{ count_label(ignored, 'column', 'columns') }} not imported
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro mapping_missing_fields(missing_labels) -%}
+  {%- for label in missing_labels[:3] -%}<code class='mapping-field-name'>{{ label }}</code>{{ ', ' if not loop.last }}{%- endfor -%}
+  {%- if missing_labels|length > 3 %} and {{ missing_labels|length - 3 }} more{% endif -%}
+{%- endmacro %}

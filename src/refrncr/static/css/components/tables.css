@@ -15,6 +15,16 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .numeric-column { text-align: right; font-variant-numeric: tabular-nums; }
 /* The identifier key carries the accent colour, like the Identifier badge. */
 .key-icon { display: inline-block; width: 1rem; height: 1rem; vertical-align: -.2em; color: var(--color-action-primary); }
+.column-heading { display: inline-flex; align-items: center; gap: var(--space-2xs, 4px); white-space: nowrap; }
+.column-heading-label { flex: none; }
+.numeric-column .column-heading { justify-content: flex-end; }
+.column-heading .mapping-field-heading { flex: none; }
+.record-table thead .key-icon, .record-table thead .field-metadata-trigger .button-icon { width: .8125rem; height: .8125rem; stroke-width: 1.75; vertical-align: 0; translate: 0 -.5px; }
+.column-heading .key-icon, .column-heading .field-metadata-disclosure, .record-table thead .field-metadata-trigger { flex: none; }
+.record-table thead .field-metadata-disclosure { margin-inline-start: 0; }
+.record-table thead .field-metadata-trigger { width: 1.5rem; height: 1.5rem; margin-block: -.25rem; margin-inline-start: -.3rem; color: var(--color-control-border); }
+.record-table thead th:hover .field-metadata-trigger, .record-table thead .field-metadata-trigger:focus-visible, .record-table thead .field-metadata-trigger[aria-expanded="true"] { color: var(--color-text-muted); }
+.record-table thead th .field-metadata-trigger:hover { color: var(--color-action-primary); }
 .record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .record-toolbar > span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
 .record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }
@@ -24,10 +34,10 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 /* The cap limits how wide a column asks to be; once the table is laid out, the text fills its cell. */
 .record-table .cell-content { min-width: 100%; }
 /* Content-sized columns keep short headings (ISO code 3) readable; long headings still wrap. */
-.record-table thead th { min-width: 8rem; }
+.record-table thead th { min-width: max(8rem, max-content); }
 .mapping-field-heading { display: flex; flex-direction: column; align-items: flex-start; gap: .2rem; }
 .record-table :is(th, td).mapping-direction-column { width: 2.5rem; min-width: 2.5rem; padding-inline: var(--space-xs); color: var(--color-action-primary); font-family: var(--font-interface); font-size: var(--font-size-body); font-weight: var(--font-weight-bold); text-align: center; vertical-align: middle; }
-.mapping-system-name { display: block; max-width: 14rem; overflow: hidden; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); letter-spacing: normal; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }
+.mapping-system-name { display: block; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-bold); letter-spacing: normal; text-transform: none; white-space: nowrap; }
 .mapping-field-role { color: var(--color-text-muted); font-family: var(--font-interface); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); letter-spacing: normal; text-transform: none; }
 .record-table tbody tr { min-height: var(--record-row-min-height); height: var(--record-row-min-height); }
 .record-table td { min-width: 0; padding-block: .5rem; color: var(--color-text-data); font-family: var(--font-data); font-size: var(--font-size-xs); font-style: normal; font-weight: var(--font-weight-regular); vertical-align: middle; }

@@ -17,8 +17,8 @@ for width in (320, 768, 1440):
     s.dataset_fields.create_field(
         admin.id,
         d.key,
-        "code",
-        "Code",
+        "e_number",
+        "E_NUMBER",
         "string",
         True,
         True,
@@ -26,7 +26,27 @@ for width in (320, 768, 1440):
         definition="A readable identifier",
         unit="days",
     )
-    s.dataset_records.create_record(admin.id, d.key, {"code": "A"})
+    for key, name in (
+        ("in_eu_database", "IN_EU_DATABASE"),
+        ("in_wikipedia", "IN_WIKIPEDIA"),
+        ("eu_status", "EU_STATUS"),
+        ("eu_status_addition", "EU_STATUS_ADDITION"),
+        ("us_status", "US_STATUS"),
+    ):
+        s.dataset_fields.create_field(admin.id, d.key, key, name, "string", False, False, False)
+    for record_number in range(24):
+        s.dataset_records.create_record(
+            admin.id,
+            d.key,
+            {
+                "e_number": f"A{record_number}",
+                "in_eu_database": "yes",
+                "in_wikipedia": "yes",
+                "eu_status": "active",
+                "eu_status_addition": "",
+                "us_status": "active",
+            },
+        )
 app = create_flask_app(
     s.users,
     s.authentication,

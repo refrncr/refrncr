@@ -92,7 +92,7 @@ async function capture(page, name) {
       assert(await opener.evaluate(el=>el===document.activeElement),'Close focus restoration');
       page.off('request',observe); assert(!requests.includes('POST'),'Read-only panel mutated');
       await page.getByLabel('Added',{exact:true}).uncheck();
-      await page.getByLabel('Removed',{exact:true}).uncheck();
+      await page.getByLabel('Deleted',{exact:true}).uncheck();
       await page.getByRole('button',{name:'Apply filters',exact:true}).click();
       assert.equal(await page.locator('table tbody tr').count(),1);
       for (const term of ['OLD','NEW']) {

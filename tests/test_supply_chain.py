@@ -300,19 +300,21 @@ def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
     text = (ROOT / ".github/workflows/codeql.yml").read_text()
     assert "languages: python" in text
     pull_request = workflow["jobs"]["analyze-pull-request"]
-    trusted = workflow["jobs"]["analyze-and-publish"]
+    trusted = workflow["jobs"]["analyze-and-gate"]
     assert workflow["permissions"] == {"contents": "read"}
     assert pull_request["permissions"] == {"actions": "read", "contents": "read"}
-    assert trusted["permissions"] == {
-        "actions": "read",
-        "contents": "read",
-        "security-events": "write",
-    }
+    assert trusted["permissions"] == {"actions": "read", "contents": "read"}
     assert text.count("upload: never") == 2
     assert "upload: false" not in text
-    assert "gate-sarif" in text
-    assert all("upload-sarif@" not in step.get("uses", "") for step in pull_request["steps"])
-    assert any("upload-sarif@" in step.get("uses", "") for step in trusted["steps"])
+    assert all(
+        any("gate-sarif" in step.get("run", "") for step in job["steps"])
+        for job in (pull_request, trusted)
+    )
+    assert all(
+        "upload-sarif@" not in step.get("uses", "")
+        for job in (pull_request, trusted)
+        for step in job["steps"]
+    )
 
 
 def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():

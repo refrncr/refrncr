@@ -1721,9 +1721,6 @@
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
-        "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
-        "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
@@ -2123,7 +2120,6 @@
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
@@ -2185,7 +2181,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "No domain event; transient state retains existing replay policy.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2214,7 +2212,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "Transient workflow retains existing replay policy; no domain event.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2244,7 +2244,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "No domain event; transient workflow retains existing replay policy.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2273,7 +2275,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "No domain event; consumed transient state rejects replay.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2303,7 +2307,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "No domain event; transient workflow retains existing replay policy.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2312,7 +2318,9 @@
       "capability": "HierarchyImportService",
       "operation": "revoke_session",
       "service": "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
-      "interface_entrypoints": ["refrncr.web.logout POST /logout"],
+      "interface_entrypoints": [
+        "refrncr.web.logout POST /logout"
+      ],
       "kind": "mutation",
       "classification": "intentionally excluded",
       "domain_audit": false,
@@ -2330,7 +2338,9 @@
       "no_op": "No domain event.",
       "rollback": "No committed domain state is changed.",
       "duplicate_retry": "No domain event.",
-      "tests": ["tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"],
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
       "implementation_status": "Implemented for REF-183.",
       "exclusion_reason": "Transient preview state only; no committed hierarchy change.",
       "persistence_scope": "Transient process state only."
@@ -2483,7 +2493,8 @@
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
-        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
+        "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm",
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2618,7 +2629,6 @@
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
         "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
         "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
@@ -5498,9 +5508,6 @@
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
-        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats",
-        "refrncr.web.review_import_mapping GET /datasets/<key>/records/import/<token>/mapping",
-        "refrncr.web.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview",
         "refrncr.web.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
       ],
       "kind": "read",
@@ -6498,6 +6505,71 @@
       "implementation_status": "Implemented for REF-220 centralized route capability enforcement.",
       "exclusion_reason": "Capability calculation only; the authoritative caller owns the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
       "persistence_scope": "Existing dataset authorization service boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetRecordImportService",
+      "operation": "submitted_source_format_assistance",
+      "service": "refrncr.record_import.DatasetRecordImportService.submitted_source_format_assistance",
+      "interface_entrypoints": [
+        "refrncr.web.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: import attempt/outcome, unauthorized maintenance, malformed/oversized/unsupported upload, unsafe workbook, schema/uniqueness conflict, cross-Dataset/session claim, expired/replayed/busy token and suspicious mapping tampering. Never include token, session ID, path, filename, headers or row values. Preview/cancel success is not a successful import.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Validates submitted source-format choices and returns transient assistance only; no committed Records.",
+      "validation_failure": "No domain event; return safe coded source-format issues without changing committed state.",
+      "authorization_failure": "No successful domain event; reject invalid, stale, or incorrectly bound import state without committed business changes. REF-31 owns denied-attempt logs.",
+      "stale_input": "Bound transient import state is required; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No durable business mutation or successful domain event.",
+      "duplicate_retry": "No domain event; repeated validation has no committed side effect.",
+      "tests": [
+        "tests/test_record_import.py::test_submitted_format_helpers_require_a_bound_import_state",
+        "tests/test_record_import.py::test_submitted_format_methods_bind_valid_token_to_user_and_session"
+      ],
+      "implementation_status": "Implemented by REF-221; validates submitted source-format components against user-, session-, and Dataset-bound transient import state.",
+      "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "DatasetRecordImportService",
+      "operation": "submitted_source_formats",
+      "service": "refrncr.record_import.DatasetRecordImportService.submitted_source_formats",
+      "interface_entrypoints": [
+        "Trusted programmatic caller"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: import attempt/outcome, unauthorized maintenance, malformed/oversized/unsupported upload, unsafe workbook, schema/uniqueness conflict, cross-Dataset/session claim, expired/replayed/busy token and suspicious mapping tampering. Never include token, session ID, path, filename, headers or row values. Preview/cancel success is not a successful import.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Validates source-format components and returns coded issues only; no committed Records.",
+      "validation_failure": "No domain event; return safe coded source-format issues without changing committed state.",
+      "authorization_failure": "No successful domain event; reject invalid, stale, or incorrectly bound import state without committed business changes. REF-31 owns denied-attempt logs.",
+      "stale_input": "Bound transient import state is required; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No durable business mutation or successful domain event.",
+      "duplicate_retry": "No domain event; repeated validation has no committed side effect.",
+      "tests": [
+        "tests/test_record_import.py::test_import_service_exposes_mapping_and_source_format_error_codes",
+        "tests/test_record_import.py::test_submitted_format_helpers_require_a_bound_import_state",
+        "tests/test_record_import.py::test_submitted_format_methods_bind_valid_token_to_user_and_session"
+      ],
+      "implementation_status": "Implemented by REF-221; validates submitted source-format components against user-, session-, and Dataset-bound transient import state.",
+      "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
+      "persistence_scope": "Transient process state only; no durable business state."
     }
   ]
 }

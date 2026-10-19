@@ -459,6 +459,7 @@ def dataset_version_client(c, actor=None):
         dataset_fields=c.s.dataset_fields,
         dataset_business_keys=c.s.dataset_business_keys,
         dataset_records=c.s.dataset_records,
+        record_imports=c.s.record_imports,
         dataset_versions=c.service,
     ).test_client()
     token, session = c.s.sessions.create(actor)

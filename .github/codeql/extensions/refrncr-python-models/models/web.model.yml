@@ -1,3 +1,5 @@
+# Since CodeQL CLI 2.27 this barrier guard no longer suppresses py/url-redirection for the
+# login redirect; web.py now rebuilds the target from "/" instead. Kept for older CLIs.
 extensions:
   - addsTo:
       pack: codeql/python-all

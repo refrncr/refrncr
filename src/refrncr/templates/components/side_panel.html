@@ -1,12 +1,12 @@
 {% from "components/icons.html" import close_icon %}
-{% macro side_panel(panel_id, title, title_id, description=none, description_id=none, has_modes=false, entity=none, auto_open=none, eyebrow_slot=false, default_mode='view') -%}
+{% macro side_panel(panel_id, title, title_id, description=none, description_id=none, has_modes=false, entity=none, auto_open=none, eyebrow_slot=false, default_mode='view', eyebrow=none, title_suffix=none) -%}
   {% set description_id = description_id or panel_id ~ '-description' %}
   <dialog class='side-panel' id='{{ panel_id }}' data-side-panel data-modal-side-panel aria-labelledby='{{ title_id }}'{% if description and description_id %} aria-describedby='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-modes data-default-mode='{{ default_mode }}'{% endif %}{% if entity %} data-panel-entity='{{ entity }}'{% endif %}{% if auto_open %} data-auto-open='{{ auto_open }}'{% endif %}>
     <div class='side-panel-layout'>
       <header class='side-panel-header'>
         <div>
-          <h2 id='{{ title_id }}' tabindex='-1'>{{ title }}</h2>
-          {% if description %}<p{% if description_id %} id='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-subtitle data-default-text='{{ description }}'{% endif %}>{{ description }}</p>{% elif eyebrow_slot %}<p data-panel-eyebrow hidden></p>{% endif %}
+          <div class='side-panel-title-row'><h2 id='{{ title_id }}' tabindex='-1'>{{ title }}</h2>{% if title_suffix %}{{ title_suffix }}{% endif %}</div>
+          {% if eyebrow %}<p class='side-panel-eyebrow'>{{ eyebrow }}</p>{% elif description %}<p{% if description_id %} id='{{ description_id }}'{% endif %}{% if has_modes %} data-panel-subtitle data-default-text='{{ description }}'{% endif %}>{{ description }}</p>{% elif eyebrow_slot %}<p data-panel-eyebrow hidden></p>{% endif %}
         </div>
         <button class='side-panel-close' type='button' data-dialog-close aria-label='Close panel'>{{ close_icon() }}</button>
       </header>

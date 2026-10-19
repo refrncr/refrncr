@@ -37,7 +37,7 @@
           <div class='form-field'>
             <label class='visually-hidden' for='export-subject'>User or team</label>
             <div class='inline-form-action'>
-              <select id='export-subject' name='subject' required aria-describedby='export-subject-help{% if error %} export-subject-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
+              <select id='export-subject' name='subject' data-select data-noun='users and teams' required aria-describedby='export-subject-help{% if error %} export-subject-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
                 <option value=''>Select a user or team</option>
                 <optgroup label='Users'>{% for user in users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
                 <optgroup label='Teams'>{% for team in teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>

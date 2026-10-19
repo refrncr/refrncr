@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 function element(extra = {}) {
-  return Object.assign({
+  const item = Object.assign({
     handlers: {}, attributes: {}, isConnected: true,
     addEventListener(type, callback) { this.handlers[type] = callback; },
     setAttribute(name, value) { this.attributes[name] = value; },
@@ -10,32 +10,29 @@ function element(extra = {}) {
     hasAttribute(name) { return name in this.attributes; },
     closest() { return null; }, getClientRects() { return [{}]; },
     matches() { return false; }, focus() { document.activeElement = this; },
+    replaceChildren(...children) { this.children = children; this.textContent = children.map(child => child.textContent || '').join(''); },
+    append(...children) { this.children ||= []; this.children.push(...children); this.textContent = this.children.map(child => child.textContent || '').join(''); },
+    scrollIntoView(options) { this.scrollOptions = options; },
   }, extra);
+  return item;
 }
 const badges = [element(), element(), element()];
+const labels = {code:'Code', amount:'Amount', active:'Active', subgroup:'Subgroup', subgroup_range:'Subgroup range', function:'Function'};
+const requiredKeys = ['code','amount'];
 const selects = ['code', '', '__ignored__'].map((value, index) => {
-  const groups = Object.fromEntries(['suggested', 'available', 'used'].map(key => [key, {
-    dataset:{optionGroup:key}, children:[],
-    append(option) {
-      if (option.parent) option.parent.children.splice(option.parent.children.indexOf(option), 1);
-      this.children.push(option); option.parent = this;
-    },
-  }]));
-  const options = ['code', 'amount', 'active'].map((key, order) => ({value:key,
-    dataset:{optionLabel:key, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
+  const options = Object.entries(labels).map(([key, name], order) => ({value:key,
+    hidden:false, dataset:{optionLabel:name, optionOrder:String(order), optionGroup:order===0?'suggested':'available'},
   }));
-  options.forEach(option => groups[option.dataset.optionGroup].append(option));
-  return element({value, groups, options,
-    querySelectorAll: selector => selector.startsWith('option[') ? options : Object.values(groups),
+  return element({value, options,
+    querySelectorAll: selector => selector.startsWith('option[') ? options : [],
     closest: () => ({querySelector: () => badges[index]})});
 });
-const summary = element();
-const missingLabels = ['code', 'amount'].map(key => element({dataset:{missingKey:key}}));
-const missing = element({querySelectorAll: () => missingLabels});
 const advance = element({disabled:false});
-const status = element();
+const statusText = element();
+const status = element({dataset:{},querySelector:selector => selector === '[data-mapping-status-text]' ? statusText : null});
+const reason = element({hidden:true});
 const mapping = element({dataset:{requiredKeys:'["code","amount"]'},
-  querySelectorAll: () => selects, querySelector: selector => ({"[data-mapping-status]":status, "[data-mapping-summary]":summary, "[data-mapping-missing]":missing})[selector]});
+  querySelectorAll: () => selects, querySelector: selector => ({"[data-mapping-status]":status, "[data-mapping-reason]":reason})[selector]});
 const submit = element({type:'submit',disabled:false});
 const confirm = element({elements:[submit]});
 const close = element();
@@ -64,39 +61,60 @@ const document = {
       '[data-dialog-close]':[close]})[selector] || [];
   },
   querySelector: selector => selector === '[data-mapping-continue]' ? advance : null,
+  createElement: tag => element({tagName:tag.toUpperCase(), dataset:{}}),
+  createTextNode: text => ({textContent:text}),
   getElementById: id => id === 'report' ? dialog : null,
   addEventListener(type, callback) { (this.handlers[type] ||= []).push(callback); },
 };
-vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {document,window:{innerWidth:320,innerHeight:480,addEventListener(){}}});
+vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {document,JSON:{parse:() => requiredKeys},window:{innerWidth:320,innerHeight:480,addEventListener(){}}});
 assert.equal(advance.disabled,true);
 assert.equal(badges[0].textContent, 'Mapped');
 assert.equal(selects[0].value, 'code');
-assert.equal(selects[0].options[0].parent, selects[0].groups.suggested);
-assert.equal(selects[1].options[0].parent, selects[1].groups.used);
-assert.equal(selects[1].groups.suggested.hidden, true);
+assert.equal(selects[0].options[0].hidden, false);
+assert.equal(selects[1].options[0].hidden, true);
 assert.equal(badges[1].textContent, 'Needs a choice');
 assert.equal(badges[2].textContent, 'Do not import');
-assert.equal(missing.hidden, false);
-assert.equal(missingLabels[0].hidden, true);
-assert.equal(missingLabels[1].hidden, false);
-assert.match(summary.textContent, /1 of 2 required fields mapped · 1 choices remaining · 1 columns ignored/);
+assert.equal(statusText.textContent, '1 column still needs a choice · 1 field not mapped: Amount');
+const jumpButton = statusText.children.find(child => child.dataset?.mappingJump !== undefined);
+assert.equal(jumpButton.className, 'mapping-jump');
+assert.equal(jumpButton.className.includes('button-link'), false);
+assert.equal(status.dataset.state, 'pending');
+assert.equal(reason.hidden, false);
+assert.equal(status.hidden, undefined);
+selects[1].scrollIntoView = options => { selects[1].scrollOptions = options; };
+status.handlers.click({target:{closest:() => ({})}});
+assert.equal(selects[1].scrollOptions.block, 'center');
+assert.equal(document.activeElement, selects[1]);
 selects[1].value='amount'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.equal(missing.hidden, true);
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(status.dataset.state, 'ready');
+assert.equal(reason.hidden,true);
+selects[0].value=''; selects[2].value=''; mapping.handlers.change();
+assert.equal(statusText.textContent, '2 columns still need a choice · 1 field not mapped: Code');
+assert.equal(status.dataset.state, 'pending');
+selects[0].value='__ignored__'; selects[1].value='__ignored__'; selects[2].value='__ignored__';
+requiredKeys.push('active'); mapping.handlers.change();
+assert.equal(statusText.textContent, '3 fields not mapped: Code, Amount, Active');
+assert.equal(reason.hidden,false);
+requiredKeys.push('subgroup', 'subgroup_range'); mapping.handlers.change();
+assert.equal(statusText.textContent, '5 fields not mapped: Code, Amount, Active and 2 more');
+assert.equal(statusText.children.filter(child => child.tagName === 'CODE').length, 3);
+requiredKeys.pop(); requiredKeys.pop(); requiredKeys.pop(); selects[0].value='code'; selects[1].value='amount'; selects[2].value='__ignored__'; mapping.handlers.change();
 selects[2].value='amount'; mapping.handlers.change();
 assert.equal(badges[1].textContent, 'Mapping error');
 assert.match(badges[2].className, /badge-error/);
 assert.equal(advance.disabled,true);
 selects[2].value='__ignored__'; selects[0].value=''; mapping.handlers.change();
-assert.equal(selects[1].options[0].parent, selects[1].groups.suggested);
-assert.equal(selects[1].groups.suggested.hidden, false);
+assert.equal(selects[1].options[0].hidden, false);
 assert.equal(selects[1].value, 'amount');
 assert.equal(selects[2].value, '__ignored__');
-assert.equal(selects[2].options[1].parent, selects[2].groups.used);
+assert.equal(selects[2].options[1].hidden, true);
 assert.equal(advance.disabled,true);
 selects[0].value='code'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.match(status.textContent,/Ready to continue/);
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(statusText.children.some(child => child.dataset?.mappingJump !== undefined), false);
 tip.handlers.mouseenter();
 assert.equal(tip.open,true);
 assert.equal(tipBody.style.left,'62px');

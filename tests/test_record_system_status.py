@@ -39,7 +39,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     before = snapshot(c)
     view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
     assert view.record_states == {
-        c.record.id: "Edited",
+        c.record.id: "Changed",
         deleted.id: "Deleted",
         untouched.id: "Published",
         added.id: "Added",
@@ -52,7 +52,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         concept_html,
     )
     assert sorted(statuses) == sorted(
-        [("badge-draft", "Edited"), ("badge-draft", "Added"), ("badge-removed", "Deleted")]
+        [("badge-draft", "Changed"), ("badge-draft", "Added"), ("badge-removed", "Deleted")]
     )
     assert view.context.record_count == 3 and view.deleted_count == 1 and view.page.total == 4
     assert c.service.concept_context(c.a.id, c.d.key).summary.counts.records_removed == 1
@@ -63,12 +63,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     html = response.text
     assert "3 records" in html and "1 marked for deletion" in html
 
-    headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
-    assert [re.sub(r"<[^>]+>", "", h).strip() for h in headers[-4:-1]] == [
-        "Status",
-        "Change",
-        "Validation",
-    ]
+    field_headers = re.findall(r"<span class='column-heading-label'>(.*?)</span>", html, re.S)
+    assert field_headers[-3:] == ["Status", "Change", "Validation"]
     assert "Status (application metadata)" in html
     assert "Complete" in html and "badge-success" not in html
     assert "Old &lt;identifier&gt;" in html and "Old <identifier>" not in html
@@ -107,12 +103,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         html = response.text
         assert "record-system-status" not in html
         assert "Status (application metadata)" not in html
-        content_headers = re.findall(r"<th\b[^>]*>(.*?)</th>", html, re.S)
-        assert [re.sub(r"<[^>]+>", "", h).strip() for h in content_headers[2:5]] == [
-            "Status",
-            "Change",
-            "Validation",
-        ]
+        field_headers = re.findall(r"<span class='column-heading-label'>(.*?)</span>", html, re.S)
+        assert field_headers[2:5] == ["Status", "Change", "Validation"]
         assert ">Complete</span>" in html
     rows = exported_rows(
         c.s.dataset_records.export_dataset(c.a.id, c.d.key, "csv", version_id=first.id)
