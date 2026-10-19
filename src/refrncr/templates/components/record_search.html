@@ -28,7 +28,7 @@
   <div class='record-criteria-toolbar'>
   <form id='record-search-form' method='get' role='search' aria-label='Search records' class='record-search-form'>
     {{ hidden_criteria(criteria_parameters, ['q', 'import_results', 'status']) }}
-    {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=200, clear_url=clear_url) }}
+    {{ search_field('record-search', 'Search records', 'Search text and text identifiers', name='q', value=record_search, maxlength=MAX_SEARCH, clear_url=clear_url) }}
     {% if import_results or import_totals %}{{ record_status_filter(dataset.key, record_search, import_results, result_statuses, import_totals, clear_import_url) }}{% endif %}
   </form>
   <button class='button button-secondary' type='submit' form='record-search-form' name='action' value='search'>Search</button>

@@ -36,13 +36,14 @@ CURSOR_LIFETIME = 12 * 60 * 60
 FILTER_KEYS = frozenset({"start", "end", "actor", "action", "object_type"})
 INVALID_FILTERS = "Invalid audit filters. Check the dates and selections, or clear filters."
 INVALID_CURSOR = "This audit page link is invalid or expired. Clear filters to start again."
+MAX_AUDIT_DATETIME_LENGTH = 40
 
 
 def parse_audit_time(value):
     # Explicit offset required; never interpret an ambiguous server-local timestamp.
     if (
         not isinstance(value, str)
-        or len(value) > 40
+        or len(value) > MAX_AUDIT_DATETIME_LENGTH
         or not re.fullmatch(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})", value
         )

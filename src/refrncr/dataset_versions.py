@@ -9,9 +9,7 @@ from unicodedata import normalize
 
 from refrncr.audit import record_audit
 from refrncr.change_status import (
-    DISPLAY_STATUSES,
     RECORD_STATUS_FILTERS,
-    status_label,
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
@@ -24,6 +22,7 @@ from refrncr.ports import (
     PersistenceConflictError,
     StoredRecord,
 )
+from refrncr.presentation import DISPLAY_STATUSES, record_label, status_label
 from refrncr.published_contracts import CurrentPublication, CurrentRead, decode_identifier
 from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
@@ -724,16 +723,18 @@ class DatasetVersionService:
                     else identifier.field_keys
                 )
                 values = {value.field_key: value for value in record.values}
-                labels[record.id] = " · ".join(
+                label = record_label(
                     get_datatype(values[key].data_type).text(values[key].value)
                     if key in values
-                    else "—"
+                    else None
                     for key in keys
                 )
                 if dataset.kind == "hierarchy":
-                    labels[record.id] = labels[record.id] or node_names[record.id]
+                    labels[record.id] = node_names[record.id] if not keys else label
                     if not keys:
                         return False, ((0, "string", node_names[record.id].casefold()),), record.id
+                else:
+                    labels[record.id] = label
                 incomplete, components, _id = DatasetRecordService._record_sort_key(record, keys)
                 # Old/new identifier datatypes can differ. Type tags preserve typed ordering
                 # within each datatype and make their combined ordering total and stable.

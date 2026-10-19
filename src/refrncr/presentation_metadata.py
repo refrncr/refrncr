@@ -7,6 +7,7 @@ from pathlib import Path
 
 MAX_FIELD_DEFINITION = 4000
 MAX_FIELD_UNIT = 64
+MAX_DATASET_ICON_LENGTH = 64
 
 # The pinned local sprite is the source of truth for available names. No user
 # input is used in file paths or parsed as SVG. The UI offers a small suggestion set.
@@ -31,7 +32,9 @@ def default_dataset_icon(kind=None):
 def rendered_dataset_icon(value, kind=None):
     return (
         value
-        if isinstance(value, str) and len(value) <= 64 and value in LUCIDE_ICON_NAMES
+        if isinstance(value, str)
+        and len(value) <= MAX_DATASET_ICON_LENGTH
+        and value in LUCIDE_ICON_NAMES
         else default_dataset_icon(kind)
     )
 
@@ -113,7 +116,7 @@ def dataset_icon(value: str | None) -> str | None:
     Bound before normalization/lookup. Never truncate into a different valid name,
     retain raw input, interpret markup, or construct a path from the submitted value.
     """
-    if not isinstance(value, str) or len(value) > 64:
+    if not isinstance(value, str) or len(value) > MAX_DATASET_ICON_LENGTH:
         return None
     normalized = value.strip().lower()
     return normalized if normalized in LUCIDE_ICON_NAMES else None

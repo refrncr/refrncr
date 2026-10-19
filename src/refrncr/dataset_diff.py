@@ -20,6 +20,7 @@ from refrncr.diff_contracts import (
     ReviewIdentity,
 )
 from refrncr.ports import PersistenceConflictError
+from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, decode_record_identifier
 from refrncr.services import ConflictError, NotFoundError, ValidationError, _valid_identity
 from refrncr.version_contracts import SnapshotField, version_states
@@ -271,7 +272,7 @@ class DatasetDiffService:
             ordering.append(datatype.ordering_key(value))
         if not labels:
             raise ValidationError("Invalid stored Record identifier")
-        return " · ".join(labels), tuple(ordering)
+        return record_label(labels), tuple(ordering)
 
     @classmethod
     def _record(cls, row, current, previous):

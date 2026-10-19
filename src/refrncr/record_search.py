@@ -3,8 +3,10 @@
 from logging import Filter
 from unicodedata import normalize
 
-from refrncr.change_status import DISPLAY_STATUSES, LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
+from refrncr.change_status import LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
 from refrncr.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
+from refrncr.diff_contracts import MAX_SEARCH
+from refrncr.presentation import DISPLAY_STATUSES
 
 MAX_QUERY_BYTES = 32 * 1024
 RECORD_CHANGE_FILTERS = tuple(RECORD_STATUS_FILTERS)
@@ -35,8 +37,8 @@ class RecordQueryLogFilter(Filter):
 
 
 def search_term(raw):
-    if not isinstance(raw, str) or len(raw) > 200:
-        raise RecordSearchError("Search must not exceed 200 characters.")
+    if not isinstance(raw, str) or len(raw) > MAX_SEARCH:
+        raise RecordSearchError(f"Search must not exceed {MAX_SEARCH} characters.")
     try:
         parsed = get_datatype("string").canonicalize(raw)
     except DatatypeError:

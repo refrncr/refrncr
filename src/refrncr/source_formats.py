@@ -248,8 +248,11 @@ def _time(value, style):
     return time(hour, minute, second, microsecond)
 
 
+MAX_SOURCE_TIMEZONE_LENGTH = 100
+
+
 def _source_timezone(timezone, fold):
-    if not isinstance(timezone, str) or not timezone or len(timezone) > 100:
+    if not isinstance(timezone, str) or not timezone or len(timezone) > MAX_SOURCE_TIMEZONE_LENGTH:
         raise SourceFormatError(
             "Confirm an IANA source timezone for local timestamps.", requires_choice=True
         )

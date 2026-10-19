@@ -26,6 +26,7 @@ from refrncr.services import (
     _require_concept,
     canonicalize_record_value,
 )
+from refrncr.upload_names import safe_upload_filename
 
 STRUCTURAL_COLUMNS = ("Node ID", "Parent ID", "Name", "Parent")
 
@@ -70,10 +71,6 @@ def _field_columns(fields):
             column = f"Field: {column}"
         columns.append(column)
     return tuple(columns)
-
-
-def _safe_filename(filename):
-    return os.path.basename(filename or "")[:255]
 
 
 def _value_map(node):
@@ -258,14 +255,14 @@ class HierarchyImportService:
 
     def begin(self, actor_id, session_id, dataset_key, filename, content):
         dataset_id, revision = self._target(actor_id, dataset_key)
-        preview = self._preview_for(dataset_id, content, _safe_filename(filename), revision)
+        preview = self._preview_for(dataset_id, content, safe_upload_filename(filename), revision)
         if not preview.valid:
             raise ImportValidationError("; ".join(preview.errors))
         state = self.store.create(
             actor_id,
             session_id,
             dataset_id,
-            _safe_filename(filename),
+            safe_upload_filename(filename),
             content,
             "xlsx",
             concept_id=self._concept_id(dataset_id),

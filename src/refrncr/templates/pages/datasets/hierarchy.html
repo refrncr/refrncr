@@ -68,7 +68,7 @@
       <form id='record-search-form' method='get' role='search' aria-label='Search hierarchy' class='record-search-form'>
         <input type='hidden' name='view' value='{{ selected_view }}'>
         {% if sort_key %}<input type='hidden' name='sort' value='{{ sort_key }}'><input type='hidden' name='direction' value='{{ sort_direction }}'>{% endif %}
-        {{ search_field('record-search', 'Search hierarchy', 'Search node names and text values', name='q', value=hierarchy_search, maxlength=200, clear_url=hierarchy_clear_url) }}
+        {{ search_field('record-search', 'Search hierarchy', 'Search node names and text values', name='q', value=hierarchy_search, maxlength=MAX_SEARCH, clear_url=hierarchy_clear_url) }}
       </form>
       <button class='button button-secondary' type='submit' form='record-search-form'>Search</button>
       {% if fields %}

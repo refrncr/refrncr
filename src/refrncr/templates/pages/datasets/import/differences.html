@@ -31,7 +31,7 @@
 {% if mode == 'new_version' %}
   {% if difference_total > 10 or difference_search %}
     <form method='get' class='record-toolbar import-difference-filters' aria-label='Filter import differences' data-auto-filter>
-      {{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=200) }}
+      {{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=MAX_SEARCH) }}
       {% if available_statuses.count > 1 %}<label class='visually-hidden' for='difference-status'>Status</label><select id='difference-status' name='status' data-select='compact'><option value=''>All statuses</option>{% for status in DISPLAY_STATUSES if preview.counts[status] %}<option value='{{ status }}'{% if status in difference_statuses %} selected{% endif %}>{{ status }}</option>{% endfor %}</select>{% endif %}
     </form>
   {% endif %}
@@ -72,7 +72,7 @@
     {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
   </nav>{% endif %}
 {% else %}
-  {% if difference_total > 10 or difference_search %}<form method='get' class='record-toolbar import-difference-filters' aria-label='Search import preview' data-auto-filter>{{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=200) }}</form>{% endif %}
+  {% if difference_total > 10 or difference_search %}<form method='get' class='record-toolbar import-difference-filters' aria-label='Search import preview' data-auto-filter>{{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=MAX_SEARCH) }}</form>{% endif %}
   {% set page_count = ((preview.counts.matching + 49) // 50) %}
   <div class='table-scroll import-differences' tabindex='0' role='region' aria-label='Changes in this import'>
     <table><caption>Changes in this import</caption><thead><tr><th scope='col'>Identifier</th><th scope='col'>Status</th></tr></thead><tbody>

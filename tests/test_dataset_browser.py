@@ -22,7 +22,7 @@ from support import (
 from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.presentation_metadata import DATASET_ICONS
-from refrncr.services import NotFoundError
+from refrncr.services import NotFoundError, ValidationError
 
 
 @pytest.mark.parametrize(
@@ -102,6 +102,12 @@ def test_dataset_navigation_filters_reference_and_mapping_datasets(dataset_brows
 
     reference_form = body(request(client, "get", "/datasets/new?kind=reference"))
     mapping_form = body(request(client, "get", "/datasets/new?kind=mapping"))
+    assert "Dataset type" in reference_form
+    assert "Reference dataset" in reference_form
+    assert "Mapping dataset" in reference_form
+    assert "Hierarchy dataset" in reference_form
+    assert "Table type" not in reference_form
+    assert "Mapping table" not in reference_form
     assert "name='kind' value='reference' checked" in reference_form
     assert "name='kind' value='mapping' checked" in mapping_form
     assert "data-mapping-setup hidden" in reference_form
@@ -341,7 +347,7 @@ def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_bro
 
     assert "Add record" not in page
     assert "No source records yet" in page
-    assert "Records appear here when they are available in the linked source table." in page
+    assert "Records appear here when they are available in the linked source dataset." in page
     assert request(client, "get", f"/datasets/{mapping.key}/records/new").status_code == 404
 
 
@@ -1136,6 +1142,64 @@ def test_create_validation_safely_redisplays_values(
         assert session.scalar(select(func.count(Dataset.id))) == 0
 
 
+def test_create_validation_field_comes_from_domain_error_not_its_message(
+    dataset_browser, monkeypatch
+):
+    _, _, _, client = dataset_browser
+    login(client)
+    form = request(client, "get", "/datasets/new")
+    owner_team_id = re.search(r"<option value='([^']+)' selected", body(form))[1]
+
+    def renamed_key_error(_key):
+        raise ValidationError("A differently worded key error", field="key")
+
+    monkeypatch.setattr("refrncr.services.validate_dataset_key", renamed_key_error)
+    response = request(
+        client,
+        "post",
+        "/datasets",
+        data={
+            "key": "valid-key",
+            "name": "Valid dataset",
+            "description": "",
+            "csrf_token": form_csrf(form),
+            "owner_team_id": owner_team_id,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "A differently worded key error" in body(response)
+    assert "id='dataset-key-error'" in body(response)
+
+
+def test_setup_validation_field_comes_from_domain_error_not_its_message(
+    dataset_browser, monkeypatch
+):
+    _, services, _, client = dataset_browser
+    monkeypatch.setattr(services.users, "has_users", lambda: False)
+
+    def renamed_display_name_error(*_args):
+        raise ValidationError("A differently worded name error", field="display_name")
+
+    monkeypatch.setattr(services.users, "create_initial_admin", renamed_display_name_error)
+    form = request(client, "get", "/setup")
+    response = request(
+        client,
+        "post",
+        "/setup",
+        data={
+            "email": "admin@example.com",
+            "display_name": "Admin",
+            "password": "a long valid password",
+            "csrf_token": form_csrf(form),
+        },
+    )
+
+    assert response.status_code == 400
+    assert "A differently worded name error" in body(response)
+    assert "id='setup-name-error'" in body(response)
+
+
 def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
     _, services, admin, client = dataset_browser
     create_dataset(services, admin, "duplicate")
@@ -1489,6 +1553,9 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema/concept"))
+    assert "<dt>Dataset type</dt><dd>Reference</dd>" in empty_page
+    assert "Reference table" not in empty_page
+    assert "Table type" not in empty_page
     assert "<h2 id='fields-heading'>Fields</h2>" in empty_page
     assert "No fields are defined for this dataset." in empty_page
     assert "Add field" in empty_page
@@ -1528,6 +1595,35 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
         assert f"aria-label='Move {name} up'" not in page
         assert f"aria-label='Move {name} down'" not in page
     assert "class='button-stack'" not in page
+
+
+def test_hierarchy_table_orders_casefold_ties_consistently(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_owned_dataset(
+        services.datasets, admin.id, "ordered-hierarchy", "Ordered", "", kind="hierarchy"
+    )
+    root = services.hierarchy.create_node(
+        admin.id, dataset.key, "Root", expected_revision=dataset.revision
+    )
+    revision = services.datasets.get_dataset_for_edit(admin.id, dataset.key).revision
+    services.hierarchy.create_node(
+        admin.id, dataset.key, "zeta", root.id, expected_revision=revision
+    )
+    revision = services.datasets.get_dataset_for_edit(admin.id, dataset.key).revision
+    services.hierarchy.create_node(
+        admin.id, dataset.key, "alpha", root.id, expected_revision=revision
+    )
+    revision = services.datasets.get_dataset_for_edit(admin.id, dataset.key).revision
+    services.hierarchy.create_node(
+        admin.id, dataset.key, "Alpha", root.id, expected_revision=revision
+    )
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/records?view=table"))
+    rows = re.findall(r"<tr data-hierarchy-node=.*?</tr>", page, flags=re.DOTALL)
+    names = [re.search(r"aria-label='Edit node ([^']+)'", row)[1] for row in rows]
+
+    assert names == ["Root", "Root / Alpha", "Root / alpha", "Root / zeta"]
 
 
 def test_dataset_detail_maps_late_field_not_found_to_ordinary_404(dataset_browser, monkeypatch):

@@ -25,7 +25,12 @@ from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.audit import record_security_event
-from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
+from refrncr.audit_history import (
+    MAX_AUDIT_DATETIME_LENGTH,
+    AuditHistoryService,
+    filter_values,
+    parse_audit_filters,
+)
 from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
@@ -33,20 +38,23 @@ from refrncr.browser_security import (
     BrowserCookiePolicy,
 )
 from refrncr.change_status import (
-    DISPLAY_STATUSES,
     RECORD_STATUS_FILTERS,
     ChangeStatus,
     change_status,
-    status_badge_variant,
-    status_label,
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import DATATYPES, get_datatype
-from refrncr.diff_contracts import STATUSES, DiffCriteria
-from refrncr.hierarchy import HierarchyService
+from refrncr.diff_contracts import MAX_SEARCH, STATUSES, DiffCriteria
+from refrncr.hierarchy import (
+    MAX_HIERARCHY_NODE_NAME,
+    HierarchyService,
+    canonical_hierarchy_view,
+    hierarchy_sibling_sort_key,
+)
+from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
@@ -56,8 +64,19 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
+from refrncr.presentation import (
+    DISPLAY_STATUSES,
+    dataset_kind_label,
+    pluralize,
+    record_label,
+    status_badge_variant,
+    status_label,
+)
 from refrncr.presentation_metadata import (
     DATASET_ICONS,
+    MAX_DATASET_ICON_LENGTH,
+    MAX_FIELD_DEFINITION,
+    MAX_FIELD_UNIT,
     dataset_icon_sprite,
     default_dataset_icon,
     key_from_name,
@@ -105,6 +124,7 @@ from refrncr.services import (
     ValidationError,
     parse_expected_revision,
 )
+from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
 
 
@@ -246,9 +266,21 @@ def create_flask_app(
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
     app.jinja_env.filters["status_label"] = status_label
     app.jinja_env.filters["status_badge_variant"] = status_badge_variant
+    app.jinja_env.filters["dataset_kind_label"] = dataset_kind_label
+    app.jinja_env.filters["pluralize"] = pluralize
+    app.jinja_env.globals["dataset_kind_label"] = dataset_kind_label
     app.jinja_env.globals["ChangeStatus"] = ChangeStatus
     app.jinja_env.globals["DISPLAY_STATUSES"] = DISPLAY_STATUSES
     app.jinja_env.globals["status_label"] = status_label
+    app.jinja_env.globals.update(
+        MAX_AUDIT_DATETIME_LENGTH=MAX_AUDIT_DATETIME_LENGTH,
+        MAX_DATASET_ICON_LENGTH=MAX_DATASET_ICON_LENGTH,
+        MAX_HIERARCHY_NODE_NAME=MAX_HIERARCHY_NODE_NAME,
+        MAX_SEARCH=MAX_SEARCH,
+        MAX_SOURCE_TIMEZONE_LENGTH=MAX_SOURCE_TIMEZONE_LENGTH,
+        MAX_FIELD_DEFINITION=MAX_FIELD_DEFINITION,
+        MAX_FIELD_UNIT=MAX_FIELD_UNIT,
+    )
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -1034,14 +1066,7 @@ def create_flask_app(
             )
         except (ValidationError, ConflictError) as error:
             message = str(error)
-            if message.startswith("Dataset key"):
-                error_field = "key"
-            elif message.startswith("Dataset name"):
-                error_field = "name"
-            elif message.startswith("Dataset description"):
-                error_field = "description"
-            else:
-                error_field = None
+            error_field = error.field
             response = render_dataset_create_form(
                 key=key,
                 name=name,
@@ -1753,7 +1778,7 @@ def create_flask_app(
         for node in nodes.values():
             children.setdefault(node.parent_id, []).append(node)
         for siblings in children.values():
-            siblings.sort(key=lambda node: (node.name.casefold(), node.id))
+            siblings.sort(key=hierarchy_sibling_sort_key)
         rows, visited = [], set()
 
         def append_subtree(start):
@@ -1774,7 +1799,7 @@ def create_flask_app(
                         "parent_name": nodes[node.parent_id].name
                         if node.parent_id in nodes
                         else None,
-                        "path": " / ".join(path),
+                        "path": hierarchy_path_label(path),
                         "leaf": not children.get(node.id),
                         "values": {
                             value.field_key: value.value
@@ -1809,9 +1834,7 @@ def create_flask_app(
         }:
             abort(400, description="Choose Tree or Table.")
         legacy_view = selected[0]
-        selected[0] = {"hierarchy": "tree", "hybrid": "tree", "records": "table"}.get(
-            selected[0], selected[0]
-        )
+        selected[0] = canonical_hierarchy_view(selected[0])
         records_view = request.args.getlist("records_view") or ["reference"]
         if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
             abort(400, description="Choose a valid hierarchy view.")
@@ -2025,9 +2048,7 @@ def create_flask_app(
     def hierarchy_return_view():
         values = request.form if request.method == "POST" else request.args
         selected = values.getlist("return_view") or values.getlist("view") or ["tree"]
-        selected[0] = {"hierarchy": "tree", "hybrid": "tree", "records": "table"}.get(
-            selected[0], selected[0]
-        )
+        selected[0] = canonical_hierarchy_view(selected[0])
         searches = values.getlist("return_q") or values.getlist("q") or [""]
         sorts = values.getlist("return_sort") or values.getlist("sort") or [""]
         directions = values.getlist("return_direction") or values.getlist("direction") or ["asc"]
@@ -2373,7 +2394,7 @@ def create_flask_app(
                 )
             return get_datatype(field.data_type).text(value) if value is not None else None
 
-        record_type = key[:-3] + "y" if key.endswith("ies") else key.removesuffix("s")
+        record_type = pluralize(key, 1)
         range_start = (page.page - 1) * page.page_size + 1 if page.records else 0
         range_end = min(page.page * page.page_size, page.total) if page.records else 0
 
@@ -2735,9 +2756,9 @@ def create_flask_app(
             for number, errors in preview.row_error_groups:
                 row = rows[number]
                 identifier_values = [
-                    row.values[preview.mapping.index(key)]
+                    row.values[preview.mapping.index(key)] if key in preview.mapping else None
                     for key in required_keys
-                    if key in identifier_keys and key in preview.mapping
+                    if key in identifier_keys
                 ]
                 details = []
                 for item in errors:
@@ -2747,7 +2768,7 @@ def create_flask_app(
                         value = "[Formula]" if index in row.formulas else row.values[index]
                     details.append(dict(field=item.field, value=value, message=item.message))
                 report_rows.append(
-                    dict(number=number, identifier=" · ".join(identifier_values), errors=details)
+                    dict(number=number, identifier=record_label(identifier_values), errors=details)
                 )
         back_step = 3 if step == 4 else 1 if automatic else step - 1
         return render_authenticated_template(
@@ -3319,9 +3340,7 @@ def create_flask_app(
     ):
         submitted = submitted or {}
         errors = errors or {}
-        record_type = (
-            dataset.key[:-3] + "y" if dataset.key.endswith("ies") else dataset.key.removesuffix("s")
-        )
+        record_type = pluralize(dataset.key, 1)
         response = render_authenticated_template(
             "pages/datasets/records/form.html",
             dataset=dataset,
@@ -3367,19 +3386,7 @@ def create_flask_app(
             fields = field_service.list_fields(actor.id, key)
         except NotFoundError:
             abort(404)
-        expected = {field.key for field in fields}
-        submitted: dict[str, str] = {}
-        errors: dict[str, str] = {}
-        for form_key, form_values in request.form.lists():
-            if form_key == "csrf_token":
-                continue
-            if form_key not in expected:
-                errors[form_key] = "Unknown Dataset field"
-                errors["_record"] = "Record contains unknown Dataset fields"
-            elif len(form_values) != 1:
-                errors[form_key] = "Submit exactly one value"
-            else:
-                submitted[form_key] = form_values[0]
+        submitted, errors = parsed_record_form(fields, {"csrf_token"})
         if errors:
             return render_record_form(
                 dataset,
@@ -3574,13 +3581,14 @@ def create_flask_app(
             identifier_keys = business_keys.get_business_key(actor.id, key).field_keys
         except NotFoundError:
             abort(404)
-        values = {value.field_key: value.value for value in record.values}
-        incomplete = any(field_key not in values for field_key in identifier_keys)
-        identifier = (
-            "Incomplete record"
-            if incomplete
-            else " / ".join(str(values[field_key]) for field_key in identifier_keys)
-        )
+        values = {value.field_key: value for value in record.values}
+        identifier_parts = [
+            get_datatype(values[field_key].data_type).text(values[field_key].value)
+            if field_key in values
+            else None
+            for field_key in identifier_keys
+        ]
+        identifier = record_label(identifier_parts, sentence=True)
         error = None
         status = 200
         if request.method == "POST":
@@ -3664,14 +3672,7 @@ def create_flask_app(
             except NotFoundError:
                 abort(404)
             message = str(error)
-            if message.startswith("Dataset name"):
-                error_field = "name"
-            elif message.startswith("Dataset key"):
-                error_field = "technical_key"
-            elif message.startswith("Dataset description"):
-                error_field = "description"
-            else:
-                error_field = None
+            error_field = {"key": "technical_key"}.get(error.field, error.field)
             return (
                 render_dataset_configuration(
                     dataset.key,
@@ -4056,14 +4057,7 @@ def create_flask_app(
                 )
             except UserManagementError as error:
                 message = str(error)
-                if message.startswith("Display name"):
-                    error_field = "display_name"
-                elif message.startswith("A valid email"):
-                    error_field = "email"
-                elif message.startswith("Password"):
-                    error_field = "password"
-                else:
-                    error_field = None
+                error_field = getattr(error, "field", None)
                 return (
                     render_anonymous_template(
                         "pages/auth/setup.html",

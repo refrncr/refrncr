@@ -81,7 +81,9 @@ class AuthorizationError(UserManagementError):
 
 
 class ConflictError(UserManagementError):
-    pass
+    def __init__(self, message, *, field=None):
+        self.field = field
+        super().__init__(message)
 
 
 class InvalidLifecycleError(UserManagementError):
@@ -159,15 +161,15 @@ class RecordPage:
 def validate_password(password: str) -> str:
     """Validate without trimming, normalizing, or otherwise rewriting a password."""
     if not isinstance(password, str):
-        raise ValidationError("Password must be text")
+        raise ValidationError("Password must be text", field="password")
     if len(password) < 12:
-        raise ValidationError("Password must contain at least 12 characters")
+        raise ValidationError("Password must contain at least 12 characters", field="password")
     try:
         encoded_size = len(password.encode("utf-8"))
     except UnicodeEncodeError as exc:
-        raise ValidationError("Password must be valid Unicode text") from exc
+        raise ValidationError("Password must be valid Unicode text", field="password") from exc
     if encoded_size > 1024:
-        raise ValidationError("Password must not exceed 1024 UTF-8 bytes")
+        raise ValidationError("Password must not exceed 1024 UTF-8 bytes", field="password")
     return password
 
 
@@ -203,10 +205,10 @@ def normalize_email(email: str) -> str:
         or normalized.count("@") != 1
         or any(character.isspace() or ord(character) < 32 for character in normalized)
     ):
-        raise ValidationError("A valid email address is required")
+        raise ValidationError("A valid email address is required", field="email")
     local_part, domain = normalized.split("@")
     if not local_part or not domain:
-        raise ValidationError("A valid email address is required")
+        raise ValidationError("A valid email address is required", field="email")
     return normalized
 
 
@@ -221,25 +223,30 @@ def validate_dataset_key(key: str) -> str:
     if not isinstance(key, str) or re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,99}", key) is None:
         raise ValidationError(
             "Dataset key must contain 1-100 lowercase ASCII letters, numbers, "
-            "underscores, or hyphens"
+            "underscores, or hyphens",
+            field="key",
         )
     return key
 
 
 def normalize_dataset_name(name: str) -> str:
     if not isinstance(name, str):
-        raise ValidationError("Dataset name must be text")
+        raise ValidationError("Dataset name must be text", field="name")
     normalized_name = unicodedata.normalize("NFC", name.strip())
     if not 1 <= len(normalized_name) <= 200:
-        raise ValidationError("Dataset name must contain between 1 and 200 characters")
+        raise ValidationError(
+            "Dataset name must contain between 1 and 200 characters", field="name"
+        )
     return normalized_name
 
 
 def validate_dataset_description(description: str) -> str:
     if not isinstance(description, str):
-        raise ValidationError("Dataset description must be text")
+        raise ValidationError("Dataset description must be text", field="description")
     if len(description) > 10_000:
-        raise ValidationError("Dataset description must not exceed 10000 characters")
+        raise ValidationError(
+            "Dataset description must not exceed 10000 characters", field="description"
+        )
     return description
 
 
@@ -445,7 +452,7 @@ class UserService:
         if role not in {"admin", "user"}:
             raise ValidationError("Unknown role")
         if not display_name.strip():
-            raise ValidationError("Display name is required")
+            raise ValidationError("Display name is required", field="display_name")
         return uow.users.create(
             email=normalize_email(email),
             display_name=display_name.strip(),
@@ -932,7 +939,9 @@ class DatasetService:
                 uow.flush()
             except PersistenceConflictError as exc:
                 if exc.constraint == "uq_datasets_key":
-                    raise ConflictError("Dataset key already exists in this installation") from exc
+                    raise ConflictError(
+                        "Dataset key already exists in this installation", field="key"
+                    ) from exc
                 raise
             record_audit(
                 uow,
@@ -1273,7 +1282,7 @@ class DatasetService:
                 except PersistenceConflictError as exc:
                     if exc.constraint == "uq_datasets_key":
                         raise ConflictError(
-                            "Dataset key already exists in this installation"
+                            "Dataset key already exists in this installation", field="key"
                         ) from exc
                     raise
             dataset.icon = validated_icon
@@ -1288,7 +1297,9 @@ class DatasetService:
                 uow.flush()
             except PersistenceConflictError as exc:
                 if exc.constraint == "uq_datasets_key":
-                    raise ConflictError("Dataset key already exists in this installation") from exc
+                    raise ConflictError(
+                        "Dataset key already exists in this installation", field="key"
+                    ) from exc
                 raise
             return dataset
 

@@ -2,9 +2,9 @@
   {% set selected_type = type_choices|selectattr('id', 'equalto', data_type)|first %}
   <label>Name <input name='name' value='{{ name }}'></label>
   {% if include_key %}<label>Key <input name='key' value='{{ key }}' aria-describedby='field-key-help'></label><p class='help-text' id='field-key-help'>Generated from the name until you edit it. Used in exports and the API. It can be changed until the first version is published.</p>{% endif %}
-  <label>Definition <textarea name='definition' maxlength='4000' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
+  <label>Definition <textarea name='definition' maxlength='{{ MAX_FIELD_DEFINITION }}' aria-describedby='field-definition-help'>{{ definition or '' }}</textarea></label>
   <p class='help-text' id='field-definition-help'>Optional explanation of meaning and intended use. Maximum 4000 characters.</p>
-  <label>Unit <input name='unit' value='{{ unit or "" }}' maxlength='64' aria-describedby='field-unit-help'></label>
+  <label>Unit <input name='unit' value='{{ unit or "" }}' maxlength='{{ MAX_FIELD_UNIT }}' aria-describedby='field-unit-help'></label>
   <p class='help-text' id='field-unit-help'>Optional label such as EUR, kg, % or days. Maximum 64 characters; no conversion or calculation.</p>
   <label>Data type <select name='data_type' data-select data-noun='data types' data-field-datatype>{% for choice in type_choices %}<option value='{{ choice.id }}' data-identifier-eligible='{{ 'true' if choice.identifier_eligible else 'false' }}'{% if choice.id == data_type %} selected{% endif %}>{{ choice.label }}</option>{% endfor %}</select></label>
   {% if hierarchy %}

@@ -63,6 +63,21 @@ def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():
     artifact.content.close()
 
 
+def test_hierarchy_export_sorts_sibling_names_casefold_then_name_then_id():
+    nodes = (
+        node("root", "Root"),
+        node("zeta", "zeta", "root"),
+        node("lower", "alpha", "root"),
+        node("upper", "Alpha", "root"),
+    )
+
+    artifact = generate_export("csv", (), (), "hierarchy", hierarchy_nodes=nodes)
+    rows = read_csv(artifact)
+
+    assert [row[0] for row in rows[1:]] == ["root", "upper", "lower", "zeta"]
+    artifact.content.close()
+
+
 def test_hierarchy_csv_bundle_contains_both_variants():
     fields = (field("f1", "code", "leaves"),)
     nodes = (node("root", "Root"), node("leaf", "Leaf", "root", (value("f1", "code", "L"),)))
@@ -232,7 +247,7 @@ def test_reporting_csv_contains_every_node_in_tree_order_with_fill_down_and_safe
     assert rows[1][6:10] == ["1", "false", "1", "'=Executive"]
     assert rows[1][10:13] == ["'=Executive", "'=Executive", "'=Executive"]
     assert rows[2][4] == ""  # Leaves-only values stored on a branch remain inactive.
-    assert rows[2][6:10] == ["2", "false", "2", "'=Executive/Commercial"]
+    assert rows[2][6:10] == ["2", "false", "2", "'=Executive / Commercial"]
     assert rows[2][10:13] == ["'=Executive", "Commercial", "Commercial"]
     assert rows[2][13::2] == ["Global", "EU", "EU"]
     assert rows[3][1] == 'West, "quoted"\nline'

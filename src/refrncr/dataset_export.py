@@ -21,7 +21,8 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
 from refrncr.datatypes import DatatypeError, get_datatype
-from refrncr.hierarchy import applicable
+from refrncr.hierarchy import applicable, hierarchy_order, hierarchy_paths
+from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.ports import DatasetFieldRecord, StoredRecord
 
 SPOOL_MEMORY_LIMIT = 1024 * 1024
@@ -279,35 +280,6 @@ def _hierarchy_columns(fields, reserved):
     return columns
 
 
-def _hierarchy_order(nodes):
-    by_parent = {}
-    for node in nodes:
-        by_parent.setdefault(node.parent_id, []).append(node)
-    for siblings in by_parent.values():
-        siblings.sort(key=lambda node: (node.name.casefold(), node.name, node.id))
-    result = []
-    pending = list(reversed(by_parent.get(None, ())))
-    while pending:
-        node = pending.pop()
-        result.append(node)
-        pending.extend(reversed(by_parent.get(node.id, ())))
-    result.extend(node for node in nodes if node not in result)
-    return result
-
-
-def _hierarchy_paths(nodes):
-    by_id = {node.id: node for node in nodes}
-    paths = {}
-    for node in nodes:
-        path, current, visited = [], node, set()
-        while current is not None and current.id not in visited:
-            visited.add(current.id)
-            path.append(current)
-            current = by_id.get(current.parent_id)
-        paths[node.id] = tuple(reversed(path))
-    return paths
-
-
 def _hierarchy_cell(field, node, parent_ids):
     if not applicable(field, node, parent_ids):
         return "Not applicable"
@@ -325,7 +297,7 @@ def _hierarchy_data_rows(fields, nodes, *, include_ids=True):
         else ["Name", "Parent", *columns]
     )
     rows = []
-    for node in _hierarchy_order(nodes):
+    for node in hierarchy_order(nodes):
         row = [
             node.name,
             by_id[node.parent_id].name if node.parent_id in by_id else "",
@@ -337,10 +309,10 @@ def _hierarchy_data_rows(fields, nodes, *, include_ids=True):
 
 def _hierarchy_flattened_rows(fields, nodes, *, include_ids=True):
     parent_ids = {node.parent_id for node in nodes}
-    paths = _hierarchy_paths(nodes)
+    paths = hierarchy_paths(nodes)
     leaves = [
         node
-        for node in _hierarchy_order(nodes)
+        for node in hierarchy_order(nodes)
         if node.parent_id is not None and node.id not in parent_ids
     ]
     max_ancestors = max((len(paths[node.id]) - 1 for node in leaves), default=0)
@@ -394,9 +366,9 @@ def _reporting_field_columns(fields, reserved):
 
 
 def _hierarchy_reporting_rows(fields, nodes):
-    ordered = _hierarchy_order(nodes)
+    ordered = hierarchy_order(nodes)
     parent_ids = {node.parent_id for node in nodes}
-    paths = _hierarchy_paths(nodes)
+    paths = hierarchy_paths(nodes)
     max_depth = max((len(path) for path in paths.values()), default=0)
     level_names = [f"level_{index}" for index in range(1, max_depth + 1)]
     all_node_fields = [field for field in fields if field.hierarchy_scope == "all_nodes"]
@@ -441,7 +413,7 @@ def _hierarchy_reporting_rows(fields, nodes):
             len(path),
             node.id not in parent_ids,
             sort_order,
-            "/".join(item.name for item in path),
+            hierarchy_path_label(item.name for item in path),
             *[item.name for item in filled_path],
         ]
         row.extend(
@@ -520,13 +492,13 @@ def write_hierarchy_xlsx(target, fields, nodes, title: str) -> None:
         _write_hierarchy_sheet(flattened, flat_headers, flat_rows)
         hierarchy = workbook.create_sheet(title="Hierarchy")
         hierarchy_headers = ["Name", "Path"]
-        paths = _hierarchy_paths(nodes)
+        paths = hierarchy_paths(nodes)
         hierarchy_rows = [
             [
                 node.name,
-                " / ".join(item.name for item in paths[node.id]),
+                hierarchy_path_label(item.name for item in paths[node.id]),
             ]
-            for node in _hierarchy_order(nodes)
+            for node in hierarchy_order(nodes)
         ]
         _write_hierarchy_sheet(hierarchy, hierarchy_headers, hierarchy_rows)
         workbook.save(target)
@@ -595,7 +567,7 @@ def write_hierarchy_json(target, fields, nodes, *, dataset_key, provenance):
     target.write(b',"nodes":[')
     parent_ids = {node.parent_id for node in nodes}
     first_node = True
-    for node in _hierarchy_order(nodes):
+    for node in hierarchy_order(nodes):
         if not first_node:
             target.write(b",")
         first_node = False

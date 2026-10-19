@@ -70,7 +70,7 @@
       {% if column.timestamp %}
         <div data-source-timezone{% if not column.choice.get('profile_id') or column.choice.get('profile_id') == 'v1-offset' %} hidden{% endif %}>
           <label for='timezone-{{ index }}'>IANA source timezone (required for local timestamps)</label>
-          <input id='timezone-{{ index }}' name='timezone_{{ index }}' value='{{ column.choice.get("timezone", "") }}' maxlength='100' placeholder='Europe/Amsterdam' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
+          <input id='timezone-{{ index }}' name='timezone_{{ index }}' value='{{ column.choice.get("timezone", "") }}' maxlength='{{ MAX_SOURCE_TIMEZONE_LENGTH }}' placeholder='Europe/Amsterdam' aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
           <label for='fold-{{ index }}'>Repeated local times</label>
           <select id='fold-{{ index }}' name='fold_{{ index }}' data-select aria-describedby='{{ error_description }}'{% if column.error %} aria-invalid='true'{% endif %}>
             <option value=''>Require a decision</option>
