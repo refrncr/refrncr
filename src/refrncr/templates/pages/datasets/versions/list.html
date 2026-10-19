@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/concept.html" import new_concept with context %}
-{% from "components.html" import feedback %}
+{% from "components.html" import feedback, status_badge %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "layouts/page.html" import page_context %}
 {% block title %}Versions · {{ dataset.name }} · REFRNCR{% endblock %}
@@ -23,7 +23,7 @@
         <tbody>{% if history.concept %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
             <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}</th>
-            <td><span class='badge{{ " badge-published" if state.status == "Current" else " badge-info" if state.status == "Scheduled" else "" }}'>{{ state.status }}</span></td>
+            <td>{{ status_badge(state.status) }}</td>
             <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date|short_date }}</time></td>
             <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date|short_date }}</time>{% else %}—{% endif %}</td>
             <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time='datetime'>{{ version.published_at|absolute_utc }}</time></td>

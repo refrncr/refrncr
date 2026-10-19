@@ -44,31 +44,31 @@
     ) }}
     {{ team_choice(teams, owner_team_id) }}
     <fieldset class='form-field'>
-      <legend>Table type</legend>
-      <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference table</label>
-      <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping table</label>
-      <label><input type='radio' name='kind' value='hierarchy'{% if table_kind == 'hierarchy' %} checked{% endif %}> Hierarchy table</label>
-      <p class='help-text'>Mapping tables are versioned 1:1 crosswalks and use the same Draft → review → publish lifecycle.</p>
-      <p class='help-text'>Hierarchy tables start with a root and its children. Custom fields and a record identifier are optional.</p>
+      <legend>Dataset type</legend>
+      <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference dataset</label>
+      <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping dataset</label>
+      <label><input type='radio' name='kind' value='hierarchy'{% if table_kind == 'hierarchy' %} checked{% endif %}> Hierarchy dataset</label>
+      <p class='help-text'>Mapping datasets are versioned 1:1 crosswalks and use the same Draft → review → publish lifecycle.</p>
+      <p class='help-text'>Hierarchy datasets start with a root and its children. Custom fields and a record identifier are optional.</p>
     </fieldset>
     <div data-mapping-setup{% if table_kind != 'mapping' %} hidden{% endif %}>
       <fieldset class='form-field'>
         <legend>Mapping setup</legend>
         <label><input type='radio' name='mapping_mode' value='standalone'{% if mapping_mode == 'standalone' %} checked{% endif %}> Standalone</label>
-        <label><input type='radio' name='mapping_mode' value='linked'{% if mapping_mode == 'linked' %} checked{% endif %}> Linked to reference tables</label>
+        <label><input type='radio' name='mapping_mode' value='linked'{% if mapping_mode == 'linked' %} checked{% endif %}> Linked to reference datasets</label>
       </fieldset>
       <div data-linked-mapping{% if mapping_mode != 'linked' %} hidden{% endif %}>
         <div class='form-field'>
-          <label for='mapping-source-table'>Source table</label>
-          <select id='mapping-source-table' name='source_dataset_id' data-select data-noun='reference tables' required{% if table_kind != 'mapping' or mapping_mode != 'linked' %} disabled{% endif %}>
-            <option value=''>Choose a reference table</option>
+          <label for='mapping-source-table'>Source dataset</label>
+          <select id='mapping-source-table' name='source_dataset_id' data-select data-noun='reference datasets' required{% if table_kind != 'mapping' or mapping_mode != 'linked' %} disabled{% endif %}>
+            <option value=''>Choose a reference dataset</option>
             {% for table in available_reference_tables %}<option value='{{ table.id }}'{% if table.id == source_dataset_id %} selected{% endif %}>{{ table.name }}</option>{% endfor %}
           </select>
         </div>
         <div class='form-field' data-source-identifier-select{% if not source_dataset_id %} hidden{% endif %}>
           <label for='mapping-source-field'>Source identifier</label>
           <select id='mapping-source-field' name='source_field_key' data-select data-noun='fields' data-field-select data-selected='{{ source_field_key }}' required{% if table_kind != 'mapping' or mapping_mode != 'linked' or not source_dataset_id %} disabled{% endif %}>
-            <option value=''>Choose a source table first</option>
+            <option value=''>Choose a source dataset first</option>
             {% for table in available_reference_tables %}{% for field in reference_table_fields[table.id] %}<option value='{{ field.key }}' data-table-id='{{ table.id }}'{% if table.id == source_dataset_id and field.key == source_field_key %} selected{% endif %}>{{ field.name }}</option>{% endfor %}{% endfor %}
           </select>
         </div>

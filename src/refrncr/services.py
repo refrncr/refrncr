@@ -894,13 +894,13 @@ class DatasetService:
             )
             if kind == "mapping" and mapping_mode == "linked":
                 if not source_dataset_id:
-                    raise ValidationError("Choose a source table for a linked mapping table.")
+                    raise ValidationError("Choose a source dataset for a linked mapping dataset.")
                 linked = uow.datasets.get(source_dataset_id)
                 visible = linked is not None and self.authorization.has_capability(
                     actor_id, "can_view_dataset", linked.id, uow=uow
                 )
                 if not visible or linked.kind != "reference":
-                    raise ValidationError("Choose an available reference source table.")
+                    raise ValidationError("Choose an available reference source dataset.")
                 source_fields = {
                     field.key: field for field in uow.dataset_fields.list_for_dataset(linked.id)
                 }
@@ -999,7 +999,7 @@ class DatasetService:
     @staticmethod
     def _mapping_metadata(kind, mapping_mode, source_system, target_system):
         if kind not in {"reference", "mapping", "hierarchy"}:
-            raise ValidationError("Choose a valid table type.")
+            raise ValidationError("Choose a valid dataset type.")
         if kind in {"reference", "hierarchy"}:
             return kind, None, None, None
         if mapping_mode not in {"standalone", "linked"}:
@@ -1367,7 +1367,9 @@ class DatasetFieldService:
                 if mapping_role == "source_context":
                     if dataset.mapping_mode == "linked":
                         if not dataset.source_dataset_id:
-                            raise ValidationError("Source context requires a linked mapping table")
+                            raise ValidationError(
+                                "Source context requires a linked mapping dataset"
+                            )
                         source_dataset = uow.datasets.get(dataset.source_dataset_id)
                         if not source_field_key:
                             raise ValidationError("Choose an available source field")
@@ -1685,7 +1687,7 @@ class DatasetFieldService:
                 )
             if key_changed and uow.datasets.uses_linked_field(dataset.id, field.key):
                 raise ValidationError(
-                    "Field key cannot change while used by a linked mapping table."
+                    "Field key cannot change while used by a linked mapping dataset."
                 )
             existing_key = uow.dataset_fields.find_by_key(dataset.id, validated_new_key)
             if key_changed and existing_key is not None:
@@ -1818,7 +1820,7 @@ class DatasetFieldService:
                     "Remove this field from the Record identifier before deleting it"
                 )
             if uow.datasets.uses_linked_field(dataset.id, field.key):
-                raise ValidationError("A field used by a linked mapping table cannot be deleted")
+                raise ValidationError("A field used by a linked mapping dataset cannot be deleted")
             if uow.dataset_records.field_has_values(dataset.id, field.id) or (
                 dataset.kind == "hierarchy" and uow.hierarchy.field_has_values(dataset.id, field.id)
             ):
@@ -2070,7 +2072,9 @@ class DatasetRecordService:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if dataset.kind == "mapping" and dataset.mapping_mode == "linked":
-                raise ValidationError("Linked mapping records are populated from the source table")
+                raise ValidationError(
+                    "Linked mapping records are populated from the source dataset"
+                )
             fields = uow.dataset_fields.list_for_dataset(dataset.id)
             if dataset.kind == "mapping":
                 if message := mapping_incomplete_message(fields):

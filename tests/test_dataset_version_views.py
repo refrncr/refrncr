@@ -178,7 +178,9 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):
     assert listing.status_code == 200
     assert "Version 2" not in listing.text and future.isoformat() not in listing.text
     assert "Secret future" not in listing.text
-    assert "Scheduled" in request(owner, "get", f"/datasets/{c.d.key}/versions").text
+    owner_listing = request(owner, "get", f"/datasets/{c.d.key}/versions").text
+    assert "<span class='badge badge-info'>Scheduled</span>" in owner_listing
+    assert "<span class='badge badge-published'>Current</span>" in owner_listing
     assert c.service.read(c.a.id, c.d.key, scheduled.id).fields[1].name == "Secret future"
     for actor in (c.a, c.u):
         with pytest.raises(NotFoundError):
@@ -192,7 +194,8 @@ def test_scheduled_cancelled_visibility_and_export_denial(context):
                 ).status_code
                 == 404
             )
-    assert "Cancelled" in request(owner, "get", f"/datasets/{c.d.key}/versions").text
+    cancelled_listing = request(owner, "get", f"/datasets/{c.d.key}/versions").text
+    assert "<span class='badge badge-warning'>Cancelled</span>" in cancelled_listing
     assert "Cancelled" not in request(ordinary, "get", f"/datasets/{c.d.key}/versions").text
     with pytest.raises(NotFoundError):
         c.s.dataset_records.export_dataset(c.u.id, c.d.key, "json", version_id=first.id)

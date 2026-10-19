@@ -180,7 +180,7 @@ def test_linked_mapping_requires_visible_reference_source(dataset_services):
     assert mapping.target_dataset_id is None
     assert mapping.target_field_key is None
     assert mapping.target_system is None
-    with pytest.raises(ValidationError, match="source table"):
+    with pytest.raises(ValidationError, match="source dataset"):
         create_owned_dataset(
             services.datasets,
             admin.id,
@@ -227,7 +227,7 @@ def test_linked_mapping_records_source_field_and_defers_target_table(dataset_ser
         None,
         None,
     )
-    with pytest.raises(ValidationError, match="linked mapping table"):
+    with pytest.raises(ValidationError, match="linked mapping dataset"):
         services.dataset_fields.delete_field(admin.id, source.key, source_field.key)
     with pytest.raises(ValidationError, match="source identifier"):
         create_owned_dataset(
@@ -275,7 +275,7 @@ def test_linked_mapping_populates_source_rows_and_adds_context_and_target_fields
         source_field_key=code.key,
     )
 
-    with pytest.raises(ValidationError, match="populated from the source table"):
+    with pytest.raises(ValidationError, match="populated from the source dataset"):
         services.dataset_records.create_record(admin.id, mapping.key, {code.key: "USD"})
 
     fields = services.dataset_fields.list_fields(admin.id, mapping.key)

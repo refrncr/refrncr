@@ -73,7 +73,7 @@
     <a href='{{ record_page_url(1) }}'>First page</a>
     {% else %}
     <h2>{{ 'No matching records' if has_criteria else 'No source records yet' if dataset.kind == 'mapping' and dataset.mapping_mode == 'linked' else 'No records yet' }}</h2>
-    <p>{{ 'Remove or change your search criteria.' if has_criteria else 'Records appear here when they are available in the linked source table.' if dataset.kind == 'mapping' and dataset.mapping_mode == 'linked' else 'No active records are available.' }}</p>
+    <p>{{ 'Remove or change your search criteria.' if has_criteria else 'Records appear here when they are available in the linked source dataset.' if dataset.kind == 'mapping' and dataset.mapping_mode == 'linked' else 'No active records are available.' }}</p>
     {% endif %}
     <a href='{{ clear_url }}'>Clear all criteria</a>
   </div>

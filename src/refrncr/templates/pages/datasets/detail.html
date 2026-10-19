@@ -7,7 +7,7 @@
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon, configure_icon %}
 {% from "components/dataset_icon.html" import dataset_icon %}
-{% from "components.html" import content_metadata, feedback %}
+{% from "components.html" import content_metadata, feedback, status_badge %}
 {% from "layouts/page.html" import page_context %}
 
 {% set detail_tab = request.args.get('tab', 'dataset-details') %}
@@ -63,7 +63,7 @@
           <dl class='detail-list'>
             <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
             <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Draft is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
-            <div><dt>Table type</dt><dd>{{ 'Mapping table' if dataset.kind == 'mapping' else 'Hierarchy table' if dataset.kind == 'hierarchy' else 'Reference table' }}</dd></div>
+            <div><dt>Dataset type</dt><dd>{{ dataset.kind|dataset_kind_label }}</dd></div>
             <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
           </dl>
         </div>
@@ -113,15 +113,15 @@
     </section>
     {% if dataset.kind == 'mapping' %}
     <section id='mapping' aria-labelledby='mapping-heading'>
-      <div class='page-header section-header'><div><h2 id='mapping-heading'>Mapping</h2><p class='section-description'>How source records populate this mapping table.</p></div></div>
+      <div class='page-header section-header'><div><h2 id='mapping-heading'>Mapping</h2><p class='section-description'>How source records populate this mapping dataset.</p></div></div>
       {% if mapping_incomplete %}{{ feedback(mapping_incomplete_message, kind="warning") }}{% endif %}
       <dl class='detail-list'>
         <div><dt>Mapping setup</dt><dd>{{ dataset.mapping_mode|capitalize }}</dd></div>
         {% if dataset.mapping_mode == 'linked' %}
-        <div><dt>Source table</dt><dd>{{ mapping_source_table.name if mapping_source_table else 'Unavailable' }}</dd></div>
+        <div><dt>Source dataset</dt><dd>{{ mapping_source_table.name if mapping_source_table else 'Unavailable' }}</dd></div>
         <div><dt>Source identifier</dt><dd>{{ dataset.source_system or dataset.source_field_key }}</dd></div>
         {% endif %}
-        <div><dt>Target table</dt><dd><span class='detail-hint-inline'>Not configured · future capability</span></dd></div>
+        <div><dt>Target dataset</dt><dd><span class='detail-hint-inline'>Not configured · future capability</span></dd></div>
       </dl>
     </section>
     {% endif %}
@@ -161,7 +161,7 @@
                     <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
                   {% else %}<span class='field-position'>{{ loop.index }}</span>{% endif %}
                 </td>
-                <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} <span class='badge badge-draft'>{{ field_states[field.id] }}</span>{% endif %}<code class='field-key'>{{ field.key }}</code></td>
+                <td class='field-identity'><span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} {{ status_badge(field_states[field.id]) }}{% endif %}<code class='field-key'>{{ field.key }}</code></td>
                 {% if dataset.kind == 'mapping' %}<td class='field-mapping'><div class='mapping-property-list'>{% if field.mapping_role == 'source_identifier' %}<span class='badge badge-identifier'>Source identifier</span>{% elif field.mapping_role == 'source_context' %}<span class='badge'>Source context</span>{% elif field.mapping_role == 'mapping_target' %}<span class='badge badge-draft'>Mapping target</span>{% else %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>No mapping role</span>{% endif %}</div></td>{% endif %}
                 <td class='field-type'>{{ field.data_type|datatype_label }}</td>
                 {% if dataset.kind == 'hierarchy' %}<td>{{ 'All nodes' if field.hierarchy_scope == 'all_nodes' else 'Leaves only' }}</td>{% endif %}

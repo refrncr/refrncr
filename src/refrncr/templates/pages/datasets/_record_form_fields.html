@@ -13,7 +13,7 @@
       {% else %}
         <input id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}'{% if values is not none %} value='{{ values.get(field.key) if raw_values else values.get(field.key)|record_value_text(field.data_type) }}'{% endif %}{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} readonly aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>
       {% endif %}
-      {% if read_only_mapping_field %}<p class='field-help'>Copied from the source table and read-only.</p>{% endif %}
+      {% if read_only_mapping_field %}<p class='field-help'>Copied from the source dataset and read-only.</p>{% endif %}
       {% if errors.get(field.key) %}<p class='field-error' id='{{ prefix }}-{{ field.key }}-error' role='alert'>{{ errors[field.key] }}</p>{% endif %}
     </div>
   {% endfor %}
