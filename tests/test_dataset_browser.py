@@ -2452,7 +2452,7 @@ def test_dataset_admin_adds_and_removes_identifier_membership_from_edit_field_wi
     )
 
     change_form = request(client, "get", f"/datasets/{dataset.key}/fields/{required.key}/edit")
-    assert "name='is_business_key_component' checked" in body(change_form)
+    assert "name='is_business_key_component' data-identifier-toggle checked" in body(change_form)
     changed = request(
         client,
         "post",
@@ -2478,7 +2478,18 @@ def test_admin_can_add_field_directly_to_record_identifier(dataset_browser):
     dataset = create_dataset(services, admin, "create-identifier-field")
     login(client)
     form = request(client, "get", f"/datasets/{dataset.key}/fields/new")
-    assert "Part of record identifier" in body(form)
+    page = body(form)
+    controls = [
+        attrs
+        for tag, attrs in html_elements(page)
+        if tag == "input" and attrs.get("type") == "checkbox"
+    ]
+    names = [attrs.get("name") for attrs in controls]
+    assert (
+        names.index("is_business_key_component")
+        < names.index("is_required")
+        < names.index("is_unique")
+    )
 
     response = request(
         client,
@@ -2522,8 +2533,22 @@ def test_add_field_rejects_identifier_membership_without_required(dataset_browse
     )
 
     assert response.status_code == 400
-    assert "Record identifier field must be required" in body(response)
-    assert "name='is_business_key_component' checked" in body(response)
+    page = body(response)
+    assert "Record identifier field must be required" in page
+    assert "name='is_business_key_component' data-identifier-toggle checked" in page
+    required = next(
+        attrs
+        for tag, attrs in html_elements(page)
+        if tag == "input" and attrs.get("name") == "is_required" and attrs.get("type") == "checkbox"
+    )
+    assert "checked" in required and "disabled" in required
+    assert any(
+        tag == "input"
+        and attrs.get("name") == "is_required"
+        and attrs.get("type") == "hidden"
+        and "data-required-mirror" in attrs
+        for tag, attrs in html_elements(page)
+    )
     with factory() as session:
         assert session.scalar(select(func.count(DatasetField.id))) == 0
     assert services.dataset_business_keys.get_business_key(admin.id, dataset.key).field_keys == ()

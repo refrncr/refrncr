@@ -144,17 +144,63 @@
     }
   });
 
+  const identifierRequirementSyncs = new WeakMap();
+  const initializeIdentifierRequirements = (root) => {
+    root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
+      const form = identifier.form;
+      const scope = identifier.closest("[data-mapping-field-panel]") || form;
+      const required = scope?.querySelector("[data-identifier-required]");
+      if (!form || !required || identifierRequirementSyncs.has(identifier)) return;
+      const sync = () => {
+        const active = identifier.checked;
+        const locked = required.hasAttribute("data-role-locked");
+        const inactivePanel = Boolean(identifier.closest("[data-mapping-field-panel][hidden]"));
+        if (active) required.checked = true;
+        required.disabled = locked || active || inactivePanel;
+        const identifierHelp = scope.querySelector("[data-identifier-required-help]");
+        const defaultHelp = scope.querySelector("[data-required-help]");
+        if (identifierHelp) identifierHelp.hidden = !active;
+        if (defaultHelp) defaultHelp.hidden = active;
+        const help = active ? identifierHelp : defaultHelp;
+        if (help) required.setAttribute("aria-describedby", help.id);
+        let mirror = scope.querySelector("[data-required-mirror]");
+        if (active && !locked && !mirror) {
+          mirror = document.createElement("input");
+          mirror.type = "hidden";
+          mirror.name = required.name;
+          mirror.value = "on";
+          mirror.dataset.requiredMirror = "";
+          required.closest("label")?.after(mirror);
+        } else if ((!active || locked) && mirror) {
+          mirror.remove();
+        }
+      };
+      identifierRequirementSyncs.set(identifier, sync);
+      identifier.addEventListener("change", sync);
+      sync();
+    });
+  };
+  initializeIdentifierRequirements(document);
+  const syncIdentifierRequirements = (root) => {
+    initializeIdentifierRequirements(root);
+    root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
+      identifierRequirementSyncs.get(identifier)?.();
+    });
+  };
+
   const datatypeControls = new WeakSet();
   const initializeDatatypeControls = (root) => {
     root.querySelectorAll("[data-field-datatype]").forEach((select) => {
       if (datatypeControls.has(select)) return;
-      const component = select.closest("form")?.querySelector("[name='is_business_key_component']");
+      const scope = select.closest("[data-mapping-field-panel]") || select.closest("form");
+      const component = scope?.querySelector("[name='is_business_key_component']");
       if (!component) return;
       datatypeControls.add(select);
       const update = () => {
         const eligible = select.selectedOptions[0]?.dataset.identifierEligible === "true";
         component.disabled = component.hasAttribute("data-role-locked") || !eligible;
         if (!eligible) component.checked = false;
+        syncIdentifierRequirements(scope);
       };
       select.addEventListener("change", update);
       update();
@@ -176,6 +222,7 @@
             control.disabled = !active || control.hasAttribute("data-role-locked");
           });
         });
+        syncIdentifierRequirements(form);
       };
       form.addEventListener("change", (event) => {
         if (event.target.name === "mapping_field_role") sync();
@@ -575,6 +622,7 @@
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     initializeDatatypeControls(host);
+    syncIdentifierRequirements(host);
     initializeMappingFieldForms(host);
     initializeSourceFormats(host);
     initializeConfirmations(host);

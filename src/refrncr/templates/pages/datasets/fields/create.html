@@ -20,10 +20,10 @@
       <p class='help-text'>Adds context while mapping. Values and field properties cannot be changed here.</p>
     </div>
     {% else %}
-    <div data-mapping-field-panel='source_identifier'{% if mapping_field_role != 'source_identifier' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, true, true, true, type_choices, true, definition, unit, true) }}<p class='help-text'>The source identifier is automatically required, unique and the record identifier.</p></div>
-    <div data-mapping-field-panel='source_context'{% if mapping_field_role != 'source_context' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true) }}<p class='help-text'>Adds editable source context to each standalone mapping record.</p></div>
+    <div data-mapping-field-panel='source_identifier'{% if mapping_field_role != 'source_identifier' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, true, true, true, type_choices, true, definition, unit, true, field_id_prefix='source-identifier') }}<p class='help-text'>The source identifier is automatically required, unique and the record identifier.</p></div>
+    <div data-mapping-field-panel='source_context'{% if mapping_field_role != 'source_context' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true, field_id_prefix='source-context') }}<p class='help-text'>Adds editable source context to each standalone mapping record.</p></div>
     {% endif %}
-    <div data-mapping-field-panel='mapping_target'{% if mapping_field_role != 'mapping_target' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true) }}</div>
+    <div data-mapping-field-panel='mapping_target'{% if mapping_field_role != 'mapping_target' %} hidden{% endif %}>{{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true, field_id_prefix='mapping-target') }}</div>
     {% else %}{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true, definition, unit, hierarchy=dataset.kind == 'hierarchy', hierarchy_scope=hierarchy_scope) }}{% endif %}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
   </div>

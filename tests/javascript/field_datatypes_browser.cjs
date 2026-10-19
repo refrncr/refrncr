@@ -40,6 +40,20 @@ async function login(page) {
       await panel.getByLabel('Name', {exact: true}).fill(label);
       await select.selectOption(id);
       assert.equal(await panel.getByLabel('Part of record identifier', {exact: true}).isDisabled(), id === 'float');
+      if (id === 'string') {
+        const identifier = panel.getByLabel('Part of record identifier', {exact: true});
+        const required = panel.getByLabel('Required', {exact: true});
+        const unique = panel.getByLabel('Unique', {exact: true});
+        await identifier.check();
+        assert(await required.isChecked());
+        assert(await required.isDisabled());
+        assert.equal(await panel.locator('[data-required-mirror]').count(), 1);
+        assert.equal(await unique.isChecked(), false, 'identifier membership does not imply uniqueness');
+        await identifier.uncheck();
+        assert(await required.isChecked(), 'removing identifier membership preserves Required');
+        assert.equal(await required.isDisabled(), false);
+        await identifier.check();
+      }
       if (id === 'float') {
         await select.selectOption('integer');
         await panel.getByLabel('Part of record identifier', {exact: true}).check();
