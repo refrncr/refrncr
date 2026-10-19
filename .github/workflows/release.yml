@@ -37,7 +37,7 @@ jobs:
       - name: Install locked runtime graph and release tools
         run: |
           python -m pip install --require-hashes -r requirements/release.txt
-          python -m pip install build==1.6.1 cyclonedx-bom==7.4.0 pip-audit==2.10.1 twine==6.2.0
+          python -m pip install build==1.6.1 cyclonedx-bom==7.5.0 pip-audit==2.10.1 twine==7.0.0
       - name: Gate runtime vulnerabilities
         run: >-
           python tools/supply_chain.py audit-runtime requirements/release.txt
