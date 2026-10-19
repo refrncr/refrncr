@@ -34,13 +34,3 @@ def change_status(value: str | ChangeStatus) -> ChangeStatus:
     if value in UI_STATUS_ALIASES:
         return UI_STATUS_ALIASES[value]
     return ChangeStatus(value)
-
-
-# Backward-compatible imports for existing service and web consumers. The
-# presentation definitions themselves live in the dedicated presentation module.
-from refrncr.presentation import (  # noqa: E402, F401
-    DISPLAY_STATUSES,
-    STATUS_PRESENTATION,
-    status_badge_variant,
-    status_label,
-)
