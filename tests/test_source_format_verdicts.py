@@ -182,7 +182,11 @@ def test_radio_form_tampering_fails_closed(wizard, endpoint, defect):
         data["date_2"] = "v1-date-dmy-slash"
     else:
         data["source_2"] = "v1-invented" if defect == "unknown" else "v1-float"
-    assert wizard.post(wizard.path + endpoint, list(data.items(multi=True))).status_code == 400
+    response = wizard.post(wizard.path + endpoint, list(data.items(multi=True)))
+    service_reported = defect in {"unknown", "incompatible", "components"}
+    assert response.status_code == (200 if endpoint == "/formats" and service_reported else 400)
+    if endpoint == "/formats" and service_reported:
+        assert "Choose a valid source type and its required format components." in response.text
     assert wizard.count() == 0
 
 

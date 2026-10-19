@@ -36,6 +36,7 @@ from refrncr.services import (
 from refrncr.source_formats import (
     SourceFormatError,
     canonical_source,
+    compose_format,
     formats_for,
     propose_format,
     source_format_label,
@@ -67,6 +68,12 @@ UNREADABLE_XLSX_MESSAGE = (
 
 class ImportValidationError(ValidationError):
     """A safe, user-facing import validation failure."""
+
+
+class SourceFormatComponentsError(ImportValidationError):
+    def __init__(self, issues):
+        self.issues = tuple(issues)
+        super().__init__("Choose a valid source type and its required format components.")
 
 
 class ImportExpiredError(NotFoundError):
@@ -144,9 +151,97 @@ class MappingCompleteness:
 
 
 @dataclass(frozen=True, slots=True)
+class MappingIssue:
+    code: str
+    column_index: int | None = None
+    field_key: str | None = None
+    mode: str | None = None
+
+
+def mapping_issues(mapping, fields, identifier, mode="create", expected_count=None):
+    """Return the canonical coded mapping violations used by assistance and preview."""
+    field_by_key = {field.key: field for field in fields}
+    issues = []
+    if expected_count is not None and len(mapping) != expected_count:
+        issues.append(MappingIssue("mapping_count_mismatch", mode=mode))
+    for index, selection in enumerate(mapping):
+        if selection == "":
+            issues.append(MappingIssue("column_unmapped", index, mode=mode))
+        elif selection is not None and selection not in field_by_key:
+            issues.append(MappingIssue("field_unknown", index, selection, mode))
+        if selection in field_by_key and mapping.count(selection) > 1:
+            issues.append(MappingIssue("field_mapped_twice", index, selection, mode))
+    mapped = {selection for selection in mapping if selection in field_by_key}
+    required = tuple(
+        field
+        for field in fields
+        if field.is_required or mode == "new_version" or field.key in identifier.field_keys
+    )
+    issues.extend(
+        MappingIssue("required_field_unmapped", field_key=field.key, mode=mode)
+        for field in required
+        if field.key not in mapped
+    )
+    return tuple(issues)
+
+
+def validate_source_format_components(fields, mapping, components):
+    """Normalize submitted source-format components and return coded column errors."""
+    field_by_key = {field.key: field for field in fields}
+    choices = {}
+    errors = []
+    for index, target in enumerate(mapping):
+        if not target:
+            continue
+        raw = components[index] if index < len(components) else {}
+        if (
+            not isinstance(raw, Mapping)
+            or set(raw) - {"source", "date", "time", "timezone", "fold"}
+            or any(not isinstance(value, str) or len(value) > 100 for value in raw.values())
+        ):
+            errors.append(MappingIssue("source_format_incomplete", index, target or None))
+            continue
+        profile = raw.get("source", "")
+        parts = {name: raw[name] for name in ("date", "time") if name in raw}
+        composed = {"source": profile, **parts}
+        field = field_by_key.get(target)
+        datatype = field.data_type if field else None
+        try:
+            if profile in {"text", "native", "offset"}:
+                profile = compose_format(datatype, composed)
+            elif len(composed) != 1:
+                raise SourceFormatError(
+                    "Choose a valid source type and its required format components."
+                )
+            if profile and profile not in {item.id for item in formats_for(datatype)}:
+                raise SourceFormatError("Choose an accepted source format for this datatype.")
+            timezone = raw.get("timezone", "")
+            fold = raw.get("fold", "")
+            if timezone or fold:
+                if datatype != "timestamp" or profile == "v1-offset" or not profile:
+                    raise SourceFormatError(
+                        "Timezone and repeated-time choices require a local Timestamp format."
+                    )
+            if fold not in {"", "earlier", "later"}:
+                raise SourceFormatError("Choose a valid repeated-time decision.")
+        except SourceFormatError:
+            errors.append(MappingIssue("source_format_incomplete", index, target or None))
+            continue
+        if target:
+            choices[target] = {"profile_id": profile, "timezone": timezone, "fold": fold}
+    return choices, tuple(errors)
+
+
+@dataclass(frozen=True, slots=True)
 class MappingAssistance:
     columns: tuple[ColumnMappingAdvice, ...]
     completeness: MappingCompleteness
+    fields: tuple = ()
+    required_keys: tuple[str, ...] = ()
+    identifier_keys: tuple[str, ...] = ()
+    errors: tuple[MappingIssue, ...] = ()
+    format_columns: tuple = ()
+    remembered_formats: Mapping | None = None
 
     @property
     def mapping(self) -> tuple[str | None, ...]:
@@ -159,6 +254,30 @@ class ImportIssue:
     header: str | None
     field: str | None
     message: str
+    code: str | None = None
+    column_index: int | None = None
+    field_key: str | None = None
+    mode: str | None = None
+
+
+def mapping_issue_message(issue: MappingIssue | ImportIssue, default_mode="create") -> str:
+    return {
+        "mapping_count_mismatch": "Submit exactly one mapping for every source column.",
+        "column_unmapped": "Choose a field or Do not import.",
+        "field_unknown": "Choose a field from this dataset.",
+        "field_mapped_twice": (
+            "This field is mapped more than once. Choose a different field or Do not import."
+        ),
+        "required_field_unmapped": (
+            "Map every active Field exactly once."
+            if (issue.mode or default_mode) == "new_version"
+            else "Map every required and identifier field."
+        ),
+        "source_format_incomplete": (
+            "Choose a valid source type and its required format components."
+        ),
+        "source_format_ambiguous": "Choose an unambiguous source format for this field.",
+    }.get(issue.code)
 
 
 @dataclass(frozen=True, slots=True)
@@ -589,7 +708,7 @@ def rank_mapping_candidates(header: str, profile: ColumnTypeProfile, fields) -> 
 
 
 def build_mapping_assistance(
-    source: ParsedSource, fields, identifier, selected_mapping=None
+    source: ParsedSource, fields, identifier, selected_mapping=None, *, mode="create"
 ) -> MappingAssistance:
     profiles = profile_source_columns(source)
     candidate_sets = [
@@ -641,7 +760,7 @@ def build_mapping_assistance(
         for index, header in enumerate(source.headers)
     )
     mapped = {selection for selection in selections if selection}
-    required = [field for field in fields if field.is_required]
+    required = [field for field in fields if field.is_required or mode == "new_version"]
     field_by_key = {field.key: field for field in fields}
     missing_required = tuple(field.name for field in required if field.key not in mapped)
     missing_identifier = tuple(
@@ -655,7 +774,18 @@ def build_mapping_assistance(
         sum(selection == "" for selection in selections),
         sum(selection is None for selection in selections),
     )
-    return MappingAssistance(columns, completeness)
+    required_keys = tuple(
+        dict.fromkeys([field.key for field in required] + list(identifier.field_keys))
+    )
+    errors = mapping_issues(selections, fields, identifier, mode)
+    return MappingAssistance(
+        columns,
+        completeness,
+        tuple(fields),
+        required_keys,
+        tuple(identifier.field_keys),
+        tuple(errors),
+    )
 
 
 def _validated_headers(values) -> tuple[str, ...]:
@@ -944,7 +1074,7 @@ class DatasetRecordImportService:
                 worksheet = source.worksheets[0]
             if worksheet:
                 source = parse_source(safe_name, content, worksheet)
-        assistance = self._assistance(dataset.id, source) if source.headers else None
+        assistance = self._assistance(dataset.id, source, mode=mode) if source.headers else None
         mapping = assistance.mapping if assistance else None
         if previous and previous.mapping is not None and source.headers:
             old = parse_source(previous.filename, previous.content, previous.worksheet)
@@ -968,7 +1098,7 @@ class DatasetRecordImportService:
                     else mapping[index]
                     for index, header in enumerate(source.headers)
                 )
-                assistance = self._assistance(dataset.id, source, mapping)
+                assistance = self._assistance(dataset.id, source, mapping, mode=mode)
         state = self.store.create(
             actor_id,
             session_id,
@@ -1025,9 +1155,20 @@ class DatasetRecordImportService:
             )
         else:
             state = self.store.update(state, step=3)
-        return state, source, self._assistance(dataset.id, source, state.mapping)
+        assistance = self._assistance(dataset.id, source, state.mapping, mode=state.mode)
+        state = self.store.update(state, mapping=assistance.mapping, step=3)
+        return state, source, assistance
 
-    def mapping_assistance(self, actor_id, session_id, dataset_key, token):
+    def mapping_assistance(
+        self,
+        actor_id,
+        session_id,
+        dataset_key,
+        token,
+        selected_mapping=None,
+        *,
+        include_formats=False,
+    ):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
@@ -1035,7 +1176,19 @@ class DatasetRecordImportService:
         source = parse_source(state.filename, state.content, state.worksheet)
         if not source.headers:
             raise NotFoundError("Import not found")
-        return state, source, self._assistance(dataset.id, source, state.mapping)
+        mapping = state.mapping if selected_mapping is None else tuple(selected_mapping)
+        return (
+            state,
+            source,
+            self._assistance(
+                dataset.id,
+                source,
+                mapping,
+                mode=state.mode,
+                include_formats=include_formats,
+                choices=state.source_formats,
+            ),
+        )
 
     def format_assistance(
         self, actor_id, session_id, dataset_key, token, mapping=None, choices=None
@@ -1049,6 +1202,45 @@ class DatasetRecordImportService:
             remembered = uow.dataset_fields.source_formats(state.dataset_id)
         selected = choices if choices is not None else (state.source_formats or {})
         return self._format_columns(source, fields, mapping, selected, remembered)
+
+    def submitted_source_formats(
+        self, actor_id, session_id, dataset_key, token, mapping, components
+    ):
+        _state, _source, assistance = self.mapping_assistance(
+            actor_id, session_id, dataset_key, token, mapping
+        )
+        return self._submitted_source_formats(assistance, mapping, components)
+
+    @staticmethod
+    def _submitted_source_formats(assistance, mapping, components):
+        return validate_source_format_components(assistance.fields, mapping, components)
+
+    def submitted_source_format_assistance(
+        self, actor_id, session_id, dataset_key, token, mapping, components
+    ):
+        state, source, assistance = self.mapping_assistance(
+            actor_id, session_id, dataset_key, token, mapping, include_formats=True
+        )
+        return self._submitted_source_format_assistance(
+            state, source, assistance, mapping, components
+        )
+
+    def _submitted_source_format_assistance(self, state, source, assistance, mapping, components):
+        choices, issues = validate_source_format_components(assistance.fields, mapping, components)
+        if not issues:
+            assistance = replace(
+                assistance,
+                format_columns=tuple(
+                    self._format_columns(
+                        source,
+                        assistance.fields,
+                        mapping,
+                        choices,
+                        assistance.remembered_formats or {},
+                    )
+                ),
+            )
+        return state, source, assistance, issues
 
     @staticmethod
     def _format_columns(source, fields, mapping, choices, remembered):
@@ -1175,7 +1367,7 @@ class DatasetRecordImportService:
             )
         return columns
 
-    def preview(self, actor_id, session_id, dataset_key, token, mapping, source_formats=None):
+    def preview(self, actor_id, session_id, dataset_key, token, mapping, format_components=None):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
@@ -1184,27 +1376,44 @@ class DatasetRecordImportService:
         if not source.headers:
             raise NotFoundError("Import not found")
         mapping = tuple(mapping)
-        if mapping != state.mapping:
+        mapping_changed = mapping != state.mapping
+        retained_formats = {
+            key: choice
+            for key, choice in (state.source_formats or {}).items()
+            if key in mapping
+            and state.mapping
+            and key in state.mapping
+            and mapping.index(key) == state.mapping.index(key)
+        }
+        assistance = self._assistance(
+            dataset.id,
+            source,
+            mapping,
+            mode=state.mode,
+            include_formats=True,
+            choices=retained_formats,
+        )
+        if format_components is not None:
+            state, source, assistance, issues = self._submitted_source_format_assistance(
+                state, source, assistance, mapping, format_components
+            )
+            if issues:
+                raise SourceFormatComponentsError(issues)
+        if mapping_changed:
             state = self.store.update(
                 state,
                 mapping=mapping,
-                source_formats={
-                    key: choice
-                    for key, choice in (state.source_formats or {}).items()
-                    if key in mapping
-                    and state.mapping
-                    and key in state.mapping
-                    and mapping.index(key) == state.mapping.index(key)
-                },
+                source_formats=retained_formats,
                 mapping_ready=False,
                 validation_valid=False,
                 schema_fingerprint=None,
                 step=3,
             )
-        columns = self.format_assistance(
-            actor_id, session_id, dataset_key, token, mapping, source_formats
-        )
-        choices = {column["key"]: column["choice"] for column in columns if column is not None}
+        choices = {
+            column["key"]: column["choice"]
+            for column in assistance.format_columns
+            if column is not None
+        }
         if choices != state.source_formats:
             state = self.store.update(
                 state,
@@ -1473,11 +1682,37 @@ class DatasetRecordImportService:
     def revoke_session(self, session_id: str) -> None:
         self.store.revoke_session(session_id)
 
-    def _assistance(self, dataset_id, source, selected_mapping=None):
+    def _assistance(
+        self,
+        dataset_id,
+        source,
+        selected_mapping=None,
+        *,
+        mode="create",
+        include_formats=False,
+        choices=None,
+    ):
         with self.uow() as uow:
             fields = uow.dataset_fields.list_for_dataset(dataset_id)
             identifier = uow.dataset_business_keys.get(dataset_id)
-        return build_mapping_assistance(source, fields, identifier, selected_mapping)
+            remembered = uow.dataset_fields.source_formats(dataset_id) if include_formats else {}
+        assistance = build_mapping_assistance(
+            source, fields, identifier, selected_mapping, mode=mode
+        )
+        if include_formats:
+            format_columns = self._format_columns(
+                source,
+                fields,
+                assistance.mapping,
+                choices or {},
+                remembered,
+            )
+            assistance = replace(
+                assistance,
+                format_columns=tuple(format_columns),
+                remembered_formats=remembered,
+            )
+        return assistance
 
     def _validate(
         self,
@@ -1536,53 +1771,25 @@ class DatasetRecordImportService:
         identifier = uow.dataset_business_keys.get(dataset_id)
         field_by_key = {field.key: field for field in fields}
         mapping = tuple(mapping)
-        mapping_errors = []
-        if len(mapping) != len(source.headers):
-            mapping_errors.append(
-                ImportIssue(None, None, None, "Submit exactly one mapping for every source column")
-            )
-        unmapped = [value for value in mapping if value == ""]
-        unknown = [
-            value for value in mapping if value not in {None, ""} and value not in field_by_key
-        ]
-        duplicate = [
-            value for value in set(mapping) if value not in {None, ""} and mapping.count(value) > 1
-        ]
-        if unknown:
-            mapping_errors.append(
-                ImportIssue(None, None, None, "A mapping refers to an unknown Dataset field")
-            )
-        if unmapped:
-            mapping_errors.append(
-                ImportIssue(
-                    None,
-                    None,
-                    None,
-                    "Map or explicitly mark every source column as Ignored",
-                )
-            )
-        if duplicate:
-            mapping_errors.append(
-                ImportIssue(None, None, None, "A Dataset field may be mapped only once")
-            )
-        required = {field.key for field in fields if field.is_required} | set(identifier.field_keys)
-        if mode == "new_version":
-            required.update(field.key for field in fields)
-        missing = sorted(required - {value for value in mapping if value})
-        if missing:
-            mapping_errors.append(
-                ImportIssue(
-                    None,
-                    None,
-                    None,
-                    "Map every active Field exactly once"
-                    if mode == "new_version"
-                    else "Map every required and identifier field",
-                )
-            )
-        mapping_errors.extend(
+        coded_issues = list(mapping_issues(mapping, fields, identifier, mode, len(source.headers)))
+        coded_issues.extend(
             self._source_format_issues(mapping, source, field_by_key, source_formats)
         )
+        mapping_errors = [
+            ImportIssue(
+                None,
+                source.headers[issue.column_index]
+                if issue.column_index is not None and issue.column_index < len(source.headers)
+                else None,
+                field_by_key[issue.field_key].name if issue.field_key in field_by_key else None,
+                mapping_issue_message(issue) or issue.message,
+                issue.code,
+                issue.column_index,
+                issue.field_key,
+                issue.mode or mode,
+            )
+            for issue in coded_issues
+        ]
         fingerprint = (
             uow.datasets.get(dataset_id).revision,
             tuple(
@@ -1629,7 +1836,14 @@ class DatasetRecordImportService:
                 except SourceFormatError as exc:
                     if exc.requires_choice:
                         choice_errors[target] = ImportIssue(
-                            None, source.headers[index], field_by_key[target].name, str(exc)
+                            None,
+                            source.headers[index],
+                            field_by_key[target].name,
+                            "Choose an unambiguous source format for this field.",
+                            "source_format_ambiguous",
+                            index,
+                            target,
+                            mode,
                         )
                     row_errors.append(
                         ImportIssue(
@@ -1644,7 +1858,7 @@ class DatasetRecordImportService:
                             source.headers[index],
                             field_by_key[mapping[index]].name,
                             "Formula cells cannot be imported. Replace the formula with its value "
-                            "or mark this source column as Ignored.",
+                            "or choose Do not import for this source column.",
                         )
                     )
             try:
@@ -1876,6 +2090,9 @@ class DatasetRecordImportService:
                 source.headers[index] if index < len(source.headers) else None,
                 field_by_key[key].name,
                 "Choose an unambiguous source format for this field.",
+                "source_format_ambiguous",
+                index,
+                key,
             )
             for index, key in enumerate(mapping)
             if key in field_by_key and not source_formats.get(key, {}).get("profile_id")

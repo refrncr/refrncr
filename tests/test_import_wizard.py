@@ -102,6 +102,20 @@ def test_worksheet_skip_or_explicit_selection_and_invalidation(wizard, sheets):
         assert wizard.post(wizard.path + "/worksheet", {"worksheet": ""}).status_code == 400
         page = wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
         assert states(page)[2] == ("3", "active")
+        format_review = wizard.post(
+            wizard.path + "/formats",
+            {
+                "mapping_0": "code",
+                "mapping_1": "amount",
+                "source_0": "v1-text",
+                "source_1": "v1-plain",
+                "timezone_0": "",
+                "timezone_1": "",
+                "fold_0": "",
+                "fold_1": "",
+            },
+        )
+        assert format_review.status_code == 200
         wizard.preview()
         wizard.post(wizard.path + "/worksheet", {"worksheet": "First"})
         assert wizard.get(wizard.path + "/step/5").status_code == 404
@@ -470,6 +484,17 @@ def test_compact_mapping_errors_keep_control_associations(wizard):
     assert html_tag_texts(page.text, "summary").count("Mapping error") == 2
     assert "1 field not mapped: Amount" in html_text(page.text)
     assert "This field is mapped more than once" in page.text
+
+
+def test_preview_keeps_required_and_source_format_errors_together(wizard):
+    wizard.services.dataset_fields.create_field(
+        wizard.admin.id, wizard.dataset.key, "stamp", "Stamp", "timestamp"
+    )
+    wizard.upload(b"code,amount,stamp\nA,1,2024-10-27 02:30:00\n")
+    page = wizard.preview(("code", "", "stamp"))
+    text = html_text(page.text)
+    assert "Map every active Field exactly once." in text
+    assert "Choose an unambiguous source format for this field." in text
 
 
 def test_mapping_options_are_flat_ordered_and_reserved_selections_are_hidden(wizard):

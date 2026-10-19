@@ -30,6 +30,7 @@ from refrncr.record_import import (
     parse_source,
     profile_source_columns,
     rank_mapping_candidates,
+    validate_source_format_components,
 )
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
@@ -179,6 +180,41 @@ def test_auto_selection_requires_unique_strong_match_and_resolves_duplicate_targ
     assert advice.columns[1].warning is not None
 
 
+def test_mapping_assistance_returns_coded_issues_for_each_column_and_missing_field():
+    source = ParsedSource(
+        "csv",
+        ("first", "second", "unknown", "blank"),
+        (SourceRow(2, ("A", "B", "C", "D")),),
+        0,
+    )
+    fields = (field("code", "Code", required=True), field("amount", "Amount", required=True))
+    advice = build_mapping_assistance(
+        source,
+        fields,
+        SimpleNamespace(field_keys=("code",)),
+        ("code", "code", "missing", ""),
+    )
+    assert [(item.code, item.column_index, item.field_key) for item in advice.errors] == [
+        ("field_mapped_twice", 0, "code"),
+        ("field_mapped_twice", 1, "code"),
+        ("field_unknown", 2, "missing"),
+        ("column_unmapped", 3, None),
+        ("required_field_unmapped", None, "amount"),
+    ]
+
+
+def test_source_format_component_validation_returns_a_column_issue():
+    choices, errors = validate_source_format_components(
+        (field("day", "Day", "date"),),
+        ("day",),
+        ({"source": "text"},),
+    )
+    assert choices == {}
+    assert [(item.code, item.column_index, item.field_key) for item in errors] == [
+        ("source_format_incomplete", 0, "day")
+    ]
+
+
 @pytest.mark.parametrize("header", ["country_code", "Country-Code", "countryCode", "Country code"])
 def test_separator_variants_strongly_select_unique_display_name(header):
     source = ParsedSource("csv", (header,), (SourceRow(2, ("NL",)),), 0)
@@ -240,6 +276,104 @@ def import_context():
         )
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code", "amount"))
     return factory, services, admin, dataset
+
+
+def test_import_service_exposes_mapping_and_source_format_error_codes(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        "records.csv",
+        b"code,amount\nA,1\n",
+    )
+    _, _, assistance = service.mapping_assistance(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+    )
+    assert [(issue.code, issue.column_index) for issue in assistance.errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    _, issues = service.submitted_source_formats(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "amount"),
+        (
+            {"source": "v1-text", "timezone": "", "fold": ""},
+            {"source": "v1-eu", "date": "unexpected", "timezone": "", "fold": ""},
+        ),
+    )
+    assert [(issue.code, issue.column_index) for issue in issues] == [
+        ("source_format_incomplete", 1)
+    ]
+
+
+def test_submitted_format_helpers_require_a_bound_import_state(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    components = ({"source": "v1-text", "timezone": "", "fold": ""},)
+    mapping = ("code",)
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_formats(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+    with pytest.raises(NotFoundError):
+        service.submitted_source_format_assistance(
+            admin.id, "unbound-format", dataset.key, "invalid-token", mapping, components
+        )
+
+
+def test_submitted_format_methods_bind_valid_token_to_user_and_session(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id, "format-owner-session", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    mapping = state.mapping
+    components = ({"source": "v1-text"}, {"source": "v1-plain"})
+    editor = services.users.create_user(admin.id, "editor@example.com", "Editor", PASSWORD)
+    services.grants.create_grant(admin.id, "user", editor.id, "dataset", dataset.id, "editor")
+
+    for method in (
+        service.submitted_source_formats,
+        service.submitted_source_format_assistance,
+    ):
+        method(
+            admin.id,
+            "format-owner-session",
+            dataset.key,
+            state.token,
+            mapping,
+            components,
+        )
+        with pytest.raises(NotFoundError):
+            method(
+                admin.id,
+                "another-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
+        with pytest.raises(NotFoundError):
+            method(
+                editor.id,
+                "format-owner-session",
+                dataset.key,
+                state.token,
+                mapping,
+                components,
+            )
 
 
 @pytest.fixture
@@ -729,7 +863,10 @@ def test_preview_error_cap_authorization_and_session_revocation(import_context):
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert len(preview.errors) == 100
     assert preview.total_errors == 120
@@ -755,7 +892,10 @@ def test_failed_row_report_groups_all_errors_and_limits_rows(import_context, fai
         dataset.key,
         state.token,
         ("code", "amount"),
-        {"amount": {"profile_id": "v1-plain"}},
+        format_components=(
+            {"source": "v1-text"},
+            {"source": "v1-plain"},
+        ),
     )
     assert preview.invalid_rows == failed_rows
     assert len(preview.row_error_groups) == min(failed_rows, 100)
@@ -780,12 +920,48 @@ def test_mapping_errors_are_non_row_errors_and_do_not_consume_row_limit(import_c
         admin.id, "mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
     )
     preview = services.record_imports.preview(
-        admin.id, "mapping", dataset.key, state.token, ("code", "code")
+        admin.id,
+        "mapping",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+        format_components=({"source": "v1-text"}, {"source": "v1-text"}),
     )
     assert preview.invalid_rows == 0
     assert preview.row_error_groups == ()
     assert preview.non_row_errors == preview.errors
+    assert [(issue.code, issue.column_index) for issue in preview.non_row_errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
     assert not preview.row_report_truncated
+
+
+def test_preview_uses_the_same_coded_mapping_rules_as_assistance(import_context):
+    _, services, admin, dataset = import_context
+    state, _, _ = services.record_imports.begin(
+        admin.id, "coded-mapping", dataset.key, "records.csv", b"code,amount\nA,1\n"
+    )
+    _, _, assistance = services.record_imports.mapping_assistance(
+        admin.id, "coded-mapping", dataset.key, state.token, ("unknown", "")
+    )
+    preview = services.record_imports.preview(
+        admin.id,
+        "coded-mapping",
+        dataset.key,
+        state.token,
+        ("unknown", ""),
+        {},
+    )
+    expected = {(issue.code, issue.column_index) for issue in assistance.errors}
+    actual = {(issue.code, issue.column_index) for issue in preview.non_row_errors}
+    assert {"field_unknown", "column_unmapped", "required_field_unmapped"} <= {
+        code for code, _column in actual
+    }
+    assert expected <= actual
+    assert all("Ignored" not in issue.message for issue in preview.non_row_errors)
 
 
 def test_wrong_token_binding_does_not_consume_other_sessions_import(import_context):

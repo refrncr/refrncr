@@ -27,6 +27,11 @@ CSRF-protected by the request method, independently of its endpoint name. REF-33
 introduce a public user-management REST contract; future FastAPI endpoints will call the same
 services as Flask.
 
+Import mapping and source-format completeness rules are owned by `DatasetRecordImportService`.
+The service returns coded issues and the fields needed to render the mapping step in one call;
+Flask translates those codes into wizard copy. The route must not open the import unit of work or
+recompute required-field, identifier, target-cardinality, or source-format validation.
+
 ## Consequences
 
 The product has one deployable application and one composition root. Flask can deliver the first

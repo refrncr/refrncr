@@ -188,7 +188,12 @@ def test_crafted_component_submissions_fail_closed(wizard, change, endpoint):
         data["timezone_2"] = "Europe/Amsterdam"
     else:
         data["fold_2"] = "earlier"
-    assert wizard.post(wizard.path + endpoint, list(data.items(multi=True))).status_code == 400
+    response = wizard.post(wizard.path + endpoint, list(data.items(multi=True)))
+    malformed_structure = change.startswith("duplicate_") or change == "extra"
+    expected_status = 400 if endpoint == "/preview" or malformed_structure else 200
+    assert response.status_code == expected_status
+    if endpoint == "/formats" and not malformed_structure:
+        assert "Choose a valid source type and its required format components." in response.text
     assert wizard.count() == 0
     assert wizard.post(wizard.path + "/confirm").status_code == 404
 
@@ -210,7 +215,9 @@ def test_offset_rejects_timezone_and_local_timestamp_retains_dst_decisions(wizar
         assert f"2024-10-27T{expected}:30:00Z" in response.text
     data["source_2"] = "offset"
     del data["date_2"], data["time_2"]
-    assert wizard.post(wizard.path + "/formats", data).status_code == 400
+    response = wizard.post(wizard.path + "/formats", data)
+    assert response.status_code == 200
+    assert "Choose a valid source type and its required format components." in response.text
 
 
 def test_changed_format_invalidates_prior_confirmation(wizard):
