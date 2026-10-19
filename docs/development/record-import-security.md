@@ -55,7 +55,10 @@ Only one clear, type-compatible High candidate is selected automatically. Near t
 unmapped. When source columns compete for one target, only a strictly stronger match may be
 selected; ties require a user choice. Required and identifier status affects only the completeness
 summary, never candidate ranking. Explicit manual mappings and `Ignored` choices remain authoritative
-after server-side identity, cardinality, and Dataset-scope validation.
+after server-side identity, cardinality, required-field, and Dataset-scope validation. Mapping and
+submitted source-format completeness checks live in `DatasetRecordImportService`, which returns
+structured issue codes and the field metadata needed by the wizard. The web layer translates those
+codes into presentation text; it does not repeat validation or open the service unit of work.
 
 The assistant uses no external AI, machine learning, telemetry, network service, saved aliases, or
 durable mapping templates. Profiling is bounded independently of the 10,000-row import limit and

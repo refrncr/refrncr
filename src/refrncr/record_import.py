@@ -36,6 +36,7 @@ from refrncr.services import (
 from refrncr.source_formats import (
     SourceFormatError,
     canonical_source,
+    compose_format,
     formats_for,
     propose_format,
     source_format_label,
@@ -144,9 +145,67 @@ class MappingCompleteness:
 
 
 @dataclass(frozen=True, slots=True)
+class MappingIssue:
+    code: str
+    column_index: int | None = None
+    field_key: str | None = None
+
+
+def validate_source_format_components(fields, mapping, components):
+    """Normalize submitted source-format components and return coded column errors."""
+    field_by_key = {field.key: field for field in fields}
+    choices = {}
+    errors = []
+    for index, target in enumerate(mapping):
+        if not target:
+            continue
+        raw = components[index] if index < len(components) else {}
+        if (
+            not isinstance(raw, Mapping)
+            or set(raw) - {"source", "date", "time", "timezone", "fold"}
+            or any(not isinstance(value, str) or len(value) > 100 for value in raw.values())
+        ):
+            errors.append(MappingIssue("source_format_incomplete", index, target or None))
+            continue
+        profile = raw.get("source", "")
+        parts = {name: raw[name] for name in ("date", "time") if name in raw}
+        composed = {"source": profile, **parts}
+        field = field_by_key.get(target)
+        datatype = field.data_type if field else None
+        try:
+            if profile in {"text", "native", "offset"}:
+                profile = compose_format(datatype, composed)
+            elif len(composed) != 1:
+                raise SourceFormatError(
+                    "Choose a valid source type and its required format components."
+                )
+            if profile and profile not in {item.id for item in formats_for(datatype)}:
+                raise SourceFormatError("Choose an accepted source format for this datatype.")
+            timezone = raw.get("timezone", "")
+            fold = raw.get("fold", "")
+            if timezone or fold:
+                if datatype != "timestamp" or profile == "v1-offset" or not profile:
+                    raise SourceFormatError(
+                        "Timezone and repeated-time choices require a local Timestamp format."
+                    )
+            if fold not in {"", "earlier", "later"}:
+                raise SourceFormatError("Choose a valid repeated-time decision.")
+        except SourceFormatError:
+            errors.append(MappingIssue("source_format_incomplete", index, target or None))
+            continue
+        if target:
+            choices[target] = {"profile_id": profile, "timezone": timezone, "fold": fold}
+    return choices, tuple(errors)
+
+
+@dataclass(frozen=True, slots=True)
 class MappingAssistance:
     columns: tuple[ColumnMappingAdvice, ...]
     completeness: MappingCompleteness
+    fields: tuple = ()
+    required_keys: tuple[str, ...] = ()
+    identifier_keys: tuple[str, ...] = ()
+    errors: tuple[MappingIssue, ...] = ()
 
     @property
     def mapping(self) -> tuple[str | None, ...]:
@@ -589,7 +648,7 @@ def rank_mapping_candidates(header: str, profile: ColumnTypeProfile, fields) -> 
 
 
 def build_mapping_assistance(
-    source: ParsedSource, fields, identifier, selected_mapping=None
+    source: ParsedSource, fields, identifier, selected_mapping=None, *, mode="create"
 ) -> MappingAssistance:
     profiles = profile_source_columns(source)
     candidate_sets = [
@@ -641,7 +700,7 @@ def build_mapping_assistance(
         for index, header in enumerate(source.headers)
     )
     mapped = {selection for selection in selections if selection}
-    required = [field for field in fields if field.is_required]
+    required = [field for field in fields if field.is_required or mode == "new_version"]
     field_by_key = {field.key: field for field in fields}
     missing_required = tuple(field.name for field in required if field.key not in mapped)
     missing_identifier = tuple(
@@ -655,7 +714,31 @@ def build_mapping_assistance(
         sum(selection == "" for selection in selections),
         sum(selection is None for selection in selections),
     )
-    return MappingAssistance(columns, completeness)
+    errors = []
+    for index, selection in enumerate(selections):
+        if selection == "":
+            errors.append(MappingIssue("column_unmapped", index))
+        elif selection is not None and selection not in field_by_key:
+            errors.append(MappingIssue("field_unknown", index, selection))
+        if selection in field_by_key and selections.count(selection) > 1:
+            errors.append(MappingIssue("field_mapped_twice", index, selection))
+    mapped_keys = {selection for selection in selections if selection in field_by_key}
+    required_keys = tuple(
+        dict.fromkeys([field.key for field in required] + list(identifier.field_keys))
+    )
+    errors.extend(
+        MappingIssue("required_field_unmapped", None, field.key)
+        for field in fields
+        if field.key in required_keys and field.key not in mapped_keys
+    )
+    return MappingAssistance(
+        columns,
+        completeness,
+        tuple(fields),
+        required_keys,
+        tuple(identifier.field_keys),
+        tuple(errors),
+    )
 
 
 def _validated_headers(values) -> tuple[str, ...]:
@@ -944,7 +1027,7 @@ class DatasetRecordImportService:
                 worksheet = source.worksheets[0]
             if worksheet:
                 source = parse_source(safe_name, content, worksheet)
-        assistance = self._assistance(dataset.id, source) if source.headers else None
+        assistance = self._assistance(dataset.id, source, mode=mode) if source.headers else None
         mapping = assistance.mapping if assistance else None
         if previous and previous.mapping is not None and source.headers:
             old = parse_source(previous.filename, previous.content, previous.worksheet)
@@ -968,7 +1051,7 @@ class DatasetRecordImportService:
                     else mapping[index]
                     for index, header in enumerate(source.headers)
                 )
-                assistance = self._assistance(dataset.id, source, mapping)
+                assistance = self._assistance(dataset.id, source, mapping, mode=mode)
         state = self.store.create(
             actor_id,
             session_id,
@@ -1025,9 +1108,9 @@ class DatasetRecordImportService:
             )
         else:
             state = self.store.update(state, step=3)
-        return state, source, self._assistance(dataset.id, source, state.mapping)
+        return state, source, self._assistance(dataset.id, source, state.mapping, mode=state.mode)
 
-    def mapping_assistance(self, actor_id, session_id, dataset_key, token):
+    def mapping_assistance(self, actor_id, session_id, dataset_key, token, selected_mapping=None):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         state = self._bound_state(token, actor_id, session_id, dataset.id)
         if state.imported_count is not None or state.busy:
@@ -1035,7 +1118,8 @@ class DatasetRecordImportService:
         source = parse_source(state.filename, state.content, state.worksheet)
         if not source.headers:
             raise NotFoundError("Import not found")
-        return state, source, self._assistance(dataset.id, source, state.mapping)
+        mapping = state.mapping if selected_mapping is None else tuple(selected_mapping)
+        return state, source, self._assistance(dataset.id, source, mapping, mode=state.mode)
 
     def format_assistance(
         self, actor_id, session_id, dataset_key, token, mapping=None, choices=None
@@ -1049,6 +1133,14 @@ class DatasetRecordImportService:
             remembered = uow.dataset_fields.source_formats(state.dataset_id)
         selected = choices if choices is not None else (state.source_formats or {})
         return self._format_columns(source, fields, mapping, selected, remembered)
+
+    def submitted_source_formats(
+        self, actor_id, session_id, dataset_key, token, mapping, components
+    ):
+        state, _source, assistance = self.mapping_assistance(
+            actor_id, session_id, dataset_key, token, mapping
+        )
+        return validate_source_format_components(assistance.fields, mapping, components)
 
     @staticmethod
     def _format_columns(source, fields, mapping, choices, remembered):
@@ -1473,11 +1565,11 @@ class DatasetRecordImportService:
     def revoke_session(self, session_id: str) -> None:
         self.store.revoke_session(session_id)
 
-    def _assistance(self, dataset_id, source, selected_mapping=None):
+    def _assistance(self, dataset_id, source, selected_mapping=None, *, mode="create"):
         with self.uow() as uow:
             fields = uow.dataset_fields.list_for_dataset(dataset_id)
             identifier = uow.dataset_business_keys.get(dataset_id)
-        return build_mapping_assistance(source, fields, identifier, selected_mapping)
+        return build_mapping_assistance(source, fields, identifier, selected_mapping, mode=mode)
 
     def _validate(
         self,

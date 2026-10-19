@@ -201,6 +201,16 @@ def test_mapping_progressive_disclosure_and_live_examples(wizard):
     assert "Changes in this import" in response.text
 
 
+def test_incomplete_source_format_components_are_rendered_from_service_issue(wizard):
+    wizard.upload(b"code;amount\nA;1.234\nB;2.345\n")
+    data = form_data(wizard)
+    data["date_1"] = "unexpected-component"
+    response = wizard.post(wizard.path + "/formats", data)
+    assert response.status_code == 200
+    assert "Choose a valid source type and its required format components." in response.text
+    assert "source-error-1" in response.text
+
+
 def test_example_escaping_bounds_and_format_endpoint_csrf_binding(wizard):
     page = wizard.upload(
         ("code;amount\n" + ("<script>" + ("x" * 300) + ";1.234,56\n") * 5).encode()

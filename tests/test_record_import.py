@@ -30,6 +30,7 @@ from refrncr.record_import import (
     parse_source,
     profile_source_columns,
     rank_mapping_candidates,
+    validate_source_format_components,
 )
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
@@ -179,6 +180,41 @@ def test_auto_selection_requires_unique_strong_match_and_resolves_duplicate_targ
     assert advice.columns[1].warning is not None
 
 
+def test_mapping_assistance_returns_coded_issues_for_each_column_and_missing_field():
+    source = ParsedSource(
+        "csv",
+        ("first", "second", "unknown", "blank"),
+        (SourceRow(2, ("A", "B", "C", "D")),),
+        0,
+    )
+    fields = (field("code", "Code", required=True), field("amount", "Amount", required=True))
+    advice = build_mapping_assistance(
+        source,
+        fields,
+        SimpleNamespace(field_keys=("code",)),
+        ("code", "code", "missing", ""),
+    )
+    assert [(item.code, item.column_index, item.field_key) for item in advice.errors] == [
+        ("field_mapped_twice", 0, "code"),
+        ("field_mapped_twice", 1, "code"),
+        ("field_unknown", 2, "missing"),
+        ("column_unmapped", 3, None),
+        ("required_field_unmapped", None, "amount"),
+    ]
+
+
+def test_source_format_component_validation_returns_a_column_issue():
+    choices, errors = validate_source_format_components(
+        (field("day", "Day", "date"),),
+        ("day",),
+        ({"source": "text"},),
+    )
+    assert choices == {}
+    assert [(item.code, item.column_index, item.field_key) for item in errors] == [
+        ("source_format_incomplete", 0, "day")
+    ]
+
+
 @pytest.mark.parametrize("header", ["country_code", "Country-Code", "countryCode", "Country code"])
 def test_separator_variants_strongly_select_unique_display_name(header):
     source = ParsedSource("csv", (header,), (SourceRow(2, ("NL",)),), 0)
@@ -240,6 +276,44 @@ def import_context():
         )
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code", "amount"))
     return factory, services, admin, dataset
+
+
+def test_import_service_exposes_mapping_and_source_format_error_codes(import_context):
+    _, services, admin, dataset = import_context
+    service = services.record_imports
+    state, _, _ = service.begin(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        "records.csv",
+        b"code,amount\nA,1\n",
+    )
+    _, _, assistance = service.mapping_assistance(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "code"),
+    )
+    assert [(issue.code, issue.column_index) for issue in assistance.errors] == [
+        ("field_mapped_twice", 0),
+        ("field_mapped_twice", 1),
+        ("required_field_unmapped", None),
+    ]
+    _, issues = service.submitted_source_formats(
+        admin.id,
+        "mapping-errors",
+        dataset.key,
+        state.token,
+        ("code", "amount"),
+        (
+            {"source": "v1-text", "timezone": "", "fold": ""},
+            {"source": "v1-eu", "date": "unexpected", "timezone": "", "fold": ""},
+        ),
+    )
+    assert [(issue.code, issue.column_index) for issue in issues] == [
+        ("source_format_incomplete", 1)
+    ]
 
 
 @pytest.fixture
