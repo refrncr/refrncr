@@ -16,11 +16,7 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.record_identity import (
-    RECORD_IDENTIFIER_MESSAGES,
-    RecordIdentifierError,
-    decode_record_identifier,
-)
+from refrncr.record_identity import decode_record_identifier
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,
@@ -323,12 +319,12 @@ def test_audit_failure_rolls_back_record_update_and_delete(record_services, monk
 def test_required_unknown_duplicate_identifier_and_unique_value(record_services):
     _, _, services, admin = record_services
     dataset, _ = configured_dataset(services, admin)
-    with pytest.raises(RecordIdentifierError) as missing:
+    with pytest.raises(RecordValidationError) as missing:
         services.dataset_records.create_record(admin.id, dataset.key, {"code": "one"})
-    assert str(missing.value) == RECORD_IDENTIFIER_MESSAGES["incomplete"]
-    with pytest.raises(RecordIdentifierError) as incomplete:
+    assert missing.value.errors == {"amount": "A value is required"}
+    with pytest.raises(RecordValidationError) as incomplete:
         services.dataset_records.create_record(admin.id, dataset.key, {"amount": "1"})
-    assert str(incomplete.value) == RECORD_IDENTIFIER_MESSAGES["incomplete"]
+    assert incomplete.value.errors == {"code": "A value is required"}
     with pytest.raises(RecordValidationError) as unknown:
         services.dataset_records.create_record(
             admin.id, dataset.key, {"code": "one", "amount": "1", "foreign": "x"}
@@ -740,7 +736,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
         data={"amount": "8", "expected_revision": "1", "csrf_token": csrf},
     )
     assert blocked.status_code == 400
-    assert "Record identifier is incomplete" in blocked.get_data(as_text=True)
+    assert "A value is required" in blocked.get_data(as_text=True)
     repaired = client.post(
         legacy_edit_url,
         base_url="https://localhost",

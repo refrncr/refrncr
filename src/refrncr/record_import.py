@@ -1989,7 +1989,7 @@ class DatasetRecordImportService:
             len(source.rows) - len(invalid_rows),
             len(invalid_rows),
             reported_errors,
-            len(invalid_rows) + sum(error.row is None for error in errors),
+            len(errors),
             len(invalid_rows) > MAX_REPORTED_ROWS,
             sample,
             fingerprint,

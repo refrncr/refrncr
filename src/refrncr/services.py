@@ -49,7 +49,7 @@ from refrncr.presentation_metadata import (
     dataset_icon,
     optional_plain_text,
 )
-from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
+from refrncr.record_identity import encode_record_identifier
 from refrncr.version_contracts import mapping_incomplete_message
 
 SUBJECT_TYPES = {"user", "team"}
@@ -2299,7 +2299,6 @@ class DatasetRecordService:
             _require_identifier_type(field_by_key[key].data_type)
         errors: dict[str, str] = {}
         values: list[RecordValue] = []
-        missing_identifier_component = False
         for field in fields:
             raw = submitted.get(field.key, "")
             try:
@@ -2308,9 +2307,7 @@ class DatasetRecordService:
                 errors[field.key] = str(error)
                 continue
             if canonical is None:
-                if field.key in identifier.field_keys:
-                    missing_identifier_component = True
-                elif field.is_required:
+                if field.is_required or field.key in identifier.field_keys:
                     errors[field.key] = "A value is required"
                 continue
             value, key = canonical
@@ -2319,8 +2316,6 @@ class DatasetRecordService:
             )
         if errors:
             raise RecordValidationError(errors)
-        if missing_identifier_component:
-            raise RecordIdentifierError("incomplete")
         value_by_key = {value.field_key: value for value in values}
         encoded_identifier = encode_record_identifier(
             {key: value_by_key[key].canonical_key for key in identifier.field_keys},

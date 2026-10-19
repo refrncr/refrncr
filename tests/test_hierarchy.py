@@ -9,7 +9,6 @@ from support import audits, snapshot
 
 from refrncr.hierarchy import hierarchy_snapshot, hierarchy_validation_errors
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.record_identity import RECORD_IDENTIFIER_MESSAGES, RecordIdentifierError
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,
@@ -244,14 +243,14 @@ def test_optional_composite_identifier_and_field_scope_are_independent(hierarchy
         values(c, first, code="A", region="North", external="ONE")
 
 
-def test_hierarchy_identifier_uses_shared_incomplete_error(hierarchy):
+def test_hierarchy_identifier_uses_field_level_required_error(hierarchy):
     c = hierarchy
     root = add(c, "Root")
     leaf = add(c, "Leaf", root.id)
     field(c, "code", scope="all_nodes", required=True, identifier=True)
-    with pytest.raises(RecordIdentifierError) as error:
+    with pytest.raises(RecordValidationError) as error:
         values(c, leaf, code="")
-    assert str(error.value) == RECORD_IDENTIFIER_MESSAGES["incomplete"]
+    assert error.value.errors == {"code": "A value is required"}
 
 
 def test_delete_subtree_removes_descendants_and_values_but_protects_root(hierarchy):

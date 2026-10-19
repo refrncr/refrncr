@@ -897,7 +897,7 @@ def test_preview_error_cap_authorization_and_session_revocation(import_context):
             {"source": "v1-plain"},
         ),
     )
-    assert len(preview.errors) == 200  # The first 100 rejected rows retain both diagnostics.
+    assert len(preview.errors) == 100
     assert preview.total_errors == 120
     assert preview.invalid_rows == 120
     assert preview.row_report_truncated
