@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 
@@ -179,12 +179,6 @@ class DatasetOverview:
     owner_team_name: str = ""
     concept_in_progress: bool = False
     no_current: bool = False
-
-    def __post_init__(self) -> None:
-        value = self.last_updated
-        # SQLite returns naive values for timestamps stored in UTC.
-        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        object.__setattr__(self, "last_updated", value)
 
 
 class DatasetFieldRecord(Protocol):
@@ -518,6 +512,10 @@ class UnitOfWork(Protocol):
     dataset_records: DatasetRecordOperations
     hierarchy: HierarchyOperations
     dataset_export_access: DatasetExportAccessOperations
+
+    def now(self) -> datetime: ...
+
+    def today(self) -> date: ...
 
     def begin_export_snapshot(self) -> None: ...
 

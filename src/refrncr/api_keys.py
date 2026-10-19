@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from refrncr.audit import record_audit
 from refrncr.audit_presentation import valid_id
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.services import (
     AuthenticatedPrincipal,
     AuthorizationError,
@@ -20,10 +21,6 @@ from refrncr.services import (
 LIFETIME = timedelta(days=90)
 LAST_USED_INTERVAL = timedelta(minutes=15)
 TOKEN = re.compile(r"Bearer (rfr_([0-9a-f]{32})\.([A-Za-z0-9_-]{43}))", re.IGNORECASE | re.ASCII)
-
-
-def utc(value):
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,14 +57,14 @@ class ApiKeyAuthenticationError(Exception):
 
 
 class ApiKeyService:
-    def __init__(self, uow, *, pepper, clock=None):
+    def __init__(self, uow, *, pepper, clock: Clock | None = None):
         if not isinstance(pepper, bytes) or len(pepper) < 32:
             raise ValueError(
                 "API key verification requires a configured secret of at least 32 bytes"
             )
         self.uow = uow
         self._pepper = pepper
-        self._clock = clock or (lambda: datetime.now(UTC))
+        self.clock = clock or getattr(uow, "clock", SYSTEM_CLOCK)
 
     @staticmethod
     def _actor(work, actor_id, *, lock=False):
@@ -78,17 +75,15 @@ class ApiKeyService:
 
     @staticmethod
     def _view(key, now):
-        status = (
-            "Revoked" if key.revoked_at else "Expired" if utc(key.expires_at) <= now else "Active"
-        )
+        status = "Revoked" if key.revoked_at else "Expired" if key.expires_at <= now else "Active"
         return KeyView(
             key.id,
             key.name,
             "rfr_" + key.id.replace("-", ""),
-            utc(key.created_at),
-            utc(key.expires_at),
-            utc(key.revoked_at) if key.revoked_at else None,
-            utc(key.last_used_at) if key.last_used_at else None,
+            key.created_at,
+            key.expires_at,
+            key.revoked_at,
+            key.last_used_at,
             key.revision,
             status,
         )
@@ -96,7 +91,7 @@ class ApiKeyService:
     def list_keys(self, actor_id):
         with self.uow() as work:
             self._actor(work, actor_id)
-            now = self._clock()
+            now = self.clock.now()
             return tuple(self._view(key, now) for key in work.api_keys.list_owned(actor_id))
 
     def get_key(self, actor_id, key_id):
@@ -105,12 +100,12 @@ class ApiKeyService:
             key = work.api_keys.get_owned(actor_id, key_id) if valid_id(key_id) else None
             if key is None:
                 raise NotFoundError("API key not found")
-            return self._view(key, self._clock())
+            return self._view(key, self.clock.now())
 
     def create_key(self, actor_id, name, expires_at=None, *, request_id=None):
         with self.uow(write=True, serialized=True, translate_errors=True) as work:
             self._actor(work, actor_id, lock=True)
-            now = self._clock()
+            now = self.clock.now()
             if request_id is not None:
                 if not valid_id(request_id):
                     raise ValidationError("Invalid creation request")
@@ -161,7 +156,7 @@ class ApiKeyService:
                 raise ConflictError("API key changed. Reload and try again")
             if key.revoked_at is not None:
                 raise ConflictError("API key is already revoked")
-            key.revoked_at = self._clock()
+            key.revoked_at = self.clock.now()
             key.revision += 1
             self._audit(work, actor_id, key.id, "api_key.revoked")
 
@@ -186,12 +181,12 @@ class ApiKeyService:
             verifier_valid = isinstance(verifier, str) and re.fullmatch(r"[0-9a-f]{64}", verifier)
             matches = hmac.compare_digest(digest, verifier if verifier_valid else "0" * 64)
             matches = bool(matches and verifier_valid)
-            now = self._clock()
+            now = self.clock.now()
             if (
                 matches
                 and candidate is not None
                 and candidate.revoked_at is None
-                and utc(candidate.expires_at) > now
+                and candidate.expires_at > now
                 and actor is not None
                 and actor.is_active
                 and not actor.is_deleted
@@ -222,7 +217,7 @@ class ApiKeyService:
         )
 
 
-def configured_api_keys(uow):
+def configured_api_keys(uow, *, clock: Clock | None = None):
     """Missing configuration disables credentials; never substitute an ephemeral pepper."""
     import os
 
@@ -231,4 +226,4 @@ def configured_api_keys(uow):
         return None
     if re.fullmatch(r"[0-9a-fA-F]{64}", value) is None:
         raise ValueError("REFRNCR_API_KEY_PEPPER must contain 64 hexadecimal characters")
-    return ApiKeyService(uow, pepper=bytes.fromhex(value))
+    return ApiKeyService(uow, pepper=bytes.fromhex(value), clock=clock)

@@ -14,9 +14,10 @@ See [ADR-014](../architecture/adr-014-dataset-versions.md).
 
 ## Date and lifecycle contract
 
-UTC is the application timezone for effective calendar dates. The existing aware UTC
-clock is injectable in the version service. Browser-local timestamp display does not
-change validity. Publication accepts today or future, never a past effective date.
+UTC is the application timezone for effective calendar dates. The shared application
+`Clock` supplies aware UTC instants and the effective calendar date, and can be injected
+through application composition for deterministic tests. Browser-local timestamp display
+does not change validity. Publication accepts today or future, never a past effective date.
 An effective date includes that day; an exclusive end boundary is the next non-cancelled
 version's effective date. Displayed end date is the preceding calendar day. With multiple
 publications effective on the same date, the highest version number wins; earlier ones

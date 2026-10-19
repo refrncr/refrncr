@@ -3,15 +3,16 @@
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from threading import Barrier, Event, local
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import event, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
-from support import NOW, audits, content, publish, revision, setup, snapshot, versions
+from support import NOW, MutableClock, audits, content, publish, revision, setup, snapshot, versions
 
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
@@ -207,7 +208,7 @@ def test_date_boundaries_and_deletion(context):
     future = NOW.date() + timedelta(days=1)
     v = publish(c, day=future)
     assert not any(s.status == "Current" for s in version_states(versions(c), NOW.date()))
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     assert version_states(versions(c), future)[0].status == "Current"
     with pytest.raises(ConflictError):
         c.service.cancel(c.a.id, c.d.id, v.id)
@@ -277,7 +278,7 @@ def test_invalid_publication_is_atomic(database_context, invalid):
 
     c = database_context
     c.service = DatasetVersionService(
-        c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
+        c.s.datasets.uow, c.s.authorization.datasets, clock=MutableClock(NOW)
     )
     if invalid != "fields":
         setup(c)
@@ -516,17 +517,31 @@ def test_version_database_constraints(database_context):
     assert snapshot(c) == before
 
 
-def test_clock_uses_utc_calendar_and_rejects_naive_clock(database_context):
-    from datetime import timezone
-
+def test_clock_uses_utc_calendar(database_context):
     c = database_context
     setup(c)
-    c.service.clock = lambda: datetime(2026, 9, 11, 0, 30, tzinfo=timezone(timedelta(hours=2)))
+    c.service.clock = MutableClock(datetime(2026, 9, 10, 22, 30, tzinfo=UTC))
     v = publish(c)
     assert v.published_at.date() == NOW.date()
-    c.service.clock = lambda: datetime(2026, 9, 10)
-    with pytest.raises(ValueError, match="aware"):
-        c.service.review(c.a.id, c.d.id)
+    assert c.service.clock.today() == NOW.date()
+
+
+def test_effective_date_uses_utc_day_at_amsterdam_midnight(database_context):
+    c = database_context
+    setup(c)
+    amsterdam = datetime(2027, 1, 1, 0, 30, tzinfo=ZoneInfo("Europe/Amsterdam"))
+    clock = MutableClock(amsterdam.astimezone(UTC))
+    c.service.clock = clock
+    version = publish(c, day=date(2027, 1, 1))
+
+    assert clock.now() == datetime(2026, 12, 31, 23, 30, tzinfo=UTC)
+    assert clock.today() == date(2026, 12, 31)
+    with pytest.raises(NotFoundError):
+        c.service.read_current(c.a.id, c.d.key)
+
+    clock.set(datetime(2027, 1, 1, tzinfo=UTC))
+    current = c.service.read_current(c.a.id, c.d.key)
+    assert current.publications[0].version.id == version.id
 
 
 def test_persisted_version_timestamps_are_utc(database_context):

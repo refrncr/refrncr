@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import event, text
 from sqlalchemy.exc import OperationalError
-from support import INSTANT, seed
+from support import INSTANT, MutableClock, seed
 from support import audit_history_client as client
 from support import audit_history_state as state
 
@@ -122,8 +122,8 @@ def test_invalid_filters_are_never_broadened(pairs):
 def test_cursor_integrity_expiry_and_filter_binding(database_history):
     h = database_history
     seed(h, 51)
-    now = INSTANT
-    service = AuditHistoryService(h.s.users.uow, cursor_key=b"test-key" * 4, clock=lambda: now)
+    clock = MutableClock(INSTANT)
+    service = AuditHistoryService(h.s.users.uow, cursor_key=b"test-key" * 4, clock=clock)
     cursor = service.list_history(h.admin).next_cursor
     for invalid in ("bad", cursor[:-1] + ("0" if cursor[-1] != "0" else "1"), "x" * 2049):
         with pytest.raises(ValidationError, match="invalid or expired"):
@@ -134,7 +134,7 @@ def test_cursor_integrity_expiry_and_filter_binding(database_history):
         session.get(User, h.reader).role = "admin"
     with pytest.raises(ValidationError):
         service.list_history(h.reader, cursor=cursor)
-    now += timedelta(seconds=CURSOR_LIFETIME)
+    clock.advance(seconds=CURSOR_LIFETIME)
     with pytest.raises(ValidationError):
         service.list_history(h.admin, cursor=cursor)
 

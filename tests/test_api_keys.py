@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
+from support import MutableClock
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.api_keys import LAST_USED_INTERVAL, LIFETIME, ApiKeyAuthenticationError, ApiKeyService
@@ -23,10 +24,8 @@ def _make_keys(database):
     engine, sessions, services = database
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
-    now = [datetime(2026, 9, 19, 12, tzinfo=UTC)]
-    service = ApiKeyService(
-        services.users.uow, pepper=b"test-only-pepper!" * 2, clock=lambda: now[0]
-    )
+    now = MutableClock(datetime(2026, 9, 19, 12, tzinfo=UTC))
+    service = ApiKeyService(services.users.uow, pepper=b"test-only-pepper!" * 2, clock=now)
     return engine, sessions, services, admin, user, service, now
 
 
@@ -44,11 +43,11 @@ def test_lifecycle_and_secret_redaction(keys, caplog):
     _, sessions, _, admin, _, service, now = keys
     created = service.create_key(admin.id, "  Integration  ")
     assert created.key.name == "Integration"
-    assert created.key.expires_at == now[0] + LIFETIME
+    assert created.key.expires_at == now.now() + LIFETIME
     assert created.secret not in repr(created)
     assert len(created.secret.split(".")[1]) == 43
     assert service.authenticate("Bearer " + created.secret).id == admin.id
-    assert service.list_keys(admin.id)[0].last_used_at == now[0]
+    assert service.list_keys(admin.id)[0].last_used_at == now.now()
     with sessions() as session:
         stored = session.get(ApiKey, created.key.id)
         assert stored.verifier != created.secret
@@ -87,10 +86,13 @@ def test_name_validation(keys, value):
 def test_expiry_bounds(keys, delta):
     _, _, _, _, user, service, now = keys
     with pytest.raises(ValidationError):
-        service.create_key(user.id, "Expiry", now[0] + timedelta(days=delta))
+        service.create_key(user.id, "Expiry", now.now() + timedelta(days=delta))
 
 
-@pytest.mark.parametrize("value", ["", "forever", "2026-12-01", datetime(2026, 12, 1), 123])
+@pytest.mark.parametrize(
+    "value",
+    ["", "forever", "2026-12-01", datetime(2026, 12, 1), 123],  # noqa: DTZ001
+)
 def test_malformed_expiry(keys, value):
     _, _, _, _, user, service, _ = keys
     with pytest.raises(ValidationError):
@@ -99,14 +101,14 @@ def test_malformed_expiry(keys, value):
 
 def test_expiry_duplicate_names_limit_and_reuse(keys):
     _, _, _, _, user, service, now = keys
-    first = service.create_key(user.id, "Integration", now[0] + timedelta(days=1))
+    first = service.create_key(user.id, "Integration", now.now() + timedelta(days=1))
     with pytest.raises(ConflictError):
         service.create_key(user.id, "integration")
     for n in range(4):
         service.create_key(user.id, str(n))
     with pytest.raises(ConflictError):
         service.create_key(user.id, "Sixth")
-    now[0] += timedelta(days=1)
+    now.advance(days=1)
     assert service.get_key(user.id, first.key.id).status == "Expired"
     with pytest.raises(ApiKeyAuthenticationError):
         service.authenticate("Bearer " + first.secret)
@@ -274,7 +276,7 @@ def test_audit_failure_rolls_back(database_keys, monkeypatch):
 
 def browser_client(keys):
     _, _, s, _, user, service, now = keys
-    now[0] = datetime.now(UTC)
+    now.set(datetime.now(UTC))
     app = create_flask_app(
         s.users, s.authentication, s.sessions, s.teams, s.memberships, api_keys=service
     )
@@ -464,14 +466,14 @@ def test_success_has_no_durable_audit_and_throttles_last_used(keys):
     created = service.create_key(user.id, "Recent use")
 
     assert service.authenticate("Bearer " + created.secret).id == user.id
-    first_use = now[0]
-    now[0] += LAST_USED_INTERVAL
+    first_use = now.now()
+    now.advance(seconds=LAST_USED_INTERVAL.total_seconds())
     service.authenticate("Bearer " + created.secret)
     assert service.get_key(user.id, created.key.id).last_used_at == first_use
 
-    now[0] += timedelta(microseconds=1)
+    now.advance(microseconds=1)
     service.authenticate("Bearer " + created.secret)
-    assert service.get_key(user.id, created.key.id).last_used_at == now[0]
+    assert service.get_key(user.id, created.key.id).last_used_at == now.now()
     with sessions() as session:
         assert not list(
             session.scalars(select(AuditEvent).where(AuditEvent.action == "api_key.authenticated"))

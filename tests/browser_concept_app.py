@@ -1,14 +1,14 @@
 """Disposable explicit-concept browser fixture; no persistent user data."""
 
+from support import MutableClock, create_dataset, create_field
 from support import _dataset_browser as dataset_browser
-from support import create_dataset, create_field
 
-from refrncr.models import utc_now
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.web import create_flask_app
 
 _factory, services, admin, _client = dataset_browser()
-now = utc_now()
-services.dataset_versions.clock = lambda: now
+now = SYSTEM_CLOCK.now()
+services.dataset_versions.clock = MutableClock(now)
 password = "correct horse battery staple"
 owner = services.users.create_user(admin.id, "owner@example.com", "Dataset owner", password)
 reader = services.users.create_user(admin.id, "reader@example.com", "Reader", password)

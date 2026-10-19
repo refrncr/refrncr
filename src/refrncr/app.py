@@ -12,6 +12,7 @@ from refrncr.api.documentation import publish_documentation
 from refrncr.api.routes import create_api
 from refrncr.api_keys import ApiKeyService, configured_api_keys
 from refrncr.audit_history import AuditHistoryService
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
@@ -71,24 +72,24 @@ class CommunityServices:
 
 
 def create_community_services(
-    sessions: sessionmaker[Session], resources: ResourceTypeRegistry
+    sessions: sessionmaker[Session], resources: ResourceTypeRegistry, *, clock: Clock = SYSTEM_CLOCK
 ) -> CommunityServices:
     """Compose shared services with the Community SQLAlchemy adapters."""
-    uow = SqlAlchemyUnitOfWorkFactory(sessions)
+    uow = SqlAlchemyUnitOfWorkFactory(sessions, clock)
     permission_data = SqlAlchemyPermissionDataSource(sessions)
     resources.register("dataset", DatasetResourceResolver(uow))
     authorization = AuthorizationService(
         permission_data, resources, DatasetAuthorizationService(uow)
     )
-    versions = DatasetVersionService(uow, authorization.datasets)
+    versions = DatasetVersionService(uow, authorization.datasets, clock=clock)
     dataset_records = DatasetRecordService(uow, authorization, versions=versions)
     return CommunityServices(
-        api_keys=configured_api_keys(uow),
+        api_keys=configured_api_keys(uow, clock=clock),
         dataset_versions=versions,
-        audit_history=AuditHistoryService(uow),
+        audit_history=AuditHistoryService(uow, clock=clock),
         users=UserService(uow),
         authentication=AuthenticationService(uow),
-        sessions=SessionService(sessions),
+        sessions=SessionService(sessions, clock=clock),
         teams=TeamService(uow),
         memberships=MembershipService(uow),
         _deprecated_grants=lambda: create_deprecated_grant_service(uow, resources),
@@ -144,12 +145,13 @@ def create_application(
         lifespan=lifespan,
     )
     app.add_middleware(OperationalMiddleware)
+    clock = getattr(api_keys, "clock", getattr(users.uow, "clock", SYSTEM_CLOCK))
     versions = (
         dataset_versions
         or datasets.versions
         or DatasetVersionService(datasets.uow, authorization.datasets)
     )
-    api = create_api(versions, api_keys)
+    api = create_api(versions, api_keys, clock=clock)
     app.mount("/api/v1", api)
     publish_documentation(app, api)
 
@@ -202,6 +204,7 @@ def create_application(
         audit_history=audit_history,
         api_keys=api_keys,
         dataset_versions=dataset_versions,
+        clock=clock,
     )
     app.mount("/", WSGIMiddleware(flask_app))
     return app

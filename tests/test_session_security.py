@@ -36,6 +36,12 @@ class MutableClock:
     def __call__(self) -> datetime:
         return self.value
 
+    def now(self) -> datetime:
+        return self.value
+
+    def today(self):
+        return self.value.date()
+
 
 def configured_web(*, allow_loopback_http: bool = False):
     engine = create_database_engine(

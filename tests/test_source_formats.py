@@ -240,10 +240,10 @@ def test_dst_gap_fold_and_explicit_timezone():
     "datatype,value,expected",
     [
         ("date", date(2024, 2, 29), "2024-02-29"),
-        ("date", datetime(2024, 2, 29), "2024-02-29"),
+        ("date", datetime(2024, 2, 29), "2024-02-29"),  # noqa: DTZ001
         ("time", time(12, 34, 56, 123000), "12:34:56.123"),
-        ("datetime", datetime(2024, 2, 29, 12, 34, 56), "2024-02-29T12:34:56"),
-        ("timestamp", datetime(2024, 2, 29, 12, 34, 56), "2024-02-29T11:34:56Z"),
+        ("datetime", datetime(2024, 2, 29, 12, 34, 56), "2024-02-29T12:34:56"),  # noqa: DTZ001
+        ("timestamp", datetime(2024, 2, 29, 12, 34, 56), "2024-02-29T11:34:56Z"),  # noqa: DTZ001
     ],
 )
 def test_native_excel_values(datatype, value, expected):
@@ -255,7 +255,7 @@ def test_native_excel_values(datatype, value, expected):
 
 def test_native_date_does_not_silently_discard_time():
     with pytest.raises(SourceFormatError):
-        canonical_source("date", datetime(2024, 2, 29, 12), "v1-excel-date")
+        canonical_source("date", datetime(2024, 2, 29, 12), "v1-excel-date")  # noqa: DTZ001
     with pytest.raises(SourceFormatError):
         canonical_source("datetime", datetime(2024, 2, 29, tzinfo=UTC), "v1-excel-datetime")
 

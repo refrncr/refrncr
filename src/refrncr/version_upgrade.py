@@ -5,8 +5,9 @@ from types import SimpleNamespace
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.dataset_versions import validated_snapshot
-from refrncr.models import Dataset, utc_now
+from refrncr.models import Dataset
 from refrncr.persistence import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
@@ -76,7 +77,7 @@ def publication_preflight(connection):
 
 def create_initial_versions(connection):
     """Run only inside the migration's transaction after complete successful preflight."""
-    now = utc_now().astimezone(APPLICATION_TIMEZONE)
+    now = SYSTEM_CLOCK.now().astimezone(APPLICATION_TIMEZONE)
     with Session(bind=connection) as session:
         versions = SqlAlchemyVersionOperations(
             session,
@@ -88,6 +89,6 @@ def create_initial_versions(connection):
             summary = SummaryCounts(
                 fields_added=len(content.fields), records_added=len(content.records)
             )
-            versions.append(dataset.id, 1, now, None, now.date(), "", content, summary)
+            versions.append(dataset.id, 1, now, None, SYSTEM_CLOCK.today(), "", content, summary)
         session.flush()
     # No commit: the caller owns DDL, data, and migration revision atomically.

@@ -35,6 +35,12 @@ class MutableClock:
     def __call__(self):
         return self.value
 
+    def now(self):
+        return self.value
+
+    def today(self):
+        return self.value.date()
+
 
 def csrf(response) -> str:
     marker = "name='csrf_token' value='"

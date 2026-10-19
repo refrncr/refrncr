@@ -2,14 +2,14 @@
 
 from datetime import timedelta
 
-from support import create_dataset, create_field, dataset_browser
+from support import MutableClock, create_dataset, create_field, dataset_browser
 
-from refrncr.models import utc_now
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.web import create_flask_app
 
 _factory, s, admin, _client = dataset_browser.__wrapped__()
-now = utc_now()
-s.dataset_versions.clock = lambda: now
+now = SYSTEM_CLOCK.now()
+s.dataset_versions.clock = MutableClock(now)
 PASSWORD = "correct horse battery staple"
 owner = s.users.create_user(admin.id, "owner@example.com", "Dataset owner", PASSWORD)
 reader = s.users.create_user(admin.id, "reader@example.com", "Reader", PASSWORD)
@@ -32,7 +32,7 @@ def source(key, name):
 def publish(dataset, effective=None, note=""):
     current = s.datasets.get_dataset(admin.id, dataset.key)
     return s.dataset_versions.publish(
-        admin.id, dataset.id, effective or s.dataset_versions.clock().date(), note, current.revision
+        admin.id, dataset.id, effective or s.dataset_versions.clock.today(), note, current.revision
     )
 
 
@@ -40,15 +40,15 @@ for width in (320, 768, 1440):
     source(f"publish-{width}", f"Publication {width}")
 source("publish-nojs", "Publication without JavaScript")
 history, record = source("history", "History demo")
-s.dataset_versions.clock = lambda: now - timedelta(days=2)
+s.dataset_versions.clock.set(now - timedelta(days=2))
 publish(history, note="First published version")
-s.dataset_versions.clock = lambda: now - timedelta(days=1)
+s.dataset_versions.clock.set(now - timedelta(days=1))
 s.dataset_versions.create_concept(admin.id, history.id)
 s.dataset_records.update_record(
     admin.id, history.key, record.id, 1, {"code": "FIRST", "label": "Second published value"}
 )
 publish(history, note="Current version")
-s.dataset_versions.clock = lambda: now
+s.dataset_versions.clock.set(now)
 s.dataset_versions.create_concept(admin.id, history.id)
 s.datasets.update_dataset(admin.id, history.key, "Unpublished history name", "DRAFT DESCRIPTION")
 s.dataset_records.update_record(

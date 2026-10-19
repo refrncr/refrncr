@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -9,7 +9,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -26,10 +25,12 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, column_property, mapped_column
+from sqlalchemy.orm import Mapped, Session, column_property, mapped_column
 
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.datatypes import DATASET_FIELD_TYPES
 from refrncr.db.base import Base
+from refrncr.db.types import UTCDateTime
 from refrncr.record_identity import MAX_RECORD_IDENTIFIER_BYTES
 
 
@@ -37,8 +38,33 @@ def new_id() -> str:
     return str(uuid.uuid4())
 
 
-def utc_now() -> datetime:
-    return datetime.now(UTC)
+def _has_utc_column(instance, name: str) -> bool:
+    attribute = inspect(instance).mapper.attrs.get(name)
+    return bool(
+        attribute
+        and hasattr(attribute, "columns")
+        and isinstance(attribute.columns[0].type, UTCDateTime)
+    )
+
+
+@event.listens_for(Session, "before_flush")
+def _stamp_database_timestamps(session, _flush_context, _instances) -> None:
+    """Apply one injected instant to ORM-managed created/updated/audit timestamps."""
+    now = session.info.get("clock", SYSTEM_CLOCK).now()
+    for instance in session.new:
+        if _has_utc_column(instance, "created_at") and instance.created_at is None:
+            instance.created_at = now
+        if _has_utc_column(instance, "updated_at") and instance.updated_at is None:
+            instance.updated_at = now
+        if _has_utc_column(instance, "timestamp") and instance.timestamp is None:
+            instance.timestamp = now
+    for instance in session.dirty:
+        if (
+            _has_utc_column(instance, "updated_at")
+            and not inspect(instance).attrs.updated_at.history.has_changes()
+            and session.is_modified(instance, include_collections=False)
+        ):
+            instance.updated_at = now
 
 
 class Organisation(Base):
@@ -48,7 +74,7 @@ class Organisation(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default="community")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class User(Base):
@@ -71,10 +97,8 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class LoginSession(Base):
@@ -84,9 +108,9 @@ class LoginSession(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     csrf_token: Mapped[str] = mapped_column(String(128))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
 
 class AuditEvent(Base):
@@ -102,7 +126,7 @@ class AuditEvent(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    timestamp: Mapped[datetime] = mapped_column(UTCDateTime())
     details: Mapped[dict[str, str | int] | None] = mapped_column(JSON)
     actor_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     object_type: Mapped[str] = mapped_column(String(100))
@@ -122,10 +146,10 @@ class ApiKey(Base):
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     verifier: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     revision: Mapped[int] = mapped_column(Integer, default=1)
 
 
@@ -138,10 +162,8 @@ class Team(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(100))
     _name_key: Mapped[str] = mapped_column("name_key", String(300), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     @hybrid_property
     def name_key(self) -> str:
@@ -166,7 +188,7 @@ class Membership(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), index=True)
     team_id: Mapped[str] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class Grant(Base):
@@ -189,10 +211,8 @@ class Grant(Base):
     resource_type: Mapped[str] = mapped_column(String(100), index=True)
     resource_id: Mapped[str] = mapped_column(String(100), index=True)
     permission: Mapped[str] = mapped_column(String(16))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class ImmutableDatasetKeyError(ValueError):
@@ -247,16 +267,14 @@ class Dataset(Base):
     owner_team_id: Mapped[str] = mapped_column(
         ForeignKey("teams.id", ondelete="RESTRICT"), index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     owner_team_name = column_property(
         select(Team.name).where(Team.id == owner_team_id).scalar_subquery()
     )
 
-    content_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    content_updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     @hybrid_property
@@ -335,10 +353,8 @@ class DatasetField(Base):
         index=True,
     )
     source_field_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     @hybrid_property
     def key(self) -> str:
@@ -400,10 +416,8 @@ class DatasetRecord(Base):
     identifier_key: Mapped[bytes] = mapped_column(LargeBinary(MAX_RECORD_IDENTIFIER_BYTES))
     deleted_content: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     revision: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class DatasetRecordValue(Base):
@@ -525,7 +539,7 @@ class DatasetExportAccess(Base):
     team_id: Mapped[str | None] = mapped_column(
         ForeignKey("teams.id", ondelete="CASCADE"), index=True
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     @property
     def subject_type(self) -> str:
@@ -562,7 +576,7 @@ class DatasetVersion(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     number: Mapped[int] = mapped_column(Integer)
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime] = mapped_column(UTCDateTime())
     publisher_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     effective_date: Mapped[date] = mapped_column(Date)
     release_note: Mapped[str] = mapped_column(Text, default="")
@@ -576,7 +590,7 @@ class DatasetVersion(Base):
     records_added: Mapped[int] = mapped_column(Integer)
     records_changed: Mapped[int] = mapped_column(Integer)
     records_removed: Mapped[int] = mapped_column(Integer)
-    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     cancelling_actor_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT")
     )
@@ -763,8 +777,8 @@ class DatasetConcept(Base):
     id: Mapped[str] = mapped_column(String(36), default=new_id)
     base_version_id: Mapped[str | None] = mapped_column(String(36))
     creator_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime())
     start_revision: Mapped[int] = mapped_column(Integer)
     records_mutated: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=False, server_default=false()

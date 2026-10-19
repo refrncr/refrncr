@@ -637,12 +637,12 @@ def test_current_export_in_progress_retains_coherent_snapshot_during_delete(cont
     populate(c)
     # REF-155 invalidates pending Concept exports. Published exports keep ADR-012's
     # snapshot contract even when the Dataset is deleted during preparation.
-    from refrncr.models import utc_now
+    from refrncr.clock import SYSTEM_CLOCK
 
     c.s.dataset_versions.publish(
         c.a.id,
         c.d.id,
-        utc_now().date(),
+        SYSTEM_CLOCK.today(),
         "Release",
         c.s.datasets.get_dataset_for_edit(c.a.id, c.d.key).revision,
     )

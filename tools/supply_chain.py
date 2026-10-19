@@ -7,7 +7,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 REQUIRED_EXCEPTION_FIELDS = {
@@ -28,7 +28,7 @@ def load_exceptions(path: Path, *, today: date | None = None) -> list[dict[str, 
     data = json.loads(path.read_text())
     if data.get("schema_version") != 1 or not isinstance(data.get("exceptions"), list):
         raise ValueError("exception register must use schema_version 1 and an exceptions array")
-    current = today or date.today()
+    current = today or datetime.now(UTC).date()
     validated = []
     for index, entry in enumerate(data["exceptions"]):
         missing = sorted(REQUIRED_EXCEPTION_FIELDS - entry.keys())

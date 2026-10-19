@@ -104,8 +104,9 @@ Upgrade/downgrade tests preserve historical rows and context exactly. Index crea
 transactional DDL, not an online/concurrent migration; operators should account for index build
 time/locking on large installations. Optional filter indexes should follow measured workloads.
 
-SQLite's naive stored datetimes are interpreted as UTC; PostgreSQL values are normalized to UTC.
-Both engines use the same ordering, boundaries, lookahead, batch projections and context validation.
+The shared `UTCDateTime` type returns aware UTC timestamps on SQLite and PostgreSQL (SQLite's
+underlying storage remains timezone-naive). Both engines use the same ordering, boundaries,
+lookahead, batch projections and context validation.
 
 ## Presentation and privacy
 

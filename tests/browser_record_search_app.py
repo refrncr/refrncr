@@ -2,14 +2,14 @@
 
 import logging
 
-from support import create_dataset, create_field, dataset_browser
+from support import MutableClock, create_dataset, create_field, dataset_browser
 
-from refrncr.models import utc_now
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.web import create_flask_app
 
 _sessions, services, admin, _client = dataset_browser.__wrapped__()
-now = utc_now()
-services.dataset_versions.clock = lambda: now
+now = SYSTEM_CLOCK.now()
+services.dataset_versions.clock = MutableClock(now)
 for suffix in ("320", "768", "1440", "nojs"):
     dataset = create_dataset(services, admin, f"search-{suffix}", f"Record search {suffix}")
     create_field(services, admin, dataset, "code", "Code", is_required=True)

@@ -44,7 +44,7 @@ class DatasetDiffService:
         )
         if concept.base_version_id is not None and latest is None:
             raise ConflictError("The concept basis is unavailable. Your changes are preserved.")
-        state = version_states((latest,), self.versions._today().date())[0] if latest else None
+        state = version_states((latest,), self.versions.clock.today())[0] if latest else None
         if state and state.status == "Cancelled" and not allow_stale:
             raise ConflictError(
                 "The concept basis was cancelled. Your changes are preserved; "
@@ -91,7 +91,7 @@ class DatasetDiffService:
         # A Scheduled baseline becoming Current during a long query is stale too.
         if state is None:
             return
-        current = version_states((state.version,), self.versions._today().date())[0]
+        current = version_states((state.version,), self.versions.clock.today())[0]
         if current.status != state.status:
             raise ConflictError(STALE_MESSAGE)
 

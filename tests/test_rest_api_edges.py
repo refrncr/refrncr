@@ -1,7 +1,6 @@
 """Composition, pagination, privacy and atomic-publication regressions."""
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
 from threading import Event
 
 import pytest
@@ -168,7 +167,7 @@ def test_etag_is_specific_to_representation_and_principal(api):
     key = c.keys.create_key(c.a.id, "admin reader")
     response = get(c, headers={"Authorization": "Bearer " + key.secret, "If-None-Match": tags[0]})
     assert response.status_code == 200
-    c.now[0] += timedelta(days=90)
+    c.now.advance(days=90)
     assert get(c, headers={**c.headers, "If-None-Match": tags[0]}).status_code == 401
 
 

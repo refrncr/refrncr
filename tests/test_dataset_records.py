@@ -12,9 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from support import PASSWORD, html_tag_texts
 
 from refrncr.app import create_community_services
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
+from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.record_identity import decode_record_identifier
 from refrncr.services import (
@@ -833,7 +834,7 @@ def test_populated_ref_75_sqlite_upgrade_preserves_schema_and_adds_records(tmp_p
     dataset = create_owned_dataset(services.datasets, admin.id, "preserved", "Preserved", "")
     downgrade_historical_fixture(config, "0007_ref_75")
     field_id = str(uuid.uuid4())
-    now = utc_now()
+    now = SYSTEM_CLOCK.now()
     with factory.begin() as session:
         session.execute(
             text(

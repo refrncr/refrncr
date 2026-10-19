@@ -4,10 +4,12 @@ import hashlib
 import ipaddress
 import threading
 from collections import OrderedDict, deque
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from itertools import islice
+
+from refrncr.clock import SYSTEM_CLOCK, Clock
 
 DEFAULT_SOURCE_LIMIT = 20
 DEFAULT_SOURCE_ACCOUNT_LIMIT = 5
@@ -126,7 +128,7 @@ class LoginAttemptLimiter:
         source_account_limit: int = DEFAULT_SOURCE_ACCOUNT_LIMIT,
         window: timedelta = DEFAULT_WINDOW,
         max_entries: int = DEFAULT_MAX_ENTRIES,
-        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        clock: Clock = SYSTEM_CLOCK,
         cleanup_budget: int = 16,
     ) -> None:
         if min(source_limit, source_account_limit, cleanup_budget) < 1 or max_entries < 2:
@@ -145,7 +147,7 @@ class LoginAttemptLimiter:
         return self.reserve(source, account) is not None
 
     def reserve(self, source: str, account: str) -> LoginAttemptReservation | None:
-        now = self.clock()
+        now = self.clock.now()
         source_key = ("source", source)
         pair_key = ("pair", source, account)
         with self._lock:

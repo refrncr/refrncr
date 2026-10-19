@@ -46,10 +46,13 @@ but not content freshness. Import staging,
 preview and failures do not touch it. Any failure, including commit failure after a flush, rolls
 back both the mutation and its timestamp. Operation groups never commit independently.
 
-PostgreSQL stores aware timestamps; SQLite returns naive UTC values according to the existing
-storage convention. The context result normalizes these to aware UTC. The presentation filter
-uses explicit English month names independent of process locale, with an ISO `datetime` attribute
-on the semantic `time` element. No browser timezone is consulted.
+Every ORM timestamp column uses the shared `UTCDateTime` type: writes must be aware and are
+bound as UTC; reads are returned aware in UTC on both PostgreSQL and SQLite. The type preserves
+the existing database column types, so this change needs no migration. The application shares
+one injectable clock across services and persistence; `created_at`, `updated_at` and audit
+timestamps use that clock. The presentation filter uses explicit English month names independent
+of process locale, with an ISO `datetime` attribute on the semantic `time` element. No browser
+timezone is consulted.
 
 Upgrade uses an additive column and SQL backfill. Downgrade uses Alembic batch alteration;
 the existing migration environment suspends SQLite foreign keys during reconstruction and

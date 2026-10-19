@@ -108,7 +108,7 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "A", "BLE", "C90"]
+select = ["E", "F", "I", "UP", "B", "A", "BLE", "C90", "DTZ"]
 per-file-ignores = { "src/refrncr/web.py" = ["C901"] }
 
 [tool.ruff.lint.mccabe]

@@ -8,7 +8,7 @@ import unicodedata
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from argon2 import PasswordHasher
@@ -19,10 +19,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.errors import UserManagementError, ValidationError
-from refrncr.models import LoginSession, User, utc_now
+from refrncr.models import LoginSession, User
 from refrncr.ports import (
     AuditEntry,
     DatasetBusinessKey,
@@ -309,10 +310,6 @@ def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -
     return actor
 
 
-def _now() -> datetime:
-    return datetime.now(UTC)
-
-
 class UserService:
     """User operations within the one Community installation context."""
 
@@ -432,8 +429,8 @@ class UserService:
                 target.is_active = False
                 if action == "deleted":
                     target.is_deleted = True
-                uow.users.revoke_active_sessions(target.id, _now())
-            target.updated_at = _now()
+                uow.users.revoke_active_sessions(target.id, uow.now())
+            target.updated_at = uow.now()
             self._add_audit(uow, self._audit(actor.id, target, action))
             return target
 
@@ -567,7 +564,7 @@ class TeamService:
             if team.name == normalized:
                 return team
             team.name = normalized
-            team.updated_at = _now()
+            team.updated_at = uow.now()
             try:
                 uow.flush()
             except PersistenceConflictError as exc:
@@ -785,7 +782,7 @@ def _require_concept(uow, dataset_id):
 def _advance_concept(uow, dataset):
     _require_concept(uow, dataset.id)
     dataset.revision += 1
-    uow.concepts.touch(dataset.id, _now())
+    uow.concepts.touch(dataset.id, uow.now())
 
 
 def _version_reads(service):
@@ -845,9 +842,7 @@ class DatasetService:
 
     @staticmethod
     def _deletion_timestamp(dataset):
-        value = dataset.updated_at
-        value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-        return value.isoformat(timespec="microseconds")
+        return dataset.updated_at.isoformat(timespec="microseconds")
 
     def _deletion_context(self, uow, dataset):
         fields, records, versions, export_access = uow.datasets.deletion_counts(dataset.id)
@@ -1213,7 +1208,7 @@ class DatasetService:
             maintain = self.authorization.datasets.can_maintain_dataset(
                 actor_id, dataset.id, uow=uow
             )
-            if not maintain and not uow.versions.current_for_datasets((dataset.id,), _now().date()):
+            if not maintain and not uow.versions.current_for_datasets((dataset.id,), uow.today()):
                 raise NotFoundError("Dataset not found")
             govern = self.authorization.datasets.can_change_dataset_owner(
                 actor_id, dataset.id, uow=uow
@@ -1284,7 +1279,7 @@ class DatasetService:
             dataset.icon = validated_icon
             dataset.name = normalized_name
             dataset.description = validated_description
-            dataset.updated_at = _now()
+            dataset.updated_at = uow.now()
             self._add_audit(
                 uow,
                 self._audit(actor_id, "dataset", dataset.id, "metadata_updated"),
@@ -1446,7 +1441,7 @@ class DatasetFieldService:
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field.id, "created")
             if validated_component:
                 current_key = uow.dataset_business_keys.get(dataset.id)
@@ -1533,7 +1528,7 @@ class DatasetFieldService:
             maintenance = self.authorization.datasets.maintainable_resources(actor_id, uow=uow)
             allowed = set(maintenance.resource_ids)
             concepts = uow.concepts.list_for_datasets(tuple(datasets))
-            current = uow.versions.current_for_datasets(tuple(datasets), versions._today().date())
+            current = uow.versions.current_for_datasets(tuple(datasets), versions.clock.today())
             working_ids = tuple(
                 dataset_id
                 for dataset_id in dataset_ids
@@ -1646,9 +1641,9 @@ class DatasetFieldService:
             field.is_required = validated_required
             field.is_unique = validated_unique
             field.hierarchy_scope = hierarchy_scope
-            field.updated_at = _now()
+            field.updated_at = uow.now()
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
 
@@ -1797,7 +1792,7 @@ class DatasetFieldService:
                 )
 
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             if definition_changed or key_changed:
                 field.definition, field.unit = definition, unit
                 field.name = normalized_name
@@ -1805,7 +1800,7 @@ class DatasetFieldService:
                 field.is_required = validated_required
                 field.is_unique = validated_unique
                 field.hierarchy_scope = hierarchy_scope
-                field.updated_at = _now()
+                field.updated_at = uow.now()
                 self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
 
@@ -1834,7 +1829,7 @@ class DatasetFieldService:
             remaining = uow.dataset_fields.list_for_dataset(dataset.id)
             uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field_id, "deleted")
 
     def replace_order(
@@ -1867,7 +1862,7 @@ class DatasetFieldService:
             if proposed_order == current:
                 return tuple(fields)
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
             record_audit(
                 uow,
@@ -2027,7 +2022,7 @@ class DatasetBusinessKeyService:
                 raise ValidationError("Record identifier cannot change after records exist")
 
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
             record_audit(
                 uow,
@@ -2110,7 +2105,7 @@ class DatasetRecordService:
                 raise
             uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
                 actor_user_id=actor_id,
@@ -2178,7 +2173,7 @@ class DatasetRecordService:
                 self._raise_record_conflict(error)
             uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
                 actor_user_id=actor_id,
@@ -2203,7 +2198,7 @@ class DatasetRecordService:
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
                 actor_user_id=actor_id,
@@ -2261,7 +2256,7 @@ class DatasetRecordService:
                 self._raise_record_conflict(error)
             uow.concepts.record_mutation(dataset.id)
             _advance_concept(uow, dataset)
-            dataset.content_updated_at = _now()
+            dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
                 actor_user_id=actor_id,
@@ -2569,7 +2564,7 @@ class GrantService:
             if grant.permission == permission:
                 return grant
             grant.permission = permission
-            grant.updated_at = _now()
+            grant.updated_at = uow.now()
             self._add_audit(uow, self._audit(actor.id, grant.id, "permission_changed"))
             return grant
 
@@ -2842,7 +2837,7 @@ class SessionService:
         sessions: sessionmaker[Session],
         lifetime: timedelta = timedelta(hours=12),
         *,
-        clock: Callable[[], datetime] = utc_now,
+        clock: Clock = SYSTEM_CLOCK,
         retention: timedelta = timedelta(days=7),
         cleanup_batch_size: int = 100,
     ):
@@ -2857,13 +2852,16 @@ class SessionService:
     def create(self, user: User | AuthenticatedPrincipal) -> tuple[str, LoginSession]:
         self.cleanup()
         token = secrets.token_urlsafe(48)
+        now = self.clock.now()
         login = LoginSession(
             user_id=user.id,
             token_hash=self._digest(token),
             csrf_token=secrets.token_urlsafe(32),
-            expires_at=self.clock() + self.lifetime,
+            created_at=now,
+            expires_at=now + self.lifetime,
         )
         with self.sessions.begin() as session:
+            session.info["clock"] = self.clock
             session.add(login)
             session.flush()
             session.expunge(login)
@@ -2880,10 +2878,7 @@ class SessionService:
             )
             if login is None or login.revoked_at is not None:
                 return None
-            expires_at = login.expires_at
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=UTC)
-            if expires_at <= self.clock():
+            if login.expires_at <= self.clock.now():
                 return None
             user = session.get(User, login.user_id)
             if user is None or not user.is_active or user.is_deleted:
@@ -2895,14 +2890,14 @@ class SessionService:
             session.execute(
                 update(LoginSession)
                 .where(LoginSession.token_hash == self._digest(token))
-                .values(revoked_at=self.clock())
+                .values(revoked_at=self.clock.now())
             )
         self.cleanup()
 
     def cleanup(self) -> int:
         """Inspect and delete at most one primary-key page of retained sessions."""
         with self._cleanup_lock:
-            now = self.clock()
+            now = self.clock.now()
             cutoff = now - self.retention
             with self.sessions.begin() as session:
                 statement = (

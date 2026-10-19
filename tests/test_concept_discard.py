@@ -413,7 +413,7 @@ def test_current_activation_requires_new_confirmation(context):
     publish(c, day=NOW.date() + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
     identity = c.service.review_discard(c.a.id, c.d.id).identity
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     before = snapshot(c)
     with pytest.raises(ConflictError, match="changed"):
         discard(c, identity=identity)

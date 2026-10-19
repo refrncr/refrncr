@@ -8,7 +8,7 @@ from threading import Barrier
 
 import pytest
 from sqlalchemy import select, update
-from support import NOW, audits, content, publish, revision, snapshot
+from support import NOW, MutableClock, audits, content, publish, revision, snapshot
 
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
@@ -23,7 +23,7 @@ def prepare(c):
         c.a.id, "hierarchy", "Hierarchy", "", c.owner.id, kind="hierarchy"
     )
     c.service = DatasetVersionService(
-        c.s.datasets.uow, c.s.authorization.datasets, clock=lambda: NOW
+        c.s.datasets.uow, c.s.authorization.datasets, clock=MutableClock(NOW)
     )
     c.diff = DatasetDiffService(c.service)
     return node(c, "Root")

@@ -10,6 +10,7 @@ from email.utils import format_datetime, parsedate_to_datetime
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
+from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import get_datatype
 
 PRIVATE = "private, no-cache, max-age=0, must-revalidate"
@@ -47,15 +48,22 @@ class CanonicalJSONResponse(JSONResponse):
         return json_bytes(content)
 
 
-def utc(value):
-    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
-
 class ConditionalRead:
     def __init__(
-        self, request, *, actor_id, kind, key, identifier, page, effective_date, version_number
+        self,
+        request,
+        *,
+        actor_id,
+        kind,
+        key,
+        identifier,
+        page,
+        effective_date,
+        version_number,
+        clock: Clock = SYSTEM_CLOCK,
     ):
         self.request = request
+        self.clock = clock
         self.selection = (
             "refrncr-json-v1",
             actor_id,
@@ -80,7 +88,7 @@ class ConditionalRead:
                 p.kind,
                 p.version.id,
                 p.version.number,
-                utc(p.version.published_at).isoformat(),
+                p.version.published_at.isoformat(),
                 p.version.effective_date.isoformat(),
             )
             for p in publications
@@ -91,7 +99,7 @@ class ConditionalRead:
             + '"'
         )
         modified = max(
-            (utc(p.version.published_at) for p in publications),
+            (p.version.published_at for p in publications),
             default=datetime(1970, 1, 1, tzinfo=UTC),
         )
         self.headers = {
@@ -128,10 +136,10 @@ class ConditionalRead:
         # Collection deletion/page membership and independently mutable metadata cannot
         # be proven unchanged by a publication date. ETags cover both exactly.
         if self.selection[2] == "datasets" or any(
-            utc(p.metadata_updated_at) > since
+            p.metadata_updated_at > since
             or datetime.combine(p.version.effective_date, datetime.min.time(), UTC) > since
             for p in publications
         ):
             return False
         # Compare actual precision: same-second publications must never produce a false 304.
-        return modified <= since <= datetime.now(UTC)
+        return modified <= since <= self.clock.now()

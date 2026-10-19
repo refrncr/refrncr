@@ -1,13 +1,13 @@
 """Disposable in-memory REF-84 browser fixture, loopback only."""
 
-from support import create_dataset, create_field, dataset_browser
+from support import MutableClock, create_dataset, create_field, dataset_browser
 
-from refrncr.models import utc_now
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.web import create_flask_app
 
 _factory, s, admin, _client = dataset_browser.__wrapped__()
-now = utc_now()
-s.dataset_versions.clock = lambda: now
+now = SYSTEM_CLOCK.now()
+s.dataset_versions.clock = MutableClock(now)
 password = "correct horse battery staple"
 owner = s.users.create_user(admin.id, "owner@example.com", "Dataset owner", password)
 reader = s.users.create_user(admin.id, "reader@example.com", "Reader", password)

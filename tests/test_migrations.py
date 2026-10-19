@@ -714,6 +714,9 @@ def test_populated_ref_36_sqlite_database_upgrades_to_ref_72(tmp_path):
         historical_events = connection.execute(
             select(metadata.tables["audit_events"]).order_by(metadata.tables["audit_events"].c.id)
         ).all()
+        historical_events = [
+            (*row[:1], row[1].replace(tzinfo=UTC), *row[2:]) for row in historical_events
+        ]
     engine.dispose()
 
     command.upgrade(config, "head")

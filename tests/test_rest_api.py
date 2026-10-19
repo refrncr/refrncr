@@ -187,7 +187,7 @@ def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
     c = api
     caplog.set_level(logging.INFO, logger=LOGGER_NAME)
     first = get(c, "/audit")
-    c.now[0] += timedelta(minutes=16)
+    c.now.advance(minutes=16)
     caplog.clear()
     cached = get(c, "/audit", headers={**c.headers, "If-None-Match": first.headers["etag"]})
     assert cached.status_code == 304
@@ -214,7 +214,7 @@ def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
     for prohibited in (c.key.secret, c.key.key.id, c.u.id, "Authorization", "Read integration"):
         assert prohibited not in serialized
     with c.sessions() as session:
-        assert c.keys.get_key(c.u.id, c.key.key.id).last_used_at == c.now[0]
+        assert c.keys.get_key(c.u.id, c.key.key.id).last_used_at == c.now.now()
         assert not list(
             session.scalars(select(AuditEvent).where(AuditEvent.action == "api_key.authenticated"))
         )
@@ -239,9 +239,9 @@ def test_duplicate_expired_revoked_inactive_keys(api):
     c = api
     duplicate = [("Authorization", c.headers["Authorization"])] * 2
     assert get(c, headers=duplicate).status_code == 401
-    c.now[0] += timedelta(days=90)
+    c.now.advance(days=90)
     assert get(c).status_code == 401
-    c.now[0] = NOW
+    c.now.set(NOW)
     c.keys.revoke_key(c.u.id, c.key.key.id, 1, confirmed=True)
     assert get(c).status_code == 401
     c.key = c.keys.create_key(c.u.id, "replacement")
@@ -287,7 +287,7 @@ def test_pagination_current_only_and_publication(api):
     assert get(c, "/audit/records").content == first.content
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
     assert get(c, "/audit/records").content == first.content
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     current = get(c, "/audit/records?limit=1")
     assert current.json()["pagination"]["total"] == 2
     assert current.json()["data"][0]["values"]["code"] == "a"
@@ -432,6 +432,7 @@ def test_modified_since_precedence_and_metadata_changes(api):
     assert get(c, "/audit", headers=headers).status_code == 304
     assert get(c, "/audit", headers={**headers, "If-None-Match": '"different"'}).status_code == 200
     assert get(c, "/audit", headers={**headers, "If-Modified-Since": "invalid"}).status_code == 200
+    c.now.advance(seconds=1)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "Updated metadata", "new description")
     updated = get(c, "/audit", headers={**headers, "If-None-Match": first.headers["etag"]})
     assert updated.status_code == 200
@@ -447,7 +448,7 @@ def test_sql_pagination_no_n_plus_one(database_api, monkeypatch):
     for i in range(110):
         c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": f"z{i:03}", "label": "value"})
     publish(c, day=NOW.date() + timedelta(days=1))
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     statements = []
 
     def capture(conn, cursor, statement, parameters, execution_context, executemany):

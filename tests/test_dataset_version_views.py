@@ -30,10 +30,10 @@ def test_history_places_concept_before_scheduled_and_current_versions(context, b
 
     c = context
     configured(c)
-    c.service.clock = lambda: NOW - timedelta(days=2)
+    c.service.clock.set(NOW - timedelta(days=2))
     publish(c, day=NOW.date() - timedelta(days=2))
     for number, day in ((2, NOW.date() - timedelta(days=1)), (3, NOW.date() + timedelta(days=1))):
-        c.service.clock = (lambda: NOW - timedelta(days=1)) if number == 2 else (lambda: NOW)
+        c.service.clock.set(NOW - timedelta(days=1) if number == 2 else NOW)
         c.service.create_concept(c.a.id, c.d.id)
         record = c.s.dataset_records.get_record_for_edit(c.a.id, c.d.key, c.record.id)
         c.s.dataset_records.update_record(
@@ -140,7 +140,7 @@ def test_snapshot_exports_all_formats(context, format_name, expired):
     mutate_concept(c)
     if expired:
         publish(c, day=NOW.date() + timedelta(days=1))
-        c.service.clock = lambda: NOW + timedelta(days=1)
+        c.service.clock.set(NOW + timedelta(days=1))
     c.s.datasets.grant_export_access(c.a.id, c.d.key, "user", c.u.id)
     artifact = c.s.dataset_records.export_dataset(c.u.id, c.d.key, format_name, version_id=first.id)
     assert artifact.download_name == f"{c.d.key}-v1.{format_name}"
@@ -241,7 +241,7 @@ def test_cancel_form_rechecks_activation_and_csrf(context):
     assert request(browser, "post", path, data={"confirmed": "yes"}).status_code == 403
     assert request(browser, "post", path, data={"csrf_token": csrf}).status_code == 400
     assert snapshot(c) == before
-    c.service.clock = lambda: NOW + timedelta(days=1)
+    c.service.clock.set(NOW + timedelta(days=1))
     response = request(browser, "post", path, data={"csrf_token": csrf, "confirmed": "yes"})
     assert response.status_code == 409 and "Only a Scheduled version" in response.text
     assert not [event for event in audits(c) if event.action == "dataset.version_cancelled"]

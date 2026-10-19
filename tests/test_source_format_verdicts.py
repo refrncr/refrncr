@@ -272,7 +272,7 @@ def test_workbook_native_date_verdict_and_text_datetime(native_date_source, wiza
     from flask import render_template
 
     assert len(native_date_source.rows) == 24
-    assert native_date_source.rows[0].source_value(1) == datetime(2026, 4, 3)
+    assert native_date_source.rows[0].source_value(1) == datetime(2026, 4, 3)  # noqa: DTZ001
     columns = DatasetRecordImportService._format_columns(
         native_date_source,
         [
@@ -310,7 +310,7 @@ def test_workbook_native_date_verdict_and_text_datetime(native_date_source, wiza
 def test_native_nonmidnight_datetime_keeps_time_and_failed_date_keeps_error():
     from datetime import datetime
 
-    value = datetime(2026, 4, 3, 12, 34, 56)
+    value = datetime(2026, 4, 3, 12, 34, 56)  # noqa: DTZ001 - Excel's local datetime value
     result = column("datetime", [value])
     assert result["state"] == "clean"
     assert result["examples"][0]["source"] == "2026-04-03T12:34:56"

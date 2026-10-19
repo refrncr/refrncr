@@ -1,7 +1,7 @@
 """Explicit active-concept identity; content remains in the existing working tables."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 DISCARD_UNAVAILABLE = (
     "This Concept contains the Dataset’s first unpublished version. "
@@ -41,15 +41,6 @@ class ActiveConcept:
     start_revision: int
     records_mutated: bool | None = False
     import_result: dict | None = None
-
-    def __post_init__(self):
-        for name in ("created_at", "updated_at"):
-            value = getattr(self, name)
-            object.__setattr__(
-                self,
-                name,
-                value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC),
-            )
 
 
 @dataclass(frozen=True, slots=True)
