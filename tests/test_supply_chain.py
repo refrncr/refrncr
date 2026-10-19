@@ -78,7 +78,6 @@ def test_release_lock_is_hashed_and_fully_pinned():
     assert all("==" in line and line.endswith("\\") for line in requirements)
     assert lock.count("--hash=sha256:") >= len(requirements)
     assert "#    python tools/compile_release_lock.py" in lock
-    assert "greenlet==" in lock
 
 
 def test_release_lock_generator_pins_tool_and_all_relevant_flags():

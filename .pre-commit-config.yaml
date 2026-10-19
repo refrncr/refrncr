@@ -14,7 +14,7 @@ repos:
         exclude: ^src/refrncr/static/js/swagger-ui-bundle\.js$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5
+    rev: v0.17.0
     hooks:
       - id: ruff-check
         args: [--fix]
