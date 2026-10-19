@@ -32,6 +32,14 @@ from refrncr.browser_security import (
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
+from refrncr.change_status import (
+    DISPLAY_STATUSES,
+    RECORD_STATUS_FILTERS,
+    ChangeStatus,
+    change_status,
+    status_badge_variant,
+    status_label,
+)
 from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
@@ -98,15 +106,9 @@ from refrncr.services import (
 )
 from refrncr.version_contracts import mapping_incomplete_message
 
-STATUS_LABELS = {"Removed": "Deleted", "Edited": "Changed"}
-
 
 def merge_error_messages(*messages):
     return " ".join(dict.fromkeys(message for message in messages if message))
-
-
-def status_label(status: str) -> str:
-    return STATUS_LABELS.get(status, status)
 
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
@@ -238,6 +240,10 @@ def create_flask_app(
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
     app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
     app.jinja_env.filters["status_label"] = status_label
+    app.jinja_env.filters["status_badge_variant"] = status_badge_variant
+    app.jinja_env.globals["ChangeStatus"] = ChangeStatus
+    app.jinja_env.globals["DISPLAY_STATUSES"] = DISPLAY_STATUSES
+    app.jinja_env.globals["status_label"] = status_label
 
     @app.template_filter("record_value_text")
     def record_value_text(value, data_type):
@@ -1153,7 +1159,7 @@ def create_flask_app(
             field_states = {
                 change.id: change.status
                 for change in (g.concept_ui.field_changes if concept else ())
-                if change.status != "Added"
+                if change.status != ChangeStatus.ADDED
             }
             may_start_concept = (
                 view.may_maintain
@@ -1370,12 +1376,12 @@ def create_flask_app(
             "backwards", "0"
         ) not in {"0", "1"}:
             raise ValidationError("Choose valid review parameters.")
+        try:
+            statuses = tuple(change_status(value) for value in request.args.getlist("status"))
+        except ValueError:
+            raise ValidationError("Choose valid review parameters.") from None
         criteria = DiffCriteria(
-            tuple(
-                "Changed" if value == "Edited" else value
-                for value in request.args.getlist("status")
-            )
-            or STATUSES,
+            statuses or STATUSES,
             request.args.get("q", ""),
             request.args.get("anchor", ""),
             request.args.get("backwards", "0") == "1",
@@ -2275,9 +2281,7 @@ def create_flask_app(
                 1 if action else requested_page,
                 prefer_concept=concept,
                 search=parameters.get("q", ""),
-                statuses=(selected_statuses or ("Added", "Changed", "Deleted"))
-                if import_results
-                else (),
+                statuses=(selected_statuses or DISPLAY_STATUSES) if import_results else (),
                 record_status=record_status,
             )
             criteria_parameters = {
@@ -2376,11 +2380,11 @@ def create_flask_app(
                 **criteria_parameters,
             )
 
-        change_order = ("added", "edited", "deleted")
+        change_order = tuple(RECORD_STATUS_FILTERS)
         selected_changes = set() if record_status == "all" else set(record_status.split(","))
         record_change_options = []
         for label, value, count in zip(
-            ("Added", "Changed", "Deleted"),
+            DISPLAY_STATUSES,
             change_order,
             view.status_counts,
             strict=True,

@@ -3,6 +3,7 @@
 from bisect import bisect_left
 from dataclasses import fields as dataclass_fields
 
+from refrncr.change_status import ChangeStatus
 from refrncr.datatypes import get_datatype
 from refrncr.diff_contracts import STATUSES, FieldChange, PropertyChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
@@ -110,7 +111,11 @@ def classify_fields(current, previous):
                 FieldChange(
                     identity,
                     (after or before).name,
-                    "Added" if before is None else "Removed" if after is None else "Changed",
+                    ChangeStatus.ADDED
+                    if before is None
+                    else ChangeStatus.REMOVED
+                    if after is None
+                    else ChangeStatus.CHANGED,
                     tuple(properties),
                     identity in moved,
                     bool(before and after and before.data_type != after.data_type),
@@ -213,7 +218,11 @@ def classify_hierarchy(current, previous, current_fields, previous_fields):
                 FieldChange(
                     identity,
                     new_paths.get(identity) or old_paths[identity],
-                    "Added" if before is None else "Removed" if after is None else "Changed",
+                    ChangeStatus.ADDED
+                    if before is None
+                    else ChangeStatus.REMOVED
+                    if after is None
+                    else ChangeStatus.CHANGED,
                     tuple(properties),
                     bool(before and after and before.parent_id != after.parent_id),
                 )

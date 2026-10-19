@@ -223,8 +223,8 @@ restore the matching pre-upgrade backup if rollback is required.
 
 ## Record system Status and Deleted rows
 
-Status uses the same REF-83/84 classifier: Changed remains Changed, Removed displays as Deleted,
-Added remains Added, and a surviving unchanged Record is Published. Published snapshot
+Status uses the shared change-status mapping: Changed remains Changed, the persisted Removed
+value displays as Deleted, Added remains Added, and a surviving unchanged Record is Published. Published snapshot
 pages show Published. There is no Complete/Incomplete system badge; existing publication
 validation still applies. Configure Field badges retain their existing classifier.
 

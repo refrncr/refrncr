@@ -278,7 +278,7 @@ also rejects direct catalog bypass in the version service module.
 The product owner approved `dataset.version_diff_viewed` on 2026-09-11 as an
 explicit exception to REF-149's ordinary-read exclusion. Opening a new valid
 concept review emits exactly one event on the stable Dataset ID with its trusted
-actor, baseline version number, concept revision and six Added/Changed/Removed
+actor, baseline version number, concept revision and six Added/Changed/Deleted
 Field/Record counts. All eight context values are bounded integers. No names,
 identifiers, descriptions, definitions, values, search terms or request tokens
 are stored. This does not change the policy for ordinary reads or REF-39 history.
@@ -333,7 +333,7 @@ Rollback/stale/concurrent failures preserve previous proposals and audit exactly
 
 `DatasetVersionService.discard_concept` writes exactly one `dataset.concept_discarded`
 event on the Dataset UUID, using the trusted actor. Context consists of Concept UUID,
-metadata-change count and the existing six Field/Record Added/Changed/Removed counts.
+metadata-change count and the existing six Field/Record Added/Changed/Deleted counts.
 All counts use the bounded `version_count` contract; there are no names, descriptions,
 Record values or source data. Working-state deletion, metadata restoration and this
 event commit or roll back together. Denied, no-Current, stale, duplicate and failed

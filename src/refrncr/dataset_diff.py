@@ -5,6 +5,7 @@ from heapq import nlargest, nsmallest
 from unicodedata import normalize
 
 from refrncr.audit import record_audit
+from refrncr.change_status import ChangeStatus
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.diff_contracts import (
@@ -284,7 +285,7 @@ class DatasetDiffService:
             new, new_sort = cls._identifier(row.after_identifier, current)
         return RecordChange(
             row.id,
-            row.status,
+            ChangeStatus(row.status),
             old,
             new,
             row.changed_values,
