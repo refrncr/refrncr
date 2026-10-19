@@ -739,6 +739,39 @@ def test_import_rejects_stored_record_with_missing_identifier_component(request,
             tuple(services.record_imports._differences(work, dataset.id, ()))
 
 
+def test_import_rejects_oversized_stored_identifier_component(import_context):
+    factory, services, admin, dataset = import_context
+    services.dataset_fields.create_field(
+        admin.id, dataset.key, "extra", "Extra", "string", is_required=True
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code", "extra"))
+    services.dataset_records.create_record(
+        admin.id, dataset.key, {"code": "A", "amount": "1", "extra": "B"}
+    )
+    with factory() as session:
+        rows = session.scalars(
+            select(DatasetRecordValue)
+            .join(DatasetRecord, DatasetRecord.id == DatasetRecordValue.record_id)
+            .join(DatasetField, DatasetField.id == DatasetRecordValue.field_id)
+            .where(
+                DatasetRecord.dataset_id == dataset.id,
+                DatasetField.key.in_(("code", "extra")),
+            )
+        ).all()
+        assert len(rows) == 2
+        for row in rows:
+            row.canonical_value_key = b"s" + b"x" * 999
+            row.string_value = "x" * 999
+        session.commit()
+
+    with pytest.raises(
+        ImportValidationError,
+        match="^Stored Record identifiers are inconsistent\\. Import unavailable\\.$",
+    ):
+        with services.datasets.uow() as work:
+            tuple(services.record_imports._differences(work, dataset.id, ()))
+
+
 def test_manual_mapping_and_ignored_choice_survive_validation_errors(import_context):
     _, services, admin, dataset = import_context
     state, _, assistance = services.record_imports.begin(

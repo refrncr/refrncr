@@ -19,7 +19,7 @@ class RecordIdentifierError(ValidationError):
 
     def __init__(self, reason: str = "incomplete") -> None:
         if reason not in RECORD_IDENTIFIER_MESSAGES:
-            reason = "incomplete"
+            raise ValueError(f"Unknown Record identifier error reason: {reason}")
         self.reason = reason
         self.code = reason
         super().__init__(RECORD_IDENTIFIER_MESSAGES[reason])

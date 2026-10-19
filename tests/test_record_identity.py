@@ -44,6 +44,11 @@ def test_missing_expected_component_uses_the_shared_error():
         encode_record_identifier({"id": b"x"}, expected_keys=("id", "type"))
 
 
+def test_unknown_error_reason_is_rejected():
+    with pytest.raises(ValueError, match="Unknown Record identifier error reason: other"):
+        RecordIdentifierError("other")
+
+
 @pytest.mark.parametrize("encoded", [b"", b"\x00", b"\x00\x00\x00\x02x"])
 def test_malformed_identifier_uses_the_shared_error(encoded):
     with pytest.raises(RecordIdentifierError):
