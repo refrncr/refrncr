@@ -413,7 +413,7 @@ def _hierarchy_reporting_rows(fields, nodes):
             len(path),
             node.id not in parent_ids,
             sort_order,
-            hierarchy_path_label(item.name for item in path),
+            "/".join(item.name for item in path),
             *[item.name for item in filled_path],
         ]
         row.extend(

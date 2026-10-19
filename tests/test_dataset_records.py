@@ -753,7 +753,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
     legacy_delete_url = f"/datasets/{dataset.key}/records/{legacy_delete.id}/delete"
     legacy_confirmation = client.get(legacy_delete_url, base_url="https://localhost")
     assert legacy_confirmation.status_code == 200
-    assert "Record identifier: this record" in legacy_confirmation.get_data(as_text=True)
+    assert "You are about to delete this record." in legacy_confirmation.get_data(as_text=True)
     assert (
         client.post(
             legacy_delete_url,

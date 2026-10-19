@@ -44,7 +44,7 @@
     ) }}
     {{ team_choice(teams, owner_team_id) }}
     <fieldset class='form-field'>
-      <legend>Dataset type</legend>
+      <legend>Type</legend>
       <label><input type='radio' name='kind' value='reference'{% if table_kind == 'reference' %} checked{% endif %}> Reference dataset</label>
       <label><input type='radio' name='kind' value='mapping'{% if table_kind == 'mapping' %} checked{% endif %}> Mapping dataset</label>
       <label><input type='radio' name='kind' value='hierarchy'{% if table_kind == 'hierarchy' %} checked{% endif %}> Hierarchy dataset</label>

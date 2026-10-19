@@ -1269,7 +1269,8 @@ class DatasetService:
                 uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
             ):
                 raise ValidationError(
-                    "Dataset key can only be changed before the first version is published."
+                    "Dataset key can only be changed before the first version is published.",
+                    field="key",
                 )
             metadata_changed = (
                 dataset.name != normalized_name or dataset.description != validated_description

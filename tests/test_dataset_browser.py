@@ -102,7 +102,7 @@ def test_dataset_navigation_filters_reference_and_mapping_datasets(dataset_brows
 
     reference_form = body(request(client, "get", "/datasets/new?kind=reference"))
     mapping_form = body(request(client, "get", "/datasets/new?kind=mapping"))
-    assert "Dataset type" in reference_form
+    assert "Type" in reference_form and "Dataset type" not in reference_form
     assert "Reference dataset" in reference_form
     assert "Mapping dataset" in reference_form
     assert "Hierarchy dataset" in reference_form
@@ -1553,7 +1553,7 @@ def test_dataset_detail_field_empty_state_order_values_and_admin_controls(datase
     login(client)
 
     empty_page = body(request(client, "get", "/datasets/schema/concept"))
-    assert "<dt>Dataset type</dt><dd>Reference</dd>" in empty_page
+    assert "<dt>Type</dt><dd>Reference</dd>" in empty_page
     assert "Reference table" not in empty_page
     assert "Table type" not in empty_page
     assert "<h2 id='fields-heading'>Fields</h2>" in empty_page

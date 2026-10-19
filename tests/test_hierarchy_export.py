@@ -247,7 +247,7 @@ def test_reporting_csv_contains_every_node_in_tree_order_with_fill_down_and_safe
     assert rows[1][6:10] == ["1", "false", "1", "'=Executive"]
     assert rows[1][10:13] == ["'=Executive", "'=Executive", "'=Executive"]
     assert rows[2][4] == ""  # Leaves-only values stored on a branch remain inactive.
-    assert rows[2][6:10] == ["2", "false", "2", "'=Executive / Commercial"]
+    assert rows[2][6:10] == ["2", "false", "2", "'=Executive/Commercial"]
     assert rows[2][10:13] == ["'=Executive", "Commercial", "Commercial"]
     assert rows[2][13::2] == ["Global", "EU", "EU"]
     assert rows[3][1] == 'West, "quoted"\nline'

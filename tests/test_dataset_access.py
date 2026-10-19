@@ -11,7 +11,12 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, Dataset, User
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.services import AuthorizationError, NotFoundError, ResourceTypeRegistry
+from refrncr.services import (
+    AuthorizationError,
+    NotFoundError,
+    ResourceTypeRegistry,
+    ValidationError,
+)
 
 
 @pytest.fixture
@@ -305,7 +310,7 @@ def test_technical_name_is_editable_only_before_first_publication(dataset_access
     publish_dataset(services, admin.id, renamed)
     services.dataset_versions.create_concept(admin.id, renamed.id)
     assert not services.datasets.get_dataset_configuration(admin.id, "corrected-key").may_edit_key
-    with pytest.raises(ValueError, match="before the first version"):
+    with pytest.raises(ValidationError, match="before the first version") as error:
         services.datasets.update_dataset(
             admin.id,
             "corrected-key",
@@ -313,6 +318,7 @@ def test_technical_name_is_editable_only_before_first_publication(dataset_access
             renamed.description,
             new_key="too-late",
         )
+    assert error.value.field == "key"
 
 
 def test_audit_failure_rolls_back_metadata_update(dataset_access, monkeypatch):

@@ -31,6 +31,8 @@ def test_change_status_has_one_visible_label_and_badge_mapping():
     assert STATUS_PRESENTATION[ChangeStatus.REMOVED].label == "Deleted"
     assert status_badge_variant("Current") == "badge-published"
     assert status_badge_variant("Scheduled") == "badge-info"
+    assert status_badge_variant("Expired") == ""
+    assert status_badge_variant("Cancelled") == "badge-warning"
     assert status_badge_variant("Draft") == "badge-draft"
     assert status_badge_variant("Stale") == "badge-removed"
     assert status_badge_variant("Error") == "badge-error"

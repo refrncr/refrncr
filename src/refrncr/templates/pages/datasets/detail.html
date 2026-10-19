@@ -63,7 +63,7 @@
           <dl class='detail-list'>
             <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
             <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Draft is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
-            <div><dt>Dataset type</dt><dd>{{ dataset.kind|dataset_kind_label }}</dd></div>
+            <div><dt>Type</dt><dd>{{ dataset.kind|dataset_kind_label }}</dd></div>
             <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
           </dl>
         </div>

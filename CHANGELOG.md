@@ -4,6 +4,7 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Use “dataset” terminology and “Type” labels consistently; return hierarchy API nodes in a fixed order.
 - Centralize change statuses in a domain enum and map them to the Added/Changed/Deleted UI labels.
 - Give incomplete and oversized Record identifiers distinct, actionable validation messages.
 - Build the return address after sign-in from the application root, so the redirect can never
