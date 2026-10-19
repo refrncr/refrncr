@@ -30,6 +30,7 @@ from sqlalchemy.orm import Mapped, column_property, mapped_column
 
 from refrncr.datatypes import DATASET_FIELD_TYPES
 from refrncr.db.base import Base
+from refrncr.record_identity import MAX_RECORD_IDENTIFIER_BYTES
 
 
 def new_id() -> str:
@@ -396,7 +397,7 @@ class DatasetRecord(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
-    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(MAX_RECORD_IDENTIFIER_BYTES))
     deleted_content: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
     revision: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -628,13 +629,16 @@ class DatasetVersionRecord(Base):
     __tablename__ = "dataset_version_records"
     __table_args__ = (
         UniqueConstraint("version_id", "identifier_key", name="uq_version_records_identifier"),
-        CheckConstraint("length(identifier_key) BETWEEN 1 AND 2000", name="ck_version_records_key"),
+        CheckConstraint(
+            f"length(identifier_key) BETWEEN 1 AND {MAX_RECORD_IDENTIFIER_BYTES}",
+            name="ck_version_records_key",
+        ),
     )
     version_id: Mapped[str] = mapped_column(
         ForeignKey("dataset_versions.id", ondelete="CASCADE"), primary_key=True
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(2000))
+    identifier_key: Mapped[bytes] = mapped_column(LargeBinary(MAX_RECORD_IDENTIFIER_BYTES))
 
 
 class DatasetVersionValue(Base):

@@ -24,6 +24,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 from refrncr.audit import record_audit
 from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.ports import PersistenceConflictError
+from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     MAX_RECORD_REVISION,
     DatasetFieldService,
@@ -2139,12 +2140,12 @@ class DatasetRecordImportService:
         for record in uow.dataset_records.iterate_all(dataset_id):
             by_key = {v.field_key: v for v in record.values}
             try:
-                parts = [by_key[key].canonical_key for key in identifier.field_keys]
-            except KeyError:
-                raise ImportValidationError(
-                    "A stored Record has an incomplete identifier."
-                ) from None
-            encoded = b"".join(len(part).to_bytes(4, "big") + part for part in parts)
+                encoded = encode_record_identifier(
+                    {key: by_key.get(key).canonical_key for key in identifier.field_keys},
+                    expected_keys=identifier.field_keys,
+                )
+            except AttributeError:
+                raise RecordIdentifierError from None
             if encoded in seen or stored_keys.get(record.id) != encoded:
                 raise ImportValidationError(
                     "Stored Record identifiers are inconsistent. Import unavailable."

@@ -14,6 +14,7 @@ from refrncr.models import (
     DatasetVersionRecord,
     DatasetVersionValue,
 )
+from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 
 
 class SqlAlchemyDiffOperations:
@@ -317,9 +318,9 @@ class SqlAlchemyDiffOperations:
             for record in expected:
                 by_key = {value.field_key: value.canonical_key for value in record.values}
                 expected_identifiers[record.id] = (
-                    b"".join(
-                        len(by_key[key]).to_bytes(4, "big") + by_key[key]
-                        for key in identifier.field_keys
+                    encode_record_identifier(
+                        {key: by_key.get(key) for key in identifier.field_keys},
+                        expected_keys=identifier.field_keys,
                     )
                     if identifier.field_keys
                     else b"hierarchy:" + record.id.encode()
@@ -433,11 +434,14 @@ class SqlAlchemyDiffOperations:
         record_id, encoded, components, count = None, None, [], 0
 
         def valid_identifier():
-            return tuple(
-                key for key, _value in components
-            ) == identifier_fields and encoded == b"".join(
-                len(value).to_bytes(4, "big") + value for _key, value in components
-            )
+            if tuple(key for key, _value in components) != identifier_fields:
+                return False
+            try:
+                return encoded == encode_record_identifier(
+                    components, expected_keys=identifier_fields
+                )
+            except RecordIdentifierError:
+                return False
 
         for (
             identity,
@@ -466,8 +470,6 @@ class SqlAlchemyDiffOperations:
                     raise DatatypeError("Invalid stored canonical value", "invalid_storage")
                 if is_identifier:
                     components.append((field_key, key))
-                    if sum(len(value) + 4 for _field, value in components) > 2000:
-                        return False
         return (expected_count is None or count == expected_count) and (
             record_id is None or valid_identifier()
         )

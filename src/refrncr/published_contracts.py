@@ -9,6 +9,11 @@ from datetime import datetime
 from refrncr.datatypes import DATATYPES, DatatypeError
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import StoredRecord
+from refrncr.record_identity import (
+    MAX_RECORD_IDENTIFIER_BYTES,
+    decode_record_identifier,
+    encode_record_identifier,
+)
 from refrncr.version_contracts import PublishedVersion, SnapshotField
 
 
@@ -26,15 +31,10 @@ def decode_identifier(identifier: str) -> bytes:
         key = base64.b64decode(
             identifier + "=" * (-len(identifier) % 4), altchars=b"-_", validate=True
         )
-        if len(key) > 2000 or encode_identifier(key) != identifier:
+        if len(key) > MAX_RECORD_IDENTIFIER_BYTES or encode_identifier(key) != identifier:
             raise ValueError
-        remaining = key
-        while remaining:
-            if len(remaining) < 5:
-                raise ValueError
-            length = int.from_bytes(remaining[:4], "big")
-            component, remaining = remaining[4 : 4 + length], remaining[4 + length :]
-            if length < 2 or len(component) != length:
+        for component in decode_record_identifier(key):
+            if len(component) < 2:
                 raise ValueError
             datatype = next(d for d in DATATYPES.values() if d.key_prefix == component[:1])
             if not datatype.identifier_eligible:
@@ -48,10 +48,9 @@ def decode_identifier(identifier: str) -> bytes:
 def record_identifier(record, fields):
     values = {value.field_key: value.canonical_key for value in record.values}
     return encode_identifier(
-        b"".join(
-            len(values[f.key]).to_bytes(4, "big") + values[f.key]
-            for f in sorted(fields, key=lambda f: f.key)
-            if f.is_identifier
+        encode_record_identifier(
+            {field.key: values.get(field.key) for field in fields if field.is_identifier},
+            expected_keys=(field.key for field in fields if field.is_identifier),
         )
     )
 

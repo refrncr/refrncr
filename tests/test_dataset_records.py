@@ -16,6 +16,7 @@ from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue, utc_now
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.record_identity import decode_record_identifier
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,
@@ -102,7 +103,13 @@ def test_create_normalized_record_values_identifier_and_audit(record_services):
                 select(DatasetRecordValue).where(DatasetRecordValue.record_id == record.id)
             )
         )
-        assert persisted.identifier_key.startswith(len(b"n1").to_bytes(4, "big") + b"n1")
+        assert decode_record_identifier(persisted.identifier_key) == tuple(
+            value.canonical_key
+            for value in sorted(
+                (value for value in record.values if value.field_key in {"code", "amount"}),
+                key=lambda value: value.field_key,
+            )
+        )
         assert persisted.revision == 1
         assert len(values) == 4
         assert {value.field_id for value in values} == set(fields[field].id for field in fields)

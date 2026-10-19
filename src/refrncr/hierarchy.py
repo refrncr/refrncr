@@ -6,6 +6,7 @@ from refrncr.audit import record_audit
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import RecordValue, StoredRecord
+from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     DatasetFieldService,
     NotFoundError,
@@ -165,9 +166,14 @@ def hierarchy_validation_errors(
         if keys and node.parent_id is not None and node.id not in parents:
             if any(key not in by_key or by_key[key].id not in values for key in keys):
                 continue  # Required-field errors provide the actionable missing components.
-            marker = tuple(values[by_key[key].id].canonical_key for key in sorted(keys))
-            if sum(4 + len(component) for component in marker) > 2000:
-                errors.append(f"{label}: Record identifier exceeds 2000 UTF-8 bytes")
+            ordered_keys = tuple(sorted(keys))
+            marker = tuple(values[by_key[key].id].canonical_key for key in ordered_keys)
+            try:
+                encode_record_identifier(
+                    dict(zip(ordered_keys, marker, strict=True)), expected_keys=ordered_keys
+                )
+            except RecordIdentifierError as error:
+                errors.append(f"{label}: {error}")
             if marker in seen_identifiers:
                 errors.append(
                     f"{label}: Record identifier must be unique among leaves; also used by "
@@ -366,11 +372,12 @@ class HierarchyService:
         ):
             by_key = {value.field_key: value.canonical_key for value in values}
             marker = tuple(by_key.get(key) for key in identifier.field_keys)
-            if (
-                any(component is None for component in marker)
-                or sum(4 + len(component) for component in marker) > 2000
-            ):
-                raise ValidationError("Record identifier must be complete and at most 2000 bytes")
+            if any(component is None for component in marker):
+                raise RecordIdentifierError
+            encode_record_identifier(
+                dict(zip(identifier.field_keys, marker, strict=True)),
+                expected_keys=identifier.field_keys,
+            )
             for other in candidate_nodes:
                 if other.id == target_node.id or other.parent_id is None or other.id in parent_ids:
                     continue
