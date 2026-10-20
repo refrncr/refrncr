@@ -1,7 +1,8 @@
 # ADR-016: complete Record imports and retained deletions
 
-Status: proposed for REF-160 review. Migration compatibility decisions approved by the
-product owner on 13 September 2026. Extends ADR-014/015 and REF-155/159.
+Status: accepted. Migration compatibility decisions approved by the product owner on
+13 September 2026. Never-published Dataset exception approved in REF-276. Extends
+ADR-014/015 and REF-155/159.
 
 ## Context
 
@@ -23,8 +24,13 @@ programmatic callers; no product entry point selects it. Stored mode/audit ident
 remain stable. This UX consolidation adds no schema migration or dependency.
 
 Every active Field still needs mapping, and confirmation is bound to the full difference.
-One completed import or any Record mutation blocks another import in the same Concept,
-including a first import into an empty table. Published versions remain immutable.
+For a Concept with at least one non-cancelled version, one completed import or any Record
+mutation blocks another import in the same Concept, including a first import into an empty
+table. For a new Concept on a Dataset with no non-cancelled version, Record mutations and
+completed imports do not block later imports: each preview compares against the current Draft,
+and confirmation replaces the prior import result. A legacy Concept whose `records_mutated`
+marker is null remains ineligible because its history cannot be verified. Eligibility is checked
+again under the Dataset lock at confirmation. Published versions remain immutable.
 
 Keep the existing Record identity, ports, Unit of Work, canonical values, snapshots and
 system-status presentation. Add three nullable storage columns in Alembic 0018:

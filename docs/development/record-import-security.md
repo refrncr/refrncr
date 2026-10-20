@@ -338,10 +338,14 @@ once; identifiers must be complete and non-null. Extra columns require explicit 
 An empty file cannot mark every Record Deleted. Existing source formats, Date/Time
 composition, archive limits, TTL and full-file validation apply unchanged.
 
-One server-side eligibility rule guards the action, upload, preview and confirmation.
-Record mutations (including edit/revert, Undo and create-only import) and a completed
-new-version import block further attempts. Field-only changes preserve eligibility.
-Every migrated Concept has unknown mutation history and is deliberately ineligible:
+One server-side eligibility rule guards the action, upload, preview and confirmation. For a
+Dataset with at least one non-cancelled version, Record mutations (including edit/revert, Undo
+and create-only import) and a completed new-version import block further attempts. Field-only
+changes preserve eligibility. A new Concept on a Dataset with no non-cancelled version remains
+eligible after Record mutations and completed imports; every preview compares the file with the
+current Draft, and confirmation replaces the previous import result. Confirmation rechecks the
+same rule under the Dataset lock. Every migrated Concept has unknown mutation history and is
+deliberately ineligible, even when its Dataset has no non-cancelled version:
 
 > **Import unavailable**
 > This Concept was created before new-version imports were introduced, so REFRNCR cannot

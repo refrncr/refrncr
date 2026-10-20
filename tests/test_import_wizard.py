@@ -84,8 +84,9 @@ def test_four_steps_confirm_on_preview_and_replay(wizard):
         ).status_code
         == 404
     )
-    assert wizard.get(wizard.root).status_code == 400
-    assert "Import already completed" in wizard.get(wizard.root).text
+    another_import = wizard.get(wizard.root)
+    assert another_import.status_code == 200
+    assert "Import records</h1>" in another_import.text
 
 
 @pytest.mark.parametrize("sheets", [("Only",), ("First", "Second")])
@@ -369,9 +370,9 @@ def test_conflict_after_preview_requires_new_validation(wizard):
         wizard.admin.id, wizard.dataset.key, {"code": "A", "amount": "1"}
     )
     failed = wizard.post(wizard.path + "/confirm")
-    assert failed.status_code == 400
-    assert "Records in this Draft have already been changed" in failed.text
-    assert wizard.post(wizard.path + "/confirm").status_code == 400
+    assert failed.status_code == 409
+    assert "No records have been imported" in failed.text
+    assert wizard.post(wizard.path + "/confirm").status_code == 409
     assert wizard.count() == 1
 
 

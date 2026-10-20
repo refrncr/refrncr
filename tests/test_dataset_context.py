@@ -276,11 +276,11 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):
         "/datasets/context/records/import",
     ):
         if path.endswith("/import"):
-            blocked = request(client, "get", path)
-            assert blocked.status_code == 400
-            assert "Records in this Draft have already been changed" in body(blocked)
-            publish_dataset(services, admin.id, dataset)
-            services.dataset_versions.create_concept(admin.id, dataset.id)
+            available = request(client, "get", path)
+            assert available.status_code == 200
+            assert "you can import again after changing Records or importing once" in body(
+                available
+            )
         response = request(client, "get", path)
         assert response.status_code == 200
         html = body(response)

@@ -999,13 +999,7 @@ class DatasetRecordImportService:
             return _require_concept(uow, dataset_id)
 
     @staticmethod
-    def _eligibility(concept):
-        if concept.import_result is not None:
-            return (
-                "Import already completed",
-                "A new version has already been imported into this Draft. "
-                "Review and publish or discard this Draft before starting another import.",
-            )
+    def _eligibility(concept, has_non_cancelled_version):
         if concept.records_mutated is None:
             return (
                 "Import unavailable",
@@ -1013,6 +1007,14 @@ class DatasetRecordImportService:
                 "so REFRNCR cannot reliably verify that its Records are unchanged. "
                 "Publish or discard this Draft, then create a new Draft "
                 "to import a new version.",
+            )
+        if not has_non_cancelled_version:
+            return None
+        if concept.import_result is not None:
+            return (
+                "Import already completed",
+                "A new version has already been imported into this Draft. "
+                "Review and publish or discard this Draft before starting another import.",
             )
         if concept.records_mutated:
             return (
@@ -1025,10 +1027,22 @@ class DatasetRecordImportService:
 
     def eligibility(self, actor_id, dataset_key):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        return self._eligibility(self._concept(dataset.id))
+        with self.uow() as uow:
+            concept = uow.concepts.get(dataset.id)
+            has_non_cancelled_version = uow.versions.latest_non_cancelled(dataset.id) is not None
+        return self._eligibility(concept, has_non_cancelled_version)
 
-    def _require_eligible(self, concept):
-        reason = self._eligibility(concept)
+    def _require_eligible(self, concept, *, uow=None):
+        if uow is None:
+            with self.uow() as read_uow:
+                has_non_cancelled_version = (
+                    read_uow.versions.latest_non_cancelled(concept.dataset_id) is not None
+                )
+        else:
+            has_non_cancelled_version = (
+                uow.versions.latest_non_cancelled(concept.dataset_id) is not None
+            )
+        reason = self._eligibility(concept, has_non_cancelled_version)
         if reason:
             raise ImportValidationError(". ".join(reason))
 
@@ -1036,11 +1050,11 @@ class DatasetRecordImportService:
         state = self.store.get(token, actor_id, session_id, dataset_id)
         with self.uow() as uow:
             concept = uow.concepts.get(dataset_id)
-        if concept is None or state.concept_id != concept.id:
-            self.store.revoke_concept(state.concept_id)
-            raise NotFoundError("Import not found")
-        if state.mode == "new_version" and state.imported_count is None:
-            self._require_eligible(concept)
+            if concept is None or state.concept_id != concept.id:
+                self.store.revoke_concept(state.concept_id)
+                raise NotFoundError("Import not found")
+            if state.mode == "new_version" and state.imported_count is None:
+                self._require_eligible(concept, uow=uow)
         return state
 
     def active(self, actor_id, session_id, dataset_key):
@@ -1536,7 +1550,7 @@ class DatasetRecordImportService:
                 if concept is None or concept.id != state.concept_id:
                     raise NotFoundError("Import not found")
                 if state.mode == "new_version":
-                    self._require_eligible(concept)
+                    self._require_eligible(concept, uow=uow)
                 source = parse_source(state.filename, state.content, state.worksheet)
                 preview, validated = self._validate_in_uow(
                     uow,
@@ -1776,7 +1790,7 @@ class DatasetRecordImportService:
     ):
         concept = uow.concepts.get(dataset_id)
         if mode == "new_version":
-            self._require_eligible(concept)
+            self._require_eligible(concept, uow=uow)
         fields = uow.dataset_fields.list_for_dataset(dataset_id)
         identifier = uow.dataset_business_keys.get(dataset_id)
         field_by_key = {field.key: field for field in fields}
