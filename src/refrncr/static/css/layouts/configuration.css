@@ -30,10 +30,11 @@
 .configuration-table .field-actions { justify-content: flex-end; flex-wrap: nowrap; }
 .configuration-table .field-actions .button-icon { margin: 0; }
 .field-identity .field-key { display: block; margin-top: .125rem; padding: 0; background: none; font-size: var(--font-size-xs); }
+.field-identity .field-version-details { display: inline-flex; align-items: baseline; gap: var(--space-xs); width: auto; }
+.field-identity .field-version-details .row-action-label { display: inline; }
 .field-identity .badge { margin-inline-start: var(--space-xs); }
 .mapping-property-list { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 .field-type { color: var(--color-text-secondary); font-family: var(--font-technical); font-size: var(--font-size-xs); }
-.field-position { color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
 .field-empty { color: var(--color-control-border); }
 .badge.badge-identifier { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
 .section-count { margin-inline-start: var(--space-xs); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); letter-spacing: 0; }

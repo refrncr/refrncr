@@ -119,7 +119,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "role='region' aria-label='Dataset fields' tabindex='0'" in field_section
     assert re.findall(
         r"<th scope='col'[^>]*>(?:<span[^>]*>)?(.*?)(?:</span>)?</th>", field_section
-    ) == ["Field order", "Field", "Type", "Constraints"] + (
+    ) == ([] if permission == "viewer" else ["Field order"]) + ["Field", "Type", "Constraints"] + (
         [] if permission == "viewer" else ["Actions"]
     )
     assert "<span class='badge'>Required</span>" in field_section
@@ -136,20 +136,30 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     )
     rows = re.findall(r"<tr[^>]*>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
+    assert field_section.count("data-row-action class='interactive-row'") == (
+        count if permission == "viewer" else 0
+    )
+    assert field_section.count("data-row-primary") == (count if permission == "viewer" else 0)
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
         if permission == "viewer":
             assert (
-                "<a class='row-action field-version-details'" in row
+                "<a class='row-action field-version-details' data-row-primary" in row
                 and f"<span class='field-name row-action-label'>{field.name}</span>" in row
             )
         else:
             assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
         assert f"<code class='field-key'>{field.key}</code></td>" in row
-        order_cell, indicator = row.split("</td>")[:2]
-        assert "key-icon" not in order_cell
+        cells = row.split("</td>")
+        order_cell, indicator = (cells[0], cells[1]) if permission != "viewer" else ("", row)
+        if permission != "viewer":
+            assert "key-icon" not in order_cell
         if index != 1:
             if permission == "viewer":
-                assert f"{field.name}</span></a> <svg" in indicator
+                assert f"{field.name}</span> <svg" in indicator
+                primary_link = row.split("<a class='row-action field-version-details", 1)[1].split(
+                    "</a>", 1
+                )[0]
+                assert '<svg class="key-icon"' in primary_link
             else:
                 assert f"{field.name}</span> <svg" in indicator
             assert '<svg class="key-icon"' in indicator
@@ -171,7 +181,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert f"aria-label='Reorder {field.name}'" in order_cell
         else:
             assert "<form" not in row and "<button" not in row and "Edit field" not in row
-            assert f"<span class='field-position'>{index + 1}</span>" in order_cell
+            assert "field-position" not in row and "field-order-column" not in row
     if count == 3:
         assert "None" in rows[1] and "Identifier</span>" not in rows[1]
         assert field_section.index("First field") < field_section.index("Last field")
