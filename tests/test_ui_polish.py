@@ -792,16 +792,58 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "field-authority", "Fields")
     s.dataset_fields.create_field(
-        a.id, d.key, "code", "Published field", "string", True, True, True
+        a.id,
+        d.key,
+        "code",
+        "Published field",
+        "string",
+        True,
+        True,
+        True,
+        definition="Field explanation",
+        unit="EUR",
     )
-    publish_dataset(s, a.id, d)
+    version = publish_dataset(s, a.id, d)
     s.dataset_versions.create_concept(a.id, d.id)
+    s.dataset_fields.update_field(
+        a.id,
+        d.key,
+        "code",
+        "Draft field",
+        "string",
+        True,
+        True,
+        definition="Draft explanation",
+        unit="USD",
+    )
     s.dataset_fields.create_field(a.id, d.key, "private", "Private concept field", "string")
     user = s.users.create_user(a.id, "fields-reader@example.com", "Reader", "valid password")
     login(client, user.email, "valid password")
     html = body(request(client, "get", f"/datasets/{d.key}/configure"))
     assert "Published field" in html and "Current · Version 1 · Read only" in html
     assert "Private concept field" not in html
+
+    published_page = body(request(client, "get", f"/datasets/{d.key}/versions/{version.id}"))
+    fields = published_page.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
+    assert "field-version-details" in fields
+    assert f"/datasets/{d.key}/versions/{version.id}/fields/" in fields
+    assert "id='configuration-panel'" in published_page
+    field = s.dataset_versions.read(user.id, d.key, version.id, page=None).fields[0]
+    panel_response = request(
+        client,
+        "get",
+        f"/datasets/{d.key}/versions/{version.id}/fields/{field.id}",
+    )
+    assert panel_response.status_code == 200
+    panel_page = body(panel_response)
+    assert "Published field" in panel_page
+    assert "Field explanation" in panel_page and "EUR" in panel_page
+    assert "Part of record identifier" in panel_page
+    assert "Required" in panel_page and "Unique" in panel_page
+    assert "field-edit-form" not in panel_page and "field-delete-form" not in panel_page
+    assert "Save field" not in panel_page and "Delete field" not in panel_page
+    assert "Draft field" not in panel_page and "Draft explanation" not in panel_page
+    assert "Private concept field" not in panel_page
 
 
 def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):

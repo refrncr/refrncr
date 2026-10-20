@@ -1126,6 +1126,25 @@ def create_flask_app(
             key, standalone=True, edit_mode=request.args.get("edit") == "1"
         )
 
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>/fields/<field_id>",
+        capability="can_view_dataset",
+        methods=["GET"],
+    )
+    @version_errors
+    def dataset_version_field_detail(key, version_id, field_id):
+        actor, _login_session = require_authenticated()
+        view = dataset_versions.read(actor.id, key, version_id, page=None)
+        field = next((item for item in view.fields if item.id == field_id), None)
+        if field is None:
+            abort(404)
+        return render_authenticated_template(
+            "pages/datasets/fields/read.html",
+            dataset=view.context.dataset,
+            field=field,
+            version_state=view.state,
+        )
+
     def render_dataset_configuration(
         key,
         *,
