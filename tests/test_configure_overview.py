@@ -107,7 +107,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
     assert "<h2 id='fields-heading'>Fields</h2>" in field_section
     assert ("Add field" in field_section) == (permission != "viewer")
-    assert ("configuration-panel" in page) == (permission != "viewer")
+    assert ("configuration-panel" in page) == (version is not None or permission != "viewer")
     assert "record-identifier-heading" not in page
     assert "No record identifier configured" not in page
     if not count:
@@ -137,12 +137,21 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     rows = re.findall(r"<tr[^>]*>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
-        assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
+        if permission == "viewer":
+            assert (
+                "<a class='row-action field-version-details'" in row
+                and f"<span class='field-name row-action-label'>{field.name}</span>" in row
+            )
+        else:
+            assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
         assert f"<code class='field-key'>{field.key}</code></td>" in row
         order_cell, indicator = row.split("</td>")[:2]
         assert "key-icon" not in order_cell
         if index != 1:
-            assert f"{field.name}</span> <svg" in indicator
+            if permission == "viewer":
+                assert f"{field.name}</span></a> <svg" in indicator
+            else:
+                assert f"{field.name}</span> <svg" in indicator
             assert '<svg class="key-icon"' in indicator
             assert identifier_badge in row
             assert f"{field.name} is part of the record identifier" in indicator

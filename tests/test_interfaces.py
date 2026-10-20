@@ -270,6 +270,7 @@ def _route_matrix_expectations():
         "dataset_version_review",
         "dataset_version_record_diff",
         "dataset_version_field_diff",
+        "dataset_version_field_detail",
         "dataset_hierarchy_node_values",
         "dataset_records_view",
     }

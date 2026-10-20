@@ -146,6 +146,7 @@
 
   const identifierRequirementSyncs = new WeakMap();
   const initializeIdentifierRequirements = (root) => {
+    if (typeof root?.querySelectorAll !== "function") return;
     root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
       const form = identifier.form;
       const scope = identifier.closest("[data-mapping-field-panel]") || form;
@@ -182,6 +183,7 @@
   };
   initializeIdentifierRequirements(document);
   const syncIdentifierRequirements = (root) => {
+    if (typeof root?.querySelectorAll !== "function") return;
     initializeIdentifierRequirements(root);
     root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
       identifierRequirementSyncs.get(identifier)?.();

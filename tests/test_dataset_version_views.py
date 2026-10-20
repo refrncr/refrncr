@@ -120,7 +120,7 @@ def test_readers_can_open_expired_field_details_but_not_scheduled_versions(conte
     detail = request(
         browser,
         "get",
-        f"/datasets/{c.d.key}/versions/{current.id}/fields/{field.id}",
+        f"/datasets/{c.d.key}/versions/{current.id}/fields/{field.key}",
     )
     assert detail.status_code == 200
     assert "Code" in detail.text and "Part of record identifier" in detail.text

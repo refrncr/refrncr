@@ -280,6 +280,17 @@
       ]
     },
     {
+      "symbol": "refrncr.web.dataset_version_field_detail",
+      "path": "/datasets/<key>/versions/<version_id>/fields/<field_key>",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.read",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
       "symbol": "refrncr.web.dataset_concept_create",
       "path": "/datasets/<key>/concept/new",
       "methods": [

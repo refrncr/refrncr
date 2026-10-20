@@ -832,7 +832,7 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
     panel_response = request(
         client,
         "get",
-        f"/datasets/{d.key}/versions/{version.id}/fields/{field.id}",
+        f"/datasets/{d.key}/versions/{version.id}/fields/{field.key}",
     )
     assert panel_response.status_code == 200
     panel_page = body(panel_response)
