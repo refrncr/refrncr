@@ -539,7 +539,7 @@ def test_record_overview_renders_export_import_and_add_as_buttons(dataset_browse
     assert "class='button button-primary' type='submit'>Create record</button>" in page
     assert "action='/datasets/button-actions/records'" in page
     assert re.search(
-        r"id='add-record-panel'.*?data-panel-host>\s*<form class='side-panel-form'",
+        r"id='add-record-panel'.*?data-panel-host>\s*<form class='side-panel-form' novalidate",
         page,
         re.DOTALL,
     )
@@ -585,8 +585,33 @@ def test_duplicate_unique_record_value_stays_in_panel_with_field_error(dataset_b
     assert "id='new-record-code'" in page
     assert "aria-invalid='true' aria-describedby='new-record-code-error'" in page
     assert "id='new-record-code-error' role='alert'" in page
+    assert "class='field-error'" in page
     assert "ISO code must be unique; this value already exists" in page
     assert "A unique field value already exists" not in page
+
+
+def test_missing_required_record_value_uses_inline_field_error(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "required-record")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    login(client)
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/records",
+        data={"code": "", "csrf_token": session_csrf(client, services)},
+    )
+    page = body(response)
+
+    assert response.status_code == 400
+    assert "class='side-panel-form' novalidate" in page
+    assert "id='new-record-code'" in page and "required" in page
+    assert "aria-invalid='true' aria-describedby='new-record-code-error'" in page
+    assert "id='new-record-code-error' role='alert'" in page
+    assert "class='field-error'" in page
+    assert "A value is required" in page
 
 
 def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_browser):
@@ -617,7 +642,7 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
     assert "data-panel-mode='edit'" in page
     assert "data-panel-view='view' hidden" in page
-    assert "data-panel-view='edit' autocomplete='off'" in page
+    assert "data-panel-view='edit' novalidate autocomplete='off'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     panel = page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[0]
     assert ">View current version</a>" not in panel

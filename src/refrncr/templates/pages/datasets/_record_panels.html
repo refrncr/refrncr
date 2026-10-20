@@ -6,7 +6,7 @@
 {% if may_add_record %}
   {% call side_panel("add-record-panel", "New " ~ record_type ~ " record", "add-record-title", "Add record", "add-record-description") %}
     <div class='side-panel-view' data-panel-host>
-      <form class='side-panel-form' {{ non_login_form_attrs() }} method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
+      <form class='side-panel-form' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <footer class='side-panel-footer'>
@@ -50,7 +50,7 @@
       {% endif %}
     </section>
     {% if record_may_edit %}
-      <form class='side-panel-view side-panel-form' data-panel-view='edit' {{ non_login_form_attrs() }} method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='edit' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
