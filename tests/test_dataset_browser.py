@@ -612,6 +612,7 @@ def test_missing_required_record_value_uses_inline_field_error(dataset_browser):
     assert "id='new-record-code-error' role='alert'" in page
     assert "class='field-error'" in page
     assert "A value is required" in page
+    assert "concept-banner" not in page
 
 
 def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_browser):
