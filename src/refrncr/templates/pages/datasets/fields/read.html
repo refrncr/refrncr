@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% from "components/icons.html" import key_icon %}
+{% from "components/icons.html" import lock_icon %}
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>Field details</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='{{ field.name }}' data-panel-eyebrow='Version {{ version_state.version.number }} · {{ version_state.status }} · Read only'>
     <div class='side-panel-body'>
-      <p class='panel-context'>{{ key_icon() }}Version {{ version_state.version.number }} · published, read only</p>
+      <p class='panel-context'>{{ lock_icon() }}Version {{ version_state.version.number }} · published, read only</p>
       <dl class='record-details'>
         <div><dt>Name</dt><dd>{{ field.name }}</dd></div>
         <div><dt>Key</dt><dd><code>{{ field.key }}</code></dd></div>

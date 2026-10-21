@@ -47,6 +47,8 @@ async function login(page) {
         await identifier.check();
         assert(await required.isChecked());
         assert.equal(await required.getAttribute('aria-disabled'), 'true');
+        assert.equal(await required.evaluate(el => getComputedStyle(el).cursor), 'not-allowed');
+        assert(Number(await required.evaluate(el => getComputedStyle(el).opacity)) < 1);
         assert.match(await panel.locator('[data-identifier-status]').textContent(), /checked and locked/);
         await required.click();
         assert(await required.isChecked(), 'the required constraint stays checked while locked');

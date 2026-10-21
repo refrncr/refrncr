@@ -837,6 +837,8 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
     assert panel_response.status_code == 200
     panel_page = body(panel_response)
     assert "Published field" in panel_page
+    assert "<p class='panel-context'><svg class=\"button-icon\"" in panel_page
+    assert "<p class='panel-context'><svg class=\"key-icon\"" not in panel_page
     assert "Field explanation" in panel_page and "EUR" in panel_page
     assert "Part of record identifier" in panel_page
     assert "Required" in panel_page and "Unique" in panel_page
