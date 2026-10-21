@@ -89,16 +89,16 @@
 .access-grant-row td { width: auto; padding: var(--space-md); background: var(--color-surface-subtle); text-align: left; }
 .access-grant-row .form { max-width: none; }
 .access-grant-row .form-field { margin: 0; }
-.access-grant-row .inline-form-action { grid-template-columns: 34rem auto; max-width: none; margin-top: 0; align-items: center; }
-.access-grant-row .help-text { margin: var(--space-xs) 0 0; }
-.access-grant-action { display: flex; align-items: center; gap: var(--space-md); }
-.access-grant-row .access-grant-help { flex: 0 1 22rem; max-width: 22rem; margin: 0; }
+.access-grant-row .select-popup { text-align: left; }
+.access-grant-row .inline-form-action { grid-template-columns: 34rem max-content; max-width: none; margin-top: 0; align-items: center; }
+.access-grant-row .inline-form-action > .button { justify-self: start; }
 .access-empty-help { margin-bottom: var(--space-sm) !important; }
 .access-owner-action { font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-decoration: none; white-space: nowrap; }
 .access-owner-action:hover { text-decoration: underline; }
 .button-remove { color: var(--color-status-removed); }
 .button-remove:hover { border-color: var(--color-status-removed-border); background: var(--color-status-removed-surface); color: var(--color-status-removed); }
 @media (max-width: 767px) {
+  .access-grant-row .inline-form-action { grid-template-columns: minmax(0, 1fr); }
   .access-grant-row td { padding: var(--space-sm); }
 }
 

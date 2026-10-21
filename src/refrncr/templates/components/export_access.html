@@ -39,20 +39,17 @@
             </tbody>
             <tfoot>
               <tr class='access-grant-row'><td colspan='4'>
-                <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.'>
+                <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-no-success-feedback>
                   <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
                   <div class='form-field'>
                     <label class='visually-hidden' for='export-subject'>User or team</label>
                     <div class='inline-form-action'>
-                      <select id='export-subject' name='subject' data-select data-noun='users and teams' required aria-describedby='export-subject-help{% if error %} export-subject-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
+                      <select id='export-subject' name='subject' data-select data-noun='users and teams' required{% if error %} aria-describedby='export-subject-error' aria-invalid='true'{% endif %}>
                         <option value=''>Select a user or team</option>
                         <optgroup label='Users'>{% for user in users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
                         <optgroup label='Teams'>{% for team in teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
                       </select>
-                      <div class='access-grant-action'>
-                        <button class='button button-primary' type='submit'>Grant access</button>
-                        <p class='help-text access-grant-help' id='export-subject-help'>Export only: they can view and download the records, not change them.</p>
-                      </div>
+                      <button class='button button-primary' type='submit'>Grant export access</button>
                     </div>
                     {% if error %}<p class='error-text' id='export-subject-error'>{{ error }}</p>{% endif %}
                   </div>

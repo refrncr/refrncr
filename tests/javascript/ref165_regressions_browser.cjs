@@ -89,7 +89,7 @@ async function savedMove(page, action) {
           return route.continue();
         };
         await page.route('**/export-access*',fail);
-        const [response] = await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Grant access',exact:true}).click()]);
+        const [response] = await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Grant export access',exact:true}).click()]);
         assert.equal(response.status(),200); assert.equal(posts,1);
         assert.equal(page.url(),base+configure+'#access-management');
         assert.deepEqual(await visiblePanels(page),['access-management']);
@@ -97,7 +97,7 @@ async function savedMove(page, action) {
       }
       // Revoke uses the same safe GET target; a failed attempt is not replayed.
       await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'});
-      await page.getByRole('button',{name:'Grant access',exact:true}).click();
+      await page.getByRole('button',{name:'Grant export access',exact:true}).click();
       await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).waitFor();
       await page.route('**/revoke*',route=>route.abort());
       page.once('dialog',dialog=>dialog.accept());

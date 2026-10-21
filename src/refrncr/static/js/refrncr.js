@@ -142,6 +142,7 @@
       initializeSelectionForms(content);
       const error = content.querySelector("[data-error-focus]");
       if (error) error.focus();
+      else if (form.hasAttribute("data-panel-no-success-feedback")) content.querySelector(".select-trigger")?.focus();
       else {
         const status = content.querySelector("[data-panel-status]");
         status.hidden = false;

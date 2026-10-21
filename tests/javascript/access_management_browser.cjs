@@ -16,7 +16,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
   const shot = async name => { if (output) await page.screenshot({path: `${output}/${name}.png`, fullPage: true}); };
   const tab = () => page.getByRole('tabpanel', {name: 'Access', exact: true});
   const select = () => tab().getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]');
-  const grant = () => tab().getByRole('button', {name: 'Grant access', exact: true});
+  const grant = () => tab().getByRole('button', {name: 'Grant export access', exact: true});
   const rows = () => tab().locator('.access-table tbody tr[data-access-entry]');
   const status = async text => {
     await page.waitForFunction(text => {
@@ -48,7 +48,9 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       // Keyboard grant refreshes the tab in place and announces the result.
       await select().selectOption({label: 'Row user (row@example.com)'});
       await grant().focus(); await page.keyboard.press('Enter');
-      await status('Export access granted.');
+      await page.waitForFunction(() => document.querySelectorAll('[data-export-access] .access-table tbody tr[data-access-entry]').length === 1);
+      assert(await page.locator('[data-export-access] [data-panel-status]').isHidden());
+      assert(await page.locator('[data-export-access] .select-trigger').evaluate(e => e === document.activeElement));
       assert.equal(page.url(), url);
       assert.equal(await rows().count(), 1);
       assert((await rows().first().textContent()).includes('row@example.com'));
@@ -63,7 +65,9 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await noOverflow(); await shot(`access-duplicate-${width}`);
 
       await select().selectOption({label: 'Row team'}); await grant().click();
-      await status('Export access granted.');
+      await page.waitForFunction(() => document.querySelectorAll('[data-export-access] .access-table tbody tr[data-access-entry]').length === 2);
+      assert(await page.locator('[data-export-access] [data-panel-status]').isHidden());
+      assert(await page.locator('[data-export-access] .select-trigger').evaluate(e => e === document.activeElement));
       assert.equal(await rows().count(), 2);
       assert.deepEqual(await rows().locator('.badge').allTextContents(), ['User', 'Team']);
       await noOverflow(); await shot(`access-populated-${width}`);
@@ -87,12 +91,12 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
     const plain = await browser.newContext({javaScriptEnabled: false, storageState: await context.storageState()});
     const fallback = await plain.newPage();
     await fallback.goto(`${base}/datasets/row-check`);
-    const plainGrant = fallback.locator('#access-management').getByRole('button', {name: 'Grant access', exact: true});
+    const plainGrant = fallback.locator('#access-management').getByRole('button', {name: 'Grant export access', exact: true});
     assert(!(await plainGrant.isDisabled()));
     await plainGrant.click();
     await fallback.locator('#export-subject-error').waitFor();
     await fallback.locator('#access-management').getByLabel('User or team', {exact: true}).selectOption({label: 'Row team'});
-    await fallback.locator('#access-management').getByRole('button', {name: 'Grant access', exact: true}).click();
+    await fallback.locator('#access-management').getByRole('button', {name: 'Grant export access', exact: true}).click();
     await fallback.waitForURL(`${base}/datasets/row-check#access-management`);
     await fallback.getByRole('button', {name: 'Remove export access for Team Row team', exact: true}).click();
     await fallback.waitForURL(`${base}/datasets/row-check#access-management`);

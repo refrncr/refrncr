@@ -476,8 +476,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
         "Dataset access",
         "User or team",
         "Select a user or team",
-        "Grant access",
-        "Export only: they can view and download the records, not change them.",
+        "Grant export access",
         "Only the owning team has access. Add a user or team below to give them export access.",
     ):
         assert copy in empty
@@ -490,14 +489,12 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
-    assert empty.index(">Grant access</button>") < empty.index("id='export-subject-help'")
+    assert ">Grant export access</button>" in empty
     assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
     invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400
     assert "id='access-management-heading'" in invalid.text
-    assert "aria-describedby='export-subject-help export-subject-error' aria-invalid='true'" in (
-        invalid.text
-    )
+    assert "aria-describedby='export-subject-error' aria-invalid='true'" in (invalid.text)
     assert "data-error-focus" in invalid.text
     assert post(access_url, {"subject": f"user:{u.id}"}).status_code == 403
     granted = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})

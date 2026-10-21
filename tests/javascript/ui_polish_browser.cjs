@@ -267,11 +267,11 @@ async function layout(page, label) {
       await page.goto(base + `/datasets/polish-${width}/configure#access-management`);
       let access = page.locator('#access-management');
       await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
-      await access.getByRole('button', {name: 'Grant access', exact: true}).click();
+      await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).waitFor();
-      assert.equal(await page.locator('[data-panel-status]:not([hidden])').textContent(), 'Export access granted.');
+      assert(await access.locator('[data-panel-status]').isHidden());
       await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
-      await access.getByRole('button', {name: 'Grant access', exact: true}).click();
+      await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('alert').waitFor();
       assert.equal(await access.getByLabel('User or team').getAttribute('aria-invalid'), 'true');
       page.once('dialog', dialog => dialog.accept());
