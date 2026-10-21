@@ -5,7 +5,7 @@
 {% from "components/dataset_navigation.html" import dataset_navigation with context %}
 {% from "components/export_action.html" import export_action %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, alert_triangle_icon, history_icon, configure_icon %}
+{% from "components/icons.html" import file_pen_icon, key_icon, lock_icon, team_icon, configure_icon %}
 {% from "components/dataset_icon.html" import dataset_icon %}
 {% from "components.html" import content_metadata, feedback, status_badge %}
 {% from "layouts/page.html" import page_context %}
@@ -42,73 +42,56 @@
     <section id='dataset-details' aria-labelledby='dataset-details-heading'>
       <div class='page-header section-header'>
         <div>
-          <h2 id='dataset-details-heading' tabindex='-1'>Settings</h2>
+          <h2 id='dataset-details-heading' tabindex='-1'>{% if edit_mode == 'general' %}Edit general details{% elif edit_mode == 'ownership' %}Edit ownership{% else %}Settings{% endif %}</h2>
           {% if not edit_mode %}<p class='section-description'>Applies to the whole dataset, not to one version. Changes take effect right away.</p>{% endif %}
         </div>
-        {% if editable and not edit_mode %}<div class='page-actions'><a class='button button-secondary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true if not version_state and not standalone_configuration else none, edit=1) }}#dataset-name'>{{ file_pen_icon() }}Edit dataset</a></div>{% endif %}
       </div>
       {% if edit_mode %}
-        {% include 'pages/datasets/_edit_form.html' %}
+        {% if edit_mode == 'ownership' %}
+          {% include 'pages/datasets/_edit_ownership_form.html' %}
+        {% elif edit_mode == 'general' %}
+          {% include 'pages/datasets/_edit_general_form.html' %}
+        {% else %}
+          {% include 'pages/datasets/_edit_form.html' %}
+        {% endif %}
       {% else %}
-      <div class='dataset-details-layout'>
-        <div class='dataset-details-main'>
-          <div class='dataset-identity-card'>
-            <span class='dataset-icon-tile'>{{ dataset_icon(dataset.icon, kind=dataset.kind) }}</span>
-            <div>
-              <p class='dataset-identity-name'>{{ dataset.name|dataset_title }}</p>
-              {% if dataset.description %}<p class='dataset-identity-description'>{{ dataset.description }}</p>
-              {% else %}<p class='dataset-identity-description dataset-identity-empty'>No description provided</p>{% endif %}
-            </div>
-          </div>
-          <dl class='detail-list'>
-            <div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span><span class='detail-hint'>Maintains fields and records and publishes versions.</span></dd></div>
-            <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until published</span><span class='detail-hint'>Used in URLs, exports and the API. You can correct it while this first Draft is unpublished.</span>{% else %}<span class='badge'>Permanent</span><span class='detail-hint'>Used in URLs, exports and the API. It cannot be changed after the first publication.</span>{% endif %}</dd></div>
-            <div><dt>Type</dt><dd>{{ dataset.kind|dataset_kind_label }}</dd></div>
-            <div><dt>Icon</dt><dd>{{ dataset_icon_label }}{% if dataset.icon %} <code>{{ dataset.icon }}</code>{% else %} <span class='detail-hint-inline'>(default)</span>{% endif %}</dd></div>
-          </dl>
-        </div>
-        <aside class='dataset-details-aside' aria-label='Dataset summary'>
-          <div class='dataset-facts'>
-            <h3 class='dataset-facts-heading'>At a glance</h3>
-            <dl>
-              <div><dt>Version</dt><dd>{{ dataset_facts.version }}</dd></div>
-              {% if dataset_facts.record_count is not none %}<div><dt>Records</dt><dd>{{ dataset_facts.record_count }}</dd></div>{% endif %}
-              <div><dt>Fields</dt><dd>{{ dataset_facts.field_count }}</dd></div>
-              <div><dt>Created</dt><dd><time datetime='{{ dataset_facts.created_at.isoformat() }}'>{{ dataset_facts.created_at|absolute_utc }}</time></dd></div>
-              {% if dataset_facts.last_updated %}<div><dt>Last updated</dt><dd><time datetime='{{ dataset_facts.last_updated.isoformat() }}'>{{ dataset_facts.last_updated|absolute_utc }}</time></dd></div>{% endif %}
+      {% set general_edit_url = url_for('dataset_configuration', key=dataset.key, edit='general') if standalone_configuration else url_for('dataset_detail', key=dataset.key, concept=true if not version_state and not standalone_configuration else none, edit='general') %}
+      {% set ownership_edit_url = url_for('dataset_configuration', key=dataset.key, edit='ownership') if standalone_configuration else url_for('dataset_detail', key=dataset.key, concept=true if not version_state and not standalone_configuration else none, edit='ownership') %}
+      <div class='dataset-settings'>
+        <section class='dataset-settings-section' id='dataset-general' aria-labelledby='dataset-general-heading'>
+          <header><h3 id='dataset-general-heading'>General</h3><p>How the dataset appears in navigation, search and exports.</p></header>
+          <div class='dataset-settings-card'>
+            {% if editable %}<div class='dataset-settings-actions'><a class='button button-secondary' href='{{ general_edit_url }}#dataset-name'>{{ file_pen_icon() }}Edit</a></div>{% endif %}
+            <dl class='dataset-settings-values'>
+              <div><dt>Name</dt><dd>{{ dataset.name|dataset_title }}</dd></div>
+              <div><dt>Description</dt><dd>{% if dataset.description %}{{ dataset.description }}{% else %}<span class='detail-hint-inline'>No description provided</span>{% endif %}</dd></div>
+              <div><dt>Icon</dt><dd><span class='dataset-settings-icon'>{{ dataset_icon(dataset.icon, dataset.kind) }}</span>{{ dataset_icon_label }}</dd></div>
             </dl>
           </div>
-        </aside>
+        </section>
+        <section class='dataset-settings-section' id='dataset-ownership' aria-labelledby='dataset-ownership-heading'>
+          <header><h3 id='dataset-ownership-heading'>Ownership</h3><p>The team that maintains fields and records and publishes versions.</p></header>
+          <div class='dataset-settings-card'>
+            {% if may_govern %}<div class='dataset-settings-actions'><a class='button button-secondary' href='{{ ownership_edit_url }}#owner-team'>{{ file_pen_icon() }}Edit</a></div>{% endif %}
+            <dl class='dataset-settings-values'><div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span></dd></div></dl>
+          </div>
+        </section>
+        <section class='dataset-settings-section' id='dataset-identification' aria-labelledby='dataset-identification-heading'>
+          <header><h3 id='dataset-identification-heading'>Identification</h3><p>Fixed after the first publication. Used in URLs, exports and the API.</p></header>
+          <div class='dataset-settings-card'>
+            <dl class='dataset-settings-values'>
+              <div><dt>Technical name</dt><dd><code>{{ dataset.key }}</code> {% if may_edit_key %}<span class='badge badge-draft'>Editable until first publication</span><span class='detail-hint'>Change it in General before publishing.</span>{% else %}<span class='dataset-permanent'>{{ lock_icon() }}Permanent</span><span class='detail-hint'>It cannot be changed after the first publication.</span>{% endif %}</dd></div>
+              <div><dt>Type</dt><dd>{{ dataset.kind|dataset_kind_label }}</dd></div>
+            </dl>
+          </div>
+        </section>
+        {% if editable %}
+        <section id='danger-zone' class='dataset-settings-section dataset-delete-section' aria-labelledby='dataset-danger-heading'>
+          <header><h3 id='dataset-danger-heading'>Delete dataset</h3><p>This cannot be undone.</p></header>
+          <div class='dataset-delete-action'><p>Removes {{ dataset.name|dataset_title }} with all its versions, records and fields. The audit log records who deleted it and when.</p><a class='button dataset-delete-button' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a></div>
+        </section>
+        {% endif %}
       </div>
-      {% if editable %}
-      <section id='danger-zone' class='danger-zone' aria-labelledby='dataset-danger-heading'>
-        <div class='page-header section-header'>
-          <div>
-            <h2 id='dataset-danger-heading' tabindex='-1'>Danger zone</h2>
-            <p class='section-description'>Actions here cannot be undone.</p>
-          </div>
-        </div>
-        <div class='danger-card'>
-          <div class='danger-card-head'>
-            {{ alert_triangle_icon() }}
-            <div>
-              <h3>Delete this dataset</h3>
-              <p>Removes the dataset with all its versions, records, fields, record identifiers and export access. This cannot be undone.</p>
-            </div>
-          </div>
-          <div class='danger-card-body'>
-            <ul class='danger-counts'>
-              <li>Versions <b>{{ deletion.version_count }}</b></li>
-              <li>Records <b>{{ deletion.record_count }}</b></li>
-              <li>Fields <b>{{ deletion.field_count }}</b></li>
-              <li>Export access <b>{{ deletion.export_access_count }}</b></li>
-            </ul>
-            <a class='button button-danger' href='{{ url_for("dataset_delete", dataset_id=dataset.id) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
-          </div>
-        </div>
-        <p class='danger-note'>{{ history_icon() }}<span>The audit log keeps a record of the deletion, including who deleted the dataset and when.</span></p>
-      </section>
-      {% endif %}
       {% endif %}
     </section>
     {% if dataset.kind == 'mapping' %}

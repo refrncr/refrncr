@@ -61,7 +61,7 @@ def test_hierarchy_creation_opens_fields_after_create(dataset_browser):
     assert response.status_code == 302
     assert response.location.endswith("/datasets/structure/concept?tab=fields#fields")
     page = body(request(client, "get", response.location.split("#", 1)[0]))
-    assert "Draft in progress" in page
+    assert "No published version yet" in page
     assert "Add field" in page
     page = request(client, "get", response.location)
     assert page.status_code == 200

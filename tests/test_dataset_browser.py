@@ -269,10 +269,11 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
     assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
     assert "Configure · SAP → Salesforce" in configuration
-    assert "<p class='dataset-identity-name'>SAP → Salesforce</p>" in configuration
+    assert "SAP → Salesforce" in configuration
+    assert "id='dataset-general'" in configuration
     assert "SAP -&gt; Salesforce" not in configuration
     assert "<dt>Technical name</dt>" in configuration
-    assert "Editable until published" in configuration
+    assert "Editable until first publication" in configuration
     assert "It cannot be changed after the first publication." not in configuration
     fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
     assert ">Add field</a>" in fields_section
@@ -1390,7 +1391,7 @@ def test_create_redirects_each_dataset_type_to_its_next_step(
     assert destination.status_code == 200
     if kind in {"reference", "hierarchy"}:
         page = body(destination)
-        assert "Draft in progress" in page
+        assert "No published version yet" in page
         assert "Add field" in page
 
 
@@ -1628,9 +1629,9 @@ def test_detail_authorization_owner_display_edit_link_and_escaping(dataset_brows
     assert "Edit dataset" not in viewer_page
 
     login(client, "editor@example.com", "editor password")
-    assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe"))
+    assert "edit=general" in body(request(client, "get", "/datasets/unsafe"))
     services.dataset_versions.create_concept(admin.id, dataset.id)
-    assert "Edit dataset" in body(request(client, "get", "/datasets/unsafe/concept"))
+    assert "edit=general" in body(request(client, "get", "/datasets/unsafe/concept"))
 
 
 def test_missing_inaccessible_and_owner_only_detail_are_same_404(dataset_browser):

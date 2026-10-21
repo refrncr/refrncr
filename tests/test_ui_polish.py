@@ -262,7 +262,7 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):
     assert "id='access-management'" in html
     assert "href='#access-management'>Access</a>" in html
     edit = re.search(
-        r"<a[^>]+href='/datasets/polish/concept\?edit=1#dataset-name'[^>]*>.*?Edit dataset</a>",
+        r"<a[^>]+href='/datasets/polish/concept\?edit=general#dataset-name'[^>]*>.*?Edit</a>",
         html,
         re.DOTALL,
     ).group()
@@ -633,7 +633,7 @@ def test_dataset_metadata_is_independent_of_versions(context, with_concept):
 
 
 def test_danger_zone_shows_what_deletion_removes(dataset_browser):
-    """The tab states the destructive action and counts everything it takes with it."""
+    """Settings use the quiet delete row; exact deletion details stay in confirmation."""
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "danger", "Danger")
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
@@ -641,10 +641,10 @@ def test_danger_zone_shows_what_deletion_removes(dataset_browser):
     login(client)
     html = body(request(client, "get", "/datasets/danger/configure"))
     danger = html.split("<section id='danger-zone'", 1)[1]
-    assert "Delete this dataset" in danger and "cannot be undone" in danger
-    for label, count in [("Versions", 1), ("Records", 0), ("Fields", 1), ("Export access", 0)]:
-        assert f"{label} <b>{count}</b>" in danger
-    assert "The audit log keeps a record of the deletion" in danger
+    assert "Delete dataset" in danger and "all its versions, records and fields" in danger
+    assert "cannot be undone" in danger
+    assert "danger-counts" not in danger and "danger-card" not in danger
+    assert "The audit log records who deleted it and when" in danger
 
     # The confirmation panel repeats the counts and asks for the exact name.
     panel = body(request(client, "get", f"/datasets/id/{d.id}/delete"))

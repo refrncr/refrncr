@@ -44,9 +44,9 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           await panel.getByLabel('Name',{exact:true}).fill(`Review ${kind} ${width}`);
           await panel.getByRole('button',{name:'Create dataset',exact:true}).click();
           await page.waitForURL(`${base}/datasets/review-${kind}-${width}`);
-          await page.getByRole('link',{name:'Edit dataset',exact:true}).click();
-          await panel.getByText('Owning team: Test data domain',{exact:true}).waitFor();
-          assert.equal(await panel.locator('select[name=owner_team_id]').count(),0);
+          const ownership = page.locator('#dataset-ownership');
+          await ownership.getByText('Test data domain',{exact:true}).waitFor();
+          assert.equal(await ownership.getByRole('link',{name:'Edit',exact:true}).count(),0);
           await page.keyboard.press('Escape');
           await page.getByRole('link',{name:'View records',exact:true}).click();
           await page.getByRole('button',{name:'Add record',exact:true}).waitFor();
@@ -63,7 +63,7 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         // The fixture explicitly publishes row-check; current REF-73 permissions still apply.
         await page.goto(`${base}/datasets/row-check`);
         assert.equal(await page.getByRole('link',{name:'Access management',exact:true}).count(),0);
-        assert.equal(await page.getByRole('link',{name:'Edit dataset',exact:true}).count(),kind==='row'?0:1);
+        assert.equal(await page.locator('#dataset-general').getByRole('link',{name:'Edit',exact:true}).count(),kind==='row'?0:1);
         await page.getByRole('link',{name:'View records',exact:true}).click();
         assert.equal(await page.locator('.export-menu').count(),kind==='row'?0:1);
         assert.equal(await page.getByRole('button',{name:'Add record',exact:true}).count(),kind==='row'?0:1);

@@ -40,9 +40,8 @@ async function focused(page, locator) {
       assert.equal(await page.locator('#dataset-description').inputValue(), 'Unsaved draft must survive cancel');
 
       // The tab states what a deletion removes before anything is confirmed.
-      const counts = await page.locator('#danger-zone .danger-counts li').allInnerTexts();
-      assert.deepEqual(counts.map(t => t.replace(/\s+/g,' ').trim()),
-        ['Versions 1','Records 52','Fields 2','Export access 0']);
+      assert.equal(await page.locator('#danger-zone .danger-counts').count(),0);
+      assert(await page.locator('#danger-zone').getByText('This cannot be undone.',{exact:true}).isVisible());
 
       const trigger = page.getByRole('link', {name:'Delete dataset', exact:true});
       await trigger.focus();
@@ -167,7 +166,7 @@ async function focused(page, locator) {
     const reader = await readerContext.newPage();
     await signIn(reader,'row@example.com');
     await reader.goto(base + '/datasets/empty-check');
-    assert.equal(await reader.getByRole('link',{name:'Edit dataset',exact:true}).count(),0);
+    assert.equal(await reader.locator('#dataset-general').getByRole('link',{name:'Edit',exact:true}).count(),0);
     assert.equal(await reader.locator('#danger-zone').count(),0);
     await readerContext.close();
     assert.deepEqual(errors,[]);
