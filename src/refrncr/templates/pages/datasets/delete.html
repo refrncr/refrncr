@@ -27,7 +27,7 @@
       </form>
     </div>
     {% call panel_form_actions() %}
-      <a class='button button-secondary' href='{{ url_for("dataset_configuration", key=deletion.key) }}' data-panel-cancel>Cancel</a>
+      <a class='button button-secondary' href='{{ url_for("dataset_detail", key=deletion.key, version_id=request.args.get("version_id"), concept=true if request.args.get("concept") == "1" else none, tab="dataset-details", _anchor="dataset-details") }}' data-panel-cancel>Cancel</a>
       <button class='button button-danger' type='submit' form='dataset-delete-form'>Delete dataset</button>
     {% endcall %}
   </div>

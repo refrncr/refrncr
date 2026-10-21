@@ -21,6 +21,8 @@
     ) }}
     {{ icon_picker(dataset_icon_choices, selected_icon, kind=dataset.kind) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>
+    {% if settings_return_version_id %}<input type='hidden' name='settings_return_version_id' value='{{ settings_return_version_id }}'>{% endif %}
     <div class='dataset-edit-pair'>
       {% if may_govern %}
         <div>
@@ -53,6 +55,6 @@
     </div>
     <div class='form-actions'>
       <button class='button button-primary' type='submit'>Save dataset</button>
-      <a class='button button-secondary' href='{{ configuration_url }}#dataset-details-heading'>Cancel</a>
+      <a class='button button-secondary' href='{{ configuration_url }}'>Cancel</a>
     </div>
   </form>

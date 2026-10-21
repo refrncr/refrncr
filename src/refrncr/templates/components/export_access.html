@@ -1,9 +1,9 @@
 {% from 'components.html' import feedback %}
 {% from 'components/icons.html' import user_icon, team_icon %}
 {# Access management tab: one list of dataset access and inline grant/revoke actions. #}
-{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, standalone=false, change_owner_url=none) -%}
-{% set return_to = {'concept': 1 if concept else none, 'standalone': 1 if standalone else none} %}
-{% set fallback = url_for('dataset_configuration', key=dataset.key, _anchor='access-management') if standalone else url_for('dataset_detail', key=dataset.key, concept=true if concept else none, _anchor='access-management') %}
+{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, version_id=none, change_owner_url=none) -%}
+{% set return_to = {'concept': 1 if concept else none, 'version_id': version_id or none} %}
+{% set fallback = url_for('dataset_detail', key=dataset.key, concept=true if concept else none, version_id=version_id, tab='access-management', _anchor='access-management') %}
 {% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
     <div class='access-management' data-export-access>
       <p class='help-text' data-panel-status tabindex='-1' hidden></p>

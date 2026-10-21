@@ -7,6 +7,7 @@ import secrets
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
+from types import SimpleNamespace
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
@@ -1084,7 +1085,15 @@ def create_flask_app(
             )
             return response, 409 if isinstance(error, ConflictError) else 400
         if dataset.kind == "mapping":
-            return redirect(url_for("dataset_configuration", key=dataset.key) + "#mapping")
+            return redirect(
+                url_for(
+                    "dataset_detail",
+                    key=dataset.key,
+                    concept=True,
+                    tab="dataset-details",
+                    _anchor="dataset-details",
+                )
+            )
         return redirect(
             url_for(
                 "dataset_detail",
@@ -1124,6 +1133,41 @@ def create_flask_app(
             key, version_id=version_id, concept=concept, edit_mode=edit_mode
         )
 
+    def dataset_settings_redirect(key, *, edit_mode=None):
+        actor, _login_session = require_authenticated()
+        try:
+            view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
+        except NotFoundError:
+            try:
+                datasets.get_dataset_configuration(actor.id, key)
+            except NotFoundError:
+                abort(404)
+            version_id = None
+            use_concept = False
+        else:
+            use_concept = view.state is None
+            # Settings describe dataset-wide metadata. Do not send a legacy
+            # configure link to a scheduled/expired snapshot: that would expose
+            # version context (and its release details) instead of Settings.
+            version_id = (
+                view.state.version.id
+                if view.state and view.state.status == "Current" and not use_concept
+                else None
+            )
+            if view.state and view.state.status != "Current":
+                use_concept = False
+        return redirect(
+            url_for(
+                "dataset_detail",
+                key=key,
+                version_id=version_id,
+                concept=True if use_concept else None,
+                edit=edit_mode,
+                tab="dataset-details",
+                _anchor="dataset-details",
+            )
+        )
+
     @dataset_route("/datasets/<key>/configure", capability="can_view_dataset", methods=["GET"])
     @version_errors
     def dataset_configuration(key):
@@ -1132,7 +1176,7 @@ def create_flask_app(
             edit_mode = "all"
         if edit_mode not in (None, "general", "ownership", "all"):
             abort(404)
-        return render_dataset_configuration(key, standalone=True, edit_mode=edit_mode)
+        return dataset_settings_redirect(key, edit_mode=edit_mode)
 
     @dataset_route(
         "/datasets/<key>/versions/<version_id>/fields/<field_key>",
@@ -1158,7 +1202,6 @@ def create_flask_app(
         *,
         version_id=None,
         concept=False,
-        standalone=False,
         edit_mode=False,
         name=None,
         description=None,
@@ -1171,57 +1214,39 @@ def create_flask_app(
         require_dataset_dependencies()
         field_context_label = None
         draft_in_progress = False
-        may_export = False
+        may_edit_key = False
         mapping_configuration = None
-        if standalone:
+        try:
+            view = dataset_versions.read(
+                actor.id, key, version_id, page=None, prefer_concept=concept
+            )
+            if (
+                version_id is None
+                and not concept
+                and view.state is not None
+                and view.state.status != "Current"
+            ):
+                # The default version lookup may select Scheduled or Expired
+                # when no Current version exists. Settings are dataset-wide;
+                # show metadata, not a non-current version's release details.
+                raise NotFoundError("No Current version")
+        except NotFoundError:
+            if version_id is not None or concept:
+                raise
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
-            if dataset.kind == "mapping":
-                mapping_configuration = dataset
+            context = SimpleNamespace(record_count=0, last_updated=dataset.updated_at)
+            state, identifier = None, None
+            fields, field_states = (), {}
             editable = configuration.may_maintain
             may_govern = configuration.may_govern
             may_edit_key = configuration.may_edit_key
             may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
-            context, state, identifier = None, None, None
-            fields, field_states = (), {}
-            field_view = None
-            try:
-                field_view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
-            except NotFoundError:
-                field_context_label = "No Current version or active Draft available."
-            else:
-                fields, identifier = field_view.fields, field_view.identifier
-                schema_admin = field_view.state is None and field_view.may_maintain
-                may_start_concept = (
-                    field_view.may_maintain
-                    and field_view.concept is None
-                    and field_view.state is not None
-                    and field_view.state.status == "Current"
-                )
-                draft_in_progress = field_view.concept is not None
-                if field_view.state:
-                    field_context_label = (
-                        f"Current · Version {field_view.state.version.number} · Read only"
-                    )
-                elif not schema_admin:
-                    field_context_label = "Draft · Read only"
-            if field_view is None:
-                schema_admin, may_start_concept = False, False
+            schema_admin, may_start_concept = False, False
+            field_context_label = "No Current version or active Draft available."
+            if dataset.kind == "mapping":
+                mapping_configuration = dataset
         else:
-            may_edit_key = False
-            try:
-                view = dataset_versions.read(
-                    actor.id, key, version_id, page=None, prefer_concept=concept
-                )
-            except NotFoundError:
-                if version_id is not None or concept:
-                    raise
-                history = dataset_versions.history(actor.id, key)
-                return render_authenticated_template(
-                    "pages/datasets/no_current.html",
-                    dataset=history.context.dataset,
-                    history=history,
-                )
             dataset = view.context.dataset
             if dataset.kind == "mapping":
                 # PublishedDataset intentionally contains snapshot content, not mutable
@@ -1279,18 +1304,18 @@ def create_flask_app(
             dataset=dataset,
             mapping_configuration=mapping_configuration,
             context=context,
-            standalone_configuration=standalone,
             settings_return_context=(
-                "configure" if standalone else "concept" if concept else "detail"
+                "version" if version_id else "concept" if concept else "detail"
             ),
+            settings_return_version_id=version_id,
             configuration_url=(
-                url_for("dataset_configuration", key=dataset.key)
-                if standalone
-                else url_for(
+                url_for(
                     "dataset_detail",
                     key=dataset.key,
                     version_id=version_id,
                     concept=True if concept else None,
+                    tab="dataset-details",
+                    _anchor="dataset-details",
                 )
             ),
             editable=editable,
@@ -1706,15 +1731,20 @@ def create_flask_app(
         ), status
 
     def access_management_target(key):
-        """Where export access changes return: the configuration page they came from."""
-        standalone = request.args.get("standalone") == "1"
+        """Where export access changes return: the dataset's Access tab."""
         concept = request.args.get("concept") == "1"
-        endpoint = "dataset_configuration" if standalone else "dataset_detail"
-        options = {} if standalone else {"concept": concept or None}
+        version_id = request.args.get("version_id") or None
         return (
-            standalone,
             concept,
-            url_for(endpoint, key=key, _anchor="access-management", **options),
+            version_id,
+            url_for(
+                "dataset_detail",
+                key=key,
+                version_id=version_id,
+                concept=concept or None,
+                tab="access-management",
+                _anchor="access-management",
+            ),
         )
 
     @dataset_route(
@@ -1725,7 +1755,7 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
         require_csrf(login_session.csrf_token)
-        standalone, concept, target = access_management_target(key)
+        concept, version_id, target = access_management_target(key)
         try:
             expected = {"csrf_token", "subject"}
             if set(request.form) != expected or any(
@@ -1746,7 +1776,7 @@ def create_flask_app(
             response = render_dataset_configuration(
                 key,
                 concept=concept,
-                standalone=standalone,
+                version_id=version_id,
                 access_error=str(error),
                 access_subject=request.form.get("subject", ""),
             )
@@ -3689,7 +3719,7 @@ def create_flask_app(
             dataset = dataset_service.get_dataset_for_edit(actor.id, key)
         except NotFoundError:
             abort(404)
-        return render_dataset_configuration(dataset.key, standalone=True, edit_mode="all")
+        return dataset_settings_redirect(dataset.key, edit_mode="all")
 
     @dataset_route("/datasets/<key>", capability="can_maintain_dataset", methods=["POST"])
     def update_dataset(key: str):
@@ -3701,11 +3731,13 @@ def create_flask_app(
         edit_mode = request.form.get("edit_section")
         if edit_mode not in (None, "general", "ownership"):
             abort(400)
-        return_context = request.form.get("settings_return_context", "configure")
-        if return_context not in ("configure", "concept", "detail"):
+        return_context = request.form.get("settings_return_context", "detail")
+        if return_context not in ("concept", "detail", "version"):
             abort(400)
-        return_standalone = return_context == "configure"
         return_concept = return_context == "concept"
+        return_version_id = request.form.get("settings_return_version_id") or None
+        if return_context != "version" and return_version_id:
+            abort(400)
         try:
             current = dataset_service.get_dataset_for_edit(actor.id, key)
             if edit_mode == "ownership":
@@ -3754,11 +3786,16 @@ def create_flask_app(
                 abort(404)
             message = str(error)
             error_field = {"key": "technical_key"}.get(error.field, error.field)
+            if return_concept:
+                try:
+                    g.concept_ui = dataset_versions.concept_context(actor.id, dataset.key)
+                except (NotFoundError, ConflictError):
+                    return_concept = False
             return (
                 render_dataset_configuration(
                     dataset.key,
                     concept=return_concept,
-                    standalone=return_standalone,
+                    version_id=return_version_id,
                     edit_mode=edit_mode or "all",
                     name=name,
                     description=description,
@@ -3767,12 +3804,11 @@ def create_flask_app(
                 ),
                 409 if isinstance(error, ConflictError) else 400,
             )
-        if return_standalone:
-            return redirect(url_for("dataset_configuration", key=dataset.key))
         return redirect(
             url_for(
                 "dataset_detail",
                 key=dataset.key,
+                version_id=return_version_id,
                 concept=True if return_concept else None,
                 tab="dataset-details",
                 _anchor="dataset-details",

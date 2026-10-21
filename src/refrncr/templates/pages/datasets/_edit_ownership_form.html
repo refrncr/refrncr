@@ -5,11 +5,12 @@
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <input type='hidden' name='edit_section' value='ownership'>
     <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>
+    {% if settings_return_version_id %}<input type='hidden' name='settings_return_version_id' value='{{ settings_return_version_id }}'>{% endif %}
     {{ team_choice(teams, selected_team_id) }}
     <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>
     <p class='help-text'>Only administrators can change dataset ownership.</p>
     <div class='form-actions'>
       <button class='button button-primary' type='submit'>Save changes</button>
-      <a class='button button-secondary' href='{{ configuration_url }}#dataset-details-heading'>Cancel</a>
+      <a class='button button-secondary' href='{{ configuration_url }}'>Cancel</a>
     </div>
   </form>

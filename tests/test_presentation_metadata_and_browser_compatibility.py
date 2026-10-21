@@ -6,7 +6,6 @@ import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pytest
 from support import (
     body,
     create_dataset,
@@ -65,7 +64,7 @@ def test_history_icon_survives_the_browser_metadata_form(dataset_browser):
     with factory.begin() as session:
         session.get(Dataset, dataset.id).icon = "history"
     login(client)
-    page = body(request(client, "get", "/datasets/legacy-icon/configure?edit=1"))
+    page = body(request(client, "get", "/datasets/legacy-icon/concept?edit=all"))
     assert "lucide-legacy-0.468.0.svg#history" in page
     assert "name='icon' value='history'" in page
     response = request(
@@ -80,17 +79,22 @@ def test_history_icon_survives_the_browser_metadata_form(dataset_browser):
     assert services.datasets.get_dataset_for_edit(admin.id, dataset.key).icon == "history"
 
 
-@pytest.mark.parametrize("path", ["/configure", "/concept"])
-def test_export_forms_have_a_safe_get_fallback(dataset_browser, path):
+def test_export_forms_have_a_safe_get_fallback(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "fallback", "Fallback")
     services.datasets.grant_export_access(admin.id, dataset.key, "user", admin.id)
     login(client)
-    page = body(request(client, "get", f"/datasets/fallback{path}"))
+    page = body(request(client, "get", "/datasets/fallback/concept"))
     targets = re.findall(r"data-inline-refresh='([^']+)'", page)
-    target = "/configure" if path == "/configure" else "/concept"
-    assert targets == [f"/datasets/fallback{target}#access-management" for _ in range(2)]
+    assert targets == [
+        "/datasets/fallback?tab=access-management#access-management" for _ in range(2)
+    ]
     assert request(client, "get", targets[0]).status_code == 200
+    legacy = request(client, "get", "/datasets/fallback/configure")
+    assert legacy.status_code == 302
+    assert legacy.location.endswith(
+        "/datasets/fallback/concept?tab=dataset-details#dataset-details"
+    )
     assert request(client, "get", "/datasets/fallback/export-access").status_code == 405
 
 

@@ -232,7 +232,7 @@ def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepub
     dataset = create_dataset(services, admin, "settings-edit", "Settings edit", "Original")
     login(client)
 
-    general = request(client, "get", "/datasets/settings-edit/configure?edit=general")
+    general = request(client, "get", "/datasets/settings-edit/concept?edit=general")
     assert general.status_code == 200
     general_html = body(general)
     assert "name='edit_section' value='general'" in general_html
@@ -245,6 +245,7 @@ def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepub
         data={
             "csrf_token": session_csrf(client, services),
             "edit_section": "general",
+            "settings_return_context": "concept",
             "name": "Renamed dataset",
             "description": "Updated description",
             "technical_key": "renamed-dataset",
@@ -252,7 +253,9 @@ def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepub
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("/datasets/renamed-dataset/configure")
+    assert response.location.endswith(
+        "/datasets/renamed-dataset/concept?tab=dataset-details#dataset-details"
+    )
     updated = services.datasets.get_dataset_for_edit(admin.id, "renamed-dataset")
     assert (updated.name, updated.description, updated.icon) == (
         "Renamed dataset",
@@ -260,7 +263,7 @@ def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepub
         "database",
     )
 
-    ownership = request(client, "get", "/datasets/renamed-dataset/configure?edit=ownership")
+    ownership = request(client, "get", "/datasets/renamed-dataset/concept?edit=ownership")
     assert ownership.status_code == 200
     ownership_html = body(ownership)
     assert "name='edit_section' value='ownership'" in ownership_html
@@ -305,7 +308,7 @@ def test_cancel_general_edit_returns_to_the_same_dataset_settings_tabs(dataset_b
     cancel = re.search(r"<a class='button button-secondary' href='([^']+)'>Cancel</a>", page).group(
         1
     )
-    assert cancel == "/datasets/settings-cancel/concept#dataset-details-heading", cancel
+    assert cancel == "/datasets/settings-cancel/concept?tab=dataset-details#dataset-details", cancel
 
     saved = request(
         client,

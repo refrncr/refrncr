@@ -1,5 +1,6 @@
 """REF-73 authority, ownership compare-and-set, and orthogonal export contracts."""
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
@@ -430,13 +431,20 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     csrf = sign_in(a)
     detail = get(f"/datasets/{d.key}").text
     assert "id='access-management-heading'>Access</h2>" in detail
-    assert (
-        f"<a class='access-owner-action' href='/datasets/{d.key}?edit=1#owner-team'>"
-        "Change owning team</a>" in detail
+    owner_action = re.search(
+        r"<a class='access-owner-action' href='([^']+)'>Change owning team</a>", detail
+    )
+    assert owner_action is not None, detail[detail.find("access-owner-row") :][:1200]
+    owner_edit_url = owner_action.group(1).replace("&amp;", "&")
+    assert re.fullmatch(
+        rf"/datasets/{d.key}/versions/[0-9a-f-]+\?edit=ownership&tab=dataset-details#owner-team",
+        owner_edit_url,
     )
     assert "All active Community users can view this dataset." not in detail
     s.dataset_versions.create_concept(a.id, d.id)
-    edit = get(f"/datasets/{d.key}/edit").text
+    legacy_edit = get(f"/datasets/{d.key}/edit")
+    assert legacy_edit.status_code == 302
+    edit = get(legacy_edit.headers["Location"]).text
     assert "name='expected_owner_team_id'" in edit
     before = state(factory, d)
     assert (
@@ -490,7 +498,8 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
     assert ">Grant export access</button>" in empty
-    assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
+    access_action = re.search(r"action='([^']*/export-access[^']*)'", empty)
+    assert access_action and access_action.group(1) == f"/datasets/{d.key}/export-access"
     invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400
     assert "id='access-management-heading'" in invalid.text
@@ -499,13 +508,13 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert post(access_url, {"subject": f"user:{u.id}"}).status_code == 403
     granted = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert granted.status_code == 302
-    assert granted.location == f"/datasets/{d.key}/concept#access-management"
+    assert granted.location == f"/datasets/{d.key}/concept?tab=access-management#access-management"
     duplicate = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert duplicate.status_code == 409
     assert f"value='user:{u.id}' selected" in duplicate.text
     team = post(f"{access_url}?standalone=1", {"subject": f"team:{owner.id}", "csrf_token": csrf})
     assert team.status_code == 302
-    assert team.location == f"/datasets/{d.key}/configure#access-management"
+    assert team.location == f"/datasets/{d.key}?tab=access-management#access-management"
     populated = access_section(get(concept_url).text)
     assert populated.count("<table") == 1
     assert populated.index("class='access-owner-row'") < populated.index("data-access-entry")
@@ -528,7 +537,9 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert post(revoke, {}).status_code == 403
     revoked = post(f"{revoke}?concept=1", {"csrf_token": csrf})
     assert revoked.status_code == 302
-    assert revoked.location == f"/datasets/{d.key}/concept#access-management"
+    assert revoked.location == (
+        f"/datasets/{d.key}/concept?tab=access-management#access-management"
+    )
     with factory() as session:
         assert session.get(DatasetExportAccess, access.id) is None
         assert {

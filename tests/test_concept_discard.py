@@ -59,10 +59,13 @@ def test_current_required_preserves_first_metadata(context, published):
     ):
         with pytest.raises(ConflictError, match="There is no Current"):
             operation()
-    response = request(browser, "get", f"/datasets/{c.d.key}/concept")
-    assert "aria-disabled='true' tabindex='0'" in response.text
-    assert "aria-describedby='concept-discard-panel-unavailable'" in response.text
-    assert DISCARD_UNAVAILABLE in response.text
+    response = request(browser, "get", f"/datasets/{c.d.key}/configure")
+    assert response.status_code == 302
+    assert response.location.endswith(
+        f"/datasets/{c.d.key}/concept?tab=dataset-details#dataset-details"
+    )
+    settings = request(browser, "get", response.location)
+    assert settings.status_code == 200 and "Settings" in settings.text
     response = request(browser, "get", f"/datasets/{c.d.key}/concept/discard")
     assert response.status_code == 409 and DISCARD_UNAVAILABLE in response.text
     assert "id='discard-concept-form'" not in response.text
@@ -711,10 +714,13 @@ def test_old_urls_and_posts_do_not_create_concept(context):
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("/configure")
+    assert response.location.endswith("?tab=dataset-details#dataset-details")
     assert active(c) is None
     assert snapshot(c)["dataset_versions"] == before["dataset_versions"]
-    assert request(browser, "get", f"/datasets/{c.d.key}/edit").status_code == 200
+    legacy_edit = request(browser, "get", f"/datasets/{c.d.key}/edit")
+    assert legacy_edit.status_code == 302
+    assert "edit=all" in legacy_edit.location
+    assert request(browser, "get", legacy_edit.location).status_code == 200
 
 
 def test_discard_preserves_another_datasets_active_work(context):

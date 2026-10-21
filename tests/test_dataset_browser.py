@@ -266,9 +266,10 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         page,
     )
 
-    configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
-    assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
-    assert "Configure · SAP → Salesforce" in configuration
+    configuration = body(
+        request(client, "get", f"/datasets/{mapping.key}/concept?tab=dataset-details")
+    )
+    assert "<title>Settings · SAP → Salesforce · REFRNCR</title>" in configuration
     assert "SAP → Salesforce" in configuration
     assert "id='dataset-general'" in configuration
     assert "SAP -&gt; Salesforce" not in configuration
@@ -299,7 +300,7 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
     )[0]
     assert ">Added</span>" not in concept_fields
 
-    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/configure?edit=1"))
+    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/concept?edit=all"))
     assert "name='technical_key'" in edit_page
     assert "value='system-map'" in edit_page
 
@@ -316,7 +317,9 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         },
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/corrected-system-map/configure")
+    assert response.headers["Location"].endswith(
+        "/datasets/corrected-system-map?tab=dataset-details#dataset-details"
+    )
     assert request(client, "get", "/datasets/system-map/configure").status_code == 404
 
 
@@ -434,8 +437,14 @@ def test_reader_can_open_scheduled_mapping_version_without_current_version(datas
 
     configuration = request(client, "get", f"/datasets/{mapping.key}/configure")
 
-    assert configuration.status_code == 200
-    assert "Scheduled mapping" in body(configuration)
+    assert configuration.status_code == 302
+    assert configuration.location.endswith(
+        f"/datasets/{mapping.key}?tab=dataset-details#dataset-details"
+    )
+    settings = body(request(client, "get", configuration.location))
+    assert "Settings" in settings
+    assert "No Current version or active Draft available." in settings
+    assert "Scheduled · Version" not in settings
 
 
 def test_reader_cannot_open_configuration_with_only_cancelled_versions(dataset_browser):
@@ -463,6 +472,25 @@ def test_reader_cannot_open_configuration_with_only_cancelled_versions(dataset_b
     response = request(client, "get", f"/datasets/{dataset.key}/configure")
 
     assert response.status_code == 404
+
+
+def test_legacy_configure_redirects_to_current_version_settings(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "settings-redirect", "Settings redirect")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    current = publish_dataset(services, admin.id, dataset)
+    login(client)
+
+    response = request(client, "get", f"/datasets/{dataset.key}/configure")
+
+    expected = f"/datasets/{dataset.key}/versions/{current.id}?tab=dataset-details#dataset-details"
+    assert response.status_code == 302
+    assert response.location == expected
+    settings = body(request(client, "get", response.location.split("#", 1)[0]))
+    assert "Settings" in settings
+    assert "Configure dataset sections" not in settings
+    assert f"/datasets/{dataset.key}/versions/{current.id}?edit=general" in settings
 
 
 def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_browser):
@@ -1358,7 +1386,7 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
         (
             "mapping",
             {"mapping_mode": "standalone", "source_system": "Legacy", "target_system": "New"},
-            "/datasets/created-mapping/configure#mapping",
+            "/datasets/created-mapping/concept?tab=dataset-details#dataset-details",
         ),
     ],
 )
@@ -1391,7 +1419,7 @@ def test_create_redirects_each_dataset_type_to_its_next_step(
     assert destination.status_code == 200
     if kind in {"reference", "hierarchy"}:
         page = body(destination)
-        assert "No published version yet" in page
+        assert "Fields" in page
         assert "Add field" in page
 
 
@@ -1662,7 +1690,7 @@ def test_owning_member_with_legacy_role_can_edit_with_prg_and_audit(dataset_brow
     services.grants.create_grant(admin.id, "user", user.id, "dataset", dataset.id, permission)
     services.memberships.create_membership(admin.id, user.id, dataset.owner_team_id)
     login(client, "editor@example.com", "user password")
-    edit_form = request(client, "get", "/datasets/editable/edit")
+    edit_form = request(client, "get", "/datasets/editable/concept?edit=all")
     assert edit_form.status_code == 200
     assert "name='key'" not in body(edit_form)
     csrf = form_csrf(edit_form)
@@ -1685,7 +1713,9 @@ def test_owning_member_with_legacy_role_can_edit_with_prg_and_audit(dataset_brow
     )
 
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/editable/configure")
+    assert response.headers["Location"].endswith(
+        "/datasets/editable?tab=dataset-details#dataset-details"
+    )
     with factory() as session:
         persisted = session.get(Dataset, dataset.id)
         audits = session.scalar(
@@ -1715,11 +1745,11 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     )
     login(client)
 
-    response = request(client, "get", "/datasets/edit-form/edit")
+    response = request(client, "get", "/datasets/edit-form/concept?edit=all")
     page = body(response)
 
     assert response.status_code == 200
-    assert "<title>Configure · Stored &lt;name&gt; · REFRNCR</title>" in page
+    assert "<title>Settings · Stored &lt;name&gt; · REFRNCR</title>" in page
     assert "<div class='page-header page-header-actions-end'>" in page
     assert "<label for='dataset-technical-key'>Technical name</label>" in page
     assert "name='technical_key'" in page
@@ -1761,7 +1791,7 @@ def test_community_admin_can_edit_without_dataset_grant(dataset_browser):
         session.execute(Grant.__table__.delete().where(Grant.resource_type == "dataset"))
     login(client)
 
-    edit_form = request(client, "get", "/datasets/admin-edit/edit")
+    edit_form = request(client, "get", "/datasets/admin-edit/concept?edit=all")
     response = request(
         client,
         "post",
@@ -1849,7 +1879,7 @@ def test_invalid_edit_redisplays_escaped_values_without_mutation(dataset_browser
     factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "invalid-edit", "Original", "Original")
     login(client)
-    edit_form = request(client, "get", "/datasets/invalid-edit/edit")
+    edit_form = request(client, "get", "/datasets/invalid-edit/concept?edit=all")
     markup = "<script>alert(1)</script>"
 
     response = request(
@@ -1860,6 +1890,7 @@ def test_invalid_edit_redisplays_escaped_values_without_mutation(dataset_browser
             "name": markup,
             "description": "x" * 10_001,
             "csrf_token": form_csrf(edit_form),
+            "settings_return_context": "concept",
         },
     )
 
@@ -3219,7 +3250,16 @@ def test_panel_validation_keeps_server_errors_values_and_csrf(dataset_browser, p
     rejected = request(client, "post", path, data=data)
     assert rejected.status_code == 403
     assert "data-side-panel-content" not in body(rejected)
-    response = request(client, "post", path, data={**data, "csrf_token": csrf})
+    response = request(
+        client,
+        "post",
+        path,
+        data={
+            **data,
+            "csrf_token": csrf,
+            **({"settings_return_context": "concept"} if path == "/datasets/panel-errors" else {}),
+        },
+    )
     page = body(response)
     assert response.status_code == 400
     if path == "/datasets/panel-errors":
