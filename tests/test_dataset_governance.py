@@ -490,6 +490,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
+    assert empty.index(">Grant access</button>") < empty.index("id='export-subject-help'")
     assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
     invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400

@@ -50,9 +50,9 @@
                         <optgroup label='Teams'>{% for team in teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
                       </select>
                       <button class='button button-primary' type='submit'>Grant access</button>
+                      <p class='help-text access-grant-help' id='export-subject-help'>Export only: they can view and download the records, not change them.</p>
                     </div>
                     {% if error %}<p class='error-text' id='export-subject-error'>{{ error }}</p>{% endif %}
-                    <p class='help-text' id='export-subject-help'>Export only: they can view and download the records, not change them.</p>
                   </div>
                 </form>
               </td></tr>

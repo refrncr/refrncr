@@ -88,8 +88,9 @@
 .access-owner-type { white-space: nowrap; }
 .access-grant-row td { padding: var(--space-md); background: var(--color-surface-subtle); }
 .access-grant-row .form-field { margin: 0; }
-.access-grant-row .inline-form-action { max-width: 42rem; margin-top: 0; }
+.access-grant-row .inline-form-action { grid-template-columns: minmax(0, 1fr) auto minmax(12rem, 1.25fr); max-width: 42rem; margin-top: 0; align-items: center; }
 .access-grant-row .help-text { margin: var(--space-xs) 0 0; }
+.access-grant-row .access-grant-help { margin: 0; }
 .access-empty-help { margin-bottom: var(--space-sm) !important; }
 .access-owner-action { font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-decoration: none; white-space: nowrap; }
 .access-owner-action:hover { text-decoration: underline; }
