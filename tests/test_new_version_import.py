@@ -134,6 +134,36 @@ def test_record_mutations_block_all_new_import_steps(database_context, mutation)
             operation()
 
 
+def test_import_unavailable_message_explains_complete_record_set(database_context):
+    c = database_context
+    clean(c)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Manual change"}
+    )
+    reason = c.s.record_imports.eligibility(c.a.id, c.d.key)
+    assert reason[0] == "Import unavailable"
+    message = reason[1]
+    for explanation in (
+        "For safety",
+        "an import doesn't add Records",
+        "the file describes the complete set of Records you want",
+        "Added, Changed, Unchanged or Deleted",
+        "Publish or discard this Draft",
+    ):
+        assert explanation in message
+
+    browser, _ = dataset_version_client(c)
+    records_page = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+    assert records_page.status_code == 200
+    assert "For safety" in records_page.text
+    assert "Added, Changed, Unchanged or Deleted" in records_page.text
+
+    import_page = request(browser, "get", f"/datasets/{c.d.key}/records/import")
+    assert import_page.status_code == 400
+    assert "For safety" in import_page.text
+    assert "Added, Changed, Unchanged or Deleted" in import_page.text
+
+
 @pytest.mark.parametrize("mutation", ["add", "edit", "delete", "restore"])
 def test_unpublished_dataset_allows_import_after_record_mutations(database_context, mutation):
     c = database_context

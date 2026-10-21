@@ -1019,9 +1019,11 @@ class DatasetRecordImportService:
         if concept.records_mutated:
             return (
                 "Import unavailable",
-                "Records in this Draft have already been changed. "
-                "Importing a file could overwrite or mix with those changes. Publish or discard "
-                "this Draft, then create a new Draft to import a new version.",
+                "Records in this Draft have already been changed. For safety, an import can't "
+                "be combined with other changes: an import doesn't add Records; the file "
+                "describes the complete set of Records you want. refrncr compares it with the "
+                "current Records and marks each one as Added, Changed, Unchanged or Deleted. "
+                "Publish or discard this Draft, then create a new Draft to import a new version.",
             )
         return None
 
