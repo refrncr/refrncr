@@ -160,7 +160,7 @@ def test_unpublished_dataset_allows_import_after_record_mutations(database_conte
     assert f"/datasets/{c.d.key}/records/import" in records_page.text
     import_page = request(browser, "get", f"/datasets/{c.d.key}/records/import")
     assert import_page.status_code == 200
-    assert "you can import again after changing Records or importing once" in import_page.text
+    assert "Supported formats: .csv and .xlsx." in import_page.text
 
     state, result = preview(c, b"code,label\na,Cafe\n", session=f"unpublished-{mutation}")
     assert result.valid
@@ -235,6 +235,15 @@ def test_field_only_and_legacy_eligibility(context):
     )
     with pytest.raises(ImportValidationError, match="created before"):
         preview(c)
+
+
+def test_import_eligibility_without_active_concept_returns_conflict(context):
+    c = context
+    setup(c)
+    publish(c)
+
+    with pytest.raises(ConflictError, match="Start a New concept before editing this Dataset"):
+        c.s.record_imports.eligibility(c.a.id, c.d.key)
 
 
 @pytest.mark.parametrize("source", [b"code,label\na,One\na,Two\n", b"code,label\n,Missing\n"])

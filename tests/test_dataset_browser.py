@@ -612,7 +612,8 @@ def test_missing_required_record_value_uses_inline_field_error(dataset_browser):
     assert "id='new-record-code-error' role='alert'" in page
     assert "class='field-error'" in page
     assert "A value is required" in page
-    assert "concept-banner" not in page
+    assert "class='concept-banner'" in page
+    assert "concept-banner" not in page.split("data-side-panel-content", 1)[1]
 
 
 def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_browser):
@@ -671,13 +672,47 @@ def test_draft_notice_is_not_duplicated_in_field_or_record_panels(dataset_browse
 
     create_panel = body(request(client, "get", f"/datasets/{dataset.key}/fields/new"))
     edit_panel = body(request(client, "get", f"/datasets/{dataset.key}/fields/{field.key}/edit"))
-    assert "concept-banner" not in create_panel
-    assert "concept-banner" not in edit_panel
+    for panel_page in (create_panel, edit_panel):
+        assert "class='concept-banner'" in panel_page
+        assert "concept-banner" not in panel_page.split("data-side-panel-content", 1)[1]
 
     delete_page = body(
         request(client, "get", f"/datasets/{dataset.key}/records/{record.id}/delete")
     )
     assert "class='concept-banner'" in delete_page
+
+
+def test_record_form_draft_notice_is_outside_side_panel_content(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "record-form-notice")
+    create_field(services, admin, dataset, "code", "Code")
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records/new"))
+
+    assert "class='concept-banner'" in page
+    assert "concept-banner" not in page.split("data-side-panel-content", 1)[1]
+
+
+def test_record_level_error_uses_standard_alert_style(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "record-level-error")
+    create_field(services, admin, dataset, "code", "Code")
+    login(client)
+    form = request(client, "get", f"/datasets/{dataset.key}/records/new")
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{dataset.key}/records",
+        data={"unexpected": "value", "csrf_token": form_csrf(form)},
+    )
+
+    assert response.status_code == 400
+    page = body(response)
+    assert "class='alert alert-error' role='alert'" in page
+    assert "Record contains unknown Dataset fields" in page
+    assert "concept-banner" not in page.split("data-side-panel-content", 1)[1]
 
 
 def test_record_table_right_aligns_and_pads_number_columns(dataset_browser):

@@ -278,9 +278,7 @@ def test_overview_context_breadcrumbs_and_utc(dataset_browser):
         if path.endswith("/import"):
             available = request(client, "get", path)
             assert available.status_code == 200
-            assert "you can import again after changing Records or importing once" in body(
-                available
-            )
+            assert "Supported formats: .csv and .xlsx." in body(available)
         response = request(client, "get", path)
         assert response.status_code == 200
         html = body(response)

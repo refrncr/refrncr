@@ -46,12 +46,16 @@ async function login(page) {
         const unique = panel.getByLabel('Unique', {exact: true});
         await identifier.check();
         assert(await required.isChecked());
-        assert(await required.isDisabled());
+        assert.equal(await required.getAttribute('aria-disabled'), 'true');
+        assert.match(await panel.locator('[data-identifier-status]').textContent(), /checked and locked/);
+        await required.click();
+        assert(await required.isChecked(), 'the required constraint stays checked while locked');
         assert.equal(await panel.locator('[data-required-mirror]').count(), 1);
         assert.equal(await unique.isChecked(), false, 'identifier membership does not imply uniqueness');
         await identifier.uncheck();
         assert(await required.isChecked(), 'removing identifier membership preserves Required');
         assert.equal(await required.isDisabled(), false);
+        assert.equal(await required.getAttribute('aria-disabled'), null);
         await identifier.check();
       }
       if (id === 'float') {

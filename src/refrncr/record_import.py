@@ -1027,8 +1027,10 @@ class DatasetRecordImportService:
 
     def eligibility(self, actor_id, dataset_key):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        from refrncr.services import _require_concept
+
         with self.uow() as uow:
-            concept = uow.concepts.get(dataset.id)
+            concept = _require_concept(uow, dataset.id)
             has_non_cancelled_version = uow.versions.latest_non_cancelled(dataset.id) is not None
         return self._eligibility(concept, has_non_cancelled_version)
 

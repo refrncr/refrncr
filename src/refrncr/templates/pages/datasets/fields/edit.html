@@ -3,7 +3,7 @@
 {% from "components/side_panel.html" import panel_form_actions %}
 {% from "pages/datasets/fields/_form_fields.html" import field_form_fields %}
 {% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Edit field</h1>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Edit field</h1>{% include 'pages/datasets/concepts/_banner.html' %}
   <div class='side-panel-view' data-side-panel-content data-panel-title='Edit field' data-panel-eyebrow='Configure · {{ dataset.name }}'>
     <div class='side-panel-body'>
       {% if not may_edit_key %}{{ readonly_field("Key", field.key, technical=true) }}{% endif %}

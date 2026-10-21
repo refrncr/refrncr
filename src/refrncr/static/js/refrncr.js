@@ -152,18 +152,26 @@
       const scope = identifier.closest("[data-mapping-field-panel]") || form;
       const required = scope?.querySelector("[data-identifier-required]");
       if (!form || !required || identifierRequirementSyncs.has(identifier)) return;
-      const sync = () => {
+      const sync = (announce = false) => {
         const active = identifier.checked;
         const locked = required.hasAttribute("data-role-locked");
         const inactivePanel = Boolean(identifier.closest("[data-mapping-field-panel][hidden]"));
         if (active) required.checked = true;
-        required.disabled = locked || active || inactivePanel;
+        required.disabled = locked || inactivePanel;
+        if (active && !locked) required.setAttribute("aria-disabled", "true");
+        else required.removeAttribute("aria-disabled");
         const identifierHelp = scope.querySelector("[data-identifier-required-help]");
         const defaultHelp = scope.querySelector("[data-required-help]");
+        const status = scope.querySelector("[data-identifier-status]");
         if (identifierHelp) identifierHelp.hidden = !active;
         if (defaultHelp) defaultHelp.hidden = active;
         const help = active ? identifierHelp : defaultHelp;
         if (help) required.setAttribute("aria-describedby", help.id);
+        if (status && announce) {
+          status.textContent = active
+            ? "Required is checked and locked because this field is part of the Record identifier."
+            : "Required can now be changed.";
+        }
         let mirror = scope.querySelector("[data-required-mirror]");
         if (active && !locked && !mirror) {
           mirror = document.createElement("input");
@@ -177,7 +185,13 @@
         }
       };
       identifierRequirementSyncs.set(identifier, sync);
-      identifier.addEventListener("change", sync);
+      identifier.addEventListener("change", () => sync(true));
+      required.addEventListener("click", (event) => {
+        if (required.getAttribute("aria-disabled") === "true") event.preventDefault();
+      });
+      required.addEventListener("change", () => {
+        if (identifier.checked) required.checked = true;
+      });
       sync();
     });
   };

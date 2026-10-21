@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "pages/datasets/fields/_form_fields.html" import field_form_fields %}
 {% block content %}
-  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Add field</h1>
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Add field</h1>{% include 'pages/datasets/concepts/_banner.html' %}
   <div class='side-panel-body' data-side-panel-content data-panel-title='Add field' data-panel-eyebrow='Configure · {{ dataset.name }}'>{% if error %}<div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ error }}</div>{% endif %}
   <form {{ non_login_form_attrs() }} class='form' data-generate-key{% if dataset.kind == 'mapping' %} data-mapping-field-form{% endif %} novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>
     {% if dataset.kind == 'mapping' %}
