@@ -265,6 +265,72 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         page,
     )
 
+
+@pytest.mark.parametrize("mapping_mode", ["standalone", "linked"])
+def test_published_mapping_configuration_and_field_details_load(dataset_browser, mapping_mode):
+    _, services, admin, client = dataset_browser
+    source_dataset_id = source_field_key = None
+    if mapping_mode == "linked":
+        source = create_dataset(services, admin, "mapping-source", "Mapping source")
+        source_field = create_field(
+            services, admin, source, key="code", name="Code", is_required=True
+        )
+        services.dataset_business_keys.set_business_key(admin.id, source.key, (source_field.key,))
+        source_dataset_id, source_field_key = source.id, source_field.key
+
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        f"published-{mapping_mode}-mapping",
+        f"Published {mapping_mode} mapping",
+        "",
+        kind="mapping",
+        mapping_mode=mapping_mode,
+        source_system="Source system",
+        target_system="Target system",
+        source_dataset_id=source_dataset_id,
+        source_field_key=source_field_key,
+    )
+    if mapping_mode == "standalone":
+        services.dataset_fields.create_field(
+            admin.id,
+            mapping.key,
+            "source_code",
+            "Source code",
+            "string",
+            is_required=True,
+            is_business_key_component=True,
+            mapping_role="source_identifier",
+        )
+    target = services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "target_code",
+        "Target code",
+        "string",
+        is_required=True,
+        mapping_role="mapping_target",
+    )
+    login(client)
+    version = publish_dataset(services, admin.id, mapping)
+
+    for tab in ("dataset-details", "mapping", "fields", "access-management"):
+        response = request(client, "get", f"/datasets/{mapping.key}?tab={tab}")
+        assert response.status_code == 200
+    mapping_page = body(request(client, "get", f"/datasets/{mapping.key}?tab=mapping"))
+    assert f"{mapping_mode.capitalize()}</dd>" in mapping_page
+    if mapping_mode == "linked":
+        assert "Mapping source" in mapping_page
+        assert "Source system" in mapping_page
+
+    detail = request(
+        client,
+        "get",
+        f"/datasets/{mapping.key}/versions/{version.id}/fields/{target.key}",
+    )
+    assert detail.status_code == 200
+    assert target.name in body(detail)
+
     configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
     assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
     assert "Configure · SAP → Salesforce" in configuration

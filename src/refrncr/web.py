@@ -1165,9 +1165,12 @@ def create_flask_app(
         overview = None
         draft_in_progress = False
         may_export = False
+        mapping_configuration = None
         if standalone:
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
+            if dataset.kind == "mapping":
+                mapping_configuration = dataset
             editable = configuration.may_maintain
             may_govern = configuration.may_govern
             may_edit_key = configuration.may_edit_key
@@ -1213,6 +1216,10 @@ def create_flask_app(
                     history=history,
                 )
             dataset = view.context.dataset
+            if dataset.kind == "mapping":
+                # PublishedDataset intentionally contains snapshot content, not mutable
+                # mapping configuration. Read the separately authorized current metadata.
+                mapping_configuration = datasets.get_dataset_configuration(actor.id, key).dataset
             editable = view.may_maintain
             schema_admin = view.state is None and view.may_maintain
             may_govern = editable and authorization.datasets.can_change_dataset_owner(
@@ -1255,10 +1262,12 @@ def create_flask_app(
             "last_updated": overview.last_updated if overview else None,
         }
         mapping_source_table = None
-        if dataset.kind == "mapping" and dataset.source_dataset_id:
+        if mapping_configuration and mapping_configuration.source_dataset_id:
             try:
                 visible_dataset_lookup = datasets.get_visible_dataset_by_id
-                mapping_source_table = visible_dataset_lookup(actor.id, dataset.source_dataset_id)
+                mapping_source_table = visible_dataset_lookup(
+                    actor.id, mapping_configuration.source_dataset_id
+                )
             except NotFoundError:
                 mapping_source_table = None
         mapping_incomplete_text = (
@@ -1276,6 +1285,7 @@ def create_flask_app(
         return render_authenticated_template(
             "pages/datasets/detail.html",
             dataset=dataset,
+            mapping_configuration=mapping_configuration,
             context=context,
             standalone_configuration=standalone,
             configuration_url=url_for("dataset_configuration", key=dataset.key),

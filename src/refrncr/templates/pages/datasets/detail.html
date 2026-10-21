@@ -116,10 +116,10 @@
       <div class='page-header section-header'><div><h2 id='mapping-heading'>Mapping</h2><p class='section-description'>How source records populate this mapping dataset.</p></div></div>
       {% if mapping_incomplete %}{{ feedback(mapping_incomplete_message, kind="warning") }}{% endif %}
       <dl class='detail-list'>
-        <div><dt>Mapping setup</dt><dd>{{ dataset.mapping_mode|capitalize }}</dd></div>
-        {% if dataset.mapping_mode == 'linked' %}
+        <div><dt>Mapping setup</dt><dd>{{ mapping_configuration.mapping_mode|capitalize }}</dd></div>
+        {% if mapping_configuration.mapping_mode == 'linked' %}
         <div><dt>Source dataset</dt><dd>{{ mapping_source_table.name if mapping_source_table else 'Unavailable' }}</dd></div>
-        <div><dt>Source identifier</dt><dd>{{ dataset.source_system or dataset.source_field_key }}</dd></div>
+        <div><dt>Source identifier</dt><dd>{{ mapping_configuration.source_system or mapping_configuration.source_field_key }}</dd></div>
         {% endif %}
         <div><dt>Target dataset</dt><dd><span class='detail-hint-inline'>Not configured · future capability</span></dd></div>
       </dl>
