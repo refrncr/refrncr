@@ -1386,7 +1386,7 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
         (
             "mapping",
             {"mapping_mode": "standalone", "source_system": "Legacy", "target_system": "New"},
-            "/datasets/created-mapping/concept?tab=dataset-details#dataset-details",
+            "/datasets/created-mapping/concept?tab=fields#fields",
         ),
     ],
 )

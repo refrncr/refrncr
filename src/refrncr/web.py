@@ -1084,16 +1084,6 @@ def create_flask_app(
                 error_field=error_field,
             )
             return response, 409 if isinstance(error, ConflictError) else 400
-        if dataset.kind == "mapping":
-            return redirect(
-                url_for(
-                    "dataset_detail",
-                    key=dataset.key,
-                    concept=True,
-                    tab="dataset-details",
-                    _anchor="dataset-details",
-                )
-            )
         return redirect(
             url_for(
                 "dataset_detail",
