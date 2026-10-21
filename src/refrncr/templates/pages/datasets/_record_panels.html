@@ -50,10 +50,10 @@
       {% endif %}
     </section>
     {% if record_may_edit %}
-      <form class='side-panel-view side-panel-form' data-panel-view='edit' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='edit' data-focus-return-record-id='{{ record.id }}' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-        <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
+        <input type='hidden' name='expected_revision' value='{{ record.revision }}'><input type='hidden' name='return_focus' value='pointer'>
         <footer class='side-panel-footer'>
           <button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>
           <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>

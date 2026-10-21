@@ -44,6 +44,11 @@ def test_admin_created_user_form_is_shielded_and_uses_neutral_names(dataset_brow
     assert "name='invitee_display_name' autocomplete='off'" in page
     assert "name='invitee_password' type='password' autocomplete='off'" in page
     assert "data-bwignore='true'" in page
+    assert "id='user-search' type='search' autocomplete='off' data-form-type='other'" in page
+    assert "data-1p-ignore data-lpignore='true' data-bwignore='true'" in page
+
+    team_page = body(request(client, "get", "/teams"))
+    assert "id='team-search' type='search' autocomplete='off' data-form-type='other'" in team_page
 
     response = request(
         client,

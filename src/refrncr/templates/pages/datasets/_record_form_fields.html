@@ -2,6 +2,14 @@
   {% set errors = errors or {} %}
   {% for field in fields %}
     {% set read_only_mapping_field = field.source_field_key %}
+    {% set field_value = values.get(field.key) if values is not none else none %}
+    {% if values is not none %}
+      {% if raw_values %}
+        {% set rendered_value = field_value if field_value is not none else '' %}
+      {% else %}
+        {% set rendered_value = field_value|record_value_text(field.data_type) if field_value is not none else '' %}
+      {% endif %}
+    {% endif %}
     <div class='form-field'>
       <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} <span class='required-mark' aria-hidden='true'>*</span>{% endif %}</label>
       {% if field.data_type == 'boolean' %}
@@ -11,7 +19,7 @@
           <option value='false'{% if values is not none and values.get(field.key) in (false, 'false') %} selected{% endif %}>No</option>
         </select>
       {% else %}
-        <input id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}' autocomplete='off' {{ non_login_field_attrs() }}{% if values is not none %} value='{{ values.get(field.key) if raw_values else values.get(field.key)|record_value_text(field.data_type) }}'{% endif %}{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} readonly aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>
+        <input id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}' type='{{ "date" if field.data_type == "date" else "text" }}' autocomplete='off' {{ non_login_field_attrs() }}{% if values is not none %} value='{{ rendered_value }}'{% endif %}{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} readonly aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>
       {% endif %}
       {% if read_only_mapping_field %}<p class='field-help'>Copied from the source dataset and read-only.</p>{% endif %}
       {% if errors.get(field.key) %}<p class='field-error' id='{{ prefix }}-{{ field.key }}-error' role='alert'>{{ errors[field.key] }}</p>{% endif %}

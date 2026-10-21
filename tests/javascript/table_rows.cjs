@@ -89,7 +89,7 @@ assert.equal(primary.clicks, 2, 'explicit semantic cells remain usable row space
 fire({closest: () => null});
 assert.equal(primary.clicks, 2, 'headers and non-navigable rows are ignored');
 const keydowns = listeners.filter(l => l.type === 'keydown');
-assert.equal(keydowns.length, 2, 'global Escape and row keyboard handlers are registered');
+assert.equal(keydowns.length, 3, 'global Escape, focus modality and row keyboard handlers are registered');
 const keydown = keydowns.at(-1).callback;
 exportMenu.open = true;
 keydown({key: 'Enter'});

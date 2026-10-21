@@ -38,7 +38,7 @@
       <tbody>
         {% for record, values, incomplete in rows %}
           {% set status = record_states.get(record.id) if record_states.get(record.id) != 'Published' else none %}
-          {% call table_row('record-row record-tombstone' if status == status_label(ChangeStatus.REMOVED) else 'record-row', panel=true) %}
+          {% call table_row('record-row record-tombstone' if status == status_label(ChangeStatus.REMOVED) else 'record-row', panel=true, row_id='record-row-' ~ record.id) %}
             {% set row_direction = namespace(rendered=false) %}
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}

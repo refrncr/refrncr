@@ -1,6 +1,7 @@
 (() => {
   if (document.refrncrInitialized) return;
   document.refrncrInitialized = true;
+  let keyboardInput = false;
   document.querySelectorAll("[data-password-toggle]").forEach((button) => {
     const input = document.getElementById(button.getAttribute("aria-controls"));
     if (!input || input.type !== "password") return;
@@ -77,9 +78,19 @@
     window.addEventListener("scroll", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); }, true);
   });
   document.addEventListener("pointerdown", (event) => {
+    keyboardInput = false;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
     if (openFieldMetadata && !openFieldMetadata.panel.contains(event.target) && event.target !== openFieldMetadata.trigger) closeFieldMetadata();
   });
   document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    const active = document.activeElement;
+    if (active?.matches?.(".interactive-row .row-action[data-pointer-restored-focus]")) {
+      active.removeAttribute("data-pointer-restored-focus");
+      active.setAttribute("data-keyboard-restored-focus", "");
+    } else {
+      active?.removeAttribute?.("data-pointer-restored-focus");
+    }
     if (event.key === "Escape" && openFieldMetadata) {
       const {trigger} = openFieldMetadata;
       closeFieldMetadata();
@@ -606,6 +617,26 @@
   const panelLoads = new WeakMap();
   const panelParents = new WeakMap();
   const pendingForms = new WeakSet();
+  document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
+    if (event.target !== document.activeElement) {
+      event.target?.removeAttribute?.("data-pointer-restored-focus");
+    }
+  }, true);
+  document.addEventListener("pointerdown", () => {
+    keyboardInput = false;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
+    document.activeElement?.removeAttribute?.("data-keyboard-restored-focus");
+  }, true);
+  document.addEventListener("focusout", (event) => {
+    event.target?.removeAttribute?.("data-pointer-restored-focus");
+    event.target?.removeAttribute?.("data-keyboard-restored-focus");
+  }, true);
+  document.addEventListener("submit", (event) => {
+    const focusReturn = event.target.querySelector?.("[name='return_focus']");
+    if (focusReturn) focusReturn.value = keyboardInput ? "keyboard" : "pointer";
+  }, true);
   const visibleControl = (element) =>
     !element.closest("[hidden]") && element.getClientRects().length > 0;
   const focusSidePanel = (dialog) => {
@@ -704,6 +735,11 @@
     if (opener?.isConnected && !opener.matches(":disabled, [hidden], [tabindex='-1']")) {
       // Menu actions must be visible again before Cancel/Escape restores focus.
       opener.closest("details")?.setAttribute("open", "");
+      if (opener.matches(".interactive-row .row-action") && !keyboardInput) {
+        opener.setAttribute("data-pointer-restored-focus", "");
+      } else {
+        opener.removeAttribute?.("data-pointer-restored-focus");
+      }
       opener.focus();
     } else {
       document.getElementById("content")?.focus();
@@ -918,6 +954,8 @@
     });
   });
   document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
     if (event.key === "Escape") {
       exportMenus.forEach((menu) => menu.removeAttribute("open"));
       document.querySelectorAll(".button-row-icon[data-tooltip]:is(:hover, :focus-visible)").forEach((trigger) => {
@@ -925,6 +963,24 @@
       });
     }
   });
+
+  if (typeof window !== 'undefined' && window.location?.search) {
+    const focusReturn = new URLSearchParams(window.location.search);
+    const focusRecord = focusReturn.get("focus_record");
+    if (focusRecord) {
+      const primary = document.getElementById(`record-row-${focusRecord}`)?.querySelector("[data-row-primary]");
+      if (primary) {
+        const keyboard = focusReturn.get("focus_mode") === "keyboard";
+        primary.toggleAttribute("data-pointer-restored-focus", !keyboard);
+        primary.toggleAttribute("data-keyboard-restored-focus", keyboard);
+        primary.focus();
+      }
+      focusReturn.delete("focus_record");
+      focusReturn.delete("focus_mode");
+      const remaining = focusReturn.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${remaining ? `?${remaining}` : ""}`);
+    }
+  }
 
   // Keep selectable text unobstructed: only enhance unused parts of a row.
   // The primary anchor/button retains its own native keyboard and pointer behavior.

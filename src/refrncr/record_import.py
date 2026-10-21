@@ -1004,7 +1004,7 @@ class DatasetRecordImportService:
             return (
                 "Import unavailable",
                 "This Draft was created before new-version imports were introduced, "
-                "so REFRNCR cannot reliably verify that its Records are unchanged. "
+                "so refrncr cannot reliably verify that its Records are unchanged. "
                 "Publish or discard this Draft, then create a new Draft "
                 "to import a new version.",
             )

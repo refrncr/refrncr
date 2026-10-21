@@ -58,12 +58,14 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .row-action:hover { color: inherit; }
 .row-action-label { display: block; min-width: 0; }
 .interactive-row:has(.row-action:not(:disabled):not([aria-disabled="true"])):hover > td { background-image: linear-gradient(color-mix(in srgb, var(--color-row-hover) 35%, transparent), color-mix(in srgb, var(--color-row-hover) 35%, transparent)); }
-.interactive-row:hover .row-action-label, .interactive-row:has(.row-action:focus-visible) .row-action-label { text-decoration: underline; text-underline-offset: .18em; }
-.interactive-row:has(.row-action:focus-visible) { outline: 3px solid var(--color-focus-ring); outline-offset: -3px; }
-.row-action:focus-visible { outline-offset: 0; }
+.interactive-row:hover .row-action-label, .interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])) .row-action-label, .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) .row-action-label { text-decoration: underline; text-underline-offset: .18em; }
+.interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])), .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) { outline: none; }
+.interactive-row .row-action:focus-visible { outline: none; }
+.interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])) > td, .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) > td { box-shadow: inset 0 3px var(--color-focus-ring), inset 0 -3px var(--color-focus-ring); }
+.interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])) > td:first-child, .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) > td:first-child { box-shadow: inset 3px 0 var(--color-focus-ring), inset 0 3px var(--color-focus-ring), inset 0 -3px var(--color-focus-ring); }
+.interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])) > td:last-child, .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) > td:last-child { box-shadow: inset -3px 0 var(--color-focus-ring), inset 0 3px var(--color-focus-ring), inset 0 -3px var(--color-focus-ring); }
 .interactive-row:active .row-action-label { text-decoration: underline double; }
 .interactive-row:active { outline: 1px solid var(--color-border); outline-offset: -1px; }
-.interactive-row:has(.row-action:focus-visible):active { outline: 3px solid var(--color-focus-ring); outline-offset: -3px; }
 @media (max-width: 767px) {
   .record-toolbar { flex-wrap: wrap; }
   .record-toolbar .search-field { max-width: none; }
@@ -128,6 +130,12 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 /* Exception rows: concept changes and pending removals get an edge marker next to their badge. */
 .record-table .record-row:has(> .record-system-status .badge-draft) > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-draft-border); }
 .record-table .record-tombstone > td:first-child { box-shadow: inset 3px 0 0 var(--color-status-removed-border); }
+/* Keep the keyboard focus ring above row-status markers in the first cell. */
+.record-table .interactive-row:has(.row-action:focus-visible:not([data-pointer-restored-focus])) > td:first-child,
+.record-table .interactive-row:has(.row-action[data-keyboard-restored-focus]:focus) > td:first-child {
+  box-shadow: inset 3px 0 var(--color-focus-ring), inset 0 3px var(--color-focus-ring),
+    inset 0 -3px var(--color-focus-ring);
+}
 .row-secondary { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-regular); overflow-wrap: break-word; }
 /* Row headers name the row; they are not column headings. */
 tbody th[scope="row"] { background: transparent; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }

@@ -11,16 +11,27 @@ d = create_dataset(s, admin, "row-check", "Row check")
 create_field(s, admin, d, "description", "Description")
 create_field(s, admin, d, "code", "Code", is_required=True)
 s.dataset_business_keys.set_business_key(admin.id, d.key, ("code",))
+records = []
 for i in range(52):
-    s.dataset_records.create_record(
-        admin.id,
-        d.key,
-        {
-            "code": f"ITEM-{i:02}",
-            "description": "Selectable row text " + ("Long" * 100 if i == 0 else str(i)),
-        },
+    records.append(
+        s.dataset_records.create_record(
+            admin.id,
+            d.key,
+            {
+                "code": f"ITEM-{i:02}",
+                "description": "Selectable row text " + ("Long" * 100 if i == 0 else str(i)),
+            },
+        )
     )
 publish_dataset(s, admin.id, d)
+s.dataset_versions.create_concept(admin.id, d.id)
+s.dataset_records.update_record(
+    admin.id,
+    d.key,
+    records[0].id,
+    records[0].revision,
+    {"code": "ITEM-00", "description": "Changed row text"},
+)
 hierarchy = create_owned_dataset(
     s.datasets,
     admin.id,

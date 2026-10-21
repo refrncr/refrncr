@@ -3528,7 +3528,9 @@ def create_flask_app(
                 record=record,
             )
         require_csrf(login_session.csrf_token)
-        submitted, errors = parsed_record_form(fields, {"csrf_token", "expected_revision"})
+        submitted, errors = parsed_record_form(
+            fields, {"csrf_token", "expected_revision", "return_focus"}
+        )
         try:
             expected_revision = exact_expected_revision()
         except ValidationError as error:
@@ -3577,7 +3579,18 @@ def create_flask_app(
             )
         except NotFoundError:
             abort(404)
-        return redirect(url_for("dataset_records_view", key=key, concept=True))
+        focus_mode = (
+            "keyboard" if request.form.getlist("return_focus") == ["keyboard"] else "pointer"
+        )
+        return redirect(
+            url_for(
+                "dataset_records_view",
+                key=key,
+                concept=True,
+                focus_record=record_id,
+                focus_mode=focus_mode,
+            )
+        )
 
     @dataset_route(
         "/datasets/<key>/concept/records/<record_id>/restore",

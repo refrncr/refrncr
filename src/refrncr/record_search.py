@@ -70,6 +70,8 @@ def parse_parameters(items):
         "import_results",
         "status_selection",
         "action",
+        "focus_record",
+        "focus_mode",
     }
     for name, value in items:
         if not isinstance(value, str) or len(value) > MAX_INPUT_LENGTH:
@@ -92,6 +94,11 @@ def parse_parameters(items):
         raise RecordSearchError("Import statuses require import results.")
     if values.get("action", "") not in {"", "search", "apply"}:
         raise RecordSearchError("Invalid search action.")
+    if "focus_record" in values:
+        if not values["focus_record"] or values.get("focus_mode") not in {"pointer", "keyboard"}:
+            raise RecordSearchError("Invalid focus return parameters.")
+    elif "focus_mode" in values:
+        raise RecordSearchError("Invalid focus return parameters.")
     status = values.get("record_status", "all")
     selected_changes = tuple(status.split(",")) if status != "all" else ()
     if (

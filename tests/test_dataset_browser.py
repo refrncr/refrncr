@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -265,6 +266,58 @@ def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
         page,
     )
 
+    configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
+    assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
+    assert "Configure · SAP → Salesforce" in configuration
+    assert "<p class='dataset-identity-name'>SAP → Salesforce</p>" in configuration
+    assert "SAP -&gt; Salesforce" not in configuration
+    assert "<dt>Technical name</dt>" in configuration
+    assert "Editable until published" in configuration
+    assert "It cannot be changed after the first publication." not in configuration
+    fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
+    assert ">Add field</a>" in fields_section
+    assert "Concept · Read only" not in fields_section
+    assert "data-field-order" in fields_section
+    assert "name='csrf_token'" in fields_section
+    assert "name='field_id'" in fields_section
+    assert ">Description</th>" not in fields_section
+    assert ">Mapping</th>" in fields_section
+    source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
+    field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
+    mapping_properties = re.search(r"<td class='field-mapping'>(.*?)</td>", source_row, re.DOTALL)[
+        1
+    ]
+    constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
+    assert "Source identifier" not in field_cell
+    assert "Source identifier" in mapping_properties
+    assert "Source identifier" not in constraints
+
+    concept_configuration = body(request(client, "get", f"/datasets/{mapping.key}/concept#fields"))
+    concept_fields = concept_configuration.split("<section id='fields'", 1)[1].split(
+        "</section>", 1
+    )[0]
+    assert ">Added</span>" not in concept_fields
+
+    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/configure?edit=1"))
+    assert "name='technical_key'" in edit_page
+    assert "value='system-map'" in edit_page
+
+    response = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "name": mapping.name,
+            "description": mapping.description,
+            "technical_key": "corrected-system-map",
+            "icon": mapping.icon or "",
+        },
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/datasets/corrected-system-map/configure")
+    assert request(client, "get", "/datasets/system-map/configure").status_code == 404
+
 
 @pytest.mark.parametrize("mapping_mode", ["standalone", "linked"])
 def test_published_mapping_configuration_and_field_details_load(dataset_browser, mapping_mode):
@@ -321,7 +374,7 @@ def test_published_mapping_configuration_and_field_details_load(dataset_browser,
     assert f"{mapping_mode.capitalize()}</dd>" in mapping_page
     if mapping_mode == "linked":
         assert "Mapping source" in mapping_page
-        assert "Source system" in mapping_page
+        assert "Code" in mapping_page
 
     detail = request(
         client,
@@ -331,57 +384,84 @@ def test_published_mapping_configuration_and_field_details_load(dataset_browser,
     assert detail.status_code == 200
     assert target.name in body(detail)
 
-    configuration = body(request(client, "get", f"/datasets/{mapping.key}/configure"))
-    assert "<title>Configure · SAP → Salesforce · REFRNCR</title>" in configuration
-    assert "Configure · SAP → Salesforce" in configuration
-    assert "<p class='dataset-identity-name'>SAP → Salesforce</p>" in configuration
-    assert "SAP -&gt; Salesforce" not in configuration
-    assert "<dt>Technical name</dt>" in configuration
-    assert "Editable until published" in configuration
-    assert "It cannot be changed after the first publication." not in configuration
-    fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
-    assert ">Add field</a>" in fields_section
-    assert "Concept · Read only" not in fields_section
-    assert "data-field-order" in fields_section
-    assert "name='csrf_token'" in fields_section
-    assert "name='field_id'" in fields_section
-    assert ">Description</th>" not in fields_section
-    assert ">Mapping</th>" in fields_section
-    source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
-    field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
-    mapping_properties = re.search(r"<td class='field-mapping'>(.*?)</td>", source_row, re.DOTALL)[
-        1
-    ]
-    constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
-    assert "Source identifier" not in field_cell
-    assert "Source identifier" in mapping_properties
-    assert "Source identifier" not in constraints
 
-    concept_configuration = body(request(client, "get", f"/datasets/{mapping.key}/concept#fields"))
-    concept_fields = concept_configuration.split("<section id='fields'", 1)[1].split(
-        "</section>", 1
-    )[0]
-    assert ">Added</span>" not in concept_fields
-
-    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/configure?edit=1"))
-    assert "name='technical_key'" in edit_page
-    assert "value='system-map'" in edit_page
-
-    response = request(
-        client,
-        "post",
-        f"/datasets/{mapping.key}",
-        data={
-            "csrf_token": session_csrf(client, services),
-            "name": mapping.name,
-            "description": mapping.description,
-            "technical_key": "corrected-system-map",
-            "icon": mapping.icon or "",
-        },
+def test_reader_can_open_scheduled_mapping_version_without_current_version(dataset_browser):
+    _, services, admin, client = dataset_browser
+    mapping = create_owned_dataset(
+        services.datasets,
+        admin.id,
+        "scheduled-mapping",
+        "Scheduled mapping",
+        "",
+        kind="mapping",
+        mapping_mode="standalone",
+        source_system="Source system",
+        target_system="Target system",
     )
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith("/datasets/corrected-system-map/configure")
-    assert request(client, "get", "/datasets/system-map/configure").status_code == 404
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "source_code",
+        "Source code",
+        "string",
+        is_required=True,
+        is_business_key_component=True,
+        mapping_role="source_identifier",
+    )
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "target_code",
+        "Target code",
+        "string",
+        is_required=True,
+        mapping_role="mapping_target",
+    )
+    reader = services.users.create_user(
+        admin.id, "mapping-reader@example.com", "Reader", "valid reader password"
+    )
+    services.grants.create_grant(admin.id, "user", reader.id, "dataset", mapping.id, "viewer")
+    current_dataset = services.datasets.get_dataset(admin.id, mapping.key)
+    services.dataset_versions.publish(
+        admin.id,
+        mapping.id,
+        services.dataset_versions.clock.today() + timedelta(days=1),
+        "Scheduled mapping",
+        current_dataset.revision,
+    )
+    login(client, reader.email, "valid reader password")
+
+    configuration = request(client, "get", f"/datasets/{mapping.key}/configure")
+
+    assert configuration.status_code == 200
+    assert "Scheduled mapping" in body(configuration)
+
+
+def test_reader_cannot_open_configuration_with_only_cancelled_versions(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_owned_dataset(
+        services.datasets, admin.id, "cancelled-only", "Cancelled only", ""
+    )
+    field = create_field(services, admin, dataset, key="code", name="Code", is_required=True)
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, (field.key,))
+    reader = services.users.create_user(
+        admin.id, "cancelled-reader@example.com", "Reader", "valid reader password"
+    )
+    services.grants.create_grant(admin.id, "user", reader.id, "dataset", dataset.id, "viewer")
+    current = services.datasets.get_dataset(admin.id, dataset.key)
+    scheduled = services.dataset_versions.publish(
+        admin.id,
+        dataset.id,
+        services.dataset_versions.clock.today() + timedelta(days=1),
+        "Cancelled version",
+        current.revision,
+    )
+    services.dataset_versions.cancel(admin.id, dataset.id, scheduled.id)
+    login(client, reader.email, "valid reader password")
+
+    response = request(client, "get", f"/datasets/{dataset.key}/configure")
+
+    assert response.status_code == 404
 
 
 def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_browser):
@@ -682,6 +762,22 @@ def test_missing_required_record_value_uses_inline_field_error(dataset_browser):
     assert "concept-banner" not in page.split("data-side-panel-content", 1)[1]
 
 
+def test_standalone_new_record_form_never_renders_none_as_a_value(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "empty-record-form")
+    create_field(services, admin, dataset, "code", "Code", is_required=True)
+    create_field(services, admin, dataset, "active", "Active", data_type="boolean")
+    create_field(services, admin, dataset, "entry_date", "Entry date", data_type="date")
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/records/new"))
+
+    assert "value='None'" not in page
+    assert 'value="None"' not in page
+    assert "<option value='true'>Yes</option>" in page
+    assert "<option value='false'>No</option>" in page
+
+
 def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_browser):
     _, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "currencies")
@@ -695,7 +791,10 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert f"data-dialog-open='record-panel-{record.id}'" in page
     assert "<caption class='visually-hidden'>Records</caption>" in page
     assert "data-record-row" in page
-    assert "<tr class='record-row interactive-row' data-row-action data-record-row" in page
+    assert (
+        f"<tr class='record-row interactive-row' data-row-action id='record-row-{record.id}'"
+        in page
+    )
     assert not re.search(r"<tr\b[^>]*(?:tabindex=|role=['\"]button)", page)
     assert f"type='button' data-dialog-open='record-panel-{record.id}'" in page
     assert f"aria-label='Edit record EUR ({record.id})'" in page
@@ -707,10 +806,12 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "data-default-mode='edit'" in page
     assert "data-panel-subtitle data-default-text='Edit record'>Edit record</p>" in page
     assert f"action='/datasets/currencies/records/{record.id}/edit'" in page
+    assert "name='return_focus' value='pointer'" in page
     assert f"action='/datasets/currencies/records/{record.id}/delete'" in page
     assert "data-panel-mode='edit'" in page
     assert "data-panel-view='view' hidden" in page
-    assert "data-panel-view='edit' novalidate autocomplete='off'" in page
+    assert "data-panel-view='edit' data-focus-return-record-id=" in page
+    assert "novalidate autocomplete='off'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
     assert "class='button button-secondary' type='button' data-panel-mode='edit'>Cancel" in page
     assert "class='button button-danger' type='submit'>Delete record</button>" in page
@@ -721,6 +822,25 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "value='1'" in page
     assert "You can Undo delete while this Draft remains active." in page
     assert "name='confirm' value='yes'" in page
+
+    for mode in ("keyboard", "pointer"):
+        response = request(
+            client,
+            "post",
+            f"/datasets/currencies/records/{record.id}/edit",
+            data={
+                "csrf_token": session_csrf(client, services),
+                "expected_revision": record.revision,
+                "return_focus": mode,
+                "code": "EUR",
+            },
+        )
+        assert response.status_code == 302
+        assert f"?focus_record={record.id}" in response.headers["Location"]
+        assert f"focus_mode={mode}" in response.headers["Location"]
+        listing = request(client, "get", response.headers["Location"])
+        assert listing.status_code == 200
+        record = services.dataset_records.get_record_for_edit(admin.id, dataset.key, record.id)
 
 
 def test_draft_notice_is_not_duplicated_in_field_or_record_panels(dataset_browser):
@@ -3204,7 +3324,7 @@ def test_user_email_error_reopens_edit_panel_with_submitted_value(dataset_browse
     assert f"id='user-panel-{user.id}'" in page
     assert "Email already exists in this installation" in page
     assert (
-        f"id='edit-user-email-{user.id}' name='email' type='email' autocomplete='email' "
+        f"id='edit-user-email-{user.id}' name='email' type='email' autocomplete='off' "
         f"data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' "
         f"value='taken@example.com'" in page
     )

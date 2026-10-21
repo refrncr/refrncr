@@ -10,7 +10,7 @@
         {{ record_form_fields(fields, "edit-record" if record else "new-record", submitted, errors, initial_focus=true, raw_values=true) }}
       </div>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-      {% if record %}<input type='hidden' name='expected_revision' value='{{ record.revision }}'>{% endif %}
+      {% if record %}<input type='hidden' name='expected_revision' value='{{ record.revision }}'><input type='hidden' name='return_focus' value='pointer'>{% endif %}
       <footer class='side-panel-footer'>
         <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
         <button class='button button-primary' type='submit'>{{ 'Save record' if record else 'Create record' }}</button>

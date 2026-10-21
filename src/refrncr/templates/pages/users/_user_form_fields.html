@@ -8,6 +8,6 @@
 
 {% macro edit_user_fields(user, email=user.email) -%}
   <div class='form-field'><label for='edit-user-name-{{ user.id }}'>Name</label><input id='edit-user-name-{{ user.id }}' value='{{ user.display_name }}' disabled></div>
-  <div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label><input id='edit-user-email-{{ user.id }}' name='email' type='email' autocomplete='email' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ email }}' required></div>
+  <div class='form-field'><label for='edit-user-email-{{ user.id }}'>Email address</label><input id='edit-user-email-{{ user.id }}' name='email' type='email' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ email }}' required></div>
   <div class='form-field'><label for='edit-user-role-{{ user.id }}'>Role</label><input id='edit-user-role-{{ user.id }}' value='{{ "Administrator" if user.role == "admin" else "User" }}' disabled></div>
 {%- endmacro %}

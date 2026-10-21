@@ -1205,7 +1205,7 @@ class DatasetService:
         )
 
     def get_dataset_configuration(self, actor_id: str, key: str) -> DatasetConfiguration:
-        """Current Dataset metadata; unpublished existence remains maintainer-only."""
+        """Dataset metadata; unpublished existence remains maintainer-only."""
         key = self._validated_lookup_key(key)
         with self.uow() as uow:
             uow.begin_export_snapshot()
@@ -1217,7 +1217,7 @@ class DatasetService:
             maintain = self.authorization.datasets.can_maintain_dataset(
                 actor_id, dataset.id, uow=uow
             )
-            if not maintain and not uow.versions.current_for_datasets((dataset.id,), uow.today()):
+            if not maintain and uow.versions.latest_non_cancelled(dataset.id) is None:
                 raise NotFoundError("Dataset not found")
             govern = self.authorization.datasets.can_change_dataset_owner(
                 actor_id, dataset.id, uow=uow
