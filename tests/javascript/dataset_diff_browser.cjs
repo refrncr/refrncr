@@ -53,7 +53,19 @@ async function capture(page, name) {
       await capture(page,`summary-${width}`);
       await page.getByRole('link',{name:'Fields',exact:true}).click();
       assert.match(await page.locator('main').innerText(),/Renamed label/);
-      await capture(page,`fields-${width}`);
+      assert.equal(await page.getByRole('columnheader',{name:'Field',exact:true}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Property',exact:true}).count(),1);
+      assert.equal(await page.locator('.record-toolbar + .review-fields-table').count(),1);
+      if (width === 320) {
+        assert(await page.locator('.review-fields-table').evaluate(el=>el.scrollWidth>el.clientWidth),'field table scrolls inside its frame on phone width');
+        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'field table does not overflow the page');
+      }
+      for (const theme of ['light','dark']) {
+        await page.locator('html').evaluate((el,value)=>el.dataset.theme=value,theme);
+        await capture(page,`fields-${theme}-${width}`);
+      }
+      await page.locator('html').evaluate(el=>delete el.dataset.theme);
       await page.getByRole('link',{name:'Renamed label',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);

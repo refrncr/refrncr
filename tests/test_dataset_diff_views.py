@@ -45,6 +45,11 @@ def test_review_navigation_details_and_no_audit_noise(context):
         if section == "Fields":
             assert "<span class='badge badge-draft'>Changed</span>" in response.text
             assert "<span class='badge badge-published'>Changed</span>" not in response.text
+            assert "<div class='record-toolbar review-fields-toolbar'>" in response.text
+            assert "<div class='table-scroll management-table review-fields-table'" in response.text
+            assert "<th scope='col'>Property</th>" in response.text
+            assert "<th scope='rowgroup' rowspan='1'>" in response.text
+            assert "New label" in response.text
         if section == "Records":
             assert "<span class='badge badge-draft'>Changed</span>" in response.text
             assert "<span class='badge badge-published'>Changed</span>" not in response.text
@@ -65,6 +70,29 @@ def test_review_navigation_details_and_no_audit_noise(context):
     assert snapshot(c) == before
     events = [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
     assert len(events) == 1
+
+
+def test_empty_field_review_uses_shared_empty_state(context):
+    c = context
+    configured(c)
+    publish(c)
+    c.service.clock.set(NOW + timedelta(days=1))
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "new", "label": "Draft"}
+    )
+    browser, _csrf = client(c)
+    base = f"/datasets/{c.d.key}/versions/review"
+    entrypoint = request(browser, "get", base)
+    token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+
+    response = request(browser, "get", path(base, token, section="Fields"))
+
+    assert response.status_code == 200
+    assert "record-toolbar review-fields-toolbar" in response.text
+    assert "No matching changes" in response.text
+    assert "There are no changes in this view." in response.text
+    assert "review-fields-table" not in response.text
 
 
 def test_legacy_edited_review_filter_selects_changed(context):

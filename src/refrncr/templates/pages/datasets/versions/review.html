@@ -3,7 +3,7 @@
 {% from "components/concept.html" import banner with context %}
 {% from "layouts/page.html" import page_context %}
 {% from "components/side_panel.html" import form_side_panel %}
-{% from "components/version_diff.html" import properties, field_changes %}
+{% from "components/version_diff.html" import properties, value %}
 {% block title %}Review & publish · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
 <div data-version-review>
@@ -41,8 +41,8 @@
     </div>
     {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The Draft matches this published version.</p></div>{% endif %}
   {% else %}
-    <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</p>
     {% if section == 'Records' %}
+      <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</p>
       <form {{ non_login_form_attrs() }} class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
         <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
         <label for='diff-search'>Search old or new identifier</label>
@@ -62,11 +62,19 @@
         </tr>{% endfor %}</tbody></table>
       </div>{% endif %}
     {% else %}
-      <p class='help-text'>{{ result.total }} changed Fields · 50 per page.</p>
-      {% for item in result.items %}<section class='panel-sections'>
-        <h3><a href='{{ detail_url("field", item.id) }}' data-panel-url data-dialog-open='review-panel'>{{ item.name }}</a></h3>
-        {{ field_changes(item) }}
-      </section>{% endfor %}
+      <div class='record-toolbar review-fields-toolbar'>
+        <span class='record-toolbar-note'>{{ result.total }} changed field{{ '' if result.total == 1 else 's' }} · {{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</span>
+      </div>
+      {% if result.items %}<div class='table-scroll management-table review-fields-table' role='region' aria-label='Field changes' tabindex='0'>
+        <table class='diff-table'><caption class='visually-hidden'>Field changes, Added then Changed then Deleted</caption>
+          <thead><tr><th scope='col'>Field</th><th scope='col'>Status</th><th scope='col'>Property</th><th scope='col'>Before</th><th scope='col'>After</th></tr></thead>
+          {% for item in result.items %}<tbody>{% for change in item.properties %}<tr>
+            {% if loop.first %}<th scope='rowgroup' rowspan='{{ item.properties|length }}'><a class='row-action' href='{{ detail_url("field", item.id) }}' data-panel-url data-dialog-open='review-panel'>{{ item.name }}</a></th>
+            <td rowspan='{{ item.properties|length }}'>{{ status_badge(item.status) }}{% if item.moved %} <span class='badge'>Moved</span>{% endif %}{% if item.datatype_changed %}<p class='alert alert-warning'>Datatype changed. Interpretation or presentation may differ; publication still validates the values.</p>{% endif %}</td>{% endif %}
+            <th scope='row'>{{ change.name }}</th><td>{{ value(change.before) }}</td><td>{{ value(change.after) }}</td>
+          </tr>{% endfor %}</tbody>{% endfor %}
+        </table>
+      </div>{% endif %}
     {% endif %}
     {% if not result.items %}<div class='empty-state'><h3>No matching changes</h3><p>There are no changes in this view.</p></div>{% endif %}
     <nav class='pagination' aria-label='Change pages'>
