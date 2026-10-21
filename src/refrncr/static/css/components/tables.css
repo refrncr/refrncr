@@ -116,6 +116,8 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .status-toggle { display: inline-flex; align-items: center; gap: .375rem; min-height: var(--control-height-compact); padding: .25rem .5rem; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); line-height: 1.5; letter-spacing: .02em; cursor: pointer; }
 .status-toggle:hover { border-color: var(--color-control-border); color: var(--color-text); }
 .status-toggle[aria-pressed="true"] { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
+.status-toggle-link { text-decoration: none; }
+.status-toggle-link[aria-current="true"] { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
 .status-toggle[aria-disabled="true"] { cursor: default; }
 .status-toggle-count { color: var(--color-text); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
 .status-toggle-deleted .status-toggle-count { color: var(--color-status-removed); }

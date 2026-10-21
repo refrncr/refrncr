@@ -2,6 +2,7 @@
 
 import re
 from datetime import timedelta
+from html import unescape
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 
@@ -93,6 +94,69 @@ def test_empty_field_review_uses_shared_empty_state(context):
     assert "No matching changes" in response.text
     assert "There are no changes in this view." in response.text
     assert "review-fields-table" not in response.text
+
+
+def test_record_review_search_and_status_chips_preserve_url_criteria(context):
+    c = context
+    browser, _csrf, base, token = prepared(c)
+    c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "added", "label": "Added"})
+    entrypoint = request(browser, "get", base)
+    assert entrypoint.status_code == 303
+    token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+
+    initial = request(browser, "get", path(base, token, section="Records"))
+    assert initial.status_code == 200
+    assert "class='record-toolbar record-toolbar-search review-record-toolbar'" in initial.text
+    assert "class='search-field' data-search-field" in initial.text
+    assert "id='review-record-search' type='search'" in initial.text
+    assert "Search old or new identifier" in initial.text
+    assert "class='record-status-toggles'" in initial.text
+    assert "class='status-toggle status-toggle-link" in initial.text
+    assert "2 matching changes" in initial.text
+
+    clear_href = re.search(
+        r"<a class='search-clear' href='([^']+)' aria-label='Clear search'", initial.text
+    ).group(1)
+    clear_query = parse_qs(urlsplit(unescape(clear_href)).query)
+    assert clear_query["review"] == [token]
+    assert clear_query["section"] == ["Records"]
+    assert clear_query["status"] == ["Added", "Changed", "Removed"]
+    assert "q" not in clear_query
+
+    added_filter_href = re.search(
+        r"<a class='status-toggle status-toggle-link' href='([^']+)' aria-current='true'>Added",
+        initial.text,
+    ).group(1)
+    added_filter_query = parse_qs(urlsplit(unescape(added_filter_href)).query)
+    assert added_filter_query["review"] == [token]
+    assert added_filter_query["section"] == ["Records"]
+    assert added_filter_query["status"] == ["Changed", "Removed"]
+
+    changed = request(
+        browser,
+        "get",
+        path(base, token, section="Records", q="new", status="Changed"),
+    )
+    assert changed.status_code == 200
+    assert "value='new'" in changed.text
+    assert "1 matching changes" in changed.text
+    assert "new" in changed.text
+    assert "aria-current='false'>Added" in changed.text
+    changed_clear_href = re.search(
+        r"<a class='search-clear' href='([^']+)' aria-label='Clear search'", changed.text
+    ).group(1)
+    changed_clear_query = parse_qs(urlsplit(unescape(changed_clear_href)).query)
+    assert changed_clear_query["status"] == ["Changed"]
+    assert "q" not in changed_clear_query
+
+    added = request(
+        browser,
+        "get",
+        path(base, token, section="Records", q="added", status="Added"),
+    )
+    assert added.status_code == 200
+    assert "1 matching changes" in added.text
+    assert "Added" in added.text
 
 
 def test_legacy_edited_review_filter_selects_changed(context):

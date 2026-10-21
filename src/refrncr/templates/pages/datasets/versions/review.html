@@ -4,6 +4,7 @@
 {% from "layouts/page.html" import page_context %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "components/version_diff.html" import properties, value %}
+{% from "components/search_field.html" import search_field %}
 {% block title %}Review & publish · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
 <div data-version-review>
@@ -42,15 +43,25 @@
     {% if not result.has_changes %}<div class='empty-state'><h3>No changes</h3><p>The Draft matches this published version.</p></div>{% endif %}
   {% else %}
     {% if section == 'Records' %}
-      <p class='metadata'>{{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</p>
-      <form {{ non_login_form_attrs() }} class='form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
-        <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
-        <label for='diff-search'>Search old or new identifier</label>
-        <input id='diff-search' type='search' name='q' value='{{ criteria.search }}' maxlength='{{ MAX_SEARCH }}'>
-        <fieldset><legend>Change status</legend>{% for status in (ChangeStatus.ADDED, ChangeStatus.CHANGED, ChangeStatus.REMOVED) %}<label><input type='checkbox' name='status' value='{{ status }}'{% if status in criteria.statuses %} checked{% endif %}> {{ status|status_label }}</label>{% endfor %}</fieldset>
-        <div class='form-actions'><button class='button button-primary' type='submit'>Apply filters</button><a class='button button-secondary' href='{{ sections.Records }}'>Clear filters</a></div>
-      </form>
-      <p class='help-text'>{{ result.total }} matching changes · 50 per page. Search checks identifiers only; no selected statuses means all statuses.</p>
+      <div class='record-toolbar record-toolbar-search review-record-toolbar' role='group' aria-label='Record changes'>
+        <form {{ non_login_form_attrs() }} id='review-record-search-form' class='record-search-form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}' role='search' aria-label='Search records'>
+          <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
+          {% for status in criteria.statuses %}<input type='hidden' name='status' value='{{ status }}'>{% endfor %}
+          {{ search_field('review-record-search', 'Search old or new identifier', 'Search old or new identifier', name='q', value=criteria.search, maxlength=MAX_SEARCH, clear_url=page_url(q='', anchor='', backwards='0')) }}
+        </form>
+        <button class='button button-secondary' type='submit' form='review-record-search-form'>Search</button>
+        <div class='record-status-toggles' role='group' aria-label='Filter by change status'>
+          {% set all_statuses = (ChangeStatus.ADDED, ChangeStatus.CHANGED, ChangeStatus.REMOVED) %}
+          {% for status in all_statuses %}
+            {% if status in criteria.statuses %}{% set target_statuses = criteria.statuses|reject('equalto', status)|list %}
+            {% else %}{% set target_statuses = criteria.statuses|list + [status] %}{% endif %}
+            {% if target_statuses %}{% set target_statuses = all_statuses|select('in', target_statuses)|list %}
+            {% else %}{% set target_statuses = all_statuses %}{% endif %}
+            <a class='status-toggle status-toggle-link{{ " status-toggle-deleted" if status == ChangeStatus.REMOVED else "" }}' href='{{ page_url(status=target_statuses, anchor="", backwards="0") }}' aria-current='{{ "true" if status in criteria.statuses else "false" }}'>{{ status|status_label }} <span class='status-toggle-count'>{{ result.status_counts[loop.index0] }}</span></a>
+          {% endfor %}
+        </div>
+        <span id='review-result-count'>{{ result.total }} matching changes</span>
+      </div>
       {% if result.items %}<div class='table-scroll management-table' role='region' aria-label='Record changes' tabindex='0'>
         <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Deleted</caption>
         <thead><tr><th scope='col'>Status</th><th scope='col'>Identifier</th><th scope='col'>Old identifier</th><th scope='col'>Changed values</th></tr></thead>

@@ -71,6 +71,26 @@ async function capture(page, name) {
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
       await page.getByRole('link',{name:'Records',exact:true}).click();
+      assert.equal(await page.locator('.review-record-toolbar .search-field').count(),1);
+      assert.equal(await page.locator('.review-record-toolbar .status-toggle-link').count(),3);
+      for (const theme of ['light','dark']) {
+        await page.locator('html').evaluate((el,value)=>el.dataset.theme=value,theme);
+        await capture(page,`records-${theme}-${width}`);
+      }
+      await page.locator('html').evaluate(el=>delete el.dataset.theme);
+      const reviewSearch = page.getByRole('searchbox',{name:'Search old or new identifier'});
+      await reviewSearch.fill('ADDED00');
+      await reviewSearch.press('Enter');
+      assert.equal(new URL(page.url()).searchParams.get('q'),'ADDED00');
+      assert.equal(await page.locator('table tbody tr').count(),1);
+      await page.getByRole('link',{name:/^Added/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed','Removed']);
+      assert.match(await page.locator('main').innerText(),/No matching changes/);
+      await page.getByRole('link',{name:'Clear search'}).click();
+      assert.equal(new URL(page.url()).searchParams.has('q'),false);
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed','Removed']);
+      await page.getByRole('link',{name:/^Added/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added','Changed','Removed']);
       assert.equal(await page.locator('table tbody tr').count(),50);
       await page.getByRole('link',{name:'Next page',exact:true}).click();
       assert.equal(await page.locator('table tbody tr').count(),3);
