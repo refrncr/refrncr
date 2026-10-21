@@ -712,6 +712,8 @@ def test_concept_record_rows_open_directly_in_edit_mode_with_delete(dataset_brow
     assert "data-panel-view='view' hidden" in page
     assert "data-panel-view='edit' novalidate autocomplete='off'" in page
     assert "class='button button-danger' type='button' data-panel-mode='delete'>Delete" in page
+    assert "class='button button-secondary' type='button' data-panel-mode='edit'>Cancel" in page
+    assert "class='button button-danger' type='submit'>Delete record</button>" in page
     panel = page.split(f"id='record-panel-{record.id}'", 1)[1].split("</dialog>", 1)[0]
     assert ">View current version</a>" not in panel
     assert "concept-banner" not in panel
