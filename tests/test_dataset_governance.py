@@ -431,7 +431,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     detail = get(f"/datasets/{d.key}").text
     assert "id='access-management-heading'>Access</h2>" in detail
     assert (
-        f"<a class='access-overview-action' href='/datasets/{d.key}?edit=1#owner-team'>"
+        f"<a class='access-owner-action' href='/datasets/{d.key}?edit=1#owner-team'>"
         "Change owning team</a>" in detail
     )
     assert "All active Community users can view this dataset." not in detail
@@ -473,22 +473,21 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     for copy in (
         "Who has access",
         "Owning team",
-        "Community administrators",
-        "Give export access",
-        "Additional export access",
+        "Dataset access",
         "User or team",
         "Select a user or team",
         "Grant access",
         "Export only: they can view and download the records, not change them.",
-        "No additional access yet",
-        "Only &lt;img",
-        "members and Community administrators can export this dataset.",
+        "Only the owning team has access. Add a user or team below to give them export access.",
     ):
         assert copy in empty
-    for right in ("View", "Edit", "Publish", "Export", "All rights"):
-        assert f"<span class='badge'>{right}</span>" in empty
+    assert "&lt;img src=x" in empty
+    for right in ("View", "Edit", "Publish", "Export"):
+        assert f"<span class='badge badge-subtle'>{right}</span>" in empty
     assert "<img src=x" not in empty
-    assert "<table" not in empty
+    assert empty.count("<table") == 1
+    assert "class='access-owner-row'" in empty
+    assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
     assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
@@ -510,20 +509,17 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert team.status_code == 302
     assert team.location == f"/datasets/{d.key}/configure#access-management"
     populated = access_section(get(concept_url).text)
-    assert sum(tag == "tr" for tag, _ in html_elements(populated)) == 3
+    assert populated.count("<table") == 1
+    assert populated.index("class='access-owner-row'") < populated.index("data-access-entry")
+    assert sum("data-access-entry" in attrs for tag, attrs in html_elements(populated)) == 2
     assert "<span class='badge'>User</span>" in populated
     assert "<span class='badge'>Team</span>" in populated
+    assert "<span class='badge badge-identifier'>Owning team</span>" in populated
     assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
-    assert (
-        sum(
-            tag == "time" and "access-added" in attrs.get("class", "").split()
-            for tag, attrs in html_elements(populated)
-        )
-        == 2
-    )
-    assert "<span class='section-count'>2</span>" in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
+    assert "data-confirm='Remove export access for User?'" in populated
+    assert "data-confirm='Remove export access for Team Data domain?'" in populated
     assert "button-danger" not in populated
     assert f"Remove export access for {a.id}" not in populated
     with factory() as session:

@@ -17,7 +17,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
   const tab = () => page.getByRole('tabpanel', {name: 'Access', exact: true});
   const select = () => tab().getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]');
   const grant = () => tab().getByRole('button', {name: 'Grant access', exact: true});
-  const rows = () => tab().locator('.access-table tbody tr');
+  const rows = () => tab().locator('.access-table tbody tr[data-access-entry]');
   const status = async text => {
     await page.waitForFunction(text => {
       const e = document.querySelector('[data-export-access] [data-panel-status]');
@@ -36,11 +36,12 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.goto(`${base}/datasets/row-check#access-management`);
       await tab().waitFor();
       const url = page.url();
-      for (const heading of ['Who has access', 'Give export access', 'Additional export access']) {
-        await tab().getByRole('heading', {name: heading, level: 3}).waitFor();
-      }
-      await tab().getByRole('heading', {name: 'No additional access yet', level: 4}).waitFor();
+      await tab().getByRole('heading', {name: 'Who has access', level: 3}).waitFor();
+      await tab().getByRole('table', {name: 'Dataset access'}).waitFor();
+      await tab().getByText('Only the owning team has access.', {exact: false}).waitFor();
       await tab().getByRole('link', {name: 'Change owning team', exact: true}).waitFor();
+      assert.equal(await tab().locator('.access-table tbody tr').count(), 1);
+      assert.match(await tab().locator('.access-owner-row').textContent(), /Owning team/);
       assert(await grant().isDisabled());
       await noOverflow(); await shot(`access-empty-${width}`);
 
@@ -51,7 +52,6 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(page.url(), url);
       assert.equal(await rows().count(), 1);
       assert((await rows().first().textContent()).includes('row@example.com'));
-      assert.equal(await rows().first().locator('time').count(), 1);
 
       // Duplicates keep the selection and move focus to the error summary.
       await select().selectOption({label: 'Row user (row@example.com)'}); await grant().click();
@@ -69,10 +69,17 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await noOverflow(); await shot(`access-populated-${width}`);
 
       for (const name of ['Row user', 'Team Row team']) {
-        await tab().getByRole('button', {name: `Remove export access for ${name}`, exact: true}).click();
+        const remove = tab().getByRole('button', {name: `Remove export access for ${name}`, exact: true});
+        const confirmation = page.waitForEvent('dialog');
+        await remove.click();
+        const dialog = await confirmation;
+        assert.equal(dialog.type(), 'confirm');
+        assert.equal(dialog.message(), `Remove export access for ${name}?`);
+        await dialog.accept();
         await status('Export access removed.');
       }
-      await tab().getByRole('heading', {name: 'No additional access yet', level: 4}).waitFor();
+      await tab().getByText('Only the owning team has access.', {exact: false}).waitFor();
+      assert.equal(await tab().locator('.access-table tbody tr').count(), 1);
       console.log(`PASS: ${width}px empty, grant, duplicate, team and revoke states`);
     }
 

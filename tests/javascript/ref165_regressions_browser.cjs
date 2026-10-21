@@ -100,6 +100,7 @@ async function savedMove(page, action) {
       await page.getByRole('button',{name:'Grant access',exact:true}).click();
       await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).waitFor();
       await page.route('**/revoke*',route=>route.abort());
+      page.once('dialog',dialog=>dialog.accept());
       const [revoked] = await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Remove export access for Row user',exact:true}).click()]);
       assert.equal(revoked.status(),200); assert.equal(page.url(),base+configure+'#access-management');
       assert(await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).isVisible());

@@ -274,8 +274,9 @@ async function layout(page, label) {
       await access.getByRole('button', {name: 'Grant access', exact: true}).click();
       await access.getByRole('alert').waitFor();
       assert.equal(await access.getByLabel('User or team').getAttribute('aria-invalid'), 'true');
+      page.once('dialog', dialog => dialog.accept());
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).click();
-      await access.getByRole('heading', {name: 'No additional access'}).waitFor();
+      await access.getByText('Only the owning team has access.', {exact: false}).waitFor();
       await layout(page, `configure ${width}`);
       await page.screenshot({path: `${output}/configure-${width}.png`, fullPage: true});
       await page.getByRole('link', {name: 'Versions', exact: true}).click();

@@ -60,7 +60,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
     assert sum(tag == "section" for tag, _ in html_elements(page)) == (
-        8 if permission == "community_admin" else 2 if permission == "viewer" else 4
+        6 if permission == "community_admin" else 2 if permission == "viewer" else 4
     )
     header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
@@ -230,8 +230,8 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
     elements = html_elements(page)
-    assert sum(tag == "section" for tag, _ in elements) == 8
-    assert sum(tag == "table" for tag, _ in elements) == 1
+    assert sum(tag == "section" for tag, _ in elements) == 6
+    assert sum(tag == "table" for tag, _ in elements) == 2
     assert "aria-label='Edit field &lt;img" in page
 
     field_section = section(page, "fields-heading")

@@ -117,6 +117,10 @@
   document.addEventListener("submit", async (event) => {
     const form = event.target.closest("form[data-inline-refresh]");
     if (!form) return;
+    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     const host = form.closest("[data-export-access]");
     if (inlinePending.has(host)) return;
