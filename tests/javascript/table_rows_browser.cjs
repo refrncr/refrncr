@@ -64,6 +64,20 @@ if (output) fs.mkdirSync(output, {recursive:true});
       for (const width of [1440,768,320]) {
         await page.setViewportSize({width,height:900}); await page.goto(base+item.path); await page.evaluate(() => document.fonts.ready);
         await overflow();
+        const separators = await page.locator("table").evaluateAll(tables => tables.map(table => {
+          const cell = table.querySelector("th, td");
+          const style = getComputedStyle(table);
+          return {
+            collapse: style.borderCollapse,
+            spacing: style.borderSpacing,
+            divider: cell ? getComputedStyle(cell).borderBottomWidth : null,
+          };
+        }));
+        for (const separator of separators) {
+          assert.equal(separator.collapse, "separate", `separate borders (${item.path} @${width})`);
+          assert.match(separator.spacing, /^0px(?: 0px)?$/, `no gaps between cells (${item.path} @${width})`);
+          assert.equal(separator.divider, "1px", `one-pixel divider (${item.path} @${width})`);
+        }
         const rows = page.locator('tbody [data-row-action]');
         assert(await rows.count() > 1);
         assert.equal(await page.locator('thead th').count(),item.columns);
@@ -191,6 +205,10 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await page.goto(base+'/datasets/row-check/concept/records');
     const identifier = await page.locator('.record-row:has(> .record-system-status .badge-draft) [data-row-primary]').first().getAttribute('aria-label');
     const recordId = identifier.match(/\(([^)]+)\)$/)[1];
+    const statusCell = page.locator("tbody .record-system-status").first;
+    assert.equal(await statusCell.evaluate(cell => getComputedStyle(cell).boxShadow), "none");
+    assert.equal(await statusCell.evaluate(cell => getComputedStyle(cell).borderInlineStartWidth), "1px");
+    record('Sticky record status column uses a one-pixel divider without a shadow');
     for (const mode of ['pointer', 'keyboard']) {
       await page.goto(`${base}/datasets/row-check/concept/records`);
       const primary = page.locator(`#record-row-${recordId} [data-row-primary]`);
