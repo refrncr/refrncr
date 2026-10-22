@@ -41,6 +41,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
             target: style('tbody .mapping-target-cell').backgroundColor,
             sourceHeading: style('.mapping-group-headings .mapping-source-cell').backgroundColor,
             targetHeading: style('.mapping-group-headings .mapping-target-cell').backgroundColor,
+            targetColumnHeading: style('thead tr:last-child .mapping-target-cell').backgroundColor,
             borders: [...el.querySelectorAll('tbody tr:first-child td')].map(cell => getComputedStyle(cell).borderBottom),
             frames: [...el.querySelectorAll('.mapping-group-headings [scope="colgroup"]')].map(cell => {
               const cs = getComputedStyle(cell);
@@ -52,6 +53,9 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
         assert.notEqual(groups.source, groups.target);
         assert.notEqual(groups.sourceHeading, groups.targetHeading);
         assert.notEqual(groups.sourceHeading, groups.source);
+        assert.notEqual(groups.targetHeading, groups.target);
+        assert.equal(groups.targetHeading, groups.targetColumnHeading);
+        assert.equal(groups.targetHeading, groups.status);
         assert.notEqual(groups.status, 'rgba(0, 0, 0, 0)');
         assert.equal(new Set(groups.borders).size, 1, JSON.stringify(groups));
         assert.deepEqual(groups.frames, [['1px', '1px', '1px'], ['1px', '1px', '1px']]);

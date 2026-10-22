@@ -37,7 +37,8 @@ explicit upgrading belongs to REF-301. The source owner's usage view belongs to 
 ## Presentation and authorization
 
 Records and record review share one table with source/target column groups, a muted source
-background, a white target group and a white direction strip. Both groups have their own frame;
+background, white target values and a white direction strip. Target group and column headings
+use the normal table-heading background, distinct from the white values. Both groups have their own frame;
 row lines continue through the strip. Status/Change remain outside the groups, with the normal
 record metadata style. On phones, each row becomes one source-then-target card.
 Fields use equally framed, vertically stacked source and target groups with separate add actions;

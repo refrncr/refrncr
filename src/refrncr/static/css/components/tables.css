@@ -203,7 +203,7 @@ table time[title] { cursor: help; text-decoration: underline dotted var(--color-
 .mapping-record-table .mapping-group-end { border-inline-end: 1px solid var(--color-border); }
 .mapping-record-table .mapping-group-headings :is(.mapping-source-cell, .mapping-target-cell) { border-top: 1px solid var(--color-border); }
 .mapping-record-table .mapping-group-headings .mapping-source-cell { background: var(--color-border); }
-.mapping-record-table thead .record-system-status { background: var(--color-table-heading); }
+.mapping-record-table thead :is(.mapping-target-cell, .record-system-status) { background: var(--color-table-heading); }
 .mapping-record-table .mapping-target-cell + .record-system-status { border-inline-start: 0; }
 .mapping-record-table .mapping-group-headings th { color: var(--color-text); font-family: var(--font-interface); font-weight: var(--font-weight-bold); text-transform: none; }
 .mapping-fields-block { padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
