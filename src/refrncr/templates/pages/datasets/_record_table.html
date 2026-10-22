@@ -1,4 +1,4 @@
-{% from 'components/mapping.html' import group_headings %}
+{% from 'components/mapping.html' import group_headings, cell_class %}
 {% from 'components/field_metadata.html' import field_metadata %}
 {% from 'components.html' import status_badge %}
 {% from "components/icons.html" import key_icon, lock_icon %}
@@ -26,7 +26,7 @@
           {% set header_direction = namespace(rendered=false) %}
           {% for field in fields %}
             {% if dataset.kind == 'mapping' and field.mapping_role == 'mapping_target' and not header_direction.rendered %}<th scope='col' class='mapping-direction-column'><span class='visually-hidden'>Mapping direction</span></th>{% set header_direction.rendered = true %}{% endif %}
-            <th scope='col' class='{{ (("mapping-source-cell " if mapping_source and field.mapping_role != "mapping_target" else "") ~ ("numeric-column" if field.data_type in ('integer', 'number', 'float') else ""))|trim }}'>
+            <th scope='col' class='{{ ((cell_class(fields, field, loop.index0)|trim ~ " " if mapping_source else "") ~ ("numeric-column" if field.data_type in ('integer', 'number', 'float') else ""))|trim }}'>
               <div class='column-heading'>
                 <span class='column-heading-label'>{{ field.name }}</span>{% if field.key in identifier.field_keys %}{{ key_icon() }}{% endif %}
                 {{ field_metadata(field, disclosure=true, is_identifier=field.key in identifier.field_keys) }}
@@ -44,7 +44,7 @@
             {% for field in fields %}
               {% set cell_value = values.get(field.key) %}
               {% if dataset.kind == 'mapping' and field.mapping_role == 'mapping_target' and not row_direction.rendered %}<td class='mapping-direction-column'><span aria-hidden='true'>→</span><span class='visually-hidden'>maps to</span></td>{% set row_direction.rendered = true %}{% endif %}
-              <td{% if mapping_source %} data-label='{{ ("Source · " if field.mapping_role != "mapping_target" else "Target · ") ~ field.name if mapping_source else field.name }}'{% endif %} class='{{ (("mapping-source-cell " if mapping_source and field.mapping_role != "mapping_target" else "") ~ ("numeric-column" if field.data_type in ('integer', 'number', 'float') else ""))|trim }}'>
+              <td{% if mapping_source %} data-label='{{ ("Source · " if field.mapping_role != "mapping_target" else "Target · ") ~ field.name if mapping_source else field.name }}'{% endif %} class='{{ ((cell_class(fields, field, loop.index0)|trim ~ " " if mapping_source else "") ~ ("numeric-column" if field.data_type in ('integer', 'number', 'float') else ""))|trim }}'>
                 {% set value_content %}
                 {% if cell_value is none %}
                   <span aria-hidden='true'>-</span><span class='visually-hidden'>No value</span>

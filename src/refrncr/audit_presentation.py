@@ -105,6 +105,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset_field", "deleted"): ActionPresentation("Dataset field deleted", True),
         ("dataset_record", "created"): ActionPresentation("Record created", False),
         ("dataset_record", "restored"): ActionPresentation("Record restored", False),
+        ("dataset", "dataset.mapping_targets_updated"): ActionPresentation(
+            "Mapping targets updated", False
+        ),
         ("dataset", "dataset.new_version_imported"): ActionPresentation(
             "New Record version imported", False
         ),

@@ -138,6 +138,11 @@ _EVENTS = (
     ),
     EventContract(
         "dataset",
+        "dataset.mapping_targets_updated",
+        (("format", "import_format"), ("changed", "count"), ("unchanged", "count")),
+    ),
+    EventContract(
+        "dataset",
         "dataset.new_version_imported",
         (("mode", "import_mode"), ("format", "import_format"))
         + tuple(
@@ -492,6 +497,7 @@ _audited(
     "confirm",
     ("dataset", "dataset.records_imported"),
     ("dataset", "dataset.new_version_imported"),
+    ("dataset", "dataset.mapping_targets_updated"),
     module="record_import",
 )
 _register(

@@ -2410,6 +2410,10 @@
         [
           "dataset",
           "dataset.new_version_imported"
+        ],
+        [
+          "dataset",
+          "dataset.mapping_targets_updated"
         ]
       ],
       "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
@@ -2428,9 +2432,14 @@
           "unchanged": "version_count",
           "deleted": "version_count",
           "total_processed": "version_count"
+        },
+        "dataset:dataset.mapping_targets_updated": {
+          "format": "import_format",
+          "changed": "count",
+          "unchanged": "count"
         }
       },
-      "success": "Create-only adds validated Records; new-version applies the complete canonical difference, records its one-use marker and emits one transactional summary. Unchanged Records are not written.",
+      "success": "Create-only adds validated Records; new-version applies the complete canonical difference, records its one-use marker and emits one transactional summary. Unchanged Records are not written. Mapping imports update only changed target rows, returning their count and emitting dataset.mapping_targets_updated with changed/unchanged row counts.",
       "validation_failure": "No successful domain event; reject without committed business state changes.",
       "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
       "stale_input": "Revalidate schema, authority and uniqueness under Dataset lock; invalid/stale claim produces no summary.",
@@ -2444,7 +2453,9 @@
         "tests/test_audit_coverage.py::test_every_mutation_rolls_back_business_and_audit",
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
-        "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit"
+        "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit",
+        "tests/test_record_import.py::test_mapping_import_counts_changes_and_requires_confirmation",
+        "tests/test_record_import.py::test_mapping_import_no_changes_preserves_all_persisted_state"
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",

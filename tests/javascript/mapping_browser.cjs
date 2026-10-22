@@ -27,7 +27,35 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
         const box = await button.boundingBox();
         if (box) assert(box.x + box.width <= width, `Clipped record control at ${width}`);
       }
-      if (width === 320) assert.equal(layout.row, 'block');
+      if (width === 320) {
+        assert.equal(layout.row, 'block');
+        const arrow = await table.locator('tbody .mapping-direction-column').first().boundingBox();
+        const row = await table.locator('tbody tr').first().boundingBox();
+        assert(Math.abs(arrow.width - row.width) <= 2, 'Arrow strip must span the mobile card');
+      }
+      if (width > 640) {
+        const groups = await table.evaluate(el => {
+          const style = selector => getComputedStyle(el.querySelector(selector));
+          return {
+            source: style('tbody .mapping-source-cell').backgroundColor,
+            target: style('tbody .mapping-target-cell').backgroundColor,
+            sourceHeading: style('.mapping-group-headings .mapping-source-cell').backgroundColor,
+            targetHeading: style('.mapping-group-headings .mapping-target-cell').backgroundColor,
+            borders: [...el.querySelectorAll('tbody tr:first-child td')].map(cell => getComputedStyle(cell).borderBottom),
+            frames: [...el.querySelectorAll('.mapping-group-headings [scope="colgroup"]')].map(cell => {
+              const cs = getComputedStyle(cell);
+              return [cs.borderLeftWidth, cs.borderRightWidth, cs.borderTopWidth];
+            }),
+            status: style('.mapping-group-headings .record-system-status').backgroundColor,
+          };
+        });
+        assert.notEqual(groups.source, groups.target);
+        assert.notEqual(groups.sourceHeading, groups.targetHeading);
+        assert.notEqual(groups.sourceHeading, groups.source);
+        assert.notEqual(groups.status, 'rgba(0, 0, 0, 0)');
+        assert.equal(new Set(groups.borders).size, 1, JSON.stringify(groups));
+        assert.deepEqual(groups.frames, [['1px', '1px', '1px'], ['1px', '1px', '1px']]);
+      }
       if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/mapping-${width}.png`, fullPage: true, animations: 'disabled'});
       await table.locator('[data-row-primary]').first().click();
       const recordDialog = page.getByRole('dialog');
@@ -41,6 +69,14 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       await recordDialog.waitFor({state: 'hidden'});
       await page.goto(base + '/datasets/mapping-browser/concept?tab=fields');
       assert.equal(await page.getByRole('link', {name: 'Add source field', exact: true}).count(), 1);
+      const fieldBlocks = await page.locator('.mapping-fields-block').evaluateAll(blocks => blocks.map(block => {
+        const cs = getComputedStyle(block);
+        return {border: cs.border, padding: cs.padding, table: getComputedStyle(block.querySelector('.configuration-table')).backgroundColor};
+      }));
+      assert.equal(fieldBlocks[0].border, fieldBlocks[1].border);
+      assert.match(fieldBlocks[1].border, /^1px solid/);
+      assert.equal(fieldBlocks[0].padding, fieldBlocks[1].padding);
+      assert.notEqual(fieldBlocks[0].table, fieldBlocks[1].table);
       await page.getByRole('link', {name: 'Add target field', exact: true}).click();
       await page.getByRole('dialog').getByRole('heading', {name: 'Add target field', exact: true}).waitFor();
       assert.equal(await page.getByRole('dialog').getByText('Field role', {exact: true}).count(), 0);

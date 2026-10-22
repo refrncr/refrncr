@@ -1594,9 +1594,7 @@ class DatasetRecordImportService:
                     )
                 if not preview.valid:
                     raise ImportValidationError("The import is no longer valid; validate it again")
-                if state.mode in {"new_version", "mapping_update"} and (
-                    state.mode == "new_version" or require_confirmation
-                ):
+                if state.mode in {"new_version", "mapping_update"}:
                     if (
                         not confirmation
                         or confirmation != state.confirmation
@@ -1609,6 +1607,8 @@ class DatasetRecordImportService:
                         raise ImportValidationError(
                             "Confirm the exact number of Records marked as deleted."
                         )
+                if state.mode == "mapping_update" and not preview.counts["Changed"]:
+                    raise ImportValidationError("No changes. The file matches the draft.")
                 try:
                     if state.mode == "mapping_update":
                         changes = [
@@ -1709,6 +1709,19 @@ class DatasetRecordImportService:
                                 "total_processed": len(validated) + result["Deleted"],
                             },
                         )
+                    elif state.mode == "mapping_update":
+                        record_audit(
+                            uow,
+                            actor_user_id=actor_id,
+                            object_type="dataset",
+                            object_id=dataset.id,
+                            action="dataset.mapping_targets_updated",
+                            details={
+                                "format": source.kind,
+                                "changed": preview.counts["Changed"],
+                                "unchanged": preview.counts["Unchanged"],
+                            },
+                        )
                     else:
                         record_audit(
                             uow,
@@ -1729,16 +1742,19 @@ class DatasetRecordImportService:
         except Exception:
             self.store.finish(claimed)
             raise
+        updated_count = (
+            preview.counts["Changed"] if state.mode == "mapping_update" else len(validated)
+        )
         self.store.finish(
             claimed,
             content=b"",
             mapping=None,
             source_formats=None,
             schema_fingerprint=None,
-            imported_count=len(validated),
+            imported_count=updated_count,
             step=4 if state.mode == "mapping_update" else 5,
         )
-        return len(validated)
+        return updated_count
 
     def cancel(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)

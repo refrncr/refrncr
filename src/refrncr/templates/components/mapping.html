@@ -3,7 +3,12 @@
 {% set sources = fields|rejectattr('mapping_role', 'equalto', 'mapping_target')|list %}
 {% set targets = fields|selectattr('mapping_role', 'equalto', 'mapping_target')|list %}
 <tr class='mapping-group-headings'>
-  <th scope='colgroup' class='mapping-source-cell' colspan='{{ sources|length }}'>{{ source_heading(source) }}</th>
-  {% if targets %}<th class='mapping-direction-column' aria-hidden='true'></th><th scope='colgroup' colspan='{{ targets|length }}'>Target</th>{% endif %}{% if trailing %}<td colspan='{{ trailing }}'></td>{% endif %}
+  <th scope='colgroup' class='mapping-source-cell mapping-group-start mapping-group-end' colspan='{{ sources|length }}'>{{ source_heading(source) }}</th>
+  {% if targets %}<th class='mapping-direction-column' aria-hidden='true'></th><th scope='colgroup' class='mapping-target-cell mapping-group-start mapping-group-end' colspan='{{ targets|length }}'>Target</th>{% endif %}{% if trailing %}<td class='record-system-status' colspan='{{ trailing }}'></td>{% endif %}
 </tr>
+{%- endmacro %}
+
+{% macro cell_class(fields, field, index) -%}
+{% set role = 'target' if field.mapping_role == 'mapping_target' else 'source' %}
+mapping-{{ role }}-cell{% if index == 0 or (fields[index - 1].mapping_role == 'mapping_target') != (role == 'target') %} mapping-group-start{% endif %}{% if index == fields|length - 1 or (fields[index + 1].mapping_role == 'mapping_target') != (role == 'target') %} mapping-group-end{% endif %}
 {%- endmacro %}

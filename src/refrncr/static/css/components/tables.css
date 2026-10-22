@@ -193,12 +193,21 @@ table time[title] { cursor: help; text-decoration: underline dotted var(--color-
 .dataset-configuration-link svg { width: 1rem; height: 1rem; }
 
 /* Mapping variant: one row model, with source and target column groups. */
+/* Muted source and white target share the same framed group structure. */
 .mapping-record-table .mapping-source-cell,
-.mapping-source-block { background: var(--color-surface-subtle); }
-.mapping-record-table .mapping-direction-column { background: var(--color-surface); border-bottom-color: transparent; }
-.mapping-record-table thead th { position: static; }
+.mapping-source-block .configuration-table { background: var(--color-surface-subtle); }
+.mapping-record-table .mapping-target-cell,
+.mapping-record-table .mapping-direction-column { background: var(--color-surface); }
+.mapping-record-table thead th { position: static; box-shadow: none; }
+.mapping-record-table .mapping-group-start { border-inline-start: 1px solid var(--color-border); }
+.mapping-record-table .mapping-group-end { border-inline-end: 1px solid var(--color-border); }
+.mapping-record-table .mapping-group-headings :is(.mapping-source-cell, .mapping-target-cell) { border-top: 1px solid var(--color-border); }
+.mapping-record-table .mapping-group-headings .mapping-source-cell { background: var(--color-border); }
+.mapping-record-table thead .record-system-status { background: var(--color-table-heading); }
+.mapping-record-table .mapping-target-cell + .record-system-status { border-inline-start: 0; }
 .mapping-record-table .mapping-group-headings th { color: var(--color-text); font-family: var(--font-interface); font-weight: var(--font-weight-bold); text-transform: none; }
-.mapping-fields-block { padding: var(--space-md); border-radius: var(--radius-lg); }
+.mapping-fields-block { padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.mapping-source-block { background: var(--color-background); }
 .mapping-block-direction { padding: var(--space-sm); text-align: center; color: var(--color-text-muted); }
 @media (max-width: 40rem) {
   .mapping-record-table { width: 100%; }
@@ -209,7 +218,9 @@ table time[title] { cursor: help; text-decoration: underline dotted var(--color-
   .mapping-record-table td[data-label]::before { content: attr(data-label); display: block; color: var(--color-text-muted); font-family: var(--font-interface); }
   .mapping-record-table .cell-content { white-space: normal; max-width: 100%; overflow-wrap: anywhere; }
   .mapping-record-table .record-system-status { position: static; width: auto; }
-  .mapping-record-table .mapping-direction-column { width: auto; transform: rotate(90deg); border: 0; }
+  .mapping-record-table :is(.mapping-group-start, .mapping-group-end) { border-inline: 0; }
+  .mapping-record-table td.mapping-direction-column { width: auto; min-width: 0; }
+  .mapping-record-table .mapping-direction-column > [aria-hidden] { display: inline-block; transform: rotate(90deg); }
   .mapping-record-toolbar.record-toolbar-search .record-criteria-toolbar { flex-wrap: wrap; }
   .mapping-record-toolbar.record-toolbar-search .record-search-form { flex-basis: 100%; min-width: 0; }
   .mapping-record-toolbar.record-toolbar-search .record-status-toggles { margin-inline-start: 0; }

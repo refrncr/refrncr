@@ -13,7 +13,12 @@ context fields are selected from that same snapshot, including their original de
 and values. Source columns and row membership are read-only; maintainers edit target values
 and configure target fields. Imports update target values by matching the source identifier.
 Source context columns are ignored; unknown identifiers fail preview. Omitted rows and
-target columns remain unchanged, and the import never adds or removes rows. Source and
+target columns remain unchanged, and the import never adds or removes rows. Every caller must
+supply the confirmation token from the preview. A file without changes has no confirmation
+button and is rejected by the service without persisting changes or emitting a domain audit.
+Successful imports report changed target **records**, not total input rows or individual cells.
+One transactional `dataset.mapping_targets_updated` event records the format and changed/unchanged
+row counts (only rows present in the file). Source and
 target fields can be reordered within their respective groups;
 the persisted order is also the record and export column order.
 
@@ -32,8 +37,11 @@ explicit upgrading belongs to REF-301. The source owner's usage view belongs to 
 ## Presentation and authorization
 
 Records and record review share one table with source/target column groups, a muted source
-background and a direction column. On phones, each row becomes one source-then-target card.
-Fields use vertically stacked source and target groups with separate add actions. Settings
+background, a white target group and a white direction strip. Both groups have their own frame;
+row lines continue through the strip. Status/Change remain outside the groups, with the normal
+record metadata style. On phones, each row becomes one source-then-target card.
+Fields use equally framed, vertically stacked source and target groups with separate add actions;
+the source table stays muted and the target table stays white. Settings
 keeps dataset-level source/identifier information above the final Delete dataset section.
 
 Existing dataset permissions, CSRF, revision checks, review binding, audit and transaction

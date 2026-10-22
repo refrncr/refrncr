@@ -3431,7 +3431,8 @@ def test_mapping_history_remains_available_to_reader(dataset_browser):
     assert "Open draft" not in body(response)
 
 
-def test_mapping_import_browser_preview_and_confirmation(dataset_browser):
+@pytest.mark.parametrize("changed_count", [0, 1, 2])
+def test_mapping_import_browser_preview_and_confirmation(dataset_browser, changed_count):
     import io
 
     _, services, admin, client = dataset_browser
@@ -3443,12 +3444,16 @@ def test_mapping_import_browser_preview_and_confirmation(dataset_browser):
     upload = request(client, "get", f"/datasets/{mapping.key}/records/import")
     assert "no records are added or deleted" in body(upload)
     csrf = form_csrf(upload)
+    upload_content = (
+        f"code,target\nA,{'new' if changed_count else ''}\n"
+        f"B,{'second' if changed_count == 2 else ''}\n"
+    ).encode()
     mapped = request(
         client,
         "post",
         f"/datasets/{mapping.key}/records/import",
         follow_redirects=True,
-        data={"csrf_token": csrf, "file": (io.BytesIO(b"code,target\nA,new\n"), "targets.csv")},
+        data={"csrf_token": csrf, "file": (io.BytesIO(upload_content), "targets.csv")},
     )
     assert mapped.status_code == 200
     token = mapped.request.path.split("/import/")[1].split("/step/")[0]
@@ -3460,7 +3465,15 @@ def test_mapping_import_browser_preview_and_confirmation(dataset_browser):
         data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "target"},
     )
     assert preview.status_code == 200
-    assert "1 record will change" in body(preview)
+    if changed_count == 0:
+        assert "No changes. The file matches the draft." in body(preview)
+        assert ">Import records</button>" not in body(preview)
+    else:
+        assert (
+            f"{changed_count} {'record' if changed_count == 1 else 'records'} will change"
+            in body(preview)
+        )
+        assert ">Import records</button>" in body(preview)
     confirmation = re.search("name='confirmation' value='([^']+)'", body(preview))[1]
     confirmed = request(
         client,
@@ -3469,11 +3482,19 @@ def test_mapping_import_browser_preview_and_confirmation(dataset_browser):
         follow_redirects=True,
         data={"csrf_token": csrf, "confirmation": confirmation},
     )
-    assert confirmed.status_code == 200
-    assert "1 records imported successfully" in body(confirmed)
+    assert confirmed.status_code == (200 if changed_count else 409)
+    if changed_count:
+        assert (
+            f"{changed_count} target {'record' if changed_count == 1 else 'records'} updated"
+            in body(confirmed)
+        )
+    else:
+        assert "No changes. The file matches the draft." in body(confirmed)
     rows = services.dataset_records.list_records(admin.id, mapping.key).records
     assert len(rows) == 2
-    assert [v.value for row in rows for v in row.values if v.field_key == "target"] == ["new"]
+    assert [v.value for row in rows for v in row.values if v.field_key == "target"] == (
+        ["new", "second"] if changed_count == 2 else ["new"] if changed_count else []
+    )
 
 
 def test_mapping_history_source_queries_do_not_grow_with_versions(dataset_browser):
