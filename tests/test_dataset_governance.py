@@ -540,9 +540,19 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert f"<option value='team:{owner.id}'" not in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
-    assert "data-confirm='Remove export access for User?'" in populated
-    assert "data-confirm='Remove export access for Team Data domain?'" in populated
-    assert "button-danger" not in populated
+    assert "data-confirm='User loses export access to this dataset.'" in populated
+    assert "data-confirm='Team Data domain loses export access to this dataset.'" in populated
+    assert "data-confirm-title='Remove export access'" in populated
+    assert "data-confirm-action='Remove'" in populated
+    assert "data-panel-success-focus='selection'" in populated
+    assert '<dialog class="dialog confirmation-dialog" data-confirm-dialog' in populated
+    assert (
+        'class="button button-danger" type="button" tabindex="0" data-confirm-accept' in populated
+    )
+    assert (
+        'class="button button-secondary" type="button" tabindex="0" data-confirm-cancel'
+        in populated
+    )
     assert f"Remove export access for {a.id}" not in populated
     with factory() as session:
         access = session.scalar(

@@ -32,9 +32,9 @@
                   <td><span class='badge'>{{ 'Team' if is_team else 'User' }}</span></td>
                   <td><ul class='access-rights' aria-label='View and export'><li><span class='badge badge-subtle'>View</span></li><li><span class='badge badge-subtle'>Export</span></li></ul></td>
                   <td>
-                    <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-confirm='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}?' data-inline-refresh='{{ fallback }}' data-panel-success='Export access removed.'>
+                    <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("revoke_dataset_export_access", key=dataset.key, access_id=entry.id, **return_to) }}' data-confirm='{{ "Team " if is_team else "" }}{{ display_name }} loses export access to this dataset.' data-confirm-title='Remove export access' data-confirm-action='Remove' data-inline-refresh='{{ fallback }}' data-panel-success='Export access removed.' data-panel-success-focus='selection'>
                       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-                      <button class='button button-secondary button-table-action button-remove' type='submit' aria-label='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}'>Remove</button>
+                      <button class='button button-secondary button-table-action button-remove' type='submit' tabindex='0' aria-label='Remove export access for {{ "Team " if is_team else "" }}{{ display_name }}'>Remove</button>
                     </form>
                   </td>
                 </tr>

@@ -24,7 +24,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       const e = document.querySelector('[data-export-access] [data-panel-status]');
       const focus = document.querySelector(`[data-export-access] ${focusSelector}`);
       return e && !e.hidden && e.getAttribute('role') === 'status' && e.textContent === text && focus === document.activeElement;
-    }, {text, focusSelector});
+    }, {text, focusSelector}, {timeout: 10000});
   };
   const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   try {
@@ -33,7 +33,9 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
     await page.getByLabel('Password', {exact: true}).fill('correct horse battery staple');
     await page.getByRole('button', {name: 'Sign in', exact: true}).click();
     await page.waitForURL(`${base}/`);
-    for (const width of [1440, 320]) {
+    for (const colorScheme of ['light', 'dark']) {
+      await page.emulateMedia({colorScheme});
+      for (const width of [1440, 375]) {
       await page.setViewportSize({width, height: 900});
       await page.goto(`${base}/datasets/row-check#access-management`);
       await tab().waitFor();
@@ -100,18 +102,43 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
 
       for (const name of ['Row user', 'Team Row team']) {
         const remove = tab().getByRole('button', {name: `Remove export access for ${name}`, exact: true});
-        const confirmation = page.waitForEvent('dialog');
-        const click = remove.click();
-        const dialog = await confirmation;
-        assert.equal(dialog.type(), 'confirm');
-        assert.equal(dialog.message(), `Remove export access for ${name}?`);
-        await dialog.accept();
-        await click;
-        await status('Export access removed.');
+        const dialog = page.locator('dialog[data-confirm-dialog]');
+        assert.equal(await remove.getAttribute('tabindex'), '0', 'Remove is reachable with Safari default keyboard navigation');
+        await remove.focus();
+        await page.keyboard.press('Enter');
+        await dialog.waitFor({state: 'visible'});
+        await page.getByRole('heading', {name: 'Remove export access', exact: true}).waitFor();
+        assert.equal(await dialog.locator('[data-confirm-message]').textContent(), `${name} loses export access to this dataset.`);
+        assert.equal(await page.evaluate(() => document.activeElement?.matches('[data-confirm-cancel]')), true, 'dialog opens with Cancel focused');
+        const box = await dialog.boundingBox();
+        assert(box && box.x >= 0 && box.x + box.width <= width, 'dialog fits within the viewport');
+        assert(await dialog.getByRole('button', {name: 'Remove', exact: true}).evaluate(el => el.classList.contains('button-danger')));
+        assert(await dialog.getByRole('button', {name: 'Cancel', exact: true}).evaluate(el => el.classList.contains('button-secondary')));
+        assert.equal(await dialog.getByRole('button', {name: 'Cancel', exact: true}).getAttribute('tabindex'), '0');
+        assert.equal(await dialog.getByRole('button', {name: 'Remove', exact: true}).getAttribute('tabindex'), '0');
+        if (name === 'Row user') {
+          await page.keyboard.press('Escape');
+          await dialog.waitFor({state: 'hidden'});
+          assert.equal(await remove.evaluate(el => el === document.activeElement), true, 'Escape restores focus to the row action');
+          await page.keyboard.press('Enter');
+          await dialog.waitFor({state: 'visible'});
+          await page.mouse.click(2, 2);
+          await dialog.waitFor({state: 'hidden'});
+          assert.equal(await remove.evaluate(el => el === document.activeElement), true, 'backdrop click restores focus to the row action');
+          await page.keyboard.press('Enter');
+          await dialog.waitFor({state: 'visible'});
+        }
+        await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => document.activeElement?.matches('[data-confirm-accept]')), true, 'Tab moves from Cancel to Remove');
+        await page.keyboard.press('Enter');
+        await dialog.waitFor({state: 'hidden'});
+        await status('Export access removed.', '.select-trigger');
+        assert(await trigger().evaluate(el => el.matches(':focus-visible')), 'success returns visible keyboard focus to the selector');
       }
       await tab().getByText('Only the owning team has access.', {exact: false}).waitFor();
       assert.equal(await tab().locator('.access-table tbody tr').count(), 1);
-      console.log(`PASS: ${width}px empty, grant, duplicate, team and revoke states`);
+      console.log(`PASS: ${colorScheme} ${width}px empty, grant, duplicate, team, styled confirmation and revoke states`);
+      }
     }
 
     // Without JavaScript the forms post normally and errors render on the configuration page.

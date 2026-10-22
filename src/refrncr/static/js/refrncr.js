@@ -114,13 +114,58 @@
   initializeSelectionForms(document);
 
   const inlinePending = new WeakSet();
-  document.addEventListener("submit", async (event) => {
-    const form = event.target.closest("form[data-inline-refresh]");
-    if (!form) return;
-    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+  const confirmedForms = new WeakSet();
+  const confirmationDialog = document.querySelector("[data-confirm-dialog]");
+  let pendingConfirmation = null;
+  const confirmationClosures = [];
+  if (confirmationDialog) {
+    const cancel = confirmationDialog.querySelector("[data-confirm-cancel]");
+    const accept = confirmationDialog.querySelector("[data-confirm-accept]");
+    const closeConfirmation = (confirmed) => {
+      if (pendingConfirmation) {
+        pendingConfirmation.confirmed = confirmed;
+        confirmationClosures.push(pendingConfirmation);
+        pendingConfirmation = null;
+      }
+      confirmationDialog.close(confirmed ? "confirm" : "cancel");
+    };
+    confirmationDialog.addEventListener("click", (event) => {
+      if (event.target === confirmationDialog) closeConfirmation(false);
+    });
+    cancel.addEventListener("click", () => closeConfirmation(false));
+    accept.addEventListener("click", () => closeConfirmation(true));
+    confirmationDialog.addEventListener("cancel", (event) => {
       event.preventDefault();
+      closeConfirmation(false);
+    });
+    confirmationDialog.addEventListener("close", () => {
+      const pending = confirmationClosures.shift();
+      if (!pending) return;
+      if (!pending.confirmed) {
+        pending.submitter?.focus();
+        return;
+      }
+      confirmedForms.add(pending.form);
+      if (pending.submitter) pending.form.requestSubmit(pending.submitter);
+      else pending.form.requestSubmit();
+    });
+  }
+  document.addEventListener("submit", async (event) => {
+    const form = event.target.closest("form");
+    if (!form) return;
+    if (form.hasAttribute("data-confirm") && !confirmedForms.has(form)) {
+      if (!confirmationDialog || typeof confirmationDialog.showModal !== "function") return;
+      event.preventDefault();
+      pendingConfirmation = {form, submitter: event.submitter};
+      confirmationDialog.querySelector("[data-confirm-title]").textContent = form.dataset.confirmTitle || "Confirm action";
+      confirmationDialog.querySelector("[data-confirm-message]").textContent = form.dataset.confirm;
+      confirmationDialog.querySelector("[data-confirm-accept]").textContent = form.dataset.confirmAction || "Confirm";
+      confirmationDialog.showModal();
+      confirmationDialog.querySelector("[data-confirm-cancel]").focus();
       return;
     }
+    if (confirmedForms.has(form)) confirmedForms.delete(form);
+    if (!form.matches("form[data-inline-refresh]")) return;
     event.preventDefault();
     const host = form.closest("[data-export-access]");
     if (inlinePending.has(host)) return;
@@ -143,13 +188,19 @@
       initializeSelectionForms(content);
       const error = content.querySelector("[data-error-focus]");
       if (error) error.focus();
-      else if (form.hasAttribute("data-panel-no-success-feedback")) content.querySelector(".select-trigger")?.focus();
+      else if (form.hasAttribute("data-panel-no-success-feedback")) {
+        const trigger = content.querySelector(".select-trigger");
+        window.setTimeout(() => trigger?.focus(), 100);
+      }
       else {
         const status = content.querySelector("[data-panel-status]");
         status.hidden = false;
         status.setAttribute("role", "status");
         status.textContent = form.dataset.panelSuccess;
-        if (form.dataset.panelSuccessFocus === "selection") content.querySelector(".select-trigger")?.focus();
+        if (form.dataset.panelSuccessFocus === "selection") {
+          const trigger = content.querySelector(".select-trigger");
+          window.setTimeout(() => trigger?.focus(), 100);
+        }
         else status.focus();
       }
     } catch {

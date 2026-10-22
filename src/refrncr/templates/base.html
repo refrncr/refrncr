@@ -60,6 +60,16 @@
       {% if current_actor %}{{ navigation_drawer() }}{% endif %}
     </div>
     {% endblock %}
+    <dialog class="dialog confirmation-dialog" data-confirm-dialog aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
+      <div class="confirmation-dialog-content">
+        <h2 id="confirm-dialog-title" data-confirm-title>Confirm action</h2>
+        <p id="confirm-dialog-message" data-confirm-message></p>
+      </div>
+      <div class="confirmation-dialog-actions">
+        <button class="button button-secondary" type="button" tabindex="0" data-confirm-cancel>Cancel</button>
+        <button class="button button-danger" type="button" tabindex="0" data-confirm-accept>Confirm</button>
+      </div>
+    </dialog>
     {% block scripts %}{% endblock %}
   </body>
 </html>
