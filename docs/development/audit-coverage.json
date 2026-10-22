@@ -1160,6 +1160,7 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
