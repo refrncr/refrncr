@@ -1,12 +1,14 @@
 {% from 'components.html' import feedback %}
 {% from 'components/icons.html' import user_icon, team_icon %}
 {# Access management tab: one list of dataset access and inline grant/revoke actions. #}
-{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, version_id=none, change_owner_url=none) -%}
+{% macro export_access(dataset, teams, users, entries, current_csrf, error=none, selected_subject='', concept=false, version_id=none, change_owner_url=none, grant_teams=none, grant_users=none) -%}
 {% set return_to = {'concept': 1 if concept else none, 'version_id': version_id or none} %}
 {% set fallback = url_for('dataset_detail', key=dataset.key, concept=true if concept else none, version_id=version_id, tab='access-management', _anchor='access-management') %}
+{% set grant_teams = teams if grant_teams is none else grant_teams %}
+{% set grant_users = users if grant_users is none else grant_users %}
 {% set emails = {} %}{% for user in users %}{% set _ = emails.update({user.id: user.email}) %}{% endfor %}
     <div class='access-management' data-export-access>
-      <p class='help-text' data-panel-status tabindex='-1' hidden></p>
+      <p class='visually-hidden' data-panel-status tabindex='-1' hidden></p>
       <section aria-labelledby='access-overview-heading'>
         <h3 id='access-overview-heading'>Who has access</h3>
         {% if not entries %}<p class='help-text access-empty-help'>Only the owning team has access. Add a user or team below to give them export access.</p>{% endif %}
@@ -39,15 +41,15 @@
             </tbody>
             <tfoot>
               <tr class='access-grant-row'><td colspan='4'>
-                <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-no-success-feedback>
+                <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.' data-panel-success-focus='selection'>
                   <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
                   <div class='form-field'>
                     <label class='visually-hidden' for='export-subject'>User or team</label>
                     <div class='inline-form-action'>
-                      <select id='export-subject' name='subject' data-select data-noun='users and teams' required{% if error %} aria-describedby='export-subject-error' aria-invalid='true'{% endif %}>
+                      <select id='export-subject' name='subject' autocomplete='off' {{ non_login_field_attrs() }} data-select data-noun='users and teams' required{% if error %} aria-describedby='export-subject-error' aria-invalid='true'{% endif %}>
                         <option value=''>Select a user or team</option>
-                        <optgroup label='Users'>{% for user in users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
-                        <optgroup label='Teams'>{% for team in teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
+                        <optgroup label='Users'>{% for user in grant_users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
+                        <optgroup label='Teams'>{% for team in grant_teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
                       </select>
                       <button class='button button-primary' type='submit'>Grant export access</button>
                     </div>

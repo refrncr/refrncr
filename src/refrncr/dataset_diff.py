@@ -314,19 +314,32 @@ class DatasetDiffService:
         status_counts = [0, 0, 0]
         search = normalize("NFC", criteria.search).casefold()
 
+        def matches_search(item):
+            return not search or any(
+                search in (label or "").casefold()
+                for label in (item.before_identifier, item.after_identifier)
+            )
+
+        counts_in_candidates = set(criteria.statuses) == set(STATUSES)
+        if not counts_in_candidates:
+            for row in uow.version_diff.records(
+                identity.dataset_id, identity.baseline_id, STATUSES
+            ):
+                item = self._record(row, current, previous)
+                if matches_search(item):
+                    status_counts[STATUSES.index(item.status)] += 1
+
         def candidates():
             nonlocal total
             for row in uow.version_diff.records(
                 identity.dataset_id, identity.baseline_id, criteria.statuses
             ):
                 item = self._record(row, current, previous)
-                if search and not any(
-                    search in (label or "").casefold()
-                    for label in (item.before_identifier, item.after_identifier)
-                ):
+                if not matches_search(item):
                     continue
                 total += 1
-                status_counts[STATUSES.index(item.status)] += 1
+                if counts_in_candidates:
+                    status_counts[STATUSES.index(item.status)] += 1
                 if anchor is None or (
                     item.sort_key < anchor if criteria.backwards else item.sort_key > anchor
                 ):

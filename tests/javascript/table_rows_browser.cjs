@@ -71,10 +71,11 @@ if (output) fs.mkdirSync(output, {recursive:true});
             collapse: style.borderCollapse,
             spacing: style.borderSpacing,
             divider: cell ? getComputedStyle(cell).borderBottomWidth : null,
+            scoped: table.matches('.record-table, .hierarchy-table'),
           };
         }));
         for (const separator of separators) {
-          assert.equal(separator.collapse, "separate", `separate borders (${item.path} @${width})`);
+          assert.equal(separator.collapse, separator.scoped ? "separate" : "collapse", `scoped border model (${item.path} @${width})`);
           assert.match(separator.spacing, /^0px(?: 0px)?$/, `no gaps between cells (${item.path} @${width})`);
           assert.equal(separator.divider, "1px", `one-pixel divider (${item.path} @${width})`);
         }

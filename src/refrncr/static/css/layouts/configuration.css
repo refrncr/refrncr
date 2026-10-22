@@ -97,8 +97,20 @@
 .button-remove { color: var(--color-status-removed); }
 .button-remove:hover { border-color: var(--color-status-removed-border); background: var(--color-status-removed-surface); color: var(--color-status-removed); }
 @media (max-width: 767px) {
+  .access-table table { min-width: 0; display: block; }
+  .access-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .access-table tbody, .access-table tfoot { display: block; }
+  .access-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); padding: var(--space-sm); border-bottom: 1px solid var(--color-border-subtle); }
+  .access-table tbody td { min-width: 0; padding: 0; border: 0; }
+  .access-table tbody td:first-child { grid-column: 1 / -1; }
+  .access-table tbody td:nth-child(2) { grid-column: 1; grid-row: 2; align-self: center; }
+  .access-table tbody td:nth-child(3) { grid-column: 1 / -1; grid-row: 3; }
+  .access-table tbody td:last-child { grid-column: 2; grid-row: 2; width: auto; text-align: right; }
+  .access-table .access-grant-row { display: block; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); }
+  .access-table .access-grant-row td { display: block; }
   .access-grant-row .inline-form-action { grid-template-columns: minmax(0, 1fr); }
   .access-grant-row td { padding: var(--space-sm); }
+  .access-grant-row .inline-form-action > .button { justify-self: start; }
 }
 
 /* Dataset settings: grouped editable metadata and fixed identification details. */
@@ -123,8 +135,8 @@
 .dataset-delete-section { align-items: center; padding-bottom: 0; border-bottom: 0; }
 .dataset-delete-action { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); min-width: 0; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .dataset-delete-action p { max-width: 65ch; margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); }
-.dataset-delete-button { border-color: var(--color-status-removed-border); background: transparent; color: var(--color-error-text); }
-.dataset-delete-button:hover { background: var(--color-error-surface); color: var(--color-error-text); }
+.configuration-overview .dataset-delete-button { flex: none; border-color: var(--color-status-removed-border); background: transparent; color: var(--color-error-text); white-space: nowrap; }
+.configuration-overview .dataset-delete-button:hover { background: var(--color-error-surface); color: var(--color-error-text); }
 .detail-team { display: inline-flex; align-items: center; gap: var(--space-xs); font-weight: var(--font-weight-semibold); }
 .detail-team .button-icon { width: 1rem; height: 1rem; margin: 0; color: var(--color-text-muted); }
 .detail-hint { display: block; margin-top: .125rem; color: var(--color-text-muted); font-size: var(--font-size-xs); white-space: normal; }

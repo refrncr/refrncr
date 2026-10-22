@@ -1765,12 +1765,28 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     )
     assert "<code data-icon-preview-name>table</code>" in page
     assert "name='key'" not in page
-    assert (
-        "<form id='dataset-edit-form' class='form dataset-edit-form' autocomplete='off' "
-        "data-form-type='other' data-1p-ignore data-lpignore='true' "
-        "data-bwignore='true' novalidate "
-        "method='post' action='/datasets/edit-form'>" in page
+    form_attrs = next(
+        attrs
+        for tag, attrs in html_elements(page)
+        if tag == "form" and attrs.get("id") == "dataset-edit-form"
     )
+    for attr in (
+        "autocomplete",
+        "data-form-type",
+        "data-1p-ignore",
+        "data-lpignore",
+        "data-bwignore",
+        "class",
+    ):
+        assert attr in form_attrs
+    assert form_attrs["autocomplete"] == "off"
+    assert form_attrs["data-form-type"] == "other"
+    assert form_attrs["data-1p-ignore"] is None
+    assert form_attrs["data-lpignore"] == "true"
+    assert form_attrs["data-bwignore"] == "true"
+    assert form_attrs["class"] == "form dataset-edit-form"
+    assert "name='dataset_label'" in page
+    assert "id='dataset-name' name='dataset_label'" in page
     assert "<label for='dataset-name'>Name</label>" in page
     assert "value='Stored &lt;name&gt;'" in page
     assert "<label for='dataset-description'>Description</label>" in page
@@ -1782,6 +1798,16 @@ def test_dataset_edit_form_uses_shared_layout_fields_feedback_and_actions(datase
     assert "aria-invalid='true'" not in page
     assert "Stored <name>" not in page
     assert "Stored <description>" not in page
+
+    ownership = body(request(client, "get", "/datasets/edit-form/concept?edit=ownership"))
+    owner_form = next(
+        attrs
+        for tag, attrs in html_elements(ownership)
+        if tag == "form" and attrs.get("id") == "dataset-ownership-form"
+    )
+    assert owner_form["autocomplete"] == "off"
+    assert owner_form["data-form-type"] == "other"
+    assert owner_form["data-lpignore"] == "true"
 
 
 def test_community_admin_can_edit_without_dataset_grant(dataset_browser):

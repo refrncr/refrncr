@@ -497,6 +497,15 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
+    select_attrs = next(
+        attrs
+        for tag, attrs in html_elements(empty)
+        if tag == "select" and attrs.get("id") == "export-subject"
+    )
+    assert select_attrs["autocomplete"] == "off"
+    assert select_attrs["data-form-type"] == "other"
+    assert select_attrs["data-lpignore"] == "true"
+    assert select_attrs["data-bwignore"] == "true"
     assert ">Grant export access</button>" in empty
     access_action = re.search(r"action='([^']*/export-access[^']*)'", empty)
     assert access_action and access_action.group(1) == f"/datasets/{d.key}/export-access"
@@ -511,7 +520,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert granted.location == f"/datasets/{d.key}/concept?tab=access-management#access-management"
     duplicate = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert duplicate.status_code == 409
-    assert f"value='user:{u.id}' selected" in duplicate.text
+    assert f"value='user:{u.id}'" not in duplicate.text
     team = post(f"{access_url}?standalone=1", {"subject": f"team:{owner.id}", "csrf_token": csrf})
     assert team.status_code == 302
     assert team.location == f"/datasets/{d.key}?tab=access-management#access-management"
@@ -523,6 +532,8 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "<span class='badge'>Team</span>" in populated
     assert "<span class='badge badge-identifier'>Owning team</span>" in populated
     assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
+    assert f"<option value='user:{u.id}'" not in populated
+    assert f"<option value='team:{owner.id}'" not in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
     assert "data-confirm='Remove export access for User?'" in populated

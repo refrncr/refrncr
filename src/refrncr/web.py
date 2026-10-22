@@ -4,6 +4,7 @@ import hmac
 import logging
 import re
 import secrets
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
@@ -1285,10 +1286,22 @@ def create_flask_app(
         if edit_mode == "ownership" and not may_govern:
             abort(404)
         access_teams, access_users, access_entries = [], [], []
+        access_grant_teams, access_grant_users = [], []
         if may_govern:
             _, access_teams, access_users, access_entries = datasets.export_access_context(
                 actor.id, key
             )
+            granted_subjects = {
+                (entry.subject_type, entry.subject_id) for entry, _ in access_entries
+            }
+            access_grant_teams = [
+                team
+                for team in access_teams
+                if team.id != dataset.owner_team_id and ("team", team.id) not in granted_subjects
+            ]
+            access_grant_users = [
+                user for user in access_users if ("user", user.id) not in granted_subjects
+            ]
         return render_authenticated_template(
             "pages/datasets/detail.html",
             dataset=dataset,
@@ -1330,6 +1343,8 @@ def create_flask_app(
             draft_in_progress=draft_in_progress,
             access_teams=access_teams,
             access_users=access_users,
+            access_grant_teams=access_grant_teams,
+            access_grant_users=access_grant_users,
             access_entries=access_entries,
             access_error=access_error,
             access_subject=access_subject,
@@ -1488,7 +1503,7 @@ def create_flask_app(
             review=token,
             section=section,
             q=criteria.search,
-            status=list(criteria.statuses),
+            status=None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses),
             anchor=criteria.anchor,
             backwards="1" if criteria.backwards else "0",
         )
@@ -1511,6 +1526,33 @@ def create_flask_app(
             identity, token = review_identity(actor, session, dataset)
             section, criteria = review_parameters()
             result = dataset_diff.review(actor.id, identity, section, criteria)
+            selected_statuses = tuple(
+                dict.fromkeys(change_status(value) for value in request.args.getlist("status"))
+            )
+            field_items = result.items if section == "Fields" else ()
+            if section == "Fields":
+                field_items = tuple(
+                    replace(
+                        item,
+                        properties=tuple(
+                            change
+                            for change in item.properties
+                            if not (
+                                (
+                                    dataset.kind != "mapping"
+                                    and change.name in {"Mapping role", "Source field"}
+                                )
+                                or (dataset.kind != "hierarchy" and change.name == "Applicability")
+                                or (
+                                    item.status == ChangeStatus.ADDED
+                                    and change.before is None
+                                    and change.after is None
+                                )
+                            )
+                        ),
+                    )
+                    for item in result.items
+                )
             return render_authenticated_template(
                 "pages/datasets/versions/review.html",
                 dataset=dataset,
@@ -1519,6 +1561,8 @@ def create_flask_app(
                 section=section,
                 criteria=criteria,
                 result=result,
+                field_items=field_items,
+                selected_statuses=selected_statuses,
                 sections={
                     name: review_url(key, token, name) for name in ("Summary", "Fields", "Records")
                 },
@@ -1532,7 +1576,7 @@ def create_flask_app(
                     review=token,
                     section=section,
                     q=criteria.search,
-                    status=list(criteria.statuses),
+                    status=list(selected_statuses),
                     anchor=criteria.anchor,
                     backwards="1" if criteria.backwards else "0",
                 ),
@@ -1569,7 +1613,9 @@ def create_flask_app(
                     review=token,
                     section=section,
                     q=criteria.search,
-                    status=list(criteria.statuses),
+                    status=(
+                        None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses)
+                    ),
                     anchor=criteria.anchor,
                     backwards="1" if criteria.backwards else "0",
                     detail_page=number,

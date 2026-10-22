@@ -46,21 +46,24 @@
       <div class='record-toolbar record-toolbar-search review-record-toolbar' role='group' aria-label='Record changes'>
         <form {{ non_login_form_attrs() }} id='review-record-search-form' class='record-search-form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}' role='search' aria-label='Search records'>
           <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
-          {% for status in criteria.statuses %}<input type='hidden' name='status' value='{{ status }}'>{% endfor %}
+          {% for status in selected_statuses %}<input type='hidden' name='status' value='{{ status }}'>{% endfor %}
           {{ search_field('review-record-search', 'Search old or new identifier', 'Search old or new identifier', name='q', value=criteria.search, maxlength=MAX_SEARCH, clear_url=page_url(q='', anchor='', backwards='0')) }}
         </form>
         <button class='button button-secondary' type='submit' form='review-record-search-form'>Search</button>
         <div class='record-status-toggles' role='group' aria-label='Filter by change status'>
           {% set all_statuses = (ChangeStatus.ADDED, ChangeStatus.CHANGED, ChangeStatus.REMOVED) %}
           {% for status in all_statuses %}
-            {% if status in criteria.statuses %}{% set target_statuses = criteria.statuses|reject('equalto', status)|list %}
-            {% else %}{% set target_statuses = criteria.statuses|list + [status] %}{% endif %}
-            {% if target_statuses %}{% set target_statuses = all_statuses|select('in', target_statuses)|list %}
-            {% else %}{% set target_statuses = all_statuses %}{% endif %}
-            <a class='status-toggle status-toggle-link{{ " status-toggle-deleted" if status == ChangeStatus.REMOVED else "" }}' href='{{ page_url(status=target_statuses, anchor="", backwards="0") }}' aria-current='{{ "true" if status in criteria.statuses else "false" }}'>{{ status|status_label }} <span class='status-toggle-count'>{{ result.status_counts[loop.index0] }}</span></a>
+            {% if status in selected_statuses %}{% set target_statuses = [] %}
+            {% else %}{% set target_statuses = [status] %}{% endif %}
+            <form class='status-toggle-form' method='get' action='{{ url_for("dataset_version_review", key=dataset.key) }}'>
+              <input type='hidden' name='review' value='{{ token }}'><input type='hidden' name='section' value='Records'>
+              {% if criteria.search %}<input type='hidden' name='q' value='{{ criteria.search }}'>{% endif %}
+              {% for selected in target_statuses %}<input type='hidden' name='status' value='{{ selected }}'>{% endfor %}
+              <button class='status-toggle{{ " status-toggle-deleted" if status == ChangeStatus.REMOVED else "" }}' type='submit' aria-pressed='{{ "true" if status in selected_statuses else "false" }}'>{{ status|status_label }} <span class='status-toggle-count'>{{ result.status_counts[loop.index0] }}</span></button>
+            </form>
           {% endfor %}
         </div>
-        <span id='review-result-count'>{{ result.total }} matching changes</span>
+        <span id='review-result-count'>{{ result.total }} matching change{{ 's' if result.total != 1 else '' }}</span>
       </div>
       {% if result.items %}<div class='table-scroll management-table' role='region' aria-label='Record changes' tabindex='0'>
         <table class='diff-table'><caption class='visually-hidden'>Record changes, Added then Changed then Deleted</caption>
@@ -76,12 +79,11 @@
       <div class='record-toolbar review-fields-toolbar'>
         <span class='record-toolbar-note'>{{ result.total }} changed field{{ '' if result.total == 1 else 's' }} · {{ result.status_counts[0] }} Added · {{ result.status_counts[1] }} Changed · {{ result.status_counts[2] }} Deleted</span>
       </div>
-      {% if result.items %}<div class='table-scroll management-table review-fields-table' role='region' aria-label='Field changes' tabindex='0'>
+      {% if field_items %}<div class='table-scroll management-table review-fields-table' role='region' aria-label='Field changes' tabindex='0'>
         <table class='diff-table'><caption class='visually-hidden'>Field changes, Added then Changed then Deleted</caption>
-          <thead><tr><th scope='col'>Field</th><th scope='col'>Status</th><th scope='col'>Property</th><th scope='col'>Before</th><th scope='col'>After</th></tr></thead>
-          {% for item in result.items %}<tbody>{% for change in item.properties %}<tr>
-            {% if loop.first %}<th scope='rowgroup' rowspan='{{ item.properties|length }}'><a class='row-action' href='{{ detail_url("field", item.id) }}' data-panel-url data-dialog-open='review-panel'>{{ item.name }}</a></th>
-            <td rowspan='{{ item.properties|length }}'>{{ status_badge(item.status) }}{% if item.moved %} <span class='badge'>Moved</span>{% endif %}{% if item.datatype_changed %}<p class='alert alert-warning'>Datatype changed. Interpretation or presentation may differ; publication still validates the values.</p>{% endif %}</td>{% endif %}
+          <thead><tr><th scope='col'>Field</th><th scope='col'>Property</th><th scope='col'>Before</th><th scope='col'>After</th></tr></thead>
+          {% for item in field_items %}<tbody>{% for change in item.properties %}<tr>
+            {% if loop.first %}<th class='review-field-cell' scope='rowgroup' rowspan='{{ item.properties|length }}'><div class='review-field-heading'><a class='row-action' href='{{ detail_url("field", item.id) }}' data-panel-url data-dialog-open='review-panel'>{{ item.name }}</a><span class='review-field-status'>{{ status_badge(item.status) }}{% if item.moved %} <span class='badge'>Moved</span>{% endif %}</span></div>{% if item.datatype_changed %}<p class='alert alert-warning'>Datatype changed. Interpretation or presentation may differ; publication still validates the values.</p>{% endif %}</th>{% endif %}
             <th scope='row'>{{ change.name }}</th><td>{{ value(change.before) }}</td><td>{{ value(change.after) }}</td>
           </tr>{% endfor %}</tbody>{% endfor %}
         </table>

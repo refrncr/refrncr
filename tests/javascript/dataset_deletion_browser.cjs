@@ -44,6 +44,12 @@ async function focused(page, locator) {
       assert(await page.locator('#danger-zone').getByText('This cannot be undone.',{exact:true}).isVisible());
 
       const trigger = page.getByRole('link', {name:'Delete dataset', exact:true});
+      const deleteStyle = await trigger.evaluate(element => ({
+        border: getComputedStyle(element).borderTopColor,
+        whiteSpace: getComputedStyle(element).whiteSpace,
+      }));
+      assert.notEqual(deleteStyle.border, 'rgba(0, 0, 0, 0)');
+      assert.equal(deleteStyle.whiteSpace, 'nowrap');
       await trigger.focus();
       await page.keyboard.press('Enter');
       const name = confirmField('Row check');

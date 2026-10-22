@@ -18,11 +18,12 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
   const select = () => tab().getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]');
   const grant = () => tab().getByRole('button', {name: 'Grant export access', exact: true});
   const rows = () => tab().locator('.access-table tbody tr[data-access-entry]');
-  const status = async text => {
-    await page.waitForFunction(text => {
+  const status = async (text, focusSelector = '[data-panel-status]') => {
+    await page.waitForFunction(({text, focusSelector}) => {
       const e = document.querySelector('[data-export-access] [data-panel-status]');
-      return e && !e.hidden && e.textContent === text && e === document.activeElement;
-    }, text);
+      const focus = document.querySelector(`[data-export-access] ${focusSelector}`);
+      return e && !e.hidden && e.textContent === text && focus === document.activeElement;
+    }, {text, focusSelector});
   };
   const noOverflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   try {
@@ -45,29 +46,21 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert(await grant().isDisabled());
       await noOverflow(); await shot(`access-empty-${width}`);
 
-      // Keyboard grant refreshes the tab in place and announces the result.
+      // Keyboard grant refreshes the tab, announces the result and removes the granted user.
       await select().selectOption({label: 'Row user (row@example.com)'});
       await grant().focus(); await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.querySelectorAll('[data-export-access] .access-table tbody tr[data-access-entry]').length === 1);
-      assert(await page.locator('[data-export-access] [data-panel-status]').isHidden());
-      assert(await page.locator('[data-export-access] .select-trigger').evaluate(e => e === document.activeElement));
+      await status('Export access granted.', '.select-trigger');
+      assert(await tab().locator('.select-trigger').evaluate(el => el.matches(':focus-visible')));
       assert.equal(page.url(), url);
       assert.equal(await rows().count(), 1);
       assert((await rows().first().textContent()).includes('row@example.com'));
-
-      // Duplicates keep the selection and move focus to the error summary.
-      await select().selectOption({label: 'Row user (row@example.com)'}); await grant().click();
-      await tab().locator('[data-error-focus]').waitFor();
-      assert(await tab().locator('[data-error-focus]').evaluate(e => e === document.activeElement));
-      assert.equal(await select().getAttribute('aria-invalid'), 'true');
-      assert.match(await select().getAttribute('aria-describedby'), /export-subject-error/);
-      assert.equal(await select().inputValue() !== '', true);
-      await noOverflow(); await shot(`access-duplicate-${width}`);
+      assert.equal(await select().locator('option').filter({hasText: 'row@example.com'}).count(), 0);
+      await noOverflow(); await shot(`access-granted-${width}`);
 
       await select().selectOption({label: 'Row team'}); await grant().click();
       await page.waitForFunction(() => document.querySelectorAll('[data-export-access] .access-table tbody tr[data-access-entry]').length === 2);
-      assert(await page.locator('[data-export-access] [data-panel-status]').isHidden());
-      assert(await page.locator('[data-export-access] .select-trigger').evaluate(e => e === document.activeElement));
+      await status('Export access granted.', '.select-trigger');
       assert.equal(await rows().count(), 2);
       assert.deepEqual(await rows().locator('.badge').allTextContents(), ['User', 'Team']);
       await noOverflow(); await shot(`access-populated-${width}`);

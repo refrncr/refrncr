@@ -54,8 +54,23 @@ async function capture(page, name) {
       await page.getByRole('link',{name:'Fields',exact:true}).click();
       assert.match(await page.locator('main').innerText(),/Renamed label/);
       assert.equal(await page.getByRole('columnheader',{name:'Field',exact:true}).count(),1);
-      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),0);
       assert.equal(await page.getByRole('columnheader',{name:'Property',exact:true}).count(),1);
+      const headingStyle = await page.locator('.review-field-heading').first().evaluate(el => ({
+        family: getComputedStyle(el).fontFamily,
+        bodyFamily: getComputedStyle(document.body).fontFamily,
+        transform: getComputedStyle(el).textTransform,
+      }));
+      assert.equal(headingStyle.family, headingStyle.bodyFamily);
+      assert.equal(headingStyle.transform, 'none');
+      assert.equal(await page.locator('.review-field-heading .badge').count(),1);
+      const fieldRowgroup = page.locator('.review-fields-table tbody th[scope="rowgroup"]').first();
+      assert(await fieldRowgroup.evaluate(el => getComputedStyle(el).display === 'table-cell'));
+      assert(await fieldRowgroup.evaluate(el => el.rowSpan > 1));
+      const firstProperty = page.locator('.review-fields-table tbody').first().locator('tr').first().locator('th[scope="row"]');
+      const secondProperty = page.locator('.review-fields-table tbody').first().locator('tr').nth(1).locator('th[scope="row"]');
+      const [firstPropertyBox, secondPropertyBox] = await Promise.all([firstProperty.boundingBox(), secondProperty.boundingBox()]);
+      assert(Math.abs(firstPropertyBox.x - secondPropertyBox.x) < 1, 'rowspan keeps property headers in the same column');
       assert.equal(await page.locator('.record-toolbar + .review-fields-table').count(),1);
       if (width === 320) {
         assert(await page.locator('.review-fields-table').evaluate(el=>el.scrollWidth>el.clientWidth),'field table scrolls inside its frame on phone width');
@@ -72,7 +87,8 @@ async function capture(page, name) {
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
       await page.getByRole('link',{name:'Records',exact:true}).click();
       assert.equal(await page.locator('.review-record-toolbar .search-field').count(),1);
-      assert.equal(await page.locator('.review-record-toolbar .status-toggle-link').count(),3);
+      assert.equal(await page.locator('.review-record-toolbar .status-toggle').count(),3);
+      assert.equal(await page.locator('.review-record-toolbar .status-toggle[aria-pressed="false"]').count(),3);
       for (const theme of ['light','dark']) {
         await page.locator('html').evaluate((el,value)=>el.dataset.theme=value,theme);
         await capture(page,`records-${theme}-${width}`);
@@ -83,14 +99,25 @@ async function capture(page, name) {
       await reviewSearch.press('Enter');
       assert.equal(new URL(page.url()).searchParams.get('q'),'ADDED00');
       assert.equal(await page.locator('table tbody tr').count(),1);
-      await page.getByRole('link',{name:/^Added/}).click();
-      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed','Removed']);
-      assert.match(await page.locator('main').innerText(),/No matching changes/);
+      const chipCounts = async () => Object.fromEntries(await Promise.all(['Added','Changed','Deleted'].map(async status => {
+        const label = await page.getByRole('button',{name:new RegExp(`^${status}`)}).innerText();
+        return [status, Number(label.match(/\d+/)?.[0] ?? 0)];
+      })));
+      const countsBeforeStatusFilter = await chipCounts();
+      await page.getByRole('button',{name:/^Added/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
+      assert.equal(await page.locator('table tbody tr').count(),1);
+      assert.deepEqual(await chipCounts(),countsBeforeStatusFilter);
+      await page.getByRole('button',{name:/^Changed/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed']);
+      assert.equal(await page.locator('table tbody tr').count(),0);
+      await page.getByRole('button',{name:/^Added/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       await page.getByRole('link',{name:'Clear search'}).click();
       assert.equal(new URL(page.url()).searchParams.has('q'),false);
-      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed','Removed']);
-      await page.getByRole('link',{name:/^Added/}).click();
-      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added','Changed','Removed']);
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
+      await page.getByRole('button',{name:/^Added/}).click();
+      assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),[]);
       assert.equal(await page.locator('table tbody tr').count(),50);
       await page.getByRole('link',{name:'Next page',exact:true}).click();
       assert.equal(await page.locator('table tbody tr').count(),3);

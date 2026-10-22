@@ -1,5 +1,5 @@
 .table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--font-size-body-sm); }
+table { width: 100%; border-collapse: collapse; font-size: var(--font-size-body-sm); }
 caption { padding: var(--space-md); font-weight: var(--font-weight-bold); text-align: left; }
 th, td { padding: .75rem var(--space-md); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
 th { background: var(--color-table-heading); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); font-weight: var(--font-weight-regular); letter-spacing: var(--letter-spacing-label); text-transform: uppercase; }
@@ -27,7 +27,7 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .record-table thead th .field-metadata-trigger:hover { color: var(--color-action-primary); }
 .record-toolbar { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-lg); padding: var(--space-md); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
 .record-toolbar > span { margin-left: auto; color: var(--color-text-muted); font-size: var(--font-size-body-sm); white-space: nowrap; }
-.record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; }
+.record-table { width: max(100%, var(--data-table-min-width)); table-layout: auto; border-collapse: separate; border-spacing: 0; }
 .table-scroll:has(> .record-table) { max-height: calc(100dvh - 2 * var(--app-main-padding)); overflow: auto; }
 .record-table thead th { position: sticky; z-index: 1; top: 0; box-shadow: var(--shadow-sm); }
 .record-table .cell-content { max-width: clamp(8rem, 18vw, 22rem); }
@@ -113,6 +113,7 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .record-toolbar-search .record-search-form .search-field { flex: 1 1 12rem; min-width: 0; max-width: none; }
 /* Record status: two independent toggles on the search row (Active, Deleted). */
 .record-toolbar form.record-status-toggles, .record-status-toggles { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: var(--space-sm); align-items: center; margin-inline-start: auto; }
+.record-toolbar form.status-toggle-form { flex: 0 0 auto; margin: 0; }
 .status-toggle { display: inline-flex; align-items: center; gap: .375rem; min-height: var(--control-height-compact); padding: .25rem .5rem; border: 1px solid var(--color-button-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); font-family: var(--font-technical); font-size: var(--font-size-label); line-height: 1.5; letter-spacing: .02em; cursor: pointer; }
 .status-toggle:hover { border-color: var(--color-control-border); color: var(--color-text); }
 .status-toggle[aria-pressed="true"] { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
@@ -142,6 +143,11 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 /* Row headers name the row; they are not column headings. */
 tbody th[scope="row"] { background: transparent; color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
 .management-table tbody th[scope="row"] { white-space: nowrap; }
+.review-fields-table tbody th[scope="row"] { white-space: normal; }
+.review-fields-table tbody th[scope="rowgroup"] { background: var(--color-surface-subtle); color: var(--color-text); font-family: var(--font-interface); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); letter-spacing: normal; text-transform: none; }
+.review-fields-table .review-field-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); }
+.review-fields-table .review-field-heading .row-action { display: inline; width: auto; font: inherit; overflow-wrap: anywhere; }
+.review-field-status { display: inline-flex; flex-wrap: wrap; gap: var(--space-xs); align-items: center; }
 /* Pagination directly after a table closes the table object as its footer. */
 .table-scroll:has(+ .pagination) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .table-scroll + .pagination { justify-content: flex-end; align-items: center; margin-top: 0; padding: var(--space-sm) var(--space-md); border: 1px solid var(--color-border); border-top: 0; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--color-surface); }

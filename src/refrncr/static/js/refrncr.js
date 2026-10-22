@@ -148,7 +148,8 @@
         status.hidden = false;
         status.setAttribute("role", "status");
         status.textContent = form.dataset.panelSuccess;
-        status.focus();
+        if (form.dataset.panelSuccessFocus === "selection") content.querySelector(".select-trigger")?.focus();
+        else status.focus();
       }
     } catch {
       // Do not replay an uncertain POST. A safe GET shows the authoritative state.
