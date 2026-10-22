@@ -2,7 +2,7 @@
 {% from 'components/side_panel.html' import form_side_panel %}
 {% from 'components.html' import status_badge %}
 {% macro new_concept(key, label='Create draft') -%}
-<form method='post' action='{{ url_for("dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>{{ label }}</button></form>
+<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>{{ label }}</button></form>
 {%- endmacro %}
 {% macro versions_action(key) -%}
 <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>

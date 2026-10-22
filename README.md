@@ -15,6 +15,9 @@ distributions, and they remain under their own licenses. This includes the Postg
 `psycopg`, which is licensed under the LGPL-3.0. Licenses for assets shipped with Refrncr are
 listed in `src/refrncr/static/licenses/`.
 
+See the [user guide to importing Records](docs/user-guide/importing-records.md) for how imports
+compare a file with the current Draft.
+
 ## Quick start
 
 The PyPI package is not published yet. From a source checkout, create an isolated development

@@ -6,13 +6,14 @@
 {% block auth_content %}
   <h1 id='auth-title'>Set up administrator</h1>
   {{ feedback(error if not error_field else none, id="setup-error") }}
-  <form class='setup-form' method='post'>
+  <form class='setup-form' method='post' autocomplete='on' data-form-type='register'>
     {{ form_field(
       "Email address",
       "email",
       "setup-email",
       type="email",
       autocomplete="email",
+      shield=false,
       required=true,
       value=email,
       error=error if error_field == "email" else none
@@ -22,6 +23,7 @@
       "display_name",
       "setup-name",
       autocomplete="name",
+      shield=false,
       required=true,
       value=display_name,
       error=error if error_field == "display_name" else none
@@ -32,6 +34,8 @@
       "setup-password",
       type="password",
       autocomplete="new-password",
+      shield=false,
+      semantic_type="password,new",
       required=true,
       help_text="Use at least 12 characters.",
       error=error if error_field == "password" else none

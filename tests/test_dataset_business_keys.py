@@ -110,7 +110,8 @@ def test_every_field_type_and_non_unique_components_are_accepted(business_key_se
 @pytest.mark.parametrize(
     ("field_keys", "message"),
     [
-        ((), "At least one"),
+        ((), "Select at least one Record identifier field"),
+        ((1,), "Record identifier field keys must be text"),
         (("field", "field"), "duplicates"),
         (("missing",), "does not exist"),
     ],
@@ -131,7 +132,7 @@ def test_non_required_and_cross_dataset_components_are_rejected(business_key_ser
     services.dataset_fields.create_field(admin.id, first.key, "optional", "Optional", "string")
     create_required_field(services, admin, second, "foreign")
 
-    with pytest.raises(ValidationError, match="must be required"):
+    with pytest.raises(ValidationError, match="Record identifier field must be required"):
         services.dataset_business_keys.set_business_key(admin.id, first.key, ("optional",))
     with pytest.raises(ValidationError, match="does not exist"):
         services.dataset_business_keys.set_business_key(admin.id, first.key, ("foreign",))
@@ -303,7 +304,7 @@ def test_business_key_component_cannot_become_optional_but_other_changes_are_all
     other = create_required_field(services, admin, dataset, "other")
     services.dataset_business_keys.set_business_key(admin.id, dataset.key, (component.key,))
 
-    with pytest.raises(ValidationError, match="must remain required"):
+    with pytest.raises(ValidationError, match="Record identifier field must be required"):
         services.dataset_fields.update_field(
             admin.id, dataset.key, component.key, "Changed", "number", False, True
         )
@@ -551,10 +552,10 @@ def test_postgresql_replace_and_optional_update_serialize_in_both_orders(
     assert second_has_lock.is_set()
     if first_operation == "configure":
         assert first_result.field_keys == (field.key,)
-        assert str(failure.value) == "A business-key field must remain required"
+        assert str(failure.value) == "A Record identifier field must be required."
     else:
         assert first_result.is_required is False
-        assert str(failure.value) == "Every business-key field must be required"
+        assert str(failure.value) == "A Record identifier field must be required."
 
     with factory() as session:
         persisted_field = session.scalar(

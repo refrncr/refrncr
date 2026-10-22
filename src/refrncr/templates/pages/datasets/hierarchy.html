@@ -65,7 +65,7 @@
 <div class='record-toolbar record-toolbar-search' role='group' aria-label='Hierarchy results'>
   <section class='record-criteria' aria-label='Search hierarchy'>
     <div class='record-criteria-toolbar'>
-      <form id='record-search-form' method='get' role='search' aria-label='Search hierarchy' class='record-search-form'>
+      <form {{ non_login_form_attrs() }} id='record-search-form' method='get' role='search' aria-label='Search hierarchy' class='record-search-form'>
         <input type='hidden' name='view' value='{{ selected_view }}'>
         {% if sort_key %}<input type='hidden' name='sort' value='{{ sort_key }}'><input type='hidden' name='direction' value='{{ sort_direction }}'>{% endif %}
         {{ search_field('record-search', 'Search hierarchy', 'Search node names and text values', name='q', value=hierarchy_search, maxlength=MAX_SEARCH, clear_url=hierarchy_clear_url) }}

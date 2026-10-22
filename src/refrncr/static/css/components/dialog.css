@@ -1,6 +1,12 @@
 .dialog { width: min(calc(100% - 2rem), 32rem); padding: 0; border: 0; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); }
 .dialog::backdrop { background: var(--color-dialog-overlay); }
 .dialog-content { padding: var(--space-lg); }
+.confirmation-dialog { max-width: none; overflow: hidden; background: var(--color-surface); color: var(--color-text); }
+.confirmation-dialog-content { padding: var(--space-lg); }
+.confirmation-dialog-content h2 { margin: 0 0 var(--space-sm); font-family: var(--font-display); font-size: var(--font-size-heading-sm); font-weight: var(--font-weight-semibold); line-height: var(--line-height-heading); }
+.confirmation-dialog-content p { margin: 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.confirmation-dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+@media (max-width: 767px) { .confirmation-dialog { width: calc(100% - 2rem); } .confirmation-dialog-content { padding: var(--space-md); } .confirmation-dialog-actions { padding: var(--space-md); } }
 .side-panel { position: fixed; inset: 0 0 0 auto; z-index: var(--layer-dialog); width: var(--side-panel-width); max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--color-border); background: var(--color-surface); box-shadow: var(--shadow-xl); }
 .side-panel[open] { animation: panel-in var(--motion-duration-panel) var(--motion-easing-standard); }
 .side-panel::backdrop { background: var(--color-overlay); }

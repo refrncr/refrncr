@@ -40,6 +40,26 @@ async function login(page) {
       await panel.getByLabel('Name', {exact: true}).fill(label);
       await select.selectOption(id);
       assert.equal(await panel.getByLabel('Part of record identifier', {exact: true}).isDisabled(), id === 'float');
+      if (id === 'string') {
+        const identifier = panel.getByLabel('Part of record identifier', {exact: true});
+        const required = panel.getByLabel('Required', {exact: true});
+        const unique = panel.getByLabel('Unique', {exact: true});
+        await identifier.check();
+        assert(await required.isChecked());
+        assert.equal(await required.getAttribute('aria-disabled'), 'true');
+        assert.equal(await required.evaluate(el => getComputedStyle(el).cursor), 'not-allowed');
+        assert(Number(await required.evaluate(el => getComputedStyle(el).opacity)) < 1);
+        assert.match(await panel.locator('[data-identifier-status]').textContent(), /checked and locked/);
+        await required.click();
+        assert(await required.isChecked(), 'the required constraint stays checked while locked');
+        assert.equal(await panel.locator('[data-required-mirror]').count(), 1);
+        assert.equal(await unique.isChecked(), false, 'identifier membership does not imply uniqueness');
+        await identifier.uncheck();
+        assert(await required.isChecked(), 'removing identifier membership preserves Required');
+        assert.equal(await required.isDisabled(), false);
+        assert.equal(await required.getAttribute('aria-disabled'), null);
+        await identifier.check();
+      }
       if (id === 'float') {
         await select.selectOption('integer');
         await panel.getByLabel('Part of record identifier', {exact: true}).check();

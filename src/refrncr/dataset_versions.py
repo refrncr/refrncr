@@ -701,6 +701,7 @@ class DatasetVersionService:
             concept = uow.concepts.get(dataset.id) if maintain else None
             baseline_fields, removed = (), ()
             deleted_fields = {}
+            imported = (concept.import_result or {}).get("records", {}) if concept else {}
             if state is None and page is not None:
                 pairs = tuple(uow.dataset_records.deleted_records(dataset.id))
                 baseline = (
@@ -711,7 +712,14 @@ class DatasetVersionService:
                 baseline_ids = set(
                     uow.versions.record_ids(baseline) if baseline is not None else set()
                 )
-                removed = tuple(record for record, _fields in pairs if record.id in baseline_ids)
+                imported_deleted_ids = {
+                    record_id for record_id, status in imported.items() if status == "Deleted"
+                }
+                removed = tuple(
+                    record
+                    for record, _fields in pairs
+                    if record.id in baseline_ids or record.id in imported_deleted_ids
+                )
                 deleted_fields = {record.id: field_set for record, field_set in pairs}
             deleted_ids = {record.id for record in removed}
             labels = {}
@@ -756,7 +764,6 @@ class DatasetVersionService:
                 or (dataset.kind == "hierarchy" and term in node_names[record.id].casefold())
             ]
             projected = {}
-            imported = {}
             if state is None:
                 for offset in range(0, len(matching), 500):
                     projected.update(
@@ -766,15 +773,11 @@ class DatasetVersionService:
                             tuple(r.id for r in matching[offset : offset + 500]),
                         )
                     )
-                imported = (concept.import_result or {}).get("records", {})
             raw_states = {
                 record.id: (
                     "Deleted"
                     if record.id in deleted_ids
-                    else projected.get(
-                        record.id,
-                        imported.get(record.id) if imported.get(record.id) != "Deleted" else None,
-                    )
+                    else imported.get(record.id, projected.get(record.id))
                 )
                 for record in matching
             }
@@ -783,6 +786,9 @@ class DatasetVersionService:
                 for label in DISPLAY_STATUSES
             )
             ordered = matching
+            if statuses and imported:
+                imported_ids = set(imported)
+                ordered = [record for record in ordered if record.id in imported_ids]
             if selected_changes:
                 selected_raw = {
                     status_label(RECORD_STATUS_FILTERS[change]) for change in selected_changes

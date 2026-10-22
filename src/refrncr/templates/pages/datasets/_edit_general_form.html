@@ -1,0 +1,20 @@
+{% from 'components/dataset_icon.html' import icon_picker %}
+{% from 'components.html' import feedback, form_field %}
+  {{ feedback(error, id="dataset-edit-error", focus=true) }}
+  <form {{ non_login_form_attrs() }} id='dataset-edit-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    <input type='hidden' name='edit_section' value='general'>
+    <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>
+    {% if settings_return_version_id %}<input type='hidden' name='settings_return_version_id' value='{{ settings_return_version_id }}'>{% endif %}
+    {{ form_field("Name", "dataset_label", "dataset-name", value=name, error_id="dataset-edit-error" if error_field == "name" else none) }}
+    {{ form_field("Description", "description", "dataset-description", value=description, error_id="dataset-edit-error" if error_field == "description" else none, control="textarea") }}
+    {% if may_edit_key %}
+      {{ form_field("Technical name", "technical_key", "dataset-technical-key", value=technical_key, error_id="dataset-edit-error" if error_field == "technical_key" else none) }}
+      <p class='help-text'>Used in URLs, exports and the API. Editable until the first version is published.</p>
+    {% endif %}
+    {{ icon_picker(dataset_icon_choices, selected_icon, kind=dataset.kind) }}
+    <div class='form-actions'>
+      <button class='button button-primary' type='submit'>Save changes</button>
+      <a class='button button-secondary' href='{{ configuration_url }}'>Cancel</a>
+    </div>
+  </form>

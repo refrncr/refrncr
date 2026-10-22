@@ -2,6 +2,7 @@
 
 import re
 from datetime import timedelta
+from html import unescape
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 
@@ -10,11 +11,13 @@ from support import NOW, audits, configured, payload, publish, request, snapshot
 from support import dataset_version_client as client
 
 
-def prepared(c):
+def prepared(c, *, extra_field=False):
     configured(c)
     publish(c)
     c.service.clock.set(NOW + timedelta(days=1))
     c.service.create_concept(c.a.id, c.d.id)
+    if extra_field:
+        c.s.dataset_fields.create_field(c.a.id, c.d.key, "extra", "Extra field", "string")
     c.s.dataset_records.update_record(
         c.a.id, c.d.key, c.record.id, 1, {"code": "new", "label": "<b>draft</b>"}
     )
@@ -45,6 +48,16 @@ def test_review_navigation_details_and_no_audit_noise(context):
         if section == "Fields":
             assert "<span class='badge badge-draft'>Changed</span>" in response.text
             assert "<span class='badge badge-published'>Changed</span>" not in response.text
+            assert "<div class='record-toolbar review-fields-toolbar'>" in response.text
+            assert "<div class='table-scroll management-table review-fields-table'" in response.text
+            assert "<th scope='col'>Property</th>" in response.text
+            assert (
+                "<th class='review-field-cell' scope='rowgroup' rowspan='1'>"
+                "<div class='review-field-heading'>"
+            ) in response.text
+            assert "<th scope='col'>Status</th>" not in response.text
+            assert "<th scope='col'>Before</th>" in response.text
+            assert "New label" in response.text
         if section == "Records":
             assert "<span class='badge badge-draft'>Changed</span>" in response.text
             assert "<span class='badge badge-published'>Changed</span>" not in response.text
@@ -65,6 +78,128 @@ def test_review_navigation_details_and_no_audit_noise(context):
     assert snapshot(c) == before
     events = [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
     assert len(events) == 1
+
+
+def test_empty_field_review_uses_shared_empty_state(context):
+    c = context
+    configured(c)
+    publish(c)
+    c.service.clock.set(NOW + timedelta(days=1))
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "new", "label": "Draft"}
+    )
+    browser, _csrf = client(c)
+    base = f"/datasets/{c.d.key}/versions/review"
+    entrypoint = request(browser, "get", base)
+    token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+
+    response = request(browser, "get", path(base, token, section="Fields"))
+
+    assert response.status_code == 200
+    assert "record-toolbar review-fields-toolbar" in response.text
+    assert "No matching changes" in response.text
+    assert "There are no changes in this view." in response.text
+    assert "review-fields-table" not in response.text
+
+
+def test_field_review_uses_inline_status_and_dataset_specific_properties(context):
+    c = context
+    browser, _csrf, base, token = prepared(c, extra_field=True)
+
+    response = request(browser, "get", path(base, token, section="Fields"))
+
+    assert response.status_code == 200
+    assert "<th scope='col'>Status</th>" not in response.text
+    assert "<th class='review-field-cell' scope='rowgroup'" in response.text
+    assert "<div class='review-field-heading'>" in response.text
+    assert "<span class='badge badge-draft'>Added</span>" in response.text
+    assert "<th scope='row'>Field key</th>" in response.text
+    assert "Mapping role" not in response.text
+    assert "Source field" not in response.text
+    assert "Applicability" not in response.text
+
+
+def test_record_review_search_and_status_chips_preserve_url_criteria(context):
+    c = context
+    browser, _csrf, base, token = prepared(c)
+    c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "added", "label": "Added"})
+    entrypoint = request(browser, "get", base)
+    assert entrypoint.status_code == 303
+    token = parse_qs(urlsplit(entrypoint.location).query)["review"][0]
+
+    initial = request(browser, "get", path(base, token, section="Records"))
+    assert initial.status_code == 200
+    assert "class='record-toolbar record-toolbar-search review-record-toolbar'" in initial.text
+    assert "class='search-field' data-search-field" in initial.text
+    assert "id='review-record-search' type='search'" in initial.text
+    assert "Search old or new identifier" in initial.text
+    assert "class='record-status-toggles'" in initial.text
+    assert "class='status-toggle-form'" in initial.text
+    assert initial.text.count("aria-pressed='false'") == 3
+    assert "2 matching changes" in initial.text
+
+    clear_href = re.search(
+        r"<a class='search-clear' href='([^']+)' aria-label='Clear search'", initial.text
+    ).group(1)
+    clear_query = parse_qs(urlsplit(unescape(clear_href)).query)
+    assert clear_query["review"] == [token]
+    assert clear_query["section"] == ["Records"]
+    assert "status" not in clear_query
+    assert "q" not in clear_query
+
+    added_filter_form = re.search(
+        r"<form class='status-toggle-form'[^>]*>(.*?)"
+        r"<button class='status-toggle' type='submit' aria-pressed='false'>Added",
+        initial.text,
+        re.S,
+    ).group(1)
+    added_filter_query = parse_qs(
+        urlencode(re.findall(r"name='([^']+)' value='([^']*)'", added_filter_form))
+    )
+    assert added_filter_query["review"] == [token]
+    assert added_filter_query["section"] == ["Records"]
+    assert added_filter_query["status"] == ["Added"]
+
+    changed = request(
+        browser,
+        "get",
+        path(base, token, section="Records", q="new", status="Changed"),
+    )
+    assert changed.status_code == 200
+    assert "value='new'" in changed.text
+    assert "1 matching change</span>" in changed.text
+    assert "new" in changed.text
+    assert "aria-pressed='false'>Added" in changed.text
+    changed_count = re.search(
+        r">Changed <span class='status-toggle-count'>(\d+)</span>", changed.text
+    )
+    assert changed_count and changed_count.group(1) == "1"
+    added_count = re.search(r">Added <span class='status-toggle-count'>(\d+)</span>", changed.text)
+    assert added_count and added_count.group(1) == "0"
+    changed_clear_href = re.search(
+        r"<a class='search-clear' href='([^']+)' aria-label='Clear search'", changed.text
+    ).group(1)
+    changed_clear_query = parse_qs(urlsplit(unescape(changed_clear_href)).query)
+    assert changed_clear_query["status"] == ["Changed"]
+    assert "q" not in changed_clear_query
+
+    added = request(
+        browser,
+        "get",
+        path(base, token, section="Records", status="Added"),
+    )
+    assert added.status_code == 200
+    assert "1 matching change</span>" in added.text
+    assert "Added" in added.text
+    assert (
+        re.search(r">Added <span class='status-toggle-count'>(\d+)</span>", added.text).group(1)
+        == "1"
+    )
+    assert (
+        re.search(r">Changed <span class='status-toggle-count'>(\d+)</span>", added.text).group(1)
+        == "1"
+    )
 
 
 def test_legacy_edited_review_filter_selects_changed(context):

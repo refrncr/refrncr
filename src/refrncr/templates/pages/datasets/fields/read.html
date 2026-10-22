@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "components/icons.html" import lock_icon %}
+{% block content %}
+  {% include "pages/datasets/_breadcrumbs.html" %}<h1>Field details</h1>
+  <div class='side-panel-view' data-side-panel-content data-panel-title='{{ field.name }}' data-panel-eyebrow='Version {{ version_state.version.number }} · {{ version_state.status }} · Read only'>
+    <div class='side-panel-body'>
+      <p class='panel-context'>{{ lock_icon() }}Version {{ version_state.version.number }} · published, read only</p>
+      <dl class='record-details'>
+        <div><dt>Name</dt><dd>{{ field.name }}</dd></div>
+        <div><dt>Key</dt><dd><code>{{ field.key }}</code></dd></div>
+        <div><dt>Data type</dt><dd>{{ field.data_type|datatype_label }}</dd></div>
+        <div><dt>Definition</dt><dd>{{ field.definition or '—' }}</dd></div>
+        <div><dt>Unit</dt><dd>{{ field.unit or '—' }}</dd></div>
+        {% if field.hierarchy_scope %}<div><dt>Scope</dt><dd>{{ 'All nodes' if field.hierarchy_scope == 'all_nodes' else 'Leaves only' }}</dd></div>{% endif %}
+        {% if field.mapping_role %}<div><dt>Mapping role</dt><dd>{{ field.mapping_role|replace('_', ' ')|title }}</dd></div>{% endif %}
+        <div><dt>Part of record identifier</dt><dd>{{ 'Yes' if field.is_identifier else 'No' }}</dd></div>
+        <div><dt>Required</dt><dd>{{ 'Yes' if field.is_required else 'No' }}</dd></div>
+        <div><dt>Unique</dt><dd>{{ 'Yes' if field.is_unique else 'No' }}</dd></div>
+      </dl>
+    </div>
+  </div>
+{% endblock %}

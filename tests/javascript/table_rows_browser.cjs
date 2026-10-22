@@ -19,7 +19,7 @@ if (output) fs.mkdirSync(output, {recursive:true});
   const emptySelection = () => page.evaluate(() => getSelection().removeAllRanges());
   const overflow = async () => assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `page overflow at ${page.viewportSize().width}`);
   const openedPanel = () => page.locator('dialog[data-modal-side-panel][open]');
-  const closePanel = async primary => {
+  const closePanel = async (primary, viaPointer = false) => {
     // Native dialog.close() queues its close event after removing [open].
     // Wait for the shared controller's completed restoration before reopening.
     const dialog = openedPanel();
@@ -27,10 +27,19 @@ if (output) fs.mkdirSync(output, {recursive:true});
       node.dataset.testClosed = 'pending';
       node.addEventListener('close', () => { node.dataset.testClosed = 'done'; }, {once:true});
     });
-    await page.keyboard.press('Escape');
+    if (viaPointer) await dialog.locator('[data-dialog-close]').click();
+    else await page.keyboard.press('Escape');
     assert.equal(await openedPanel().count(), 0);
     await page.waitForFunction(() => !!document.querySelector('dialog[data-test-closed="done"]'));
     assert(await primary.evaluate(e => e === document.activeElement), 'focus returns to the primary button');
+    const row = primary.locator('xpath=ancestor::tr[1]');
+    assert.equal(await row.evaluate(e => getComputedStyle(e).outlineWidth), '0px');
+    const edgeShadows = await row.locator('td').evaluateAll(cells => [cells[0], cells.at(-1)].map(cell => getComputedStyle(cell).boxShadow));
+    assert.equal(edgeShadows.every(shadow => shadow !== 'none'), !viaPointer, 'focus ring reaches both edges without a pointer ring');
+    if (!viaPointer) {
+      assert.equal(edgeShadows.every(shadow => shadow.split(',').length === 3), true, 'focus ring wins over status stripes on the first cell');
+    }
+    assert.equal(await primary.evaluate(e => getComputedStyle(e).outlineWidth), '0px', 'focus ring is drawn once, on the row');
     await page.locator('dialog[data-test-closed="done"]').evaluateAll(nodes => nodes.forEach(node => delete node.dataset.testClosed));
   };
   const dragText = async locator => {
@@ -55,6 +64,21 @@ if (output) fs.mkdirSync(output, {recursive:true});
       for (const width of [1440,768,320]) {
         await page.setViewportSize({width,height:900}); await page.goto(base+item.path); await page.evaluate(() => document.fonts.ready);
         await overflow();
+        const separators = await page.locator("table").evaluateAll(tables => tables.map(table => {
+          const cell = table.querySelector("th, td");
+          const style = getComputedStyle(table);
+          return {
+            collapse: style.borderCollapse,
+            spacing: style.borderSpacing,
+            divider: cell ? getComputedStyle(cell).borderBottomWidth : null,
+            scoped: table.matches('.record-table, .hierarchy-table'),
+          };
+        }));
+        for (const separator of separators) {
+          assert.equal(separator.collapse, separator.scoped ? "separate" : "collapse", `scoped border model (${item.path} @${width})`);
+          assert.match(separator.spacing, /^0px(?: 0px)?$/, `no gaps between cells (${item.path} @${width})`);
+          assert.equal(separator.divider, "1px", `one-pixel divider (${item.path} @${width})`);
+        }
         const rows = page.locator('tbody [data-row-action]');
         assert(await rows.count() > 1);
         assert.equal(await page.locator('thead th').count(),item.columns);
@@ -87,7 +111,8 @@ if (output) fs.mkdirSync(output, {recursive:true});
           assert(await primary.evaluate(e=>e===document.activeElement));
         }
         await primary.focus();
-        assert.equal(await rows.first().evaluate(e=>getComputedStyle(e).outlineWidth),'3px');
+        assert.equal(await rows.first().evaluate(e=>getComputedStyle(e).outlineWidth),'0px');
+        assert.notEqual(await rows.first().locator('td').first().evaluate(e=>getComputedStyle(e).boxShadow),'none');
         await shot(`${item.path.replaceAll('/','-')}-${width}-focus`);
         if(item.kind==='button') {
           for(const key of ['Enter','Space']) {await page.keyboard.press(key); assert.equal(await openedPanel().count(),1); await overflow(); await closePanel(primary);}
@@ -124,6 +149,10 @@ if (output) fs.mkdirSync(output, {recursive:true});
         const fallback=await nojs.newPage(); await fallback.goto(base+item.path); await fallback.locator('[data-row-primary]').first().click();
         assert.equal(fallback.url(),base+href); await nojs.close();
       }
+      if (item.kind === 'button') {
+        await primary.click();
+        await closePanel(primary, true);
+      }
       record(`${item.path}: pointer row activation, primary text selection/copy${item.kind==='link'?', native new tabs/contextmenu event and no-JS link':''}`);
     }
     await page.goto(base+'/datasets/row-check/records');
@@ -154,11 +183,50 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await page.getByRole('link',{name:'Next',exact:true}).click(); assert.equal(await page.locator('[data-row-action]').count(),2);
     await page.getByRole('link',{name:'Previous',exact:true}).click(); assert.equal(await page.locator('[data-row-action]').count(),50);
     record('Nested native/custom controls, handled events, selection in secondary cells, modifiers and pagination');
+    await page.goto(base+'/datasets/row-check/concept/records');
+    const changedRow = page.locator('.record-row:has(> .record-system-status .badge-draft)').first();
+    assert.equal(await changedRow.count(), 1, 'fixture includes a changed record with a status stripe');
+    const changedPrimary = changedRow.locator('[data-row-primary]');
+    await changedPrimary.focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.activeElement === document.querySelector('.record-row:has(> .record-system-status .badge-draft) [data-row-primary]'));
+    let firstCellShadow = await changedRow.locator('td').first().evaluate(cell => getComputedStyle(cell).boxShadow);
+    assert.equal(firstCellShadow.split('inset').length - 1, 3, 'keyboard ring replaces the changed-row stripe and covers the first cell edges');
+    await changedPrimary.click();
+    await page.locator('dialog[data-modal-side-panel][open] .side-panel-close').click();
+    await page.waitForFunction(() => document.activeElement === document.querySelector('.record-row:has(> .record-system-status .badge-draft) [data-row-primary]'));
+    firstCellShadow = await changedRow.locator('td').first().evaluate(cell => getComputedStyle(cell).boxShadow);
+    assert.equal(firstCellShadow.split('inset').length - 1, 1, 'pointer close restores focus without the keyboard ring');
+    assert(!firstCellShadow.includes('0px 3px') && !firstCellShadow.includes('0px -3px'));
+    record('Changed-row status stripe yields to keyboard ring and remains without ring after pointer close');
     await page.goto(base+'/datasets/empty-check/records'); assert.equal(await page.locator('[data-row-action]').count(),0);
     await page.getByRole('heading',{name:'No records yet'}).click(); assert.equal(await openedPanel().count(),0);
     await page.goto(base+'/datasets/row-check'); assert.equal(await page.locator('[data-row-action]').count(),0);
     assert.equal(await page.getByRole('columnheader',{name:'Actions',exact:true}).count(),1);
     record('Empty records and configuration excluded; legitimate Actions column preserved');
+    await page.goto(base+'/datasets/row-check/concept/records');
+    const identifier = await page.locator('.record-row:has(> .record-system-status .badge-draft) [data-row-primary]').first().getAttribute('aria-label');
+    const recordId = identifier.match(/\(([^)]+)\)$/)[1];
+    const statusCell = page.locator("tbody .record-system-status").first;
+    assert.equal(await statusCell.evaluate(cell => getComputedStyle(cell).boxShadow), "none");
+    assert.equal(await statusCell.evaluate(cell => getComputedStyle(cell).borderInlineStartWidth), "1px");
+    record('Sticky record status column uses a one-pixel divider without a shadow');
+    for (const mode of ['pointer', 'keyboard']) {
+      await page.goto(`${base}/datasets/row-check/concept/records`);
+      const primary = page.locator(`#record-row-${recordId} [data-row-primary]`);
+      await primary.click();
+      const editForm = page.locator(`form[data-focus-return-record-id='${recordId}']`);
+      await editForm.locator("input[name='description']").fill(`Edited from panel by ${mode}`);
+      if (mode === 'pointer') await editForm.getByRole('button', {name:'Save record'}).click();
+      else await editForm.locator("input[name='description']").press('Enter');
+      await page.waitForURL(url => url.pathname === '/datasets/row-check/concept/records');
+      const restored = page.locator(`#record-row-${recordId}`);
+      await page.waitForFunction(id => document.activeElement === document.querySelector(`#record-row-${id} [data-row-primary]`), recordId);
+      assert.equal(await restored.locator('[data-row-primary]').getAttribute('data-keyboard-restored-focus') !== null, mode === 'keyboard');
+      const firstCellShadow = await restored.locator('td').first().evaluate(cell => getComputedStyle(cell).boxShadow);
+      assert.equal(firstCellShadow.includes('0px 3px'), mode === 'keyboard', `${mode} save focus ring at the first cell`);
+      assert.equal(firstCellShadow.includes('0px -3px'), mode === 'keyboard', `${mode} save focus ring at the first cell`);
+    }
+    record('JavaScript panel Save returns focus with a ring only after keyboard submission');
     assert.deepEqual(errors,[]);
     if(output) fs.writeFileSync(`${output}/results.json`,JSON.stringify({browser:browser.version(),checks,errors},null,2));
     console.log(`PASS: ${checks.length} browser scenario groups; no JavaScript errors`);

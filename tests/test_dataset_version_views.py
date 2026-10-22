@@ -95,6 +95,38 @@ def test_no_current_never_exposes_concept(context):
     assert not c.s.datasets.list_datasets(c.u.id)
 
 
+def test_readers_can_open_expired_field_details_but_not_scheduled_versions(context):
+    c = context
+    configured(c)
+    current = publish(c)
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_fields.update_field(
+        c.a.id, c.d.key, "label", "Future label", "string", False, False
+    )
+    scheduled = publish(c, day=NOW.date() + timedelta(days=1))
+    browser, _csrf = client(c, c.u)
+
+    scheduled_page = request(browser, "get", f"/datasets/{c.d.key}/versions/{scheduled.id}")
+    assert scheduled_page.status_code == 404
+    versions_page = request(browser, "get", f"/datasets/{c.d.key}/versions")
+    assert f"/datasets/{c.d.key}/versions/{scheduled.id}" not in versions_page.text
+
+    c.service.clock.set(NOW + timedelta(days=1))
+    expired_page = request(browser, "get", f"/datasets/{c.d.key}/versions/{current.id}")
+    assert expired_page.status_code == 200
+    assert "Expired · Version 1 · Read only" in expired_page.text
+    assert f"/datasets/{c.d.key}/versions/{current.id}/fields/" in expired_page.text
+    field = c.service.read(c.u.id, c.d.key, current.id, page=None).fields[0]
+    detail = request(
+        browser,
+        "get",
+        f"/datasets/{c.d.key}/versions/{current.id}/fields/{field.key}",
+    )
+    assert detail.status_code == 200
+    assert "Code" in detail.text and "Part of record identifier" in detail.text
+    assert "field-edit-form" not in detail.text and "field-delete-form" not in detail.text
+
+
 def test_current_and_historical_pages_use_only_snapshot_content(context):
     c = context
     configured(c)

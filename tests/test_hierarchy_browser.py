@@ -40,7 +40,7 @@ def panel_revision(response):
     return re.search(r"name='expected_revision' value='(\d+)'", body(response)).group(1)
 
 
-def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
+def test_hierarchy_creation_opens_fields_after_create(dataset_browser):
     _, services, admin, client = dataset_browser
     login(client)
     form = request(client, "get", "/datasets/new?kind=hierarchy")
@@ -59,12 +59,14 @@ def test_hierarchy_creation_opens_structure_before_fields(dataset_browser):
         },
     )
     assert response.status_code == 302
-    assert response.location.endswith("/datasets/structure/concept/records")
+    assert response.location.endswith("/datasets/structure/concept?tab=fields#fields")
+    page = body(request(client, "get", response.location.split("#", 1)[0]))
+    assert "Fields" in page
+    assert "Configure dataset sections" not in page
+    assert "Add field" in page
     page = request(client, "get", response.location)
     assert page.status_code == 200
-    assert "Start with the root" in body(page)
-    assert "Add root" in body(page)
-    assert "Hierarchy views" in body(page)
+    assert "Add field" in body(page)
     assert not services.dataset_fields.list_fields(admin.id, "structure")
 
     panel = request(client, "get", "/datasets/structure/concept/nodes/new")
@@ -117,6 +119,16 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
     assert export.headers["Content-Disposition"].endswith(
         f"filename={dataset.key}-concept-reporting.xlsx"
     )
+
+
+def test_hierarchy_delete_page_keeps_its_draft_notice(dataset_browser):
+    _, services, admin, client = dataset_browser
+    dataset, _hierarchy, _root, branch, _child, _sibling = hierarchy_fixture(services, admin)
+    login(client)
+
+    page = body(request(client, "get", f"/datasets/{dataset.key}/concept/nodes/{branch.id}/delete"))
+
+    assert "class='concept-banner'" in page
 
 
 def test_export_validation_error_uses_a_handling_screen(dataset_browser, monkeypatch):

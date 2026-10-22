@@ -274,12 +274,15 @@ authorization. Stale, reused-identifier, unique-value and incompatible-schema re
 fails without changing content. Current/history remain immutable. Publication excludes
 Deleted Records; discard and later Concept initialization retain their existing semantics.
 
-Migration 0018 establishes an explicitly approved one-time compatibility boundary: every
-existing Concept is excluded from complete new-version import; publish/discard and create
-a new Concept to use it. No historical audit attribution is guessed. Physically missing
-baseline Records are restored as Deleted using their published baseline values; their
-old Concept edits were already lost. New deletions preserve actual last Concept values.
-Field-only changes leave a newly created Concept importable. See
+Migration 0018 leaves legacy Concepts with unknown `records_mutated` history ineligible;
+no historical audit attribution is guessed. Physically missing baseline Records are restored
+as Deleted using their published baseline values; their old Concept edits were already lost.
+For a Dataset with no non-cancelled version, a non-legacy Concept remains importable after
+Record changes or a completed import. Every new preview compares with the current Draft and
+the latest import replaces the previous result. For Datasets with a non-cancelled version,
+Record mutations and completed imports continue to block further imports in that Concept.
+Field-only changes preserve eligibility. New import deletions, including Records added to an
+unpublished Draft, remain visible as Deleted and can be undone. See
 [ADR-016](../architecture/adr-016-complete-record-import.md) and
 [import security](record-import-security.md#complete-new-version-imports-ref-160).
 

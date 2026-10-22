@@ -59,6 +59,7 @@
 
     const trigger = element("button", `select-trigger${compact ? " is-compact" : ""}`);
     trigger.type = "button";
+    trigger.setAttribute("tabindex", "0");
     trigger.id = `${select.id}-trigger`;
     trigger.setAttribute("role", "combobox");
     trigger.setAttribute("aria-haspopup", "listbox");

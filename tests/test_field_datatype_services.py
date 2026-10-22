@@ -436,7 +436,11 @@ def test_browser_catalog_float_guard_trusted_actor_and_canonical_edit(record_ser
     for type_id, _raw, text, _value in CASES:
         if type_id != "boolean":
             input_type = "date" if type_id == "date" else "text"
-            assert f"name='{type_id}' type='{input_type}' value='{text}'" in page
+            assert (
+                f"name='{type_id}' type='{input_type}' autocomplete='off' "
+                f"data-form-type='other' data-1p-ignore data-lpignore='true' "
+                f"data-bwignore='true' value='{text}'" in page
+            )
     assert "2024-02-29 01:02:03" not in page
     assert "2024-02-29 23:30:00" not in page
     with factory() as session:

@@ -12,7 +12,7 @@
       {{ feedback('This version will not become Current. Its immutable snapshot remains in administrator history, and its number will never be reused.', kind='warning') }}
       {{ feedback(error, id='cancellation-error', focus=true) }}
       {% if can_cancel %}
-        <form id='cancellation-form' class='form' method='post' action='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=state.version.id) }}' data-single-submit data-busy-message='Cancelling version…' novalidate>
+        <form {{ non_login_form_attrs() }} id='cancellation-form' class='form' method='post' action='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=state.version.id) }}' data-single-submit data-busy-message='Cancelling version…' novalidate>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           {{ form_field('I confirm cancellation of this Scheduled version.', 'confirmed', 'cancellation-confirmed', type='checkbox', required=true, value='yes', error_id='cancellation-error' if error else none) }}
           <p data-submit-status role='status' hidden></p>

@@ -328,7 +328,7 @@ def test_node_panel_contains_structure_and_values_in_one_form(dataset_browser):
     login(client)
     panel = body(request(client, "get", f"/datasets/{dataset.key}/concept/nodes/{branch.id}/edit"))
     assert "Edit node" in panel
-    assert "name='name'" in panel
+    assert "name='node_label'" in panel
     assert "name='parent_id'" in panel
     assert "name='field:owner'" in panel
     assert "Save node" in panel

@@ -261,11 +261,14 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):
     html = body(request(client, "get", f"/datasets/{d.key}/concept"))
     assert "id='access-management'" in html
     assert "href='#access-management'>Access</a>" in html
-    edit = re.search(
-        r"<a[^>]+href='/datasets/polish/concept\?edit=1#dataset-name'[^>]*>.*?Edit dataset</a>",
+    edit_match = re.search(
+        r"<a[^>]+href='([^']*edit=general[^']*#dataset-name)'[^>]*>.*?Edit</a>",
         html,
         re.DOTALL,
-    ).group()
+    )
+    assert edit_match, html[html.find("dataset-general") : html.find("dataset-general") + 1200]
+    edit = edit_match.group()
+    assert "tab=dataset-details" in edit
     assert "button-secondary" in edit and "data-panel-url" not in edit
     assert len(re.findall(r"id='configuration-panel'", html)) == 1
     target = s.users.create_user(a.id, "export@example.com", "Exporter", "valid password")
@@ -276,7 +279,9 @@ def test_configure_inline_access_and_small_edit_link(dataset_browser):
         "/datasets/polish/export-access?inline=1&concept=1",
         data={"csrf_token": csrf, "subject": f"user:{target.id}"},
     )
-    assert result.status_code == 302 and result.location.endswith("/concept#access-management")
+    assert result.status_code == 302 and result.location.endswith(
+        "/concept?tab=access-management#access-management"
+    )
     html = body(request(client, "get", result.location))
     assert "Remove export access for Exporter" in html
     ids = re.findall(r"\bid=[\'\"]([^\'\"]+)", html)
@@ -519,7 +524,7 @@ def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):
     s.datasets.update_dataset(a.id, d.key, d.name, d.description, icon="database")
     login(client)
     assert "lucide-1.46.0.svg#database" in body(request(client, "get", "/datasets"))
-    assert "value='database'" in body(request(client, "get", f"/datasets/{d.key}/edit"))
+    assert "value='database'" in body(request(client, "get", f"/datasets/{d.key}/concept?edit=all"))
     assert rendered_dataset_icon("missing") == "table"
     assert rendered_dataset_icon("<svg>") == "table"
     assert rendered_dataset_icon(None) == "table"
@@ -564,7 +569,13 @@ def test_configure_inline_edit_and_cancel_preserve_content(dataset_browser):
         client,
         "post",
         "/datasets/inline-edit",
-        data={"csrf_token": csrf, "name": "", "description": "Draft text", "icon": "cloud"},
+        data={
+            "csrf_token": csrf,
+            "settings_return_context": "concept",
+            "name": "",
+            "description": "Draft text",
+            "icon": "cloud",
+        },
     )
     assert invalid.status_code == 400
     html = body(invalid)
@@ -633,18 +644,18 @@ def test_dataset_metadata_is_independent_of_versions(context, with_concept):
 
 
 def test_danger_zone_shows_what_deletion_removes(dataset_browser):
-    """The tab states the destructive action and counts everything it takes with it."""
+    """Settings use the quiet delete row; exact deletion details stay in confirmation."""
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "danger", "Danger")
     s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
     publish_dataset(s, a.id, d)
     login(client)
-    html = body(request(client, "get", "/datasets/danger/configure"))
+    html = body(request(client, "get", "/datasets/danger"))
     danger = html.split("<section id='danger-zone'", 1)[1]
-    assert "Delete this dataset" in danger and "cannot be undone" in danger
-    for label, count in [("Versions", 1), ("Records", 0), ("Fields", 1), ("Export access", 0)]:
-        assert f"{label} <b>{count}</b>" in danger
-    assert "The audit log keeps a record of the deletion" in danger
+    assert "Delete dataset" in danger and "all its versions, records and fields" in danger
+    assert "cannot be undone" in danger
+    assert "danger-counts" not in danger and "danger-card" not in danger
+    assert "The audit log records who deleted it and when" in danger
 
     # The confirmation panel repeats the counts and asks for the exact name.
     panel = body(request(client, "get", f"/datasets/id/{d.id}/delete"))
@@ -657,9 +668,11 @@ def test_danger_zone_shows_what_deletion_removes(dataset_browser):
 def test_standalone_configuration_without_concept(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "standalone", "Standalone")
-    publish_dataset(s, a.id, d)
+    version = publish_dataset(s, a.id, d)
     login(client)
-    html = body(request(client, "get", "/datasets/standalone/configure"))
+    html = body(
+        request(client, "get", f"/datasets/standalone/versions/{version.id}?tab=dataset-details")
+    )
     assert "href='#fields'>Fields</a>" in html
     assert "id='fields' aria-labelledby='fields-heading' hidden" not in html
     assert "Current · Version 1 · Read only" in html
@@ -672,12 +685,16 @@ def test_standalone_configuration_without_concept(dataset_browser):
         "/datasets/standalone",
         data={
             "csrf_token": csrf,
+            "settings_return_context": "version",
+            "settings_return_version_id": version.id,
             "name": "Current details",
             "description": "Independent",
             "icon": "database",
         },
     )
-    assert response.status_code == 302 and response.location.endswith("/configure")
+    assert response.status_code == 302 and response.location.endswith(
+        f"/datasets/standalone/versions/{version.id}?tab=dataset-details#dataset-details"
+    )
     assert "Current details" in body(request(client, "get", response.location))
     assert (
         request(client, "post", "/datasets/standalone", data={"name": "No CSRF"}).status_code == 403
@@ -694,11 +711,15 @@ def test_standalone_configuration_preserves_read_and_write_authority(dataset_bro
     user = s.users.create_user(a.id, "reader-config@example.com", "Reader", "valid password")
     login(client, user.email, "valid password")
     response = request(client, "get", "/datasets/authority/configure")
-    assert response.status_code == (200 if published else 404)
-    assert "Edit dataset" not in response.text
-    assert "id='access-management'" not in response.text
-    assert "id='danger-zone'" not in response.text
-    assert request(client, "get", "/datasets/authority/configure?edit=1").status_code == 404
+    assert response.status_code == (302 if published else 404)
+    if published:
+        target = request(client, "get", response.location)
+        assert target.status_code == 200
+        assert "Edit dataset" not in target.text
+        assert "id='access-management'" not in target.text
+        assert "id='danger-zone'" not in target.text
+        edit = request(client, "get", "/datasets/authority/configure?edit=1", follow_redirects=True)
+        assert edit.status_code == 404
     before = s.datasets.get_dataset_for_edit(a.id, d.key)
     before = {column.name: getattr(before, column.name) for column in before.__table__.columns}
     denied = request(
@@ -728,7 +749,7 @@ def test_standalone_access_redirect_and_revocation_without_concept(dataset_brows
         data={"csrf_token": csrf, "subject": f"user:{user.id}"},
     )
     assert response.status_code == 302
-    assert response.location.endswith("/configure#access-management")
+    assert response.location.endswith("?tab=access-management#access-management")
     assert "Remove export access for Exporter" in body(request(client, "get", response.location))
     entry = s.datasets.export_access_context(a.id, d.key)[3][0][0]
     response = request(
@@ -738,7 +759,7 @@ def test_standalone_access_redirect_and_revocation_without_concept(dataset_brows
         data={"csrf_token": csrf},
     )
     assert response.status_code == 302
-    assert response.location.endswith("/configure#access-management")
+    assert response.location.endswith("?tab=access-management#access-management")
     assert not s.datasets.export_access_context(a.id, d.key)[3]
 
 
@@ -758,10 +779,12 @@ def test_configuration_fields_follow_concept_lifecycle(dataset_browser, publishe
         definition="Field explanation",
         unit="EUR",
     )
-    if published:
-        publish_dataset(s, a.id, d)
+    version = publish_dataset(s, a.id, d) if published else None
     login(client)
-    html = body(request(client, "get", f"/datasets/{d.key}/configure"))
+    page_url = (
+        f"/datasets/{d.key}/versions/{version.id}" if version else f"/datasets/{d.key}/concept"
+    )
+    html = body(request(client, "get", page_url))
     fields = html.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
     assert "Visible code" in fields
     assert "Field explanation" not in fields and "EUR" not in fields
@@ -792,16 +815,60 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "field-authority", "Fields")
     s.dataset_fields.create_field(
-        a.id, d.key, "code", "Published field", "string", True, True, True
+        a.id,
+        d.key,
+        "code",
+        "Published field",
+        "string",
+        True,
+        True,
+        True,
+        definition="Field explanation",
+        unit="EUR",
     )
-    publish_dataset(s, a.id, d)
+    version = publish_dataset(s, a.id, d)
     s.dataset_versions.create_concept(a.id, d.id)
+    s.dataset_fields.update_field(
+        a.id,
+        d.key,
+        "code",
+        "Draft field",
+        "string",
+        True,
+        True,
+        definition="Draft explanation",
+        unit="USD",
+    )
     s.dataset_fields.create_field(a.id, d.key, "private", "Private concept field", "string")
     user = s.users.create_user(a.id, "fields-reader@example.com", "Reader", "valid password")
     login(client, user.email, "valid password")
-    html = body(request(client, "get", f"/datasets/{d.key}/configure"))
+    html = body(request(client, "get", f"/datasets/{d.key}/versions/{version.id}"))
     assert "Published field" in html and "Current · Version 1 · Read only" in html
     assert "Private concept field" not in html
+
+    published_page = body(request(client, "get", f"/datasets/{d.key}/versions/{version.id}"))
+    fields = published_page.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
+    assert "field-version-details" in fields
+    assert f"/datasets/{d.key}/versions/{version.id}/fields/" in fields
+    assert "id='configuration-panel'" in published_page
+    field = s.dataset_versions.read(user.id, d.key, version.id, page=None).fields[0]
+    panel_response = request(
+        client,
+        "get",
+        f"/datasets/{d.key}/versions/{version.id}/fields/{field.key}",
+    )
+    assert panel_response.status_code == 200
+    panel_page = body(panel_response)
+    assert "Published field" in panel_page
+    assert "<p class='panel-context'><svg class=\"button-icon\"" in panel_page
+    assert "<p class='panel-context'><svg class=\"key-icon\"" not in panel_page
+    assert "Field explanation" in panel_page and "EUR" in panel_page
+    assert "Part of record identifier" in panel_page
+    assert "Required" in panel_page and "Unique" in panel_page
+    assert "field-edit-form" not in panel_page and "field-delete-form" not in panel_page
+    assert "Save field" not in panel_page and "Delete field" not in panel_page
+    assert "Draft field" not in panel_page and "Draft explanation" not in panel_page
+    assert "Private concept field" not in panel_page
 
 
 def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):

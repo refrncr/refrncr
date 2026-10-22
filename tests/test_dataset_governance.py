@@ -1,5 +1,6 @@
 """REF-73 authority, ownership compare-and-set, and orthogonal export contracts."""
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
@@ -430,13 +431,20 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     csrf = sign_in(a)
     detail = get(f"/datasets/{d.key}").text
     assert "id='access-management-heading'>Access</h2>" in detail
-    assert (
-        f"<a class='access-overview-action' href='/datasets/{d.key}?edit=1#owner-team'>"
-        "Change owning team</a>" in detail
+    owner_action = re.search(
+        r"<a class='access-owner-action' href='([^']+)'>Change owning team</a>", detail
+    )
+    assert owner_action is not None, detail[detail.find("access-owner-row") :][:1200]
+    owner_edit_url = owner_action.group(1).replace("&amp;", "&")
+    assert re.fullmatch(
+        rf"/datasets/{d.key}/versions/[0-9a-f-]+\?edit=ownership&tab=dataset-details#owner-team",
+        owner_edit_url,
     )
     assert "All active Community users can view this dataset." not in detail
     s.dataset_versions.create_concept(a.id, d.id)
-    edit = get(f"/datasets/{d.key}/edit").text
+    legacy_edit = get(f"/datasets/{d.key}/edit")
+    assert legacy_edit.status_code == 302
+    edit = get(legacy_edit.headers["Location"]).text
     assert "name='expected_owner_team_id'" in edit
     before = state(factory, d)
     assert (
@@ -473,58 +481,78 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     for copy in (
         "Who has access",
         "Owning team",
-        "Community administrators",
-        "Give export access",
-        "Additional export access",
+        "Dataset access",
         "User or team",
         "Select a user or team",
-        "Grant access",
-        "Export only: they can view and download the records, not change them.",
-        "No additional access yet",
-        "Only &lt;img",
-        "members and Community administrators can export this dataset.",
+        "Grant export access",
+        "Only the owning team has access. Add a user or team below to give them export access.",
     ):
         assert copy in empty
-    for right in ("View", "Edit", "Publish", "Export", "All rights"):
-        assert f"<span class='badge'>{right}</span>" in empty
+    assert "&lt;img src=x" in empty
+    for right in ("View", "Edit", "Publish", "Export"):
+        assert f"<span class='badge badge-subtle'>{right}</span>" in empty
     assert "<img src=x" not in empty
-    assert "<table" not in empty
+    assert empty.count("<table") == 1
+    assert "class='access-owner-row'" in empty
+    table_end = empty.index("</table>")
+    scroll_end = empty.index("</div>", table_end)
+    grant_row = empty.index("class='access-grant-row'")
+    assert scroll_end < grant_row
+    assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty
-    assert f"action='/datasets/{d.key}/export-access?concept=1'" in empty
+    select_attrs = next(
+        attrs
+        for tag, attrs in html_elements(empty)
+        if tag == "select" and attrs.get("id") == "export-subject"
+    )
+    assert select_attrs["autocomplete"] == "off"
+    assert select_attrs["data-form-type"] == "other"
+    assert select_attrs["data-lpignore"] == "true"
+    assert select_attrs["data-bwignore"] == "true"
+    assert ">Grant export access</button>" in empty
+    access_action = re.search(r"action='([^']*/export-access[^']*)'", empty)
+    assert access_action and access_action.group(1) == f"/datasets/{d.key}/export-access"
     invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400
     assert "id='access-management-heading'" in invalid.text
-    assert "aria-describedby='export-subject-help export-subject-error' aria-invalid='true'" in (
-        invalid.text
-    )
+    assert "aria-describedby='export-subject-error' aria-invalid='true'" in (invalid.text)
     assert "data-error-focus" in invalid.text
     assert post(access_url, {"subject": f"user:{u.id}"}).status_code == 403
     granted = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert granted.status_code == 302
-    assert granted.location == f"/datasets/{d.key}/concept#access-management"
+    assert granted.location == f"/datasets/{d.key}/concept?tab=access-management#access-management"
     duplicate = post(f"{access_url}?concept=1", {"subject": f"user:{u.id}", "csrf_token": csrf})
     assert duplicate.status_code == 409
-    assert f"value='user:{u.id}' selected" in duplicate.text
+    assert f"value='user:{u.id}'" not in duplicate.text
     team = post(f"{access_url}?standalone=1", {"subject": f"team:{owner.id}", "csrf_token": csrf})
     assert team.status_code == 302
-    assert team.location == f"/datasets/{d.key}/configure#access-management"
+    assert team.location == f"/datasets/{d.key}?tab=access-management#access-management"
     populated = access_section(get(concept_url).text)
-    assert sum(tag == "tr" for tag, _ in html_elements(populated)) == 3
+    assert populated.count("<table") == 1
+    assert populated.index("class='access-owner-row'") < populated.index("data-access-entry")
+    assert sum("data-access-entry" in attrs for tag, attrs in html_elements(populated)) == 2
     assert "<span class='badge'>User</span>" in populated
     assert "<span class='badge'>Team</span>" in populated
+    assert "<span class='badge badge-identifier'>Owning team</span>" in populated
     assert f"<span class='access-subject-detail'>{u.email}</span>" in populated
-    assert (
-        sum(
-            tag == "time" and "access-added" in attrs.get("class", "").split()
-            for tag, attrs in html_elements(populated)
-        )
-        == 2
-    )
-    assert "<span class='section-count'>2</span>" in populated
+    assert f"<option value='user:{u.id}'" not in populated
+    assert f"<option value='team:{owner.id}'" not in populated
     assert "Remove export access for User" in populated
     assert "Remove export access for Team Data domain" in populated
-    assert "button-danger" not in populated
+    assert "data-confirm='User loses export access to this dataset.'" in populated
+    assert "data-confirm='Team Data domain loses export access to this dataset.'" in populated
+    assert "data-confirm-title='Remove export access'" in populated
+    assert "data-confirm-action='Remove'" in populated
+    assert "data-panel-success-focus='selection'" in populated
+    assert '<dialog class="dialog confirmation-dialog" data-confirm-dialog' in populated
+    assert (
+        'class="button button-danger" type="button" tabindex="0" data-confirm-accept' in populated
+    )
+    assert (
+        'class="button button-secondary" type="button" tabindex="0" data-confirm-cancel'
+        in populated
+    )
     assert f"Remove export access for {a.id}" not in populated
     with factory() as session:
         access = session.scalar(
@@ -534,7 +562,9 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert post(revoke, {}).status_code == 403
     revoked = post(f"{revoke}?concept=1", {"csrf_token": csrf})
     assert revoked.status_code == 302
-    assert revoked.location == f"/datasets/{d.key}/concept#access-management"
+    assert revoked.location == (
+        f"/datasets/{d.key}/concept?tab=access-management#access-management"
+    )
     with factory() as session:
         assert session.get(DatasetExportAccess, access.id) is None
         assert {

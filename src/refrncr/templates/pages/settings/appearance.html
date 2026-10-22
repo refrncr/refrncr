@@ -3,7 +3,7 @@
 {% set settings_title = "Appearance" %}
 
 {% block settings_content %}
-  <form class="appearance-form" method="post" action="{{ url_for('theme_preference') }}" novalidate>
+  <form {{ non_login_form_attrs() }} class="appearance-form" method="post" action="{{ url_for('theme_preference') }}" novalidate>
     <fieldset class="theme-options">
       <legend>Theme</legend>
       <p class="help-text" id="theme-help">Stored for your account and used on every device.</p>

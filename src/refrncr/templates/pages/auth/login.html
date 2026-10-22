@@ -12,13 +12,15 @@
 {% block auth_content %}
   <h1 id='auth-title'>Sign in to your account</h1>
   {{ feedback(error, id="login-error", focus=true) }}
-  <form class='login-form' method='post' action='{{ url_for("login") }}' novalidate>
+  <form class='login-form' method='post' action='{{ url_for("login") }}' autocomplete='on' data-form-type='login' novalidate>
     {{ form_field(
       "Email address",
       "email",
       "login-email",
       type="email",
       autocomplete="username",
+      shield=false,
+      semantic_type="username",
       value=email|default(none),
       required=true,
       error=field_errors.email if field_errors else none,
@@ -30,6 +32,8 @@
       "login-password",
       type="password",
       autocomplete="current-password",
+      shield=false,
+      semantic_type="password",
       required=true,
       password_toggle=true,
       error=field_errors.password if field_errors else none,

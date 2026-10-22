@@ -108,11 +108,13 @@ async function layout(page, label) {
       await tabs.getByRole('tab', {name: 'Fields', exact: true}).focus();
       await page.keyboard.press('Home');
       await page.getByRole('tabpanel', {name: 'Dataset details', exact: true}).waitFor();
-      const edit = page.getByRole('link', {name: 'Edit dataset', exact: true});
-      assert((await edit.getAttribute('class') || '').includes('button-secondary'));
       const details = page.getByRole('tabpanel', {name: 'Dataset details', exact: true});
-      await details.getByRole('heading', {name: 'At a glance', exact: true}).waitFor();
-      assert.equal(await details.locator('.dataset-icon-tile use').count(), 1);
+      const edit = details.locator('#dataset-general').getByRole('link', {name: 'Edit', exact: true});
+      assert((await edit.getAttribute('class') || '').includes('button-secondary'));
+      await details.getByRole('heading', {name: 'General', exact: true}).waitFor();
+      assert.equal(await details.locator('#dataset-identification').getByText('Permanent', {exact:true}).count(), 0);
+      assert.equal(await details.locator('#dataset-identification').getByText('Editable until first publication', {exact:true}).count(), 1);
+      assert.equal(await details.locator('#dataset-general .dataset-icon use').count(), 1);
       await layout(page, `dataset details ${width}`);
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
@@ -121,11 +123,12 @@ async function layout(page, label) {
       assert.equal(await panel.locator('input[name=icon]').isVisible(), true);
       assert.equal(await panel.locator('[data-icon-picker]').getByRole('combobox').count(), 1);
       assert.equal(await panel.locator('input[name=key]').count(), 0);
+      assert.equal(await panel.locator('input[name=technical_key]').count(), 1);
       assert.equal(await page.locator('dialog[open]').count(), 0);
       assert.equal(await panel.getByLabel('Name', {exact: true}).evaluate(e => e === document.activeElement), true);
       await panel.getByLabel('Name', {exact: true}).fill('');
       await panel.getByLabel('Description', {exact: true}).fill('Draft retained after validation');
-      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
+      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save changes', exact: true}).click()]);
       assert.equal(await panel.getByLabel('Description', {exact: true}).inputValue(), 'Draft retained after validation');
       assert.equal(await page.locator('#dataset-edit-error').evaluate(e => e === document.activeElement), true);
       await panel.getByRole('link', {name: 'Cancel', exact: true}).click();
@@ -190,14 +193,14 @@ async function layout(page, label) {
       await picker.press('ArrowDown');
       await picker.press('Enter');
       await layout(page, `icon picker ${width}`);
-      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
+      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save changes', exact: true}).click()]);
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
       panel = page.locator('#dataset-edit-form');
       await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill('warehouse');
       await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).press('Tab');
       assert.equal(await panel.locator('input[name=icon]').inputValue(), 'warehouse');
-      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
+      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save changes', exact: true}).click()]);
       await page.goto(base + '/datasets');
       assert.equal(await row.locator('use').getAttribute('href'), '/static/images/lucide-1.46.0.svg#warehouse');
       await row.locator('[data-row-primary]').click();
@@ -207,13 +210,13 @@ async function layout(page, label) {
       panel = page.locator('#dataset-edit-form');
       assert.equal(await panel.locator('input[name=icon]').inputValue(), 'warehouse');
       await panel.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill('not-a-real-icon');
-      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
+      await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Save changes', exact: true}).click()]);
       assert((await page.locator('.page-title use').getAttribute('href')).endsWith('#table'));
       for (const invalid of ['<svg onload=alert(1)>', 'https://invalid.example/icon.svg', '../icons']) {
         await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
         await page.getByRole('combobox', {name: 'Dataset icon', exact: true}).fill(invalid);
-        await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save dataset', exact: true}).click()]);
+        await Promise.all([page.waitForNavigation(), page.getByRole('button', {name: 'Save changes', exact: true}).click()]);
         assert((await page.locator('.page-title use').getAttribute('href')).endsWith('#table'));
         assert.equal(await page.locator('#dataset-edit-error').count(), 0);
       }
@@ -234,7 +237,16 @@ async function layout(page, label) {
       // Fields reorder with the keyboard on the drag handle and save right away.
       const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
       const fieldOrder = await fieldNames();
-      assert(await page.locator('#fields .field-drag-handle').first().isVisible());
+      const dragHandle = page.locator('#fields .field-drag-handle').first();
+      assert(await dragHandle.isVisible());
+      const dragAlignment = await dragHandle.evaluate(handle => {
+        const cell = handle.closest('td').getBoundingClientRect();
+        const row = handle.closest('tr').getBoundingClientRect();
+        const box = handle.getBoundingClientRect();
+        return {leftOffset: box.left - cell.left, centerOffset: box.top + box.height / 2 - row.top - row.height / 2};
+      });
+      assert(Math.abs(dragAlignment.leftOffset) <= 1, JSON.stringify({width, dragAlignment}));
+      assert(Math.abs(dragAlignment.centerOffset) <= 1, JSON.stringify({width, dragAlignment}));
       assert.equal(await page.locator('#fields .button-stack').count(), 0);
       const reorder = async (name, key) => {
         await page.getByRole('button', {name: `Reorder ${name}`, exact: true}).focus();
@@ -258,15 +270,16 @@ async function layout(page, label) {
       await page.goto(base + `/datasets/polish-${width}/configure#access-management`);
       let access = page.locator('#access-management');
       await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
-      await access.getByRole('button', {name: 'Grant access', exact: true}).click();
+      await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).waitFor();
-      assert.equal(await page.locator('[data-panel-status]:not([hidden])').textContent(), 'Export access granted.');
+      assert(await access.locator('[data-panel-status]').isHidden());
       await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
-      await access.getByRole('button', {name: 'Grant access', exact: true}).click();
+      await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('alert').waitFor();
       assert.equal(await access.getByLabel('User or team').getAttribute('aria-invalid'), 'true');
+      page.once('dialog', dialog => dialog.accept());
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).click();
-      await access.getByRole('heading', {name: 'No additional access'}).waitFor();
+      await access.getByText('Only the owning team has access.', {exact: false}).waitFor();
       await layout(page, `configure ${width}`);
       await page.screenshot({path: `${output}/configure-${width}.png`, fullPage: true});
       await page.getByRole('link', {name: 'Versions', exact: true}).click();

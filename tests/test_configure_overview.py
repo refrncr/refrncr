@@ -14,6 +14,7 @@ from support import (
     html_tag_texts,
     login,
     request,
+    session_csrf,
 )
 
 
@@ -59,9 +60,16 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in page
     assert '<div class="page-context">' in page
     assert "0 records</span>" in page and "Updated <time" in page
-    assert sum(tag == "section" for tag, _ in html_elements(page)) == (
-        8 if permission == "community_admin" else 2 if permission == "viewer" else 4
-    )
+    for section_id in (
+        "dataset-details",
+        "dataset-general",
+        "dataset-ownership",
+        "dataset-identification",
+        "fields",
+    ):
+        assert f"id='{section_id}'" in page
+    assert ("id='danger-zone'" in page) == (permission != "viewer")
+    assert ("id='access-management'" in page) == (permission == "community_admin")
     header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]
@@ -72,31 +80,33 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     )
     assert f"class='button button-secondary' href='{records_url}'>View records" not in actions
     assert "Edit dataset" not in actions
-    details = section(page, "dataset-details-heading")
-    assert ("Edit dataset" in details) == (permission != "viewer")
-    for label in (
-        "Owning team",
-        "Technical name",
-        "Icon",
-        "Version",
-        "Fields",
-        "Created",
-    ):
-        assert f"<dt>{label}</dt>" in details
-    assert "<p class='dataset-identity-name'>Reference data</p>" in details
-    assert "</svg>Test data domain</span>" in details
-    assert "No description provided" in details
-    expected_key_status = "Permanent" if permission == "viewer" else "Editable until published"
-    assert expected_key_status in details
-    assert f"<dt>Fields</dt><dd>{count}</dd>" in details
-    assert "<dt>Records</dt><dd>0</dd>" in details
-    version_label = "Version 1 · Current" if version else "Draft in progress"
-    assert f"<dt>Version</dt><dd>{version_label}</dd>" in details
-    assert "They are not part of a version." not in details
-    assert (
-        "Applies to the whole dataset, not to one version. Changes take effect right away."
-        in details
+    general = section(page, "dataset-general-heading")
+    ownership = section(page, "dataset-ownership-heading")
+    identification = section(page, "dataset-identification-heading")
+    assert "Edit dataset" not in page
+    assert ("edit=general" in general) == (permission != "viewer")
+    assert ("edit=ownership" in ownership) == (permission == "community_admin")
+    for label in ("Name", "Description", "Icon"):
+        assert f"<dt>{label}</dt>" in general
+    assert "<dt>Owning team</dt>" in ownership
+    for label in ("Technical name", "Type"):
+        assert f"<dt>{label}</dt>" in identification
+    assert "At a glance" not in page
+    assert "<dt>Version</dt>" not in page and "<dt>Created</dt>" not in page
+    assert "<dt>Fields</dt>" not in page
+    assert "<p class='dataset-identity-name'>Reference data</p>" not in page
+    assert "</svg>Test data domain</span>" in ownership
+    assert "No description provided" in general
+    expected_key_status = (
+        "Permanent" if permission == "viewer" else "Editable until first publication"
     )
+    assert expected_key_status in identification
+    assert "<dt>Records</dt>" not in page
+    assert "0 records</span>" in page
+    assert "They are not part of a version." not in page
+    assert "How the dataset appears in navigation, search and exports." in general
+    assert "Fixed after the first publication." in identification
+    assert "Used in URLs, exports and the API." in identification
     # UUIDs remain legal in functional hidden inputs and access subject values.
     presentation = re.sub(
         r"<input[^>]*type='hidden'[^>]*>| value='[^']*'| href='/datasets/id/[^']*'", "", page
@@ -107,7 +117,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert not re.search(r"draggable|ondrag\w*|ondrop|data-drag", field_section, re.IGNORECASE)
     assert "<h2 id='fields-heading'>Fields</h2>" in field_section
     assert ("Add field" in field_section) == (permission != "viewer")
-    assert ("configuration-panel" in page) == (permission != "viewer")
+    assert ("configuration-panel" in page) == (version is not None or permission != "viewer")
     assert "record-identifier-heading" not in page
     assert "No record identifier configured" not in page
     if not count:
@@ -119,7 +129,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     assert "role='region' aria-label='Dataset fields' tabindex='0'" in field_section
     assert re.findall(
         r"<th scope='col'[^>]*>(?:<span[^>]*>)?(.*?)(?:</span>)?</th>", field_section
-    ) == ["Field order", "Field", "Type", "Constraints"] + (
+    ) == ([] if permission == "viewer" else ["Field order"]) + ["Field", "Type", "Constraints"] + (
         [] if permission == "viewer" else ["Actions"]
     )
     assert "<span class='badge'>Required</span>" in field_section
@@ -136,13 +146,32 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     )
     rows = re.findall(r"<tr[^>]*>\s*<td[^>]*>(.*?)</tr>", field_section, re.DOTALL)
     assert len(rows) == count
+    assert field_section.count("data-row-action class='interactive-row'") == (
+        count if permission == "viewer" else 0
+    )
+    assert field_section.count("data-row-primary") == (count if permission == "viewer" else 0)
     for index, (field, row) in enumerate(zip(fields, rows, strict=True)):
-        assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
+        if permission == "viewer":
+            assert (
+                "<a class='row-action field-version-details' data-row-primary" in row
+                and f"<span class='field-name row-action-label'>{field.name}</span>" in row
+            )
+        else:
+            assert f"<td class='field-identity'><span class='field-name'>{field.name}</span>" in row
         assert f"<code class='field-key'>{field.key}</code></td>" in row
-        order_cell, indicator = row.split("</td>")[:2]
-        assert "key-icon" not in order_cell
+        cells = row.split("</td>")
+        order_cell, indicator = (cells[0], cells[1]) if permission != "viewer" else ("", row)
+        if permission != "viewer":
+            assert "key-icon" not in order_cell
         if index != 1:
-            assert f"{field.name}</span> <svg" in indicator
+            if permission == "viewer":
+                assert f"{field.name}</span> <svg" in indicator
+                primary_link = row.split("<a class='row-action field-version-details", 1)[1].split(
+                    "</a>", 1
+                )[0]
+                assert '<svg class="key-icon"' in primary_link
+            else:
+                assert f"{field.name}</span> <svg" in indicator
             assert '<svg class="key-icon"' in indicator
             assert identifier_badge in row
             assert f"{field.name} is part of the record identifier" in indicator
@@ -162,7 +191,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
             assert f"aria-label='Reorder {field.name}'" in order_cell
         else:
             assert "<form" not in row and "<button" not in row and "Edit field" not in row
-            assert f"<span class='field-position'>{index + 1}</span>" in order_cell
+            assert "field-position" not in row and "field-order-column" not in row
     if count == 3:
         assert "None" in rows[1] and "Identifier</span>" not in rows[1]
         assert field_section.index("First field") < field_section.index("Last field")
@@ -196,6 +225,110 @@ def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, t
     assert html_tag_texts(page, "a").count("View current version") == 1
 
 
+def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepublication(
+    dataset_browser,
+):
+    _, services, admin, client = dataset_browser
+    dataset = create_dataset(services, admin, "settings-edit", "Settings edit", "Original")
+    login(client)
+
+    general = request(client, "get", "/datasets/settings-edit/concept?edit=general")
+    assert general.status_code == 200
+    general_html = body(general)
+    assert "name='edit_section' value='general'" in general_html
+    assert "name='technical_key'" in general_html
+    assert "name='owner_team_id'" not in general_html
+    response = request(
+        client,
+        "post",
+        "/datasets/settings-edit",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "edit_section": "general",
+            "settings_return_context": "concept",
+            "name": "Renamed dataset",
+            "description": "Updated description",
+            "technical_key": "renamed-dataset",
+            "icon": "database",
+        },
+    )
+    assert response.status_code == 302
+    assert response.location.endswith(
+        "/datasets/renamed-dataset/concept?tab=dataset-details#dataset-details"
+    )
+    updated = services.datasets.get_dataset_for_edit(admin.id, "renamed-dataset")
+    assert (updated.name, updated.description, updated.icon) == (
+        "Renamed dataset",
+        "Updated description",
+        "database",
+    )
+
+    ownership = request(client, "get", "/datasets/renamed-dataset/concept?edit=ownership")
+    assert ownership.status_code == 200
+    ownership_html = body(ownership)
+    assert "name='edit_section' value='ownership'" in ownership_html
+    assert "name='owner_team_id'" in ownership_html
+    assert "name='name'" not in ownership_html
+    assert "name='technical_key'" not in ownership_html
+    response = request(
+        client,
+        "post",
+        "/datasets/renamed-dataset",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "edit_section": "ownership",
+            "owner_team_id": dataset.owner_team_id,
+            "expected_owner_team_id": dataset.owner_team_id,
+        },
+    )
+    assert response.status_code == 302
+    retained = services.datasets.get_dataset_for_edit(admin.id, "renamed-dataset")
+    assert (retained.name, retained.description, retained.icon, retained.key) == (
+        "Renamed dataset",
+        "Updated description",
+        "database",
+        "renamed-dataset",
+    )
+
+
+def test_cancel_general_edit_returns_to_the_same_dataset_settings_tabs(dataset_browser):
+    _, services, admin, client = dataset_browser
+    create_dataset(services, admin, "settings-cancel", "Settings cancel")
+    login(client)
+
+    response = request(
+        client,
+        "get",
+        "/datasets/settings-cancel/concept?tab=dataset-details&edit=general",
+    )
+
+    assert response.status_code == 200
+    page = body(response)
+    assert "aria-label='Dataset sections'" in page
+    cancel = re.search(r"<a class='button button-secondary' href='([^']+)'>Cancel</a>", page).group(
+        1
+    )
+    assert cancel == "/datasets/settings-cancel/concept?tab=dataset-details#dataset-details", cancel
+
+    saved = request(
+        client,
+        "post",
+        "/datasets/settings-cancel",
+        data={
+            "csrf_token": session_csrf(client, services),
+            "edit_section": "general",
+            "settings_return_context": "concept",
+            "name": "Settings saved",
+            "description": "Updated",
+            "icon": "database",
+        },
+    )
+    assert saved.status_code == 302
+    assert saved.location.endswith(
+        "/datasets/settings-cancel/concept?tab=dataset-details#dataset-details"
+    )
+
+
 def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
     _, services, admin, client = dataset_browser
     name = '<script>alert("metadata")</script>' + "N" * 150
@@ -211,8 +344,8 @@ def test_long_and_malicious_metadata_stays_escaped(dataset_browser):
     for value in (name, description, field_name):
         assert escape(value).replace("&#x27;", "&#39;").replace("&quot;", "&#34;") in page
     elements = html_elements(page)
-    assert sum(tag == "section" for tag, _ in elements) == 8
-    assert sum(tag == "table" for tag, _ in elements) == 1
+    assert "id='dataset-general'" in page and "id='dataset-identification'" in page
+    assert sum(tag == "table" for tag, _ in elements) == 2
     assert "aria-label='Edit field &lt;img" in page
 
     field_section = section(page, "fields-heading")

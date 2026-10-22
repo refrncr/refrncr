@@ -4,9 +4,11 @@ import hmac
 import logging
 import re
 import secrets
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
+from types import SimpleNamespace
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
@@ -21,6 +23,7 @@ from flask import (
     send_file,
     url_for,
 )
+from markupsafe import Markup
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
@@ -260,6 +263,13 @@ def create_flask_app(
     audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
 
     app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
+    app.jinja_env.globals["non_login_form_attrs"] = lambda: Markup(
+        "autocomplete='off' data-form-type='other' data-1p-ignore "
+        "data-lpignore='true' data-bwignore='true'"
+    )
+    app.jinja_env.globals["non_login_field_attrs"] = lambda: Markup(
+        "data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true'"
+    )
     app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
     app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
     app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
@@ -1042,7 +1052,7 @@ def create_flask_app(
         )
         require_csrf(login_session.csrf_token)
         key = request.form.get("key", "")
-        name = request.form.get("name", "")
+        name = request.form.get("dataset_label", request.form.get("name", ""))
         description = request.form.get("description", "")
         try:
             submitted_teams = request.form.getlist("owner_team_id")
@@ -1075,11 +1085,15 @@ def create_flask_app(
                 error_field=error_field,
             )
             return response, 409 if isinstance(error, ConflictError) else 400
-        if dataset.kind == "mapping":
-            return redirect(url_for("dataset_configuration", key=dataset.key) + "#mapping")
-        if dataset.kind == "hierarchy":
-            return redirect(url_for("dataset_records_view", key=dataset.key, concept=True))
-        return redirect(url_for("dataset_detail", key=dataset.key, concept=True))
+        return redirect(
+            url_for(
+                "dataset_detail",
+                key=dataset.key,
+                concept=True,
+                tab="fields",
+                _anchor="fields",
+            )
+        )
 
     @dataset_route(
         "/datasets/<key>/concept",
@@ -1101,15 +1115,77 @@ def create_flask_app(
     )
     @version_errors
     def dataset_detail(key: str, version_id=None, concept=False):
+        edit_mode = request.args.get("edit")
+        if edit_mode == "1":
+            edit_mode = "all"
+        if edit_mode not in (None, "general", "ownership", "all"):
+            abort(404)
         return render_dataset_configuration(
-            key, version_id=version_id, concept=concept, edit_mode=request.args.get("edit") == "1"
+            key, version_id=version_id, concept=concept, edit_mode=edit_mode
+        )
+
+    def dataset_settings_redirect(key, *, edit_mode=None):
+        actor, _login_session = require_authenticated()
+        try:
+            view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
+        except NotFoundError:
+            try:
+                datasets.get_dataset_configuration(actor.id, key)
+            except NotFoundError:
+                abort(404)
+            version_id = None
+            use_concept = False
+        else:
+            use_concept = view.state is None
+            # Settings describe dataset-wide metadata. Do not send a legacy
+            # configure link to a scheduled/expired snapshot: that would expose
+            # version context (and its release details) instead of Settings.
+            version_id = (
+                view.state.version.id
+                if view.state and view.state.status == "Current" and not use_concept
+                else None
+            )
+            if view.state and view.state.status != "Current":
+                use_concept = False
+        return redirect(
+            url_for(
+                "dataset_detail",
+                key=key,
+                version_id=version_id,
+                concept=True if use_concept else None,
+                edit=edit_mode,
+                tab="dataset-details",
+                _anchor="dataset-details",
+            )
         )
 
     @dataset_route("/datasets/<key>/configure", capability="can_view_dataset", methods=["GET"])
     @version_errors
     def dataset_configuration(key):
-        return render_dataset_configuration(
-            key, standalone=True, edit_mode=request.args.get("edit") == "1"
+        edit_mode = request.args.get("edit")
+        if edit_mode == "1":
+            edit_mode = "all"
+        if edit_mode not in (None, "general", "ownership", "all"):
+            abort(404)
+        return dataset_settings_redirect(key, edit_mode=edit_mode)
+
+    @dataset_route(
+        "/datasets/<key>/versions/<version_id>/fields/<field_key>",
+        capability="can_view_dataset",
+        methods=["GET"],
+    )
+    @version_errors
+    def dataset_version_field_detail(key, version_id, field_key):
+        actor, _login_session = require_authenticated()
+        view = dataset_versions.read(actor.id, key, version_id, page=None)
+        field = next((item for item in view.fields if item.key == field_key), None)
+        if field is None:
+            abort(404)
+        return render_authenticated_template(
+            "pages/datasets/fields/read.html",
+            dataset=view.context.dataset,
+            field=field,
+            version_state=view.state,
         )
 
     def render_dataset_configuration(
@@ -1117,7 +1193,6 @@ def create_flask_app(
         *,
         version_id=None,
         concept=False,
-        standalone=False,
         edit_mode=False,
         name=None,
         description=None,
@@ -1129,64 +1204,51 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         field_context_label = None
-        overview = None
         draft_in_progress = False
-        may_export = False
-        if standalone:
+        may_edit_key = False
+        mapping_configuration = None
+        try:
+            view = dataset_versions.read(
+                actor.id, key, version_id, page=None, prefer_concept=concept
+            )
+            if (
+                version_id is None
+                and not concept
+                and view.state is not None
+                and view.state.status != "Current"
+            ):
+                # The default version lookup may select Scheduled or Expired
+                # when no Current version exists. Settings are dataset-wide;
+                # show metadata, not a non-current version's release details.
+                raise NotFoundError("No Current version")
+        except NotFoundError:
+            if version_id is not None or concept:
+                raise
             configuration = datasets.get_dataset_configuration(actor.id, key)
             dataset = configuration.dataset
+            context = SimpleNamespace(record_count=0, last_updated=dataset.updated_at)
+            state, identifier = None, None
+            fields, field_states = (), {}
             editable = configuration.may_maintain
             may_govern = configuration.may_govern
             may_edit_key = configuration.may_edit_key
             may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
-            context, state, identifier = None, None, None
-            fields, field_states = (), {}
-            try:
-                field_view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
-            except NotFoundError:
-                field_context_label = "No Current version or active Draft available."
-            else:
-                fields, identifier = field_view.fields, field_view.identifier
-                overview, state_for_facts = field_view.context, field_view.state
-                schema_admin = field_view.state is None and field_view.may_maintain
-                may_start_concept = (
-                    field_view.may_maintain
-                    and field_view.concept is None
-                    and field_view.state is not None
-                    and field_view.state.status == "Current"
-                )
-                draft_in_progress = field_view.concept is not None
-                if field_view.state:
-                    field_context_label = (
-                        f"Current · Version {field_view.state.version.number} · Read only"
-                    )
-                elif not schema_admin:
-                    field_context_label = "Draft · Read only"
-            if overview is None:
-                schema_admin, may_start_concept = False, False
+            schema_admin, may_start_concept = False, False
+            field_context_label = "No Current version or active Draft available."
+            if dataset.kind == "mapping":
+                mapping_configuration = dataset
         else:
-            may_edit_key = False
-            try:
-                view = dataset_versions.read(
-                    actor.id, key, version_id, page=None, prefer_concept=concept
-                )
-            except NotFoundError:
-                if version_id is not None or concept:
-                    raise
-                history = dataset_versions.history(actor.id, key)
-                return render_authenticated_template(
-                    "pages/datasets/no_current.html",
-                    dataset=history.context.dataset,
-                    history=history,
-                )
             dataset = view.context.dataset
+            if dataset.kind == "mapping":
+                # PublishedDataset intentionally contains snapshot content, not mutable
+                # mapping configuration. Read the separately authorized current metadata.
+                mapping_configuration = datasets.get_dataset_configuration(actor.id, key).dataset
             editable = view.may_maintain
             schema_admin = view.state is None and view.may_maintain
             may_govern = editable and authorization.datasets.can_change_dataset_owner(
                 actor.id, dataset.id
             )
             context, state, identifier = view.context, view.state, view.identifier
-            overview, state_for_facts = view.context, view.state
             fields = view.fields
             field_states = {
                 change.id: change.status
@@ -1207,25 +1269,13 @@ def create_flask_app(
                     f"{view.state.status} · Version {view.state.version.number} · Read only"
                 )
             draft_in_progress = view.concept is not None
-        # "At a glance" facts for the Dataset details tab.
-        if overview is None:
-            version_label = "No version available"
-        elif state_for_facts is not None:
-            version_label = f"Version {state_for_facts.version.number} · {state_for_facts.status}"
-        else:
-            version_label = "Draft in progress"
-        dataset_facts = {
-            "version": version_label,
-            "record_count": overview.record_count if overview else None,
-            "field_count": len(fields),
-            "created_at": dataset.created_at,
-            "last_updated": overview.last_updated if overview else None,
-        }
         mapping_source_table = None
-        if dataset.kind == "mapping" and dataset.source_dataset_id:
+        if mapping_configuration and mapping_configuration.source_dataset_id:
             try:
                 visible_dataset_lookup = datasets.get_visible_dataset_by_id
-                mapping_source_table = visible_dataset_lookup(actor.id, dataset.source_dataset_id)
+                mapping_source_table = visible_dataset_lookup(
+                    actor.id, mapping_configuration.source_dataset_id
+                )
             except NotFoundError:
                 mapping_source_table = None
         mapping_incomplete_text = (
@@ -1233,19 +1283,44 @@ def create_flask_app(
         )
         if edit_mode and not editable:
             abort(404)
-        # The Danger zone tab shows what a deletion would remove.
-        deletion = datasets.get_dataset_for_deletion(actor.id, dataset.id) if editable else None
+        if edit_mode == "ownership" and not may_govern:
+            abort(404)
         access_teams, access_users, access_entries = [], [], []
+        access_grant_teams, access_grant_users = [], []
         if may_govern:
             _, access_teams, access_users, access_entries = datasets.export_access_context(
                 actor.id, key
             )
+            granted_subjects = {
+                (entry.subject_type, entry.subject_id) for entry, _ in access_entries
+            }
+            access_grant_teams = [
+                team
+                for team in access_teams
+                if team.id != dataset.owner_team_id and ("team", team.id) not in granted_subjects
+            ]
+            access_grant_users = [
+                user for user in access_users if ("user", user.id) not in granted_subjects
+            ]
         return render_authenticated_template(
             "pages/datasets/detail.html",
             dataset=dataset,
+            mapping_configuration=mapping_configuration,
             context=context,
-            standalone_configuration=standalone,
-            configuration_url=url_for("dataset_configuration", key=dataset.key),
+            settings_return_context=(
+                "version" if version_id else "concept" if concept else "detail"
+            ),
+            settings_return_version_id=version_id,
+            configuration_url=(
+                url_for(
+                    "dataset_detail",
+                    key=dataset.key,
+                    version_id=version_id,
+                    concept=True if concept else None,
+                    tab="dataset-details",
+                    _anchor="dataset-details",
+                )
+            ),
             editable=editable,
             edit_mode=edit_mode,
             name=dataset.name if name is None else name,
@@ -1268,6 +1343,8 @@ def create_flask_app(
             draft_in_progress=draft_in_progress,
             access_teams=access_teams,
             access_users=access_users,
+            access_grant_teams=access_grant_teams,
+            access_grant_users=access_grant_users,
             access_entries=access_entries,
             access_error=access_error,
             access_subject=access_subject,
@@ -1277,8 +1354,6 @@ def create_flask_app(
             mapping_incomplete_message=mapping_incomplete_text,
             field_states=field_states,
             field_context_label=field_context_label,
-            dataset_facts=dataset_facts,
-            deletion=deletion,
             dataset_icon_label=DATASET_ICONS.get(
                 rendered_dataset_icon(dataset.icon, dataset.kind),
                 rendered_dataset_icon(dataset.icon, dataset.kind).replace("-", " ").capitalize(),
@@ -1428,7 +1503,7 @@ def create_flask_app(
             review=token,
             section=section,
             q=criteria.search,
-            status=list(criteria.statuses),
+            status=None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses),
             anchor=criteria.anchor,
             backwards="1" if criteria.backwards else "0",
         )
@@ -1451,6 +1526,33 @@ def create_flask_app(
             identity, token = review_identity(actor, session, dataset)
             section, criteria = review_parameters()
             result = dataset_diff.review(actor.id, identity, section, criteria)
+            selected_statuses = tuple(
+                dict.fromkeys(change_status(value) for value in request.args.getlist("status"))
+            )
+            field_items = result.items if section == "Fields" else ()
+            if section == "Fields":
+                field_items = tuple(
+                    replace(
+                        item,
+                        properties=tuple(
+                            change
+                            for change in item.properties
+                            if not (
+                                (
+                                    dataset.kind != "mapping"
+                                    and change.name in {"Mapping role", "Source field"}
+                                )
+                                or (dataset.kind != "hierarchy" and change.name == "Applicability")
+                                or (
+                                    item.status == ChangeStatus.ADDED
+                                    and change.before is None
+                                    and change.after is None
+                                )
+                            )
+                        ),
+                    )
+                    for item in result.items
+                )
             return render_authenticated_template(
                 "pages/datasets/versions/review.html",
                 dataset=dataset,
@@ -1459,6 +1561,8 @@ def create_flask_app(
                 section=section,
                 criteria=criteria,
                 result=result,
+                field_items=field_items,
+                selected_statuses=selected_statuses,
                 sections={
                     name: review_url(key, token, name) for name in ("Summary", "Fields", "Records")
                 },
@@ -1472,7 +1576,7 @@ def create_flask_app(
                     review=token,
                     section=section,
                     q=criteria.search,
-                    status=list(criteria.statuses),
+                    status=list(selected_statuses),
                     anchor=criteria.anchor,
                     backwards="1" if criteria.backwards else "0",
                 ),
@@ -1509,7 +1613,9 @@ def create_flask_app(
                     review=token,
                     section=section,
                     q=criteria.search,
-                    status=list(criteria.statuses),
+                    status=(
+                        None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses)
+                    ),
                     anchor=criteria.anchor,
                     backwards="1" if criteria.backwards else "0",
                     detail_page=number,
@@ -1661,15 +1767,20 @@ def create_flask_app(
         ), status
 
     def access_management_target(key):
-        """Where export access changes return: the configuration page they came from."""
-        standalone = request.args.get("standalone") == "1"
+        """Where export access changes return: the dataset's Access tab."""
         concept = request.args.get("concept") == "1"
-        endpoint = "dataset_configuration" if standalone else "dataset_detail"
-        options = {} if standalone else {"concept": concept or None}
+        version_id = request.args.get("version_id") or None
         return (
-            standalone,
             concept,
-            url_for(endpoint, key=key, _anchor="access-management", **options),
+            version_id,
+            url_for(
+                "dataset_detail",
+                key=key,
+                version_id=version_id,
+                concept=concept or None,
+                tab="access-management",
+                _anchor="access-management",
+            ),
         )
 
     @dataset_route(
@@ -1680,7 +1791,7 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         _auth, service, *_rest = require_dataset_dependencies()
         require_csrf(login_session.csrf_token)
-        standalone, concept, target = access_management_target(key)
+        concept, version_id, target = access_management_target(key)
         try:
             expected = {"csrf_token", "subject"}
             if set(request.form) != expected or any(
@@ -1701,7 +1812,7 @@ def create_flask_app(
             response = render_dataset_configuration(
                 key,
                 concept=concept,
-                standalone=standalone,
+                version_id=version_id,
                 access_error=str(error),
                 access_subject=request.form.get("subject", ""),
             )
@@ -2025,7 +2136,9 @@ def create_flask_app(
             ),
             parent_options=[entry for entry in rows if entry["node"].id not in excluded],
             parent_id=parent_id,
-            name=request.form.get("name", node.name if node else ""),
+            name=request.form.get(
+                "node_label", request.form.get("name", node.name if node else "")
+            ),
             values=(
                 {
                     key.removeprefix("field:"): value
@@ -2083,7 +2196,7 @@ def create_flask_app(
                 hierarchy.create_node(
                     actor.id,
                     key,
-                    request.form.get("name", ""),
+                    request.form.get("node_label", request.form.get("name", "")),
                     request.form.get("parent_id") or None,
                     expected_revision=exact_expected_revision(),
                 )
@@ -2118,7 +2231,7 @@ def create_flask_app(
                     actor.id,
                     key,
                     node_id,
-                    request.form.get("name", ""),
+                    request.form.get("node_label", request.form.get("name", "")),
                     request.form.get("parent_id") or None,
                     submitted,
                     expected_revision=exact_expected_revision(),
@@ -3483,7 +3596,9 @@ def create_flask_app(
                 record=record,
             )
         require_csrf(login_session.csrf_token)
-        submitted, errors = parsed_record_form(fields, {"csrf_token", "expected_revision"})
+        submitted, errors = parsed_record_form(
+            fields, {"csrf_token", "expected_revision", "return_focus"}
+        )
         try:
             expected_revision = exact_expected_revision()
         except ValidationError as error:
@@ -3532,7 +3647,18 @@ def create_flask_app(
             )
         except NotFoundError:
             abort(404)
-        return redirect(url_for("dataset_records_view", key=key, concept=True))
+        focus_mode = (
+            "keyboard" if request.form.getlist("return_focus") == ["keyboard"] else "pointer"
+        )
+        return redirect(
+            url_for(
+                "dataset_records_view",
+                key=key,
+                concept=True,
+                focus_record=record_id,
+                focus_mode=focus_mode,
+            )
+        )
 
     @dataset_route(
         "/datasets/<key>/concept/records/<record_id>/restore",
@@ -3629,7 +3755,7 @@ def create_flask_app(
             dataset = dataset_service.get_dataset_for_edit(actor.id, key)
         except NotFoundError:
             abort(404)
-        return render_dataset_configuration(dataset.key, standalone=True, edit_mode=True)
+        return dataset_settings_redirect(dataset.key, edit_mode="all")
 
     @dataset_route("/datasets/<key>", capability="can_maintain_dataset", methods=["POST"])
     def update_dataset(key: str):
@@ -3638,12 +3764,35 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
-        name = request.form.get("name", "")
-        description = request.form.get("description", "")
-        technical_key = request.form.get("technical_key")
+        edit_mode = request.form.get("edit_section")
+        if edit_mode not in (None, "general", "ownership"):
+            abort(400)
+        return_context = request.form.get("settings_return_context", "detail")
+        if return_context not in ("concept", "detail", "version"):
+            abort(400)
+        return_concept = return_context == "concept"
+        return_version_id = request.form.get("settings_return_version_id") or None
+        if return_context != "version" and return_version_id:
+            abort(400)
         try:
+            current = dataset_service.get_dataset_for_edit(actor.id, key)
+            if edit_mode == "ownership":
+                name, description, icon, technical_key = (
+                    current.name,
+                    current.description,
+                    None,
+                    None,
+                )
+            else:
+                name = request.form.get("dataset_label", request.form.get("name", current.name))
+                description = request.form.get("description", current.description)
+                icon = request.form.get("icon")
+                technical_key = request.form.get("technical_key")
             owner_change = None
-            if {"owner_team_id", "expected_owner_team_id"} & set(request.form):
+            if edit_mode in (None, "ownership") and {
+                "owner_team_id",
+                "expected_owner_team_id",
+            } & set(request.form):
                 if any(
                     len(request.form.getlist(field)) != 1
                     for field in ("owner_team_id", "expected_owner_team_id")
@@ -3661,7 +3810,7 @@ def create_flask_app(
                 name,
                 description,
                 owner_change=owner_change,
-                icon=request.form.get("icon"),
+                icon=icon,
                 new_key=technical_key,
             )
         except NotFoundError:
@@ -3673,11 +3822,17 @@ def create_flask_app(
                 abort(404)
             message = str(error)
             error_field = {"key": "technical_key"}.get(error.field, error.field)
+            if return_concept:
+                try:
+                    g.concept_ui = dataset_versions.concept_context(actor.id, dataset.key)
+                except (NotFoundError, ConflictError):
+                    return_concept = False
             return (
                 render_dataset_configuration(
                     dataset.key,
-                    standalone=True,
-                    edit_mode=True,
+                    concept=return_concept,
+                    version_id=return_version_id,
+                    edit_mode=edit_mode or "all",
                     name=name,
                     description=description,
                     error=message,
@@ -3685,7 +3840,16 @@ def create_flask_app(
                 ),
                 409 if isinstance(error, ConflictError) else 400,
             )
-        return redirect(url_for("dataset_configuration", key=dataset.key))
+        return redirect(
+            url_for(
+                "dataset_detail",
+                key=dataset.key,
+                version_id=return_version_id,
+                concept=True if return_concept else None,
+                tab="dataset-details",
+                _anchor="dataset-details",
+            )
+        )
 
     @dataset_route(
         "/datasets/id/<dataset_id>/delete",
@@ -3832,7 +3996,7 @@ def create_flask_app(
         )
         require_csrf(login_session.csrf_token)
         field_key = request.form.get("key", "")
-        name = request.form.get("name", "")
+        name = request.form.get("field_label", request.form.get("name", ""))
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
@@ -3947,7 +4111,7 @@ def create_flask_app(
             require_dataset_dependencies()
         )
         require_csrf(login_session.csrf_token)
-        name = request.form.get("name", "")
+        name = request.form.get("field_label", request.form.get("name", ""))
         data_type = request.form.get("data_type", "")
         is_required = "is_required" in request.form
         is_unique = "is_unique" in request.form
@@ -4233,8 +4397,10 @@ def create_flask_app(
             open_user=form_target_id or request.args.get("open_user"),
             form_error=form_error,
             form_target_id=form_target_id,
-            form_email=form_data.get("email", ""),
-            form_display_name=form_data.get("display_name", ""),
+            form_email=form_data.get("invitee_email", form_data.get("email", "")),
+            form_display_name=form_data.get(
+                "invitee_display_name", form_data.get("display_name", "")
+            ),
             form_role=form_data.get("role", "user"),
             current_actor=actor,
             current_csrf=login_session.csrf_token,
@@ -4255,9 +4421,9 @@ def create_flask_app(
         try:
             users.create_user(
                 actor.id,
-                request.form.get("email", ""),
-                request.form.get("display_name", ""),
-                request.form.get("password", ""),
+                request.form.get("invitee_email", request.form.get("email", "")),
+                request.form.get("invitee_display_name", request.form.get("display_name", "")),
+                request.form.get("invitee_password", request.form.get("password", "")),
                 request.form.get("role", "user"),
             )
         except (ValidationError, ConflictError) as error:
@@ -4358,11 +4524,12 @@ def create_flask_app(
         actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
-            teams.create_team(actor.id, request.form.get("name", ""))
+            team_name = request.form.get("team_label", request.form.get("name", ""))
+            teams.create_team(actor.id, team_name)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
                 form_error=str(error),
-                form_name=request.form.get("name", ""),
+                form_name=request.form.get("team_label", request.form.get("name", "")),
                 status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))
@@ -4373,14 +4540,15 @@ def create_flask_app(
         actor, login_session = require_capability("can_manage_access")
         require_csrf(login_session.csrf_token)
         try:
-            teams.rename_team(actor.id, team_id, request.form.get("name", ""))
+            team_name = request.form.get("team_label", request.form.get("name", ""))
+            teams.rename_team(actor.id, team_id, team_name)
         except NotFoundError:
             abort(404)
         except (ValidationError, ConflictError) as error:
             return render_team_list(
                 form_error=str(error),
                 form_target_id=team_id,
-                form_name=request.form.get("name", ""),
+                form_name=request.form.get("team_label", request.form.get("name", "")),
                 status=409 if isinstance(error, ConflictError) else 400,
             )
         return redirect(url_for("team_list"))

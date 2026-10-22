@@ -2902,6 +2902,7 @@
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
         "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
@@ -5141,6 +5142,7 @@
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
         "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
@@ -5344,6 +5346,7 @@
       "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
       "interface_entrypoints": [
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",

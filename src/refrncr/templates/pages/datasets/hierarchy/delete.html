@@ -11,7 +11,7 @@
     <p class='hierarchy-path'>{{ node_row.path }}</p>
     {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
     <p class='delete-confirmation'>This permanently deletes {{ subtree_count }} {{ 'node' if subtree_count == 1 else 'nodes' }}, including all descendants and all values attached to them. Published versions remain unchanged.</p>
-    <form id='hierarchy-delete-form' class='form' method='post' action='{{ url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=node_row.node.id) }}'>
+    <form {{ non_login_form_attrs() }} id='hierarchy-delete-form' class='form' method='post' action='{{ url_for("dataset_hierarchy_node_delete", key=dataset.key, node_id=node_row.node.id) }}'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
       <label><input type='checkbox' name='confirm' value='yes' required> I confirm permanent deletion</label>

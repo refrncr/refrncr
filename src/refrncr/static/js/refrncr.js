@@ -1,6 +1,7 @@
 (() => {
   if (document.refrncrInitialized) return;
   document.refrncrInitialized = true;
+  let keyboardInput = false;
   document.querySelectorAll("[data-password-toggle]").forEach((button) => {
     const input = document.getElementById(button.getAttribute("aria-controls"));
     if (!input || input.type !== "password") return;
@@ -77,9 +78,19 @@
     window.addEventListener("scroll", () => { if (openFieldMetadata?.panel === panel) positionFieldMetadata(trigger, panel); }, true);
   });
   document.addEventListener("pointerdown", (event) => {
+    keyboardInput = false;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
     if (openFieldMetadata && !openFieldMetadata.panel.contains(event.target) && event.target !== openFieldMetadata.trigger) closeFieldMetadata();
   });
   document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    const active = document.activeElement;
+    if (active?.matches?.(".interactive-row .row-action[data-pointer-restored-focus]")) {
+      active.removeAttribute("data-pointer-restored-focus");
+      active.setAttribute("data-keyboard-restored-focus", "");
+    } else {
+      active?.removeAttribute?.("data-pointer-restored-focus");
+    }
     if (event.key === "Escape" && openFieldMetadata) {
       const {trigger} = openFieldMetadata;
       closeFieldMetadata();
@@ -103,9 +114,58 @@
   initializeSelectionForms(document);
 
   const inlinePending = new WeakSet();
+  const confirmedForms = new WeakSet();
+  const confirmationDialog = document.querySelector("[data-confirm-dialog]");
+  let pendingConfirmation = null;
+  const confirmationClosures = [];
+  if (confirmationDialog) {
+    const cancel = confirmationDialog.querySelector("[data-confirm-cancel]");
+    const accept = confirmationDialog.querySelector("[data-confirm-accept]");
+    const closeConfirmation = (confirmed) => {
+      if (pendingConfirmation) {
+        pendingConfirmation.confirmed = confirmed;
+        confirmationClosures.push(pendingConfirmation);
+        pendingConfirmation = null;
+      }
+      confirmationDialog.close(confirmed ? "confirm" : "cancel");
+    };
+    confirmationDialog.addEventListener("click", (event) => {
+      if (event.target === confirmationDialog) closeConfirmation(false);
+    });
+    cancel.addEventListener("click", () => closeConfirmation(false));
+    accept.addEventListener("click", () => closeConfirmation(true));
+    confirmationDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeConfirmation(false);
+    });
+    confirmationDialog.addEventListener("close", () => {
+      const pending = confirmationClosures.shift();
+      if (!pending) return;
+      if (!pending.confirmed) {
+        pending.submitter?.focus();
+        return;
+      }
+      confirmedForms.add(pending.form);
+      if (pending.submitter) pending.form.requestSubmit(pending.submitter);
+      else pending.form.requestSubmit();
+    });
+  }
   document.addEventListener("submit", async (event) => {
-    const form = event.target.closest("form[data-inline-refresh]");
+    const form = event.target.closest("form");
     if (!form) return;
+    if (form.hasAttribute("data-confirm") && !confirmedForms.has(form)) {
+      if (!confirmationDialog || typeof confirmationDialog.showModal !== "function") return;
+      event.preventDefault();
+      pendingConfirmation = {form, submitter: event.submitter};
+      confirmationDialog.querySelector("[data-confirm-title]").textContent = form.dataset.confirmTitle || "Confirm action";
+      confirmationDialog.querySelector("[data-confirm-message]").textContent = form.dataset.confirm;
+      confirmationDialog.querySelector("[data-confirm-accept]").textContent = form.dataset.confirmAction || "Confirm";
+      confirmationDialog.showModal();
+      confirmationDialog.querySelector("[data-confirm-cancel]").focus();
+      return;
+    }
+    if (confirmedForms.has(form)) confirmedForms.delete(form);
+    if (!form.matches("form[data-inline-refresh]")) return;
     event.preventDefault();
     const host = form.closest("[data-export-access]");
     if (inlinePending.has(host)) return;
@@ -124,15 +184,24 @@
       }
       const content = document.importNode(replacement, true);
       host.replaceWith(content);
+      window.refrncrSelects?.(content);
       initializeSelectionForms(content);
       const error = content.querySelector("[data-error-focus]");
       if (error) error.focus();
+      else if (form.hasAttribute("data-panel-no-success-feedback")) {
+        const trigger = content.querySelector(".select-trigger");
+        window.setTimeout(() => trigger?.focus(), 100);
+      }
       else {
         const status = content.querySelector("[data-panel-status]");
         status.hidden = false;
         status.setAttribute("role", "status");
         status.textContent = form.dataset.panelSuccess;
-        status.focus();
+        if (form.dataset.panelSuccessFocus === "selection") {
+          const trigger = content.querySelector(".select-trigger");
+          window.setTimeout(() => trigger?.focus(), 100);
+        }
+        else status.focus();
       }
     } catch {
       // Do not replay an uncertain POST. A safe GET shows the authoritative state.
@@ -144,17 +213,79 @@
     }
   });
 
+  const identifierRequirementSyncs = new WeakMap();
+  const initializeIdentifierRequirements = (root) => {
+    if (typeof root?.querySelectorAll !== "function") return;
+    root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
+      const form = identifier.form;
+      const scope = identifier.closest("[data-mapping-field-panel]") || form;
+      const required = scope?.querySelector("[data-identifier-required]");
+      if (!form || !required || identifierRequirementSyncs.has(identifier)) return;
+      const sync = (announce = false) => {
+        const active = identifier.checked;
+        const locked = required.hasAttribute("data-role-locked");
+        const inactivePanel = Boolean(identifier.closest("[data-mapping-field-panel][hidden]"));
+        if (active) required.checked = true;
+        required.disabled = locked || inactivePanel;
+        if (active && !locked) required.setAttribute("aria-disabled", "true");
+        else required.removeAttribute("aria-disabled");
+        const identifierHelp = scope.querySelector("[data-identifier-required-help]");
+        const defaultHelp = scope.querySelector("[data-required-help]");
+        const status = scope.querySelector("[data-identifier-status]");
+        if (identifierHelp) identifierHelp.hidden = !active;
+        if (defaultHelp) defaultHelp.hidden = active;
+        const help = active ? identifierHelp : defaultHelp;
+        if (help) required.setAttribute("aria-describedby", help.id);
+        if (status && announce) {
+          status.textContent = active
+            ? "Required is checked and locked because this field is part of the Record identifier."
+            : "Required can now be changed.";
+        }
+        let mirror = scope.querySelector("[data-required-mirror]");
+        if (active && !locked && !mirror) {
+          mirror = document.createElement("input");
+          mirror.type = "hidden";
+          mirror.name = required.name;
+          mirror.value = "on";
+          mirror.dataset.requiredMirror = "";
+          required.closest("label")?.after(mirror);
+        } else if ((!active || locked) && mirror) {
+          mirror.remove();
+        }
+      };
+      identifierRequirementSyncs.set(identifier, sync);
+      identifier.addEventListener("change", () => sync(true));
+      required.addEventListener("click", (event) => {
+        if (required.getAttribute("aria-disabled") === "true") event.preventDefault();
+      });
+      required.addEventListener("change", () => {
+        if (identifier.checked) required.checked = true;
+      });
+      sync();
+    });
+  };
+  initializeIdentifierRequirements(document);
+  const syncIdentifierRequirements = (root) => {
+    if (typeof root?.querySelectorAll !== "function") return;
+    initializeIdentifierRequirements(root);
+    root.querySelectorAll("[data-identifier-toggle]").forEach((identifier) => {
+      identifierRequirementSyncs.get(identifier)?.();
+    });
+  };
+
   const datatypeControls = new WeakSet();
   const initializeDatatypeControls = (root) => {
     root.querySelectorAll("[data-field-datatype]").forEach((select) => {
       if (datatypeControls.has(select)) return;
-      const component = select.closest("form")?.querySelector("[name='is_business_key_component']");
+      const scope = select.closest("[data-mapping-field-panel]") || select.closest("form");
+      const component = scope?.querySelector("[name='is_business_key_component']");
       if (!component) return;
       datatypeControls.add(select);
       const update = () => {
         const eligible = select.selectedOptions[0]?.dataset.identifierEligible === "true";
         component.disabled = component.hasAttribute("data-role-locked") || !eligible;
         if (!eligible) component.checked = false;
+        syncIdentifierRequirements(scope);
       };
       select.addEventListener("change", update);
       update();
@@ -176,6 +307,7 @@
             control.disabled = !active || control.hasAttribute("data-role-locked");
           });
         });
+        syncIdentifierRequirements(form);
       };
       form.addEventListener("change", (event) => {
         if (event.target.name === "mapping_field_role") sync();
@@ -543,6 +675,26 @@
   const panelLoads = new WeakMap();
   const panelParents = new WeakMap();
   const pendingForms = new WeakSet();
+  document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
+    if (event.target !== document.activeElement) {
+      event.target?.removeAttribute?.("data-pointer-restored-focus");
+    }
+  }, true);
+  document.addEventListener("pointerdown", () => {
+    keyboardInput = false;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
+    document.activeElement?.removeAttribute?.("data-keyboard-restored-focus");
+  }, true);
+  document.addEventListener("focusout", (event) => {
+    event.target?.removeAttribute?.("data-pointer-restored-focus");
+    event.target?.removeAttribute?.("data-keyboard-restored-focus");
+  }, true);
+  document.addEventListener("submit", (event) => {
+    const focusReturn = event.target.querySelector?.("[name='return_focus']");
+    if (focusReturn) focusReturn.value = keyboardInput ? "keyboard" : "pointer";
+  }, true);
   const visibleControl = (element) =>
     !element.closest("[hidden]") && element.getClientRects().length > 0;
   const focusSidePanel = (dialog) => {
@@ -575,6 +727,7 @@
     window.refrncrLocalTime?.(host);
     initializeSelectionForms(host);
     initializeDatatypeControls(host);
+    syncIdentifierRequirements(host);
     initializeMappingFieldForms(host);
     initializeSourceFormats(host);
     initializeConfirmations(host);
@@ -640,6 +793,11 @@
     if (opener?.isConnected && !opener.matches(":disabled, [hidden], [tabindex='-1']")) {
       // Menu actions must be visible again before Cancel/Escape restores focus.
       opener.closest("details")?.setAttribute("open", "");
+      if (opener.matches(".interactive-row .row-action") && !keyboardInput) {
+        opener.setAttribute("data-pointer-restored-focus", "");
+      } else {
+        opener.removeAttribute?.("data-pointer-restored-focus");
+      }
       opener.focus();
     } else {
       document.getElementById("content")?.focus();
@@ -854,6 +1012,8 @@
     });
   });
   document.addEventListener("keydown", (event) => {
+    keyboardInput = true;
+    document.activeElement?.removeAttribute?.("data-pointer-restored-focus");
     if (event.key === "Escape") {
       exportMenus.forEach((menu) => menu.removeAttribute("open"));
       document.querySelectorAll(".button-row-icon[data-tooltip]:is(:hover, :focus-visible)").forEach((trigger) => {
@@ -861,6 +1021,24 @@
       });
     }
   });
+
+  if (typeof window !== 'undefined' && window.location?.search) {
+    const focusReturn = new URLSearchParams(window.location.search);
+    const focusRecord = focusReturn.get("focus_record");
+    if (focusRecord) {
+      const primary = document.getElementById(`record-row-${focusRecord}`)?.querySelector("[data-row-primary]");
+      if (primary) {
+        const keyboard = focusReturn.get("focus_mode") === "keyboard";
+        primary.toggleAttribute("data-pointer-restored-focus", !keyboard);
+        primary.toggleAttribute("data-keyboard-restored-focus", keyboard);
+        primary.focus();
+      }
+      focusReturn.delete("focus_record");
+      focusReturn.delete("focus_mode");
+      const remaining = focusReturn.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${remaining ? `?${remaining}` : ""}`);
+    }
+  }
 
   // Keep selectable text unobstructed: only enhance unused parts of a row.
   // The primary anchor/button retains its own native keyboard and pointer behavior.

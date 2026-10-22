@@ -270,6 +270,7 @@ def _route_matrix_expectations():
         "dataset_version_review",
         "dataset_version_record_diff",
         "dataset_version_field_diff",
+        "dataset_version_field_detail",
         "dataset_hierarchy_node_values",
         "dataset_records_view",
     }
@@ -694,7 +695,10 @@ def test_setup_get_uses_auth_layout_and_shared_form_components(interface):
     assert response.status_code == 200
     assert "<title>Set up administrator · REFRNCR</title>" in page
     assert "<section class='card' aria-labelledby='auth-title'>" in page
-    assert "<form class='setup-form' method='post'>" in page
+    assert (
+        "<form class='setup-form' method='post' autocomplete='on' "
+        "data-form-type='register'>" in page
+    )
     assert "<label for='setup-email'>Email address</label>" in page
     assert "id='setup-email' name='email' type='email'" in page
     assert "autocomplete='email' required" in page
@@ -703,7 +707,7 @@ def test_setup_get_uses_auth_layout_and_shared_form_components(interface):
     assert "autocomplete='name' required" in page
     assert "<label for='setup-password'>Password</label>" in page
     assert "id='setup-password' name='password' type='password'" in page
-    assert "autocomplete='new-password' required" in page
+    assert "autocomplete='new-password' data-form-type='password,new' required" in page
     assert "aria-describedby='setup-password-help'" in page
     assert "id='setup-password-help'>Use at least 12 characters.</p>" in page
     assert (
@@ -849,13 +853,16 @@ def test_login_get_uses_auth_layout_and_shared_form_components(interface):
     assert response.status_code == 200
     assert "<title>Sign in · REFRNCR</title>" in page
     assert "<section class='card' aria-labelledby='auth-title'>" in page
-    assert "<form class='login-form' method='post' action='/login' novalidate>" in page
+    assert (
+        "<form class='login-form' method='post' action='/login' autocomplete='on' "
+        "data-form-type='login' novalidate>" in page
+    )
     assert "<label for='login-email'>Email address</label>" in page
     assert "id='login-email' name='email' type='email'" in page
-    assert "autocomplete='username' required" in page
+    assert "autocomplete='username' data-form-type='username' required" in page
     assert "<label for='login-password'>Password</label>" in page
     assert "id='login-password' name='password' type='password'" in page
-    assert "autocomplete='current-password' required" in page
+    assert "autocomplete='current-password' data-form-type='password' required" in page
     assert '<button class="button button-primary" type="submit">Sign in</button>' in page
     assert "aria-invalid='true'" not in page
     assert "aria-describedby='login-error'" not in page
@@ -1060,7 +1067,7 @@ def test_user_list_uses_management_layout_and_add_user_panel(interface):
     assert "data-panel-entity='user'" in body
     assert "data-panel-mode='edit'>Edit user" in body
     assert "data-panel-mode='delete'>Delete user" in body
-    assert "data-panel-view='edit' hidden method='post' action='/users/" in body
+    assert "data-panel-view='edit' hidden autocomplete='off' data-form-type='other'" in body
     assert "This deletion cannot be undone." in body
     assert "action='/users'" in body
     assert "name='role'" in body

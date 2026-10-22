@@ -2,11 +2,11 @@
 
 import pytest
 from sqlalchemy import select
-from support import content, publish, setup, snapshot
+from support import content, dataset_version_client, publish, request, setup, snapshot
 
 from refrncr.models import AuditEvent, DatasetConcept, DatasetRecord
 from refrncr.record_import import ImportValidationError
-from refrncr.services import NotFoundError
+from refrncr.services import ConflictError, NotFoundError
 
 
 def clean(c):
@@ -134,6 +134,125 @@ def test_record_mutations_block_all_new_import_steps(database_context, mutation)
             operation()
 
 
+def test_import_unavailable_message_explains_complete_record_set(database_context):
+    c = database_context
+    clean(c)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Manual change"}
+    )
+    reason = c.s.record_imports.eligibility(c.a.id, c.d.key)
+    assert reason[0] == "Import unavailable"
+    message = reason[1]
+    for explanation in (
+        "For safety",
+        "an import doesn't add Records",
+        "the file describes the complete set of Records you want",
+        "Added, Changed, Unchanged or Deleted",
+        "Publish or discard this Draft",
+    ):
+        assert explanation in message
+
+    browser, _ = dataset_version_client(c)
+    records_page = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+    assert records_page.status_code == 200
+    assert "For safety" in records_page.text
+    assert "Added, Changed, Unchanged or Deleted" in records_page.text
+
+    import_page = request(browser, "get", f"/datasets/{c.d.key}/records/import")
+    assert import_page.status_code == 400
+    assert "For safety" in import_page.text
+    assert "Added, Changed, Unchanged or Deleted" in import_page.text
+
+
+@pytest.mark.parametrize("mutation", ["add", "edit", "delete", "restore"])
+def test_unpublished_dataset_allows_import_after_record_mutations(database_context, mutation):
+    c = database_context
+    setup(c)
+    if mutation == "add":
+        c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "manual", "label": "Manual"})
+    elif mutation == "edit":
+        c.s.dataset_records.update_record(
+            c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Manual"}
+        )
+    elif mutation in {"delete", "restore"}:
+        with c.sessions() as session:
+            concept_id = session.get(DatasetConcept, c.d.id).id
+        c.s.dataset_records.delete_record(c.a.id, c.d.key, c.record.id, 1)
+        if mutation == "restore":
+            c.s.dataset_records.restore_record(
+                c.a.id, c.d.key, c.record.id, 2, concept_id=concept_id
+            )
+
+    assert c.s.record_imports.eligibility(c.a.id, c.d.key) is None
+    browser, _ = dataset_version_client(c)
+    records_page = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+    assert records_page.status_code == 200
+    assert f"/datasets/{c.d.key}/records/import" in records_page.text
+    import_page = request(browser, "get", f"/datasets/{c.d.key}/records/import")
+    assert import_page.status_code == 200
+    assert "Supported formats: .csv and .xlsx." in import_page.text
+
+    state, result = preview(c, b"code,label\na,Cafe\n", session=f"unpublished-{mutation}")
+    assert result.valid
+    if mutation == "add":
+        assert result.counts["Deleted"] == 1
+        assert any(
+            difference["identifier"] == "manual" and difference["status"] == "Deleted"
+            for difference in result.differences
+        )
+    elif mutation == "edit":
+        assert result.counts["Changed"] == 1
+    confirm(c, state, acknowledge_deletions=bool(result.counts["Deleted"]))
+
+
+def test_unpublished_dataset_can_be_imported_twice_and_keeps_only_latest_results(database_context):
+    c = database_context
+    setup(c)
+    first, first_preview = preview(
+        c, b"code,label\na,First import\nb,Added in first import\n", session="first"
+    )
+    assert first_preview.counts["Changed"] == 1
+    assert first_preview.counts["Added"] == 1
+    confirm(c, first)
+
+    second, second_preview = preview(c, b"code,label\na,First import\n", session="second")
+    assert second_preview.valid
+    assert second_preview.counts["Unchanged"] == 1
+    assert second_preview.counts["Deleted"] == 1
+    assert second_preview.differences[0]["status"] == "Deleted"
+    confirm(c, second, acknowledge_deletions=True)
+
+    view = c.service.read(
+        c.a.id,
+        c.d.key,
+        prefer_concept=True,
+        statuses=("Added", "Changed", "Deleted"),
+    )
+    assert len(view.page.records) == 1
+    deleted = view.page.records[0]
+    assert view.record_states[deleted.id] == "Deleted"
+    restored = c.s.dataset_records.restore_record(
+        c.a.id, c.d.key, deleted.id, deleted.revision, concept_id=view.concept.id
+    )
+    assert {value.field_key: value.value for value in restored.values}["code"] == "b"
+    with c.sessions() as session:
+        concept = session.get(DatasetConcept, c.d.id)
+        assert concept.import_result["Changed"] == 0
+        assert concept.import_result["Added"] == 0
+        assert concept.import_result["Deleted"] == 1
+        assert set(concept.import_result["records"].values()) == {"Deleted"}
+
+
+def test_unpublished_import_confirmation_is_invalidated_when_version_is_published(context):
+    c = context
+    setup(c)
+    state, _ = preview(c, b"code,label\na,Imported\n", session="staged-before-publish")
+    publish(c)
+
+    with pytest.raises(ConflictError):
+        confirm(c, state)
+
+
 def test_field_only_and_legacy_eligibility(context):
     c = context
     clean(c)
@@ -146,6 +265,15 @@ def test_field_only_and_legacy_eligibility(context):
     )
     with pytest.raises(ImportValidationError, match="created before"):
         preview(c)
+
+
+def test_import_eligibility_without_active_concept_returns_conflict(context):
+    c = context
+    setup(c)
+    publish(c)
+
+    with pytest.raises(ConflictError, match="Start a New concept before editing this Dataset"):
+        c.s.record_imports.eligibility(c.a.id, c.d.key)
 
 
 @pytest.mark.parametrize("source", [b"code,label\na,One\na,Two\n", b"code,label\n,Missing\n"])
@@ -524,8 +652,8 @@ def test_one_http_import_flow_for_empty_and_populated_tables(context, empty, leg
         assert receipt["Added"] == (2 if empty else 1)
         assert receipt["Changed"] == (0 if empty else 1)
         assert receipt["Deleted"] == 0
-    # Neither the old address nor a forged mode selector bypasses the one-import guard.
-    assert request(browser, "get", root + "?mode=create").status_code == 400
+    # A no-baseline Dataset remains eligible; a published Dataset keeps the one-import guard.
+    assert request(browser, "get", root + "?mode=create").status_code == (200 if empty else 400)
 
 
 def test_http_status_checkboxes_and_all_records(context):

@@ -1,7 +1,7 @@
 {% macro create_team_fields(name='') -%}
-  <div class='form-field'><label for='new-team-name'>Name</label><input id='new-team-name' name='name' value='{{ name }}' required autofocus data-initial-focus></div>
+  <div class='form-field'><label for='new-team-name'>Name</label><input id='new-team-name' name='team_label' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ name }}' required autofocus data-initial-focus></div>
 {%- endmacro %}
 
 {% macro edit_team_fields(team, name=none) -%}
-  <div class='form-field'><label for='edit-team-name-{{ team.id }}'>Name</label><input id='edit-team-name-{{ team.id }}' name='name' value='{{ team.name if name is none else name }}' required></div>
+  <div class='form-field'><label for='edit-team-name-{{ team.id }}'>Name</label><input id='edit-team-name-{{ team.id }}' name='team_label' autocomplete='off' data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true' value='{{ team.name if name is none else name }}' required></div>
 {%- endmacro %}

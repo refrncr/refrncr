@@ -1205,7 +1205,7 @@ class DatasetService:
         )
 
     def get_dataset_configuration(self, actor_id: str, key: str) -> DatasetConfiguration:
-        """Current Dataset metadata; unpublished existence remains maintainer-only."""
+        """Dataset metadata; unpublished existence remains maintainer-only."""
         key = self._validated_lookup_key(key)
         with self.uow() as uow:
             uow.begin_export_snapshot()
@@ -1217,7 +1217,7 @@ class DatasetService:
             maintain = self.authorization.datasets.can_maintain_dataset(
                 actor_id, dataset.id, uow=uow
             )
-            if not maintain and not uow.versions.current_for_datasets((dataset.id,), uow.today()):
+            if not maintain and uow.versions.latest_non_cancelled(dataset.id) is None:
                 raise NotFoundError("Dataset not found")
             govern = self.authorization.datasets.can_change_dataset_owner(
                 actor_id, dataset.id, uow=uow
@@ -1427,7 +1427,7 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required")
+                raise ValidationError("A Record identifier field must be required.")
             if uow.dataset_records.count(dataset.id) and (
                 validated_required or validated_component
             ):
@@ -1616,7 +1616,7 @@ class DatasetFieldService:
                 and not validated_required
                 and uow.dataset_business_keys.contains(dataset.id, field.key)
             ):
-                raise ValidationError("A business-key field must remain required")
+                raise ValidationError("A Record identifier field must be required.")
             replacement = (
                 normalized_name,
                 validated_type,
@@ -1730,7 +1730,7 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required")
+                raise ValidationError("A Record identifier field must be required.")
 
             current_key = uow.dataset_business_keys.get(dataset.id)
             currently_component = field.key in current_key.field_keys
@@ -2007,11 +2007,11 @@ class DatasetBusinessKeyService:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
             if not isinstance(field_keys, tuple) or not field_keys:
-                raise ValidationError("At least one business-key field is required")
+                raise ValidationError("Select at least one Record identifier field.")
             if any(not isinstance(field_key, str) for field_key in field_keys):
-                raise ValidationError("Business-key field keys must be text")
+                raise ValidationError("Record identifier field keys must be text.")
             if len(set(field_keys)) != len(field_keys):
-                raise ValidationError("Business-key fields must not contain duplicates")
+                raise ValidationError("Record identifier fields must not contain duplicates.")
 
             components: list[str] = []
             for submitted_key in field_keys:
@@ -2024,7 +2024,7 @@ class DatasetBusinessKeyService:
                     raise ValidationError("Selected Dataset field does not exist")
                 _require_identifier_type(field.data_type)
                 if not field.is_required:
-                    raise ValidationError("Every business-key field must be required")
+                    raise ValidationError("A Record identifier field must be required.")
                 components.append(field.key)
 
             canonical = tuple(sorted(components))

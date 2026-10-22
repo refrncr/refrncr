@@ -4,7 +4,7 @@
 {% set settings_title = "Audit log" %}
 
 {% block settings_content %}
-  <form class="audit-filters" action="{{ url_for('audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
+  <form {{ non_login_form_attrs() }} class="audit-filters" action="{{ url_for('audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
     <div class="form-field">
       <label for="audit-start">Start date and time<span class="visually-hidden"> (inclusive)</span></label>
       <input id="audit-start" name="start" type="text" value="{{ filters.get('start', '') }}" maxlength="{{ MAX_AUDIT_DATETIME_LENGTH }}" aria-describedby="audit-time-help" data-audit-date>

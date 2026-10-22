@@ -27,7 +27,6 @@ unchanged apart from the surrounding `class`, `aria-hidden` and `focusable` attr
 | Macro | Lucide icon |
 | --- | --- |
 | `settings_icon` | Settings |
-| `configure_icon` | Settings 2 |
 | `home_icon` | House |
 | `datasets_icon` | Table |
 | `network_icon` | [Network](https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/network.svg) — Hierarchy navigation |
