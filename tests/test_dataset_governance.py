@@ -494,6 +494,10 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert "<img src=x" not in empty
     assert empty.count("<table") == 1
     assert "class='access-owner-row'" in empty
+    table_end = empty.index("</table>")
+    scroll_end = empty.index("</div>", table_end)
+    grant_row = empty.index("class='access-grant-row'")
+    assert scroll_end < grant_row
     assert "data-access-entry" not in empty
     assert "data-requires-selection" in empty and "data-inline-refresh" in empty
     assert "data-panel-refresh" not in empty

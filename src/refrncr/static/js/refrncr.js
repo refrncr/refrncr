@@ -139,6 +139,7 @@
       }
       const content = document.importNode(replacement, true);
       host.replaceWith(content);
+      window.refrncrSelects?.(content);
       initializeSelectionForms(content);
       const error = content.querySelector("[data-error-focus]");
       if (error) error.focus();

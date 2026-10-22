@@ -13,6 +13,7 @@
         <h3 id='access-overview-heading'>Who has access</h3>
         {% if not entries %}<p class='help-text access-empty-help'>Only the owning team has access. Add a user or team below to give them export access.</p>{% endif %}
         {{ feedback(error, id='governance-error', focus=true) }}
+        <div class='access-table-frame'>
         <div class='table-scroll access-table' role='region' aria-label='Dataset access' tabindex='0'>
           <table>
             <caption class='visually-hidden'>Dataset access</caption>
@@ -39,26 +40,25 @@
                 </tr>
               {% endfor %}
             </tbody>
-            <tfoot>
-              <tr class='access-grant-row'><td colspan='4'>
-                <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.' data-panel-success-focus='selection'>
-                  <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
-                  <div class='form-field'>
-                    <label class='visually-hidden' for='export-subject'>User or team</label>
-                    <div class='inline-form-action'>
-                      <select id='export-subject' name='subject' autocomplete='off' {{ non_login_field_attrs() }} data-select data-noun='users and teams' required{% if error %} aria-describedby='export-subject-error' aria-invalid='true'{% endif %}>
-                        <option value=''>Select a user or team</option>
-                        <optgroup label='Users'>{% for user in grant_users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
-                        <optgroup label='Teams'>{% for team in grant_teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
-                      </select>
-                      <button class='button button-primary' type='submit'>Grant export access</button>
-                    </div>
-                    {% if error %}<p class='error-text' id='export-subject-error'>{{ error }}</p>{% endif %}
-                  </div>
-                </form>
-              </td></tr>
-            </tfoot>
           </table>
+        </div>
+        <div class='access-grant-row'>
+          <form {{ non_login_form_attrs() }} class='form' novalidate method='post' action='{{ url_for("dataset_export_access", key=dataset.key, **return_to) }}' data-requires-selection data-inline-refresh='{{ fallback }}' data-panel-success='Export access granted.' data-panel-success-focus='selection'>
+            <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+            <div class='form-field'>
+              <label class='visually-hidden' for='export-subject'>User or team</label>
+              <div class='inline-form-action'>
+                <select id='export-subject' name='subject' autocomplete='off' {{ non_login_field_attrs() }} data-select data-noun='users and teams' required{% if error %} aria-describedby='export-subject-error' aria-invalid='true'{% endif %}>
+                  <option value=''>Select a user or team</option>
+                  <optgroup label='Users'>{% for user in grant_users %}<option value='user:{{ user.id }}'{% if selected_subject == 'user:' ~ user.id %} selected{% endif %}>{{ user.display_name }} ({{ user.email }})</option>{% endfor %}</optgroup>
+                  <optgroup label='Teams'>{% for team in grant_teams %}<option value='team:{{ team.id }}'{% if selected_subject == 'team:' ~ team.id %} selected{% endif %}>{{ team.name }}</option>{% endfor %}</optgroup>
+                </select>
+                <button class='button button-primary' type='submit' tabindex='0'>Grant export access</button>
+              </div>
+              {% if error %}<p class='error-text' id='export-subject-error'>{{ error }}</p>{% endif %}
+            </div>
+          </form>
+        </div>
         </div>
       </section>
     </div>

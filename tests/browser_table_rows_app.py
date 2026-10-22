@@ -74,6 +74,13 @@ for label, team_names in (
     for team in s.teams.list_teams(admin.id):
         if team.name in team_names:
             s.memberships.create_membership(admin.id, actor.id, team.id)
+for index in range(1, 5):
+    s.users.create_user(
+        admin.id,
+        f"available-{index}@example.com",
+        f"Available user {index}",
+        "correct horse battery staple",
+    )
 app = create_flask_app(
     s.users,
     s.authentication,
