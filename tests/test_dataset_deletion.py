@@ -541,7 +541,7 @@ def test_deletion_on_complete_migration_chain(database_audit_db):
     c = context_from_audit_db(database_audit_db)
     populate(c)
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0031_ref_239"
     with pytest.raises(IntegrityError), c.sessions.begin() as session:
         session.add(DatasetRecord(dataset_id=str(uuid4()), identifier_key=b"test", revision=1))
     # Field RESTRICT is effective on the real migrated schema too.

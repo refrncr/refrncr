@@ -462,7 +462,7 @@ _read(
     "DatasetService",
     "export_access_context list_datasets list_dataset_overview "
     "get_dataset_context get_dataset get_dataset_details get_dataset_for_edit "
-    "get_visible_dataset_by_id",
+    "get_visible_dataset_by_id mapping_source mapping_source_choices",
 )
 _identifier_events = (("dataset", "business_key_defined"), ("dataset", "business_key_updated"))
 _audited("DatasetFieldService", "create_field", ("dataset_field", "created"), *_identifier_events)

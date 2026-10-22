@@ -10,7 +10,7 @@
 {% block title %}Records · {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 {% block content %}
   <div class='page-header'>
-    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none, draft_in_progress=draft_in_progress and version_state is not none), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+    {% call page_context(dataset.name|dataset_title, content_metadata(context.record_count, context.last_updated, version_state.version.number if version_state else none, deleted_count, version_state.status if version_state else none, draft_in_progress=draft_in_progress and version_state is not none, mapping_source=mapping_source), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions record-page-actions'>
@@ -21,6 +21,7 @@
       {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
     </div>
   </div>
+  {% include 'pages/datasets/_source_notice.html' %}
   {% if version_state and version_state.status == 'Expired' %}
   <section class='version-status-bar version-status-bar-neutral' aria-label='Expired version'>
     <p>You're viewing an expired version · in effect from <time datetime='{{ version_state.version.effective_date.isoformat() }}'>{{ version_state.version.effective_date|short_date }}</time> to <time datetime='{{ version_state.end_date.isoformat() }}'>{{ version_state.end_date|short_date }}</time></p>
@@ -32,7 +33,7 @@
       {% if may_edit %}
       <div class='page-actions' role='group' aria-label='Edit draft records'>
       {% if may_edit %}
-      {{ record_import_action(dataset.key, import_unavailable) }}
+      {% if dataset.kind != 'mapping' %}{{ record_import_action(dataset.key, import_unavailable) }}{% endif %}
       {% if may_add_record %}<button class='button button-secondary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
       {% endif %}
     </div>

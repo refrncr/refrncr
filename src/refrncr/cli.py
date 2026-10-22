@@ -307,6 +307,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0028_ref_179",
         "0029_ref_195",
         "0030_ref_205",
+        "0031_ref_239",
     }:
         return
     inspector = inspect(connection)

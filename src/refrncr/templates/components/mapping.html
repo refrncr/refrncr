@@ -1,0 +1,9 @@
+{% macro source_heading(source) -%}Source · {{ source.name }} V{{ source.number }}{%- endmacro %}
+{% macro group_headings(fields, source, trailing=0) -%}
+{% set sources = fields|rejectattr('mapping_role', 'equalto', 'mapping_target')|list %}
+{% set targets = fields|selectattr('mapping_role', 'equalto', 'mapping_target')|list %}
+<tr class='mapping-group-headings'>
+  <th scope='colgroup' class='mapping-source-cell' colspan='{{ sources|length }}'>{{ source_heading(source) }}</th>
+  {% if targets %}<th class='mapping-direction-column' aria-hidden='true'></th><th scope='colgroup' colspan='{{ targets|length + trailing }}'>Target</th>{% elif trailing %}<th scope='col'>Status</th>{% endif %}
+</tr>
+{%- endmacro %}

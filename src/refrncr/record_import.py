@@ -1080,6 +1080,10 @@ class DatasetRecordImportService:
         if mode not in {"create", "new_version"}:
             raise ImportValidationError("Choose a valid import mode")
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        if dataset.kind == "mapping":
+            raise ImportValidationError(
+                "Mapping source records are read-only; edit target values instead."
+            )
         concept = self._concept(dataset.id)
         if mode == "new_version":
             self._require_eligible(concept)
@@ -1534,6 +1538,10 @@ class DatasetRecordImportService:
         if target is None:
             raise NotFoundError("Dataset not found")
         self.records._require_access(actor_id, target, "can_maintain_dataset")
+        if target.kind == "mapping":
+            raise ImportValidationError(
+                "Mapping source records are read-only; edit target values instead."
+            )
         state = self._bound_state(token, actor_id, session_id, target.id)
         if (
             state.busy

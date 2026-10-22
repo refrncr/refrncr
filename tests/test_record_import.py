@@ -647,67 +647,22 @@ def test_mapping_preview_conflicts_atomic_confirmation_and_replay(import_context
     assert any("already exists" in error.message for error in conflict.errors)
 
 
-def test_mapping_table_uses_existing_preview_and_atomic_import_flow(import_context):
+def test_mapping_import_cannot_replace_pinned_source_records(import_context):
+    from dataset_helpers import create_mapping_dataset
+
+    from refrncr.services import ValidationError
+
     factory, services, admin, _dataset = import_context
-    mapping = create_owned_dataset(
-        services.datasets,
-        admin.id,
-        "cost-centers",
-        "Cost centers",
-        "",
-        kind="mapping",
-        mapping_mode="standalone",
-        source_system="SAP",
-        target_system="Salesforce",
+    mapping = create_mapping_dataset(
+        services, admin, "cost-centers", "Cost centers", records=("1001",)
     )
-    for key, name, role in (
-        ("source_value", "Source value", "source_identifier"),
-        ("target_value", "Target value", "mapping_target"),
-        ("target_name", "Target name", "mapping_target"),
-        ("mapping_status", "Status", "mapping_target"),
-    ):
-        services.dataset_fields.create_field(
-            admin.id,
-            mapping.key,
-            key,
-            name,
-            "string",
-            mapping_role=role,
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    before = services.dataset_records.list_records(admin.id, mapping.key).records
+    with pytest.raises(ValidationError):
+        services.record_imports.begin(
+            admin.id, "mapping-import", mapping.key, "mapping.csv", b"code,target\n1003,changed\n"
         )
-    content = (
-        b"source_value,target_value,target_name,mapping_status\n"
-        b"1001,EMEA-SALES,EMEA Sales,mapped\n"
-        b"1003,,,unmapped\n"
-    )
-
-    state, _source, assistance = services.record_imports.begin(
-        admin.id, "mapping-import", mapping.key, "mapping.csv", content
-    )
-    assert assistance.mapping == (
-        "source_value",
-        "target_value",
-        "target_name",
-        "mapping_status",
-    )
-    preview = services.record_imports.preview(
-        admin.id,
-        "mapping-import",
-        mapping.key,
-        state.token,
-        assistance.mapping,
-    )
-    assert preview.valid
-    assert (
-        services.record_imports.confirm(admin.id, "mapping-import", mapping.key, state.token) == 2
-    )
-
-    with factory() as session:
-        assert (
-            session.scalar(
-                select(func.count(DatasetRecord.id)).where(DatasetRecord.dataset_id == mapping.id)
-            )
-            == 2
-        )
+    assert services.dataset_records.list_records(admin.id, mapping.key).records == before
 
 
 @pytest.mark.parametrize(

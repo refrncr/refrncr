@@ -66,6 +66,7 @@ class SnapshotContent:
     fields: tuple[SnapshotField, ...]
     records: tuple[StoredRecord, ...]
     hierarchy_nodes: tuple[HierarchyNode, ...] = ()
+    source_version_id: str | None = None
 
     @property
     def identifier_keys(self):
@@ -98,6 +99,7 @@ class PublishedVersion:
     summary: SummaryCounts
     cancelled_at: datetime | None = None
     cancelling_actor_id: str | None = None
+    source_version_id: str | None = None
 
     @property
     def system_published(self):

@@ -6573,6 +6573,84 @@
       "implementation_status": "Implemented by REF-221; validates submitted source-format components against user-, session-, and Dataset-bound transient import state.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_source",
+      "service": "refrncr.services.DatasetService.mapping_source",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_source_versions.py::test_source_snapshot_survives_drafts_publications_and_clock_changes",
+        "tests/test_dataset_browser.py::test_mapping_source_target_blocks_and_field_entry_points"
+      ],
+      "implementation_status": "Implemented for REF-239 pinned source metadata and Current source selection.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_source_choices",
+      "service": "refrncr.services.DatasetService.mapping_source_choices",
+      "interface_entrypoints": [
+        "refrncr.web.new_dataset GET /datasets/new",
+        "refrncr.web.create_dataset POST /datasets"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_source_versions.py::test_source_snapshot_survives_drafts_publications_and_clock_changes",
+        "tests/test_dataset_browser.py::test_mapping_source_target_blocks_and_field_entry_points"
+      ],
+      "implementation_status": "Implemented for REF-239 pinned source metadata and Current source selection.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
     }
   ]
 }

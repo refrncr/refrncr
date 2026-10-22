@@ -4,6 +4,7 @@ from collections import defaultdict
 from dataclasses import asdict
 
 from sqlalchemy import Numeric, cast, func, select, update
+from sqlalchemy.orm import aliased, undefer
 
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.hierarchy_contracts import HierarchyNode
@@ -33,8 +34,15 @@ class SqlAlchemyVersionOperations:
         self.session = session
         self.legacy_metadata = legacy_metadata
 
-    @staticmethod
-    def _version(row):
+    def _select_version(self):
+        statement = select(DatasetVersion)
+        return (
+            statement
+            if self.legacy_metadata
+            else statement.options(undefer(DatasetVersion.source_version_id))
+        )
+
+    def _version(self, row):
         return PublishedVersion(
             row.id,
             row.dataset_id,
@@ -50,13 +58,14 @@ class SqlAlchemyVersionOperations:
             SummaryCounts(*(getattr(row, key) for key in SummaryCounts.__dataclass_fields__)),
             row.cancelled_at,
             row.cancelling_actor_id,
+            None if self.legacy_metadata else row.source_version_id,
         )
 
     def list_for_dataset(self, dataset_id):
         return tuple(
             self._version(row)
             for row in self.session.scalars(
-                select(DatasetVersion)
+                self._select_version()
                 .where(DatasetVersion.dataset_id == dataset_id)
                 .order_by(DatasetVersion.number.desc())
             )
@@ -64,15 +73,34 @@ class SqlAlchemyVersionOperations:
 
     def get(self, dataset_id, version_id):
         row = self.session.scalar(
-            select(DatasetVersion).where(
+            self._select_version().where(
                 DatasetVersion.dataset_id == dataset_id, DatasetVersion.id == version_id
             )
         )
         return self._version(row) if row else None
 
+    def source_updates(self, source_version_ids):
+        if not source_version_ids:
+            return frozenset()
+        newer = aliased(DatasetVersion)
+        return frozenset(
+            self.session.scalars(
+                select(DatasetVersion.id).where(
+                    DatasetVersion.id.in_(source_version_ids),
+                    select(newer.id)
+                    .where(
+                        newer.dataset_id == DatasetVersion.dataset_id,
+                        newer.number > DatasetVersion.number,
+                        newer.cancelled_at.is_(None),
+                    )
+                    .exists(),
+                )
+            )
+        )
+
     def latest_non_cancelled(self, dataset_id):
         row = self.session.scalar(
-            select(DatasetVersion)
+            self._select_version()
             .where(DatasetVersion.dataset_id == dataset_id, DatasetVersion.cancelled_at.is_(None))
             .order_by(DatasetVersion.number.desc())
             .limit(1)
@@ -95,7 +123,7 @@ class SqlAlchemyVersionOperations:
             ranked = ranked.where(DatasetVersion.dataset_id.in_(dataset_ids))
         ranked = ranked.subquery()
         rows = self.session.scalars(
-            select(DatasetVersion)
+            self._select_version()
             .join(ranked, ranked.c.id == DatasetVersion.id)
             .where(ranked.c.position == 1)
         )
@@ -118,6 +146,7 @@ class SqlAlchemyVersionOperations:
         )
         statement = (
             select(Dataset, DatasetVersion)
+            .options(undefer(DatasetVersion.source_version_id))
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
             .where(ranked.c.position == 1)
@@ -150,7 +179,7 @@ class SqlAlchemyVersionOperations:
             ranked = ranked.where(DatasetVersion.dataset_id.in_(dataset_ids))
         ranked = ranked.subquery()
         statement = (
-            select(DatasetVersion)
+            self._select_version()
             .join(ranked, ranked.c.id == DatasetVersion.id)
             .where(ranked.c.position == 1)
         )
@@ -186,6 +215,7 @@ class SqlAlchemyVersionOperations:
         ranked = ranked.subquery()
         statement = (
             select(Dataset, DatasetVersion)
+            .options(undefer(DatasetVersion.source_version_id))
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .join(ranked, ranked.c.id == DatasetVersion.id)
             .where(ranked.c.position == 1)
@@ -201,7 +231,7 @@ class SqlAlchemyVersionOperations:
     def version_for_datasets(self, dataset_ids, version_number):
         if dataset_ids == ():
             return {}
-        statement = select(DatasetVersion).where(
+        statement = self._select_version().where(
             DatasetVersion.cancelled_at.is_(None), DatasetVersion.number == version_number
         )
         if dataset_ids is not None:
@@ -213,6 +243,7 @@ class SqlAlchemyVersionOperations:
     ):
         statement = (
             select(Dataset, DatasetVersion)
+            .options(undefer(DatasetVersion.source_version_id))
             .join(DatasetVersion, DatasetVersion.dataset_id == Dataset.id)
             .where(
                 DatasetVersion.cancelled_at.is_(None),
@@ -292,11 +323,22 @@ class SqlAlchemyVersionOperations:
             release_note=release_note,
             name=content.name,
             description=content.description,
+            source_version_id=content.source_version_id,
             field_count=len(content.fields),
             record_count=len(content.records),
             **asdict(summary),
         )
-        self.session.add(row)
+        if self.legacy_metadata:
+            from sqlalchemy import MetaData, Table
+
+            table = Table("dataset_versions", MetaData(), autoload_with=self.session.connection())
+            self.session.execute(
+                table.insert().values(
+                    **{column.name: getattr(row, column.name) for column in table.columns}
+                )
+            )
+        else:
+            self.session.add(row)
         self.session.flush()
         if self.legacy_metadata:
             from sqlalchemy import MetaData, Table
@@ -518,6 +560,7 @@ class SqlAlchemyVersionOperations:
             self.fields(version),
             tuple(self.iterate_records(version)),
             self.hierarchy_nodes(version) if not self.legacy_metadata else (),
+            version.source_version_id,
         )
 
     def hierarchy_node_counts(self, version_ids):

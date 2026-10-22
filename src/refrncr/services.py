@@ -864,6 +864,78 @@ class DatasetService:
             self._deletion_timestamp(dataset),
         )
 
+    def mapping_source(self, actor_id, key, version_id=None):
+        """Source metadata for an authorized mapping; never expose source drafts."""
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(self._validated_lookup_key(key))
+            if dataset is None or not self.authorization.has_capability(
+                actor_id, "can_view_dataset", dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            if dataset.kind != "mapping":
+                return None
+            maintain = self.authorization.has_capability(
+                actor_id, "can_maintain_dataset", dataset.id, uow=uow
+            )
+            source_id = dataset.source_version_id
+            if not version_id and not maintain:
+                raise NotFoundError("Dataset version not found")
+            if version_id:
+                version = uow.versions.get(dataset.id, version_id)
+                if (
+                    version is None
+                    or version.cancelled_at is not None
+                    or (
+                        version.effective_date > _version_reads(self).clock.today() and not maintain
+                    )
+                ):
+                    raise NotFoundError("Dataset version not found")
+                source_id = version.source_version_id
+            source = uow.datasets.get(dataset.source_dataset_id)
+            version = uow.versions.get(source.id, source_id)
+            latest = uow.versions.latest_non_cancelled(source.id)
+            visible = self.authorization.has_capability(
+                actor_id, "can_view_dataset", source.id, uow=uow
+            )
+            return {
+                "name": version.name,
+                "key": source.key if visible else None,
+                "number": version.number,
+                "version_id": version.id,
+                "latest_number": latest.number
+                if latest and latest.number > version.number
+                else None,
+                "fields": uow.versions.fields(version),
+            }
+
+    def mapping_source_choices(self, actor_id):
+        """Current reference snapshots only, including their published field definitions."""
+        contexts = _version_reads(self).overview(actor_id)
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            ids = tuple(
+                context.dataset.id
+                for context in contexts
+                if context.dataset.kind == "reference" and not context.no_current
+            )
+            versions = uow.versions.current_for_datasets(ids, _version_reads(self).clock.today())
+            tables = tuple(
+                context.dataset for context in contexts if context.dataset.id in versions
+            )
+            choices = {}
+            for table in tables:
+                fields = uow.versions.fields(versions[table.id])
+                identifier_count = sum(field.is_identifier for field in fields)
+                choices[table.id] = tuple(
+                    field
+                    for field in fields
+                    if (field.is_unique or (field.is_identifier and identifier_count == 1))
+                    and field.is_required
+                    and get_datatype(field.data_type).identifier_eligible
+                )
+            return tables, choices
+
     def create_dataset(
         self,
         actor_id: str,
@@ -899,6 +971,7 @@ class DatasetService:
             kind, mapping_mode, source_system, target_system = self._mapping_metadata(
                 kind, mapping_mode, source_system, target_system
             )
+            source_version = None
             if kind == "mapping" and mapping_mode == "linked":
                 if not source_dataset_id:
                     raise ValidationError("Choose a source dataset for a linked mapping dataset.")
@@ -908,12 +981,29 @@ class DatasetService:
                 )
                 if not visible or linked.kind != "reference":
                     raise ValidationError("Choose an available reference source dataset.")
-                source_fields = {
-                    field.key: field for field in uow.dataset_fields.list_for_dataset(linked.id)
-                }
+                source_version = uow.versions.current_for_datasets(
+                    (linked.id,), _version_reads(self).clock.today()
+                ).get(linked.id)
+                if source_version is None:
+                    raise ValidationError(
+                        f"Source dataset {linked.name} must have a Current version."
+                    )
+                source_fields = {field.key: field for field in uow.versions.fields(source_version)}
                 if not source_field_key or source_field_key not in source_fields:
                     raise ValidationError("Choose an available source identifier.")
                 source_field = source_fields[source_field_key]
+                if (
+                    not (
+                        source_field.is_unique
+                        or (
+                            source_field.is_identifier
+                            and sum(field.is_identifier for field in source_fields.values()) == 1
+                        )
+                    )
+                    or not source_field.is_required
+                    or not get_datatype(source_field.data_type).identifier_eligible
+                ):
+                    raise ValidationError("Choose a required, unique source identifier.")
                 source_system = source_field.name
                 target_system = target_dataset_id = target_field_key = None
             else:
@@ -931,6 +1021,7 @@ class DatasetService:
                 source_system=source_system,
                 target_system=target_system,
                 source_dataset_id=source_dataset_id,
+                source_version_id=source_version.id if source_version else None,
                 target_dataset_id=target_dataset_id,
                 source_field_key=source_field_key,
                 target_field_key=target_field_key,
@@ -970,7 +1061,7 @@ class DatasetService:
                     )
                     uow.dataset_business_keys.replace(dataset.id, (source_field.key,))
                     uow.flush()
-                    for source_record in uow.dataset_records.iterate_all(source_dataset_id):
+                    for source_record in uow.versions.iterate_records(source_version):
                         source_value = next(
                             (
                                 value
@@ -1011,8 +1102,9 @@ class DatasetService:
             raise ValidationError("Choose a valid dataset type.")
         if kind in {"reference", "hierarchy"}:
             return kind, None, None, None
-        if mapping_mode not in {"standalone", "linked"}:
-            raise ValidationError("Choose standalone or linked mapping mode.")
+        if mapping_mode not in {None, "linked"}:
+            raise ValidationError("Mapping datasets require a published source dataset.")
+        mapping_mode = "linked"
 
         def label(value, name):
             value = value.strip() if isinstance(value, str) else ""
@@ -1385,9 +1477,16 @@ class DatasetFieldService:
                         source_dataset = uow.datasets.get(dataset.source_dataset_id)
                         if not source_field_key:
                             raise ValidationError("Choose an available source field")
-                        source_field = uow.dataset_fields.find_by_key(
-                            dataset.source_dataset_id,
-                            self._validated_field_lookup_key(source_field_key),
+                        source_version = uow.versions.get(
+                            dataset.source_dataset_id, dataset.source_version_id
+                        )
+                        source_field = next(
+                            (
+                                field
+                                for field in uow.versions.fields(source_version)
+                                if field.key == self._validated_field_lookup_key(source_field_key)
+                            ),
+                            None,
                         )
                         if source_dataset is None or source_field is None:
                             raise ValidationError("Choose an available source field")
@@ -1473,13 +1572,23 @@ class DatasetFieldService:
                     ),
                 )
             if source_field is not None:
+                ordered = uow.dataset_fields.list_for_dataset(dataset.id)
+                uow.dataset_fields.replace_order(
+                    dataset.id,
+                    tuple(
+                        item.id
+                        for item in sorted(
+                            ordered, key=lambda item: item.mapping_role == "mapping_target"
+                        )
+                    ),
+                )
                 mapping_records = {
                     identifier: record_id
                     for record_id, identifier in uow.dataset_records.identifier_keys(
                         dataset.id
                     ).items()
                 }
-                for source_record in uow.dataset_records.iterate_all(source_dataset.id):
+                for source_record in uow.versions.iterate_records(source_version):
                     identifier_value = next(
                         (
                             value
@@ -1873,6 +1982,13 @@ class DatasetFieldService:
                 raise StaleFieldOrderError("Field order changed since this page was opened")
             if len(proposed_order) != len(current) or set(proposed_order) != set(current):
                 raise ValidationError("Field order must contain every current field exactly once")
+            if dataset.kind == "mapping":
+                by_id = {field.id: field for field in fields}
+                roles = [
+                    by_id[field_id].mapping_role == "mapping_target" for field_id in proposed_order
+                ]
+                if roles != sorted(roles):
+                    raise ValidationError("Move fields within their Source or Target block.")
             if proposed_order == current:
                 return tuple(fields)
             _advance_concept(uow, dataset)
@@ -2028,6 +2144,8 @@ class DatasetBusinessKeyService:
                 components.append(field.key)
 
             canonical = tuple(sorted(components))
+            if dataset.kind == "mapping" and canonical != (dataset.source_field_key,):
+                raise ValidationError("The mapping source identifier cannot change.")
             current = uow.dataset_business_keys.get(dataset.id)
             if current.field_keys == canonical:
                 return current
@@ -2165,6 +2283,7 @@ class DatasetRecordService:
                 existing_value = next(
                     (value for value in existing.values if value.field_id == field.id), None
                 )
+                submitted.pop(field.key, None)
                 if existing_value is not None:
                     submitted[field.key] = get_datatype(field.data_type).text(existing_value.value)
             identifier = uow.dataset_business_keys.get(dataset.id)
@@ -2210,6 +2329,10 @@ class DatasetRecordService:
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_key, for_update=True)
             self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
+            if dataset.kind == "mapping":
+                raise ValidationError(
+                    "Source records are read-only; edit the target values instead."
+                )
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             uow.concepts.record_mutation(dataset.id)

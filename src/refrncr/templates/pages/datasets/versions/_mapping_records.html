@@ -1,0 +1,22 @@
+{% from 'components/mapping.html' import group_headings %}
+{% if result.items %}
+<div class='table-scroll' role='region' aria-label='Mapping record changes' tabindex='0'>
+<table class='record-table mapping-record-table'>
+  <caption class='visually-hidden'>Mapping record changes</caption>
+  <thead>{{ group_headings(result.mapping_fields, mapping_source, 1) }}<tr>
+  {% set direction = namespace(shown=false) %}
+  {% for field in result.mapping_fields %}
+    {% if field.mapping_role == 'mapping_target' and not direction.shown %}<th class='mapping-direction-column' aria-label='Mapping direction'></th>{% set direction.shown = true %}{% endif %}
+    <th scope='col' class='{{ "mapping-source-cell" if field.mapping_role != "mapping_target" else "" }}'>{{ field.name }}</th>
+  {% endfor %}<th scope='col'>Change</th></tr></thead>
+  <tbody>{% for item, values in result.mapping_values %}<tr>
+    {% set direction = namespace(shown=false) %}
+    {% for field in result.mapping_fields %}
+      {% if field.mapping_role == 'mapping_target' and not direction.shown %}<td class='mapping-direction-column'><span aria-hidden='true'>→</span><span class='visually-hidden'>maps to</span></td>{% set direction.shown = true %}{% endif %}
+      <td class='{{ "mapping-source-cell" if field.mapping_role != "mapping_target" else "" }}' data-label='{{ ("Source · " if field.mapping_role != "mapping_target" else "Target · ") ~ field.name }}'>{{ values.get(field.id, '—') }}</td>
+    {% endfor %}
+    <td>{{ status_badge(item.status) }} <a href='{{ detail_url("record", item.id) }}' data-panel-url data-dialog-open='review-panel'>Review changes<span class='visually-hidden'> for {{ item.after_identifier or item.before_identifier }}</span></a></td>
+  </tr>{% endfor %}</tbody>
+</table>
+</div>
+{% endif %}

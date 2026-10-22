@@ -124,6 +124,7 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
             "source_system",
             "target_system",
             "source_dataset_id",
+            "source_version_id",
             "target_dataset_id",
             "source_field_key",
             "target_field_key",
@@ -219,7 +220,7 @@ def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=Tru
     assert dataset_foreign_key["referred_table"] == "datasets"
     assert dataset_foreign_key["options"].get("ondelete") == "CASCADE"
     if mapping_tables:
-        assert field_foreign_keys[("source_field_id",)]["referred_table"] == "dataset_fields"
+        assert ("source_field_id",) not in field_foreign_keys
     business_key_columns = {
         column["name"] for column in inspector.get_columns("dataset_business_key_fields")
     }
@@ -464,7 +465,7 @@ def test_ref_121_sqlite_upgrade_recovers_after_add_column_was_committed(tmp_path
         assert_community_schema(upgraded)
         with upgraded.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0030_ref_205"
+                "0031_ref_239"
             )
     finally:
         upgraded.dispose()
@@ -1030,7 +1031,7 @@ def test_empty_postgresql_database_upgrades():
         assert_community_schema(application_engine)
         with application_engine.connect() as connection:
             assert (
-                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
+                connection.scalar(text("SELECT version_num FROM alembic_version")) == "0031_ref_239"
             )
         factory = create_session_factory(application_engine)
         uow = SqlAlchemyUnitOfWorkFactory(factory)
