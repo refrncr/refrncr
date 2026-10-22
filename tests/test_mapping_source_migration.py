@@ -67,3 +67,45 @@ def test_upgrade_refuses_existing_mappings_without_deleting_them(database_audit_
         assert "source_version_id" not in {
             c["name"] for c in inspect(connection).get_columns("datasets")
         }
+
+
+def test_source_version_requirement_is_service_policy_after_upgrade(database_audit_db):
+    from dataset_helpers import create_mapping_dataset
+    from sqlalchemy.exc import IntegrityError
+
+    engine, _, services = database_audit_db
+    admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
+    mapping = create_mapping_dataset(services, admin, "map", "Map", records=("A",))
+    with engine.connect() as connection:
+        config = config_for(connection)
+        command.stamp(config, "head")
+        command.downgrade(config, "0031_ref_239")
+        with pytest.raises(IntegrityError):
+            connection.execute(
+                text("UPDATE datasets SET source_version_id=NULL WHERE id=:id"), {"id": mapping.id}
+            )
+        connection.rollback()
+        command.upgrade(config, "head")
+        connection.execute(
+            text("UPDATE datasets SET source_version_id=NULL WHERE id=:id"), {"id": mapping.id}
+        )
+        connection.commit()
+        assert (
+            connection.scalar(
+                text("SELECT source_version_id FROM datasets WHERE id=:id"), {"id": mapping.id}
+            )
+            is None
+        )
+        assert (
+            connection.scalar(
+                text("SELECT count(*) FROM dataset_records WHERE dataset_id=:id"),
+                {"id": mapping.id},
+            )
+            == 1
+        )
+        assert (
+            connection.scalar(
+                text("SELECT source_dataset_id FROM datasets WHERE id=:id"), {"id": mapping.id}
+            )
+            == mapping.source_dataset_id
+        )

@@ -11,8 +11,10 @@ through direct service calls or forged form submissions.
 Creation copies source identifiers and records from the Current snapshot. Additional source
 context fields are selected from that same snapshot, including their original definitions
 and values. Source columns and row membership are read-only; maintainers edit target values
-and configure target fields. Complete-record import is unavailable for mappings because it
-replaces rows. Source and target fields can be reordered within their respective groups;
+and configure target fields. Imports update target values by matching the source identifier.
+Source context columns are ignored; unknown identifiers fail preview. Omitted rows and
+target columns remain unchanged, and the import never adds or removes rows. Source and
+target fields can be reordered within their respective groups;
 the persisted order is also the record and export column order.
 
 The working mapping and every immutable publication store `source_version_id`. Starting a
@@ -52,6 +54,11 @@ The migration adds working/published source-version columns and a mapping-source
 Published links reference immutable versions with `ON DELETE RESTRICT`. Source field IDs
 now identify fields in the pinned snapshot and no longer have a foreign key to mutable
 working fields. The source dataset itself remains protected against deletion while in use.
+
+Revision `0032_ref_239` removes only the working source-version non-null check, preserving
+existing mappings and values. Current-version selection remains required in the service.
+Downgrading to `0031_ref_239` restores the stricter check and requires all mapping source
+version pointers to be populated.
 
 ## Browser verification
 

@@ -33,7 +33,7 @@
       {% if may_edit %}
       <div class='page-actions' role='group' aria-label='Edit draft records'>
       {% if may_edit %}
-      {% if dataset.kind != 'mapping' %}{{ record_import_action(dataset.key, import_unavailable) }}{% endif %}
+      {{ record_import_action(dataset.key, import_unavailable) }}
       {% if may_add_record %}<button class='button button-secondary' type='button' data-dialog-open='add-record-panel'>{{ plus_icon() }}Add record</button>{% endif %}
       {% endif %}
     </div>

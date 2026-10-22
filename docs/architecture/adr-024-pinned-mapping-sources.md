@@ -18,16 +18,20 @@ concept restores the baseline link; publishing validates the source identity and
 copies the link unchanged. Source contexts are copied from that pinned snapshot.
 
 Published source-version references have a self-referencing foreign key with RESTRICT. The
-working pointer is service-validated together with its source dataset identity and required
-by a database check for mappings. It has no reverse Dataset-to-DatasetVersion foreign key,
+working pointer is required and validated together with its source dataset identity by the
+service. The database permits a null source version so this policy can evolve independently.
+It has no reverse Dataset-to-DatasetVersion foreign key,
 which avoids a cyclic schema creation/deletion dependency. The source dataset remains a
 RESTRICT reference. Source field IDs identify immutable snapshot fields rather than mutable
 working fields, so the previous working-field foreign key is removed.
 
 Newer-source signals are read-time comparisons against non-cancelled published version
 numbers, including future-effective publications. Dataset lists batch these comparisons.
-Source changes never mutate a mapping. Existing complete-record imports are rejected for
-mappings because row membership and source values belong to the pinned snapshot.
+Version history loads source metadata in a batch.
+Source changes never mutate a mapping. Mapping imports match existing rows by source
+identifier and update only target values.
+Source contexts are ignored, unknown identifiers fail preview, and omitted rows or target
+columns remain unchanged. Row membership and source values belong to the pinned snapshot.
 
 ## Consequences
 

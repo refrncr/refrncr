@@ -206,7 +206,9 @@ def test_mapping_source_target_blocks_and_field_entry_points(dataset_browser):
     login(client)
     page = body(request(client, "get", f"/datasets/{mapping.key}/concept/records"))
     assert "Source · SAP &amp; ECC V1" in page
-    assert ">Target</th>" in page
+    assert "colspan='1'>Target</th>" in page
+    assert "class='form-field mapping-source-field'" in page
+    assert ">Import</a>" in page
     assert "mapping-source-cell" in page
     assert "maps to" in page
     assert page.count("<table ") == 1
@@ -3351,6 +3353,7 @@ def test_mapping_review_history_and_source_publication_signal(dataset_browser):
     assert "Source · Source &amp; table V1" in body(records)
     assert "Mapped" in body(records)
     assert "mapping-record-table" in body(records)
+    assert "colspan='1'>Target</th>" in body(records)
     version = publish_dataset(services, admin.id, mapping)
     history = body(request(client, "get", f"/datasets/{mapping.key}/versions"))
     assert "Source: Source &amp; table V1" in history
@@ -3426,3 +3429,95 @@ def test_mapping_history_remains_available_to_reader(dataset_browser):
     assert "Source:" in body(response)
     assert "V1" in body(response)
     assert "Open draft" not in body(response)
+
+
+def test_mapping_import_browser_preview_and_confirmation(dataset_browser):
+    import io
+
+    _, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(
+        services, admin, "import-map", "Import map", records=("A", "B")
+    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    login(client)
+    upload = request(client, "get", f"/datasets/{mapping.key}/records/import")
+    assert "no records are added or deleted" in body(upload)
+    csrf = form_csrf(upload)
+    mapped = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "file": (io.BytesIO(b"code,target\nA,new\n"), "targets.csv")},
+    )
+    assert mapped.status_code == 200
+    token = mapped.request.path.split("/import/")[1].split("/step/")[0]
+    preview = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import/{token}/preview",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "target"},
+    )
+    assert preview.status_code == 200
+    assert "1 record will change" in body(preview)
+    confirmation = re.search("name='confirmation' value='([^']+)'", body(preview))[1]
+    confirmed = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import/{token}/confirm",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "confirmation": confirmation},
+    )
+    assert confirmed.status_code == 200
+    assert "1 records imported successfully" in body(confirmed)
+    rows = services.dataset_records.list_records(admin.id, mapping.key).records
+    assert len(rows) == 2
+    assert [v.value for row in rows for v in row.values if v.field_key == "target"] == ["new"]
+
+
+def test_mapping_history_source_queries_do_not_grow_with_versions(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(services, admin, "history-map", "History map")
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    publish_dataset(services, admin.id, mapping)
+    login(client)
+    engine = factory.kw["bind"]
+
+    def source_queries():
+        queries = []
+
+        def capture(_connection, _cursor, statement, *_args):
+            if statement.lstrip().upper().startswith("SELECT"):
+                queries.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            response = request(client, "get", f"/datasets/{mapping.key}/versions")
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+        assert response.status_code == 200
+        return len(queries), body(response)
+
+    before, _ = source_queries()
+    from support import MutableClock
+
+    clock = MutableClock(services.dataset_versions.clock.now())
+    services.dataset_versions.clock = clock
+    for index in range(5):
+        clock.set(clock.now() + timedelta(days=1))
+        services.dataset_versions.create_concept(admin.id, mapping.id)
+        services.dataset_fields.create_field(
+            admin.id, mapping.key, f"target_{index}", f"Target {index}", "string"
+        )
+        current = services.datasets.get_dataset_for_edit(admin.id, mapping.key)
+        services.dataset_versions.publish(
+            admin.id,
+            mapping.id,
+            services.dataset_versions.clock.today(),
+            "",
+            current.revision,
+        )
+    after, page = source_queries()
+    assert after == before
+    assert page.count("Source: Source V1") == 6

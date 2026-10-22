@@ -6,11 +6,11 @@
 
 <p class='import-result-summary'>
   <span class='import-file-name' title='{{ state.filename }}'>File: {{ state.filename }}</span>
-  {% if mode == 'new_version' and preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted and not preview.counts.Unchanged %}
+  {% if mode in ('new_version', 'mapping_update') and preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted and not preview.counts.Unchanged %}
     · First import: {{ preview.counts.Added }} {{ 'record' if preview.counts.Added == 1 else 'records' }} will be added to the draft.
-  {% elif mode == 'new_version' and not preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted %}
+  {% elif mode in ('new_version', 'mapping_update') and not preview.counts.Added and not preview.counts.Changed and not preview.counts.Deleted %}
     · No changes. The file matches the draft.
-  {% elif mode == 'new_version' %}
+  {% elif mode in ('new_version', 'mapping_update') %}
     {% if preview.counts.Added or preview.counts.Deleted %}
       {% set summary_parts = [] %}
       {% if preview.counts.Added %}{% set _ = summary_parts.append(preview.counts.Added ~ ' added') %}{% endif %}
@@ -28,7 +28,7 @@
 {% set available_statuses = namespace(count=0) %}
 {% for status in DISPLAY_STATUSES if preview.counts[status] %}{% set available_statuses.count = available_statuses.count + 1 %}{% endfor %}
 {% set difference_total = preview.counts.Added + preview.counts.Changed + preview.counts.Deleted %}
-{% if mode == 'new_version' %}
+{% if mode in ('new_version', 'mapping_update') %}
   {% if difference_total > 10 or difference_search %}
     <form {{ non_login_form_attrs() }} method='get' class='record-toolbar import-difference-filters' aria-label='Filter import differences' data-auto-filter>
       {{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=MAX_SEARCH) }}

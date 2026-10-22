@@ -184,5 +184,17 @@ def test_mapping_source_details_follow_mapping_version_authority(database_contex
     scheduled = publish_table(c, mapping, NOW.date() + timedelta(days=1))
     with pytest.raises(NotFoundError):
         c.s.datasets.mapping_source(c.u.id, mapping.key, scheduled.id)
+    with pytest.raises(NotFoundError):
+        c.s.datasets.mapping_source(
+            c.u.id, mapping.key, scheduled.id, history_version_ids=(scheduled.id,)
+        )
     c.service.clock.set(NOW + timedelta(days=1))
     assert c.s.datasets.mapping_source(c.u.id, mapping.key, scheduled.id)["number"] == 1
+    with pytest.raises(NotFoundError):
+        c.s.datasets.mapping_source(
+            c.u.id, mapping.key, scheduled.id, history_version_ids=("unknown",)
+        )
+    result = c.s.datasets.mapping_source(
+        c.u.id, mapping.key, scheduled.id, history_version_ids=(scheduled.id,)
+    )
+    assert result["history"][scheduled.id]["number"] == 1

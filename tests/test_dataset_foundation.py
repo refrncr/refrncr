@@ -90,7 +90,7 @@ def test_create_dataset_persists_metadata_team_creator_and_audit(dataset_service
 
 def test_standalone_mapping_is_rejected(dataset_services):
     _, _, _, services, admin = dataset_services
-    with pytest.raises(ValidationError, match="published source"):
+    with pytest.raises(ValidationError, match="Current version"):
         create_owned_dataset(
             services.datasets,
             admin.id,

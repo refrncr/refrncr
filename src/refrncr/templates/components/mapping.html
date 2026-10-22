@@ -4,6 +4,6 @@
 {% set targets = fields|selectattr('mapping_role', 'equalto', 'mapping_target')|list %}
 <tr class='mapping-group-headings'>
   <th scope='colgroup' class='mapping-source-cell' colspan='{{ sources|length }}'>{{ source_heading(source) }}</th>
-  {% if targets %}<th class='mapping-direction-column' aria-hidden='true'></th><th scope='colgroup' colspan='{{ targets|length + trailing }}'>Target</th>{% elif trailing %}<th scope='col'>Status</th>{% endif %}
+  {% if targets %}<th class='mapping-direction-column' aria-hidden='true'></th><th scope='colgroup' colspan='{{ targets|length }}'>Target</th>{% endif %}{% if trailing %}<td colspan='{{ trailing }}'></td>{% endif %}
 </tr>
 {%- endmacro %}

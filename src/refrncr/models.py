@@ -229,7 +229,7 @@ class Dataset(Base):
         CheckConstraint("revision >= 1", name="ck_datasets_revision"),
         CheckConstraint(
             "kind <> 'mapping' OR (mapping_mode = 'linked' AND source_dataset_id IS NOT NULL "
-            "AND source_field_key IS NOT NULL AND source_version_id IS NOT NULL)",
+            "AND source_field_key IS NOT NULL)",
             name="ck_datasets_mapping_source",
         ),
         CheckConstraint("kind IN ('reference', 'mapping', 'hierarchy')", name="ck_datasets_kind"),

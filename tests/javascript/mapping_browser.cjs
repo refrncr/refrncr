@@ -7,7 +7,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
   const browser = await chromium.launch({headless: true, executablePath: process.env.REFRNCR_BROWSER_EXECUTABLE});
   try {
     for (const width of [320, 768, 1440]) {
-      const context = await browser.newContext({viewport: {width, height: 1000}});
+      const context = await browser.newContext({viewport: {width, height: 1000}, reducedMotion: 'reduce'});
       const page = await context.newPage();
       await page.goto(base + '/login');
       await page.locator('#login-email').fill('admin@example.com');
@@ -20,7 +20,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await table.locator('tbody tr').count(), 2);
       assert.match(await table.textContent(), /Source · Currencies V1/);
       assert.equal(await page.locator('[data-panel-mode="delete"]').count(), 0);
-      assert.equal(await page.getByRole('link', {name: 'Import', exact: true}).count(), 0);
+      assert.equal(await page.getByRole('link', {name: 'Import', exact: true}).count(), 1);
       const layout = await page.evaluate(() => ({width: innerWidth, scroll: document.documentElement.scrollWidth, row: getComputedStyle(document.querySelector('.mapping-record-table tbody tr')).display}));
       assert(layout.scroll <= width, JSON.stringify(layout));
       for (const button of await page.locator('.record-criteria-toolbar button').all()) {
@@ -28,7 +28,17 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
         if (box) assert(box.x + box.width <= width, `Clipped record control at ${width}`);
       }
       if (width === 320) assert.equal(layout.row, 'block');
-      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/mapping-${width}.png`, fullPage: true});
+      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/mapping-${width}.png`, fullPage: true, animations: 'disabled'});
+      await table.locator('[data-row-primary]').first().click();
+      const recordDialog = page.getByRole('dialog');
+      await recordDialog.waitFor();
+      assert.equal(await page.evaluate(() => document.activeElement.name), await recordDialog.locator('input:not([readonly]):not([type="hidden"])').first().getAttribute('name'));
+      const readonly = recordDialog.locator('input[readonly]');
+      assert.equal(await readonly.count(), 1);
+      assert.notEqual(await readonly.evaluate(el => getComputedStyle(el).backgroundColor), await recordDialog.locator('input[name="target"]').evaluate(el => getComputedStyle(el).backgroundColor));
+      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/edit-${width}.png`, fullPage: true, animations: 'disabled'});
+      await page.keyboard.press('Escape');
+      await recordDialog.waitFor({state: 'hidden'});
       await page.goto(base + '/datasets/mapping-browser/concept?tab=fields');
       assert.equal(await page.getByRole('link', {name: 'Add source field', exact: true}).count(), 1);
       await page.getByRole('link', {name: 'Add target field', exact: true}).click();
@@ -36,15 +46,16 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.getByRole('dialog').getByText('Field role', {exact: true}).count(), 0);
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({state: 'hidden'});
+      await page.waitForFunction(() => document.activeElement?.textContent.trim() === 'Add target field');
       await page.locator('[data-field-order-ready]').waitFor();
       const handles = page.locator('.mapping-fields-block').last().locator('.field-drag-handle');
       await handles.last().focus();
       await Promise.all([
         page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes('/fields/order')),
-        page.keyboard.press('ArrowUp')
+        handles.last().press('ArrowUp')
       ]);
       assert.match(await page.locator('#field-order-status').textContent(), /moved/);
-      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/fields-${width}.png`, fullPage: true});
+      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/fields-${width}.png`, fullPage: true, animations: 'disabled'});
       await page.goto(base + '/datasets/mapping-browser/versions/review');
       await page.getByRole('link', {name: 'Records', exact: true}).click();
       await page.waitForLoadState('networkidle');
@@ -52,7 +63,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('.mobile-bar').count(), 1);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.equal(await page.getByRole('table', {name: 'Mapping record changes', exact: true}).count(), 1);
-      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/review-${width}.png`, fullPage: true});
+      if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/review-${width}.png`, fullPage: true, animations: 'disabled'});
       await context.close();
     }
     console.log('Mapping desktop, tablet, mobile, panels and keyboard reordering passed.');

@@ -112,3 +112,6 @@ label > input:not([type="checkbox"], [type="radio"]), label > select, label > te
 .fmp-chip { display: inline-flex; align-items: center; gap: 3px; padding: 0 var(--space-xs); border: 1px solid var(--color-border); border-radius: var(--radius-full); }
 .fmp-chip-identifier { border-color: var(--color-status-published-border); background: var(--color-status-published-surface); color: var(--color-status-published); }
 .fmp-chip .key-icon { width: .6875rem; height: .6875rem; stroke-width: 1.75; color: currentColor; }
+
+/* Pinned mapping source values remain readable while target fields are edited. */
+.mapping-source-field input, .mapping-source-field select { background: var(--color-surface-subtle); color: var(--color-text-muted); }

@@ -864,7 +864,7 @@ class DatasetService:
             self._deletion_timestamp(dataset),
         )
 
-    def mapping_source(self, actor_id, key, version_id=None):
+    def mapping_source(self, actor_id, key, version_id=None, *, history_version_ids=()):
         """Source metadata for an authorized mapping; never expose source drafts."""
         with self.uow() as uow:
             uow.begin_export_snapshot()
@@ -893,8 +893,37 @@ class DatasetService:
                     raise NotFoundError("Dataset version not found")
                 source_id = version.source_version_id
             source = uow.datasets.get(dataset.source_dataset_id)
-            version = uow.versions.get(source.id, source_id)
-            latest = uow.versions.latest_non_cancelled(source.id)
+            history_sources = {}
+            if history_version_ids:
+                mapping_versions = {
+                    version.id: version for version in uow.versions.list_for_dataset(dataset.id)
+                }
+                source_versions = {
+                    version.id: version for version in uow.versions.list_for_dataset(source.id)
+                }
+                for requested_id in history_version_ids:
+                    published = mapping_versions.get(requested_id)
+                    if published is None or (
+                        not maintain
+                        and (
+                            published.cancelled_at is not None
+                            or published.effective_date > _version_reads(self).clock.today()
+                        )
+                    ):
+                        raise NotFoundError("Dataset version not found")
+                    pinned = source_versions.get(published.source_version_id)
+                    if pinned is None:
+                        raise NotFoundError("Source version not found")
+                    history_sources[requested_id] = {
+                        "name": pinned.name,
+                        "number": pinned.number,
+                        "version_id": pinned.id,
+                    }
+                version = source_versions.get(source_id)
+                latest = next((v for v in source_versions.values() if v.cancelled_at is None), None)
+            else:
+                version = uow.versions.get(source.id, source_id)
+                latest = uow.versions.latest_non_cancelled(source.id)
             visible = self.authorization.has_capability(
                 actor_id, "can_view_dataset", source.id, uow=uow
             )
@@ -907,6 +936,7 @@ class DatasetService:
                 if latest and latest.number > version.number
                 else None,
                 "fields": uow.versions.fields(version),
+                "history": history_sources,
             }
 
     def mapping_source_choices(self, actor_id):
@@ -974,7 +1004,7 @@ class DatasetService:
             source_version = None
             if kind == "mapping" and mapping_mode == "linked":
                 if not source_dataset_id:
-                    raise ValidationError("Choose a source dataset for a linked mapping dataset.")
+                    raise ValidationError("Choose a source dataset for a mapping dataset.")
                 linked = uow.datasets.get(source_dataset_id)
                 visible = linked is not None and self.authorization.has_capability(
                     actor_id, "can_view_dataset", linked.id, uow=uow
@@ -1103,7 +1133,9 @@ class DatasetService:
         if kind in {"reference", "hierarchy"}:
             return kind, None, None, None
         if mapping_mode not in {None, "linked"}:
-            raise ValidationError("Mapping datasets require a published source dataset.")
+            raise ValidationError(
+                "Mapping datasets require a source dataset with a Current version."
+            )
         mapping_mode = "linked"
 
         def label(value, name):

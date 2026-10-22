@@ -635,19 +635,15 @@ def create_flask_app(
                     return render_authenticated_template(template_name, **context)
                 state = history.entries[0]
             context["mapping_source"] = datasets.mapping_source(
-                actor.id, dataset.key, state.version.id if state else None
+                actor.id,
+                dataset.key,
+                state.version.id if state else None,
+                history_version_ids=tuple(entry.version.id for entry in history.entries)
+                if history
+                else (),
             )
             if history:
-                sources = {context["mapping_source"]["version_id"]: context["mapping_source"]}
-                history_sources = {}
-                for entry in history.entries:
-                    source_id = entry.version.source_version_id
-                    if source_id not in sources:
-                        sources[source_id] = datasets.mapping_source(
-                            actor.id, dataset.key, entry.version.id
-                        )
-                    history_sources[entry.version.id] = sources[source_id]
-                context["mapping_history_sources"] = history_sources
+                context["mapping_history_sources"] = context["mapping_source"]["history"]
         return render_authenticated_template(template_name, **context)
 
     def require_capability(capability: str):
@@ -2778,7 +2774,13 @@ def create_flask_app(
         source_format_issues=(),
     ):
         actor, _session = require_authenticated()
-        mode = state.mode if state else "new_version"
+        mode = (
+            state.mode
+            if state
+            else "mapping_update"
+            if dataset.kind == "mapping"
+            else "new_version"
+        )
         fields = ()
         source = assistance = preview = None
         required_keys = ()
@@ -2936,7 +2938,9 @@ def create_flask_app(
             error=error,
             current_csrf=login_session.csrf_token,
             mapping_reason_text=(
-                "This import replaces all records in the draft, so every field must be mapped."
+                "Map the source identifier to match existing rows; target columns are optional."
+                if mode == "mapping_update"
+                else "This import replaces all records in the draft, so every field must be mapped."
             ),
         ), status
 
@@ -2960,6 +2964,8 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        if dataset.kind == "mapping":
+            mode = "mapping_update"
         reason = record_imports.eligibility(actor.id, key)
         if reason:
             raise ImportValidationError(". ".join(reason))
@@ -3264,7 +3270,11 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
         state = record_imports.state(actor.id, login_session.id, key, token)
-        expected = {"csrf_token", "confirmation"} if state.mode == "new_version" else {"csrf_token"}
+        expected = (
+            {"csrf_token", "confirmation"}
+            if state.mode in {"new_version", "mapping_update"}
+            else {"csrf_token"}
+        )
         if "acknowledge_deletions" in request.form and state.mode == "new_version":
             expected.add("acknowledge_deletions")
         if set(request.form) != expected or any(
