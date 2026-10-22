@@ -5346,6 +5346,7 @@
       "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
       "interface_entrypoints": [
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
