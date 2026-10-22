@@ -56,7 +56,7 @@ jobs:
           retention-days: 1
 
   test-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       REFRNCR_TEST_POSTGRES_URL: postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test
