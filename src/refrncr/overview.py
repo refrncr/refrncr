@@ -13,6 +13,11 @@ REASON_LABELS = {
     3: "No Current version",
     4: "Scheduled source update",
     5: "Scheduled version coming up",
+    6: "Draft untouched for 14 days",
+    7: "Incomplete mapping draft",
+    8: "Published mapping with unmapped rows",
+}
+TALLY_LABELS = {
     6: "Drafts untouched for 14 days",
     7: "Incomplete mapping drafts",
     8: "Published mappings with unmapped rows",
@@ -24,6 +29,14 @@ def display_date(value):
     return f"{value.day} {value.strftime('%b %Y')}"
 
 
+def effect_timing(days):
+    return "today" if days == 0 else "tomorrow" if days == 1 else f"in {days} days"
+
+
+def row_count(count, description):
+    return f"{count} {description} {'row' if count == 1 else 'rows'}"
+
+
 @dataclass(frozen=True)
 class AttentionReason:
     number: int
@@ -32,6 +45,11 @@ class AttentionReason:
     version_id: str | None = None
     draft: bool = False
     mapping_status: str | None = None
+    note: str | None = None
+
+    @property
+    def label(self):
+        return REASON_LABELS[self.number]
 
     @property
     def priority(self):
@@ -69,6 +87,12 @@ class OverviewCard:
         reason = self.card_reason
         return "Needs action" if reason and reason.number <= 3 else "Coming up" if reason else None
 
+    def reason_for_display(self, number=None):
+        """A filtered work list takes precedence over the card's usual headline."""
+        if number is not None:
+            return next(reason for reason in self.reasons if reason.number == number)
+        return self.card_reason or self.primary
+
 
 @dataclass
 class Overview:
@@ -84,7 +108,7 @@ class Overview:
         return [
             (
                 number,
-                REASON_LABELS[number],
+                TALLY_LABELS[number],
                 sum(
                     any(reason.number == number for reason in card.reasons)
                     for card in self.attention
@@ -211,9 +235,9 @@ class OverviewService:
                         AttentionReason(
                             3,
                             "error",
-                            f"No Current version since {display_date(end)}. "
-                            "Consumers get no records.",
+                            f"No Current version since {display_date(end)}",
                             draft=card.has_draft,
+                            note="Consumers get no records.",
                         )
                     )
             for state in lifecycle:
@@ -227,9 +251,9 @@ class OverviewService:
                         AttentionReason(
                             5,
                             "info",
-                            f"V{state.version.number} takes effect in {days} days, "
-                            f"on {display_date(date)}. Check or cancel it before then.",
+                            f"V{state.version.number} takes effect {effect_timing(days)}",
                             state.version.id,
+                            note=f"Effective {display_date(date)}. Check or cancel it before then.",
                         )
                     )
             if concept and work.now() - concept.updated_at >= timedelta(days=14):
@@ -286,9 +310,10 @@ class OverviewService:
                     AttentionReason(
                         2,
                         "error",
-                        blocker,
+                        f"Can't update to {latest.name} V{latest.number}",
                         selected.id if selected else None,
                         draft=selected is None,
+                        note=blocker,
                     )
                 )
             for source in sources:
@@ -300,21 +325,11 @@ class OverviewService:
                 target = source.version
                 fixed = draft_source is not None and draft_source.number >= target.number
                 if source.status == "Current":
-                    text = (
-                        f"{target.name} V{target.number} is Current since "
-                        f"{display_date(target.effective_date)}. "
-                        f"This mapping still uses V{pinned.number}."
-                    )
+                    text = f"Uses V{pinned.number} · {target.name} V{target.number} is Current"
                     number, severity = 1, "warning"
                 else:
-                    text = (
-                        f"{target.name} V{target.number} takes effect on "
-                        f"{display_date(target.effective_date)}. "
-                        f"This mapping still uses V{pinned.number}."
-                    )
+                    text = f"Uses V{pinned.number} · {target.name} V{target.number} is Scheduled"
                     number, severity = 4, "info"
-                if fixed:
-                    text += f" Draft already uses V{draft_source.number}. Review and publish."
                 card.reasons.append(
                     AttentionReason(
                         number,
@@ -322,6 +337,11 @@ class OverviewService:
                         text,
                         selected.id if selected else None,
                         draft=fixed or selected is None,
+                        note=f"Draft already uses V{draft_source.number}. Review and publish."
+                        if fixed
+                        else f"Takes effect on {display_date(target.effective_date)}."
+                        if source.status == "Scheduled"
+                        else None,
                     )
                 )
         unmapped, removed = draft_counts.get(dataset.id, (0, 0))
@@ -330,9 +350,16 @@ class OverviewService:
                 AttentionReason(
                     7,
                     "warning",
-                    f"{unmapped} unmapped · {removed} removed from source in the Draft.",
+                    " · ".join(
+                        row_count(count, label)
+                        for count, label in ((unmapped, "unmapped"), (removed, "removed"))
+                        if count
+                    ),
                     draft=True,
                     mapping_status="unmapped" if unmapped else "removed",
+                    note="Removed rows are retained from the source in the Draft."
+                    if removed
+                    else None,
                 )
             )
         for state in sorted(
@@ -341,12 +368,7 @@ class OverviewService:
             count = published_counts.get(state.version.id, 0)
             if state.status in {"Current", "Scheduled"} and count:
                 fixed = card.has_draft and unmapped == 0
-                text = (
-                    f"V{state.version.number} ({state.status}) was published "
-                    f"with {count} unmapped rows."
-                )
-                if fixed:
-                    text += " The Draft has no unmapped rows. Review and publish."
+                text = f"V{state.version.number} ({state.status}) · {row_count(count, 'unmapped')}"
                 card.reasons.append(
                     AttentionReason(
                         8,
@@ -355,5 +377,8 @@ class OverviewService:
                         state.version.id,
                         draft=fixed,
                         mapping_status=None if fixed else "unmapped",
+                        note="The Draft has no unmapped rows. Review and publish."
+                        if fixed
+                        else None,
                     )
                 )

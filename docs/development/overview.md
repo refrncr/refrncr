@@ -20,8 +20,11 @@ cards recheck visibility and never make a previously visited dataset accessible.
 datasets are shown only to their maintainers, matching the existing dataset overview contract.
 
 Reasons 1–5 are cards; reasons 6–8 independently count datasets in the tally. The headline counts
-the union. Card grouping uses only card reasons, while destination and primary copy follow severity
-across all reasons. A ready Draft changes the destination but does not clear a published issue.
+the union. On Overview, the most severe card reason (1–5) determines both group and callout/destination;
+reasons 6–8 appear only as short labels in “+N more”. Filtered View all uses the requested reason
+for both callout and destination, including the Draft mapping filter for reason 7. Unfiltered
+View all uses the card reason where available, otherwise the most severe tally reason.
+The compact problem text and the plain-text preparation note are separate fields. A ready Draft changes the destination but does not clear a published issue.
 All version dates use the application's UTC calendar. Draft age uses the active Draft's last
 mutation timestamp, not administrative ownership or export-access changes.
 
@@ -63,7 +66,15 @@ The nine new tokens express sizing and semantic roles, without introducing color
 `--color-switch-off`, `--color-switch-on`. Forest resolves the same aliases against its own colors.
 The existing icon-tile styling is shared outside the picker; Forest uses `--color-link` for its icon.
 
-Overview-only rules cover section spacing, grouping/tallies and a single column below 768px.
+The shared card places its icon and borderless action menu above a full-width, two-line title
+and description. Description remains visible alongside attention feedback. Version/date sit on the
+left of the metadata row and record count on the right; callout, preparation note and short extra
+reason labels follow below. Section actions align at the right.
+
+Overview-only rules cover section spacing, grouping/tallies, a three-column attention grid at desktop
+widths, two columns from 768px, and one column below 768px. Empty recent visits show a plain sentence
+and link without a zero badge. Card hover uses the existing link-color alias; card and feedback
+borders retain at least 3:1 contrast in both themes.
 The title's full text remains in the link's accessible name and expands on keyboard focus.
 Descriptions expand on keyboard focus and remain complete in the accessibility tree. Static
 callouts do not announce as live regions. Menus reuse native `details` and the existing export
@@ -75,7 +86,7 @@ macro; REF-255 remains the separate menu-improvement story.
   personal bounded visits, query counts and rendered browser navigation.
 - `tests/test_overview_migration.py`: SQLite/PostgreSQL upgrade, preserved datasets, aware timestamps
   and cascading deletion.
-- `tests/browser_overview_app.py` and `tests/javascript/overview_browser.cjs`: Chrome at 320, 768
+- `tests/browser_overview_app.py` and `tests/javascript/overview_browser.cjs`: Chrome at 375, 768
   and 1440px in Light and Forest, computed contrast, keyboard navigation and no-JavaScript fallback.
 
 The general Concept → Draft rename and source-owner informational reason remain separate work.

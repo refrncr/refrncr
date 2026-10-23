@@ -1007,8 +1007,7 @@ def create_flask_app(
             if reason is None or any(r.number == reason for r in card.reasons)
         ]
 
-        def destination(card, attention=False):
-            selected = card.primary if attention else None
+        def destination(card, selected=None):
             draft = selected.draft if selected else card.version is None and card.has_draft
             return url_for(
                 "dataset_records_view",

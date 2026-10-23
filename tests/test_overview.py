@@ -92,10 +92,10 @@ def test_mapping_current_scheduled_and_draft_destinations(database_context):
     update(c, mapping)
     card = attention(overview.read(c.a.id, all_owners=True), mapping.id)
     assert reason(card, 1).draft
-    assert f"Draft already uses V{second.number}" in reason(card, 1).text
+    assert f"Draft already uses V{second.number}" in reason(card, 1).note
     assert reason(card, 7).draft
     assert "1 unmapped" in reason(card, 7).text
-    assert "1 removed from source" in reason(card, 7).text
+    assert "1 removed row" in reason(card, 7).text
 
 
 def test_blocked_source_is_primary_and_counts_are_independent(database_context):
@@ -116,7 +116,7 @@ def test_blocked_source_is_primary_and_counts_are_independent(database_context):
     assert card.primary.number == 2
     assert card.group == "Needs action"
     assert {r.number for r in card.reasons} >= {2, 4, 6}
-    assert "Ask the owner" in card.primary.text
+    assert "Ask the owner" in card.primary.note
     assert dict((n, count) for n, _, count in view.tallies)[6] == 1
     assert sum(item.dataset.id == mapping.id for item in view.attention) == 1
 
@@ -311,3 +311,143 @@ def test_unpublished_datasets_are_not_missing_current_errors(database_context):
     overview = service(c)
     assert not overview.read(c.a.id, all_owners=True).attention
     assert not overview.read(c.u.id).created  # no other-team Draft metadata
+
+
+def card_markup(response, key):
+    import re
+
+    match = re.search(
+        rf'<article class="dataset-card" data-dataset-key="{key}">(.*?)</article>',
+        body(response),
+        re.S,
+    )
+    assert match is not None
+    return match.group(1)
+
+
+def callout_markup(card):
+    import re
+
+    return re.search(r'<p class="callout [^\"]+">(.*?)</p>', card, re.S).group(1)
+
+
+def test_card_reason_controls_headline_and_destination_with_stale_draft(database_context):
+    from test_mapping_source_updates import browser
+
+    c = database_context
+    mapping, _, published = mapping_fixture(c)
+    overview = service(c)
+    next_source(c, day=30)
+    c.s.dataset_versions.create_concept(c.a.id, mapping.id)
+    c.s.datasets.update_dataset(
+        c.a.id, mapping.key, mapping.name, "Mapping description stays visible"
+    )
+    age_draft(c, mapping.id, 20)
+    card = attention(overview.read(c.a.id, all_owners=True), mapping.id)
+    assert card.primary.number == 6
+    assert card.card_reason.number == 4
+    assert card.group == "Coming up"
+    client = browser(c)
+    markup = card_markup(request(client, "get", "/?all_owners=1"), mapping.key)
+    assert "is Scheduled" in callout_markup(markup)
+    assert "Draft untouched" not in callout_markup(markup)
+    assert f'href="/datasets/{mapping.key}/versions/{published.id}/records"' in markup
+    assert "+1 more: Draft untouched for 14 days" in markup
+    assert "Mapping description stays visible" in markup
+    # The work list must honor its filter, even though the same dataset has a card reason.
+    markup = card_markup(request(client, "get", "/attention?reason=6&all_owners=1"), mapping.key)
+    assert "Draft untouched for 20 days" in callout_markup(markup)
+    assert f'href="/datasets/{mapping.key}/concept/records"' in markup
+    assert "+1 more: Scheduled source update" in markup
+
+
+def test_filtered_incomplete_draft_uses_its_reason_and_record_filter(database_context):
+    from test_mapping_source_updates import browser
+
+    c = database_context
+    mapping, _, _ = mapping_fixture(c)
+    service(c)
+    next_source(c)
+    c.s.datasets.uow.clock.advance(days=1)
+    update(c, mapping)
+    age_draft(c, mapping.id, 20)
+    client = browser(c)
+    markup = card_markup(request(client, "get", "/attention?reason=7&all_owners=1"), mapping.key)
+    assert "1 unmapped row · 1 removed row" in callout_markup(markup)
+    assert f'href="/datasets/{mapping.key}/concept/records?mapping_status=unmapped"' in markup
+    assert "+2 more: Source update available · Draft untouched for 14 days" in markup
+    row = rows(c, mapping)["c"]
+    c.s.dataset_records.update_record(c.a.id, mapping.key, row.id, row.revision, {"target": "C"})
+    markup = card_markup(request(client, "get", "/attention?reason=7&all_owners=1"), mapping.key)
+    assert "1 removed row" in callout_markup(markup)
+    assert "0 unmapped" not in markup
+    assert f'href="/datasets/{mapping.key}/concept/records?mapping_status=removed"' in markup
+
+
+@pytest.mark.parametrize("days,expected", [(0, "today"), (1, "tomorrow"), (2, "in 2 days")])
+def test_effect_timing_copy(days, expected):
+    from refrncr.overview import effect_timing
+
+    assert effect_timing(days) == expected
+
+
+@pytest.mark.parametrize("days,expected", [(1, "tomorrow"), (2, "in 2 days")])
+def test_scheduled_reason_uses_readable_day_count(database_context, days, expected):
+    c = prepare(database_context)
+    overview = service(c)
+    publish_table(c, c.d, NOW.date() + timedelta(days=days))
+    card = attention(overview.read(c.a.id, all_owners=True), c.d.id)
+    assert reason(card, 5).text == f"V1 takes effect {expected}"
+    c.s.datasets.uow.clock.advance(days=days)
+    # On its effective date the existing lifecycle makes it Current, not Scheduled.
+    assert all(
+        r.number != 5
+        for card in overview.read(c.a.id, all_owners=True).attention
+        for r in card.reasons
+    )
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_mapping_row_counts_and_prepared_note_are_separate(database_context, count):
+    from test_mapping_source_updates import browser
+
+    c = database_context
+    mapping, _, _ = mapping_fixture(c, publish=False)
+    overview = service(c)
+    for row in list(rows(c, mapping).values())[:count]:
+        c.s.dataset_records.update_record(c.a.id, mapping.key, row.id, row.revision, {"target": ""})
+    card = attention(overview.read(c.a.id, all_owners=True), mapping.id)
+    label = f"{count} unmapped {'row' if count == 1 else 'rows'}"
+    assert reason(card, 7).text == label
+    published = publish_table(c, mapping)
+    card = attention(overview.read(c.a.id, all_owners=True), mapping.id)
+    assert reason(card, 8).text == f"V{published.number} (Current) · {label}"
+    c.s.dataset_versions.create_concept(c.a.id, mapping.id)
+    for row in rows(c, mapping).values():
+        c.s.dataset_records.update_record(
+            c.a.id, mapping.key, row.id, row.revision, {"target": "Ready"}
+        )
+    client = browser(c)
+    markup = card_markup(request(client, "get", "/attention?reason=8&all_owners=1"), mapping.key)
+    assert label in callout_markup(markup)
+    assert "Draft" not in callout_markup(markup)
+    assert (
+        '<p class="dataset-card-note">The Draft has no unmapped rows. Review and publish.</p>'
+        in markup
+    )
+    assert f'href="/datasets/{mapping.key}/concept/records"' in markup
+
+
+def test_recent_visits_empty_state_has_no_box_or_zero_count(dataset_browser):
+    import re
+
+    _, _, _, client = dataset_browser
+    login(client)
+    markup = body(request(client, "get", "/"))
+    section = re.search(
+        r'<section[^>]+aria-labelledby="recent-1">(.*?)</section>', markup, re.S
+    ).group(1)
+    assert "Datasets you visit will show up here." in section
+    assert 'href="/datasets"' in section
+    assert 'class="count"' not in section
+    assert 'class="empty-state"' not in section

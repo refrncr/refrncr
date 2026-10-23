@@ -15,12 +15,12 @@
         <select id="attention-reason" name="reason"><option value=""{% if not reason %} selected{% endif %}>All reasons</option>{% for number, label in reason_labels.items() %}<option value="{{ number }}"{% if reason == number %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
         <noscript><button class="button button-secondary" type="submit">Apply</button></noscript>
       </form>
-      {% if attention_cards %}<ul class="card-grid">{% for card in attention_cards %}<li>{{ dataset_card(card, card_destination(card, true), attention=true) }}</li>{% endfor %}</ul>{% endif %}
+      {% if attention_cards %}<ul class="card-grid card-grid-attention">{% for card in attention_cards %}{% set selected = card.reason_for_display(reason) %}<li>{{ dataset_card(card, card_destination(card, selected), reason=selected) }}</li>{% endfor %}</ul>{% endif %}
     {% else %}
       {% for group in ['Needs action', 'Coming up'] %}
         {% set cards = overview.attention|selectattr('group', 'equalto', group)|list %}
         {% if cards %}<div class="ov-group"><h3 class="ov-group-title">{{ group }} <span class="count">{{ cards|length }}</span></h3>
-          <ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card, true), attention=true) }}</li>{% endfor %}</ul>
+          <ul class="card-grid card-grid-attention">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card, card.card_reason), reason=card.card_reason) }}</li>{% endfor %}</ul>
         </div>{% endif %}
       {% endfor %}
       {% if overview.tallies|selectattr('2')|list %}<div class="ov-group"><h3 class="ov-group-title">To finish</h3><ul class="tally">
@@ -36,8 +36,9 @@
   {% if not full %}
     {% for title, cards in [('Recently visited', overview.visited), ('Recently created', overview.created)] %}
       <section class="ov-section" aria-labelledby="recent-{{ loop.index }}">
-        {{ section_heading(title, cards|length, id='recent-' ~ loop.index) }}
+        {{ section_heading(title, none if title == 'Recently visited' and not cards else cards|length, id='recent-' ~ loop.index) }}
         {% if cards %}<ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card), export=title == 'Recently visited') }}</li>{% endfor %}</ul>
+        {% elif title == 'Recently visited' %}<p class="overview-empty-visits">Datasets you visit will show up here. <a href="{{ url_for('dataset_list') }}">View datasets</a></p>
         {% else %}<div class="empty-state"><p>{{ 'Datasets you visit will show up here.' if title == 'Recently visited' else 'New datasets will show up here.' }} <a href="{{ url_for('dataset_list') }}">View datasets</a></p></div>{% endif %}
       </section>
     {% endfor %}

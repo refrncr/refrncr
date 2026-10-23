@@ -47,7 +47,7 @@
   /* Overview sizes and semantic roles; aliases resolve in both Light and Forest. */
   --card-grid-min-width: 16rem;
   --card-padding-compact: var(--space-md);
-  --color-card-hover-border: var(--color-control-border);
+  --color-card-hover-border: var(--color-link);
   --color-count-surface: var(--color-action-secondary);
   --color-count-text: var(--color-text-secondary);
   --switch-track-width: 2.25rem;
