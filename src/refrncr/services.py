@@ -943,6 +943,8 @@ class DatasetService:
                         "team": mapping.owner_team_name,
                         "version_id": state.version.id if state else None,
                         "status": state.status if state else "Draft" if draft else None,
+                        "not_yet_in_effect": state is None
+                        and any(s.status == "Scheduled" for s in states),
                         "source_number": pinned.number if pinned else None,
                         "update_available": bool(pinned and latest > pinned.number),
                         "draft_source_number": draft.number

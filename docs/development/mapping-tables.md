@@ -104,7 +104,8 @@ list is dataset-wide even when opened from an older source snapshot.
 
 All source readers can see the count and list. Existing dataset and version permissions still
 apply: a never-published mapping is anonymous to non-maintainers; a Scheduled-only mapping
-can link to its existing dataset Settings without exposing its version or source pin. Mappings
+shows **not yet in effect** and links to its existing dataset Settings without exposing its
+version, effective date or source pin. Mappings
 without read access are grouped by owning team, returning only team name and count to the
 template. There are no new grants, notifications, API endpoints or schema changes.
 

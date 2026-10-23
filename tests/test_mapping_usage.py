@@ -39,6 +39,7 @@ def test_empty_and_draft_only_usage(database_context):
         "team": c.owner.name,
         "version_id": None,
         "status": "Draft",
+        "not_yet_in_effect": False,
         "source_number": 1,
         "update_available": False,
         "draft_source_number": None,
@@ -105,9 +106,12 @@ def test_scheduled_mapping_remains_private_then_becomes_current(database_context
     assert reader["name"] == mapping.name  # Existing dataset-wide Settings remain readable.
     assert reader["status"] is reader["version_id"] is reader["source_number"] is None
     assert not reader["update_available"]
+    assert reader["not_yet_in_effect"]
+    assert not item(c)["not_yet_in_effect"]
     c.service.clock.advance(days=1)
     assert (item(c, c.u.id)["status"], item(c, c.u.id)["version_id"]) == ("Current", scheduled.id)
     assert not item(c, c.u.id)["update_available"]
+    assert not item(c, c.u.id)["not_yet_in_effect"]
 
 
 def test_current_mapping_wins_over_scheduled_successor(database_context):
@@ -118,11 +122,49 @@ def test_current_mapping_wins_over_scheduled_successor(database_context):
     scheduled = publish_table(c, mapping, NOW.date() + timedelta(days=1))
     assert item(c)["version_id"] == published.id
     assert item(c)["source_number"] == 1
+    assert not item(c, c.u.id)["not_yet_in_effect"]
     c.service.clock.advance(days=1)
     assert item(c)["version_id"] == scheduled.id
     assert item(c)["source_number"] == 2
     assert not item(c)["update_available"]
     assert usage(c)["total"] == 1  # Expired V1 does not create a second row.
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_scheduled_usage_explanation_hides_private_details(context, cancel):
+    c = context
+    mapping, _, _ = fixture(c, publish=False)
+    c.s.datasets.update_dataset(c.a.id, mapping.key, "Private currency mapping", "")
+    next_source(c)
+    update(c, mapping)
+    scheduled = publish_table(c, mapping, NOW.date() + timedelta(days=1))
+    client = browser(c)
+    login(client, email=c.u.email, password="valid password")
+    html = page(client, f"/datasets/{c.d.key}")
+    assert f"{c.owner.name} · not yet in effect" in html_text(html)
+    assert f"/datasets/{mapping.key}?tab=dataset-details" in html
+    assert scheduled.id not in html
+    assert scheduled.effective_date.isoformat() not in html
+    assert "uses V2" not in html_text(html)
+    assert "Scheduled" not in html_text(html)
+    assert not item(c, c.u.id)["draft_source_number"]
+    if cancel:
+        c.s.dataset_versions.cancel(c.a.id, mapping.id, scheduled.id)
+    else:
+        c.service.clock.advance(days=1)
+    html = page(client, f"/datasets/{c.d.key}")
+    assert "not yet in effect" not in html
+    if cancel:
+        assert "Private currency mapping" not in html
+        assert "1 mapping you don't have access to" in html_text(html)
+    else:
+        assert "uses V2" in html_text(html)
+        link = next(
+            attrs["href"]
+            for tag, attrs in html_elements(html)
+            if tag == "a" and scheduled.id in attrs.get("href", "")
+        )
+        assert request(client, "get", link).status_code == 200
 
 
 def deny_mappings(c, monkeypatch, ids):

@@ -8,7 +8,7 @@
       {% for mapping in usage.mappings %}
       <div>
         <dt><a href='{{ url_for("dataset_records_view", key=mapping.key, version_id=mapping.version_id, concept=true if mapping.status == "Draft" else none) if mapping.status else url_for("dataset_detail", key=mapping.key, tab="dataset-details") }}'>{{ mapping.name }}</a></dt>
-        <dd>{{ mapping.team }}{% if mapping.status and mapping.status != 'Current' %} · {{ mapping.status }}{% endif %}{% if mapping.source_number is not none %} · uses V{{ mapping.source_number }} · {{ 'update available' if mapping.update_available else 'up to date' }}{% endif %}{% if mapping.draft_source_number is not none %} · <a href='{{ url_for("dataset_records_view", key=mapping.key, concept=true) }}'>Draft uses V{{ mapping.draft_source_number }}</a>{% endif %}</dd>
+        <dd>{{ mapping.team }}{% if mapping.not_yet_in_effect %} · not yet in effect{% endif %}{% if mapping.status and mapping.status != 'Current' %} · {{ mapping.status }}{% endif %}{% if mapping.source_number is not none %} · uses V{{ mapping.source_number }} · {{ 'update available' if mapping.update_available else 'up to date' }}{% endif %}{% if mapping.draft_source_number is not none %} · <a href='{{ url_for("dataset_records_view", key=mapping.key, concept=true) }}'>Draft uses V{{ mapping.draft_source_number }}</a>{% endif %}</dd>
       </div>
       {% endfor %}
       {% for group in usage.restricted %}
