@@ -1,20 +1,33 @@
 {% extends "base.html" %}
 {% from "components/dataset_card.html" import dataset_card, section_heading, owner_switch %}
+{% from "components.html" import breadcrumbs %}
 {% block title %}{{ 'Needs your attention' if full else 'Overview' }} · REFRNCR{% endblock %}
 {% block content %}
 <div class="overview-content">
-  <header class="page-header"><h1>{{ 'Needs your attention' if full else 'Overview' }}</h1>{% if full %}<a href="{{ url_for('index', all_owners=1 if overview.all_owners else none) }}">Back to Overview</a>{% endif %}</header>
+  {% if full %}<header class="page-header overview-full-header">
+    <div class="page-context">{{ breadcrumbs([('Overview', url_for('index', all_owners=1 if overview.all_owners else none)), ('Needs your attention', none)]) }}
+      <h1 id="attention-heading">Needs your attention <span class="count" aria-label="{{ overview.attention|length }} {{ 'dataset' if overview.attention|length == 1 else 'datasets' }}">{{ overview.attention|length }}</span></h1></div>
+  </header>
+  {% else %}{% set first_name = (current_actor.display_name or '').split()|first|default('') %}
+  <header class="overview-greeting" data-overview-greeting data-name="{{ first_name }}">
+    {% if overview.today %}<p class="overview-greeting-date"><time datetime="{{ overview.today.isoformat() }}" data-overview-date>{{ overview.today.strftime('%A') }} {{ overview.today.day }} {{ overview.today.strftime('%B %Y') }}</time></p>{% endif %}
+    <h1 data-overview-salutation>{{ 'Hello, ' ~ first_name if first_name else 'Overview' }}</h1>
+    <p class="overview-greeting-lead">Here's what needs your attention across your datasets.</p>
+  </header>{% endif %}
   <section class="ov-section" aria-labelledby="attention-heading">
-    {% call section_heading('Needs your attention', overview.attention|length, none if full else url_for('attention_overview', all_owners=1 if overview.all_owners else none), id='attention-heading') %}
-      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('attention_overview' if full else 'index'), reason) }}{% endif %}
-    {% endcall %}
+    {% if not full %}{% call section_heading('Needs your attention', overview.attention|length, url_for('attention_overview', all_owners=1 if overview.all_owners else none), id='attention-heading') %}
+      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('index'), reason) }}{% endif %}
+    {% endcall %}{% endif %}
     {% if full %}
+      <div class="overview-toolbar">
       <form method="get" action="{{ url_for('attention_overview') }}" data-auto-filter class="overview-reason-filter">
         {% if overview.all_owners %}<input type="hidden" name="all_owners" value="1">{% endif %}
-        <label for="attention-reason">Reason</label>
-        <select id="attention-reason" name="reason"><option value=""{% if not reason %} selected{% endif %}>All reasons</option>{% for number, label in reason_labels.items() %}<option value="{{ number }}"{% if reason == number %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <label class="visually-hidden" for="attention-reason">Reason</label>
+        <select id="attention-reason" name="reason" data-select="compact" data-noun="reasons"><option value=""{% if not reason %} selected{% endif %}>All reasons</option>{% for number, label in reason_labels.items() %}<option value="{{ number }}"{% if reason == number %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
         <noscript><button class="button button-secondary" type="submit">Apply</button></noscript>
       </form>
+      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('attention_overview'), reason) }}{% endif %}
+      </div>
       {% if attention_cards %}<ul class="card-grid card-grid-attention">{% for card in attention_cards %}{% set selected = card.reason_for_display(reason) %}<li>{{ dataset_card(card, card_destination(card, selected), reason=selected) }}</li>{% endfor %}</ul>{% endif %}
     {% else %}
       {% for group in ['Needs action', 'Coming up'] %}
@@ -45,3 +58,4 @@
   {% endif %}
 </div>
 {% endblock %}
+{% block scripts %}{% if not full %}<script src="{{ url_for('static', filename='js/overview-greeting.js') }}" defer></script>{% endif %}{% endblock %}

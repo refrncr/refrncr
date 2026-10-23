@@ -1,10 +1,22 @@
 /* Overview is a deliberate card-based entry point, not a dataset workspace. */
 .overview-content { display: flex; flex-direction: column; gap: var(--space-xl); }
 .overview-content > .page-header { margin: 0; }
+/* White cards on the tinted page background; content stops widening at 75rem. */
+.app-main:has(> .overview-content) { background: var(--color-background); }
+.overview-content { width: 100%; max-width: 75rem; margin-inline: auto; }
+/* Greeting header: date eyebrow, salutation, one-line lead. */
+.overview-greeting { display: grid; gap: var(--space-sm); }
+.overview-greeting-date { margin: 0; color: var(--color-link); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); letter-spacing: var(--letter-spacing-eyebrow); text-transform: uppercase; }
+.overview-greeting h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.75rem, 1.1rem + 1.6vw, 2.5rem); font-weight: var(--font-weight-bold); line-height: 1.1; letter-spacing: -.025em; text-wrap: balance; }
+.overview-greeting-lead { margin: 0; color: var(--color-text-muted); }
 .overview-owner-filter { margin: 0; }
 .overview-empty-visits { margin: 0; }
 .overview-content .card-grid-attention { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (min-width: 1200px) { .overview-content .card-grid-attention { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.overview-reason-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+/* View all: breadcrumb above a counted title, then one toolbar row with the reason filter and owner switch. */
+.overview-full-header h1 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin: 0; }
+.overview-full-header .breadcrumbs { margin-bottom: var(--space-sm); }
+.overview-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm) var(--space-lg); }
+.overview-reason-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin: 0; min-width: min(18rem, 100%); }
 .overview-reason-filter select { width: auto; max-width: 100%; }
 @media (max-width: 767px) { .overview-content .card-grid { grid-template-columns: minmax(0, 1fr); } }

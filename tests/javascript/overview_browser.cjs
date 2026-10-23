@@ -75,11 +75,12 @@ const fs = require('node:fs');
           const cardStyle = getComputedStyle(document.querySelector('.dataset-card'));
           const surface = cardStyle.backgroundColor;
           const text = [...document.querySelectorAll('.dataset-card-title, .dataset-card-kind, .dataset-card-desc, .dataset-card-meta, .dataset-card-more, .dataset-card-note, .dataset-card-actions > summary')].map(el => ratio(getComputedStyle(el).color, surface));
-          const borders = [...document.querySelectorAll('.dataset-card, .tally, .callout, .dataset-card-foot .button')].map(el => {
+          // Only control boundaries need 3:1 (WCAG 1.4.11): cards are identified by their name link,
+          // the tally by its links and callouts by text and icon, so their edges may stay subtle.
+          const borders = [...document.querySelectorAll('.dataset-card-foot .button')].map(el => {
             const s=getComputedStyle(el);
             return Math.min(ratio(s.borderTopColor, s.backgroundColor), ratio(s.borderTopColor, surface));
           });
-          borders.push(ratio(getComputedStyle(document.querySelector('.dataset-card-meta')).borderTopColor, surface));
           const titles = [...document.querySelectorAll('.dataset-card-title')].map(el => ({name:el.textContent, clipped:el.scrollHeight > el.clientHeight + 1, lines:el.clientHeight / parseFloat(getComputedStyle(el).lineHeight)}));
           const firstCard = document.querySelector('.dataset-card');
           const head = firstCard.querySelector('.dataset-card-head').getBoundingClientRect();

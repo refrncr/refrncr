@@ -451,3 +451,32 @@ def test_recent_visits_empty_state_has_no_box_or_zero_count(dataset_browser):
     assert 'href="/datasets"' in section
     assert 'class="count"' not in section
     assert 'class="empty-state"' not in section
+
+
+def test_overview_greeting_uses_first_name_and_utc_day(dataset_browser):
+    import re
+    from datetime import date
+
+    _, _, _, client = dataset_browser
+    login(client)
+    markup = body(request(client, "get", "/"))
+    header = re.search(r"<header class=\"overview-greeting\"(.*?)</header>", markup, re.S)
+    assert header is not None
+    header = header.group(1)
+    assert 'data-name="Administrator"' in header
+    assert "<h1 data-overview-salutation>Hello, Administrator</h1>" in header
+    assert "Here's what needs your attention across your datasets." in header
+    day = re.search(
+        r'<time datetime="(\d{4}-\d{2}-\d{2})" data-overview-date>([^<]+)</time>', header
+    )
+    assert day is not None
+    value = date.fromisoformat(day.group(1))
+    assert day.group(2) == f"{value:%A} {value.day} {value:%B %Y}"
+    assert "js/overview-greeting.js" in markup
+    full = body(request(client, "get", "/attention"))
+    assert '<h1 id="attention-heading">Needs your attention <span class="count"' in full
+    assert '<nav class="breadcrumbs" aria-label="Breadcrumb">' in full
+    assert full.count("Needs your attention</") <= 2  # title and breadcrumb, no second heading
+    assert "overview-greeting" not in full
+    # The reason filter uses the shared refrncr Select, like the other auto-filter toolbars.
+    assert '<select id="attention-reason" name="reason" data-select="compact"' in full

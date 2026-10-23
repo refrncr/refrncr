@@ -56,7 +56,7 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
     login(client)
 
     overview = body(request(client, "get", "/"))
-    assert "<h1>Overview</h1>" in overview
+    assert "<h1 data-overview-salutation>Hello, Administrator</h1>" in overview
     assert '<p class="nav-label">Datasets</p>' in overview
     assert "Reference datasets" in overview
     assert "Mapping datasets" in overview

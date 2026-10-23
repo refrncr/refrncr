@@ -102,6 +102,7 @@ class Overview:
     is_admin: bool
     has_team: bool
     all_owners: bool
+    today: object | None = None
 
     @property
     def tallies(self):
@@ -197,7 +198,9 @@ class OverviewService:
             created = sorted(
                 cards.values(), key=lambda c: (c.dataset.created_at, c.dataset.id), reverse=True
             )[:4]
-            return Overview(attention, visited, created, admin, bool(teams), all_owners)
+            return Overview(
+                attention, visited, created, admin, bool(teams), all_owners, work.today()
+            )
 
     def _attention(self, work, cards, states, concepts):
         mappings = [c for c in cards if c.dataset.kind == "mapping"]
@@ -357,7 +360,7 @@ class OverviewService:
                     ),
                     draft=True,
                     mapping_status="unmapped" if unmapped else "removed",
-                    note="Removed rows are retained from the source in the Draft."
+                    note="Rows removed from the source are still in the Draft."
                     if removed
                     else None,
                 )

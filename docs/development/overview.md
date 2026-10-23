@@ -66,15 +66,29 @@ The nine new tokens express sizing and semantic roles, without introducing color
 `--color-switch-off`, `--color-switch-on`. Forest resolves the same aliases against its own colors.
 The existing icon-tile styling is shared outside the picker; Forest uses `--color-link` for its icon.
 
-The shared card places its icon and borderless action menu above a full-width, two-line title
-and description. Description remains visible alongside attention feedback. Version/date sit on the
-left of the metadata row and record count on the right; callout, preparation note and short extra
-reason labels follow below. Section actions align at the right.
+The shared card places a compact icon tile and borderless action menu above a full-width,
+two-line title, a plain-text kind label and the description. Description remains visible alongside
+attention feedback. Version/date sit on the left of the metadata row and record count on the right;
+the metadata row follows the description directly so rows line up across a card row. The callout is
+a soft tinted line without a border, as wide as its text; the preparation note and short extra
+reason labels follow below in muted small text. Section actions align at the right.
 
-Overview-only rules cover section spacing, grouping/tallies, a three-column attention grid at desktop
-widths, two columns from 768px, and one column below 768px. Empty recent visits show a plain sentence
-and link without a zero badge. Card hover uses the existing link-color alias; card and feedback
-borders retain at least 3:1 contrast in both themes.
+Overview-only rules: white cards on the tinted page background (`--color-background`), content
+limited to 75rem, a greeting header, section spacing, grouping/tallies, a three-column attention
+grid at desktop widths, two columns from 768px and one column below 768px. Empty recent visits show
+a plain sentence and link without a zero badge. Card hover uses the existing link-color alias.
+
+Cards, the tally and callouts use the subtle `--color-border` (or no border): WCAG 1.4.11 requires
+3:1 only for boundaries needed to identify a control. A card is identified by its name link, the
+tally by its links and a callout by its text and icon. Controls (Export, switch, fields) and icons
+keep at least 3:1, and all text keeps 4.5:1, in both themes.
+
+The greeting header shows the date, "Hello, <first name>" and a one-line lead. The server renders
+the UTC calendar day used for all Overview dates; `js/overview-greeting.js` replaces it with the
+viewer's local date and a time-of-day greeting (morning before 12:00, afternoon before 18:00,
+evening after). Without JavaScript the server-rendered greeting stays. _View all_ keeps the plain
+"Needs your attention" heading.
+
 The title's full text remains in the link's accessible name and expands on keyboard focus.
 Descriptions expand on keyboard focus and remain complete in the accessibility tree. Static
 callouts do not announce as live regions. Menus reuse native `details` and the existing export
