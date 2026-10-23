@@ -95,7 +95,14 @@
         {% if editable %}
         <section id='danger-zone' class='dataset-settings-section dataset-delete-section' aria-labelledby='dataset-danger-heading'>
           <header><h3 id='dataset-danger-heading'>Delete dataset</h3><p>This cannot be undone.</p></header>
-          <div class='dataset-delete-action'><p>Removes {{ dataset.name|dataset_title }} with all its versions, records and fields. The audit log records who deleted it and when.</p><a class='button dataset-delete-button' href='{{ url_for("dataset_delete", dataset_id=dataset.id, version_id=version_state.version.id if version_state else none, concept="1" if concept else none) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a></div>
+          <div class='dataset-delete-action'>
+            {% if mapping_usage.deletion_error %}
+            <p id='dataset-delete-blocked'>{{ mapping_usage.deletion_error }}</p>
+            <button class='button dataset-delete-button' type='button' disabled aria-describedby='dataset-delete-blocked'>Delete dataset</button>
+            {% else %}
+            <p>Removes {{ dataset.name|dataset_title }} with all its versions, records and fields. The audit log records who deleted it and when.</p><a class='button dataset-delete-button' href='{{ url_for("dataset_delete", dataset_id=dataset.id, version_id=version_state.version.id if version_state else none, concept="1" if concept else none) }}' data-panel-url data-dialog-open='configuration-panel'>Delete dataset</a>
+            {% endif %}
+          </div>
         </section>
         {% endif %}
       </div>

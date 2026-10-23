@@ -136,6 +136,10 @@ The migration adds working/published source-version columns and a mapping-source
 Published links reference immutable versions with `ON DELETE RESTRICT`. Source field IDs
 now identify fields in the pinned snapshot and no longer have a foreign key to mutable
 working fields. The source dataset itself remains protected against deletion while in use.
+Settings disables deletion while any mapping depends on the source, including draft-only
+mappings. Both deletion confirmation and execution check the dependency count in the service;
+the restrictive foreign keys remain the concurrency backstop. Remove the dependent mappings
+before deleting their source.
 
 Revision `0032_ref_239` removes only the working source-version non-null check, preserving
 existing mappings and values. Current-version selection remains required in the service.
@@ -169,3 +173,11 @@ with its test account (`admin@example.com`, `correct horse battery staple`) and 
 These browser checks were performed for REF-301 review 1. The corresponding rendered-output,
 service, migration and rollback regressions live in `tests/test_mapping_source_updates.py`.
 The existing full-row loading for draft mapping counters remains a performance follow-up.
+
+For source-side usage checks, run `.venv/bin/python tests/browser_mapping_usage_app.py`
+and `node tests/javascript/mapping_usage_browser.cjs` with the same existing browser toolchain
+variables. At 1280×900 this checks that **Used by N mappings** reveals Settings, scrolls the
+whole block into `main.app-main`, and focuses its heading, including reload and keyboard
+activation. It also checks the disabled delete button, dependency explanation and consistent
+metadata separators. `REFRNCR_BROWSER_OUTPUT` optionally names a screenshot file. The fixture
+is disposable; these checks do not delete user datasets.

@@ -21,7 +21,7 @@
 {% macro settings(usage) -%}
   {% if usage and usage.total %}
   <section class='dataset-settings-section' id='used-by-mappings' aria-labelledby='used-by-mappings-heading'>
-    <header><h3 id='used-by-mappings-heading' tabindex='-1'>Used by mappings</h3><p>These teams use a published version of this dataset in their mappings.</p></header>
+    <header><h3 id='used-by-mappings-heading' tabindex='-1'>Used by mappings</h3><p>Mappings based on this dataset, with the source version they use.</p></header>
     {{ mapping_list(usage) }}
   </section>
   {% endif %}

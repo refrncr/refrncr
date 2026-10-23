@@ -8,7 +8,7 @@ from support import NOW, body, html_elements, html_text, login, request, snapsho
 from test_mapping_source_updates import browser, fixture, next_source, update
 from test_mapping_source_versions import create_mapping, prepare, publish_table
 
-from refrncr.services import NotFoundError
+from refrncr.services import ConflictError, NotFoundError
 
 
 def usage(c, actor=None, **kwargs):
@@ -25,7 +25,13 @@ def item(c, actor=None):
 def test_empty_and_draft_only_usage(database_context):
     c = prepare(database_context)
     publish_table(c, c.d)
-    assert usage(c) == {"key": c.d.key, "total": 0, "mappings": [], "restricted": []}
+    assert usage(c) == {
+        "key": c.d.key,
+        "total": 0,
+        "mappings": [],
+        "restricted": [],
+        "deletion_error": None,
+    }
     mapping = create_mapping(c)
     assert item(c) == {
         "name": mapping.name,
@@ -43,6 +49,7 @@ def test_empty_and_draft_only_usage(database_context):
         "total": 1,
         "mappings": [],
         "restricted": [{"team": c.owner.name, "count": 1}],
+        "deletion_error": "This dataset can't be deleted because 1 mapping is based on it.",
     }
     assert usage(c, details=False)["total"] == 1
     confirmation = c.s.datasets.get_dataset_for_deletion(c.a.id, mapping.id)
@@ -285,3 +292,72 @@ def test_mapping_names_and_teams_are_escaped(context):
     assert "<script>team</script>" not in html
     assert "&lt;script&gt;mapping&lt;/script&gt;" in html
     assert "&lt;script&gt;team&lt;/script&gt;" in html
+
+
+@pytest.mark.parametrize("published", [False, True])
+@pytest.mark.parametrize("count", [1, 2])
+def test_source_deletion_blocked_until_last_mapping_removed(database_context, published, count):
+    from test_dataset_deletion import browser as deletion_browser
+
+    c = prepare(database_context)
+    publish_table(c, c.d)
+    # A confirmation opened before the first mapping cannot bypass the write-side guard.
+    confirmation = c.s.datasets.get_dataset_for_deletion(c.a.id, c.d.id)
+    mappings = [create_mapping(c, f"mapping-{i}") for i in range(count)]
+    if published:
+        for mapping in mappings:
+            c.s.dataset_fields.create_field(c.a.id, mapping.key, "target", "Target", "string")
+            publish_table(c, mapping)
+    dependency = "1 mapping is" if count == 1 else "2 mappings are"
+    message = f"This dataset can't be deleted because {dependency} based on it."
+    client, csrf = deletion_browser(c)
+    path = f"/datasets/id/{c.d.id}/delete"
+    data = {
+        "csrf_token": csrf,
+        "confirmation_name": confirmation.name,
+        "expected_updated_at": confirmation.expected_updated_at,
+    }
+    before = snapshot(c)
+    for operation in (
+        lambda: c.s.datasets.get_dataset_for_deletion(c.a.id, c.d.id),
+        lambda: c.s.datasets.delete_dataset(
+            c.a.id, c.d.id, confirmation.name, confirmation.expected_updated_at
+        ),
+    ):
+        with pytest.raises(ConflictError) as error:
+            operation()
+        assert str(error.value) == message
+        assert snapshot(c) == before
+    for method in ("get", "post"):
+        response = request(client, method, path, **({"data": data} if method == "post" else {}))
+        assert response.status_code == 409
+        assert message in html_text(body(response))
+        assert "try again" not in body(response)
+        assert snapshot(c) == before
+    settings = page(client, f"/datasets/{c.d.key}")
+    assert message in html_text(settings)
+    buttons = [
+        attrs
+        for tag, attrs in html_elements(settings)
+        if tag == "button" and "dataset-delete-button" in attrs.get("class", "")
+    ]
+    assert len(buttons) == 1 and "disabled" in buttons[0]
+    assert buttons[0]["aria-describedby"] == "dataset-delete-blocked"
+    assert not any(
+        tag == "a" and attrs.get("href", "").startswith(path)
+        for tag, attrs in html_elements(settings)
+    )
+    assert snapshot(c) == before
+    for mapping in mappings:
+        target = c.s.datasets.get_dataset_for_deletion(c.a.id, mapping.id)
+        c.s.datasets.delete_dataset(c.a.id, mapping.id, target.name, target.expected_updated_at)
+    settings = page(client, f"/datasets/{c.d.key}")
+    assert "dataset-delete-blocked" not in settings
+    assert any(
+        tag == "a" and attrs.get("href", "").startswith(path)
+        for tag, attrs in html_elements(settings)
+    )
+    assert request(client, "get", path).status_code == 200
+    assert request(client, "post", path, data=data).status_code == 303
+    with pytest.raises(NotFoundError):
+        c.s.datasets.get_dataset_for_deletion(c.a.id, c.d.id)

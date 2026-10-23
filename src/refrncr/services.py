@@ -798,6 +798,13 @@ def _version_reads(service):
     return service.versions or DatasetVersionService(service.uow, service.authorization.datasets)
 
 
+def _mapping_deletion_error(count):
+    if count:
+        dependency = "1 mapping is" if count == 1 else f"{count} mappings are"
+        return f"This dataset can't be deleted because {dependency} based on it."
+    return None
+
+
 class DatasetService:
     """Authorized Dataset operations within the one Community installation context."""
 
@@ -845,6 +852,8 @@ class DatasetService:
             actor_id, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if error := _mapping_deletion_error(uow.datasets.mapping_usage_count(dataset.id)):
+            raise ConflictError(error)
         return dataset
 
     @staticmethod
@@ -881,6 +890,7 @@ class DatasetService:
                 return result
             mappings = uow.datasets.mappings_using(source.id)
             result["total"] = len(mappings)
+            result["deletion_error"] = _mapping_deletion_error(len(mappings))
             if not mappings:
                 return result
             visible, maintainable, restricted = [], set(), {}
