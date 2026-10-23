@@ -1,6 +1,6 @@
 """Revision-bound, administrator-only, on-demand concept review."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from heapq import nlargest, nsmallest
 from unicodedata import normalize
 
@@ -169,6 +169,53 @@ class DatasetDiffService:
                     result = self._field_page(changes, criteria)
                 elif section == "Records":
                     result = self._record_page(uow, identity, current, previous, criteria)
+                    if dataset.kind == "mapping":
+                        fields = {field.id: field for field in (*previous, *current)}
+                        ordered = tuple(
+                            sorted(
+                                fields.values(),
+                                key=lambda field: (
+                                    field.mapping_role == "mapping_target",
+                                    field.display_position,
+                                ),
+                            )
+                        )
+                        baseline = (
+                            uow.versions.get(dataset.id, identity.baseline_id)
+                            if identity.baseline_id
+                            else None
+                        )
+                        old_records = (
+                            {
+                                record.id: record
+                                for record in uow.versions.iterate_records(
+                                    baseline, record_ids=tuple(item.id for item in result.items)
+                                )
+                            }
+                            if baseline
+                            else {}
+                        )
+                        values = []
+                        for item in result.items:
+                            record = uow.dataset_records.get(
+                                dataset.id, item.id
+                            ) or old_records.get(item.id)
+                            values.append(
+                                (
+                                    item,
+                                    {
+                                        value.field_id: get_datatype(value.data_type).text(
+                                            value.value
+                                        )
+                                        for value in record.values
+                                    }
+                                    if record
+                                    else {},
+                                )
+                            )
+                        result = replace(
+                            result, mapping_fields=ordered, mapping_values=tuple(values)
+                        )
                 else:
                     raise ValidationError("Choose Summary, Fields or Records.")
                 self._calendar_check(state)

@@ -1,25 +1,78 @@
-# Mapping tables (REF-177)
+# Mapping tables
 
-Mapping tables are Community/core Datasets with `kind=mapping`. They support:
+Mapping tables are Community/core Datasets with `kind=mapping`. REF-239 replaces the
+standalone setup from REF-177. A new mapping requires a reference dataset with a Current
+publication and a required, uniquely identifying field in that publication. A single-field
+business key also qualifies. Unpublished and Scheduled-only sources are rejected, including
+through direct service calls or forged form submissions.
 
-- `standalone`: source and target identifiers are described with free text;
-- `linked`: a required source reference table and field, plus an optional target
-  reference table and field. Without a target table, its identifier remains free text.
+## Pinned content and lifecycle
 
-Standalone mapping tables start without an assumed schema. A maintainer first defines
-one Source identifier Field and at least one Mapping target Field through the regular
-Field configuration. The Source identifier is automatically required, unique and the
-record identifier, preserving a 1:1 crosswalk without imposing generic Field names.
-After defining it, maintainers can add editable Source context Fields alongside Mapping
-target Fields. Linked Source context Fields remain inherited and read-only.
-Maintainers can then add records manually or use the existing CSV, Excel and JSON import
-flow while a Concept is active. Import preview, validation, replay protection and atomic
-confirmation are inherited from Record import.
+Creation copies source identifiers and records from the Current snapshot. Additional source
+context fields are selected from that same snapshot, including their original definitions
+and values. Source columns and row membership are read-only; maintainers edit target values
+and configure target fields. Imports update target values by matching the source identifier.
+Source context columns are ignored; unknown identifiers fail preview. Omitted rows and
+target columns remain unchanged, and the import never adds or removes rows. Every caller must
+supply the confirmation token from the preview. A file without changes has no confirmation
+button and is rejected by the service without persisting changes or emitting a domain audit.
+Successful imports report changed target **records**, not total input rows or individual cells.
+One transactional `dataset.mapping_targets_updated` event records the format and changed/unchanged
+row counts (only rows present in the file). Source and
+target fields can be reordered within their respective groups;
+the persisted order is also the record and export column order.
 
-Each publication is an immutable Dataset version with its own effective date. Identifier
-descriptions are free text for standalone mappings and for an unlinked target. Linked
-tables store the selected field key; deleting a linked table or selected field is
-restricted to avoid broken references.
+The working mapping and every immutable publication store `source_version_id`. Starting a
+new draft inherits its baseline's source version. Publishing retains it even after it has
+become Expired, and rejects an effective date before the source's effective date. Neither a
+source draft, a source publication nor the passage of time changes mapping values. See
+[ADR-024](../architecture/adr-024-pinned-mapping-sources.md).
 
-The Dataset REST representations expose `kind`. Mapping resolution is intentionally not
-part of REF-177; REF-92 owns that API contract.
+The metadata line, review and version history identify the source version. A newer
+non-cancelled publication, including Scheduled, immediately produces an in-app notice and
+dataset-list badge. Cancelling that Scheduled publication removes its signal. These are
+computed on reads and need no notification job. There is no automatic source upgrade;
+explicit upgrading belongs to REF-301. The source owner's usage view belongs to REF-302.
+
+## Presentation and authorization
+
+Records and record review share one table with source/target column groups, a muted source
+background, white target values and a white direction strip. Target group and column headings
+use the normal table-heading background, distinct from the white values. Both groups have their own frame;
+row lines continue through the strip. Status/Change remain outside the groups, with the normal
+record metadata style. On phones, each row becomes one source-then-target card.
+Fields use equally framed, vertically stacked source and target groups with separate add actions;
+the source table stays muted and the target table stays white. Settings
+keeps dataset-level source/identifier information above the final Delete dataset section.
+
+Existing dataset permissions, CSRF, revision checks, review binding, audit and transaction
+boundaries apply. Mapping-source metadata follows the selected mapping version's visibility;
+readers cannot inspect draft or future mapping versions. A source link appears only when the
+user can view that dataset. The REST API keeps its existing read-only contract; mapping
+resolution remains separate work.
+
+## Upgrade
+
+Before deploying revision `0031_ref_239`, delete **all** existing mapping datasets through the
+preceding application version, as agreed for REF-239. Back up the database first using the
+normal operations procedure. The migration refuses to proceed while any mapping remains;
+it neither deletes nor converts existing mapping data. Reference/hierarchy datasets and
+publications are preserved. A downgrade similarly requires mapping datasets to be removed.
+
+The migration adds working/published source-version columns and a mapping-source check.
+Published links reference immutable versions with `ON DELETE RESTRICT`. Source field IDs
+now identify fields in the pinned snapshot and no longer have a foreign key to mutable
+working fields. The source dataset itself remains protected against deletion while in use.
+
+Revision `0032_ref_239` removes only the working source-version non-null check, preserving
+existing mappings and values. Current-version selection remains required in the service.
+Downgrading to `0031_ref_239` restores the stricter check and requires all mapping source
+version pointers to be populated.
+
+## Browser verification
+
+`tests/browser_mapping_app.py` starts a disposable in-memory loopback fixture on port 5193.
+With that running, `tests/javascript/mapping_browser.cjs` checks 320/768/1440 pixel layouts,
+accessible table rows, field panels and keyboard field ordering. It accepts
+`REFRNCR_PLAYWRIGHT_MODULE`, `REFRNCR_BROWSER_EXECUTABLE` and optional
+`REFRNCR_BROWSER_OUTPUT` for an existing browser toolchain; no runtime dependency is added.

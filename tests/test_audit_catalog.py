@@ -96,7 +96,8 @@ def test_historical_action_names_and_object_types_are_stable():
             "dataset.export_requested dataset.deleted "
             "dataset.version_published dataset.version_cancelled "
             "dataset.version_diff_viewed dataset.concept_created dataset.concept_discarded "
-            "dataset.new_version_imported hierarchy.node_created hierarchy.node_updated "
+            "dataset.new_version_imported dataset.mapping_targets_updated "
+            "hierarchy.node_created hierarchy.node_updated "
             "hierarchy.subtree_deleted hierarchy.values_updated hierarchy.import_applied"
         ),
         "dataset_field": "created definition_updated deleted",

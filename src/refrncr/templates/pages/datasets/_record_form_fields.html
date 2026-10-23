@@ -10,7 +10,7 @@
         {% set rendered_value = field_value|record_value_text(field.data_type) if field_value is not none else '' %}
       {% endif %}
     {% endif %}
-    <div class='form-field'>
+    <div class='form-field{{ " mapping-source-field" if read_only_mapping_field else "" }}'>
       <label for='{{ prefix }}-{{ field.key }}'>{{ field.name }}{% if field.is_required %} <span class='required-mark' aria-hidden='true'>*</span>{% endif %}</label>
       {% if field.data_type == 'boolean' %}
         <select id='{{ prefix }}-{{ field.key }}' name='{{ name_prefix }}{{ field.key }}' autocomplete='off' {{ non_login_field_attrs() }} data-select{% if field.is_required and not read_only_mapping_field %} required{% endif %}{% if read_only_mapping_field %} disabled aria-readonly='true'{% endif %}{% if errors.get(field.key) %} aria-invalid='true' aria-describedby='{{ prefix }}-{{ field.key }}-error'{% endif %}{% if initial_focus and loop.first and not errors and not read_only_mapping_field %} autofocus data-initial-focus{% endif %}>

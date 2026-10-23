@@ -4,7 +4,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from dataset_helpers import create_owned_dataset, publish_dataset
+from dataset_helpers import create_mapping_dataset, create_owned_dataset, publish_dataset
 from flask import template_rendered
 from jinja2 import BaseLoader
 from sqlalchemy import event, func, select, update
@@ -71,17 +71,7 @@ def test_dataset_navigation_and_empty_list_state(dataset_browser):
 def test_dataset_navigation_filters_reference_and_mapping_datasets(dataset_browser):
     _, services, admin, client = dataset_browser
     create_dataset(services, admin, "currencies", "Currencies")
-    create_owned_dataset(
-        services.datasets,
-        admin.id,
-        "tradable-currencies",
-        "Tradable currencies",
-        "",
-        kind="mapping",
-        mapping_mode="standalone",
-        source_system="Currency",
-        target_system="Tradable",
-    )
+    create_mapping_dataset(services, admin, "tradable-currencies", "Tradable currencies")
     login(client)
 
     overview = body(request(client, "get", "/"))
@@ -202,128 +192,45 @@ def test_dataset_list_uses_file_template_context_and_accessible_rows(dataset_bro
     assert "+ New dataset" in page
 
 
-def test_mapping_record_headers_show_source_and_target_systems(dataset_browser):
+def test_mapping_source_target_blocks_and_field_entry_points(dataset_browser):
     _, services, admin, client = dataset_browser
-    mapping = create_owned_dataset(
-        services.datasets,
-        admin.id,
+    mapping = create_mapping_dataset(
+        services,
+        admin,
         "system-map",
         "SAP -> Salesforce",
-        "",
-        kind="mapping",
-        mapping_mode="standalone",
-        source_system="SAP ECC",
-        target_system="Salesforce & CRM",
+        source_name="SAP & ECC",
+        records=("1001",),
     )
-    services.dataset_fields.create_field(
-        admin.id,
-        mapping.key,
-        "source_value",
-        "Source value",
-        "string",
-        mapping_role="source_identifier",
-    )
-    services.dataset_fields.create_field(
-        admin.id,
-        mapping.key,
-        "target_value",
-        "Target value",
-        "string",
-        mapping_role="mapping_target",
-    )
-    services.dataset_records.create_record(
-        admin.id,
-        mapping.key,
-        {"source_value": "1001", "target_value": "EMEA-SALES"},
-    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target value", "string")
     login(client)
-
     page = body(request(client, "get", f"/datasets/{mapping.key}/concept/records"))
-
-    assert "SAP → Salesforce" in page
-    assert "SAP -&gt; Salesforce" not in page
-    assert re.search(
-        r"mapping-field-heading.*mapping-system-name[^>]*>SAP ECC</span>.*"
-        r"mapping-field-role[^>]*>Source",
-        page,
-        re.DOTALL,
-    )
-    assert re.search(
-        r"<div class='column-heading'>.*mapping-field-heading",
-        page,
-        re.DOTALL,
-    )
-    assert re.search(
-        r"mapping-system-name[^>]*>Salesforce &amp; CRM</span>.*"
-        r"mapping-field-role[^>]*>Target",
-        page,
-        re.DOTALL,
-    )
-    assert "<span class='visually-hidden'>Mapping direction</span>" in page
-    assert re.search(
-        r"<td class='mapping-direction-column'><span aria-hidden='true'>→</span>"
-        r"<span class='visually-hidden'>maps to</span></td>",
-        page,
-    )
-
-    configuration = body(
-        request(client, "get", f"/datasets/{mapping.key}/concept?tab=dataset-details")
-    )
-    assert "<title>Settings · SAP → Salesforce · REFRNCR</title>" in configuration
-    assert "SAP → Salesforce" in configuration
-    assert "id='dataset-general'" in configuration
-    assert "SAP -&gt; Salesforce" not in configuration
-    assert "<dt>Technical name</dt>" in configuration
-    assert "Editable until first publication" in configuration
-    assert "It cannot be changed after the first publication." not in configuration
-    fields_section = configuration.split("<section id='fields'", 1)[1].split("</section>", 1)[0]
-    assert ">Add field</a>" in fields_section
-    assert "Concept · Read only" not in fields_section
-    assert "data-field-order" in fields_section
-    assert "name='csrf_token'" in fields_section
-    assert "name='field_id'" in fields_section
-    assert ">Description</th>" not in fields_section
-    assert ">Mapping</th>" in fields_section
-    source_row = re.search(r"<tr[^>]*>.*?Source value.*?</tr>", fields_section, re.DOTALL)[0]
-    field_cell = re.search(r"<td class='field-identity'>(.*?)</td>", source_row, re.DOTALL)[1]
-    mapping_properties = re.search(r"<td class='field-mapping'>(.*?)</td>", source_row, re.DOTALL)[
-        1
-    ]
-    constraints = re.search(r"<div class='constraint-list'>(.*?)</div>", source_row, re.DOTALL)[1]
-    assert "Source identifier" not in field_cell
-    assert "Source identifier" in mapping_properties
-    assert "Source identifier" not in constraints
-
-    concept_configuration = body(request(client, "get", f"/datasets/{mapping.key}/concept#fields"))
-    concept_fields = concept_configuration.split("<section id='fields'", 1)[1].split(
-        "</section>", 1
-    )[0]
-    assert ">Added</span>" not in concept_fields
-
-    edit_page = body(request(client, "get", f"/datasets/{mapping.key}/concept?edit=all"))
-    assert "name='technical_key'" in edit_page
-    assert "value='system-map'" in edit_page
-
-    response = request(
-        client,
-        "post",
-        f"/datasets/{mapping.key}",
-        data={
-            "csrf_token": session_csrf(client, services),
-            "name": mapping.name,
-            "description": mapping.description,
-            "technical_key": "corrected-system-map",
-            "icon": mapping.icon or "",
-        },
-    )
-    assert response.status_code == 302
-    assert response.headers["Location"].endswith(
-        "/datasets/corrected-system-map?tab=dataset-details#dataset-details"
-    )
-    assert request(client, "get", "/datasets/system-map/configure").status_code == 404
+    assert "Source · SAP &amp; ECC V1" in page
+    assert "colspan='1'>Target</th>" in page
+    assert "class='form-field mapping-source-field'" in page
+    assert ">Import</a>" in page
+    assert "mapping-source-cell" in page
+    assert "maps to" in page
+    assert page.count("<table ") == 1
+    settings = body(request(client, "get", f"/datasets/{mapping.key}/concept?tab=dataset-details"))
+    assert settings.index("id='mapping'") < settings.index("id='danger-zone'")
+    assert "Mapping setup" not in settings
+    assert "Target dataset" not in settings
+    assert ">Mapping</th>" not in settings
+    assert ">Add source field</a>" in settings
+    assert ">Add target field</a>" in settings
+    assert "Source: SAP &amp; ECC V1" in settings
+    for role, title in (
+        ("source_context", "Add source field"),
+        ("mapping_target", "Add target field"),
+    ):
+        page = body(request(client, "get", f"/datasets/{mapping.key}/fields/new?role={role}"))
+        assert f"data-panel-title='{title}'" in page
+        assert "Field role" not in page
+        assert ("name='source_field_key'" in page) == (role == "source_context")
 
 
-@pytest.mark.parametrize("mapping_mode", ["standalone", "linked"])
+@pytest.mark.parametrize("mapping_mode", ["linked"])
 def test_published_mapping_configuration_and_field_details_load(dataset_browser, mapping_mode):
     _, services, admin, client = dataset_browser
     source_dataset_id = source_field_key = None
@@ -333,6 +240,7 @@ def test_published_mapping_configuration_and_field_details_load(dataset_browser,
             services, admin, source, key="code", name="Code", is_required=True
         )
         services.dataset_business_keys.set_business_key(admin.id, source.key, (source_field.key,))
+        publish_dataset(services, admin.id, source)
         source_dataset_id, source_field_key = source.id, source_field.key
 
     mapping = create_owned_dataset(
@@ -375,7 +283,7 @@ def test_published_mapping_configuration_and_field_details_load(dataset_browser,
         response = request(client, "get", f"/datasets/{mapping.key}?tab={tab}")
         assert response.status_code == 200
     mapping_page = body(request(client, "get", f"/datasets/{mapping.key}?tab=mapping"))
-    assert f"{mapping_mode.capitalize()}</dd>" in mapping_page
+    assert "Mapping setup" not in mapping_page
     if mapping_mode == "linked":
         assert "Mapping source" in mapping_page
         assert "Code" in mapping_page
@@ -391,26 +299,8 @@ def test_published_mapping_configuration_and_field_details_load(dataset_browser,
 
 def test_reader_can_open_scheduled_mapping_version_without_current_version(dataset_browser):
     _, services, admin, client = dataset_browser
-    mapping = create_owned_dataset(
-        services.datasets,
-        admin.id,
-        "scheduled-mapping",
-        "Scheduled mapping",
-        "",
-        kind="mapping",
-        mapping_mode="standalone",
-        source_system="Source system",
-        target_system="Target system",
-    )
-    services.dataset_fields.create_field(
-        admin.id,
-        mapping.key,
-        "source_code",
-        "Source code",
-        "string",
-        is_required=True,
-        is_business_key_component=True,
-        mapping_role="source_identifier",
+    mapping = create_mapping_dataset(
+        services, admin, "scheduled-mapping", "Scheduled mapping", source_key="source_code"
     )
     services.dataset_fields.create_field(
         admin.id,
@@ -505,6 +395,7 @@ def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_bro
         is_required=True,
     )
     services.dataset_business_keys.set_business_key(admin.id, source.key, (symbol.key,))
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,
@@ -522,7 +413,7 @@ def test_linked_mapping_does_not_offer_manual_source_record_creation(dataset_bro
 
     assert "Add record" not in page
     assert "No source records yet" in page
-    assert "Records appear here when they are available in the linked source dataset." in page
+    assert "The linked source version contains no records." in page
     assert request(client, "get", f"/datasets/{mapping.key}/records/new").status_code == 404
 
 
@@ -542,6 +433,7 @@ def test_linked_mapping_shows_direction_before_first_target_field(dataset_browse
     services.dataset_records.create_record(
         admin.id, source.key, {symbol.key: "Ac", name.key: "Actinium"}
     )
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,
@@ -584,7 +476,7 @@ def test_linked_mapping_shows_direction_before_first_target_field(dataset_browse
     header = re.search(r"<thead>(.*?)</thead>", page, re.DOTALL)[1]
     row = re.search(r"<tr class='record-row interactive-row'.*?</tr>", page, re.DOTALL)[0]
 
-    assert header.index("Name") < header.index("Mapping direction") < header.index("Poisonous")
+    assert header.index("Name") < header.rindex("Mapping direction") < header.index("Poisonous")
     assert row.index("Actinium") < row.index("maps to") < row.index(">true<")
     assert header.count("Mapping direction") == 1
     assert row.count("maps to") == 1
@@ -1385,7 +1277,7 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
         ("hierarchy", {}, "/datasets/created-hierarchy/concept?tab=fields#fields"),
         (
             "mapping",
-            {"mapping_mode": "standalone", "source_system": "Legacy", "target_system": "New"},
+            {},
             "/datasets/created-mapping/concept?tab=fields#fields",
         ),
     ],
@@ -1393,7 +1285,14 @@ def test_dataset_create_form_uses_shared_layout_fields_feedback_and_actions(data
 def test_create_redirects_each_dataset_type_to_its_next_step(
     dataset_browser, kind, mapping_data, expected_location
 ):
-    _, _, _, client = dataset_browser
+    _, services, admin, client = dataset_browser
+    if kind == "mapping":
+        source = create_dataset(services, admin, "redirect-source", "Redirect source")
+        services.dataset_fields.create_field(
+            admin.id, source.key, "code", "Code", "string", True, True, True
+        )
+        publish_dataset(services, admin.id, source)
+        mapping_data = {"source_dataset_id": source.id, "source_field_key": "code"}
     login(client)
     form = request(client, "get", f"/datasets/new?kind={kind}")
     owner_team_id = re.search(r"<option value='([^']+)' selected", body(form))[1]
@@ -1420,7 +1319,7 @@ def test_create_redirects_each_dataset_type_to_its_next_step(
     if kind in {"reference", "hierarchy"}:
         page = body(destination)
         assert "Fields" in page
-        assert "Add field" in page
+        assert ("Add source field" if kind == "mapping" else "Add field") in page
 
 
 def test_dataset_list_loads_mapping_form_behaviour_for_create_panel(dataset_browser):
@@ -1435,7 +1334,10 @@ def test_dataset_list_loads_mapping_form_behaviour_for_create_panel(dataset_brow
 def test_mapping_create_form_orders_linked_tables_before_field_choices(dataset_browser):
     _, services, admin, client = dataset_browser
     source = create_dataset(services, admin, "source-options", "Source options")
-    field = create_field(services, admin, source, "cost_code", "Cost code")
+    field = services.dataset_fields.create_field(
+        admin.id, source.key, "cost_code", "Cost code", "string", True, True, True
+    )
+    publish_dataset(services, admin.id, source)
     login(client)
 
     page = body(request(client, "get", "/datasets/new"))
@@ -3420,3 +3322,223 @@ def test_membership_error_stays_in_team_members_section(dataset_browser):
     assert "User is already a member of this team" in page
     assert "data-default-mode='view'" in page
     assert "data-panel-view='edit' hidden" in page
+
+
+def test_mapping_review_history_and_source_publication_signal(dataset_browser):
+    _, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(
+        services,
+        admin,
+        "mapping-review",
+        "Mapping review",
+        source_name="Source & table",
+        records=("A",),
+    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    row = services.dataset_records.list_records(admin.id, mapping.key).records[0]
+    services.dataset_records.update_record(
+        admin.id, mapping.key, row.id, row.revision, {"target": "Mapped"}
+    )
+    login(client)
+    review = request(
+        client, "get", f"/datasets/{mapping.key}/versions/review", follow_redirects=True
+    )
+    assert review.status_code == 200
+    assert "Source: Source &amp; table V1" in body(review)
+    records_url = re.search(r"href='([^']+)'[^>]*>Records</a>", body(review))[1].replace(
+        "&amp;", "&"
+    )
+    records = request(client, "get", records_url)
+    assert records.status_code == 200
+    assert "Source · Source &amp; table V1" in body(records)
+    assert "Mapped" in body(records)
+    assert "mapping-record-table" in body(records)
+    assert "colspan='1'>Target</th>" in body(records)
+    version = publish_dataset(services, admin.id, mapping)
+    history = body(request(client, "get", f"/datasets/{mapping.key}/versions"))
+    assert "Source: Source &amp; table V1" in history
+    assert "Source update" not in body(request(client, "get", "/datasets?kind=mapping"))
+    source = services.datasets.get_visible_dataset_by_id(admin.id, mapping.source_dataset_id)
+    services.dataset_versions.create_concept(admin.id, source.id)
+    services.dataset_fields.create_field(
+        admin.id, source.key, "new_context", "New context", "string"
+    )
+    assert "Source update" not in body(request(client, "get", "/datasets?kind=mapping"))
+    current = services.datasets.get_dataset_for_edit(admin.id, source.key)
+    services.dataset_versions.publish(
+        admin.id,
+        source.id,
+        services.dataset_versions.clock.today() + timedelta(days=1),
+        "",
+        current.revision,
+    )
+    assert "Source update" in body(request(client, "get", "/datasets?kind=mapping"))
+    page = body(request(client, "get", f"/datasets/{mapping.key}/versions/{version.id}/records"))
+    assert "has a newer version (V2). This mapping uses V1." in page
+    assert "Source · Source &amp; table V1" in page
+
+
+@pytest.mark.parametrize("source_state", ["missing", "draft", "scheduled"])
+def test_mapping_direct_post_requires_current_source(dataset_browser, source_state):
+    _, services, admin, client = dataset_browser
+    source = create_dataset(services, admin, "not-current", "Not current source")
+    services.dataset_fields.create_field(
+        admin.id, source.key, "code", "Code", "string", True, True, True
+    )
+    if source_state == "scheduled":
+        current = services.datasets.get_dataset_for_edit(admin.id, source.key)
+        services.dataset_versions.publish(
+            admin.id,
+            source.id,
+            services.dataset_versions.clock.today() + timedelta(days=1),
+            "",
+            current.revision,
+        )
+    login(client)
+    data = {
+        "key": "rejected-mapping",
+        "dataset_label": "Rejected",
+        "kind": "mapping",
+        "owner_team_id": source.owner_team_id,
+        "source_field_key": "code",
+        "csrf_token": session_csrf(client, services),
+    }
+    if source_state != "missing":
+        data["source_dataset_id"] = source.id
+    response = request(client, "post", "/datasets", data=data)
+    assert response.status_code == 400
+    if source_state != "missing":
+        assert "Not current source" in body(response)
+    assert not any(
+        item.dataset.key == "rejected-mapping"
+        for item in services.datasets.list_dataset_overview(admin.id)
+    )
+
+
+def test_mapping_history_remains_available_to_reader(dataset_browser):
+    _, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(services, admin, "reader-map", "Reader mapping")
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    reader = services.users.create_user(
+        admin.id, "map-reader@example.com", "Reader", "valid reader password"
+    )
+    publish_dataset(services, admin.id, mapping)
+    login(client, reader.email, "valid reader password")
+    response = request(client, "get", f"/datasets/{mapping.key}/versions")
+    assert response.status_code == 200
+    assert "Source:" in body(response)
+    assert "V1" in body(response)
+    assert "Open draft" not in body(response)
+
+
+@pytest.mark.parametrize("changed_count", [0, 1, 2])
+def test_mapping_import_browser_preview_and_confirmation(dataset_browser, changed_count):
+    import io
+
+    _, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(
+        services, admin, "import-map", "Import map", records=("A", "B")
+    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    login(client)
+    upload = request(client, "get", f"/datasets/{mapping.key}/records/import")
+    assert "no records are added or deleted" in body(upload)
+    csrf = form_csrf(upload)
+    upload_content = (
+        f"code,target\nA,{'new' if changed_count else ''}\n"
+        f"B,{'second' if changed_count == 2 else ''}\n"
+    ).encode()
+    mapped = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "file": (io.BytesIO(upload_content), "targets.csv")},
+    )
+    assert mapped.status_code == 200
+    token = mapped.request.path.split("/import/")[1].split("/step/")[0]
+    preview = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import/{token}/preview",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "mapping_0": "code", "mapping_1": "target"},
+    )
+    assert preview.status_code == 200
+    if changed_count == 0:
+        assert "No changes. The file matches the draft." in body(preview)
+        assert ">Import records</button>" not in body(preview)
+    else:
+        assert (
+            f"{changed_count} {'record' if changed_count == 1 else 'records'} will change"
+            in body(preview)
+        )
+        assert ">Import records</button>" in body(preview)
+    confirmation = re.search("name='confirmation' value='([^']+)'", body(preview))[1]
+    confirmed = request(
+        client,
+        "post",
+        f"/datasets/{mapping.key}/records/import/{token}/confirm",
+        follow_redirects=True,
+        data={"csrf_token": csrf, "confirmation": confirmation},
+    )
+    assert confirmed.status_code == (200 if changed_count else 409)
+    if changed_count:
+        assert (
+            f"{changed_count} target {'record' if changed_count == 1 else 'records'} updated"
+            in body(confirmed)
+        )
+    else:
+        assert "No changes. The file matches the draft." in body(confirmed)
+    rows = services.dataset_records.list_records(admin.id, mapping.key).records
+    assert len(rows) == 2
+    assert [v.value for row in rows for v in row.values if v.field_key == "target"] == (
+        ["new", "second"] if changed_count == 2 else ["new"] if changed_count else []
+    )
+
+
+def test_mapping_history_source_queries_do_not_grow_with_versions(dataset_browser):
+    factory, services, admin, client = dataset_browser
+    mapping = create_mapping_dataset(services, admin, "history-map", "History map")
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    publish_dataset(services, admin.id, mapping)
+    login(client)
+    engine = factory.kw["bind"]
+
+    def source_queries():
+        queries = []
+
+        def capture(_connection, _cursor, statement, *_args):
+            if statement.lstrip().upper().startswith("SELECT"):
+                queries.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            response = request(client, "get", f"/datasets/{mapping.key}/versions")
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+        assert response.status_code == 200
+        return len(queries), body(response)
+
+    before, _ = source_queries()
+    from support import MutableClock
+
+    clock = MutableClock(services.dataset_versions.clock.now())
+    services.dataset_versions.clock = clock
+    for index in range(5):
+        clock.set(clock.now() + timedelta(days=1))
+        services.dataset_versions.create_concept(admin.id, mapping.id)
+        services.dataset_fields.create_field(
+            admin.id, mapping.key, f"target_{index}", f"Target {index}", "string"
+        )
+        current = services.datasets.get_dataset_for_edit(admin.id, mapping.key)
+        services.dataset_versions.publish(
+            admin.id,
+            mapping.id,
+            services.dataset_versions.clock.today(),
+            "",
+            current.revision,
+        )
+    after, page = source_queries()
+    assert after == before
+    assert page.count("Source: Source V1") == 6

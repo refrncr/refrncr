@@ -1,6 +1,7 @@
 # ADR-021: Mapping tables reuse Dataset lifecycle and Record storage
 
-Status: Accepted for REF-177.
+Status: Accepted for REF-177; standalone and live-source behavior superseded by
+[ADR-024](adr-024-pinned-mapping-sources.md) for REF-239. The following records the original decision.
 
 ## Context
 

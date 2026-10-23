@@ -150,6 +150,7 @@ class DatasetRecord(Protocol):
     mapping_mode: str | None
     source_system: str | None
     target_system: str | None
+    source_version_id: str | None
     source_dataset_id: str | None
     target_dataset_id: str | None
     source_field_key: str | None
@@ -179,6 +180,7 @@ class DatasetOverview:
     owner_team_name: str = ""
     concept_in_progress: bool = False
     no_current: bool = False
+    source_update_available: bool = False
 
 
 class DatasetFieldRecord(Protocol):
@@ -606,6 +608,8 @@ class VersionOperations(Protocol):
     def get(self, dataset_id, version_id): ...
 
     def latest_non_cancelled(self, dataset_id): ...
+
+    def source_updates(self, source_version_ids): ...
 
     def current_for_datasets(self, dataset_ids, today): ...
 

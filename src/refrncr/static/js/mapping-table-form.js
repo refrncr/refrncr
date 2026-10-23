@@ -36,9 +36,7 @@ window.refrncrMappingTableForms = (root = document) => root.querySelectorAll("[d
     controls(setup).forEach((control) => { control.disabled = !mapping; });
     if (!mapping) return;
 
-    const isLinked = form.querySelector("input[name='mapping_mode']:checked")?.value === "linked";
-    setActive(linked, isLinked);
-    if (!isLinked) return;
+    setActive(linked, true);
 
     const sourceIsLinked = Boolean(sourceTable.value);
     sourceSelectGroup.hidden = !sourceIsLinked;

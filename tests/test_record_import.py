@@ -647,67 +647,196 @@ def test_mapping_preview_conflicts_atomic_confirmation_and_replay(import_context
     assert any("already exists" in error.message for error in conflict.errors)
 
 
-def test_mapping_table_uses_existing_preview_and_atomic_import_flow(import_context):
-    factory, services, admin, _dataset = import_context
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_table_uses_existing_preview_and_atomic_import_flow(request, context_fixture):
+    from dataset_helpers import create_mapping_dataset
+
+    _factory, services, admin, _dataset = request.getfixturevalue(context_fixture)
+    mapping = create_mapping_dataset(
+        services, admin, "cost-centers", "Cost centers", records=("1001", "1002")
+    )
+    services.dataset_fields.create_field(
+        admin.id, mapping.key, "target", "Target", "string", False, True
+    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "label", "Label", "string")
+    rows = services.dataset_records.list_records(admin.id, mapping.key).records
+    first = next(row for row in rows if row.values[0].value == "1001")
+    services.dataset_records.update_record(
+        admin.id, mapping.key, first.id, first.revision, {"target": "old", "label": "retained"}
+    )
+    before = services.dataset_records.list_records(admin.id, mapping.key).records
+    importer = services.record_imports
+    assert importer.eligibility(admin.id, mapping.key) is None
+    state, _, advice = importer.begin(
+        admin.id, "mapping-import", mapping.key, "mapping.csv", b"code,target\n1001,changed\n"
+    )
+    preview = importer.preview(admin.id, "mapping-import", mapping.key, state.token, advice.mapping)
+    assert preview.valid, preview.errors
+    assert preview.counts["Changed"] == 1
+    assert preview.counts["Added"] == preview.counts["Deleted"] == 0
+    assert services.dataset_records.list_records(admin.id, mapping.key).records == before
+    assert (
+        importer.confirm(
+            admin.id,
+            "mapping-import",
+            mapping.key,
+            state.token,
+            confirmation=importer.state(
+                admin.id, "mapping-import", mapping.key, state.token
+            ).confirmation,
+        )
+        == 1
+    )
+    after = services.dataset_records.list_records(admin.id, mapping.key).records
+    assert {row.id for row in after} == {row.id for row in before}
+    changed = next(row for row in after if row.id == first.id)
+    assert {v.field_key: v.value for v in changed.values} == {
+        "code": "1001",
+        "target": "changed",
+        "label": "retained",
+    }
+    assert next(row for row in before if row.id != first.id) == next(
+        row for row in after if row.id != first.id
+    )
+    with pytest.raises(NotFoundError):
+        importer.confirm(
+            admin.id,
+            "mapping-import",
+            mapping.key,
+            state.token,
+            confirmation=importer.state(
+                admin.id, "mapping-import", mapping.key, state.token
+            ).confirmation,
+        )
+    # A valid row plus an unknown source identifier must fail as one atomic batch.
+    state, _, advice = importer.begin(
+        admin.id,
+        "mapping-import",
+        mapping.key,
+        "mapping.csv",
+        b"code,target\n1001,another\n1003,unknown\n",
+    )
+    preview = importer.preview(admin.id, "mapping-import", mapping.key, state.token, advice.mapping)
+    assert not preview.valid and preview.invalid_rows == 1
+    assert any("linked source version" in error.message for error in preview.errors)
+    with pytest.raises(ImportValidationError):
+        importer.confirm(
+            admin.id,
+            "mapping-import",
+            mapping.key,
+            state.token,
+            confirmation=importer.state(
+                admin.id, "mapping-import", mapping.key, state.token
+            ).confirmation,
+        )
+    assert services.dataset_records.list_records(admin.id, mapping.key).records == after
+    # A target unique value already assigned to an omitted row is a preview error.
+    state, _, advice = importer.begin(
+        admin.id, "mapping-import", mapping.key, "mapping.csv", b"code,target\n1002,changed\n"
+    )
+    preview = importer.preview(admin.id, "mapping-import", mapping.key, state.token, advice.mapping)
+    assert not preview.valid
+    assert any("Unique value already exists" in error.message for error in preview.errors)
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_import_preserves_source_context_and_revalidates_confirmation(
+    request, context_fixture
+):
+    from dataset_helpers import create_owned_dataset, publish_dataset
+
+    _, services, admin, _ = request.getfixturevalue(context_fixture)
+    source = create_owned_dataset(services.datasets, admin.id, "source-import", "Source", "")
+    for key in ("code", "context"):
+        services.dataset_fields.create_field(
+            admin.id, source.key, key, key.title(), "string", True, True
+        )
+    services.dataset_business_keys.set_business_key(admin.id, source.key, ("code",))
+    services.dataset_records.create_record(
+        admin.id, source.key, {"code": "A", "context": "original"}
+    )
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,
-        "cost-centers",
-        "Cost centers",
+        "mapping-import",
+        "Mapping",
         "",
         kind="mapping",
-        mapping_mode="standalone",
-        source_system="SAP",
-        target_system="Salesforce",
+        source_dataset_id=source.id,
+        source_field_key="code",
     )
-    for key, name, role in (
-        ("source_value", "Source value", "source_identifier"),
-        ("target_value", "Target value", "mapping_target"),
-        ("target_name", "Target name", "mapping_target"),
-        ("mapping_status", "Status", "mapping_target"),
-    ):
-        services.dataset_fields.create_field(
-            admin.id,
-            mapping.key,
-            key,
-            name,
-            "string",
-            mapping_role=role,
-        )
-    content = (
-        b"source_value,target_value,target_name,mapping_status\n"
-        b"1001,EMEA-SALES,EMEA Sales,mapped\n"
-        b"1003,,,unmapped\n"
+    services.dataset_fields.create_field(
+        admin.id,
+        mapping.key,
+        "context",
+        "Context",
+        "string",
+        mapping_role="source_context",
+        source_field_key="context",
     )
-
-    state, _source, assistance = services.record_imports.begin(
-        admin.id, "mapping-import", mapping.key, "mapping.csv", content
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    importer = services.record_imports
+    state, _, advice = importer.begin(
+        admin.id,
+        "mapping-import",
+        mapping.key,
+        "mapping.csv",
+        b"code,context,target\nA,forged,new\n",
     )
-    assert assistance.mapping == (
-        "source_value",
-        "target_value",
-        "target_name",
-        "mapping_status",
+    assert advice.mapping == ("code", None, "target")
+    preview = importer.preview(
+        admin.id, "mapping-import", mapping.key, state.token, ("code", "context", "target")
     )
-    preview = services.record_imports.preview(
+    assert preview.valid, preview.errors
+    importer.confirm(
         admin.id,
         "mapping-import",
         mapping.key,
         state.token,
-        assistance.mapping,
+        confirmation=importer.state(
+            admin.id, "mapping-import", mapping.key, state.token
+        ).confirmation,
     )
-    assert preview.valid
-    assert (
-        services.record_imports.confirm(admin.id, "mapping-import", mapping.key, state.token) == 2
+    row = services.dataset_records.list_records(admin.id, mapping.key).records[0]
+    assert {v.field_key: v.value for v in row.values} == {
+        "code": "A",
+        "context": "original",
+        "target": "new",
+    }
+    state, _, advice = importer.begin(
+        admin.id, "mapping-import", mapping.key, "mapping.csv", b"code,target\nA,imported\n"
     )
-
-    with factory() as session:
-        assert (
-            session.scalar(
-                select(func.count(DatasetRecord.id)).where(DatasetRecord.dataset_id == mapping.id)
-            )
-            == 2
+    assert importer.preview(
+        admin.id, "mapping-import", mapping.key, state.token, advice.mapping
+    ).valid
+    services.dataset_records.update_record(
+        admin.id, mapping.key, row.id, row.revision, {"target": "concurrent"}
+    )
+    with pytest.raises(ImportValidationError, match="no longer valid"):
+        importer.confirm(
+            admin.id,
+            "mapping-import",
+            mapping.key,
+            state.token,
+            confirmation=importer.state(
+                admin.id, "mapping-import", mapping.key, state.token
+            ).confirmation,
         )
+    assert (
+        next(
+            v.value
+            for v in services.dataset_records.list_records(admin.id, mapping.key).records[0].values
+            if v.field_key == "target"
+        )
+        == "concurrent"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1404,3 +1533,217 @@ def test_postgresql_same_token_concurrent_confirmation(postgresql_import_context
             )
             == 1
         )
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_import_unique_swap_rolls_back_late_failure(request, context_fixture, monkeypatch):
+    from dataset_helpers import create_mapping_dataset
+
+    from refrncr.persistence import SqlAlchemyDatasetRecordOperations
+
+    _, services, admin, _ = request.getfixturevalue(context_fixture)
+    mapping = create_mapping_dataset(services, admin, "swap-map", "Swap", records=("A", "B"))
+    services.dataset_fields.create_field(
+        admin.id, mapping.key, "target", "Target", "string", False, True
+    )
+    for row in services.dataset_records.list_records(admin.id, mapping.key).records:
+        services.dataset_records.update_record(
+            admin.id, mapping.key, row.id, row.revision, {"target": row.values[0].value}
+        )
+    before = services.dataset_records.list_records(admin.id, mapping.key).records
+    importer = services.record_imports
+    state, _, advice = importer.begin(
+        admin.id, "swap", mapping.key, "swap.csv", b"code,target\nA,B\nB,A\n"
+    )
+    assert importer.preview(admin.id, "swap", mapping.key, state.token, advice.mapping).valid
+    original = SqlAlchemyDatasetRecordOperations.add_values
+    calls = 0
+
+    def fail_second(repository, record, values):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected write failure")
+        return original(repository, record, values)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(SqlAlchemyDatasetRecordOperations, "add_values", fail_second)
+        with pytest.raises(RuntimeError, match="injected"):
+            importer.confirm(
+                admin.id,
+                "swap",
+                mapping.key,
+                state.token,
+                confirmation=importer.state(
+                    admin.id, "swap", mapping.key, state.token
+                ).confirmation,
+            )
+    assert services.dataset_records.list_records(admin.id, mapping.key).records == before
+    assert (
+        importer.confirm(
+            admin.id,
+            "swap",
+            mapping.key,
+            state.token,
+            confirmation=importer.state(admin.id, "swap", mapping.key, state.token).confirmation,
+        )
+        == 2
+    )
+    after = services.dataset_records.list_records(admin.id, mapping.key).records
+    assert {row.id for row in before} == {row.id for row in after}
+    for row in after:
+        values = {v.field_key: v.value for v in row.values}
+        assert values["code"] != values["target"]
+
+
+@pytest.mark.parametrize("kind", ["reference", "mapping"])
+@pytest.mark.parametrize("mapping_choices", [("code",), ("code", "amount", None)])
+def test_import_preview_preserves_exact_column_mapping_count(import_context, kind, mapping_choices):
+    from dataset_helpers import create_mapping_dataset
+
+    _, services, admin, dataset = import_context
+    if kind == "mapping":
+        dataset = create_mapping_dataset(services, admin, "column-count-map", "Map", records=("A",))
+        services.dataset_fields.create_field(admin.id, dataset.key, "amount", "Amount", "string")
+    importer = services.record_imports
+    state, _, _ = importer.begin(
+        admin.id, "columns", dataset.key, "file.csv", b"code,amount\nA,1\n"
+    )
+    preview = importer.preview(admin.id, "columns", dataset.key, state.token, mapping_choices)
+    assert not preview.valid
+    assert any(error.code == "mapping_count_mismatch" for error in preview.non_row_errors)
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_import_counts_changes_and_requires_confirmation(request, context_fixture):
+    from dataset_helpers import create_mapping_dataset
+    from support import snapshot
+
+    factory, services, admin, _ = request.getfixturevalue(context_fixture)
+    mapping = create_mapping_dataset(
+        services, admin, "count-map", "Counts", records=("A", "B", "C")
+    )
+    for key in ("target", "label"):
+        services.dataset_fields.create_field(admin.id, mapping.key, key, key.title(), "string")
+    importer = services.record_imports
+    state, _, advice = importer.begin(
+        admin.id,
+        "counts",
+        mapping.key,
+        "targets.csv",
+        b"code,target,label\nA,new,also changed\nB,,\n",
+    )
+    preview = importer.preview(admin.id, "counts", mapping.key, state.token, advice.mapping)
+    assert preview.valid
+    assert preview.counts["Changed"] == preview.counts["Unchanged"] == 1
+    state = importer.state(admin.id, "counts", mapping.key, state.token)
+    before = snapshot(SimpleNamespace(sessions=factory))
+    # The service enforces confirmation even when the caller leaves the web-only flag unset.
+    for confirmation in (None, "incorrect-confirmation"):
+        with pytest.raises(ImportValidationError, match="confirm again"):
+            importer.confirm(
+                admin.id, "counts", mapping.key, state.token, confirmation=confirmation
+            )
+        assert snapshot(SimpleNamespace(sessions=factory)) == before
+    assert (
+        importer.confirm(
+            admin.id, "counts", mapping.key, state.token, confirmation=state.confirmation
+        )
+        == 1
+    )
+    receipt = importer.state(admin.id, "counts", mapping.key, state.token)
+    assert receipt.imported_count == 1  # Changed rows, not input rows or individual cells.
+    with factory() as session:
+        events = session.scalars(
+            select(AuditEvent).where(
+                AuditEvent.object_id == mapping.id,
+                AuditEvent.action.in_(
+                    ("dataset.mapping_targets_updated", "dataset.records_imported")
+                ),
+            )
+        ).all()
+        assert len(events) == 1
+        assert events[0].action == "dataset.mapping_targets_updated"
+        assert events[0].actor_user_id == admin.id
+        assert events[0].details == {"format": "CSV", "changed": 1, "unchanged": 1}
+    after = snapshot(SimpleNamespace(sessions=factory))
+    with pytest.raises(NotFoundError):
+        importer.confirm(
+            admin.id, "counts", mapping.key, state.token, confirmation=state.confirmation
+        )
+    assert snapshot(SimpleNamespace(sessions=factory)) == after
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_import_no_changes_preserves_all_persisted_state(request, context_fixture):
+    from dataset_helpers import create_mapping_dataset
+    from support import snapshot
+
+    factory, services, admin, _ = request.getfixturevalue(context_fixture)
+    mapping = create_mapping_dataset(services, admin, "noop-map", "No changes", records=("A", "B"))
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    importer = services.record_imports
+    state, _, advice = importer.begin(
+        admin.id, "noop", mapping.key, "targets.csv", b"code,target\nA,\n"
+    )
+    preview = importer.preview(admin.id, "noop", mapping.key, state.token, advice.mapping)
+    assert preview.valid and preview.counts["Changed"] == 0
+    assert preview.counts["Unchanged"] == 1
+    state = importer.state(admin.id, "noop", mapping.key, state.token)
+    before = snapshot(SimpleNamespace(sessions=factory))
+    with pytest.raises(ImportValidationError, match="No changes"):
+        importer.confirm(
+            admin.id, "noop", mapping.key, state.token, confirmation=state.confirmation
+        )
+    # Includes records, values, draft mutation flags, revisions, timestamps, formats and audit.
+    assert snapshot(SimpleNamespace(sessions=factory)) == before
+
+
+@pytest.mark.parametrize(
+    "context_fixture",
+    ["import_context", pytest.param("postgresql_import_context", marks=pytest.mark.postgres)],
+)
+def test_mapping_import_audit_failure_rolls_back_all_persisted_state(
+    request, context_fixture, monkeypatch
+):
+    from dataset_helpers import create_mapping_dataset
+    from support import snapshot
+
+    from refrncr.persistence import SqlAlchemyUnitOfWork
+
+    factory, services, admin, _ = request.getfixturevalue(context_fixture)
+    mapping = create_mapping_dataset(services, admin, "audit-map", "Audit", records=("A",))
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    importer = services.record_imports
+    state, _, advice = importer.begin(
+        admin.id, "audit", mapping.key, "targets.csv", b"code,target\nA,new\n"
+    )
+    assert importer.preview(admin.id, "audit", mapping.key, state.token, advice.mapping).valid
+    state = importer.state(admin.id, "audit", mapping.key, state.token)
+    before = snapshot(SimpleNamespace(sessions=factory))
+
+    def fail_audit(*_args, **_kwargs):
+        raise RuntimeError("injected audit failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(SqlAlchemyUnitOfWork, "add_audit", fail_audit)
+        with pytest.raises(RuntimeError, match="injected audit"):
+            importer.confirm(
+                admin.id, "audit", mapping.key, state.token, confirmation=state.confirmation
+            )
+    assert snapshot(SimpleNamespace(sessions=factory)) == before
+    assert (
+        importer.confirm(
+            admin.id, "audit", mapping.key, state.token, confirmation=state.confirmation
+        )
+        == 1
+    )

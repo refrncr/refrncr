@@ -1,0 +1,3 @@
+{% if mapping_source and mapping_source.latest_number %}
+<div class='alert alert-info' role='status'>{{ mapping_source.name }} has a newer version (V{{ mapping_source.latest_number }}). This mapping uses V{{ mapping_source.number }}.</div>
+{% endif %}

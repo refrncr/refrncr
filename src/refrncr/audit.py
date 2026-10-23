@@ -138,6 +138,11 @@ _EVENTS = (
     ),
     EventContract(
         "dataset",
+        "dataset.mapping_targets_updated",
+        (("format", "import_format"), ("changed", "count"), ("unchanged", "count")),
+    ),
+    EventContract(
+        "dataset",
         "dataset.new_version_imported",
         (("mode", "import_mode"), ("format", "import_format"))
         + tuple(
@@ -462,7 +467,7 @@ _read(
     "DatasetService",
     "export_access_context list_datasets list_dataset_overview "
     "get_dataset_context get_dataset get_dataset_details get_dataset_for_edit "
-    "get_visible_dataset_by_id",
+    "get_visible_dataset_by_id mapping_source mapping_source_choices",
 )
 _identifier_events = (("dataset", "business_key_defined"), ("dataset", "business_key_updated"))
 _audited("DatasetFieldService", "create_field", ("dataset_field", "created"), *_identifier_events)
@@ -492,6 +497,7 @@ _audited(
     "confirm",
     ("dataset", "dataset.records_imported"),
     ("dataset", "dataset.new_version_imported"),
+    ("dataset", "dataset.mapping_targets_updated"),
     module="record_import",
 )
 _register(

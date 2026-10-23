@@ -121,6 +121,7 @@ class SqlAlchemyConceptOperations:
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         self.close(dataset.id)
         dataset.content_updated_at = current.published_at
+        dataset.source_version_id = current.source_version_id
 
     def initialize(self, dataset, version, now):
         # Caller owns the Dataset lock and has established there is no active concept.

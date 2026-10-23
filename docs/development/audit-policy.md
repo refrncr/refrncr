@@ -400,3 +400,13 @@ technical reads: they call no data/authentication service and emit no audit even
 Try it out invokes the unchanged protected REF-107 routes and their safe operational
 request-completion logging. The inventory guard resolves registered operations in nested
 Python modules as well as the existing top-level modules.
+
+### Mapping target import
+
+A confirmed mapping target import emits one `dataset:dataset.mapping_targets_updated` event on
+the mapping Dataset, in the same transaction as the target changes and draft revision. Its bounded
+context is `format`, `changed` and `unchanged`; counts refer to rows in the uploaded file. Omitted
+rows do not count as unchanged. Several changed target fields in one row count as one changed
+record. A no-op is rejected without changing records, draft flags, timestamps or audit. Confirmation
+is mandatory for all service callers, and stale confirmation or a failed transaction emits no
+successful import event. The existing create-only and complete-version audit contracts are unchanged.

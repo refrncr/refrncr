@@ -25,3 +25,4 @@ decision rather than duplicating the backlog.
 - [ADR-021: Mapping tables](adr-021-mapping-tables.md)
 - [ADR-022: Standalone hierarchies](adr-022-standalone-hierarchies.md)
 - [ADR-023: UTC-aware database time and a shared application clock](adr-023-utc-aware-database-time.md)
+- [ADR-024: Pinned mapping source versions](adr-024-pinned-mapping-sources.md)

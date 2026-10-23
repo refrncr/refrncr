@@ -151,7 +151,13 @@ def _validated_snapshot(uow, dataset):
             )
     except DatatypeError:
         raise ValidationError("Dataset contains invalid stored values") from None
-    return SnapshotContent(name, description, snapshots, tuple(sorted(records, key=lambda r: r.id)))
+    return SnapshotContent(
+        name,
+        description,
+        snapshots,
+        tuple(sorted(records, key=lambda r: r.id)),
+        source_version_id=getattr(dataset, "source_version_id", None),
+    )
 
 
 class DatasetVersionService:
@@ -379,6 +385,7 @@ class DatasetVersionService:
                 baseline = work.versions.latest_non_cancelled(dataset.id)
                 now = self.clock.now()
                 if baseline is not None:
+                    dataset.source_version_id = baseline.source_version_id
                     baseline_fields = work.versions.fields(baseline)
                     if len(
                         baseline_fields
@@ -488,6 +495,17 @@ class DatasetVersionService:
                 )
             )
             concepts = uow.concepts.list_for_datasets(tuple(allowed))
+            mapping_sources = {
+                row.dataset.id: (
+                    current[row.dataset.id].source_version_id
+                    if row.dataset.id in current
+                    else row.dataset.source_version_id
+                )
+                for row in rows
+                if row.dataset.kind == "mapping"
+                and (row.dataset.id in current or row.dataset.id in allowed)
+            }
+            updates = uow.versions.source_updates(tuple(mapping_sources.values()))
             result = []
             for row in rows:
                 dataset = row.dataset
@@ -507,6 +525,7 @@ class DatasetVersionService:
                         item,
                         concept_in_progress=dataset.id in concepts,
                         no_current=dataset.id not in current,
+                        source_update_available=mapping_sources.get(dataset.id) in updates,
                     )
                 )
             return sorted(result, key=lambda row: (row.dataset.name.casefold(), row.dataset.key))
@@ -914,6 +933,12 @@ class DatasetVersionService:
                     raise ValidationError("Effective date must be today or a future calendar date")
                 if not isinstance(release_note, str) or len(release_note) > MAX_RELEASE_NOTE:
                     raise ValidationError("Release note must not exceed 2000 characters")
+                if dataset.kind == "mapping":
+                    source = uow.versions.get(dataset.source_dataset_id, dataset.source_version_id)
+                    if source is None or source.cancelled_at is not None:
+                        raise ValidationError("Mapping requires its published source version.")
+                    if effective_date < source.effective_date:
+                        raise ValidationError("Effective date cannot precede the source version.")
                 content, summary, number = self._prepare(uow, dataset, today)
                 if any(
                     version.cancelled_at is None and version.effective_date == effective_date

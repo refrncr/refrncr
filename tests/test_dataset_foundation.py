@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, publish_dataset
 from sqlalchemy import event, func, select, text, update
 from sqlalchemy.engine import make_url
 
@@ -15,8 +15,6 @@ from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import (
     AuditEvent,
     Dataset,
-    DatasetBusinessKeyField,
-    DatasetField,
     Grant,
     ImmutableDatasetKeyError,
     User,
@@ -90,78 +88,35 @@ def test_create_dataset_persists_metadata_team_creator_and_audit(dataset_service
     assert {event.actor_user_id for event in events} == {admin.id}
 
 
-def test_create_standalone_mapping_table_without_assumed_schema(dataset_services):
-    _, factory, _, services, admin = dataset_services
-    mapping = create_owned_dataset(
-        services.datasets,
-        admin.id,
-        "sap-salesforce",
-        "SAP to Salesforce",
-        "Cost-centre crosswalk",
-        kind="mapping",
-        mapping_mode="standalone",
-        source_system=" SAP ECC ",
-        target_system=" Salesforce ",
-    )
-
-    assert mapping.kind == "mapping"
-    assert mapping.mapping_mode == "standalone"
-    assert mapping.source_system == "SAP ECC"
-    assert mapping.target_system == "Salesforce"
-    with factory() as session:
-        fields = list(
-            session.scalars(
-                select(DatasetField)
-                .where(DatasetField.dataset_id == mapping.id)
-                .order_by(DatasetField.display_position)
-            )
-        )
-        keys = list(
-            session.scalars(
-                select(DatasetBusinessKeyField.field_key).where(
-                    DatasetBusinessKeyField.dataset_id == mapping.id
-                )
-            )
-        )
-    assert fields == []
-    assert keys == []
-
-
-def test_standalone_mapping_source_identifier_is_user_defined(dataset_services):
+def test_standalone_mapping_is_rejected(dataset_services):
     _, _, _, services, admin = dataset_services
-    mapping = create_owned_dataset(
-        services.datasets,
-        admin.id,
-        "currency-map",
-        "Currency map",
-        "",
-        kind="mapping",
-        mapping_mode="standalone",
-    )
+    with pytest.raises(ValidationError, match="Current version"):
+        create_owned_dataset(
+            services.datasets,
+            admin.id,
+            "standalone",
+            "Standalone",
+            "",
+            kind="mapping",
+            mapping_mode="standalone",
+        )
 
-    source = services.dataset_fields.create_field(
-        admin.id,
-        mapping.key,
-        "currency_code",
-        "Currency code",
-        "string",
-        mapping_role="source_identifier",
-    )
 
-    assert source.mapping_role == "source_identifier"
-    assert source.is_required
-    assert source.is_unique
-    assert services.dataset_business_keys.get_business_key(admin.id, mapping.key).field_keys == (
-        "currency_code",
-    )
+def test_mapping_without_source_is_rejected(dataset_services):
+    _, _, _, services, admin = dataset_services
+    with pytest.raises(ValidationError, match="source dataset"):
+        create_owned_dataset(
+            services.datasets, admin.id, "missing-source", "Missing source", "", kind="mapping"
+        )
 
 
 def test_linked_mapping_requires_visible_reference_source(dataset_services):
     _, _, _, services, admin = dataset_services
     source = create_owned_dataset(services.datasets, admin.id, "source", "Source", "")
     source_field = services.dataset_fields.create_field(
-        admin.id, source.key, "source_code", "Source code", "string"
+        admin.id, source.key, "source_code", "Source code", "string", True, True, True
     )
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,
@@ -197,12 +152,13 @@ def test_linked_mapping_records_source_field_and_defers_target_table(dataset_ser
     source = create_owned_dataset(services.datasets, admin.id, "input", "Input", "")
     target = create_owned_dataset(services.datasets, admin.id, "output", "Output", "")
     source_field = services.dataset_fields.create_field(
-        admin.id, source.key, "legacy_code", "Legacy code", "string"
+        admin.id, source.key, "legacy_code", "Legacy code", "string", True, True, True
     )
     target_field = services.dataset_fields.create_field(
         admin.id, target.key, "canonical_code", "Canonical code", "string"
     )
 
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,
@@ -227,7 +183,8 @@ def test_linked_mapping_records_source_field_and_defers_target_table(dataset_ser
         None,
         None,
     )
-    with pytest.raises(ValidationError, match="linked mapping dataset"):
+    services.dataset_versions.create_concept(admin.id, source.id)
+    with pytest.raises(ValidationError, match="Record identifier|linked mapping dataset"):
         services.dataset_fields.delete_field(admin.id, source.key, source_field.key)
     with pytest.raises(ValidationError, match="source identifier"):
         create_owned_dataset(
@@ -263,6 +220,7 @@ def test_linked_mapping_populates_source_rows_and_adds_context_and_target_fields
     services.dataset_records.create_record(
         admin.id, source.key, {code.key: "EUR", name.key: "Euro"}
     )
+    publish_dataset(services, admin.id, source)
     mapping = create_owned_dataset(
         services.datasets,
         admin.id,

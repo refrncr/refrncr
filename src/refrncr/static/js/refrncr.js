@@ -699,7 +699,7 @@
     !element.closest("[hidden]") && element.getClientRects().length > 0;
   const focusSidePanel = (dialog) => {
     const candidates = dialog.querySelectorAll(
-      "[data-error-focus], [aria-invalid='true'], [data-initial-focus], input:not([type='hidden']):not([disabled]), select:not([disabled]), textarea:not([disabled])"
+      "[data-error-focus], [aria-invalid='true'], [data-initial-focus], input:not([type='hidden']):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]):not([readonly])"
     );
     // Error summaries take precedence over invalid fields and ordinary inputs.
     const initialFocus =

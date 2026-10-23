@@ -1,4 +1,4 @@
-{% if preview.valid and mode == 'new_version' %}
+{% if preview.valid and mode in ('new_version', 'mapping_update') %}
   {% include 'pages/datasets/import/differences.html' %}
 {% elif preview.valid %}
   {% include 'pages/datasets/import/differences.html' %}
