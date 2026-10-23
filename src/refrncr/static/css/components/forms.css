@@ -72,7 +72,7 @@ label > input:not([type="checkbox"], [type="radio"]), label > select, label > te
 .icon-picker-field { position: relative; }
 .icon-picker-field [data-icon-options] { position: absolute; z-index: 5; top: 100%; right: 0; left: 0; margin: var(--space-xs) 0 0; background: var(--color-surface); box-shadow: var(--shadow-md); }
 .icon-picker-preview { display: flex; align-items: center; gap: .75rem; }
-.icon-picker-preview .dataset-icon-tile { display: inline-grid; flex-shrink: 0; place-items: center; width: 3rem; height: 3rem; border: 1px solid var(--color-status-published-border); border-radius: var(--radius-lg); background: var(--color-status-published-surface); color: var(--color-action-primary); }
+.dataset-icon-tile { display: inline-grid; flex-shrink: 0; place-items: center; width: 3rem; height: 3rem; border: 1px solid var(--color-status-published-border); border-radius: var(--radius-lg); background: var(--color-status-published-surface); color: var(--color-action-primary); }
 .icon-picker-preview .dataset-icon { margin: 0; }
 .icon-picker-preview .dataset-icon svg { width: 1.5rem; height: 1.5rem; }
 .icon-picker-preview-text { display: grid; min-width: 0; font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }

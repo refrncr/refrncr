@@ -1,0 +1,53 @@
+{% from "components/dataset_icon.html" import dataset_icon %}
+{% from "components/export_action.html" import export_action %}
+
+{% macro symbol(name) -%}
+<svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="{{ url_for('static', filename=dataset_icon_sprite(name)) }}#{{ rendered_dataset_icon(name) }}"></use></svg>
+{%- endmacro %}
+
+{% macro callout(reason) -%}
+<p class="callout callout-{{ reason.severity }}">{{ symbol(reason.icon) }}<span>{{ reason.text }}</span></p>
+{%- endmacro %}
+
+{% macro dataset_card(card, href, attention=false, export=false) -%}
+{% set dataset = card.dataset %}
+<article class="dataset-card" data-dataset-key="{{ dataset.key }}">
+  <div class="dataset-card-head">
+    <span class="dataset-icon-tile">{{ dataset_icon(dataset.icon, kind=dataset.kind) }}</span>
+    <div class="dataset-card-name">
+      <h3 class="dataset-card-title"><a class="dataset-card-link" href="{{ href }}" title="{{ dataset.name }}">{{ dataset.name }}</a></h3>
+      <span class="dataset-card-kind">{{ dataset.kind|capitalize }}</span>
+    </div>
+    <details class="export-menu dataset-card-actions">
+      <summary class="button button-secondary" aria-label="Actions for {{ dataset.name }}">{{ symbol('ellipsis') }}</summary>
+      <div class="export-menu-options">
+        <a href="{{ url_for('dataset_detail', key=dataset.key) }}">Settings</a>
+        <a href="{{ url_for('dataset_versions_view', key=dataset.key) }}">Versions</a>
+      </div>
+    </details>
+  </div>
+  {% if attention and card.primary %}
+    {{ callout(card.primary) }}
+    {% if card.reasons|length > 1 %}<p class="dataset-card-more">+{{ card.reasons|length - 1 }} more: {% for extra in card.reasons if extra != card.primary %}{{ extra.text }}{% if not loop.last %} {% endif %}{% endfor %}</p>{% endif %}
+  {% elif dataset.description %}
+    <p class="dataset-card-desc" tabindex="0" title="{{ dataset.description }}">{{ dataset.description }}</p>
+  {% endif %}
+  <p class="dataset-card-meta">
+    {% if card.version %}<span>V{{ card.version.number }}</span><time datetime="{{ card.last_updated.isoformat() }}">{{ card.last_updated|short_date }}</time><span><b>{{ card.record_count }}</b> records</span>
+    {% else %}<span>{{ 'Draft' if card.has_draft else 'No Current version' }}</span>{% endif %}
+  </p>
+  {% if export and card.may_export %}<div class="dataset-card-foot">{{ export_action(dataset, {'version': card.version}, true) }}</div>{% endif %}
+</article>
+{%- endmacro %}
+
+{% macro section_heading(title, count, href=none, id=none) -%}
+<div class="section-heading"><h2{% if id %} id="{{ id }}"{% endif %}>{{ title }} <span class="count" aria-label="{{ count }} datasets">{{ count }}</span></h2>{% if href %}<a class="section-link" href="{{ href }}">View all {{ symbol('arrow-right') }}</a>{% endif %}{{ caller() if caller is defined else '' }}</div>
+{%- endmacro %}
+
+{% macro owner_switch(all_owners, action, reason=none) -%}
+<form method="get" action="{{ action }}" data-auto-filter class="overview-owner-filter">
+  {% if reason %}<input type="hidden" name="reason" value="{{ reason }}">{% endif %}
+  <label class="switch"><input type="checkbox" role="switch" name="all_owners" value="1"{% if all_owners %} checked{% endif %}> Show all owners</label>
+  <noscript><button class="button button-secondary" type="submit">Apply</button></noscript>
+</form>
+{%- endmacro %}

@@ -38,7 +38,8 @@ def path(base, token, **values):
 def test_review_navigation_details_and_no_audit_noise(context):
     c = context
     browser, _csrf, base, token = prepared(c)
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     for section in ("Summary", "Fields", "Records"):
         response = request(browser, "get", path(base, token, section=section))
         assert response.status_code == 200
@@ -75,7 +76,7 @@ def test_review_navigation_details_and_no_audit_noise(context):
     field = c.s.dataset_fields.get_field(c.a.id, c.d.key, "label")
     response = request(browser, "get", path(base + f"/fields/{field.id}", token))
     assert response.status_code == 200 and "New label" in response.text
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     events = [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
     assert len(events) == 1
 
@@ -254,7 +255,8 @@ def test_entrypoints_and_publication_reuses_revision_csrf(context):
 def test_versions_review_entry_does_not_materialize_publication(context, monkeypatch):
     c = context
     browser, _csrf, _base, _token = prepared(c)
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
 
     def forbidden(*args, **kwargs):
         raise AssertionError("Versions must not materialize a publication snapshot")
@@ -263,7 +265,7 @@ def test_versions_review_entry_does_not_materialize_publication(context, monkeyp
     response = request(browser, "get", f"/datasets/{c.d.key}/versions")
     assert response.status_code == 200 and "Review changes" not in response.text
     assert f"href='/datasets/{c.d.key}/versions/review'>Review &amp; publish</a>" in response.text
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
 
 
 def test_first_publication_panel_offers_optional_review(context):
@@ -271,14 +273,15 @@ def test_first_publication_panel_offers_optional_review(context):
     configured(c)
     browser, csrf = client(c)
     url = f"/datasets/{c.d.key}/versions/publish"
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     concept = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert "id='concept-publication-panel'" not in concept.text
     assert "data-dialog-open='concept-publication-panel'" not in concept.text
     panel = request(browser, "get", url)
     assert panel.status_code == 200 and "Review &amp; publish" in panel.text
     assert "publication-form" in panel.text
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     result = request(browser, "post", url, data=payload(c, csrf))
     assert result.status_code == 303 and "notice=published" in result.location
     assert not [item for item in audits(c) if item.action == "dataset.version_diff_viewed"]
@@ -415,16 +418,18 @@ def test_review_signature_shared_workers_and_key_rotation(context):
     first, second = worker(shared_key), worker(shared_key)
     response = request(first, "get", f"/datasets/{c.d.key}/versions/review")
     assert response.status_code == 303
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     assert request(second, "get", response.location).status_code == 200
     assert request(worker(secrets.token_bytes(32)), "get", response.location).status_code == 409
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
 
 
 def test_review_websecurity_methods_parameters_and_escaping(context):
     c = context
     browser, _csrf, base, token = prepared(c)
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     detail = path(base + f"/records/{c.record.id}", token)
     for url in (path(base, token), detail):
         for method in ("post", "put", "patch", "delete"):
@@ -452,7 +457,7 @@ def test_review_websecurity_methods_parameters_and_escaping(context):
     response = request(browser, "get", path(base, token, section="Records", q=attack))
     assert response.status_code == 200
     assert "&lt;script&gt;" in response.text and attack not in response.text
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
 
 
 def test_review_failure_hides_internal_details(context, monkeypatch):

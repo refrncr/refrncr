@@ -241,6 +241,7 @@ def test_renamed_views_keep_csrf_and_capability_checks():
 
 def _route_matrix_expectations():
     community = {
+        "attention_overview",
         "api_key_list",
         "api_key_create",
         "api_key_revoke",

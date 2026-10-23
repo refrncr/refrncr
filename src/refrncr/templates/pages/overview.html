@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "components/dataset_card.html" import dataset_card, section_heading, owner_switch %}
+{% block title %}{{ 'Needs your attention' if full else 'Overview' }} · REFRNCR{% endblock %}
+{% block content %}
+<div class="overview-content">
+  <header class="page-header"><h1>{{ 'Needs your attention' if full else 'Overview' }}</h1>{% if full %}<a href="{{ url_for('index', all_owners=1 if overview.all_owners else none) }}">Back to Overview</a>{% endif %}</header>
+  <section class="ov-section" aria-labelledby="attention-heading">
+    {% call section_heading('Needs your attention', overview.attention|length, none if full else url_for('attention_overview', all_owners=1 if overview.all_owners else none), id='attention-heading') %}
+      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('attention_overview' if full else 'index'), reason) }}{% endif %}
+    {% endcall %}
+    {% if full %}
+      <form method="get" action="{{ url_for('attention_overview') }}" data-auto-filter class="overview-reason-filter">
+        {% if overview.all_owners %}<input type="hidden" name="all_owners" value="1">{% endif %}
+        <label for="attention-reason">Reason</label>
+        <select id="attention-reason" name="reason"><option value=""{% if not reason %} selected{% endif %}>All reasons</option>{% for number, label in reason_labels.items() %}<option value="{{ number }}"{% if reason == number %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <noscript><button class="button button-secondary" type="submit">Apply</button></noscript>
+      </form>
+      {% if attention_cards %}<ul class="card-grid">{% for card in attention_cards %}<li>{{ dataset_card(card, card_destination(card, true), attention=true) }}</li>{% endfor %}</ul>{% endif %}
+    {% else %}
+      {% for group in ['Needs action', 'Coming up'] %}
+        {% set cards = overview.attention|selectattr('group', 'equalto', group)|list %}
+        {% if cards %}<div class="ov-group"><h3 class="ov-group-title">{{ group }} <span class="count">{{ cards|length }}</span></h3>
+          <ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card, true), attention=true) }}</li>{% endfor %}</ul>
+        </div>{% endif %}
+      {% endfor %}
+      {% if overview.tallies|selectattr('2')|list %}<div class="ov-group"><h3 class="ov-group-title">To finish</h3><ul class="tally">
+        {% for number, label, count in overview.tallies %}{% if count %}<li><a href="{{ url_for('attention_overview', reason=number, all_owners=1 if overview.all_owners else none) }}"><span class="count">{{ count }}</span>{{ label }}</a></li>{% endif %}{% endfor %}
+      </ul></div>{% endif %}
+    {% endif %}
+    {% if not attention_cards %}<div class="empty-state">
+      {% if not overview.has_team and not overview.all_owners %}<h2>You're not in a team yet</h2><p>Attention items from your teams will show up here.{% if overview.is_admin %} Turn on Show all owners to see attention items across all teams.{% else %} Ask an administrator to add you to a team.{% endif %}</p>
+      {% elif reason %}<h2>No datasets match this reason</h2><p><a href="{{ url_for('attention_overview', all_owners=1 if overview.all_owners else none) }}">View all attention items</a></p>
+      {% else %}<h2>Nothing needs your attention</h2><p>Mappings that lag behind, missing Current versions and upcoming versions show up here.</p>{% endif %}
+    </div>{% endif %}
+  </section>
+  {% if not full %}
+    {% for title, cards in [('Recently visited', overview.visited), ('Recently created', overview.created)] %}
+      <section class="ov-section" aria-labelledby="recent-{{ loop.index }}">
+        {{ section_heading(title, cards|length, id='recent-' ~ loop.index) }}
+        {% if cards %}<ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card), export=title == 'Recently visited') }}</li>{% endfor %}</ul>
+        {% else %}<div class="empty-state"><p>{{ 'Datasets you visit will show up here.' if title == 'Recently visited' else 'New datasets will show up here.' }} <a href="{{ url_for('dataset_list') }}">View datasets</a></p></div>{% endif %}
+      </section>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

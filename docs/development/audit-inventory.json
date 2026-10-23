@@ -42,6 +42,8 @@
     "refrncr.hierarchy_import.HierarchyImportService.preview",
     "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
     "refrncr.hierarchy_import.HierarchyImportService.state",
+    "refrncr.overview.OverviewService.read",
+    "refrncr.overview.OverviewService.record_visit",
     "refrncr.record_import.DatasetRecordImportService.active",
     "refrncr.record_import.DatasetRecordImportService.begin",
     "refrncr.record_import.DatasetRecordImportService.cancel",
@@ -175,12 +177,9 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.services.DatasetAuthorizationService.can_create_dataset",
-        "refrncr.services.DatasetService.list_dataset_overview",
-        "refrncr.services.DatasetService.mapping_source",
-        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.index"
+        "refrncr.web.index",
+        "refrncr.overview.OverviewService.read"
       ]
     },
     {
@@ -1532,6 +1531,18 @@
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]
+    },
+    {
+      "symbol": "refrncr.web.attention_overview",
+      "path": "/attention",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.overview.OverviewService.read"
+      ]
     }
   ],
   "cli_commands": [
@@ -1698,6 +1709,12 @@
         "refrncr.web.handle_oversized_request"
       ],
       "reason": "Apply to all applicable protected forms/import/login requests; failures have REF-31 disposition and no success audit."
+    },
+    {
+      "symbol": "Successful dataset HTML GET: refrncr.web.record_dataset_visit",
+      "operations": [
+        "refrncr.overview.OverviewService.record_visit"
+      ]
     }
   ],
   "module_commands": [

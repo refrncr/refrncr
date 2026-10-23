@@ -333,7 +333,7 @@ def context_from_audit_db(audit_db):
     )
 
 
-def snapshot(context):
+def snapshot(context, *, include_visits=True):
     with context.sessions() as session:
         return {
             table.name: sorted(
@@ -345,6 +345,7 @@ def snapshot(context):
                 )
             )
             for table in Base.metadata.sorted_tables
+            if include_visits or table.name != "dataset_visits"
         }
 
 

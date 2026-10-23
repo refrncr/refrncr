@@ -133,7 +133,8 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):
     version = publish(c)
     mutate_concept(c)
     browser, _csrf = client(c, c.u)
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     assert c.s.datasets.get_dataset(c.u.id, c.d.key).name == "Current dataset name"
     assert [field.name for field in c.s.dataset_fields.list_fields(c.u.id, c.d.key)] == [
         "Code",
@@ -155,7 +156,7 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):
         assert f"/datasets/{c.d.key}/versions" in response.text
     listing = request(browser, "get", "/datasets")
     assert "Current dataset name" in listing.text and "Private" not in listing.text
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     owner_browser, _ = client(c)
     concept = request(owner_browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert "Private value" in concept.text and "Draft" in concept.text

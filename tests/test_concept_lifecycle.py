@@ -174,9 +174,9 @@ def test_current_and_concept_navigation_preserve_dataset_status_value(context):
         response.status_code == 200 and "Changed" in response.text and "Complete" in response.text
     )
     assert "You’re working on a draft" in response.text
-    state = snapshot(c)
+    state = snapshot(c, include_visits=False)
     assert "Before" in request(browser, "get", f"/datasets/{c.d.key}/records").text
-    assert snapshot(c) == state
+    assert snapshot(c, include_visits=False) == state
     versions = request(browser, "get", f"/datasets/{c.d.key}/versions")
     assert "/concept/records" in versions.text and "View concept" not in versions.text
     outsider, _ = client(c, c.u)

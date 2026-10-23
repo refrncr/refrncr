@@ -66,6 +66,7 @@ from refrncr.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
+from refrncr.overview import REASON_LABELS, OverviewService
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.presentation import (
     DISPLAY_STATUSES,
@@ -373,6 +374,9 @@ def create_flask_app(
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
+    overview_service = (
+        OverviewService(datasets.uow, authorization.datasets) if dataset_ui_enabled else None
+    )
     dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
     cookie_policy = BrowserCookiePolicy(
         session_max_age=int(sessions.lifetime.total_seconds()),
@@ -961,27 +965,15 @@ def create_flask_app(
         return response
 
     @app.get("/")
+    @no_store_route
     @authenticated_route
+    @version_errors
     def index():
         resolved = authenticated()
         actor = resolved[0] if resolved else None
         csrf = resolved[1].csrf_token if resolved else None
         if resolved and dataset_ui_enabled:
-            authorization, dataset_service, *_dependencies = require_dataset_dependencies()
-            return render_mapping_template(
-                "pages/datasets/list.html",
-                actor=actor,
-                may_create=authorization.datasets.can_create_dataset(actor.id),
-                datasets=dataset_service.list_dataset_overview(actor.id),
-                deletion_notice=False,
-                page_title="Overview",
-                empty_dataset_label="datasets",
-                dataset_kind=None,
-                current_actor=actor,
-                current_csrf=csrf,
-                active_navigation="home",
-                dataset_ui_enabled=dataset_ui_enabled,
-            )
+            return render_overview(actor)
         return render_template(
             "pages/index.html",
             resolved=resolved,
@@ -990,6 +982,81 @@ def create_flask_app(
             active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
         )
+
+    @dataset_route("/attention", capability="can_access_community", methods=["GET"])
+    @no_store_route
+    @version_errors
+    def attention_overview():
+        actor, _session = require_authenticated()
+        return render_overview(actor, full=True)
+
+    def render_overview(actor, *, full=False):
+        owners = request.args.getlist("all_owners")
+        reasons = request.args.getlist("reason")
+        if len(owners) > 1 or (owners and owners[0] != "1"):
+            abort(400)
+        if len(reasons) > 1 or (
+            reasons and reasons[0] not in {"", *(str(n) for n in REASON_LABELS)}
+        ):
+            abort(400)
+        reason = int(reasons[0]) if reasons and reasons[0] and full else None
+        overview = overview_service.read(actor.id, all_owners=bool(owners))
+        cards = [
+            card
+            for card in overview.attention
+            if reason is None or any(r.number == reason for r in card.reasons)
+        ]
+
+        def destination(card, attention=False):
+            selected = card.primary if attention else None
+            draft = selected.draft if selected else card.version is None and card.has_draft
+            return url_for(
+                "dataset_records_view",
+                key=card.dataset.key,
+                concept=True if draft else None,
+                version_id=None
+                if draft
+                else selected.version_id
+                if selected
+                else card.version.id
+                if card.version
+                else None,
+                mapping_status=selected.mapping_status if selected else None,
+            )
+
+        return render_authenticated_template(
+            "pages/overview.html",
+            overview=overview,
+            attention_cards=cards,
+            full=full,
+            reason=reason,
+            reason_labels=REASON_LABELS,
+            card_destination=destination,
+            active_navigation="home",
+        )
+
+    @app.after_request
+    def record_dataset_visit(response):
+        values = request.view_args or {}
+        if (
+            dataset_ui_enabled
+            and request.method == "GET"
+            and response.status_code == 200
+            and response.mimetype == "text/html"
+            and request.path.startswith("/datasets/")
+            and (values.get("key") or values.get("dataset_id"))
+        ):
+            resolved = authenticated()
+            if resolved:
+                try:
+                    overview_service.record_visit(
+                        resolved[0].id, key=values.get("key"), dataset_id=values.get("dataset_id")
+                    )
+                except (AuthorizationError, PersistenceConflictError):
+                    # Concurrent deletion/revocation or a history-write conflict must not
+                    # replace an already-authorized page with a telemetry failure.
+                    logging.getLogger(__name__).warning("Dataset visit could not be recorded")
+        return response
 
     @dataset_route("/datasets", capability="can_access_community", methods=["GET"])
     def dataset_list():

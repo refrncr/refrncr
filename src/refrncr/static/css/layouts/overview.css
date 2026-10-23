@@ -1,0 +1,7 @@
+/* Overview is a deliberate card-based entry point, not a dataset workspace. */
+.overview-content { display: flex; flex-direction: column; gap: var(--space-xl); }
+.overview-content > .page-header { margin: 0; }
+.overview-owner-filter { margin-left: auto; }
+.overview-reason-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); }
+.overview-reason-filter select { width: auto; max-width: 100%; }
+@media (max-width: 767px) { .overview-content .card-grid { grid-template-columns: minmax(0, 1fr); } }

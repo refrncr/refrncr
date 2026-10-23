@@ -1393,6 +1393,9 @@ class SqlAlchemyUnitOfWork:
         from refrncr.concept_persistence import SqlAlchemyConceptOperations
 
         self.concepts = SqlAlchemyConceptOperations(self.session)
+        from refrncr.overview_persistence import SqlAlchemyOverviewOperations
+
+        self.overview = SqlAlchemyOverviewOperations(self.session)
         return self
 
     def __exit__(

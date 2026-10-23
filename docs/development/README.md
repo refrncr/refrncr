@@ -11,3 +11,6 @@ responses stay on their form with the submitted non-secret values escaped; passw
 and session tokens are never rendered back. Authorization and missing-resource status codes follow
 the contracts in `AGENTS.md`, and unexpected web exceptions return HTTP 500 while logging the
 exception type and traceback without request payloads.
+
+The [Overview guide](overview.md) documents attention projections, private navigation history,
+upgrades and the [shared component specimens](overview-styleguide.html).
