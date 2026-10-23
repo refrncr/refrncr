@@ -70,10 +70,12 @@
   </nav>
 {%- endmacro %}
 
-{% macro content_metadata(count, updated, version_number=none, deleted_count=0, status=none, record_label='records', secondary_count=none, secondary_label='', draft_in_progress=false, mapping_source=none) -%}
-  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}{{ status_badge(status) }}{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ record_label|pluralize(count) }}</span>{% if secondary_count is not none %}<span aria-hidden="true"> · </span><span>{{ secondary_count }} {{ secondary_label|pluralize(secondary_count) }}</span>{% endif %}
+{% macro content_metadata(count, updated, version_number=none, deleted_count=0, status=none, record_label='records', secondary_count=none, secondary_label='', draft_in_progress=false, mapping_source=none, mapping_usage=none) -%}
+  {% from 'components/mapping_usage.html' import usage_link %}
+  <p class="metadata">{% if version_number is not none %}<span class="metadata-version"><span class="badge">V{{ version_number }}</span>{% if status %}{{ status_badge(status) }}{% endif %}</span><span aria-hidden="true">•</span>{% endif %}<span>{{ count }} {{ record_label|pluralize(count) }}</span>{% if secondary_count is not none %}<span aria-hidden="true">•</span><span>{{ secondary_count }} {{ secondary_label|pluralize(secondary_count) }}</span>{% endif %}
     {% if draft_in_progress %}<span class="metadata-item"><span aria-hidden="true">•</span>{{ status_badge('Draft in progress') }}</span>{% endif %}
-    {% if mapping_source %}<span class="metadata-item">· Source: {{ mapping_source.name }} V{{ mapping_source.number }}</span>{% endif %}
+    {% if mapping_source %}<span class="metadata-item"><span aria-hidden="true">•</span>Source: {{ mapping_source.name }} V{{ mapping_source.number }}</span>{% endif %}
+    {% if mapping_usage and mapping_usage.total %}<span class="metadata-item"><span aria-hidden="true">•</span>{{ usage_link(mapping_usage) }}</span>{% endif %}
     {% if deleted_count %}<span class="metadata-item metadata-warning"><span aria-hidden="true">•</span><span>{{ deleted_count }} marked for deletion</span></span>{% endif %}
     <span class="metadata-item"><span aria-hidden="true">•</span><span>Updated <time datetime="{{ updated.isoformat() }}">{{ updated|absolute_utc }}</time></span></span>
   </p>

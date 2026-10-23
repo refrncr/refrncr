@@ -89,6 +89,42 @@ readers cannot inspect draft or future mapping versions. A source link appears o
 user can view that dataset. The REST API keeps its existing read-only contract; mapping
 resolution remains separate work.
 
+## Source-side mapping usage
+
+Settings, review and the publication panel share the `mapping_usage.html` component.
+The dataset metadata links to the Settings section. Usage counts every existing dependent
+mapping once, including unpublished mappings. Records pages use a count query; the detailed
+list batches publication headers and authorized concepts without loading mapping records.
+
+The service prefers the mapping's Current publication, then a visible Scheduled or Expired
+publication. A different draft source is shown separately to mapping maintainers. Cancelled
+publications are excluded. The update indication compares the selected source pin with the
+latest non-cancelled source publication, including Scheduled, as in REF-301. The dependency
+list is dataset-wide even when opened from an older source snapshot.
+
+All source readers can see the count and list. Existing dataset and version permissions still
+apply: a never-published mapping is anonymous to non-maintainers; a Scheduled-only mapping
+shows **not yet in effect** and links to its existing dataset Settings without exposing its
+version, effective date or source pin. Mappings
+without read access are grouped by owning team, returning only team name and count to the
+template. There are no new grants, notifications, API endpoints or schema changes.
+
+Browser check: run `.venv/bin/python tests/browser_mapping_usage_app.py` and open
+`http://127.0.0.1:5194`. The fixture uses disposable in-memory data. Sign in as
+`admin@example.com` with password `correct horse battery staple`:
+
+1. Open Currencies Records and activate **Used by 2 mappings** with Enter. Settings opens at
+   **Used by mappings**, above Delete dataset. Currency mapping uses V1 and shows **Draft uses
+   V2**; Finance currency mapping is a Draft on V1. Follow both mapping links.
+2. Open the source Draft's review and publication panel and check the shared dependency list.
+   The fixture advances its publication clock until source V2 is Current; the mapping
+   publication still uses V1 while its Draft uses V2.
+3. Sign out and sign in as `reader@example.com` with the same disposable password. The count
+   is still two. Currency mapping shows only published details; Finance appears only as
+   **1 mapping you don't have access to** and its team name.
+4. Check the anchor, wrapping, keyboard links and absence of horizontal overflow on desktop
+   and at a 320px viewport.
+
 ## Upgrade
 
 Before deploying revision `0031_ref_239`, delete **all** existing mapping datasets through the
@@ -101,6 +137,10 @@ The migration adds working/published source-version columns and a mapping-source
 Published links reference immutable versions with `ON DELETE RESTRICT`. Source field IDs
 now identify fields in the pinned snapshot and no longer have a foreign key to mutable
 working fields. The source dataset itself remains protected against deletion while in use.
+Settings disables deletion while any mapping depends on the source, including draft-only
+mappings. Both deletion confirmation and execution check the dependency count in the service;
+the restrictive foreign keys remain the concurrency backstop. Remove the dependent mappings
+before deleting their source.
 
 Revision `0032_ref_239` removes only the working source-version non-null check, preserving
 existing mappings and values. Current-version selection remains required in the service.
@@ -134,3 +174,11 @@ with its test account (`admin@example.com`, `correct horse battery staple`) and 
 These browser checks were performed for REF-301 review 1. The corresponding rendered-output,
 service, migration and rollback regressions live in `tests/test_mapping_source_updates.py`.
 The existing full-row loading for draft mapping counters remains a performance follow-up.
+
+For source-side usage checks, run `.venv/bin/python tests/browser_mapping_usage_app.py`
+and `node tests/javascript/mapping_usage_browser.cjs` with the same existing browser toolchain
+variables. At 1280×900 this checks that **Used by N mappings** reveals Settings, scrolls the
+whole block into `main.app-main`, and focuses its heading, including reload and keyboard
+activation. It also checks the disabled delete button, dependency explanation and consistent
+metadata separators. `REFRNCR_BROWSER_OUTPUT` optionally names a screenshot file. The fixture
+is disposable; these checks do not delete user datasets.

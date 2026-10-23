@@ -45,6 +45,12 @@
           const current = tabs.findIndex(tab => tab.getAttribute('aria-current') === 'page');
           const index = panels.findIndex(panel => panel === target || panel.contains(target));
           activate(index < 0 ? (current < 0 ? 0 : current) : index);
+          if (location.hash && index >= 0 && target !== panels[index] && !panels[index].hidden) {
+            const heading = document.getElementById(target.getAttribute('aria-labelledby'));
+            // Reveal the panel first: native fragment scrolling may have run while hidden.
+            target.scrollIntoView({block: 'start'});
+            (heading || target).focus({preventScroll: true});
+          }
         };
         tabs.forEach((tab, index) => {
           tab.addEventListener('click', event => {

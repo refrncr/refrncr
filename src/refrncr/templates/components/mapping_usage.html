@@ -1,0 +1,37 @@
+{% macro usage_link(usage) -%}
+  {% if usage and usage.total %}<a href='{{ url_for("dataset_detail", key=usage.key, tab="dataset-details", _anchor="used-by-mappings") }}'>Used by {{ usage.total }} {{ 'mapping' if usage.total == 1 else 'mappings' }}</a>{% endif %}
+{%- endmacro %}
+
+{% macro mapping_list(usage) -%}
+  <div class='dataset-settings-card'>
+    <dl class='dataset-settings-values mapping-usage-list'>
+      {% for mapping in usage.mappings %}
+      <div>
+        <dt><a href='{{ url_for("dataset_records_view", key=mapping.key, version_id=mapping.version_id, concept=true if mapping.status == "Draft" else none) if mapping.status else url_for("dataset_detail", key=mapping.key, tab="dataset-details") }}'>{{ mapping.name }}</a></dt>
+        <dd>{{ mapping.team }}{% if mapping.not_yet_in_effect %} · not yet in effect{% endif %}{% if mapping.status and mapping.status != 'Current' %} · {{ mapping.status }}{% endif %}{% if mapping.source_number is not none %} · uses V{{ mapping.source_number }} · {{ 'update available' if mapping.update_available else 'up to date' }}{% endif %}{% if mapping.draft_source_number is not none %} · <a href='{{ url_for("dataset_records_view", key=mapping.key, concept=true) }}'>Draft uses V{{ mapping.draft_source_number }}</a>{% endif %}</dd>
+      </div>
+      {% endfor %}
+      {% for group in usage.restricted %}
+      <div><dt>{{ group.count }} {{ 'mapping' if group.count == 1 else 'mappings' }} you don't have access to</dt><dd>{{ group.team }}</dd></div>
+      {% endfor %}
+    </dl>
+  </div>
+{%- endmacro %}
+
+{% macro settings(usage) -%}
+  {% if usage and usage.total %}
+  <section class='dataset-settings-section' id='used-by-mappings' aria-labelledby='used-by-mappings-heading'>
+    <header><h3 id='used-by-mappings-heading' tabindex='-1'>Used by mappings</h3><p>Mappings based on this dataset, with the source version they use.</p></header>
+    {{ mapping_list(usage) }}
+  </section>
+  {% endif %}
+{%- endmacro %}
+
+{% macro publication_notice(usage) -%}
+  {% if usage and usage.total %}
+  <section aria-label='Used by mappings'>
+    <p>{{ usage.total }} {{ 'mapping is' if usage.total == 1 else 'mappings are' }} based on this dataset. Their owners will see that a new version is available.</p>
+    {{ mapping_list(usage) }}
+  </section>
+  {% endif %}
+{%- endmacro %}

@@ -6708,6 +6708,53 @@
         "tests/test_mapping_source_updates.py::test_browser_source_current_warning_and_post_guards"
       ],
       "implementation_status": "Implemented by REF-301."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_usage",
+      "service": "refrncr.services.DatasetService.mapping_usage",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Authorized dependency metadata read; hidden mappings return only owning team and count.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_usage.py::test_current_mapping_and_updated_draft_are_one_dependency",
+        "tests/test_mapping_usage.py::test_source_authorization_applies_to_list_and_count",
+        "tests/test_mapping_usage.py::test_restricted_details_absent_from_all_rendered_lists"
+      ],
+      "implementation_status": "Implemented for REF-302 source-side dependency lists and counts.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Read snapshot; count query or batched publication metadata, without mapping records or new persistence."
     }
   ]
 }

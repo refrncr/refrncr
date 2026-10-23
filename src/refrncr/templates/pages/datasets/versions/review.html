@@ -6,6 +6,7 @@
 {% from "components/version_diff.html" import properties, value %}
 {% from "components/search_field.html" import search_field %}
 {% from "components/mapping_update.html" import counts, warning, transition %}
+{% from "components/mapping_usage.html" import publication_notice %}
 {% block title %}Review & publish · {{ dataset.name }} · REFRNCR{% endblock %}
 {% block content %}
 <div data-version-review>
@@ -19,6 +20,7 @@
     </div>
   </div>
   {% include 'pages/datasets/_source_notice.html' %}
+  {{ publication_notice(mapping_usage) }}
   {{ counts(mapping_source) }}
   {{ warning(mapping_source) }}
   {% call banner(dataset.key, concept_ui, actions=false, show_current=false) %}

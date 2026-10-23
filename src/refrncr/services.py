@@ -798,6 +798,13 @@ def _version_reads(service):
     return service.versions or DatasetVersionService(service.uow, service.authorization.datasets)
 
 
+def _mapping_deletion_error(count):
+    if count:
+        dependency = "1 mapping is" if count == 1 else f"{count} mappings are"
+        return f"This dataset can't be deleted because {dependency} based on it."
+    return None
+
+
 class DatasetService:
     """Authorized Dataset operations within the one Community installation context."""
 
@@ -845,6 +852,8 @@ class DatasetService:
             actor_id, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
+        if error := _mapping_deletion_error(uow.datasets.mapping_usage_count(dataset.id)):
+            raise ConflictError(error)
         return dataset
 
     @staticmethod
@@ -863,6 +872,89 @@ class DatasetService:
             export_access,
             self._deletion_timestamp(dataset),
         )
+
+    def mapping_usage(self, actor_id, key, *, details=True):
+        """Dataset-wide dependants, with private version details removed before presentation."""
+        from refrncr.version_contracts import version_states
+
+        with self.uow() as uow:
+            uow.begin_export_snapshot()
+            source = uow.datasets.find_by_key(self._validated_lookup_key(key))
+            if source is None or not self.authorization.has_capability(
+                actor_id, "can_view_dataset", source.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            result = {"key": source.key, "total": 0, "mappings": [], "restricted": []}
+            if not details:
+                result["total"] = uow.datasets.mapping_usage_count(source.id)
+                return result
+            mappings = uow.datasets.mappings_using(source.id)
+            result["total"] = len(mappings)
+            result["deletion_error"] = _mapping_deletion_error(len(mappings))
+            if not mappings:
+                return result
+            visible, maintainable, restricted = [], set(), {}
+            for mapping in mappings:
+                if not self.authorization.has_capability(
+                    actor_id, "can_view_dataset", mapping.id, uow=uow
+                ):
+                    group = restricted.setdefault(
+                        mapping.owner_team_id, {"team": mapping.owner_team_name, "count": 0}
+                    )
+                    group["count"] += 1
+                    continue
+                visible.append(mapping)
+                if self.authorization.has_capability(
+                    actor_id, "can_maintain_dataset", mapping.id, uow=uow
+                ):
+                    maintainable.add(mapping.id)
+            publications = uow.versions.list_for_datasets(tuple(m.id for m in visible))
+            concepts = uow.concepts.list_for_datasets(tuple(maintainable))
+            sources = {v.id: v for v in uow.versions.list_for_dataset(source.id)}
+            latest = max((v.number for v in sources.values() if v.cancelled_at is None), default=0)
+            today = _version_reads(self).clock.today()
+            for mapping in visible:
+                mapping_versions = publications.get(mapping.id, ())
+                # Match get_dataset_configuration: a never-published mapping's name
+                # and existence are private to maintainers, even with dataset read access.
+                if mapping.id not in maintainable and not any(
+                    v.cancelled_at is None for v in mapping_versions
+                ):
+                    group = restricted.setdefault(
+                        mapping.owner_team_id, {"team": mapping.owner_team_name, "count": 0}
+                    )
+                    group["count"] += 1
+                    continue
+                states = version_states(mapping_versions, today)
+                permitted = (
+                    ("Current", "Scheduled", "Expired")
+                    if mapping.id in maintainable
+                    else ("Current", "Expired")
+                )
+                state = next(
+                    (s for status in permitted for s in states if s.status == status), None
+                )
+                draft = sources.get(mapping.source_version_id) if mapping.id in concepts else None
+                pinned = sources.get(state.version.source_version_id) if state else draft
+                result["mappings"].append(
+                    {
+                        "name": mapping.name,
+                        "key": mapping.key,
+                        "team": mapping.owner_team_name,
+                        "version_id": state.version.id if state else None,
+                        "status": state.status if state else "Draft" if draft else None,
+                        "not_yet_in_effect": state is None
+                        and any(s.status == "Scheduled" for s in states),
+                        "source_number": pinned.number if pinned else None,
+                        "update_available": bool(pinned and latest > pinned.number),
+                        "draft_source_number": draft.number
+                        if state and draft and draft.id != state.version.source_version_id
+                        else None,
+                    }
+                )
+            result["mappings"].sort(key=lambda m: (m["name"].casefold(), m["key"]))
+            result["restricted"] = sorted(restricted.values(), key=lambda g: g["team"].casefold())
+            return result
 
     def mapping_source(self, actor_id, key, version_id=None, *, history_version_ids=()):
         """Source metadata for an authorized mapping; never expose source drafts."""
