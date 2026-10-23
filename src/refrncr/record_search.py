@@ -67,6 +67,7 @@ def parse_parameters(items):
         "q",
         "page",
         "record_status",
+        "mapping_status",
         "import_results",
         "status_selection",
         "action",

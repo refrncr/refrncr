@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% from "components.html" import feedback, form_field, readonly_field %}
 {% from "components/side_panel.html" import panel_form_actions %}
+{% from "components/mapping_update.html" import counts, warning, transition %}
 {% block title %}Publish version · REFRNCR{% endblock %}
 {% block content %}
   <h1>Publish version</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Publish version' data-panel-eyebrow='{{ dataset.name }}'>
     <div class='side-panel-body panel-sections'>
       {{ feedback(error, id='publication-error', focus=true) }}
+      {% if mapping_source %}<p>{{ transition(mapping_source) }}</p>{{ counts(mapping_source) }}{{ warning(mapping_source) }}{% endif %}
       {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a></p>{% endif %}
       {% if review %}{% set revision, number, content, summary = review %}
         {{ readonly_field('Next version', 'Version ' ~ number) }}
@@ -20,7 +22,7 @@
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <input type='hidden' name='dataset_id' value='{{ dataset.id }}'>
           <input type='hidden' name='expected_revision' value='{{ revision }}'>
-          {{ form_field('Effective date', 'effective_date', 'publication-date', type='date', required=true, value=effective_date, min_value=today, help_text='Choose today or a future day. Calendar dates use UTC.', error_id='publication-error' if error else none) }}
+          {{ form_field('Effective date', 'effective_date', 'publication-date', type='date', required=true, value=effective_date, min_value=minimum_date, help_text='Choose today or a future day. Calendar dates use UTC.', error_id='publication-error' if error else none) }}
           {{ form_field('Release note (optional)', 'release_note', 'publication-note', control='textarea', value=release_note, max_length=2000, help_text='Up to 2,000 characters.', error_id='publication-error' if error else none) }}
           {{ form_field('I reviewed this version and confirm publication.', 'confirmed', 'publication-confirmed', type='checkbox', required=true, value='yes', error_id='publication-error' if error else none) }}
           <p data-submit-status role='status' hidden></p>

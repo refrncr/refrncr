@@ -32,7 +32,37 @@ The metadata line, review and version history identify the source version. A new
 non-cancelled publication, including Scheduled, immediately produces an in-app notice and
 dataset-list badge. Cancelling that Scheduled publication removes its signal. These are
 computed on reads and need no notification job. There is no automatic source upgrade;
-explicit upgrading belongs to REF-301. The source owner's usage view belongs to REF-302.
+maintainers explicitly choose **Update to Vn** to upgrade (REF-301). The source owner's
+usage view belongs to REF-302.
+
+## Updating a source
+
+The update action selects the latest non-cancelled source publication under the existing
+Dataset locks, including Scheduled versions and jumps such as V1 to V3. It creates a draft
+or reuses the active one. Matching uses the canonical source identifier: existing target
+values, including draft edits, survive; source context values are refreshed. New identifiers
+start with empty targets. Removed identifiers retain their values as draft tombstones labeled
+**Removed from source** and are omitted from publication. Identifiers returning during further
+updates to the same draft recover their targets. They cannot be manually restored into a
+source snapshot that does not contain them.
+
+Drafts expose Unmapped and Removed from source counts and filters. Unmapped means a row has
+no target values. The review shows the source transition and the same counts, including when
+only the source link changed. Optional empty targets can be published with a counted warning;
+required targets still use the existing record validation. Publication defaults to the source
+effective date, or today when that date is in the past, and rejects dates before the source.
+A newer Current source makes the notice a warning even when a still newer Scheduled version
+is available to update to. Published mappings and their history remain immutable.
+Rebuilding a draft after discard or cancellation restores source/target field roles and
+source-field links along with the snapshot values.
+
+An update requires the selected source fields to remain available with the same datatypes
+and the source identifier to remain required and unique. Incompatible source schema changes
+are rejected without changing the draft. Updates use the existing revision, authorization,
+CSRF, audit and rollback machinery. Like existing Dataset version routes,
+`POST /datasets/<key>/source/update` returns the same non-disclosing 404 for missing
+and inaccessible Datasets; malformed/stale revisions return 400/409. The `dataset.mapping_source_updated` event includes only
+the old and new source version numbers. No schema migration or REST write endpoint is added.
 
 ## Presentation and authorization
 

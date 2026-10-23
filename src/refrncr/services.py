@@ -927,7 +927,48 @@ class DatasetService:
             visible = self.authorization.has_capability(
                 actor_id, "can_view_dataset", source.id, uow=uow
             )
+            draft = None
+            if not version_id and (concept := uow.concepts.get(dataset.id)):
+                from refrncr.mapping_updates import mapping_states
+
+                fields = uow.dataset_fields.list_for_dataset(dataset.id)
+                states = mapping_states(
+                    fields,
+                    uow.dataset_records.iterate_all(dataset.id),
+                    (record for record, _ in uow.dataset_records.deleted_records(dataset.id)),
+                )
+                baseline = (
+                    uow.versions.get(dataset.id, concept.base_version_id)
+                    if concept.base_version_id
+                    else None
+                )
+                old_source = (
+                    uow.versions.get(source.id, baseline.source_version_id) if baseline else None
+                )
+                draft = {
+                    "unmapped": sum(value == "Unmapped" for value in states.values()),
+                    "removed": sum(value == "Removed from source" for value in states.values()),
+                    "required_target": any(
+                        field.is_required and field.mapping_role == "mapping_target"
+                        for field in fields
+                    ),
+                    "previous_number": old_source.number
+                    if old_source and old_source.id != version.id
+                    else None,
+                }
+            current = uow.versions.current_for_datasets(
+                (source.id,), _version_reads(self).clock.today()
+            ).get(source.id)
             return {
+                "effective_date": version.effective_date,
+                "latest_effective_date": latest.effective_date if latest else None,
+                "current_number": current.number
+                if current and current.number > version.number
+                else None,
+                "current_effective_date": current.effective_date if current else None,
+                "may_update": maintain,
+                "revision": dataset.revision,
+                "draft": draft,
                 "name": version.name,
                 "key": source.key if visible else None,
                 "number": version.number,
@@ -2385,6 +2426,10 @@ class DatasetRecordService:
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(key, for_update=True)
             self._require_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
+            if dataset.kind == "mapping":
+                raise ValidationError(
+                    "Source records can only be restored by updating the source version."
+                )
             if _require_concept(uow, dataset.id).id != concept_id:
                 raise NotFoundError("Record not found")
             deleted = next(

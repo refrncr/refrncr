@@ -4,6 +4,15 @@
 {% from "components/icons.html" import key_icon, lock_icon %}
 {% from "components/table_row.html" import table_row, row_action %}
 {% from "components/record_search.html" import record_search_controls with context %}
+{% if mapping_source and mapping_source.draft %}
+{% from 'components/record_search.html' import hidden_criteria %}
+<form class='record-status-toggles' method='get' action='{{ request.path }}' aria-label='Mapping source status'>
+  {{ hidden_criteria(criteria_parameters, ['mapping_status']) }}
+  {% for value, label, count in [('unmapped', 'Unmapped', mapping_source.draft.unmapped), ('removed', 'Removed from source', mapping_source.draft.removed)] %}
+  <button class='status-toggle' type='submit' name='mapping_status' value='{{ "all" if mapping_status == value else value }}' aria-pressed='{{ "true" if mapping_status == value else "false" }}'>{{ label }} <span class='status-toggle-count'>{{ count }}</span></button>
+  {% endfor %}
+</form>
+{% endif %}
 {% if import_results %}
 <section aria-label='Import results'>
 <h2>Import results</h2>
@@ -61,7 +70,7 @@
               </td>
             {% endfor %}
 
-            {% if not version_state %}<td class='record-system-status'>{% if status %}{{ status_badge(status) }}{% endif %}</td>{% endif %}
+            {% if not version_state %}<td class='record-system-status'>{% if mapping_record_states.get(record.id) %}<span class='badge'>{{ mapping_record_states[record.id] }}</span>{% elif status %}{{ status_badge(status) }}{% endif %}</td>{% endif %}
           {% endcall %}
         {% endfor %}
       </tbody>

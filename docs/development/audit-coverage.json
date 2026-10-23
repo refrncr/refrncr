@@ -1403,7 +1403,8 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2970,7 +2971,8 @@
         "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
-        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
+        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -6603,7 +6605,8 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6662,6 +6665,49 @@
       "implementation_status": "Implemented for REF-239 pinned source metadata and Current source selection.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "update_mapping_source",
+      "service": "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing Dataset maintain permission and browser CSRF boundary; masked service lookup follows version operations.",
+      "exclusion_reason": "",
+      "technical_logging": "Safe fixed error only; no source or target values in logs.",
+      "events": [
+        [
+          "dataset",
+          "dataset.mapping_source_updated"
+        ]
+      ],
+      "object_identifier": "Stable mapping Dataset UUID.",
+      "actor_source": "Authenticated browser session or trusted service caller.",
+      "allowed_context": {
+        "dataset:dataset.mapping_source_updated": {
+          "previous_version": "version_count",
+          "source_version": "version_count"
+        }
+      },
+      "success": "Pin the latest non-cancelled source, reconcile rows and retain targets in one transaction; emit one source update event.",
+      "validation_failure": "No persisted changes or event; reject incompatible source fields and invalid identifiers.",
+      "authorization_failure": "No persisted changes or event for a caller without mapping maintain permission.",
+      "stale_input": "Reject mismatched Dataset revision before creating a draft or changing content.",
+      "no_op": "An already updated active draft is returned without changes or event.",
+      "rollback": "Draft creation, source pointer, records and audit share one serialized transaction.",
+      "duplicate_retry": "Old revision conflicts; a refreshed retry of the same source is a no-op.",
+      "tests": [
+        "tests/test_mapping_source_updates.py::test_upgrade_reconciles_and_preserves_targets",
+        "tests/test_mapping_source_updates.py::test_source_update_guards_and_noop_preserve_state",
+        "tests/test_mapping_source_updates.py::test_failed_source_update_rolls_back_draft_and_audit",
+        "tests/test_mapping_source_updates.py::test_browser_source_current_warning_and_post_guards"
+      ],
+      "implementation_status": "Implemented by REF-301."
     }
   ]
 }

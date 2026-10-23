@@ -277,6 +277,7 @@ def _route_matrix_expectations():
     dataset_export = {"export_dataset_records"}
     dataset_export_admin = {"dataset_export_access", "revoke_dataset_export_access"}
     dataset_maintain = {
+        "dataset_mapping_source_update",
         "dataset_concept_create",
         "dataset_concept_discard",
         "dataset_version_publish",

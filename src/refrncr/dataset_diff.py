@@ -15,6 +15,7 @@ from refrncr.diff_contracts import (
     DiffCriteria,
     DiffPage,
     DiffSummary,
+    PropertyChange,
     RecordChange,
     RecordDetail,
     ReviewIdentity,
@@ -100,6 +101,18 @@ class DatasetDiffService:
     def _summary(uow, dataset, identity, state, changes):
         # Dataset metadata is current configuration, not versioned content.
         metadata = ()
+        if (
+            dataset.kind == "mapping"
+            and state
+            and dataset.source_version_id != state.version.source_version_id
+        ):
+            before = uow.versions.get(dataset.source_dataset_id, state.version.source_version_id)
+            after = uow.versions.get(dataset.source_dataset_id, dataset.source_version_id)
+            metadata = (
+                PropertyChange(
+                    "Source", f"{before.name} V{before.number}", f"{after.name} V{after.number}"
+                ),
+            )
         counts = summary_counts(changes, uow.version_diff.counts(dataset.id, identity.baseline_id))
         hierarchy_changes, hierarchy_errors = (), ()
         if dataset.kind == "hierarchy":

@@ -152,6 +152,23 @@ class SqlAlchemyConceptOperations:
         ):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         field = DatasetVersionField
+        mapping_columns, mapping_values = [], []
+        if getattr(dataset, "kind", "reference") == "mapping":
+            from sqlalchemy.orm import aliased
+
+            source_field = aliased(DatasetVersionField)
+            mapping_columns = ["mapping_role", "source_field_key", "source_field_id"]
+            mapping_values = [
+                field.mapping_role,
+                field.source_field_key,
+                select(source_field.id)
+                .where(
+                    source_field.version_id == version.source_version_id,
+                    source_field.key == field.source_field_key,
+                )
+                .correlate(field)
+                .scalar_subquery(),
+            ]
         self.session.execute(
             insert(DatasetField.__table__).from_select(
                 [
@@ -166,6 +183,7 @@ class SqlAlchemyConceptOperations:
                     "is_unique",
                     "display_position",
                     "hierarchy_scope",
+                    *mapping_columns,
                     "created_at",
                     "updated_at",
                 ],
@@ -181,6 +199,7 @@ class SqlAlchemyConceptOperations:
                     field.is_unique,
                     field.display_position,
                     field.hierarchy_scope,
+                    *mapping_values,
                     literal(now),
                     literal(now),
                 ).where(field.version_id == version.id),
