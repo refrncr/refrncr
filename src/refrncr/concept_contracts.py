@@ -41,6 +41,7 @@ class ActiveConcept:
     start_revision: int
     records_mutated: bool | None = False
     import_result: dict | None = None
+    source_update_notes: list[str] | None = None
 
 
 @dataclass(frozen=True, slots=True)

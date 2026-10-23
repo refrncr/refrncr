@@ -29,6 +29,7 @@
     "refrncr.dataset_versions.DatasetVersionService.read_current",
     "refrncr.dataset_versions.DatasetVersionService.review",
     "refrncr.dataset_versions.DatasetVersionService.review_discard",
+    "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
     "refrncr.hierarchy.HierarchyService.create_node",
     "refrncr.hierarchy.HierarchyService.delete_subtree",
     "refrncr.hierarchy.HierarchyService.update_node",
@@ -396,7 +397,8 @@
         "refrncr.dataset_versions.DatasetVersionService.publish",
         "refrncr.dataset_versions.DatasetVersionService.review",
         "refrncr.services.DatasetService.get_dataset_for_edit",
-        "refrncr.services.SessionService.resolve_with_session"
+        "refrncr.services.SessionService.resolve_with_session",
+        "refrncr.services.DatasetService.mapping_source"
       ]
     },
     {
@@ -1500,6 +1502,18 @@
       "operations": [
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.hierarchy.HierarchyService.update_values",
+        "refrncr.services.SessionService.resolve_with_session"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_mapping_source_update",
+      "path": "/datasets/<key>/source/update",
+      "methods": [
+        "POST"
+      ],
+      "operations": [
+        "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
+        "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     }

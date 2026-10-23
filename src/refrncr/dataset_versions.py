@@ -441,6 +441,52 @@ class DatasetVersionService:
         except PersistenceConflictError:
             raise ConflictError("Concept could not be started. Reload and try again.") from None
 
+    def update_mapping_source(self, actor_id, dataset_id, expected_revision):
+        """Explicitly upgrade to the latest non-cancelled publication, atomically."""
+        from refrncr.mapping_updates import reconcile_source
+        from refrncr.services import _advance_concept
+
+        try:
+            with self.uow(write=True, serialized=True, translate_errors=True) as uow:
+                dataset = self._target(uow, actor_id, dataset_id, write=True)
+                if type(expected_revision) is not int or dataset.revision != expected_revision:
+                    raise ConflictError("Mapping changed. Reload and try again.")
+                if dataset.kind != "mapping":
+                    raise ValidationError("Only mappings can update a source version.")
+                # Serialize against publication/cancellation of the source as well.
+                uow.datasets.get(dataset.source_dataset_id, for_update=True)
+                source = uow.versions.latest_non_cancelled(dataset.source_dataset_id)
+                if uow.concepts.get(dataset.id) is None:
+                    self.create_concept(actor_id, dataset.id, uow=uow)
+                previous = uow.versions.get(dataset.source_dataset_id, dataset.source_version_id)
+                if source is None or previous is None:
+                    raise ValidationError("Mapping requires its published source version.")
+                if source.number <= previous.number:
+                    return uow.concepts.get(dataset.id)
+                notes = reconcile_source(uow, dataset, source)
+                dataset.source_version_id = source.id
+                dataset.content_updated_at = uow.now()
+                concept = uow.concepts.get(dataset.id)
+                uow.concepts.record_mutation(
+                    dataset.id,
+                    import_result={},
+                    source_update_notes=[*(concept.source_update_notes or []), *notes],
+                )
+                _advance_concept(uow, dataset)
+                record_audit(
+                    uow,
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset.id,
+                    action="dataset.mapping_source_updated",
+                    details={"previous_version": previous.number, "source_version": source.number},
+                )
+                return uow.concepts.get(dataset.id)
+        except PersistenceConflictError:
+            raise ConflictError(
+                "Source update could not be completed. Reload and try again."
+            ) from None
+
     def _target(self, uow, actor_id, dataset_id, *, write=False):
         dataset = (
             uow.datasets.get(dataset_id, for_update=write) if _valid_identity(dataset_id) else None
@@ -665,6 +711,7 @@ class DatasetVersionService:
         search="",
         statuses=(),
         record_status="all",
+        mapping_status="all",
     ):
         if page is not None and (type(page) is not int or page < 1):
             raise ValidationError("Page must be a positive integer")
@@ -689,6 +736,10 @@ class DatasetVersionService:
                 or (state is not None and (statuses or selected_changes))
             ):
                 raise RecordSearchError("Choose valid statuses for this Dataset version.")
+            if mapping_status not in {"all", "unmapped", "removed"} or (
+                mapping_status != "all" and (state is not None or dataset.kind != "mapping")
+            ):
+                raise RecordSearchError("Choose a valid mapping draft filter.")
             context = self._read_context(uow, dataset, state)
             if state is None:
                 fields = tuple(uow.dataset_fields.list_for_dataset(dataset.id))
@@ -737,7 +788,9 @@ class DatasetVersionService:
                 removed = tuple(
                     record
                     for record, _fields in pairs
-                    if record.id in baseline_ids or record.id in imported_deleted_ids
+                    if dataset.kind == "mapping"
+                    or record.id in baseline_ids
+                    or record.id in imported_deleted_ids
                 )
                 deleted_fields = {record.id: field_set for record, field_set in pairs}
             deleted_ids = {record.id for record in removed}
@@ -804,7 +857,15 @@ class DatasetVersionService:
                 sum(raw_states[record.id] == label for record in matching)
                 for label in DISPLAY_STATUSES
             )
+            mapping_record_states = {}
+            if state is None and dataset.kind == "mapping":
+                from refrncr.mapping_updates import mapping_states
+
+                mapping_record_states = mapping_states(fields, ordered, removed)
             ordered = matching
+            if mapping_status != "all":
+                wanted = "Unmapped" if mapping_status == "unmapped" else "Removed from source"
+                ordered = [r for r in ordered if mapping_record_states.get(r.id) == wanted]
             if statuses and imported:
                 imported_ids = set(imported)
                 ordered = [record for record in ordered if record.id in imported_ids]
@@ -858,6 +919,7 @@ class DatasetVersionService:
                 status_counts,
                 hierarchy_nodes,
                 hierarchy_errors,
+                MappingProxyType(mapping_record_states),
             )
 
     def review(self, actor_id, dataset_id):
@@ -899,6 +961,7 @@ class DatasetVersionService:
             fields = classify_fields(content.fields, uow.versions.fields(latest))
             summary = summary_counts(fields, uow.version_diff.counts(dataset.id, latest.id))
             changed = any(getattr(summary, key) for key in SummaryCounts.__dataclass_fields__)
+            changed = changed or dataset.source_version_id != latest.source_version_id
             if dataset.kind == "hierarchy":
                 changed = changed or bool(uow.version_diff.hierarchy_changes(dataset.id, latest.id))
         if not changed:

@@ -105,6 +105,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset_field", "deleted"): ActionPresentation("Dataset field deleted", True),
         ("dataset_record", "created"): ActionPresentation("Record created", False),
         ("dataset_record", "restored"): ActionPresentation("Record restored", False),
+        ("dataset", "dataset.mapping_source_updated"): ActionPresentation(
+            "Mapping source updated", False
+        ),
         ("dataset", "dataset.mapping_targets_updated"): ActionPresentation(
             "Mapping targets updated", False
         ),
@@ -145,6 +148,8 @@ CONTEXT_LABELS = MappingProxyType(
         "creator_user_id": "Creator user ID",
         "version_number": "Version number",
         "baseline_version_number": "Baseline version",
+        "previous_version": "Previous source version",
+        "source_version": "Source version",
         "concept_revision": "Draft revision",
         "concept_id": "Concept ID",
         "metadata_changes": "Dataset properties changed",

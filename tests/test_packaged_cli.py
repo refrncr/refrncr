@@ -144,6 +144,7 @@ def test_wheel_contains_migration_runtime(installed_artifact):
         "refrncr/migrations/versions/0030_ref_205_typed_draft_values.py",
         "refrncr/migrations/versions/0031_ref_239_mapping_source_versions.py",
         "refrncr/migrations/versions/0032_ref_239_source_version_policy.py",
+        "refrncr/migrations/versions/0033_ref_301_source_update_notes.py",
         "refrncr/api_keys.py",
         "refrncr/api_key_persistence.py",
         "refrncr/static/js/api-key-secret.js",

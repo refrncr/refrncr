@@ -67,6 +67,8 @@ def parse_parameters(items):
         "q",
         "page",
         "record_status",
+        "mapping_status",
+        "notice",
         "import_results",
         "status_selection",
         "action",
@@ -85,6 +87,8 @@ def parse_parameters(items):
             raise RecordSearchError("Unknown, duplicate or over-limit Record criteria.")
         else:
             values[name] = value
+    if "notice" in values and values["notice"] != "source-updated":
+        raise RecordSearchError("Invalid Record notice.")
     for name in ("import_results", "status_selection"):
         if name in values and values[name] != "1":
             raise RecordSearchError("Invalid import results selection.")

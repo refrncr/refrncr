@@ -41,7 +41,7 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
-        if current in {"0031_ref_239", "0032_ref_239"}:
+        if current in {"0031_ref_239", "0032_ref_239", "0033_ref_301"}:
             command.downgrade(config, "0030_ref_205")
             current = "0030_ref_205"
         if current == "0030_ref_205":

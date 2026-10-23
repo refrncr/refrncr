@@ -1402,6 +1402,36 @@ def create_flask_app(
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @dataset_route(
+        "/datasets/<key>/source/update", capability="can_maintain_dataset", methods=["POST"]
+    )
+    @version_errors
+    def dataset_mapping_source_update(key):
+        from refrncr.mapping_updates import SourceUpdateBlocked
+
+        actor, session = require_authenticated()
+        require_csrf(session.csrf_token)
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        try:
+            revisions = request.form.getlist("expected_revision")
+            if len(revisions) != 1:
+                raise ValidationError("Reload the mapping before updating its source.")
+            dataset_versions.update_mapping_source(
+                actor.id, dataset.id, parse_expected_revision(revisions[0])
+            )
+        except SourceUpdateBlocked:
+            # Re-render the mapping's shared notice, including newly incompatible sources.
+            return redirect(url_for("dataset_records_view", key=key), code=303)
+        except (ValidationError, ConflictError) as failure:
+            status = 409 if isinstance(failure, ConflictError) else 400
+            return render_authenticated_template(
+                "pages/error.html", error_code=status, error_message=str(failure)
+            ), status
+        return redirect(
+            url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
+            code=303,
+        )
+
+    @dataset_route(
         "/datasets/<key>/concept/discard",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -1732,13 +1762,23 @@ def create_flask_app(
         except (ValidationError, ConflictError) as failure:
             error, status = error or str(failure), 409
         today = dataset_versions.clock.today().isoformat()
+        mapping_source = (
+            datasets.mapping_source(actor.id, key) if dataset.kind == "mapping" else None
+        )
+        minimum_date = (
+            max(dataset_versions.clock.today(), mapping_source["effective_date"])
+            if mapping_source
+            else dataset_versions.clock.today()
+        )
         concept_summary = dataset_versions.history(actor.id, key).concept_summary
         return render_authenticated_template(
             "pages/datasets/versions/publish.html",
             dataset=dataset,
             review=review,
             error=error,
-            effective_date=effective or today,
+            effective_date=effective or minimum_date.isoformat(),
+            minimum_date=minimum_date,
+            mapping_source=mapping_source,
             release_note=note,
             today=today,
             review_token=review_token,
@@ -2444,8 +2484,10 @@ def create_flask_app(
                 search=parameters.get("q", ""),
                 statuses=(selected_statuses or DISPLAY_STATUSES) if import_results else (),
                 record_status=record_status,
+                mapping_status=parameters.get("mapping_status", "all"),
             )
             criteria_parameters = {
+                "mapping_status": parameters.get("mapping_status"),
                 "q": view.search or None,
                 "record_status": record_status if concept and record_status != "all" else None,
             }
@@ -2577,7 +2619,14 @@ def create_flask_app(
                 q=view.search or None,
                 record_status="all",
             ),
-            has_criteria=bool(view.search or import_results or record_status != "all"),
+            has_criteria=bool(
+                view.search
+                or import_results
+                or record_status != "all"
+                or parameters.get("mapping_status", "all") != "all"
+            ),
+            mapping_status=parameters.get("mapping_status", "all"),
+            mapping_record_states=view.mapping_record_states or {},
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,

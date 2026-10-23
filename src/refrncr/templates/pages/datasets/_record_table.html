@@ -61,7 +61,7 @@
               </td>
             {% endfor %}
 
-            {% if not version_state %}<td class='record-system-status'>{% if status %}{{ status_badge(status) }}{% endif %}</td>{% endif %}
+            {% if not version_state %}<td class='record-system-status'>{% if mapping_record_states.get(record.id) %}<span class='badge'>{{ mapping_record_states[record.id] }}</span>{% endif %}{% if status %}{{ status_badge(status) }}{% endif %}</td>{% endif %}
           {% endcall %}
         {% endfor %}
       </tbody>

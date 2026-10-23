@@ -797,3 +797,6 @@ class DatasetConcept(Base):
         Boolean, nullable=True, default=False, server_default=false()
     )
     import_result: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    source_update_notes: Mapped[list[str] | None] = mapped_column(
+        JSON(none_as_null=True), nullable=True
+    )

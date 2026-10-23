@@ -138,6 +138,11 @@ _EVENTS = (
     ),
     EventContract(
         "dataset",
+        "dataset.mapping_source_updated",
+        (("previous_version", "version_count"), ("source_version", "version_count")),
+    ),
+    EventContract(
+        "dataset",
         "dataset.mapping_targets_updated",
         (("format", "import_format"), ("changed", "count"), ("unchanged", "count")),
     ),
@@ -703,6 +708,12 @@ _register(
     rationale="Administrator-only audit history read; no business state change or domain event.",
 )
 
+_audited(
+    "DatasetVersionService",
+    "update_mapping_source",
+    ("dataset", "dataset.mapping_source_updated"),
+    module="dataset_versions",
+)
 _audited(
     "DatasetVersionService",
     "publish",

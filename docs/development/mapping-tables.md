@@ -32,7 +32,45 @@ The metadata line, review and version history identify the source version. A new
 non-cancelled publication, including Scheduled, immediately produces an in-app notice and
 dataset-list badge. Cancelling that Scheduled publication removes its signal. These are
 computed on reads and need no notification job. There is no automatic source upgrade;
-explicit upgrading belongs to REF-301. The source owner's usage view belongs to REF-302.
+maintainers explicitly choose **Update to Vn** to upgrade (REF-301). The source owner's
+usage view belongs to REF-302.
+
+## Updating a source
+
+The update action selects the latest non-cancelled source publication under the existing
+Dataset locks, including Scheduled versions and jumps such as V1 to V3. It creates a draft
+or reuses the active one. Matching uses the canonical source identifier: existing target
+values, including draft edits, survive; source context values are refreshed. New identifiers
+start with empty targets. Removed identifiers retain their values as draft tombstones labeled
+**Removed from source** and are omitted from publication. Identifiers returning during further
+updates to the same draft recover their targets. They cannot be manually restored into a
+source snapshot that does not contain them.
+
+Drafts expose Unmapped and Removed from source counts and filters. Unmapped means a row has
+no target values. The review shows the source transition and the same counts, including when
+only the source link changed. Optional empty targets can be published with a counted warning;
+required targets still use the existing record validation. Publication defaults to the source
+effective date, or today when that date is in the past, and rejects dates before the source.
+A newer Current source makes the notice a warning even when a still newer Scheduled version
+is available to update to. Published mappings and their history remain immutable.
+Rebuilding a draft after discard or cancellation restores source/target field roles and
+source-field links along with the snapshot values.
+
+An update removes selected context fields that are missing or have changed datatype in the
+new source. The draft and review retain an explanation for each removal, including the source
+version, until publication or discard. A still-available field can be added again with its new
+datatype. The source identifier must remain required and unique, with its original datatype;
+otherwise the shared notice explains the blocker and remediation without offering an update
+button. A direct update request is also rejected atomically and returns to the mapping notice.
+Published mappings whose draft already uses the newest source link to that draft instead of
+offering another update. Successful updates report unmapped and removed counts. The publication
+date help names the earliest permitted date and the pinned source version. Updates use the existing revision, authorization,
+CSRF, audit and rollback machinery. Like existing Dataset version routes,
+`POST /datasets/<key>/source/update` returns the same non-disclosing 404 for missing
+and inaccessible Datasets; malformed/stale revisions return 400/409. The `dataset.mapping_source_updated` event includes only
+the old and new source version numbers. No REST write endpoint is added. Revision `0033_ref_301` adds nullable JSON
+`dataset_concepts.source_update_notes` for draft explanations. Existing drafts need no backfill;
+publication and discard remove the notes with the concept. Downgrade drops only this metadata.
 
 ## Presentation and authorization
 
@@ -76,3 +114,23 @@ With that running, `tests/javascript/mapping_browser.cjs` checks 320/768/1440 pi
 accessible table rows, field panels and keyboard field ordering. It accepts
 `REFRNCR_PLAYWRIGHT_MODULE`, `REFRNCR_BROWSER_EXECUTABLE` and optional
 `REFRNCR_BROWSER_OUTPUT` for an existing browser toolchain; no runtime dependency is added.
+
+
+For REF-301 source-update checks, start the separate disposable fixture with
+`PYTHONPATH=tests .venv/bin/python tests/browser_mapping_updates_app.py` instead. Sign in
+with its test account (`admin@example.com`, `correct horse battery staple`) and check:
+
+1. `/datasets/blocked-mapping/records`: the notice explains the invalid identifier and
+   remediation, with no **Update to V2** button.
+2. `/datasets/mapping-browser/records`: click **Update to V2**. The draft reports
+   **Updated to V2: 1 unmapped, 1 removed from source.** The GBP row shows **Added** and
+   **Unmapped**; mapping filters sit beside the change filters and work by keyboard.
+3. Follow **View current version**: the notice contains **Draft already uses V2** and
+   links to the draft, with no update button.
+4. Open **Review & publish**, then **Publish version**: the effective-date help names
+   Currencies V2 and its date (seven days after the fixture starts). Check the filters
+   also fit at a 320-pixel viewport. No publication is needed for these checks.
+
+These browser checks were performed for REF-301 review 1. The corresponding rendered-output,
+service, migration and rollback regressions live in `tests/test_mapping_source_updates.py`.
+The existing full-row loading for draft mapping counters remains a performance follow-up.

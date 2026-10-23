@@ -184,6 +184,7 @@ class VersionRead:
     status_counts: tuple[int, int, int] = (0, 0, 0)
     hierarchy_nodes: tuple[HierarchyNode, ...] = ()
     hierarchy_errors: tuple[str, ...] = ()
+    mapping_record_states: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
