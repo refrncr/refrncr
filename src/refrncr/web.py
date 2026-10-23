@@ -624,6 +624,23 @@ def create_flask_app(
         dataset = context.get("dataset")
         if (
             dataset is not None
+            and actor
+            and template_name
+            in {
+                "pages/datasets/detail.html",
+                "pages/datasets/records.html",
+                "pages/datasets/hierarchy.html",
+                "pages/datasets/versions/review.html",
+            }
+        ):
+            context["mapping_usage"] = datasets.mapping_usage(
+                actor.id,
+                dataset.key,
+                details=template_name
+                in {"pages/datasets/detail.html", "pages/datasets/versions/review.html"},
+            )
+        if (
+            dataset is not None
             and dataset.kind == "mapping"
             and actor
             and context.get("source_context_available", True)
@@ -1779,6 +1796,7 @@ def create_flask_app(
             effective_date=effective or minimum_date.isoformat(),
             minimum_date=minimum_date,
             mapping_source=mapping_source,
+            mapping_usage=datasets.mapping_usage(actor.id, key),
             release_note=note,
             today=today,
             review_token=review_token,

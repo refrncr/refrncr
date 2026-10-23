@@ -461,6 +461,22 @@ class SqlAlchemyDatasetOperations:
     def list_all(self) -> list[Dataset]:
         return list(self.session.scalars(select(Dataset).order_by(Dataset._key)))
 
+    def mappings_using(self, source_dataset_id: str) -> list[Dataset]:
+        return list(
+            self.session.scalars(
+                select(Dataset)
+                .where(Dataset.kind == "mapping", Dataset.source_dataset_id == source_dataset_id)
+                .order_by(Dataset.name, Dataset._key)
+            )
+        )
+
+    def mapping_usage_count(self, source_dataset_id: str) -> int:
+        return self.session.scalar(
+            select(func.count())
+            .select_from(Dataset)
+            .where(Dataset.kind == "mapping", Dataset.source_dataset_id == source_dataset_id)
+        )
+
     def list_by_ids(self, dataset_ids: tuple[str, ...]) -> list[Dataset]:
         if not dataset_ids:
             return []

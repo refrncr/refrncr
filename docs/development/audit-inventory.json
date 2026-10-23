@@ -109,6 +109,7 @@
     "refrncr.services.DatasetService.list_datasets",
     "refrncr.services.DatasetService.mapping_source",
     "refrncr.services.DatasetService.mapping_source_choices",
+    "refrncr.services.DatasetService.mapping_usage",
     "refrncr.services.DatasetService.revoke_export_access",
     "refrncr.services.DatasetService.update_dataset",
     "refrncr.services.GrantService.change_permission",
@@ -177,6 +178,7 @@
         "refrncr.services.DatasetAuthorizationService.can_create_dataset",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.index"
       ]
@@ -193,6 +195,7 @@
         "refrncr.services.DatasetAuthorizationService.can_create_dataset",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -246,6 +249,7 @@
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -266,6 +270,7 @@
         "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -286,6 +291,7 @@
         "refrncr.services.DatasetService.get_dataset_for_deletion",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -336,6 +342,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.history",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -351,6 +358,7 @@
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -397,8 +405,9 @@
         "refrncr.dataset_versions.DatasetVersionService.publish",
         "refrncr.dataset_versions.DatasetVersionService.review",
         "refrncr.services.DatasetService.get_dataset_for_edit",
-        "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.services.DatasetService.mapping_source"
+        "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     },
     {
@@ -435,6 +444,7 @@
         "refrncr.services.DatasetService.grant_export_access",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -483,6 +493,7 @@
         "refrncr.services.DatasetService.get_dataset",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -500,6 +511,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.get_dataset",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -517,6 +529,7 @@
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
         "refrncr.services.DatasetService.get_dataset",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -918,6 +931,7 @@
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.DatasetService.update_dataset",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -953,6 +967,7 @@
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -972,6 +987,7 @@
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.list_dataset_overview",
         "refrncr.services.DatasetService.mapping_source",
+        "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]

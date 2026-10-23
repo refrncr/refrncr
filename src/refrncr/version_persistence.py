@@ -79,6 +79,18 @@ class SqlAlchemyVersionOperations:
         )
         return self._version(row) if row else None
 
+    def list_for_datasets(self, dataset_ids):
+        """Batch publication metadata only, without snapshot fields or records."""
+        result = defaultdict(list)
+        if dataset_ids:
+            for row in self.session.scalars(
+                self._select_version()
+                .where(DatasetVersion.dataset_id.in_(dataset_ids))
+                .order_by(DatasetVersion.number.desc())
+            ):
+                result[row.dataset_id].append(self._version(row))
+        return dict(result)
+
     def source_updates(self, source_version_ids):
         if not source_version_ids:
             return frozenset()

@@ -89,6 +89,41 @@ readers cannot inspect draft or future mapping versions. A source link appears o
 user can view that dataset. The REST API keeps its existing read-only contract; mapping
 resolution remains separate work.
 
+## Source-side mapping usage
+
+Settings, review and the publication panel share the `mapping_usage.html` component.
+The dataset metadata links to the Settings section. Usage counts every existing dependent
+mapping once, including unpublished mappings. Records pages use a count query; the detailed
+list batches publication headers and authorized concepts without loading mapping records.
+
+The service prefers the mapping's Current publication, then a visible Scheduled or Expired
+publication. A different draft source is shown separately to mapping maintainers. Cancelled
+publications are excluded. The update indication compares the selected source pin with the
+latest non-cancelled source publication, including Scheduled, as in REF-301. The dependency
+list is dataset-wide even when opened from an older source snapshot.
+
+All source readers can see the count and list. Existing dataset and version permissions still
+apply: a never-published mapping is anonymous to non-maintainers; a Scheduled-only mapping
+can link to its existing dataset Settings without exposing its version or source pin. Mappings
+without read access are grouped by owning team, returning only team name and count to the
+template. There are no new grants, notifications, API endpoints or schema changes.
+
+Browser check: run `.venv/bin/python tests/browser_mapping_usage_app.py` and open
+`http://127.0.0.1:5194`. The fixture uses disposable in-memory data. Sign in as
+`admin@example.com` with password `correct horse battery staple`:
+
+1. Open Currencies Records and activate **Used by 2 mappings** with Enter. Settings opens at
+   **Used by mappings**, above Delete dataset. Currency mapping uses V1 and shows **Draft uses
+   V2**; Finance currency mapping is a Draft on V1. Follow both mapping links.
+2. Open the source Draft's review and publication panel and check the shared dependency list.
+   The fixture advances its publication clock until source V2 is Current; the mapping
+   publication still uses V1 while its Draft uses V2.
+3. Sign out and sign in as `reader@example.com` with the same disposable password. The count
+   is still two. Currency mapping shows only published details; Finance appears only as
+   **1 mapping you don't have access to** and its team name.
+4. Check the anchor, wrapping, keyboard links and absence of horizontal overflow on desktop
+   and at a 320px viewport.
+
 ## Upgrade
 
 Before deploying revision `0031_ref_239`, delete **all** existing mapping datasets through the

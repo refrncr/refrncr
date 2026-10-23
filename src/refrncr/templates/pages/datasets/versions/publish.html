@@ -2,12 +2,14 @@
 {% from "components.html" import feedback, form_field, readonly_field %}
 {% from "components/side_panel.html" import panel_form_actions %}
 {% from "components/mapping_update.html" import counts, warning, transition %}
+{% from "components/mapping_usage.html" import publication_notice %}
 {% block title %}Publish version · REFRNCR{% endblock %}
 {% block content %}
   <h1>Publish version</h1>
   <div class='side-panel-view' data-side-panel-content data-panel-title='Publish version' data-panel-eyebrow='{{ dataset.name }}'>
     <div class='side-panel-body panel-sections'>
       {{ feedback(error, id='publication-error', focus=true) }}
+      {{ publication_notice(mapping_usage) }}
       {% if mapping_source %}<p>{{ transition(mapping_source) }}</p>{{ counts(mapping_source) }}{{ warning(mapping_source) }}{% endif %}
       {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a></p>{% endif %}
       {% if review %}{% set revision, number, content, summary = review %}

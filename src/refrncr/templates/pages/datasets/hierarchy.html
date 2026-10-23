@@ -12,7 +12,7 @@
 {% block title %}{{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 {% block content %}
 <div class='page-header'>
-  {% call page_context(dataset.name|dataset_title, content_metadata(hierarchy_rows|length, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none, record_label='nodes', secondary_count=leaf_count, secondary_label='leaves', draft_in_progress=draft_in_progress and version_state is not none), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+  {% call page_context(dataset.name|dataset_title, content_metadata(hierarchy_rows|length, context.last_updated, version_state.version.number if version_state else none, 0, version_state.status if version_state else none, record_label='nodes', secondary_count=leaf_count, secondary_label='leaves', draft_in_progress=draft_in_progress and version_state is not none, mapping_usage=mapping_usage), icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
     {% include "pages/datasets/_breadcrumbs.html" %}
   {% endcall %}
   <div class='page-actions'>
