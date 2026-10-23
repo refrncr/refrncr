@@ -10,7 +10,9 @@ name, description, ordered Field definitions (including required/unique flags an
 datatypes), identifier membership, stable Record IDs and canonical values. Null is an
 absent value row. Snapshots exclude owning teams, memberships, Grants, export access,
 creator metadata and working timestamps/revisions. Current permissions are authoritative.
-See [ADR-014](../architecture/adr-014-dataset-versions.md).
+See [ADR-014](../architecture/adr-014-dataset-versions.md). Mapping snapshots additionally
+store their immutable source-version relationship; see [mapping tables](mapping-tables.md)
+and [ADR-024](../architecture/adr-024-pinned-mapping-sources.md).
 
 ## Date and lifecycle contract
 

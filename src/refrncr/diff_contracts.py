@@ -91,6 +91,8 @@ class DiffPage:
     previous: str = ""
     next: str = ""
     status_counts: tuple[int, int, int] = (0, 0, 0)
+    mapping_fields: tuple = ()
+    mapping_values: tuple = ()
 
 
 @dataclass(frozen=True, slots=True)

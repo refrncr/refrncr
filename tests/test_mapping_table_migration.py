@@ -17,7 +17,7 @@ def test_mapping_table_columns_upgrade_and_downgrade(database_audit_db):
         }
         connection.commit()
         command.upgrade(config, "head")
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
         columns = {column["name"] for column in inspect(connection).get_columns("datasets")}
         assert {
             "kind",
@@ -44,7 +44,7 @@ def test_linked_mapping_fields_upgrade_an_existing_ref_177_database(database_aud
 
         command.upgrade(config, "head")
 
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030_ref_205"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
         columns = {column["name"] for column in inspect(connection).get_columns("datasets")}
         assert {"source_field_key", "target_field_key"} <= columns
 
@@ -63,7 +63,7 @@ def test_mapping_field_roles_upgrade(database_audit_db):
         command.upgrade(config, "head")
 
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0030_ref_205"
+            "0033_ref_301"
         )
         assert {"mapping_role", "source_field_id", "source_field_key"} <= {
             column["name"] for column in inspect(connection).get_columns("dataset_fields")

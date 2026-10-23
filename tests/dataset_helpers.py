@@ -41,6 +41,9 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
+        if current in {"0031_ref_239", "0032_ref_239", "0033_ref_301"}:
+            command.downgrade(config, "0030_ref_205")
+            current = "0030_ref_205"
         if current == "0030_ref_205":
             command.downgrade(config, "0029_ref_195")
             current = "0029_ref_195"
@@ -185,4 +188,27 @@ def publish_dataset(services, actor_id, dataset):
     target = services.datasets.get_dataset(actor_id, dataset.key)
     return services.dataset_versions.publish(
         actor_id, dataset.id, SYSTEM_CLOCK.today(), "", target.revision
+    )
+
+
+def create_mapping_dataset(
+    services, admin, key, name, *, source_key="code", source_name="Source", records=()
+):
+    """Explicit published-source fixture for the mapping lifecycle."""
+    source = create_owned_dataset(services.datasets, admin.id, key + "-source", source_name, "")
+    services.dataset_fields.create_field(
+        admin.id, source.key, source_key, "Source identifier", "string", True, True, True
+    )
+    for record in records:
+        services.dataset_records.create_record(admin.id, source.key, {source_key: record})
+    publish_dataset(services, admin.id, source)
+    return create_owned_dataset(
+        services.datasets,
+        admin.id,
+        key,
+        name,
+        "",
+        kind="mapping",
+        source_dataset_id=source.id,
+        source_field_key=source_key,
     )

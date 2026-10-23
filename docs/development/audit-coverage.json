@@ -1403,7 +1403,8 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2410,6 +2411,10 @@
         [
           "dataset",
           "dataset.new_version_imported"
+        ],
+        [
+          "dataset",
+          "dataset.mapping_targets_updated"
         ]
       ],
       "object_identifier": "Stable UUID of the affected object; Dataset UUID for extraction/summary/identifier/order events.",
@@ -2428,9 +2433,14 @@
           "unchanged": "version_count",
           "deleted": "version_count",
           "total_processed": "version_count"
+        },
+        "dataset:dataset.mapping_targets_updated": {
+          "format": "import_format",
+          "changed": "count",
+          "unchanged": "count"
         }
       },
-      "success": "Create-only adds validated Records; new-version applies the complete canonical difference, records its one-use marker and emits one transactional summary. Unchanged Records are not written.",
+      "success": "Create-only adds validated Records; new-version applies the complete canonical difference, records its one-use marker and emits one transactional summary. Unchanged Records are not written. Mapping imports update only changed target rows, returning their count and emitting dataset.mapping_targets_updated with changed/unchanged row counts.",
       "validation_failure": "No successful domain event; reject without committed business state changes.",
       "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
       "stale_input": "Revalidate schema, authority and uniqueness under Dataset lock; invalid/stale claim produces no summary.",
@@ -2444,7 +2454,9 @@
         "tests/test_audit_coverage.py::test_every_mutation_rolls_back_business_and_audit",
         "tests/test_audit_coverage.py::test_every_mutation_denies_untrusted_or_missing_actor",
         "tests/test_audit_coverage.py::test_repeated_submission_cannot_add_event_without_change",
-        "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit"
+        "tests/test_new_version_import.py::test_new_version_failure_rolls_back_all_content_marker_and_audit",
+        "tests/test_record_import.py::test_mapping_import_counts_changes_and_requires_confirmation",
+        "tests/test_record_import.py::test_mapping_import_no_changes_preserves_all_persisted_state"
       ],
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending. REF-31 security audit logging implemented; GitHub CI pending.",
       "exclusion_reason": "",
@@ -2959,7 +2971,8 @@
         "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
-        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
+        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -6573,6 +6586,175 @@
       "implementation_status": "Implemented by REF-221; validates submitted source-format components against user-, session-, and Dataset-bound transient import state.",
       "exclusion_reason": "Transient preview/receipt state only; no committed Records. Rejected or suspicious import attempts belong to REF-31.",
       "persistence_scope": "Transient process state only; no durable business state."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_source",
+      "service": "refrncr.services.DatasetService.mapping_source",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_source_versions.py::test_source_snapshot_survives_drafts_publications_and_clock_changes",
+        "tests/test_dataset_browser.py::test_mapping_source_target_blocks_and_field_entry_points"
+      ],
+      "implementation_status": "Implemented for REF-239 pinned source metadata and Current source selection.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_source_choices",
+      "service": "refrncr.services.DatasetService.mapping_source_choices",
+      "interface_entrypoints": [
+        "refrncr.web.new_dataset GET /datasets/new",
+        "refrncr.web.create_dataset POST /datasets"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Ordinary authorized read; no business state change.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_source_versions.py::test_source_snapshot_survives_drafts_publications_and_clock_changes",
+        "tests/test_dataset_browser.py::test_mapping_source_target_blocks_and_field_entry_points"
+      ],
+      "implementation_status": "Implemented for REF-239 pinned source metadata and Current source selection.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Existing Dataset read boundary; no new domain persistence."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "update_mapping_source",
+      "service": "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Existing Dataset maintain permission and browser CSRF boundary; masked service lookup follows version operations.",
+      "exclusion_reason": "",
+      "technical_logging": "Safe fixed error only; no source or target values in logs.",
+      "events": [
+        [
+          "dataset",
+          "dataset.mapping_source_updated"
+        ]
+      ],
+      "object_identifier": "Stable mapping Dataset UUID.",
+      "actor_source": "Authenticated browser session or trusted service caller.",
+      "allowed_context": {
+        "dataset:dataset.mapping_source_updated": {
+          "previous_version": "version_count",
+          "source_version": "version_count"
+        }
+      },
+      "success": "Pin the latest non-cancelled source, reconcile rows and retain targets in one transaction; emit one source update event.",
+      "validation_failure": "No persisted changes or event for incompatible source identifiers or invalid snapshots. Missing or datatype-changed context fields are removed with draft explanations.",
+      "authorization_failure": "No persisted changes or event for a caller without mapping maintain permission.",
+      "stale_input": "Reject mismatched Dataset revision before creating a draft or changing content.",
+      "no_op": "An already updated active draft is returned without changes or event.",
+      "rollback": "Draft creation, source pointer, context-field removals, explanatory notes, records and audit share one serialized transaction.",
+      "duplicate_retry": "Old revision conflicts; a refreshed retry of the same source is a no-op.",
+      "tests": [
+        "tests/test_mapping_source_updates.py::test_upgrade_reconciles_and_preserves_targets",
+        "tests/test_mapping_source_updates.py::test_source_update_guards_and_noop_preserve_state",
+        "tests/test_mapping_source_updates.py::test_failed_source_update_rolls_back_draft_and_audit",
+        "tests/test_mapping_source_updates.py::test_browser_source_current_warning_and_post_guards"
+      ],
+      "implementation_status": "Implemented by REF-301."
+    },
+    {
+      "capability": "DatasetService",
+      "operation": "mapping_usage",
+      "service": "refrncr.services.DatasetService.mapping_usage",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.dataset_list GET /datasets",
+        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.dataset_detail GET /datasets/<key>",
+        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
+        "refrncr.web.update_dataset POST /datasets/<key>",
+        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Protected dataset lookup uses the existing authorization service and a non-disclosing not-found result.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload or exception details in audit.",
+      "events": [],
+      "object_identifier": "No domain event; use the trusted dataset UUID only in future security diagnostics.",
+      "actor_source": "Trusted authenticated actor supplied by the web boundary.",
+      "allowed_context": {},
+      "success": "No domain event. Authorized dependency metadata read; hidden mappings return only owning team and count.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "Non-disclosing not-found result; no business state change.",
+      "stale_input": "No mutation CAS; lookup uses the current authorized snapshot.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing read transaction behavior retained.",
+      "duplicate_retry": "No domain event.",
+      "tests": [
+        "tests/test_mapping_usage.py::test_current_mapping_and_updated_draft_are_one_dependency",
+        "tests/test_mapping_usage.py::test_source_authorization_applies_to_list_and_count",
+        "tests/test_mapping_usage.py::test_restricted_details_absent_from_all_rendered_lists"
+      ],
+      "implementation_status": "Implemented for REF-302 source-side dependency lists and counts.",
+      "exclusion_reason": "Ordinary authorized read; no business state change.",
+      "persistence_scope": "Read snapshot; count query or batched publication metadata, without mapping records or new persistence."
     }
   ]
 }

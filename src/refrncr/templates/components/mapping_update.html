@@ -1,0 +1,15 @@
+{% macro counts(source) %}
+{% if source and source.draft %}
+<p>{{ source.draft.unmapped }} unmapped · {{ source.draft.removed }} removed from source</p>
+{% endif %}
+{% endmacro %}
+
+{% macro warning(source) %}
+{% if source and source.draft and source.draft.unmapped and not source.draft.required_target %}
+<div class='alert alert-warning' role='status'>{{ source.draft.unmapped }} unmapped {{ 'row' if source.draft.unmapped == 1 else 'rows' }} will be published with empty target values.</div>
+{% endif %}
+{% endmacro %}
+
+{% macro transition(source) %}
+{% if source %}Source: {{ source.name }} {% if source.draft and source.draft.previous_number %}V{{ source.draft.previous_number }} → {% endif %}V{{ source.number }}{% endif %}
+{% endmacro %}

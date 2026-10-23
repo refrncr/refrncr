@@ -64,6 +64,7 @@ def contents(engine):
                                 "source_system",
                                 "target_system",
                                 "source_dataset_id",
+                                "source_version_id",
                                 "target_dataset_id",
                                 "source_field_key",
                                 "target_field_key",

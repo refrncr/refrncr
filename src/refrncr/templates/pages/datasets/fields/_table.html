@@ -1,0 +1,35 @@
+        <div class='table-scroll configuration-table{{ " configuration-table-editable" if schema_admin else "" }}' role='region' aria-label='Dataset fields' tabindex='0'>
+          <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("move_dataset_field", key=dataset.key) }}'{% endif %}>
+            <caption class='visually-hidden'>Dataset fields</caption>
+            <thead><tr>{% if schema_admin %}<th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th>{% endif %}<th scope='col' class='field-identity-column'>Field</th><th scope='col' class='field-type-column'>Type</th>{% if dataset.kind == 'hierarchy' %}<th scope='col'>Scope</th>{% endif %}<th scope='col' class='field-constraints-column'>Constraints</th>{% if schema_admin %}<th scope='col' class='field-actions-column'>Actions</th>{% endif %}</tr></thead>
+            <tbody>{% for field in fields %}
+              {% set is_identifier = field.key in business_key.field_keys %}
+              {% set inherited_mapping_field = field.source_field_key %}
+              <tr{% if schema_admin %} data-field-row data-field-name='{{ field.name }}'{% endif %}{% if version_state %} data-row-action class='interactive-row'{% endif %}>
+                {% if schema_admin %}<td class='field-order-column'>
+                    {% if loop.first %}<input type='hidden' name='csrf_token' value='{{ current_csrf }}'>{% endif %}
+                    <input type='hidden' name='field_id' value='{{ field.id }}'>
+                    <button class='field-drag-handle' type='button' aria-label='Reorder {{ field.name }}' aria-describedby='field-order-help' hidden><span aria-hidden='true'>⋮⋮</span></button>
+                </td>{% endif %}
+                <td class='field-identity'>{% if version_state %}<a class='row-action field-version-details' data-row-primary data-panel-url data-dialog-open='configuration-panel' aria-haspopup='dialog' aria-controls='configuration-panel' href='{{ url_for("dataset_version_field_detail", key=dataset.key, version_id=version_state.version.id, field_key=field.key) }}'><span class='field-name row-action-label'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}{% endif %}</a>{% else %}<span class='field-name'>{{ field.name }}</span>{% if is_identifier %} {{ key_icon() }}{% endif %}{% endif %}{% if is_identifier %}<span class='visually-hidden'>{{ field.name }} is part of the record identifier</span>{% endif %}{% if field_states.get(field.id) %} {{ status_badge(field_states[field.id]) }}{% endif %}<code class='field-key'>{{ field.key }}</code></td>
+                <td class='field-type'>{{ field.data_type|datatype_label }}</td>
+                {% if dataset.kind == 'hierarchy' %}<td>{{ 'All nodes' if field.hierarchy_scope == 'all_nodes' else 'Leaves only' }}</td>{% endif %}
+                <td>
+                  <div class='constraint-list'>
+                    {% if is_identifier %}<span class='badge badge-identifier'>Identifier</span>{% endif %}
+                    {% if field.is_required %}<span class='badge'>Required</span>{% endif %}
+                    {% if field.is_unique %}<span class='badge'>Unique</span>{% endif %}
+                    {% if not field.is_required and not field.is_unique and not is_identifier %}<span class='field-empty' aria-hidden='true'>—</span><span class='visually-hidden'>None</span>{% endif %}
+                  </div>
+                </td>
+                {% if schema_admin %}
+                <td>
+                  <div class='field-actions'>
+                    {% if not inherited_mapping_field %}<a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>{% else %}<span class='field-empty'>Read only</span>{% endif %}
+                  </div>
+                </td>
+                {% endif %}
+              </tr>
+            {% endfor %}</tbody>
+          </table>
+        </div>

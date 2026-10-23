@@ -227,6 +227,11 @@ class Dataset(Base):
         CheckConstraint("length(description) <= 10000", name="ck_datasets_description_length"),
         UniqueConstraint("key", name="uq_datasets_key"),
         CheckConstraint("revision >= 1", name="ck_datasets_revision"),
+        CheckConstraint(
+            "kind <> 'mapping' OR (mapping_mode = 'linked' AND source_dataset_id IS NOT NULL "
+            "AND source_field_key IS NOT NULL)",
+            name="ck_datasets_mapping_source",
+        ),
         CheckConstraint("kind IN ('reference', 'mapping', 'hierarchy')", name="ck_datasets_kind"),
         CheckConstraint(
             "(kind IN ('reference', 'hierarchy') AND mapping_mode IS NULL) OR "
@@ -255,6 +260,9 @@ class Dataset(Base):
         nullable=True,
         index=True,
     )
+    # Working-copy pointer; validated against source_dataset_id by the service.
+    # Published source pointers have a restrictive FK on DatasetVersion.
+    source_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     target_dataset_id: Mapped[str | None] = mapped_column(
         ForeignKey("datasets.id", ondelete="RESTRICT", name="fk_datasets_mapping_target"),
         nullable=True,
@@ -348,7 +356,7 @@ class DatasetField(Base):
     hierarchy_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     mapping_role: Mapped[str | None] = mapped_column(String(24), nullable=True)
     source_field_id: Mapped[str | None] = mapped_column(
-        ForeignKey("dataset_fields.id", ondelete="RESTRICT", name="fk_dataset_fields_source"),
+        String(36),
         nullable=True,
         index=True,
     )
@@ -575,6 +583,11 @@ class DatasetVersion(Base):
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
+    source_version_id: Mapped[str | None] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="RESTRICT", name="fk_versions_source_version"),
+        nullable=True,
+        deferred=True,
+    )
     number: Mapped[int] = mapped_column(Integer)
     published_at: Mapped[datetime] = mapped_column(UTCDateTime())
     publisher_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
@@ -784,3 +797,6 @@ class DatasetConcept(Base):
         Boolean, nullable=True, default=False, server_default=false()
     )
     import_result: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    source_update_notes: Mapped[list[str] | None] = mapped_column(
+        JSON(none_as_null=True), nullable=True
+    )

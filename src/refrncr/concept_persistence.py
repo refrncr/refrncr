@@ -82,7 +82,7 @@ class SqlAlchemyConceptOperations:
             .values(updated_at=now)
         )
 
-    def record_mutation(self, dataset_id, *, import_result=None):
+    def record_mutation(self, dataset_id, *, import_result=None, source_update_notes=None):
         from sqlalchemy import case
 
         changes = {
@@ -90,6 +90,8 @@ class SqlAlchemyConceptOperations:
         }
         if import_result is not None:
             changes["import_result"] = dict(import_result)
+        if source_update_notes is not None:
+            changes["source_update_notes"] = list(source_update_notes)
         self.session.execute(
             update(DatasetConcept).where(DatasetConcept.dataset_id == dataset_id).values(**changes)
         )
@@ -121,6 +123,7 @@ class SqlAlchemyConceptOperations:
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         self.close(dataset.id)
         dataset.content_updated_at = current.published_at
+        dataset.source_version_id = current.source_version_id
 
     def initialize(self, dataset, version, now):
         # Caller owns the Dataset lock and has established there is no active concept.
@@ -151,6 +154,23 @@ class SqlAlchemyConceptOperations:
         ):
             self.session.execute(delete(model).where(model.dataset_id == dataset.id))
         field = DatasetVersionField
+        mapping_columns, mapping_values = [], []
+        if getattr(dataset, "kind", "reference") == "mapping":
+            from sqlalchemy.orm import aliased
+
+            source_field = aliased(DatasetVersionField)
+            mapping_columns = ["mapping_role", "source_field_key", "source_field_id"]
+            mapping_values = [
+                field.mapping_role,
+                field.source_field_key,
+                select(source_field.id)
+                .where(
+                    source_field.version_id == version.source_version_id,
+                    source_field.key == field.source_field_key,
+                )
+                .correlate(field)
+                .scalar_subquery(),
+            ]
         self.session.execute(
             insert(DatasetField.__table__).from_select(
                 [
@@ -165,6 +185,7 @@ class SqlAlchemyConceptOperations:
                     "is_unique",
                     "display_position",
                     "hierarchy_scope",
+                    *mapping_columns,
                     "created_at",
                     "updated_at",
                 ],
@@ -180,6 +201,7 @@ class SqlAlchemyConceptOperations:
                     field.is_unique,
                     field.display_position,
                     field.hierarchy_scope,
+                    *mapping_values,
                     literal(now),
                     literal(now),
                 ).where(field.version_id == version.id),

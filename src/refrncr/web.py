@@ -618,6 +618,51 @@ def create_flask_app(
         context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
         return render_template(template_name, **context)
 
+    def render_mapping_template(template_name, **context):
+        resolved = authenticated()
+        actor = resolved[0] if resolved else None
+        dataset = context.get("dataset")
+        if (
+            dataset is not None
+            and actor
+            and template_name
+            in {
+                "pages/datasets/detail.html",
+                "pages/datasets/records.html",
+                "pages/datasets/hierarchy.html",
+                "pages/datasets/versions/review.html",
+            }
+        ):
+            context["mapping_usage"] = datasets.mapping_usage(
+                actor.id,
+                dataset.key,
+                details=template_name
+                in {"pages/datasets/detail.html", "pages/datasets/versions/review.html"},
+            )
+        if (
+            dataset is not None
+            and dataset.kind == "mapping"
+            and actor
+            and context.get("source_context_available", True)
+        ):
+            state = context.get("version_state")
+            history = context.get("history")
+            if history and not history.may_maintain:
+                if not history.entries:
+                    return render_authenticated_template(template_name, **context)
+                state = history.entries[0]
+            context["mapping_source"] = datasets.mapping_source(
+                actor.id,
+                dataset.key,
+                state.version.id if state else None,
+                history_version_ids=tuple(entry.version.id for entry in history.entries)
+                if history
+                else (),
+            )
+            if history:
+                context["mapping_history_sources"] = context["mapping_source"]["history"]
+        return render_authenticated_template(template_name, **context)
+
     def require_capability(capability: str):
         resolved = authenticated()
         allowed = resolved is not None and (
@@ -923,7 +968,7 @@ def create_flask_app(
         csrf = resolved[1].csrf_token if resolved else None
         if resolved and dataset_ui_enabled:
             authorization, dataset_service, *_dependencies = require_dataset_dependencies()
-            return render_template(
+            return render_mapping_template(
                 "pages/datasets/list.html",
                 actor=actor,
                 may_create=authorization.datasets.can_create_dataset(actor.id),
@@ -966,7 +1011,7 @@ def create_flask_app(
             "mapping": "Mapping datasets",
             "hierarchy": "Hierarchy datasets",
         }[dataset_kind]
-        return render_template(
+        return render_mapping_template(
             "pages/datasets/list.html",
             actor=actor,
             may_create=_authorization.datasets.can_create_dataset(actor.id),
@@ -995,18 +1040,9 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         _auth, service, field_service, *_rest = require_dataset_dependencies()
         eligible_teams = _auth.datasets.creation_teams(actor.id)
-        available_reference_tables = tuple(
-            context.dataset
-            for context in service.list_dataset_overview(actor.id)
-            if context.dataset.kind == "reference"
+        available_reference_tables, reference_table_fields = service.mapping_source_choices(
+            actor.id
         )
-        bulk_field_lookup = field_service.list_fields_for_datasets
-        fields_by_dataset = bulk_field_lookup(
-            actor.id, tuple(table.id for table in available_reference_tables)
-        )
-        reference_table_fields = {
-            table.id: fields_by_dataset.get(table.id, ()) for table in available_reference_tables
-        }
         return render_template(
             "pages/datasets/create.html",
             dataset_icon_choices=DATASET_ICONS,
@@ -1019,7 +1055,7 @@ def create_flask_app(
             name=name,
             description=description,
             table_kind=request.form.get("kind") or initial_kind or "reference",
-            mapping_mode=request.form.get("mapping_mode", "standalone"),
+            mapping_mode="linked",
             source_system=request.form.get("source_system", ""),
             target_system=request.form.get("target_system", ""),
             source_dataset_id=request.form.get("source_dataset_id", ""),
@@ -1302,10 +1338,11 @@ def create_flask_app(
             access_grant_users = [
                 user for user in access_users if ("user", user.id) not in granted_subjects
             ]
-        return render_authenticated_template(
+        return render_mapping_template(
             "pages/datasets/detail.html",
             dataset=dataset,
             mapping_configuration=mapping_configuration,
+            source_context_available=identifier is not None,
             context=context,
             settings_return_context=(
                 "version" if version_id else "concept" if concept else "detail"
@@ -1382,6 +1419,36 @@ def create_flask_app(
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @dataset_route(
+        "/datasets/<key>/source/update", capability="can_maintain_dataset", methods=["POST"]
+    )
+    @version_errors
+    def dataset_mapping_source_update(key):
+        from refrncr.mapping_updates import SourceUpdateBlocked
+
+        actor, session = require_authenticated()
+        require_csrf(session.csrf_token)
+        dataset = datasets.get_dataset_for_edit(actor.id, key)
+        try:
+            revisions = request.form.getlist("expected_revision")
+            if len(revisions) != 1:
+                raise ValidationError("Reload the mapping before updating its source.")
+            dataset_versions.update_mapping_source(
+                actor.id, dataset.id, parse_expected_revision(revisions[0])
+            )
+        except SourceUpdateBlocked:
+            # Re-render the mapping's shared notice, including newly incompatible sources.
+            return redirect(url_for("dataset_records_view", key=key), code=303)
+        except (ValidationError, ConflictError) as failure:
+            status = 409 if isinstance(failure, ConflictError) else 400
+            return render_authenticated_template(
+                "pages/error.html", error_code=status, error_message=str(failure)
+            ), status
+        return redirect(
+            url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
+            code=303,
+        )
+
+    @dataset_route(
         "/datasets/<key>/concept/discard",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -1437,7 +1504,7 @@ def create_flask_app(
             "published": "Dataset version published.",
             "cancelled": "Scheduled version cancelled.",
         }.get(request.args.get("notice"))
-        return render_authenticated_template(
+        return render_mapping_template(
             "pages/datasets/versions/list.html",
             history=history,
             dataset=history.context.dataset,
@@ -1553,7 +1620,7 @@ def create_flask_app(
                     )
                     for item in result.items
                 )
-            return render_authenticated_template(
+            return render_mapping_template(
                 "pages/datasets/versions/review.html",
                 dataset=dataset,
                 identity=identity,
@@ -1712,13 +1779,24 @@ def create_flask_app(
         except (ValidationError, ConflictError) as failure:
             error, status = error or str(failure), 409
         today = dataset_versions.clock.today().isoformat()
+        mapping_source = (
+            datasets.mapping_source(actor.id, key) if dataset.kind == "mapping" else None
+        )
+        minimum_date = (
+            max(dataset_versions.clock.today(), mapping_source["effective_date"])
+            if mapping_source
+            else dataset_versions.clock.today()
+        )
         concept_summary = dataset_versions.history(actor.id, key).concept_summary
         return render_authenticated_template(
             "pages/datasets/versions/publish.html",
             dataset=dataset,
             review=review,
             error=error,
-            effective_date=effective or today,
+            effective_date=effective or minimum_date.isoformat(),
+            minimum_date=minimum_date,
+            mapping_source=mapping_source,
+            mapping_usage=datasets.mapping_usage(actor.id, key),
             release_note=note,
             today=today,
             review_token=review_token,
@@ -2424,8 +2502,10 @@ def create_flask_app(
                 search=parameters.get("q", ""),
                 statuses=(selected_statuses or DISPLAY_STATUSES) if import_results else (),
                 record_status=record_status,
+                mapping_status=parameters.get("mapping_status", "all"),
             )
             criteria_parameters = {
+                "mapping_status": parameters.get("mapping_status"),
                 "q": view.search or None,
                 "record_status": record_status if concept and record_status != "all" else None,
             }
@@ -2536,7 +2616,7 @@ def create_flask_app(
             )
             record_change_options.append((label, count, value in selected_changes, target))
 
-        return render_template(
+        return render_mapping_template(
             "pages/datasets/records.html",
             dataset=dataset,
             context=context,
@@ -2557,7 +2637,14 @@ def create_flask_app(
                 q=view.search or None,
                 record_status="all",
             ),
-            has_criteria=bool(view.search or import_results or record_status != "all"),
+            has_criteria=bool(
+                view.search
+                or import_results
+                or record_status != "all"
+                or parameters.get("mapping_status", "all") != "all"
+            ),
+            mapping_status=parameters.get("mapping_status", "all"),
+            mapping_record_states=view.mapping_record_states or {},
             import_unavailable=record_imports.eligibility(actor.id, key) if may_edit else None,
             import_results=import_results,
             import_totals=view.concept.import_result if view.concept and concept else None,
@@ -2754,7 +2841,13 @@ def create_flask_app(
         source_format_issues=(),
     ):
         actor, _session = require_authenticated()
-        mode = state.mode if state else "new_version"
+        mode = (
+            state.mode
+            if state
+            else "mapping_update"
+            if dataset.kind == "mapping"
+            else "new_version"
+        )
         fields = ()
         source = assistance = preview = None
         required_keys = ()
@@ -2912,7 +3005,9 @@ def create_flask_app(
             error=error,
             current_csrf=login_session.csrf_token,
             mapping_reason_text=(
-                "This import replaces all records in the draft, so every field must be mapped."
+                "Map the source identifier to match existing rows; target columns are optional."
+                if mode == "mapping_update"
+                else "This import replaces all records in the draft, so every field must be mapped."
             ),
         ), status
 
@@ -2936,6 +3031,8 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_dataset_dependencies()
         dataset = dataset_records.get_dataset_for_add(actor.id, key)
+        if dataset.kind == "mapping":
+            mode = "mapping_update"
         reason = record_imports.eligibility(actor.id, key)
         if reason:
             raise ImportValidationError(". ".join(reason))
@@ -3240,7 +3337,11 @@ def create_flask_app(
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
         state = record_imports.state(actor.id, login_session.id, key, token)
-        expected = {"csrf_token", "confirmation"} if state.mode == "new_version" else {"csrf_token"}
+        expected = (
+            {"csrf_token", "confirmation"}
+            if state.mode in {"new_version", "mapping_update"}
+            else {"csrf_token"}
+        )
         if "acknowledge_deletions" in request.form and state.mode == "new_version":
             expected.add("acknowledge_deletions")
         if set(request.form) != expected or any(
@@ -3930,36 +4031,19 @@ def create_flask_app(
         mapping_fields = (
             field_service.list_fields(actor.id, dataset.key) if dataset.kind == "mapping" else ()
         )
-        has_mapping_source_identifier = any(
-            field.mapping_role == "source_identifier" for field in mapping_fields
-        )
         mapping_source_fields = ()
-        if dataset.kind == "mapping" and dataset.mapping_mode == "linked":
-            try:
-                visible_dataset_lookup = dataset_service.get_visible_dataset_by_id
-                source = visible_dataset_lookup(actor.id, dataset.source_dataset_id)
-            except NotFoundError:
-                source = None
-            if source is not None:
-                existing = {
-                    field.source_field_key
-                    for field in mapping_fields
-                    if getattr(field, "source_field_key", None)
-                }
-                mapping_source_fields = tuple(
-                    field
-                    for field in field_service.list_fields(actor.id, source.key)
-                    if field.key not in existing
-                )
-        default_mapping_role = (
-            "mapping_target"
-            if dataset.mapping_mode == "linked" or has_mapping_source_identifier
-            else "source_identifier"
+        if dataset.kind == "mapping":
+            source = dataset_service.mapping_source(actor.id, dataset.key)
+            existing = {field.source_field_key for field in mapping_fields}
+            mapping_source_fields = tuple(
+                field for field in source["fields"] if field.key not in existing
+            )
+        selected_mapping_role = request.form.get(
+            "mapping_field_role", request.args.get("role", "mapping_target")
         )
-        selected_mapping_role = request.form.get("mapping_field_role", default_mapping_role)
-        if has_mapping_source_identifier and selected_mapping_role == "source_identifier":
+        if selected_mapping_role not in {"source_context", "mapping_target"}:
             selected_mapping_role = "mapping_target"
-        return render_authenticated_template(
+        return render_mapping_template(
             "pages/datasets/fields/create.html",
             definition=request.form.get("definition", ""),
             unit=request.form.get("unit", ""),
@@ -3974,7 +4058,6 @@ def create_flask_app(
             current_csrf=csrf,
             type_choices=tuple(DATATYPES.values()),
             mapping_field_role=selected_mapping_role,
-            has_mapping_source_identifier=has_mapping_source_identifier,
             mapping_source_field_key=request.form.get("source_field_key", ""),
             mapping_source_fields=mapping_source_fields,
             hierarchy_scope=request.form.get("hierarchy_scope", "leaves"),

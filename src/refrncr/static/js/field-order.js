@@ -4,11 +4,12 @@
 (() => {
   const table = document.querySelector('table[data-field-order]');
   if (!table) return;
+  const scope = table.closest('[data-field-order-scope]') || table;
   const body = table.tBodies[0];
   const status = document.getElementById('field-order-status');
   const csrf = table.querySelector('input[name="csrf_token"]')?.value;
   if (!body || !csrf) return;
-  const rows = () => [...body.querySelectorAll('tr[data-field-row]')];
+  const rows = () => [...scope.querySelectorAll('tr[data-field-row]')];
   const fieldId = row => row.querySelector('input[name="field_id"]')?.value;
   const order = () => rows().map(fieldId);
   let saved = order();
@@ -42,7 +43,7 @@
   };
 
   const move = (row, target) => {
-    if (!target || target === row) return false;
+    if (!target || target === row || target.parentElement !== row.parentElement) return false;
     const list = rows();
     if (list.indexOf(target) < list.indexOf(row)) target.before(row);
     else target.after(row);

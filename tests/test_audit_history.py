@@ -189,7 +189,11 @@ def test_dataset_and_team_grants_do_not_authorize(database_history, permission):
 def test_all_contracts_have_safe_presentations(database_history):
     h = database_history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 51
+    assert len(EVENTS) == len(ACTION_LABELS) == 53
+    assert (
+        ACTION_LABELS[("dataset", "dataset.mapping_targets_updated")] == "Mapping targets updated"
+    )
+    assert ACTION_LABELS[("dataset", "dataset.mapping_source_updated")] == "Mapping source updated"
     assert ACTION_LABELS[("dataset", "dataset.version_diff_viewed")] == "Dataset changes reviewed"
     assert ACTION_LABELS[("dataset", "hierarchy.node_created")] == "Hierarchy node created"
     assert ACTION_LABELS[("dataset", "hierarchy.node_updated")] == "Hierarchy node updated"

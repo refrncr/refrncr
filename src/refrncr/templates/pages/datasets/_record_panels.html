@@ -34,7 +34,7 @@
           {% for field, value in record_details[record.id] %}<div><dt>{{ field.name }}{% if field.key in identifier.field_keys %} {{ key_icon() }}<span class='visually-hidden'> (record identifier)</span>{% endif %}</dt><dd>{{ display_record_value(field, value) if value is not none else '—' }}</dd></div>{% endfor %}
         </dl>
       </div>
-      {% if deleted and may_edit %}
+      {% if deleted and may_edit and dataset.kind != 'mapping' %}
         <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("restore_dataset_record", key=dataset.key, record_id=record.id) }}' class='side-panel-footer'>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
@@ -45,7 +45,7 @@
       {% if record_may_edit %}
         <footer class='side-panel-footer'>
           <button class='button button-secondary' type='button' data-panel-mode='edit'>Edit</button>
-          <button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>
+          {% if dataset.kind != 'mapping' %}<button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>{% endif %}
         </footer>
       {% endif %}
     </section>
@@ -55,11 +55,12 @@
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'><input type='hidden' name='return_focus' value='pointer'>
         <footer class='side-panel-footer'>
-          <button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>
+          {% if dataset.kind != 'mapping' %}<button class='button button-danger' type='button' data-panel-mode='delete'>Delete</button>{% endif %}
           <button class='button button-secondary' type='button' data-dialog-close>Cancel</button>
           <button class='button button-primary' type='submit'>Save record</button>
         </footer>
       </form>
+      {% if dataset.kind != 'mapping' %}
       <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden {{ non_login_form_attrs() }} method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>
           <h3>Delete record?</h3>
@@ -73,6 +74,7 @@
           <button class='button button-danger' type='submit'>Delete record</button>
         </footer>
       </form>
+      {% endif %}
     {% endif %}
     </div>
   {% endcall %}

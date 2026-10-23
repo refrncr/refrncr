@@ -393,3 +393,12 @@ the import-change selection preserves the other criteria; Clear all returns to t
 Active view. The general Records search now accepts String Fields only, including String
 identifiers. Non-text identifiers are excluded from general search. Neither searching nor
 clearing criteria changes eligibility, the receipt, revisions, stored data or audit.
+
+### Mapping target updates (REF-239)
+
+`mapping_update` always requires the preview confirmation token, independently of the caller's
+`require_confirmation` flag. Revalidation and no-change rejection happen before any persistent
+write. Successful confirmation returns the number of changed rows and emits only
+`dataset.mapping_targets_updated` with `format`, `changed` and `unchanged` row counts; no target
+values or identifiers enter audit context. Rows omitted from the upload are not counted. The
+service rolls back records, draft mutation, source formats and audit together on failure.

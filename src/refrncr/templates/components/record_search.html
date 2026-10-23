@@ -23,6 +23,17 @@
 </form>
 {% endmacro %}
 
+{% macro mapping_status_toggles() %}
+{% if mapping_source and mapping_source.draft %}
+<form class='record-status-toggles' method='get' action='{{ request.path }}' aria-label='Mapping source status'>
+  {{ hidden_criteria(criteria_parameters, ['mapping_status']) }}
+  {% for value, label, count in [('unmapped', 'Unmapped', mapping_source.draft.unmapped), ('removed', 'Removed from source', mapping_source.draft.removed)] %}
+  <button class='status-toggle' type='submit' name='mapping_status' value='{{ "all" if mapping_status == value else value }}' aria-pressed='{{ "true" if mapping_status == value else "false" }}'>{{ label }} <span class='status-toggle-count'>{{ count }}</span></button>
+  {% endfor %}
+</form>
+{% endif %}
+{% endmacro %}
+
 {% macro record_search_controls() %}
 <section class='record-criteria' aria-label='Search Records' data-record-criteria>
   <div class='record-criteria-toolbar'>
@@ -32,7 +43,7 @@
     {% if import_results or import_totals %}{{ record_status_filter(dataset.key, record_search, import_results, result_statuses, import_totals, clear_import_url) }}{% endif %}
   </form>
   <button class='button button-secondary' type='submit' form='record-search-form' name='action' value='search'>Search</button>
-  {% if not version_state %}{{ record_status_toggles() }}{% endif %}
+  {% if not version_state %}{{ record_status_toggles() }}{{ mapping_status_toggles() }}{% endif %}
   </div>
 </section>
 {% endmacro %}

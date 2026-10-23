@@ -126,6 +126,7 @@
 .dataset-settings-values > div:first-child { border-top: 0; }
 .dataset-settings-values dt { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .dataset-settings-values dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.mapping-usage-list dt { overflow-wrap: anywhere; }
 .dataset-settings-values code { padding: .0625rem .375rem; border: 1px solid var(--color-border); }
 .dataset-permanent { display: inline-flex; align-items: center; gap: .25rem; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .dataset-permanent .button-icon { width: .75rem; height: .75rem; margin: 0; }

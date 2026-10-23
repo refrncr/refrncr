@@ -180,7 +180,9 @@ def mapping_issues(mapping, fields, identifier, mode="create", expected_count=No
     required = tuple(
         field
         for field in fields
-        if field.is_required or mode == "new_version" or field.key in identifier.field_keys
+        if (field.is_required and mode != "mapping_update")
+        or mode == "new_version"
+        or field.key in identifier.field_keys
     )
     issues.extend(
         MappingIssue("required_field_unmapped", field_key=field.key, mode=mode)
@@ -766,7 +768,11 @@ def build_mapping_assistance(
         for index, header in enumerate(source.headers)
     )
     mapped = {selection for selection in selections if selection}
-    required = [field for field in fields if field.is_required or mode == "new_version"]
+    required = [
+        field
+        for field in fields
+        if (field.is_required and mode != "mapping_update") or mode == "new_version"
+    ]
     field_by_key = {field.key: field for field in fields}
     missing_required = tuple(field.name for field in required if field.key not in mapped)
     missing_identifier = tuple(
@@ -1034,7 +1040,11 @@ class DatasetRecordImportService:
         with self.uow() as uow:
             concept = _require_concept(uow, dataset.id)
             has_non_cancelled_version = uow.versions.latest_non_cancelled(dataset.id) is not None
-        return self._eligibility(concept, has_non_cancelled_version)
+        return (
+            None
+            if dataset.kind == "mapping"
+            else self._eligibility(concept, has_non_cancelled_version)
+        )
 
     def _require_eligible(self, concept, *, uow=None):
         if uow is None:
@@ -1077,9 +1087,13 @@ class DatasetRecordImportService:
         return state
 
     def begin(self, actor_id, session_id, dataset_key, filename, content, *, mode="create"):
-        if mode not in {"create", "new_version"}:
+        if mode not in {"create", "new_version", "mapping_update"}:
             raise ImportValidationError("Choose a valid import mode")
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        if dataset.kind == "mapping":
+            mode = "mapping_update"
+        elif mode == "mapping_update":
+            raise ImportValidationError("Target updates require a mapping dataset")
         concept = self._concept(dataset.id)
         if mode == "new_version":
             self._require_eligible(concept)
@@ -1404,7 +1418,6 @@ class DatasetRecordImportService:
         if not source.headers:
             raise NotFoundError("Import not found")
         mapping = tuple(mapping)
-        mapping_changed = mapping != state.mapping
         retained_formats = {
             key: choice
             for key, choice in (state.source_formats or {}).items()
@@ -1421,6 +1434,12 @@ class DatasetRecordImportService:
             include_formats=True,
             choices=retained_formats,
         )
+        if state.mode == "mapping_update":
+            mapping = tuple(
+                assistance.mapping[index] if index < len(assistance.mapping) else target
+                for index, target in enumerate(mapping)
+            )
+        mapping_changed = mapping != state.mapping
         if format_components is not None:
             state, source, assistance, issues = self._submitted_source_format_assistance(
                 state, source, assistance, mapping, format_components
@@ -1575,7 +1594,7 @@ class DatasetRecordImportService:
                     )
                 if not preview.valid:
                     raise ImportValidationError("The import is no longer valid; validate it again")
-                if state.mode == "new_version":
+                if state.mode in {"new_version", "mapping_update"}:
                     if (
                         not confirmation
                         or confirmation != state.confirmation
@@ -1588,8 +1607,26 @@ class DatasetRecordImportService:
                         raise ImportValidationError(
                             "Confirm the exact number of Records marked as deleted."
                         )
+                if state.mode == "mapping_update" and not preview.counts["Changed"]:
+                    raise ImportValidationError("No changes. The file matches the draft.")
                 try:
-                    if state.mode == "new_version":
+                    if state.mode == "mapping_update":
+                        changes = [
+                            (record, values, encoded)
+                            for status, record, values, encoded in self._differences(
+                                uow, dataset.id, validated, updates_only=True
+                            )
+                            if status == "Changed"
+                        ]
+                        for record, _values, _encoded in changes:
+                            uow.dataset_records.replace_values(record, ())
+                        for record, values, encoded in changes:
+                            if not uow.dataset_records.update_if_revision(
+                                dataset.id, record.id, record.revision, encoded
+                            ):
+                                raise ImportValidationError("Record changed. Review again.")
+                            uow.dataset_records.add_values(record, values)
+                    elif state.mode == "new_version":
                         # Release all affected unique values before writing the replacement set.
                         # Unchanged rows are never updated, including their revision.
                         changed = {}
@@ -1672,6 +1709,19 @@ class DatasetRecordImportService:
                                 "total_processed": len(validated) + result["Deleted"],
                             },
                         )
+                    elif state.mode == "mapping_update":
+                        record_audit(
+                            uow,
+                            actor_user_id=actor_id,
+                            object_type="dataset",
+                            object_id=dataset.id,
+                            action="dataset.mapping_targets_updated",
+                            details={
+                                "format": source.kind,
+                                "changed": preview.counts["Changed"],
+                                "unchanged": preview.counts["Unchanged"],
+                            },
+                        )
                     else:
                         record_audit(
                             uow,
@@ -1692,16 +1742,19 @@ class DatasetRecordImportService:
         except Exception:
             self.store.finish(claimed)
             raise
+        updated_count = (
+            preview.counts["Changed"] if state.mode == "mapping_update" else len(validated)
+        )
         self.store.finish(
             claimed,
             content=b"",
             mapping=None,
             source_formats=None,
             schema_fingerprint=None,
-            imported_count=len(validated),
-            step=5,
+            imported_count=updated_count,
+            step=4 if state.mode == "mapping_update" else 5,
         )
-        return len(validated)
+        return updated_count
 
     def cancel(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
@@ -1723,6 +1776,15 @@ class DatasetRecordImportService:
         with self.uow() as uow:
             fields = uow.dataset_fields.list_for_dataset(dataset_id)
             identifier = uow.dataset_business_keys.get(dataset_id)
+            if mode == "mapping_update":
+                context_keys = {
+                    field.key for field in fields if field.mapping_role == "source_context"
+                }
+                if selected_mapping is not None:
+                    selected_mapping = tuple(
+                        None if key in context_keys else key for key in selected_mapping
+                    )
+                fields = [field for field in fields if field.mapping_role != "source_context"]
             remembered = uow.dataset_fields.source_formats(dataset_id) if include_formats else {}
         assistance = build_mapping_assistance(
             source, fields, identifier, selected_mapping, mode=mode
@@ -1799,7 +1861,29 @@ class DatasetRecordImportService:
         identifier = uow.dataset_business_keys.get(dataset_id)
         field_by_key = {field.key: field for field in fields}
         mapping = tuple(mapping)
-        coded_issues = list(mapping_issues(mapping, fields, identifier, mode, len(source.headers)))
+        if mode == "mapping_update":
+            # A source context may be present in the file, but is never imported.
+            mapping = tuple(
+                None
+                if key in field_by_key and field_by_key[key].mapping_role == "source_context"
+                else key
+                for key in mapping
+            )
+        import_fields = [
+            field
+            for field in fields
+            if mode != "mapping_update" or field.mapping_role != "source_context"
+        ]
+        existing_rows = {}
+        if mode == "mapping_update":
+            stored_keys = uow.dataset_records.identifier_keys(dataset_id)
+            existing_rows = {
+                stored_keys[record.id]: record
+                for record in uow.dataset_records.iterate_all(dataset_id)
+            }
+        coded_issues = list(
+            mapping_issues(mapping, import_fields, identifier, mode, len(source.headers))
+        )
         coded_issues.extend(
             self._source_format_issues(mapping, source, field_by_key, source_formats)
         )
@@ -1890,6 +1974,30 @@ class DatasetRecordImportService:
                         )
                     )
             try:
+                if mode == "mapping_update":
+                    id_fields = [field for field in fields if field.key in identifier.field_keys]
+                    _, encoded = DatasetRecordService._validated_values(
+                        id_fields,
+                        identifier,
+                        {key: submitted[key] for key in identifier.field_keys if key in submitted},
+                    )
+                    record = existing_rows.get(encoded)
+                    if record is None:
+                        raise ValidationError(
+                            "Source identifier does not exist in the linked source version"
+                        )
+                    retained = {
+                        value.field_key: get_datatype(value.data_type).text(value.value)
+                        for value in record.values
+                    }
+                    retained.update(
+                        {
+                            key: value
+                            for key, value in submitted.items()
+                            if field_by_key[key].mapping_role == "mapping_target"
+                        }
+                    )
+                    submitted = retained
                 values, encoded = DatasetRecordService._validated_values(
                     fields, identifier, submitted
                 )
@@ -1898,10 +2006,13 @@ class DatasetRecordImportService:
                 for key, message in error.errors.items():
                     if any(item.field == field_by_key[key].name for item in row_errors):
                         continue
-                    index = mapping.index(key)
+                    index = mapping.index(key) if key in mapping else None
                     row_errors.append(
                         ImportIssue(
-                            row.number, source.headers[index], field_by_key[key].name, message
+                            row.number,
+                            source.headers[index] if index is not None else None,
+                            field_by_key[key].name,
+                            message,
                         )
                     )
             except ValidationError as error:
@@ -1920,7 +2031,9 @@ class DatasetRecordImportService:
                         row_errors.append(
                             ImportIssue(
                                 row.number,
-                                source.headers[mapping.index(value.field_key)],
+                                source.headers[mapping.index(value.field_key)]
+                                if value.field_key in mapping
+                                else None,
                                 field_by_key[value.field_key].name,
                                 "Unique value is duplicated in this file",
                             )
@@ -1936,7 +2049,7 @@ class DatasetRecordImportService:
                 errors.extend(row_errors)
         existing_identifiers = (
             set()
-            if mode == "new_version"
+            if mode in {"new_version", "mapping_update"}
             else uow.dataset_records.existing_identifier_keys(
                 dataset_id, tuple(encoded for _row, _values, encoded in validated)
             )
@@ -1947,8 +2060,17 @@ class DatasetRecordImportService:
             for value in values
             if value.is_unique
         )
+        updated_ids = {encoded for _row, _values, encoded in validated}
         existing_unique = (
-            set()
+            {
+                (value.field_id, value.canonical_key)
+                for encoded, record in existing_rows.items()
+                if encoded not in updated_ids
+                for value in record.values
+                if value.is_unique
+            }
+            if mode == "mapping_update"
+            else set()
             if mode == "new_version"
             else uow.dataset_records.existing_unique_value_keys(dataset_id, unique_candidates)
         )
@@ -1970,7 +2092,9 @@ class DatasetRecordImportService:
                     database_errors.append(
                         ImportIssue(
                             row.number,
-                            source.headers[mapping.index(value.field_key)],
+                            source.headers[mapping.index(value.field_key)]
+                            if value.field_key in mapping
+                            else None,
                             field_by_key[value.field_key].name,
                             "Unique value already exists in this Dataset",
                         )
@@ -2021,17 +2145,19 @@ class DatasetRecordImportService:
             sample,
             fingerprint,
         )
-        if mode != "new_version":
+        if mode not in {"new_version", "mapping_update"}:
             preview = self._add_create_preview(
                 preview, accepted, fields, mapping, identifier, search, page
             )
-        if mode == "new_version":
+        if mode in {"new_version", "mapping_update"}:
             counts = dict.fromkeys(("Added", "Changed", "Unchanged", "Deleted", "Error"), 0)
             counts["Error"] = preview.invalid_rows + len(preview.non_row_errors)
             digest = hashlib.sha256()
             differences, matched = [], 0
             term = unicodedata.normalize("NFC", search).casefold()
-            for status, record, values, encoded in self._differences(uow, dataset_id, accepted):
+            for status, record, values, encoded in self._differences(
+                uow, dataset_id, accepted, updates_only=mode == "mapping_update"
+            ):
                 counts[status] += 1
                 for part in (
                     status.encode(),
@@ -2159,7 +2285,7 @@ class DatasetRecordImportService:
         counts["matching"] = len(filtered)
         return replace(preview, sample=sample, counts=counts)
 
-    def _differences(self, uow, dataset_id, accepted):
+    def _differences(self, uow, dataset_id, accepted, *, updates_only=False):
         proposed = {encoded: values for values, encoded in accepted}
         identifier = uow.dataset_business_keys.get(dataset_id)
         stored_keys = uow.dataset_records.identifier_keys(dataset_id)
@@ -2185,6 +2311,8 @@ class DatasetRecordImportService:
                 )
             seen.add(encoded)
             values = proposed.get(encoded)
+            if updates_only and values is None:
+                continue
             status = (
                 "Deleted"
                 if values is None

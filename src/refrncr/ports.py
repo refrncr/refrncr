@@ -150,6 +150,7 @@ class DatasetRecord(Protocol):
     mapping_mode: str | None
     source_system: str | None
     target_system: str | None
+    source_version_id: str | None
     source_dataset_id: str | None
     target_dataset_id: str | None
     source_field_key: str | None
@@ -179,6 +180,7 @@ class DatasetOverview:
     owner_team_name: str = ""
     concept_in_progress: bool = False
     no_current: bool = False
+    source_update_available: bool = False
 
 
 class DatasetFieldRecord(Protocol):
@@ -342,6 +344,10 @@ class DatasetOperations(Protocol):
     def find_by_key(self, key: str, *, for_update: bool = False) -> DatasetRecord | None: ...
 
     def list_all(self) -> list[DatasetRecord]: ...
+
+    def mappings_using(self, source_dataset_id: str) -> list[DatasetRecord]: ...
+
+    def mapping_usage_count(self, source_dataset_id: str) -> int: ...
 
     def list_by_ids(self, dataset_ids: tuple[str, ...]) -> list[DatasetRecord]: ...
 
@@ -603,9 +609,13 @@ class VersionOperations(Protocol):
 
     def list_for_dataset(self, dataset_id): ...
 
+    def list_for_datasets(self, dataset_ids): ...
+
     def get(self, dataset_id, version_id): ...
 
     def latest_non_cancelled(self, dataset_id): ...
+
+    def source_updates(self, source_version_ids): ...
 
     def current_for_datasets(self, dataset_ids, today): ...
 
@@ -676,7 +686,7 @@ class VersionDiffOperations(Protocol):
 
 
 class ConceptOperations(Protocol):
-    def record_mutation(self, dataset_id, *, import_result=None): ...
+    def record_mutation(self, dataset_id, *, import_result=None, source_update_notes=None): ...
 
     def get(self, dataset_id): ...
     def list_for_datasets(self, dataset_ids): ...
