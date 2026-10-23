@@ -38,7 +38,10 @@ columns remain unchanged. Row membership and source values belong to the pinned 
 Mapping-only edits remain publishable after the source version expires. Published history
 retains its source identity. No background synchronization or new notification infrastructure
 is required. REF-301 adds explicit source upgrades using the same draft transaction and deleted-record
-snapshots; matching identifiers preserve targets while source values refresh. The technical migration
+snapshots; matching identifiers preserve targets while source values refresh. Missing or
+datatype-changed context fields are removed; explanations belong to the active concept and
+survive subsequent updates until publication or discard. Incompatible identifiers block the
+update before offering an action. The technical migration
 requires explicit removal of existing mappings and leaves other data intact; no inferred
 conversion of old mappings is performed.
 

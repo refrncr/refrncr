@@ -1406,6 +1406,8 @@ def create_flask_app(
     )
     @version_errors
     def dataset_mapping_source_update(key):
+        from refrncr.mapping_updates import SourceUpdateBlocked
+
         actor, session = require_authenticated()
         require_csrf(session.csrf_token)
         dataset = datasets.get_dataset_for_edit(actor.id, key)
@@ -1416,12 +1418,18 @@ def create_flask_app(
             dataset_versions.update_mapping_source(
                 actor.id, dataset.id, parse_expected_revision(revisions[0])
             )
+        except SourceUpdateBlocked:
+            # Re-render the mapping's shared notice, including newly incompatible sources.
+            return redirect(url_for("dataset_records_view", key=key), code=303)
         except (ValidationError, ConflictError) as failure:
             status = 409 if isinstance(failure, ConflictError) else 400
             return render_authenticated_template(
                 "pages/error.html", error_code=status, error_message=str(failure)
             ), status
-        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+        return redirect(
+            url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
+            code=303,
+        )
 
     @dataset_route(
         "/datasets/<key>/concept/discard",
@@ -1758,7 +1766,9 @@ def create_flask_app(
             datasets.mapping_source(actor.id, key) if dataset.kind == "mapping" else None
         )
         minimum_date = (
-            max(today, mapping_source["effective_date"].isoformat()) if mapping_source else today
+            max(dataset_versions.clock.today(), mapping_source["effective_date"])
+            if mapping_source
+            else dataset_versions.clock.today()
         )
         concept_summary = dataset_versions.history(actor.id, key).concept_summary
         return render_authenticated_template(
@@ -1766,7 +1776,7 @@ def create_flask_app(
             dataset=dataset,
             review=review,
             error=error,
-            effective_date=effective or minimum_date,
+            effective_date=effective or minimum_date.isoformat(),
             minimum_date=minimum_date,
             mapping_source=mapping_source,
             release_note=note,

@@ -18,7 +18,7 @@ def test_hierarchy_schema_upgrade_and_downgrade(database_audit_db):
         }
         connection.commit()
         command.upgrade(config, "head")
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0032_ref_239"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
         assert {
             "dataset_hierarchy_nodes",
             "dataset_hierarchy_values",
@@ -51,5 +51,5 @@ def test_hierarchy_downgrade_refuses_even_empty_hierarchy(database_context):
         with pytest.raises(RuntimeError, match="Hierarchy data exists"):
             command.downgrade(config, "0027_ref_177")
         connection.rollback()
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0032_ref_239"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
         assert "dataset_hierarchy_nodes" in inspect(connection).get_table_names()

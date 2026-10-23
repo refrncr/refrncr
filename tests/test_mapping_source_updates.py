@@ -35,10 +35,12 @@ def update(c, mapping, actor=None, revision=None):
     )
 
 
-def fixture(c, *, required=False, publish=True):
+def fixture(c, *, required=False, publish=True, source_change=None):
     prepare(c)
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b", "label": "Old B"})
     first = publish_table(c, c.d)
+    if source_change:
+        source_change()
     mapping = create_mapping(c)
     c.s.dataset_fields.create_field(
         c.a.id,
@@ -107,6 +109,7 @@ def test_upgrade_reconciles_and_preserves_targets(database_context, existing_dra
     assert view.page.total == 3
     assert set(view.mapping_record_states.values()) == {"Unmapped", "Removed from source"}
     assert c.s.datasets.mapping_source(c.a.id, mapping.key)["draft"] == {
+        "notes": [],
         "unmapped": 1,
         "removed": 1,
         "required_target": False,
@@ -271,7 +274,7 @@ def browser(c):
 
 
 def test_browser_update_filters_review_and_publication(context):
-    from support import body, html_elements, html_text, request, session_csrf
+    from support import body, html_elements, html_tag_texts, html_text, request, session_csrf
 
     c = context
     mapping, _, _ = fixture(c)
@@ -296,7 +299,14 @@ def test_browser_update_filters_review_and_publication(context):
     )
     assert result.status_code == 303
     page = body(request(client, "get", result.location))
+    assert "Updated to V2: 1 unmapped, 1 removed from source." in page
     assert "Removed from source" in page and "Unmapped" in page
+    new_row = next(row for row in html_tag_texts(page, "tr") if "New C" in row)
+    assert "Added" in new_row and "Unmapped" in new_row
+    published_page = body(request(client, "get", path + "/records"))
+    assert "Draft already uses V2" in published_page
+    assert "Update to V2" not in published_page
+    assert ("a", {"href": path + "/concept/records"}) in html_elements(published_page)
     assert "Undo delete" not in page
     assert "Update to V2" not in page
     for selected, present, absent in (
@@ -321,6 +331,9 @@ def test_browser_update_filters_review_and_publication(context):
     }
     assert inputs["effective_date"]["value"] == second.effective_date.isoformat()
     assert inputs["effective_date"]["min"] == second.effective_date.isoformat()
+    assert "On or after 11 Sep 2026, the effective date of Business name V2." in html_text(
+        body(publication)
+    )
     posted = request(
         client,
         "post",
@@ -424,21 +437,153 @@ def test_removed_mapping_row_cannot_be_restored_directly(database_context):
     assert snapshot(c) == before
 
 
-def test_incompatible_source_update_is_atomic(database_context):
+@pytest.mark.parametrize("change", ["missing", "datatype"])
+@pytest.mark.parametrize("published", [False, True])
+def test_incompatible_context_is_removed_with_durable_explanation(
+    database_context, change, published
+):
     c = database_context
-    mapping, first, _ = fixture(c)
+    mapping, first, baseline = fixture(c, publish=published)
+    changed_source_context(c, change)
+    second = publish_table(c, c.d, NOW.date() + timedelta(days=1))
+    concept = update(c, mapping)
+    reason = "it no longer exists" if change == "missing" else "its datatype changed"
+    note = f"Source field label was removed because {reason} in Business name V2."
+    assert concept.source_update_notes == [note]
+    assert c.s.datasets.mapping_source(c.a.id, mapping.key)["draft"]["notes"] == [note]
+    assert c.s.datasets.mapping_source(c.a.id, mapping.key)["version_id"] == second.id
+    assert all("label" not in values(row) for row in rows(c, mapping).values())
+    assert values(rows(c, mapping)["a"])["target"] == "A"
+    assert [f.key for f in c.s.dataset_fields.list_fields(c.a.id, mapping.key)] == [
+        "code",
+        "target",
+    ]
+    if baseline:
+        old = c.s.dataset_versions.read(c.a.id, mapping.key, baseline.id)
+        assert "label" in values(old.page.records[0])
+    from support import body, html_text, request
+
+    client = browser(c)
+    for path in ("/concept/records", "/versions/review"):
+        response = request(client, "get", f"/datasets/{mapping.key}" + path, follow_redirects=True)
+        assert response.status_code == 200, (path, html_text(body(response)))
+        assert note in html_text(body(response))
+    if change == "datatype":
+        c.s.dataset_fields.create_field(
+            c.a.id,
+            mapping.key,
+            "label",
+            "Label",
+            "integer",
+            mapping_role="source_context",
+            source_field_key="label",
+        )
+        assert values(rows(c, mapping)["a"])["label"] == 10
+    if published:
+        review = c.s.dataset_versions.review_discard(c.a.id, mapping.id)
+        c.s.dataset_versions.discard_concept(c.a.id, mapping.id, review.identity)
+        restored = c.s.dataset_versions.create_concept(c.a.id, mapping.id)
+        assert restored.source_update_notes is None
+        assert c.s.datasets.mapping_source(c.a.id, mapping.key)["version_id"] == first.id
+        assert values(rows(c, mapping)["a"])["label"] == "Café"
+    else:
+        assert publish_table(c, mapping, second.effective_date).source_version_id == second.id
+
+
+def changed_source_context(c, change):
     c.s.dataset_versions.create_concept(c.a.id, c.d.id)
     for row in c.s.dataset_records.list_records(c.a.id, c.d.key).records:
         c.s.dataset_records.update_record(
             c.a.id, c.d.key, row.id, row.revision, {"code": values(row)["code"]}
         )
-    c.s.dataset_fields.delete_field(c.a.id, c.d.key, "label")
-    publish_table(c, c.d, NOW.date() + timedelta(days=1))
+    if change == "missing":
+        c.s.dataset_fields.delete_field(c.a.id, c.d.key, "label")
+    else:
+        c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Label", "integer", False, False)
+        for row in c.s.dataset_records.list_records(c.a.id, c.d.key).records:
+            c.s.dataset_records.update_record(
+                c.a.id, c.d.key, row.id, row.revision, {"code": values(row)["code"], "label": "10"}
+            )
+
+
+@pytest.mark.parametrize("intermediate_update", [False, True])
+def test_context_removed_in_third_source_version(database_context, intermediate_update):
+    c = database_context
+    mapping, _, _ = fixture(c)
+    next_source(c)
+    if intermediate_update:
+        update(c, mapping)
+    c.service.clock.set(NOW + timedelta(days=1))
+    changed_source_context(c, "missing")
+    third = publish_table(c, c.d, NOW.date() + timedelta(days=2))
+    update(c, mapping)
+    metadata = c.s.datasets.mapping_source(c.a.id, mapping.key)
+    assert metadata["version_id"] == third.id
+    assert metadata["draft"]["previous_number"] == 1
+    assert metadata["draft"]["notes"] == [
+        "Source field label was removed because it no longer exists in Business name V3."
+    ]
+    assert values(rows(c, mapping)["a"]) == {"code": "a", "target": "A"}
+    assert values(rows(c, mapping)["c"]) == {"code": "c"}
+    assert publish_table(c, mapping, third.effective_date).record_count == 2
+
+
+@pytest.mark.parametrize("change", ["missing", "optional", "not_unique"])
+def test_incompatible_identifier_blocks_notice_and_post_atomically(database_context, change):
+    from support import body, html_elements, html_text, request, session_csrf
+
+    c = database_context
+
+    def change_source():
+        c.s.dataset_versions.create_concept(c.a.id, c.d.id)
+        for row in c.s.dataset_records.list_records(c.a.id, c.d.key).records:
+            c.s.dataset_records.delete_record(c.a.id, c.d.key, row.id, row.revision)
+        c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Label", "string", True, True)
+        c.s.dataset_business_keys.set_business_key(c.a.id, c.d.key, ("label",))
+        c.s.dataset_fields.update_field(
+            c.a.id, c.d.key, "code", "Code", "string", change != "optional", change != "not_unique"
+        )
+        if change == "missing":
+            c.s.dataset_fields.delete_field(c.a.id, c.d.key, "code")
+        publish_table(c, c.d, NOW.date() + timedelta(days=1))
+
+    # Create the mapping from Current V1 after the incompatible Scheduled V2 exists.
+    mapping, first, _ = fixture(c, source_change=change_source)
+    metadata = c.s.datasets.mapping_source(c.a.id, mapping.key)
+    expected = (
+        "This mapping can't move to V2 because code is no longer a required, unique field "
+        "in Business name V2. Ask the owner of Business name to restore it, "
+        "or create a new mapping."
+    )
+    assert metadata["update_blocker"] == expected
     before = snapshot(c)
-    with pytest.raises(ValidationError, match="retain the selected source fields"):
+    with pytest.raises(ValidationError, match="required, unique"):
         update(c, mapping)
     assert snapshot(c) == before
     assert c.s.datasets.mapping_source(c.a.id, mapping.key)["version_id"] == first.id
+    client = browser(c)
+    path = f"/datasets/{mapping.key}"
+    page = request(client, "get", path + "/records")
+    assert page.status_code == 200
+    assert expected in html_text(body(page))
+    assert "Update to V2" not in body(page)
+    assert not any(
+        tag == "form" and attrs.get("action") == path + "/source/update"
+        for tag, attrs in html_elements(body(page))
+    )
+    response = request(
+        client,
+        "post",
+        path + "/source/update",
+        data={
+            "csrf_token": session_csrf(client, c.s),
+            "expected_revision": c.s.datasets.get_dataset_for_edit(c.a.id, mapping.key).revision,
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert expected in html_text(body(response))
+    assert "Records ·" in body(response)
 
 
 def test_source_upgrade_invalidates_open_review(database_context):
@@ -492,3 +637,50 @@ def test_update_after_cancelled_mapping_uses_restored_baseline(database_context)
         "mapping_target",
     ]
     assert publish_table(c, mapping, second.effective_date).record_count == 2
+
+
+def test_source_update_notes_schema_preserves_existing_draft(database_context):
+    from alembic import command
+    from support import config_for
+
+    c = database_context
+    fixture(c, publish=False)
+    before = snapshot(c)
+    with c.engine.connect() as connection:
+        config = config_for(connection)
+        command.stamp(config, "head")
+        command.downgrade(config, "0032_ref_239")
+        command.upgrade(config, "head")
+    assert snapshot(c) == before
+
+
+def test_context_removal_and_notes_roll_back_on_audit_failure(database_context, monkeypatch):
+    c = database_context
+    mapping, _, _ = fixture(c)
+    changed_source_context(c, "missing")
+    publish_table(c, c.d, NOW.date() + timedelta(days=1))
+    before = snapshot(c)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("Injected audit failure")
+
+    monkeypatch.setattr("refrncr.dataset_versions.record_audit", fail)
+    with pytest.raises(RuntimeError, match="Injected"):
+        update(c, mapping)
+    assert snapshot(c) == before
+
+
+def test_removal_explanation_survives_later_source_update(database_context):
+    c = database_context
+    mapping, _, _ = fixture(c, publish=False)
+    changed_source_context(c, "missing")
+    publish_table(c, c.d, NOW.date() + timedelta(days=1))
+    second_notes = update(c, mapping).source_update_notes
+    c.service.clock.set(NOW + timedelta(days=1))
+    c.s.dataset_versions.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "c"})
+    publish_table(c, c.d, NOW.date() + timedelta(days=2))
+    assert update(c, mapping).source_update_notes == second_notes
+    assert second_notes == [
+        "Source field label was removed because it no longer exists in Business name V2."
+    ]

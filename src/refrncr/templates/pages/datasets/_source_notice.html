@@ -2,7 +2,11 @@
 <div class='alert {{ "alert-warning" if mapping_source.current_number else "alert-info" }}' role='status'>
   <p>{{ mapping_source.name }} has a newer version (V{{ mapping_source.latest_number }}). This mapping uses V{{ mapping_source.number }}.</p>
   {% if mapping_source.current_number %}<p>V{{ mapping_source.current_number }} is current since <time datetime='{{ mapping_source.current_effective_date.isoformat() }}'>{{ mapping_source.current_effective_date|short_date }}</time>.</p>{% endif %}
-  {% if mapping_source.may_update %}
+  {% if mapping_source.draft_already_updated %}
+  <p><a href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Draft already uses V{{ mapping_source.latest_number }}</a></p>
+  {% elif mapping_source.update_blocker %}
+  <p>{{ mapping_source.update_blocker }}</p>
+  {% elif mapping_source.may_update %}
   <form method='post' action='{{ url_for("dataset_mapping_source_update", key=dataset.key) }}' data-single-submit>
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <input type='hidden' name='expected_revision' value='{{ mapping_source.revision }}'>
@@ -10,4 +14,12 @@
   </form>
   {% endif %}
 </div>
+{% endif %}
+{% if mapping_source and mapping_source.draft %}
+{% if request.args.get('notice') == 'source-updated' %}
+<div class='alert alert-success' role='status'>Updated to V{{ mapping_source.number }}: {{ mapping_source.draft.unmapped }} unmapped, {{ mapping_source.draft.removed }} removed from source.</div>
+{% endif %}
+{% for note in mapping_source.draft.notes %}
+<div class='alert alert-info' role='status'>{{ note }}</div>
+{% endfor %}
 {% endif %}

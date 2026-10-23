@@ -463,10 +463,15 @@ class DatasetVersionService:
                     raise ValidationError("Mapping requires its published source version.")
                 if source.number <= previous.number:
                     return uow.concepts.get(dataset.id)
-                reconcile_source(uow, dataset, source)
+                notes = reconcile_source(uow, dataset, source)
                 dataset.source_version_id = source.id
                 dataset.content_updated_at = uow.now()
-                uow.concepts.record_mutation(dataset.id, import_result={})
+                concept = uow.concepts.get(dataset.id)
+                uow.concepts.record_mutation(
+                    dataset.id,
+                    import_result={},
+                    source_update_notes=[*(concept.source_update_notes or []), *notes],
+                )
                 _advance_concept(uow, dataset)
                 record_audit(
                     uow,

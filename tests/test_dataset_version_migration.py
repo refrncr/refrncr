@@ -135,7 +135,7 @@ def test_empty_upgrade_from_every_supported_revision(database_audit_db, revision
         config = config_for(connection)
         command.upgrade(config, revision)
         command.upgrade(config, "head")
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0032_ref_239"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
         assert connection.scalar(text("SELECT count(*) FROM dataset_versions")) == 0
 
 

@@ -82,7 +82,7 @@ class SqlAlchemyConceptOperations:
             .values(updated_at=now)
         )
 
-    def record_mutation(self, dataset_id, *, import_result=None):
+    def record_mutation(self, dataset_id, *, import_result=None, source_update_notes=None):
         from sqlalchemy import case
 
         changes = {
@@ -90,6 +90,8 @@ class SqlAlchemyConceptOperations:
         }
         if import_result is not None:
             changes["import_result"] = dict(import_result)
+        if source_update_notes is not None:
+            changes["source_update_notes"] = list(source_update_notes)
         self.session.execute(
             update(DatasetConcept).where(DatasetConcept.dataset_id == dataset_id).values(**changes)
         )
