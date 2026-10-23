@@ -6695,11 +6695,11 @@
         }
       },
       "success": "Pin the latest non-cancelled source, reconcile rows and retain targets in one transaction; emit one source update event.",
-      "validation_failure": "No persisted changes or event; reject incompatible source fields and invalid identifiers.",
+      "validation_failure": "No persisted changes or event for incompatible source identifiers or invalid snapshots. Missing or datatype-changed context fields are removed with draft explanations.",
       "authorization_failure": "No persisted changes or event for a caller without mapping maintain permission.",
       "stale_input": "Reject mismatched Dataset revision before creating a draft or changing content.",
       "no_op": "An already updated active draft is returned without changes or event.",
-      "rollback": "Draft creation, source pointer, records and audit share one serialized transaction.",
+      "rollback": "Draft creation, source pointer, context-field removals, explanatory notes, records and audit share one serialized transaction.",
       "duplicate_retry": "Old revision conflicts; a refreshed retry of the same source is a no-op.",
       "tests": [
         "tests/test_mapping_source_updates.py::test_upgrade_reconciles_and_preserves_targets",
