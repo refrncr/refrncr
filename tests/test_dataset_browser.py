@@ -20,7 +20,7 @@ from support import (
     session_csrf,
 )
 
-from refrncr.models import AuditEvent, Dataset, DatasetField, Grant
+from refrncr.models import AuditEvent, Dataset, DatasetField, Grant, LoginSession
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.presentation_metadata import DATASET_ICONS
 from refrncr.services import NotFoundError, ValidationError
@@ -1459,9 +1459,15 @@ def test_setup_validation_field_comes_from_domain_error_not_its_message(
 
 
 def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
-    _, services, admin, client = dataset_browser
+    factory, services, admin, client = dataset_browser
     create_dataset(services, admin, "duplicate")
     login(client)
+    with factory.begin() as session:
+        session.execute(
+            update(LoginSession)
+            .where(LoginSession.user_id == admin.id)
+            .values(csrf_token="disposable-sql-csrf-token")
+        )
     form = request(client, "get", "/datasets/new")
 
     response = request(
@@ -1484,7 +1490,8 @@ def test_duplicate_key_is_safe_conflict_and_preserves_form(dataset_browser):
     assert (
         sum(attrs.get("aria-invalid") == "true" for _, attrs in html_elements(body(response))) == 1
     )
-    assert "sql" not in body(response).casefold()
+    # Random CSRF tokens may contain "sql"; check all HTML except that known token.
+    assert "sql" not in body(response).replace(form_csrf(form), "").casefold()
 
 
 @pytest.mark.parametrize("token", [None, "invalid", "é"])
@@ -2225,10 +2232,16 @@ def test_create_field_validation_is_safe_and_preserves_values(dataset_browser, o
 
 
 def test_duplicate_field_key_is_safe_conflict(dataset_browser):
-    _, services, admin, client = dataset_browser
+    factory, services, admin, client = dataset_browser
     dataset = create_dataset(services, admin, "duplicate-field")
     create_field(services, admin, dataset, "duplicate")
     login(client)
+    with factory.begin() as session:
+        session.execute(
+            update(LoginSession)
+            .where(LoginSession.user_id == admin.id)
+            .values(csrf_token="disposable-sql-csrf-token")
+        )
     form = request(client, "get", "/datasets/duplicate-field/fields/new")
 
     response = request(
@@ -2246,7 +2259,8 @@ def test_duplicate_field_key_is_safe_conflict(dataset_browser):
     assert response.status_code == 409
     assert "Field key already exists in this Dataset" in body(response)
     assert "constraint" not in body(response).casefold()
-    assert "sql" not in body(response).casefold()
+    # Random CSRF tokens may contain "sql"; check all HTML except that known token.
+    assert "sql" not in body(response).replace(form_csrf(form), "").casefold()
 
 
 @pytest.mark.parametrize("token", [None, "invalid", "é"])
