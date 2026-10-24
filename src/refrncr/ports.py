@@ -501,9 +501,22 @@ class HierarchyOperations(Protocol):
     def field_has_values(self, dataset_id: str, field_id: str) -> bool: ...
 
 
+class OverviewOperations(Protocol):
+    def recent_ids(self, user_id: str) -> tuple[str, ...]: ...
+
+    def record_visit(self, user_id: str, dataset_id: str, now: datetime) -> None: ...
+
+    def version_fields(self, version_ids): ...
+
+    def draft_counts(self, dataset_ids) -> dict[str, tuple[int, int]]: ...
+
+    def version_unmapped(self, version_ids) -> dict[str, int]: ...
+
+
 class UnitOfWork(Protocol):
     write: bool
     api_keys: ApiKeyOperations
+    overview: OverviewOperations
     concepts: ConceptOperations
     version_diff: VersionDiffOperations
     versions: VersionOperations

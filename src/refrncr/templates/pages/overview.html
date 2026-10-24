@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "components/dataset_card.html" import dataset_card, section_heading, owner_switch %}
+{% from "components.html" import breadcrumbs %}
+{% block title %}{{ 'Needs your attention' if full else 'Overview' }} · REFRNCR{% endblock %}
+{% block content %}
+<div class="overview-content">
+  {% if full %}<header class="page-header overview-full-header">
+    <div class="page-context">{{ breadcrumbs([('Overview', url_for('index', all_owners=1 if overview.all_owners else none)), ('Needs your attention', none)]) }}
+      <h1 id="attention-heading">Needs your attention <span class="count" aria-label="{{ overview.attention|length }} {{ 'dataset' if overview.attention|length == 1 else 'datasets' }}">{{ overview.attention|length }}</span></h1></div>
+  </header>
+  {% else %}{% set first_name = (current_actor.display_name or '').split()|first|default('') %}
+  <header class="overview-greeting" data-overview-greeting data-name="{{ first_name }}">
+    {% if overview.today %}<p class="overview-greeting-date"><time datetime="{{ overview.today.isoformat() }}" data-overview-date>{{ overview.today.strftime('%A') }} {{ overview.today.day }} {{ overview.today.strftime('%B %Y') }}</time></p>{% endif %}
+    <h1 data-overview-salutation>{{ 'Hello, ' ~ first_name if first_name else 'Overview' }}</h1>
+    <p class="overview-greeting-lead">Here's what needs your attention across your datasets.</p>
+  </header>{% endif %}
+  <section class="ov-section" aria-labelledby="attention-heading">
+    {% if not full %}{% call section_heading('Needs your attention', overview.attention|length, url_for('attention_overview', all_owners=1 if overview.all_owners else none), id='attention-heading') %}
+      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('index'), reason) }}{% endif %}
+    {% endcall %}{% endif %}
+    {% if full %}
+      <div class="overview-toolbar">
+      <form method="get" action="{{ url_for('attention_overview') }}" data-auto-filter class="overview-reason-filter">
+        {% if overview.all_owners %}<input type="hidden" name="all_owners" value="1">{% endif %}
+        <label class="visually-hidden" for="attention-reason">Reason</label>
+        <select id="attention-reason" name="reason" data-select="compact" data-noun="reasons"><option value=""{% if not reason %} selected{% endif %}>All reasons</option>{% for number, label in reason_labels.items() %}<option value="{{ number }}"{% if reason == number %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <noscript><button class="button button-secondary" type="submit">Apply</button></noscript>
+      </form>
+      {% if overview.is_admin %}{{ owner_switch(overview.all_owners, url_for('attention_overview'), reason) }}{% endif %}
+      </div>
+      {% if attention_cards %}<ul class="card-grid card-grid-attention">{% for card in attention_cards %}{% set selected = card.reason_for_display(reason) %}<li>{{ dataset_card(card, card_destination(card, selected), reason=selected) }}</li>{% endfor %}</ul>{% endif %}
+    {% else %}
+      {% for group in ['Needs action', 'Coming up'] %}
+        {% set cards = overview.attention|selectattr('group', 'equalto', group)|list %}
+        {% if cards %}<div class="ov-group"><h3 class="ov-group-title">{{ group }} <span class="count">{{ cards|length }}</span></h3>
+          <ul class="card-grid card-grid-attention">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card, card.card_reason), reason=card.card_reason) }}</li>{% endfor %}</ul>
+        </div>{% endif %}
+      {% endfor %}
+      {% if overview.tallies|selectattr('2')|list %}<div class="ov-group"><h3 class="ov-group-title">To finish</h3><ul class="tally">
+        {% for number, label, count in overview.tallies %}{% if count %}<li><a href="{{ url_for('attention_overview', reason=number, all_owners=1 if overview.all_owners else none) }}"><span class="count">{{ count }}</span>{{ label }}</a></li>{% endif %}{% endfor %}
+      </ul></div>{% endif %}
+    {% endif %}
+    {% if not attention_cards %}<div class="empty-state">
+      {% if not overview.has_team and not overview.all_owners %}<h2>You're not in a team yet</h2><p>Attention items from your teams will show up here.{% if overview.is_admin %} Turn on Show all owners to see attention items across all teams.{% else %} Ask an administrator to add you to a team.{% endif %}</p>
+      {% elif reason %}<h2>No datasets match this reason</h2><p><a href="{{ url_for('attention_overview', all_owners=1 if overview.all_owners else none) }}">View all attention items</a></p>
+      {% else %}<h2>Nothing needs your attention</h2><p>Mappings that lag behind, missing Current versions and upcoming versions show up here.</p>{% endif %}
+    </div>{% endif %}
+  </section>
+  {% if not full %}
+    {% for title, cards in [('Recently visited', overview.visited), ('Recently created', overview.created)] %}
+      <section class="ov-section" aria-labelledby="recent-{{ loop.index }}">
+        {{ section_heading(title, none if title == 'Recently visited' and not cards else cards|length, id='recent-' ~ loop.index) }}
+        {% if cards %}<ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card), export=title == 'Recently visited') }}</li>{% endfor %}</ul>
+        {% elif title == 'Recently visited' %}<p class="overview-empty-visits">Datasets you visit will show up here. <a href="{{ url_for('dataset_list') }}">View datasets</a></p>
+        {% else %}<div class="empty-state"><p>{{ 'Datasets you visit will show up here.' if title == 'Recently visited' else 'New datasets will show up here.' }} <a href="{{ url_for('dataset_list') }}">View datasets</a></p></div>{% endif %}
+      </section>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{% if not full %}<script src="{{ url_for('static', filename='js/overview-greeting.js') }}" defer></script>{% endif %}{% endblock %}

@@ -824,4 +824,19 @@ _register(
     rationale="Bulk current Community Dataset view decision; no mutation or domain event.",
 )
 
+_register(
+    "OverviewService",
+    "read",
+    "intentionally excluded",
+    module="overview",
+    rationale="Authorized private Overview projection; no business mutation or domain event.",
+)
+_register(
+    "OverviewService",
+    "record_visit",
+    "intentionally excluded",
+    module="overview",
+    rationale="REF-238 private navigation history is explicitly excluded from the audit log.",
+)
+
 OPERATIONS = MappingProxyType(OPERATIONS)

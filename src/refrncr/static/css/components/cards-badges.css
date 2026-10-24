@@ -17,3 +17,6 @@ a.badge-link, a.badge-link:hover { text-decoration: none; }
 .table-avatar { display: inline-grid; place-items: center; width: 1.625rem; height: 1.625rem; margin-right: var(--space-sm); border: 1px solid var(--color-avatar-border); border-radius: var(--radius-full); background: var(--color-avatar-surface); color: var(--color-avatar-text); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); vertical-align: middle; }
 .table-avatar + .row-action { display: inline-block; width: auto; vertical-align: middle; }
 .role-help { display: block; margin-top: var(--space-xs); }
+
+:root[data-theme="dark"] .dataset-icon-tile { color: var(--color-link); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dataset-icon-tile { color: var(--color-link); } }

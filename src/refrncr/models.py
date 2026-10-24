@@ -305,6 +305,21 @@ class ImmutableDatasetFieldKeyError(ValueError):
     """A persisted Dataset field key was changed."""
 
 
+class DatasetVisit(Base):
+    """Private, bounded navigation history; deliberately outside business audit."""
+
+    __tablename__ = "dataset_visits"
+    __table_args__ = (Index("ix_dataset_visits_recent", "user_id", "last_visited_at"),)
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True
+    )
+    last_visited_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
 class DatasetField(Base):
     __tablename__ = "dataset_fields"
     __table_args__ = (

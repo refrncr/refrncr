@@ -359,7 +359,8 @@ def test_source_deletion_blocked_until_last_mapping_removed(database_context, pu
         "confirmation_name": confirmation.name,
         "expected_updated_at": confirmation.expected_updated_at,
     }
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     for operation in (
         lambda: c.s.datasets.get_dataset_for_deletion(c.a.id, c.d.id),
         lambda: c.s.datasets.delete_dataset(
@@ -369,13 +370,13 @@ def test_source_deletion_blocked_until_last_mapping_removed(database_context, pu
         with pytest.raises(ConflictError) as error:
             operation()
         assert str(error.value) == message
-        assert snapshot(c) == before
+        assert snapshot(c, include_visits=False) == before
     for method in ("get", "post"):
         response = request(client, method, path, **({"data": data} if method == "post" else {}))
         assert response.status_code == 409
         assert message in html_text(body(response))
         assert "try again" not in body(response)
-        assert snapshot(c) == before
+        assert snapshot(c, include_visits=False) == before
     settings = page(client, f"/datasets/{c.d.key}")
     assert message in html_text(settings)
     buttons = [
@@ -389,7 +390,7 @@ def test_source_deletion_blocked_until_last_mapping_removed(database_context, pu
         tag == "a" and attrs.get("href", "").startswith(path)
         for tag, attrs in html_elements(settings)
     )
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     for mapping in mappings:
         target = c.s.datasets.get_dataset_for_deletion(c.a.id, mapping.id)
         c.s.datasets.delete_dataset(c.a.id, mapping.id, target.name, target.expected_updated_at)

@@ -1227,7 +1227,6 @@
       "operation": "list_dataset_overview",
       "service": "refrncr.services.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
@@ -2972,7 +2971,8 @@
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
-        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update",
+        "refrncr.web.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3228,7 +3228,6 @@
       "operation": "can_create_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_create_dataset",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets"
       ],
       "kind": "read",
@@ -4175,7 +4174,8 @@
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -6592,7 +6592,6 @@
       "operation": "mapping_source",
       "service": "refrncr.services.DatasetService.mapping_source",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
@@ -6714,7 +6713,6 @@
       "operation": "mapping_usage",
       "service": "refrncr.services.DatasetService.mapping_usage",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
@@ -6755,6 +6753,71 @@
       "implementation_status": "Implemented for REF-302 source-side dependency lists and counts.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Read snapshot; count query or batched publication metadata, without mapping records or new persistence."
+    },
+    {
+      "capability": "Private Overview",
+      "operation": "read",
+      "service": "refrncr.overview.OverviewService.read",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.attention_overview GET /attention"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication and authorization boundaries reject denied requests.",
+      "technical_logging": "Safe fixed diagnostic only; do not log browsing history or record contents.",
+      "events": [],
+      "allowed_context": {},
+      "object_identifier": "Authenticated user UUID and dataset UUID.",
+      "actor_source": "Authenticated browser principal; active user rechecked in the service.",
+      "success": "Private attention/recent projection.",
+      "validation_failure": "No navigation history is stored for an unknown dataset.",
+      "authorization_failure": "Inactive or deleted actors are rejected; only admins may request all owners.",
+      "stale_input": "Visibility is re-evaluated at read time; visits never grant access.",
+      "no_op": "Reads do not mutate; revisiting updates the existing row.",
+      "rollback": "Visit upsert and eviction share one serialized transaction.",
+      "duplicate_retry": "Unique user/dataset key and user lock prevent duplicate rows.",
+      "tests": [
+        "tests/test_overview.py::test_team_ownership_admin_override_and_explicit_grants",
+        "tests/test_overview.py::test_recent_visits_are_private_bounded_and_not_audited"
+      ],
+      "implementation_status": "Implemented by REF-238.",
+      "exclusion_reason": "Authorized private Overview projection; no business mutation or domain event.",
+      "persistence_scope": "dataset_visits only; business datasets and AuditEvent are unchanged."
+    },
+    {
+      "capability": "Private Overview",
+      "operation": "record_visit",
+      "service": "refrncr.overview.OverviewService.record_visit",
+      "interface_entrypoints": [
+        "Successful dataset HTML GET: refrncr.web.record_dataset_visit"
+      ],
+      "kind": "mutation",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication and authorization boundaries reject denied requests.",
+      "technical_logging": "Safe fixed diagnostic only; do not log browsing history or record contents.",
+      "events": [],
+      "allowed_context": {},
+      "object_identifier": "Authenticated user UUID and dataset UUID.",
+      "actor_source": "Authenticated browser principal; active user rechecked in the service.",
+      "success": "Update one visit and atomically evict entries beyond twenty; no audit event.",
+      "validation_failure": "No navigation history is stored for an unknown dataset.",
+      "authorization_failure": "Inactive or deleted actors are rejected; only admins may request all owners.",
+      "stale_input": "Visibility is re-evaluated at read time; visits never grant access.",
+      "no_op": "Reads do not mutate; revisiting updates the existing row.",
+      "rollback": "Visit upsert and eviction share one serialized transaction.",
+      "duplicate_retry": "Unique user/dataset key and user lock prevent duplicate rows.",
+      "tests": [
+        "tests/test_overview.py::test_team_ownership_admin_override_and_explicit_grants",
+        "tests/test_overview.py::test_recent_visits_are_private_bounded_and_not_audited"
+      ],
+      "implementation_status": "Implemented by REF-238.",
+      "exclusion_reason": "REF-238 private navigation history is explicitly excluded from the audit log.",
+      "persistence_scope": "dataset_visits only; business datasets and AuditEvent are unchanged."
     }
   ]
 }

@@ -461,9 +461,10 @@ def test_web_csrf_exact_confirmation_prg_and_replay(context):
         confirmation_name=target.name,
         expected_updated_at=target.expected_updated_at,
     )
-    before = snapshot(c)
+    # Successful dataset GETs now update private visits; business data must stay unchanged.
+    before = snapshot(c, include_visits=False)
     assert client.get(path, base_url="https://localhost").status_code == 200
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     for changes, status in [
         ({"csrf_token": "wrong"}, 403),
         ({"confirmation_name": "wrong"}, 400),
@@ -471,22 +472,22 @@ def test_web_csrf_exact_confirmation_prg_and_replay(context):
     ]:
         response = client.post(path, data=data | changes, base_url="https://localhost")
         assert response.status_code == status
-        assert snapshot(c) == before
+        assert snapshot(c, include_visits=False) == before
     response = client.post(
         path,
         data=MultiDict([*data.items(), ("confirmation_name", "wrong")]),
         base_url="https://localhost",
     )
-    assert response.status_code == 400 and snapshot(c) == before
+    assert response.status_code == 400 and snapshot(c, include_visits=False) == before
     response = client.post(path, data=data, base_url="https://localhost")
     assert response.status_code == 303 and response.location == "/datasets?deleted=1"
     success = client.get(response.location, base_url="https://localhost")
     assert b"Dataset deleted permanently." in success.data
-    after = snapshot(c)
+    after = snapshot(c, include_visits=False)
     assert client.get(response.location, base_url="https://localhost").status_code == 200
     assert client.get(path, base_url="https://localhost").status_code == 404
     assert client.post(path, data=data, base_url="https://localhost").status_code == 404
-    assert snapshot(c) == after
+    assert snapshot(c, include_visits=False) == after
 
 
 def test_web_denied_targets_are_uniform(context):
@@ -522,6 +523,7 @@ def test_dataset_foreign_key_inventory(context):
         "dataset_export_access",
         "dataset_versions",
         "dataset_concepts",
+        "dataset_visits",
         "datasets",
     }
     assert all(fk["referred_table"] == "users" for fk in schema.get_foreign_keys("audit_events"))
@@ -541,7 +543,7 @@ def test_deletion_on_complete_migration_chain(database_audit_db):
     c = context_from_audit_db(database_audit_db)
     populate(c)
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0033_ref_301"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0034_ref_238"
     with pytest.raises(IntegrityError), c.sessions.begin() as session:
         session.add(DatasetRecord(dataset_id=str(uuid4()), identifier_key=b"test", revision=1))
     # Field RESTRICT is effective on the real migrated schema too.
