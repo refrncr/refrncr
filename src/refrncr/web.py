@@ -600,7 +600,10 @@ def create_flask_app(
                 abort(404)
             except ConflictError as error:
                 return render_authenticated_template(
-                    "pages/datasets/concept_required.html", key=values["key"], error=str(error)
+                    "pages/datasets/concept_required.html",
+                    key=values["key"],
+                    error=str(error),
+                    has_current=dataset_versions.history(actor.id, values["key"]).has_current,
                 ), 409
 
     @app.context_processor
@@ -1482,6 +1485,7 @@ def create_flask_app(
                 key=key,
                 error=str(error),
                 already_active=True,
+                has_current=dataset_versions.history(actor.id, key).has_current,
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 

@@ -5118,7 +5118,8 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

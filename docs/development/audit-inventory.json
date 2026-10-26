@@ -313,6 +313,7 @@
       ],
       "operations": [
         "refrncr.dataset_versions.DatasetVersionService.create_concept",
+        "refrncr.dataset_versions.DatasetVersionService.history",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.SessionService.resolve_with_session"
       ]

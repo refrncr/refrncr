@@ -409,7 +409,11 @@ transactionally.
 
 Import preview and complete-identifier matching are unchanged. The post-import Records
 page retains the original receipt totals and Added/Changed/Deleted selection. Its explicit
-`import_results=1` defaults Record status to All, preserving Deleted results. General String
+`import_results=1` defaults Record status to All. For reference Datasets, Deleted rows and
+list counts include only Records from the Draft's pinned baseline, matching Review & publish;
+Records added and removed within the same Draft are omitted. Mapping Dataset deletion
+display is unchanged. Preview deletion counts, acknowledgement and receipt totals still
+reflect every Draft Record removed by the import. General String
 search combines with that selection using AND. Clearing
 the import-change selection preserves the other criteria; Clear all returns to the normal
 Active view. The general Records search now accepts String Fields only, including String

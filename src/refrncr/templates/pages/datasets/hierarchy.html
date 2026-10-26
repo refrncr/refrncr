@@ -16,7 +16,7 @@
     {% include "pages/datasets/_breadcrumbs.html" %}
   {% endcall %}
   <div class='page-actions'>
-    {% if not version_state %}{{ current_version_action(dataset.key) }}{% endif %}
+    {% if not version_state %}{{ current_version_action(dataset.key, concept_ui and concept_ui.has_current) }}{% endif %}
     {{ versions_action(dataset.key) }}
     {{ export_action(dataset, version_state, may_export, 'Export draft' if not version_state else 'Export') }}
     {% if may_edit %}<a class='button button-secondary' href='{{ url_for("import_hierarchy_file", key=dataset.key) }}'>Import</a>{% endif %}

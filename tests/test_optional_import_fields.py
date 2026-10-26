@@ -222,6 +222,9 @@ def test_missing_record_requires_acknowledgement_and_keeps_deleted_values(databa
     assert snapshot(c) == before
     confirm(c, state, acknowledge_deletions=True)
     view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
-    deleted = next(r for r in view.page.records if r.id == c.record.id)
-    assert values(deleted)["label"] == "Café"
-    assert view.record_states[deleted.id] == "Deleted"
+    assert c.record.id not in {record.id for record in view.page.records}
+    assert view.deleted_count == 0
+    restored = c.s.dataset_records.restore_record(
+        c.a.id, c.d.key, c.record.id, c.record.revision + 1, concept_id=view.concept.id
+    )
+    assert values(restored) == values(c.record)

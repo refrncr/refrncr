@@ -215,6 +215,8 @@ def test_unpublished_dataset_can_be_imported_twice_and_keeps_only_latest_results
     assert first_preview.counts["Changed"] == 1
     assert first_preview.counts["Added"] == 1
     confirm(c, first)
+    first_view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
+    added = next(record for record in first_view.page.records if record.id != c.record.id)
 
     second, second_preview = preview(c, b"code,label\na,First import\n", session="second")
     assert second_preview.valid
@@ -229,11 +231,10 @@ def test_unpublished_dataset_can_be_imported_twice_and_keeps_only_latest_results
         prefer_concept=True,
         statuses=("Added", "Changed", "Deleted"),
     )
-    assert len(view.page.records) == 1
-    deleted = view.page.records[0]
-    assert view.record_states[deleted.id] == "Deleted"
+    assert view.page.records == () and view.page.total == 0
+    assert view.deleted_count == 0 and view.status_counts == (1, 0, 0)
     restored = c.s.dataset_records.restore_record(
-        c.a.id, c.d.key, deleted.id, deleted.revision, concept_id=view.concept.id
+        c.a.id, c.d.key, added.id, added.revision + 1, concept_id=view.concept.id
     )
     assert {value.field_key: value.value for value in restored.values}["code"] == "b"
     with c.sessions() as session:

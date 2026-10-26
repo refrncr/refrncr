@@ -204,7 +204,10 @@ Dataset metadata and tabs, plus Versions and a CSRF-protected Create draft actio
 Access and Settings explicitly retain their selected Draft in the Records link, editing
 links and Draft banner. Scheduled and Expired views share a status bar across the content
 and configuration tabs: Scheduled uses the existing info colours and links to the cancellation
-confirmation; Expired shows its effective period. Both link to the default Records route.
+confirmation; Expired shows its effective period. The shared **View current version** action
+appears only when a Current version exists, including in Draft and Versions views.
+A Draft without a baseline says **Nothing is published yet. Publishing creates Version 1.**;
+its Review & publish subtitle is **This draft will become Version 1.**
 No new schema, permission, audit event or dependency is introduced.
 
 **Versions** is a header action with the
@@ -299,8 +302,11 @@ For a Dataset with no non-cancelled version, a non-legacy Concept remains import
 Record changes or a completed import. Every new preview compares with the current Draft and
 the latest import replaces the previous result. For Datasets with a non-cancelled version,
 Record mutations and completed imports continue to block further imports in that Concept.
-Field-only changes preserve eligibility. New import deletions, including Records added to an
-unpublished Draft, remain visible as Deleted and can be undone. See
+Field-only changes preserve eligibility. Reference Dataset lists and Deleted counts include
+only removals from the pinned baseline, matching Review & publish. A Record added and then
+removed within the Draft is omitted from the list, totals and filters, whether removed
+manually or by import. Retained deletion data and the Mapping Dataset rule remain unchanged.
+Import previews and their confirmation still account for every Draft Record being removed. See
 [ADR-016](../architecture/adr-016-complete-record-import.md) and
 [import security](record-import-security.md#complete-new-version-imports-ref-160).
 

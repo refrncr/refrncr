@@ -67,7 +67,7 @@ def test_version_status_bar_is_shared_by_dataset_tabs(context, tab, status):
         else "You're viewing a scheduled version"
     )
     assert explanation in page.text
-    assert "View current version" in page.text
+    assert ("View current version" in page.text) == (status == "Expired")
     assert "aria-label='Draft context'" not in page.text
     assert records_link(page.text) == root + "/records"
     if status == "Scheduled":
@@ -207,3 +207,64 @@ def test_no_current_fallback_selects_latest_expired_snapshot(context, monkeypatc
     assert page.status_code == 200
     assert "aria-label='Expired version'" in page.text
     assert "Version 1" in page.text
+
+
+@pytest.mark.parametrize("published", [False, True])
+def test_draft_first_publication_copy_and_current_links(context, published):
+    c = context
+    configured(c)
+    if published:
+        publish(c)
+        c.service.create_concept(c.a.id, c.d.id)
+        c.s.dataset_fields.create_field(c.a.id, c.d.key, "note", "Note", "string")
+    browser, csrf = dataset_version_client(c)
+    root = f"/datasets/{c.d.key}"
+    for suffix in (
+        "/concept/records",
+        "/concept?tab=fields",
+        "/concept?tab=access-management",
+        "/concept?tab=dataset-details",
+        "/records/import",
+    ):
+        page = request(browser, "get", root + suffix)
+        assert page.status_code == 200
+        assert ("View current version" in page.text) == published
+        assert ("Nothing is published yet. Publishing creates Version 1." in page.text) != published
+        assert (
+            "Changes are not visible in the current published version until you publish them."
+            in page.text
+        ) == published
+    history = request(browser, "get", root + "/versions")
+    assert ("View current version" in history.text) == published
+    duplicate = request(browser, "post", root + "/concept/new", data={"csrf_token": csrf})
+    assert duplicate.status_code == 409
+    assert ("View current version" in duplicate.text) == published
+    review = browser.get(
+        root + "/versions/review", base_url="https://localhost", follow_redirects=True
+    )
+    assert review.status_code == 200
+    assert ("This draft will become Version 1." in review.text) != published
+    assert ("Changes in the draft compared with Version 1" in review.text) == published
+
+
+@pytest.mark.parametrize("current", [False, True])
+def test_scheduled_view_links_to_current_only_when_it_exists(context, current):
+    c = context
+    configured(c)
+    if current:
+        publish(c)
+        c.service.create_concept(c.a.id, c.d.id)
+        c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b", "label": "Scheduled"})
+    scheduled = publish(c, day=NOW.date() + timedelta(days=1))
+    browser, _ = dataset_version_client(c)
+    for suffix in ("/records", "?tab=fields"):
+        page = request(browser, "get", f"/datasets/{c.d.key}/versions/{scheduled.id}" + suffix)
+        assert page.status_code == 200
+        assert ("View current version" in page.text) == current
+        assert "Cancel scheduled version…" in page.text
+    history = request(browser, "get", f"/datasets/{c.d.key}/versions")
+    assert ("View current version" in history.text) == current
+    c.service.create_concept(c.a.id, c.d.id)
+    draft = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+    assert ("View current version" in draft.text) == current
+    assert "Nothing is published yet. Publishing creates Version 1." not in draft.text

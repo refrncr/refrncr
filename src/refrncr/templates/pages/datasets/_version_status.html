@@ -1,3 +1,4 @@
+{% from "components/concept.html" import current_version_action %}
 {% if version_state and version_state.status in ('Scheduled', 'Expired') %}
 <section class='version-status-bar {{ "version-status-bar-info" if version_state.status == "Scheduled" else "version-status-bar-neutral" }}' aria-label='{{ version_state.status }} version'>
   {% if version_state.status == 'Scheduled' %}
@@ -6,7 +7,7 @@
   <p>You're viewing an expired version · in effect from <time datetime='{{ version_state.version.effective_date.isoformat() }}'>{{ version_state.version.effective_date|short_date }}</time> to <time datetime='{{ version_state.end_date.isoformat() }}'>{{ version_state.end_date|short_date }}</time></p>
   {% endif %}
   <div class='page-actions'>
-    <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
+    {{ current_version_action(dataset.key, version_state.has_current) }}
     {% if version_state.status == 'Scheduled' and may_cancel_scheduled %}<a class='button button-danger' href='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=version_state.version.id) }}'>Cancel scheduled version…</a>{% endif %}
   </div>
 </section>
