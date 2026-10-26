@@ -222,7 +222,7 @@ def test_dataset_detail_browser_title_matches_active_tab(dataset_browser, tab, t
     login(client)
     page = body(request(client, "get", f"/datasets/title-tabs/concept?tab={tab}"))
     assert f"<title>{title} · Countries · REFRNCR</title>" in page
-    assert html_tag_texts(page, "a").count("View current version") == 1
+    assert "View current version" not in html_tag_texts(page, "a")
 
 
 def test_general_and_ownership_edits_are_separate_and_keep_technical_name_prepublication(

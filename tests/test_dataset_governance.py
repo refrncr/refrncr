@@ -512,7 +512,7 @@ def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     assert select_attrs["data-bwignore"] == "true"
     assert ">Grant export access</button>" in empty
     access_action = re.search(r"action='([^']*/export-access[^']*)'", empty)
-    assert access_action and access_action.group(1) == f"/datasets/{d.key}/export-access"
+    assert access_action and access_action.group(1) == f"/datasets/{d.key}/export-access?concept=1"
     invalid = post(f"{access_url}?concept=1", {"subject": "", "csrf_token": csrf})
     assert invalid.status_code == 400
     assert "id='access-management-heading'" in invalid.text

@@ -452,3 +452,39 @@ def test_guard_checks_nested_documentation_operation(monkeypatch):
     monkeypatch.setattr(Path, "read_text", missing)
     with pytest.raises(AuditContractError):
         verify_inventory(ROOT)
+
+
+@pytest.mark.parametrize(
+    "keys", [None, "label", ["label", "label"], ["x" * 101], ["<script>"], [None]]
+)
+def test_import_audit_rejects_invalid_omitted_field_keys(keys):
+    details = dict(
+        mode="new_version",
+        format="CSV",
+        added=0,
+        changed=0,
+        unchanged=1,
+        deleted=0,
+        total_processed=1,
+        unmapped_fields=keys,
+    )
+    with pytest.raises(AuditContractError):
+        validate_event(**event(action="dataset.new_version_imported", details=details))
+
+
+def test_import_audit_keeps_schema_key_order_and_copies_the_list():
+    keys = ["z_note", "a_label"]
+    details = dict(
+        mode="new_version",
+        format="CSV",
+        added=0,
+        changed=0,
+        unchanged=1,
+        deleted=0,
+        total_processed=1,
+        unmapped_fields=keys,
+    )
+    result = validate_event(**event(action="dataset.new_version_imported", details=details))
+    assert result["unmapped_fields"] == keys
+    keys.clear()
+    assert result["unmapped_fields"] == ["z_note", "a_label"]

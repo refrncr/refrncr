@@ -600,7 +600,10 @@ def create_flask_app(
                 abort(404)
             except ConflictError as error:
                 return render_authenticated_template(
-                    "pages/datasets/concept_required.html", key=values["key"], error=str(error)
+                    "pages/datasets/concept_required.html",
+                    key=values["key"],
+                    error=str(error),
+                    has_current=dataset_versions.history(actor.id, values["key"]).has_current,
                 ), 409
 
     @app.context_processor
@@ -1407,6 +1410,7 @@ def create_flask_app(
         return render_mapping_template(
             "pages/datasets/detail.html",
             dataset=dataset,
+            concept=concept,
             mapping_configuration=mapping_configuration,
             source_context_available=identifier is not None,
             context=context,
@@ -1481,6 +1485,7 @@ def create_flask_app(
                 key=key,
                 error=str(error),
                 already_active=True,
+                has_current=dataset_versions.history(actor.id, key).has_current,
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
@@ -2213,6 +2218,7 @@ def create_flask_app(
                 else [field.key for field in view.fields[:6]]
             ),
             version_state=view.state,
+            may_cancel_scheduled=view.may_maintain,
             may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
             may_govern=authorization.datasets.can_change_dataset_owner(
@@ -2537,7 +2543,7 @@ def create_flask_app(
                 raise RecordSearchError(
                     "Record criteria exceed the URL limit. Clear all to start again."
                 )
-            if datasets.get_dataset(actor.id, key).kind == "hierarchy":
+            if datasets.get_dataset_configuration(actor.id, key).dataset.kind == "hierarchy":
                 return render_hierarchy(
                     dataset_versions.read(
                         actor.id, key, version_id, page=None, prefer_concept=concept
@@ -2602,8 +2608,34 @@ def create_flask_app(
             if version_id is not None or concept:
                 raise
             history = dataset_versions.history(actor.id, key)
+            if history.concept:
+                return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+            scheduled = [state for state in history.entries if state.status == "Scheduled"]
+            available = [
+                state for state in history.entries if state.status in {"Expired", "Cancelled"}
+            ]
+            selected = (
+                min(
+                    scheduled,
+                    key=lambda state: (state.version.effective_date, state.version.number),
+                )
+                if scheduled
+                else max(available, key=lambda state: state.version.number, default=None)
+            )
+            if selected:
+                if selected.status == "Cancelled":
+                    return redirect(url_for("dataset_versions_view", key=key), code=303)
+                return redirect(
+                    url_for("dataset_records_view", key=key, version_id=selected.version.id),
+                    code=303,
+                )
             return render_authenticated_template(
-                "pages/datasets/no_current.html", dataset=history.context.dataset, history=history
+                "pages/datasets/empty_records.html",
+                dataset=history.context.dataset,
+                may_maintain=history.may_maintain,
+                may_govern=authorization.datasets.can_change_dataset_owner(
+                    actor.id, history.context.dataset.id
+                ),
             )
 
         context, fields, identifier, page = view.context, view.fields, view.identifier, view.page
@@ -2719,6 +2751,7 @@ def create_flask_app(
             may_add_record=may_add_record,
             may_export=view.may_export,
             version_state=view.state,
+            may_cancel_scheduled=view.may_maintain,
             may_govern=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
             draft_in_progress=view.concept is not None,
             may_configure=may_configure,
@@ -2937,7 +2970,7 @@ def create_flask_app(
                 identifier_keys = assistance.identifier_keys
                 if error or source_format_issues:
                     for issue in assistance.errors:
-                        message = mapping_issue_message(issue, mode)
+                        message = mapping_issue_message(issue)
                         if issue.column_index is None:
                             if message:
                                 step_mapping_errors.append(message)
@@ -2969,7 +3002,7 @@ def create_flask_app(
                 if preview.non_row_errors:
                     step = 3
                     preview_messages = [
-                        mapping_issue_message(item, mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     ]
                     error = " ".join(dict.fromkeys(preview_messages))
@@ -2992,7 +3025,7 @@ def create_flask_app(
             format_columns = list(assistance.format_columns)
         format_columns = show_source_format_issues(format_columns, source_format_issues)
         for issue in source_format_issues:
-            message = mapping_issue_message(issue, mode)
+            message = mapping_issue_message(issue)
             if not message:
                 continue
             step_mapping_errors.append(message)
@@ -3063,6 +3096,11 @@ def create_flask_app(
             required_keys=required_keys,
             identifier_keys=identifier_keys,
             preview_fields=preview_fields,
+            unmapped_fields=(
+                tuple(field for field in fields if field.key not in preview.mapping)
+                if preview and mode == "new_version"
+                else ()
+            ),
             preview_rows=preview_rows,
             report_rows=report_rows,
             success=success,
@@ -3073,7 +3111,8 @@ def create_flask_app(
             mapping_reason_text=(
                 "Map the source identifier to match existing rows; target columns are optional."
                 if mode == "mapping_update"
-                else "This import replaces all records in the draft, so every field must be mapped."
+                else "Map every required and identifier field. "
+                "Optional fields may be left unmapped."
             ),
         ), status
 
@@ -3385,7 +3424,7 @@ def create_flask_app(
                 step=3,
                 error=merge_error_messages(
                     *(
-                        mapping_issue_message(item, state.mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     )
                 ),

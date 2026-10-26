@@ -177,6 +177,7 @@ CONTEXT_LABELS = MappingProxyType(
         "deleted": "Deleted",
         "removals": "Hierarchy nodes removed",
         "total_processed": "Total processed",
+        "unmapped_fields": "Fields not mapped",
         "rejected_row_count": "Rows rejected",
     }
 )
@@ -191,6 +192,7 @@ FORMAT_KINDS = frozenset(
         "dataset_name",
         "version_count",
         "calendar_date",
+        "field_keys",
     }
 )
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
@@ -279,6 +281,13 @@ def safe_context(event):
     # Iterate the bounded catalog, not arbitrary historical payloads. Validate a
     # complete candidate with the production validator; unknown keys never escape.
     candidate = {key: event.details.get(key) for key, _kind in contract.context}
+    if (event.object_type, event.action) == (
+        "dataset",
+        "dataset.new_version_imported",
+    ) and "unmapped_fields" not in event.details:
+        # Before REF-260 every active Field had to be mapped. Preserve historical
+        # counts without rewriting old events or accepting malformed new context.
+        candidate["unmapped_fields"] = []
     try:
         validated = (
             validate_event(
@@ -299,7 +308,11 @@ def safe_context(event):
             else "Records imported"
             if key == "record_count" and event.action == "dataset.records_imported"
             else CONTEXT_LABELS.get(key, "Additional detail"),
-            str(validated[key]).capitalize() if kind == "subject" else str(validated[key]),
+            str(validated[key]).capitalize()
+            if kind == "subject"
+            else ", ".join(validated[key]) or "None"
+            if kind == "field_keys"
+            else str(validated[key]),
         )
         for key, kind in contract.context
     )

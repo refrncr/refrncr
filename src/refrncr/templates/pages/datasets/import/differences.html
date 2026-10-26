@@ -24,6 +24,9 @@
     · First import: {{ preview.counts.Added }} {{ 'record' if preview.counts.Added == 1 else 'records' }} will be added to the draft.
   {% endif %}
 </p>
+{% if unmapped_fields %}
+  <p><strong>Not in file:</strong> {% for field in unmapped_fields %}<code>{{ field.name }}</code>{{ ', ' if not loop.last else '.' }}{% endfor %} {% if preview.counts.Changed + preview.counts.Unchanged == 0 %}These fields stay empty.{% else %}Existing records keep their values; new records leave these fields empty.{% endif %}</p>
+{% endif %}
 
 {% set available_statuses = namespace(count=0) %}
 {% for status in DISPLAY_STATUSES if preview.counts[status] %}{% set available_statuses.count = available_statuses.count + 1 %}{% endfor %}

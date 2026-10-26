@@ -388,7 +388,7 @@
     const reason = panel.querySelector("[data-mapping-reason]");
     const fieldLabels = new Map(options.flat().map((option) => [option.value, option.dataset.optionLabel]));
     const plural = (count, singular, many) => `${count} ${count === 1 ? singular : many}`;
-    const statusText = ({unselected, missingLabels, ignored, mappedCount}) => {
+    const statusText = ({unselected, missingLabels, ignored, mappedCount, notInFile}) => {
       const parts = [];
       if (unselected) parts.push(`${plural(unselected, "column", "columns")} still ${unselected === 1 ? "needs" : "need"} a choice`);
       if (missingLabels.length) {
@@ -397,7 +397,8 @@
         parts.push(`${plural(missingLabels.length, "field", "fields")} not mapped: ${labels}${more}`);
       }
       if (parts.length) return {ready: false, text: parts.join(" · "), unselected, missingLabels};
-      return {ready: true, text: `Ready to continue · ${plural(mappedCount, "field", "fields")} mapped, ${plural(ignored, "column", "columns")} not imported`};
+      const omitted = notInFile ? ` · ${plural(notInFile, "field", "fields")} not in file` : "";
+      return {ready: true, text: `Ready to continue · ${plural(mappedCount, "field", "fields")} mapped, ${plural(ignored, "column", "columns")} not imported${omitted}`};
     };
     const renderStatus = (result) => {
       const line = status.querySelector("[data-mapping-status-text]");
@@ -455,6 +456,8 @@
         missingLabels,
         ignored: values.filter((value) => value === "__ignored__").length,
         mappedCount: new Set(mapped).size,
+        notInFile: form.dataset.importMode === "new_version"
+          ? [...fieldLabels.keys()].filter((key) => !mapped.includes(key)).length : 0,
       });
       status.dataset.state = result.ready ? "ready" : "pending";
       renderStatus(result);

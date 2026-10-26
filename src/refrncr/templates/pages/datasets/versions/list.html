@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "components/concept.html" import new_concept with context %}
+{% from "components/concept.html" import new_concept, current_version_action with context %}
 {% from "components.html" import feedback, status_badge %}
 {% from "components/side_panel.html" import form_side_panel %}
 {% from "layouts/page.html" import page_context %}
@@ -10,7 +10,7 @@
       {% include "pages/datasets/_breadcrumbs.html" %}
     {% endcall %}
     <div class='page-actions'>
-      <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
+      {{ current_version_action(dataset.key, history.has_current) }}
       {% if history.concept %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% elif history.may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
     </div>
   </div>
