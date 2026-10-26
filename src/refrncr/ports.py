@@ -432,7 +432,13 @@ class DatasetRecordOperations(Protocol):
         identifier_key: bytes,
     ) -> bool: ...
 
-    def replace_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
+    def replace_values(
+        self,
+        record: DatasetRecordRow,
+        values: tuple[RecordValue, ...],
+        *,
+        field_ids: tuple[str, ...] | None = None,
+    ) -> None: ...
 
     def delete_if_revision(
         self, dataset_id: str, record_id: str, expected_revision: int

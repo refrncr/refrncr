@@ -163,6 +163,14 @@ class MappingIssue:
     mode: str | None = None
 
 
+def _required_mapping_fields(fields, identifier, mode):
+    return tuple(
+        field
+        for field in fields
+        if (field.is_required and mode != "mapping_update") or field.key in identifier.field_keys
+    )
+
+
 def mapping_issues(mapping, fields, identifier, mode="create", expected_count=None):
     """Return the canonical coded mapping violations used by assistance and preview."""
     field_by_key = {field.key: field for field in fields}
@@ -177,13 +185,7 @@ def mapping_issues(mapping, fields, identifier, mode="create", expected_count=No
         if selection in field_by_key and mapping.count(selection) > 1:
             issues.append(MappingIssue("field_mapped_twice", index, selection, mode))
     mapped = {selection for selection in mapping if selection in field_by_key}
-    required = tuple(
-        field
-        for field in fields
-        if (field.is_required and mode != "mapping_update")
-        or mode == "new_version"
-        or field.key in identifier.field_keys
-    )
+    required = _required_mapping_fields(fields, identifier, mode)
     issues.extend(
         MappingIssue("required_field_unmapped", field_key=field.key, mode=mode)
         for field in required
@@ -281,11 +283,7 @@ def mapping_issue_message(issue: MappingIssue | ImportIssue, default_mode="creat
         "field_mapped_twice": (
             "This field is mapped more than once. Choose a different field or Do not import."
         ),
-        "required_field_unmapped": (
-            "Map every active Field exactly once."
-            if (issue.mode or default_mode) == "new_version"
-            else "Map every required and identifier field."
-        ),
+        "required_field_unmapped": "Map every required and identifier field.",
         "source_format_incomplete": (
             "Choose a valid source type and its required format components."
         ),
@@ -768,11 +766,7 @@ def build_mapping_assistance(
         for index, header in enumerate(source.headers)
     )
     mapped = {selection for selection in selections if selection}
-    required = [
-        field
-        for field in fields
-        if (field.is_required and mode != "mapping_update") or mode == "new_version"
-    ]
+    required = _required_mapping_fields(fields, identifier, mode)
     field_by_key = {field.key: field for field in fields}
     missing_required = tuple(field.name for field in required if field.key not in mapped)
     missing_identifier = tuple(
@@ -1627,15 +1621,20 @@ class DatasetRecordImportService:
                                 raise ImportValidationError("Record changed. Review again.")
                             uow.dataset_records.add_values(record, values)
                     elif state.mode == "new_version":
-                        # Release all affected unique values before writing the replacement set.
+                        # Release mapped unique values before writing the replacement set.
+                        # Unmapped values stay in storage, including on Changed records.
                         # Unchanged rows are never updated, including their revision.
+                        fields = uow.dataset_fields.list_for_dataset(dataset.id)
+                        mapped_field_ids = tuple(
+                            field.id for field in fields if field.key in state.mapping
+                        )
                         changed = {}
                         imported_states = {}
                         existing_ids = uow.dataset_records.existing_identifier_keys(
                             dataset.id, tuple(encoded for _values, encoded in validated)
                         )
                         for status, record, _values, encoded in self._differences(
-                            uow, dataset.id, validated
+                            uow, dataset.id, validated, mapped_keys=state.mapping
                         ):
                             if status == "Deleted":
                                 imported_states[record.id] = "Deleted"
@@ -1647,7 +1646,9 @@ class DatasetRecordImportService:
                                 changed[encoded] = record
                                 imported_states[record.id] = "Changed"
                         for record in changed.values():
-                            uow.dataset_records.replace_values(record, ())
+                            uow.dataset_records.replace_values(
+                                record, (), field_ids=mapped_field_ids
+                            )
                         for values, identifier in validated:
                             record = changed.get(identifier)
                             if record:
@@ -1707,6 +1708,9 @@ class DatasetRecordImportService:
                                 "unchanged": result["Unchanged"],
                                 "deleted": result["Deleted"],
                                 "total_processed": len(validated) + result["Deleted"],
+                                "unmapped_fields": [
+                                    field.key for field in fields if field.key not in state.mapping
+                                ],
                             },
                         )
                     elif state.mode == "mapping_update":
@@ -2156,7 +2160,11 @@ class DatasetRecordImportService:
             differences, matched = [], 0
             term = unicodedata.normalize("NFC", search).casefold()
             for status, record, values, encoded in self._differences(
-                uow, dataset_id, accepted, updates_only=mode == "mapping_update"
+                uow,
+                dataset_id,
+                accepted,
+                updates_only=mode == "mapping_update",
+                mapped_keys=mapping if mode == "new_version" else None,
             ):
                 counts[status] += 1
                 for part in (
@@ -2285,7 +2293,7 @@ class DatasetRecordImportService:
         counts["matching"] = len(filtered)
         return replace(preview, sample=sample, counts=counts)
 
-    def _differences(self, uow, dataset_id, accepted, *, updates_only=False):
+    def _differences(self, uow, dataset_id, accepted, *, updates_only=False, mapped_keys=None):
         proposed = {encoded: values for values, encoded in accepted}
         identifier = uow.dataset_business_keys.get(dataset_id)
         stored_keys = uow.dataset_records.identifier_keys(dataset_id)
@@ -2313,6 +2321,12 @@ class DatasetRecordImportService:
             values = proposed.get(encoded)
             if updates_only and values is None:
                 continue
+            if values is not None and mapped_keys is not None:
+                # Compare and preview the complete result, retaining draft values only
+                # for omitted fields. A mapped blank deliberately has no new value.
+                values = values + tuple(
+                    value for value in record.values if value.field_key not in mapped_keys
+                )
             status = (
                 "Deleted"
                 if values is None

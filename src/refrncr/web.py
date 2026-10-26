@@ -3063,6 +3063,11 @@ def create_flask_app(
             required_keys=required_keys,
             identifier_keys=identifier_keys,
             preview_fields=preview_fields,
+            unmapped_fields=(
+                tuple(field for field in fields if field.key not in preview.mapping)
+                if preview and mode == "new_version"
+                else ()
+            ),
             preview_rows=preview_rows,
             report_rows=report_rows,
             success=success,
@@ -3073,7 +3078,8 @@ def create_flask_app(
             mapping_reason_text=(
                 "Map the source identifier to match existing rows; target columns are optional."
                 if mode == "mapping_update"
-                else "This import replaces all records in the draft, so every field must be mapped."
+                else "Map every required and identifier field. "
+                "Optional fields may be left unmapped."
             ),
         ), status
 

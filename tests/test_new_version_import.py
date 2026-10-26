@@ -64,6 +64,7 @@ def test_complete_import_and_unchanged_revision(context):
             "unchanged": 1,
             "deleted": 0,
             "total_processed": 2,
+            "unmapped_fields": [],
         }
 
 
@@ -477,10 +478,10 @@ def test_stale_schema_and_confirmation_require_review_and_fresh_ack(context):
     [
         (b"code,label\n", ("code", "label")),
         (b"code\na\n", ("code",)),
-        (b"code,label\na,New\n", ("code", None)),
+        (b"code,label\na,New\n", (None, "label")),
     ],
 )
-def test_empty_file_and_missing_optional_field_are_blocked(database_context, source, mapping):
+def test_empty_file_and_missing_identifier_field_are_blocked(database_context, source, mapping):
     c = database_context
     clean(c)
     before = snapshot(c)

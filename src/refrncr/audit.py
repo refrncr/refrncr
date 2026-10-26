@@ -47,6 +47,7 @@ class EventContract:
                 "dataset_name",
                 "version_count",
                 "calendar_date",
+                "field_keys",
             }
             for _key, kind in self.context
         ):
@@ -153,7 +154,8 @@ _EVENTS = (
         + tuple(
             (key, "version_count")
             for key in ("added", "changed", "unchanged", "deleted", "total_processed")
-        ),
+        )
+        + (("unmapped_fields", "field_keys"),),
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
     EventContract(
@@ -253,6 +255,16 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                 date.fromisoformat(value)
             except ValueError:
                 raise AuditContractError("Invalid effective date") from None
+        elif kind == "field_keys":
+            # Schema keys only, in configured order; never names or record values.
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or re.fullmatch(r"[a-z0-9][a-z0-9_]{0,99}", item) is None
+                for item in value
+            ):
+                raise AuditContractError("Invalid field keys")
+            if len(set(value)) != len(value):
+                raise AuditContractError("Duplicate field keys")
+            value = list(value)
         elif kind == "dataset_name":
             # The bounded business-name exception shared by REF-141 and REF-83.
             # Bound before any processing;

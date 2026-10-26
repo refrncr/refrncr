@@ -2431,7 +2431,8 @@
           "changed": "version_count",
           "unchanged": "version_count",
           "deleted": "version_count",
-          "total_processed": "version_count"
+          "total_processed": "version_count",
+          "unmapped_fields": "field_keys"
         },
         "dataset:dataset.mapping_targets_updated": {
           "format": "import_format",

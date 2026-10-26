@@ -260,8 +260,10 @@ The preview is the confirmation surface; `/step/5` is no longer a supported wiza
 Mapping guidance, source filename/worksheet, completeness and the live blocker message are visible
 beside the mapping action. Dataset fields appear in one flat select, with suggested fields first,
 then the remaining Configure-order fields. A field selected by another source column is hidden
-until released. The existing source-column **Do not import** choice remains supported; REF-260's
-separate destination-field skip behavior is not part of this flow.
+until released. The existing source-column **Do not import** choice remains supported. Optional destination
+Fields may stay unmapped (REF-260); mapping validation and completeness share the required and
+identifier Field rule. Preview lists omitted Fields with: **Not in file:** followed by their
+names and “Existing records keep their values; new records leave these fields empty.”
 
 The preview keeps summary counts and compact Identifier/Status rows, with changed field names as
 the only third-column content. Opening a row displays escaped read-only values in a keyboard-
@@ -333,8 +335,11 @@ changes, unchanged Records and retained deletions. Both the original `/records/i
 address and `/concept/records/import-new-version` start the `new_version` engine; neither
 offers append-only behavior. The existing Python create-only mode remains compatible for
 programmatic callers. Staging never creates a Concept or silently converts an active
-legacy staged import; cancel that upload first. All active Fields must be mapped exactly
-once; identifiers must be complete and non-null. Extra columns require explicit Ignore.
+legacy staged import; cancel that upload first. Required and identifier Fields must be mapped exactly
+once; identifiers must be complete and non-null. Optional Fields may be omitted: matching active
+Records keep their current Draft values, while Added Records have no value for those Fields.
+A previously Deleted identifier is Added without recovering its retained values. Mapped blank
+optional cells clear a value; mapped blank required cells still produce row errors. Extra columns require explicit Ignore.
 An empty file cannot mark every Record Deleted. Existing source formats, Date/Time
 composition, archive limits, TTL and full-file validation apply unchanged.
 
@@ -374,14 +379,19 @@ full count. Neither missing nor duplicate/forged confirmation fields can bypass 
 Confirmation applies the entire difference atomically and stores the one-use result on
 the Concept. Competing tokens serialize on the Dataset row; at most one can succeed.
 A process-local token claim also prevents same-token replay. Rollback includes content,
-revisions, the result marker and audit. Unique values can move between changed/new rows;
+revisions, the result marker and audit. Changed Records replace only mapped values; omitted values remain untouched in storage.
+Comparison uses the resulting values, so omitted Fields never cause false Changed counts.
+Unchanged Records receive no write or revision increment. Unique values in mapped Fields can
+move between changed/new rows;
 deleted values remain retained but do not reserve active unique values. Current and
 historical snapshots never change. The success redirect opens the Concept Records table
 with Added/Changed/Deleted filtering, totals, identifier search and a clear-filter link.
 
 Exactly one `dataset:dataset.new_version_imported` summary records `mode`, `format`,
 `added`, `changed`, `unchanged`, `deleted`, and `total_processed` (source Records plus
-Deleted Records). No per-row import events, values, identifiers, filenames or source
+Deleted Records), plus `unmapped_fields`: the omitted schema Field keys in Configure order
+(an empty list when all Fields are mapped). Each key follows the existing 100-character schema
+key contract; the list contains no Field display names or Record values. No per-row import events, values, identifiers, filenames or source
 examples are audited. Manual Undo emits `dataset_record:restored` transactionally.
 
 ### Search/filter interaction (REF-136)

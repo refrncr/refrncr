@@ -798,13 +798,20 @@ class SqlAlchemyDatasetRecordOperations:
             raise PersistenceConflictError(_safe_constraint_name(exc)) from None
         return result.rowcount == 1
 
-    def replace_values(self, record: DatasetRecord, values: tuple[RecordValue, ...]) -> None:
-        self.session.execute(
-            delete(DatasetRecordValue).where(
-                DatasetRecordValue.dataset_id == record.dataset_id,
-                DatasetRecordValue.record_id == record.id,
-            )
+    def replace_values(
+        self,
+        record: DatasetRecord,
+        values: tuple[RecordValue, ...],
+        *,
+        field_ids: tuple[str, ...] | None = None,
+    ) -> None:
+        statement = delete(DatasetRecordValue).where(
+            DatasetRecordValue.dataset_id == record.dataset_id,
+            DatasetRecordValue.record_id == record.id,
         )
+        if field_ids is not None:
+            statement = statement.where(DatasetRecordValue.field_id.in_(field_ids))
+        self.session.execute(statement)
         self.add_values(record, values)
 
     def delete_if_revision(self, dataset_id: str, record_id: str, expected_revision: int) -> bool:

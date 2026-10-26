@@ -494,7 +494,7 @@ def test_preview_keeps_required_and_source_format_errors_together(wizard):
     wizard.upload(b"code,amount,stamp\nA,1,2024-10-27 02:30:00\n")
     page = wizard.preview(("code", "", "stamp"))
     text = html_text(page.text)
-    assert "Map every active Field exactly once." in text
+    assert "Map every required and identifier field." in text
     assert "Choose an unambiguous source format for this field." in text
 
 
@@ -557,9 +557,9 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     optional_field(wizard, "function")
     missing = wizard.upload()
     attributes, message = status(missing)
-    assert message == "1 field not mapped: Function"
-    assert "data-state='pending'" in attributes
-    assert "hidden" not in re.search(
+    assert message == "Ready to continue · 2 fields mapped, 0 columns not imported"
+    assert "data-state='ready'" in attributes
+    assert "hidden" in re.search(
         r"<p class='mapping-reason help-text'([^>]*)>", missing.text
     ).group(1)
 
@@ -587,7 +587,9 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
 
 def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions(wizard):
     for key in ("active", "subgroup", "region", "category"):
-        optional_field(wizard, key)
+        wizard.services.dataset_fields.create_field(
+            wizard.admin.id, wizard.dataset.key, key, key.title(), "string", True
+        )
     page = wizard.upload(b"code,amount\nA,1\n")
     page = wizard.preview(("", ""))
     status_text = html_text(
@@ -604,7 +606,27 @@ def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions
     )
     assert (
         page.text.count(
-            "This import replaces all records in the draft, so every field must be mapped."
+            "Map every required and identifier field. Optional fields may be left unmapped."
         )
         == 2
     )
+
+
+def test_optional_fields_preview_explains_preserved_and_empty_values(wizard):
+    wizard.services.dataset_fields.create_field(
+        wizard.admin.id, wizard.dataset.key, "function", "Function <script>", "string"
+    )
+    wizard.upload()
+    page = wizard.preview()
+    assert page.status_code == 200
+    assert (
+        "Not in file: Function <script>. Existing records keep their values; "
+        "new records leave these fields empty." in html_text(page.text)
+    )
+    assert "<code>Function &lt;script&gt;</code>" in page.text
+    assert "Import records" in page.text
+    assert "every field must be mapped" not in page.text
+    wizard.get(wizard.path + "/step/4")
+    imported = wizard.post(wizard.path + "/confirm")
+    assert imported.status_code == 200
+    assert wizard.count() == 1
