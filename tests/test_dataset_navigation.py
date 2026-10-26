@@ -231,8 +231,7 @@ def test_draft_first_publication_copy_and_current_links(context, published):
         assert ("View current version" in page.text) == published
         assert ("Nothing is published yet. Publishing creates Version 1." in page.text) != published
         assert (
-            "Changes are not visible in the current published version until you publish them."
-            in page.text
+            "Changes are not visible in any published version until you publish them." in page.text
         ) == published
     history = request(browser, "get", root + "/versions")
     assert ("View current version" in history.text) == published
@@ -268,3 +267,23 @@ def test_scheduled_view_links_to_current_only_when_it_exists(context, current):
     draft = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert ("View current version" in draft.text) == current
     assert "Nothing is published yet. Publishing creates Version 1." not in draft.text
+
+
+def test_draft_on_scheduled_basis_without_current_has_publication_note(context):
+    c = context
+    configured(c)
+    publish(c, day=NOW.date() + timedelta(days=1))
+    c.service.create_concept(c.a.id, c.d.id)
+    browser, _ = dataset_version_client(c)
+
+    page = request(browser, "get", f"/datasets/{c.d.key}/concept/records")
+
+    assert page.status_code == 200
+    banner = re.search(r"<section\b[^>]*aria-label='Draft context'.*?</section>", page.text, re.S)
+    assert banner
+    assert "Based on Version 1" in banner.group()
+    assert (
+        "Changes are not visible in any published version until you publish them." in banner.group()
+    )
+    assert "Nothing is published yet. Publishing creates Version 1." not in banner.group()
+    assert "View current version" not in page.text

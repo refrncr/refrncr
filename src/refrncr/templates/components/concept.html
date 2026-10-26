@@ -43,7 +43,7 @@
 <section class='concept-banner' aria-label='Draft context'>
 <div class='concept-banner-text'>
 <div class='concept-banner-line'><h2>{{ status_badge('Stale' if ui.stale else 'Draft') }} You’re working on a draft</h2><p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Draft to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p></div>
-<p class='concept-banner-note'>{% if ui.baseline %}Changes are not visible in the current published version until you publish them.{% else %}Nothing is published yet. Publishing creates Version 1.{% endif %}</p>
+<p class='concept-banner-note'>{% if ui.baseline %}Changes are not visible in any published version until you publish them.{% else %}Nothing is published yet. Publishing creates Version 1.{% endif %}</p>
 </div>
 <div class='page-actions'>
 {% if show_current %}{{ current_version_action(key, ui.has_current) }}{% endif %}
