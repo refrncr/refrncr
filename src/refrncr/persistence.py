@@ -39,6 +39,7 @@ from refrncr.models import (
     DatasetRecordValue,
     DatasetVersion,
     Grant,
+    InstallationSettings,
     LoginSession,
     Membership,
     Organisation,
@@ -1347,6 +1348,40 @@ class SqlAlchemyAuditReadOperations:
         return {key: AuditObjectRecord(key in names, names.get(key)) for key in ids}
 
 
+class SqlAlchemyInstallationSettingsOperations:
+    def __init__(self, session):
+        self.session = session
+
+    def get_policy(self, *, for_update=False):
+        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+
+        row = self.session.scalar(
+            _locked(
+                select(InstallationSettings).where(
+                    InstallationSettings.id == INSTALLATION_SETTINGS_ID
+                ),
+                self.session,
+                for_update,
+            )
+        )
+        if row is None:
+            raise RuntimeError("Installation settings are missing; run database migrations")
+        return row.export_access_policy
+
+    def change_policy(self, expected, policy):
+        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+
+        result = self.session.execute(
+            update(InstallationSettings)
+            .where(
+                InstallationSettings.id == INSTALLATION_SETTINGS_ID,
+                InstallationSettings.export_access_policy == expected,
+            )
+            .values(export_access_policy=policy)
+        )
+        return result.rowcount == 1
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(
         self,
@@ -1377,6 +1412,7 @@ class SqlAlchemyUnitOfWork:
             if self.translate_errors:
                 raise PersistenceConflictError() from None
             raise
+        self.installation_settings = SqlAlchemyInstallationSettingsOperations(self.session)
         self.users = SqlAlchemyUserOperations(self.session)
         self.api_keys = SqlAlchemyApiKeyOperations(self.session)
         self.audit_history = SqlAlchemyAuditReadOperations(self.session)

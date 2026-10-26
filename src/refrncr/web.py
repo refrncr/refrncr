@@ -59,6 +59,8 @@ from refrncr.hierarchy import (
 )
 from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.hierarchy_import import HierarchyImportService
+from refrncr.installation_policy import EXPORT_POLICIES
+from refrncr.installation_settings import InstallationSettingsService, PolicyConfirmationRequired
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -378,6 +380,9 @@ def create_flask_app(
         OverviewService(datasets.uow, authorization.datasets) if dataset_ui_enabled else None
     )
     dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
+    installation_settings = (
+        InstallationSettingsService(users.uow, authorization.datasets) if authorization else None
+    )
     cookie_policy = BrowserCookiePolicy(
         session_max_age=int(sessions.lifetime.total_seconds()),
         allow_loopback_http=allow_loopback_http,
@@ -1335,7 +1340,7 @@ def create_flask_app(
             state, identifier = None, None
             fields, field_states = (), {}
             editable = configuration.may_maintain
-            may_govern = configuration.may_govern
+            may_change_owner = configuration.may_govern
             may_edit_key = configuration.may_edit_key
             may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
             schema_admin, may_start_concept = False, False
@@ -1350,7 +1355,7 @@ def create_flask_app(
                 mapping_configuration = datasets.get_dataset_configuration(actor.id, key).dataset
             editable = view.may_maintain
             schema_admin = view.state is None and view.may_maintain
-            may_govern = editable and authorization.datasets.can_change_dataset_owner(
+            may_change_owner = editable and authorization.datasets.can_change_dataset_owner(
                 actor.id, dataset.id
             )
             context, state, identifier = view.context, view.state, view.identifier
@@ -1388,13 +1393,16 @@ def create_flask_app(
         )
         if edit_mode and not editable:
             abort(404)
-        if edit_mode == "ownership" and not may_govern:
+        if edit_mode == "ownership" and not may_change_owner:
             abort(404)
         access_teams, access_users, access_entries = [], [], []
         access_grant_teams, access_grant_users = [], []
-        if may_govern:
-            _, access_teams, access_users, access_entries = datasets.export_access_context(
-                actor.id, key
+        may_view_access = editable
+        may_manage_export = False
+        export_policy = None
+        if may_view_access:
+            _, access_teams, access_users, access_entries, export_policy, may_manage_export = (
+                datasets.export_access_context(actor.id, key)
             )
             granted_subjects = {
                 (entry.subject_type, entry.subject_id) for entry, _ in access_entries
@@ -1445,7 +1453,10 @@ def create_flask_app(
             ),
             schema_admin=schema_admin,
             may_start_concept=may_start_concept,
-            may_govern=may_govern,
+            may_change_owner=may_change_owner,
+            may_view_access=may_view_access,
+            may_manage_export=may_manage_export,
+            export_policy=export_policy,
             may_export=may_export,
             draft_in_progress=draft_in_progress,
             access_teams=access_teams,
@@ -2221,7 +2232,8 @@ def create_flask_app(
             may_cancel_scheduled=view.may_maintain,
             may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
-            may_govern=authorization.datasets.can_change_dataset_owner(
+            may_view_access=view.may_maintain,
+            may_change_owner=authorization.datasets.can_change_dataset_owner(
                 actor_id, view.context.dataset.id
             ),
             draft_in_progress=view.concept is not None,
@@ -2633,7 +2645,8 @@ def create_flask_app(
                 "pages/datasets/empty_records.html",
                 dataset=history.context.dataset,
                 may_maintain=history.may_maintain,
-                may_govern=authorization.datasets.can_change_dataset_owner(
+                may_view_access=history.may_maintain,
+                may_change_owner=authorization.datasets.can_change_dataset_owner(
                     actor.id, history.context.dataset.id
                 ),
             )
@@ -2752,7 +2765,8 @@ def create_flask_app(
             may_export=view.may_export,
             version_state=view.state,
             may_cancel_scheduled=view.may_maintain,
-            may_govern=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
+            may_view_access=view.may_maintain,
+            may_change_owner=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
             draft_in_progress=view.concept is not None,
             may_configure=may_configure,
             may_start_concept=(
@@ -4547,6 +4561,44 @@ def create_flask_app(
         response = redirect(url_for("index"))
         response.delete_cookie(settings.session_name, **settings.common_options)
         return response
+
+    @app.route("/settings/dataset-access", methods=["GET", "POST"])
+    @capability_route("can_administer_installation")
+    def dataset_access_settings():
+        actor, login_session = require_capability("can_administer_installation")
+        require_dataset_dependencies()
+        policy = installation_settings.get_policy(actor.id)
+        expected, selected = policy, policy
+        error, confirmation, status = None, None, 200
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            expected = request.form.get("expected_policy", "")
+            selected = request.form.get("policy", "")
+            try:
+                installation_settings.change_policy(
+                    actor.id,
+                    expected,
+                    selected,
+                    confirmed=request.form.get("confirmed") == "yes",
+                )
+            except PolicyConfirmationRequired as exc:
+                confirmation = str(exc)
+            except ConflictError as exc:
+                error, status = str(exc), 409
+            except ValidationError as exc:
+                error, status = str(exc), 400
+            else:
+                return redirect(url_for("dataset_access_settings", notice="saved"), code=303)
+        return render_authenticated_template(
+            "pages/settings/dataset_access.html",
+            active_navigation="dataset_access",
+            policies=EXPORT_POLICIES,
+            selected=selected,
+            expected=expected,
+            error=error,
+            confirmation=confirmation,
+            current_csrf=login_session.csrf_token,
+        ), status
 
     @app.post("/settings/theme")
     @authenticated_route

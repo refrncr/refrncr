@@ -59,3 +59,39 @@ These are shared Community/core capabilities, without tenant identifiers or Clou
 - General Dataset revision: expands concurrency across unrelated mutations that do not use it.
 - Automatic fallback team or Grant conversion: invents ownership or broadens export rights.
 - Silent populated downgrade: loses new access semantics and can reactivate historical rights.
+
+## Amendment: installation export policy (REF-294)
+
+The installation chooses `everyone`, `team_grants` or `admin_grants`. New and existing
+installations start with `everyone` after migration `0035_ref_294`. This intentionally
+opens file export to every active user. Version visibility still applies: drafts remain
+private to maintainers and Scheduled/Cancelled content does not become exportable.
+App reading, Dataset maintenance, ownership changes and deletion retain their rules.
+
+`everyone` disables grant administration even for administrators. Explicit grants are
+retained but ignored. The stricter policies allow export for administrators, current
+owning-team members and explicit user/team grantees. `team_grants` also lets owning-team
+members manage grants; `admin_grants` reserves that operation for administrators.
+
+Access-tab visibility, grant administration and ownership changes are independent.
+Owning-team members can inspect grants under `admin_grants`, including user email
+addresses, without receiving mutation rights. Under `everyone`, the tab displays the
+owning team and the open-access explanation without exposing retained grants.
+
+A singleton `installation_settings` row stores the policy, with database constraints for
+identity and allowed values. Read authorization uses the caller's Unit of Work/snapshot.
+Policy and grant mutations lock the settings row before Dataset, team and user locks.
+Policy changes compare the submitted previous value, update with SQL compare-and-set,
+and append `installation_settings:export_access_policy_changed` in the same transaction.
+Missing settings fail closed rather than silently reopening access. As with owner CAS,
+an A→B→A sequence is indistinguishable from unchanged A. No-ops emit no audit event.
+
+Every actual transition requires server-checked confirmation except
+`admin_grants` → `team_grants`. Warning text distinguishes opening access, restricting
+export, and removing delegated administration. A stale confirmation changes nothing.
+Downgrading removes the setting and restores the older administrator-managed grant rules;
+retained grants survive. No other installation settings or Cloud infrastructure are added.
+
+**Release condition:** REF-294 and REF-306 must ship together in `0.1.0rc1`. The interface
+uses its final export-and-API wording. REF-294 does not change API authorization; REF-306
+must make API reads follow the policy before this functionality is released to testers.

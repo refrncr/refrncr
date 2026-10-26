@@ -35,7 +35,7 @@
   {% include 'pages/datasets/_source_notice.html' %}
   {% with may_cancel_scheduled=editable %}{% include 'pages/datasets/_version_status.html' %}{% endwith %}
   {% if concept %}{% with publication_panel=false, show_current=false, include_discard_panel=true %}{% include 'pages/datasets/concepts/_banner.html' %}{% endwith %}{% endif %}
-  {{ dataset_navigation(dataset, 'settings' if request.args.get('tab', 'dataset-details') == 'dataset-details' else request.args.get('tab', 'settings'), concept=concept, version_id=version_state.version.id if version_state else none, may_govern=may_govern, local=true) }}
+  {{ dataset_navigation(dataset, 'settings' if request.args.get('tab', 'dataset-details') == 'dataset-details' else request.args.get('tab', 'settings'), concept=concept, version_id=version_state.version.id if version_state else none, may_view_access=may_view_access, local=true) }}
   <div class='configuration-overview' data-tab-panels>
     <section id='dataset-details' aria-labelledby='dataset-details-heading'>
       <div class='page-header section-header'>
@@ -70,7 +70,7 @@
         <section class='dataset-settings-section' id='dataset-ownership' aria-labelledby='dataset-ownership-heading'>
           <header><h3 id='dataset-ownership-heading'>Ownership</h3><p>The team that maintains fields and records and publishes versions.</p></header>
           <div class='dataset-settings-card'>
-            {% if may_govern %}<div class='dataset-settings-actions'><a class='button button-secondary' href='{{ ownership_edit_url }}#owner-team'>{{ file_pen_icon() }}Edit</a></div>{% endif %}
+            {% if may_change_owner %}<div class='dataset-settings-actions'><a class='button button-secondary' href='{{ ownership_edit_url }}#owner-team'>{{ file_pen_icon() }}Edit</a></div>{% endif %}
             <dl class='dataset-settings-values'><div><dt>Owning team</dt><dd><span class='detail-team'>{{ team_icon() }}{{ dataset.owner_team_name }}</span></dd></div></dl>
           </div>
         </section>
@@ -148,11 +148,11 @@
         <div class='empty-state'><h3>No fields yet</h3><p>No fields are defined for this dataset. Fields describe the values each record can contain.</p></div>
       {% endif %}
     </section>
-    {% if may_govern %}<section id='access-management' aria-labelledby='access-management-heading'><div class='page-header section-header'><div><h2 id='access-management-heading'>Access</h2><p class='section-description'>Applies to the whole dataset, not to one version. Changes take effect right away.</p></div></div>
-      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=concept, version_id=version_state.version.id if version_state else none, change_owner_url=url_for("dataset_detail", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if concept else none, edit='ownership', tab='dataset-details') ~ '#owner-team' if editable else none, grant_teams=access_grant_teams, grant_users=access_grant_users) }}
+    {% if may_view_access %}<section id='access-management' aria-labelledby='access-management-heading'><div class='page-header section-header'><div><h2 id='access-management-heading'>Access</h2><p class='section-description'>Applies to the whole dataset, not to one version. Changes take effect right away.</p></div></div>
+      {{ export_access(dataset, access_teams, access_users, access_entries, current_csrf, access_error, access_subject, concept=concept, version_id=version_state.version.id if version_state else none, change_owner_url=url_for("dataset_detail", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if concept else none, edit='ownership', tab='dataset-details') ~ '#owner-team' if may_change_owner else none, policy=export_policy, may_manage=may_manage_export, grant_teams=access_grant_teams, grant_users=access_grant_users) }}
     </section>{% endif %}
   </div>
-  {% if editable or schema_admin or may_govern or version_state %}{{ form_side_panel() }}{% endif %}
+  {% if editable or schema_admin or may_change_owner or version_state %}{{ form_side_panel() }}{% endif %}
 {% endblock %}
 
 {# Not deferred: the tabs are set up while the page is parsed, before it is first shown. #}

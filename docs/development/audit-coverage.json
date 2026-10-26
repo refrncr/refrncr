@@ -2970,7 +2970,8 @@
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
         "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update",
-        "refrncr.web.attention_overview GET /attention"
+        "refrncr.web.attention_overview GET /attention",
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -6433,7 +6434,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6820,6 +6822,78 @@
       "implementation_status": "Implemented by REF-238.",
       "exclusion_reason": "REF-238 private navigation history is explicitly excluded from the audit log.",
       "persistence_scope": "dataset_visits only; business datasets and AuditEvent are unchanged."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "get_policy",
+      "service": "refrncr.installation_settings.InstallationSettingsService.get_policy",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Administrator-only browser capability with CSRF on POST.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active administrator.",
+      "allowed_context": {},
+      "success": "Return the configured policy without a domain event.",
+      "validation_failure": "No change; reject unknown policies or missing required confirmation.",
+      "authorization_failure": "403, no change for non-administrators.",
+      "stale_input": "Compare submitted previous policy; conflict changes nothing.",
+      "no_op": "Unchanged policy produces no event.",
+      "rollback": "Policy and event share one transaction.",
+      "duplicate_retry": "Stale retry is rejected; unchanged policy is a no-op.",
+      "tests": [
+        "tests/test_installation_settings.py::test_policy_transition_confirmation_and_audit",
+        "tests/test_installation_settings.py::test_policy_errors_and_grant_preservation"
+      ],
+      "implementation_status": "Implemented in REF-294.",
+      "exclusion_reason": "Administrator-only installation policy read; no mutation or domain event."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "change_policy",
+      "service": "refrncr.installation_settings.InstallationSettingsService.change_policy",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Administrator-only browser capability with CSRF on POST.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [
+        [
+          "installation_settings",
+          "export_access_policy_changed"
+        ]
+      ],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active administrator.",
+      "allowed_context": {
+        "installation_settings:export_access_policy_changed": {
+          "previous_policy": "export_policy",
+          "policy": "export_policy"
+        }
+      },
+      "success": "One policy change and one event in the same transaction.",
+      "validation_failure": "No change; reject unknown policies or missing required confirmation.",
+      "authorization_failure": "403, no change for non-administrators.",
+      "stale_input": "Compare submitted previous policy; conflict changes nothing.",
+      "no_op": "Unchanged policy produces no event.",
+      "rollback": "Policy and event share one transaction.",
+      "duplicate_retry": "Stale retry is rejected; unchanged policy is a no-op.",
+      "tests": [
+        "tests/test_installation_settings.py::test_policy_transition_confirmation_and_audit",
+        "tests/test_installation_settings.py::test_policy_errors_and_grant_preservation"
+      ],
+      "implementation_status": "Implemented in REF-294.",
+      "exclusion_reason": ""
     }
   ]
 }

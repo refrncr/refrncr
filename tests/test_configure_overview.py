@@ -69,7 +69,7 @@ def test_overview_structure_permissions_and_order_boundaries(dataset_browser, pe
     ):
         assert f"id='{section_id}'" in page
     assert ("id='danger-zone'" in page) == (permission != "viewer")
-    assert ("id='access-management'" in page) == (permission == "community_admin")
+    assert ("id='access-management'" in page) == (permission in {"community_admin", "member"})
     header = page.split("<div class='configuration-overview' data-tab-panels>")[0]
     assert "<div class='page-header page-header-actions-end'>" in header
     actions = header.split("<div class='page-actions record-page-actions'>")[1]

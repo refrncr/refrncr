@@ -519,7 +519,13 @@ class OverviewOperations(Protocol):
     def version_unmapped(self, version_ids) -> dict[str, int]: ...
 
 
+class InstallationSettingsOperations(Protocol):
+    def get_policy(self, *, for_update: bool = False) -> str: ...
+    def change_policy(self, expected: str, policy: str) -> bool: ...
+
+
 class UnitOfWork(Protocol):
+    installation_settings: InstallationSettingsOperations
     write: bool
     api_keys: ApiKeyOperations
     overview: OverviewOperations

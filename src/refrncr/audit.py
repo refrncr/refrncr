@@ -50,6 +50,7 @@ class EventContract:
                 "version_count",
                 "calendar_date",
                 "field_keys",
+                "export_policy",
             }
             for _key, kind in self.context
         ):
@@ -57,6 +58,11 @@ class EventContract:
 
 
 _EVENTS = (
+    EventContract(
+        "installation_settings",
+        "export_access_policy_changed",
+        (("previous_policy", "export_policy"), ("policy", "export_policy")),
+    ),
     *(
         EventContract("api_key", action)
         for action in ("api_key.created", "api_key.revoked", "api_key.authenticated")
@@ -281,6 +287,9 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                 raise AuditContractError("Invalid structural audit context")
             value = normalize("NFC", value.strip()).casefold()
             allowed = {
+                "export_policy": {
+                    value: value for value in ("everyone", "team_grants", "admin_grants")
+                },
                 "subject": {"user": "user", "team": "team"},
                 "import_mode": {"new_version": "new_version"},
                 "import_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel"},
@@ -851,6 +860,20 @@ _register(
     "intentionally excluded",
     module="overview",
     rationale="REF-238 private navigation history is explicitly excluded from the audit log.",
+)
+
+_register(
+    "InstallationSettingsService",
+    "get_policy",
+    "intentionally excluded",
+    module="installation_settings",
+    rationale="Administrator-only installation policy read; no mutation or domain event.",
+)
+_audited(
+    "InstallationSettingsService",
+    "change_policy",
+    ("installation_settings", "export_access_policy_changed"),
+    module="installation_settings",
 )
 
 OPERATIONS = MappingProxyType(OPERATIONS)

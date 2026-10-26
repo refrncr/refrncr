@@ -394,6 +394,9 @@ def browser_setup():
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
+    from dataset_helpers import use_admin_export_policy
+
+    use_admin_export_policy(services)
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
     app = create_flask_app(

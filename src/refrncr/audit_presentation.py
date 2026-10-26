@@ -40,6 +40,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("security", "security.workflow_token_rejected"): ActionPresentation(
             "Protected workflow token rejected", False
         ),
+        ("installation_settings", "export_access_policy_changed"): ActionPresentation(
+            "Export and API access policy changed", False
+        ),
         ("user", "created"): ActionPresentation("User created", False),
         ("user", "email_changed"): ActionPresentation("User email changed", False),
         ("user", "disabled"): ActionPresentation("User disabled", False),
@@ -136,6 +139,7 @@ OBJECTS = MappingProxyType(
         "membership": ObjectPresentation("Team membership", None),
         "grant": ObjectPresentation("Access grant", None),
         "dataset": ObjectPresentation("Dataset", "dataset"),
+        "installation_settings": ObjectPresentation("Installation settings", None),
         "dataset_export_access": ObjectPresentation("Dataset export access", None),
         "dataset_field": ObjectPresentation("Dataset field", "dataset_field"),
         "dataset_record": ObjectPresentation("Record", None),
@@ -143,6 +147,8 @@ OBJECTS = MappingProxyType(
 )
 CONTEXT_LABELS = MappingProxyType(
     {
+        "previous_policy": "Previous access policy",
+        "policy": "Access policy",
         "owner_team_id": "Owning team ID",
         "previous_owner_team_id": "Previous owning team ID",
         "creator_user_id": "Creator user ID",
@@ -193,6 +199,7 @@ FORMAT_KINDS = frozenset(
         "version_count",
         "calendar_date",
         "field_keys",
+        "export_policy",
     }
 )
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
