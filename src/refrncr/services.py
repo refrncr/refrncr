@@ -23,6 +23,7 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.errors import UserManagementError, ValidationError
+from refrncr.field_contracts import FIELD_KEY_PATTERN
 from refrncr.models import LoginSession, User
 from refrncr.ports import (
     AuditEntry,
@@ -251,7 +252,7 @@ def validate_dataset_description(description: str) -> str:
 
 
 def validate_dataset_field_key(key: str) -> str:
-    if not isinstance(key, str) or re.fullmatch(r"[a-z0-9][a-z0-9_]{0,99}", key) is None:
+    if not isinstance(key, str) or re.fullmatch(FIELD_KEY_PATTERN, key) is None:
         raise ValidationError(
             "Field key must contain 1-100 lowercase ASCII letters, numbers, or underscores"
         )

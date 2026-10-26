@@ -39,7 +39,8 @@ separators. Original headers and values remain unchanged for display and validat
 
 Each source column is profiled once from at most the first 100 parsed source rows. At
 most 25 non-empty, non-formula values per column are checked against the versioned
-source-format catalogue, with canonical datatype validation after conversion. See [Field datatypes](field-datatypes.md).
+source-format catalogue, with canonical datatype validation after conversion. See [Field
+datatypes](field-datatypes.md).
 This sample supports header mapping only; source-format proposals validate the complete column.
 The mapping page displays at most the first three of
 those values, truncating display text at 80 characters. Formula text and cached formula results are
@@ -104,11 +105,13 @@ point for non-browser callers; the browser additionally passes `require_confirma
 Confirmation atomically claims the transient state before entering the existing serialized dataset
 transaction. Other requests cannot update, cancel, replace or confirm an in-flight claim. A domain
 conflict rolls back and clears validation; a technical failure releases the claim for an explicit
-retry within the refreshed idle TTL. Logout/expiry during processing cannot resurrect state. After success,
+retry within the refreshed idle TTL. Logout/expiry during processing cannot resurrect state.
+After success,
 the store retains only the bound completion receipt (count and display metadata) until expiry,
 removes source bytes/mapping/schema data, and rejects any further mutation using that token.
 This receipt supports refresh of the success page; it is not an executable import token or a durable
-draft. Persistence, identifier uniqueness and revision 1 are unchanged. REF-149 confirmation emits exactly
+draft. Persistence, identifier uniqueness and revision 1 are unchanged. REF-149 confirmation
+emits exactly
 one transactional `dataset.records_imported` summary on the Dataset, with format and committed
 Record/rejected-row counts; it emits no per-Record events. Failures/cancellation/replay emit no
 successful summary. See [audit policy](audit-policy.md).
@@ -152,7 +155,8 @@ and examples without a meaningless selector.
 
 Expanded native `details` controls contain a labelled source-format group above
 up to three source/stored pairs. REF-158 replaces the temporal Cartesian dropdown
-with **Source type**, **Date format** and **Time format** native controls. Both sides come from the actual
+with **Source type**, **Date format** and **Time format** native controls. Both sides come from
+the actual
 staged upload, never fixtures or persisted examples. Each compact value is
 limited to 80 characters. Longer values have an escaped native disclosure,
 bounded by the 4096-character parser limit. On narrow screens each pair stacks
@@ -171,7 +175,8 @@ requires CSRF, validates form shape and changes no state or durable data.
 REF-158 adds datatype validation through the existing Field-list service; the
 audit inventory records that ordinary read, without a new audit event. Prior
 requests are aborted/ignored after newer input, including timezone typing before
-change/blur, so a delayed response cannot replace current input or steal focus; source content never becomes
+change/blur, so a delayed response cannot replace current input or steal focus; source content
+never becomes
 HTML through string interpolation. Jinja renders the same shared format partial
 for initial and updated rows. Failure leaves choices available for authoritative
 submission. Mapping changes clear that column's transient format controls.
@@ -255,15 +260,19 @@ examples or replace the source file. See the REF-158 report for current evidence
 
 ## Import usability and idle expiry (REF-259)
 
-The browser flow has four steps: Upload file, Select worksheet, Map columns, and Preview & import.
-The preview is the confirmation surface; `/step/5` is no longer a supported wizard endpoint.
-Mapping guidance, source filename/worksheet, completeness and the live blocker message are visible
-beside the mapping action. Dataset fields appear in one flat select, with suggested fields first,
-then the remaining Configure-order fields. A field selected by another source column is hidden
-until released. The existing source-column **Do not import** choice remains supported. Optional destination
-Fields may stay unmapped (REF-260); mapping validation and completeness share the required and
-identifier Field rule. Preview lists omitted Fields with: **Not in file:** followed by their
-names and “Existing records keep their values; new records leave these fields empty.”
+The browser flow has four steps: Upload file, Select worksheet, Map columns, and Preview &
+import. The preview is the confirmation surface; `/step/5` is no longer a supported wizard
+endpoint. Mapping guidance, source filename/worksheet, completeness and the live blocker message
+are visible beside the mapping action. Dataset fields appear in one flat select, with suggested
+fields first, then the remaining Configure-order fields. A field selected by another source
+column is hidden until released. The existing source-column **Do not import** choice remains
+supported. Optional destination Fields may stay unmapped (REF-260); mapping validation and
+completeness share the required and identifier Field rule. Preview lists omitted Fields with:
+**Not in file:** followed by their names and “Existing records keep their values; new records
+leave these fields empty.” When Changed + Unchanged is zero, the explanation is “These fields
+stay empty.” The ready mapping status also counts Fields not in the file, with singular/plural
+labels, only when the count is nonzero and the import is a Draft import (not a mapping target
+update).
 
 The preview keeps summary counts and compact Identifier/Status rows, with changed field names as
 the only third-column content. Opening a row displays escaped read-only values in a keyboard-
@@ -329,18 +338,18 @@ persistence. See the archived REF-155 implementation notes.
 
 ## Complete new-version imports (REF-160)
 
-The Concept has one **Import** action. The file defines the complete desired set: empty
-tables receive additions, while populated tables use the same full comparison for additions,
-changes, unchanged Records and retained deletions. Both the original `/records/import`
-address and `/concept/records/import-new-version` start the `new_version` engine; neither
-offers append-only behavior. The existing Python create-only mode remains compatible for
-programmatic callers. Staging never creates a Concept or silently converts an active
-legacy staged import; cancel that upload first. Required and identifier Fields must be mapped exactly
-once; identifiers must be complete and non-null. Optional Fields may be omitted: matching active
-Records keep their current Draft values, while Added Records have no value for those Fields.
-A previously Deleted identifier is Added without recovering its retained values. Mapped blank
-optional cells clear a value; mapped blank required cells still produce row errors. Extra columns require explicit Ignore.
-An empty file cannot mark every Record Deleted. Existing source formats, Date/Time
+The Concept has one **Import** action. The file defines the complete desired set: empty tables
+receive additions, while populated tables use the same full comparison for additions, changes,
+unchanged Records and retained deletions. Both the original `/records/import` address and
+`/concept/records/import-new-version` start the `new_version` engine; neither offers append-only
+behavior. The existing Python create-only mode remains compatible for programmatic callers.
+Staging never creates a Concept or silently converts an active legacy staged import; cancel that
+upload first. Required and identifier Fields must be mapped exactly once; identifiers must be
+complete and non-null. Optional Fields may be omitted: matching active Records keep their
+current Draft values, while Added Records have no value for those Fields. A previously Deleted
+identifier is Added without recovering its retained values. Mapped blank optional cells clear a
+value; mapped blank required cells still produce row errors. Extra columns require explicit
+Ignore. An empty file cannot mark every Record Deleted. Existing source formats, Date/Time
 composition, archive limits, TTL and full-file validation apply unchanged.
 
 One server-side eligibility rule guards the action, upload, preview and confirmation. For a
@@ -357,7 +366,8 @@ deliberately ineligible, even when its Dataset has no non-cancelled version:
 > reliably verify that its Records are unchanged. Publish or discard this Concept, then
 > create a new Concept to import a new version.
 
-This is a one-time compatibility boundary, not an error. See [ADR-016](../architecture/adr-016-complete-record-import.md).
+This is a one-time compatibility boundary, not an error. See
+[ADR-016](../architecture/adr-016-complete-record-import.md).
 
 Matching uses the complete configured identifier and existing canonical typed keys.
 Changed identifier means Deleted plus Added. Canonically identical values are Unchanged;
@@ -376,29 +386,31 @@ Concept identity; confirmation repeats authority, eligibility and validation und
 Dataset write lock. Deletions require an initially unchecked checkbox showing the exact
 full count. Neither missing nor duplicate/forged confirmation fields can bypass it.
 
-Confirmation applies the entire difference atomically and stores the one-use result on
-the Concept. Competing tokens serialize on the Dataset row; at most one can succeed.
-A process-local token claim also prevents same-token replay. Rollback includes content,
-revisions, the result marker and audit. Changed Records replace only mapped values; omitted values remain untouched in storage.
-Comparison uses the resulting values, so omitted Fields never cause false Changed counts.
-Unchanged Records receive no write or revision increment. Unique values in mapped Fields can
-move between changed/new rows;
-deleted values remain retained but do not reserve active unique values. Current and
-historical snapshots never change. The success redirect opens the Concept Records table
-with Added/Changed/Deleted filtering, totals, identifier search and a clear-filter link.
+Confirmation applies the entire difference atomically and stores the one-use result on the
+Concept. Competing tokens serialize on the Dataset row; at most one can succeed. A process-local
+token claim also prevents same-token replay. Rollback includes content, revisions, the result
+marker and audit. Changed Records replace only mapped values; omitted values remain untouched in
+storage. Comparison uses the resulting values, so omitted Fields never cause false Changed
+counts. Unchanged Records receive no write or revision increment. Unique values in mapped Fields
+can move between changed/new rows; deleted values remain retained but do not reserve active
+unique values. Current and historical snapshots never change. The success redirect opens the
+Concept Records table with Added/Changed/Deleted filtering, totals, identifier search and a
+clear-filter link.
 
-Exactly one `dataset:dataset.new_version_imported` summary records `mode`, `format`,
-`added`, `changed`, `unchanged`, `deleted`, and `total_processed` (source Records plus
-Deleted Records), plus `unmapped_fields`: the omitted schema Field keys in Configure order
-(an empty list when all Fields are mapped). Each key follows the existing 100-character schema
-key contract; the list contains no Field display names or Record values. No per-row import events, values, identifiers, filenames or source
-examples are audited. Manual Undo emits `dataset_record:restored` transactionally.
+Exactly one `dataset:dataset.new_version_imported` summary records `mode`, `format`, `added`,
+`changed`, `unchanged`, `deleted`, and `total_processed` (source Records plus Deleted Records),
+plus `unmapped_fields`: the omitted schema Field keys in Configure order (an empty list when all
+Fields are mapped). Each key follows the existing 100-character schema key contract; the list
+contains no Field display names or Record values. No per-row import events, values, identifiers,
+filenames or source examples are audited. Manual Undo emits `dataset_record:restored`
+transactionally.
 
 ### Search/filter interaction (REF-136)
 
 Import preview and complete-identifier matching are unchanged. The post-import Records
 page retains the original receipt totals and Added/Changed/Deleted selection. Its explicit
-`import_results=1` defaults Record status to All, preserving Deleted results. General String search combines with that selection using AND. Clearing
+`import_results=1` defaults Record status to All, preserving Deleted results. General String
+search combines with that selection using AND. Clearing
 the import-change selection preserves the other criteria; Clear all returns to the normal
 Active view. The general Records search now accepts String Fields only, including String
 identifiers. Non-text identifiers are excluded from general search. Neither searching nor

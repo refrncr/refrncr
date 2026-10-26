@@ -11,6 +11,8 @@ from types import MappingProxyType
 from unicodedata import category, normalize
 from uuid import UUID, uuid4
 
+from refrncr.field_contracts import FIELD_KEY_PATTERN
+
 
 class AuditContractError(ValueError):
     """An event or operation is not covered by the approved audit policy."""
@@ -258,7 +260,7 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
         elif kind == "field_keys":
             # Schema keys only, in configured order; never names or record values.
             if not isinstance(value, list) or any(
-                not isinstance(item, str) or re.fullmatch(r"[a-z0-9][a-z0-9_]{0,99}", item) is None
+                not isinstance(item, str) or re.fullmatch(FIELD_KEY_PATTERN, item) is None
                 for item in value
             ):
                 raise AuditContractError("Invalid field keys")

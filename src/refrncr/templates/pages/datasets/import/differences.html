@@ -25,7 +25,7 @@
   {% endif %}
 </p>
 {% if unmapped_fields %}
-  <p><strong>Not in file:</strong> {% for field in unmapped_fields %}<code>{{ field.name }}</code>{{ ', ' if not loop.last else '.' }}{% endfor %} Existing records keep their values; new records leave these fields empty.</p>
+  <p><strong>Not in file:</strong> {% for field in unmapped_fields %}<code>{{ field.name }}</code>{{ ', ' if not loop.last else '.' }}{% endfor %} {% if preview.counts.Changed + preview.counts.Unchanged == 0 %}These fields stay empty.{% else %}Existing records keep their values; new records leave these fields empty.{% endif %}</p>
 {% endif %}
 
 {% set available_statuses = namespace(count=0) %}

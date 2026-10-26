@@ -82,7 +82,6 @@ def test_changed_record_preserves_unmapped_storage_and_draft_values(database_con
     state, result, assistance = stage(c, b"code,label\na,Changed\nb,New\n", ("code", "label"))
     assert result.valid and not assistance.errors
     assert assistance.required_keys == ("code",)
-    assert assistance.completeness.required_total == assistance.completeness.required_mapped == 1
     assert result.counts["Changed"] == result.counts["Added"] == 1
     changed = next(item for item in result.differences if item["status"] == "Changed")
     assert changed["changes"] == (("Label", "Café", "Changed"),)
@@ -155,7 +154,7 @@ def test_blank_required_nonidentifier_is_a_row_error(database_context):
     c.s.dataset_fields.update_field(c.a.id, c.d.key, "label", "Label", "string", True, False)
     _, result, assistance = stage(c, b"code,label\na,\n", ("code", "label"))
     assert not assistance.errors
-    assert assistance.completeness.required_total == 2
+    assert assistance.required_keys == ("code", "label")
     assert not result.valid
     assert any(
         issue.row == 2 and issue.field == "Label" and "required" in issue.message

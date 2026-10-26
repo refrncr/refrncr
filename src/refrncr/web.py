@@ -2937,7 +2937,7 @@ def create_flask_app(
                 identifier_keys = assistance.identifier_keys
                 if error or source_format_issues:
                     for issue in assistance.errors:
-                        message = mapping_issue_message(issue, mode)
+                        message = mapping_issue_message(issue)
                         if issue.column_index is None:
                             if message:
                                 step_mapping_errors.append(message)
@@ -2969,7 +2969,7 @@ def create_flask_app(
                 if preview.non_row_errors:
                     step = 3
                     preview_messages = [
-                        mapping_issue_message(item, mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     ]
                     error = " ".join(dict.fromkeys(preview_messages))
@@ -2992,7 +2992,7 @@ def create_flask_app(
             format_columns = list(assistance.format_columns)
         format_columns = show_source_format_issues(format_columns, source_format_issues)
         for issue in source_format_issues:
-            message = mapping_issue_message(issue, mode)
+            message = mapping_issue_message(issue)
             if not message:
                 continue
             step_mapping_errors.append(message)
@@ -3391,7 +3391,7 @@ def create_flask_app(
                 step=3,
                 error=merge_error_messages(
                     *(
-                        mapping_issue_message(item, state.mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     )
                 ),

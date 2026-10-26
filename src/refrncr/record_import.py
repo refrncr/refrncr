@@ -147,10 +147,6 @@ class ColumnMappingAdvice:
 
 @dataclass(frozen=True, slots=True)
 class MappingCompleteness:
-    required_mapped: int
-    required_total: int
-    missing_required: tuple[str, ...]
-    missing_identifier: tuple[str, ...]
     unmapped_columns: int
     ignored_columns: int
 
@@ -275,7 +271,7 @@ class ImportIssue:
     mode: str | None = None
 
 
-def mapping_issue_message(issue: MappingIssue | ImportIssue, default_mode="create") -> str:
+def mapping_issue_message(issue: MappingIssue | ImportIssue) -> str:
     return {
         "mapping_count_mismatch": "Submit exactly one mapping for every source column.",
         "column_unmapped": "Choose a field or Do not import.",
@@ -765,18 +761,8 @@ def build_mapping_assistance(
         )
         for index, header in enumerate(source.headers)
     )
-    mapped = {selection for selection in selections if selection}
     required = _required_mapping_fields(fields, identifier, mode)
-    field_by_key = {field.key: field for field in fields}
-    missing_required = tuple(field.name for field in required if field.key not in mapped)
-    missing_identifier = tuple(
-        field_by_key[key].name for key in identifier.field_keys if key not in mapped
-    )
     completeness = MappingCompleteness(
-        len(required) - len(missing_required),
-        len(required),
-        missing_required,
-        missing_identifier,
         sum(selection == "" for selection in selections),
         sum(selection is None for selection in selections),
     )
