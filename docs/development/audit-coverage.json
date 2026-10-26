@@ -1306,10 +1306,7 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5788,7 +5785,10 @@
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

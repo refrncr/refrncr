@@ -22,12 +22,7 @@
     </div>
   </div>
   {% include 'pages/datasets/_source_notice.html' %}
-  {% if version_state and version_state.status == 'Expired' %}
-  <section class='version-status-bar version-status-bar-neutral' aria-label='Expired version'>
-    <p>You're viewing an expired version · in effect from <time datetime='{{ version_state.version.effective_date.isoformat() }}'>{{ version_state.version.effective_date|short_date }}</time> to <time datetime='{{ version_state.end_date.isoformat() }}'>{{ version_state.end_date|short_date }}</time></p>
-    <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=dataset.key) }}'>View current version</a>
-  </section>
-  {% endif %}
+  {% include 'pages/datasets/_version_status.html' %}
   {% if not version_state %}
   {% call banner(dataset.key, concept_ui, publication_panel=false, show_current=false, include_discard_panel=true) %}
       {% if may_edit %}

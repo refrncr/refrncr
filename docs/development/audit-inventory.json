@@ -489,7 +489,7 @@
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
-        "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.get_dataset_for_edit",
         "refrncr.services.DatasetService.mapping_source",
         "refrncr.services.DatasetService.mapping_usage",
@@ -508,7 +508,7 @@
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
-        "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.mapping_source",
         "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
@@ -526,7 +526,7 @@
         "refrncr.dataset_versions.DatasetVersionService.read",
         "refrncr.record_import.DatasetRecordImportService.eligibility",
         "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
-        "refrncr.services.DatasetService.get_dataset",
+        "refrncr.services.DatasetService.get_dataset_configuration",
         "refrncr.services.DatasetService.mapping_source",
         "refrncr.services.DatasetService.mapping_usage",
         "refrncr.services.SessionService.resolve_with_session"
