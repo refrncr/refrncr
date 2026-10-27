@@ -47,12 +47,7 @@
         </aside>
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
-        {% if current_actor %}{% set mobile_title = self.title().split(' · ')[0] %}
-        <div class="mobile-bar">
-          {{ navigation_button('application-navigation', expand=true) }}
-          <a class="mobile-bar-brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">{{ wordmark(current_theme_preference|default('system', true), 'wordmark', 90, 34) }}</a>
-          {% if mobile_title != 'REFRNCR' %}<span class="mobile-bar-title" aria-hidden="true">{{ mobile_title }}</span>{% endif %}
-        </div>{% endif %}
+        {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
         {% if current_actor %}<noscript><p><a href="{{ url_for('api_key_list') }}">API keys</a></p></noscript>{% endif %}
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}

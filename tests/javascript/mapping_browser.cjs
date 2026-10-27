@@ -100,7 +100,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('link', {name: 'Records', exact: true}).click();
       await page.waitForLoadState('networkidle');
       await page.evaluate(() => document.fonts.ready);
-      assert.equal(await page.locator('.mobile-bar').count(), 1);
+      assert.equal(await page.locator('.mobile-bar').count(), 0);
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.equal(await page.getByRole('table', {name: 'Mapping record changes', exact: true}).count(), 1);
       if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/review-${width}.png`, fullPage: true, animations: 'disabled'});

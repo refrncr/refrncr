@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Use the same navigation arrow tabs on desktop and small screens (REF-236), with
+  generous touch targets. Remove the mobile app topbar and share the drawer controls
+  with Settings while preserving its fixed desktop sidebar.
+
 - Require safe Excel XML parsing as a runtime dependency (REF-48). Refuse webapp
   startup before migrations and direct Excel imports when protection is unavailable.
   Preserve import limits and export contracts; verify a runtime-only wheel installation in CI.

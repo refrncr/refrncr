@@ -133,6 +133,12 @@ The navigation has two modes:
   invoking control.
 
 The behaviour must remain correct when the viewport crosses the breakpoint.
+Both modes use the same arrow tab at the navigation edge: right to open, left to close.
+The visual tab stays narrow while the button has a 44 × 44 px target and a visible keyboard
+focus ring. Reserve space above the content so the opener target does not cover it.
+The mobile app shell has no separate logo/page-title bar; the logo remains in the navigation.
+Settings shares the mobile drawer controls but keeps its fixed, non-collapsible desktop sidebar.
+
 Do not persist a server-side navigation preference for this client-only UI
 state.
 
