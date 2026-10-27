@@ -1,0 +1,37 @@
+name: Prepare dependency lock
+on:
+  push:
+    branches: [chore/consolidate-dev-dependencies]
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pip-tools==7.6.2
+      - name: Compile selected development updates
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+          import sys
+          from tools.compile_dev_lock import COMPILE_FLAGS
+
+          os.environ["CUSTOM_COMPILE_COMMAND"] = "python tools/compile_dev_lock.py"
+          subprocess.run(
+              [sys.executable, "-m", "piptools", "compile", *COMPILE_FLAGS,
+               "--upgrade-package", "filelock==4.2.1",
+               "--upgrade-package", "virtualenv==21.14.13"],
+              check=True,
+          )
+          PY
+          python tools/compile_dev_lock.py --fresh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: development-lock
+          path: requirements/dev.txt
+          retention-days: 1
