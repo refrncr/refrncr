@@ -48,16 +48,18 @@ actor**, including a deleted actor. This avoids loading an unbounded installatio
 it is not a free-text directory search. Action selections identify `(object_type, action)` pairs,
 because historical names such as `created` belong to several contracts.
 
-Every timestamp has an ISO UTC `<time datetime>` and a full UTC fallback with six fractional
-digits. JavaScript uses the browser timezone and preserves all six displayed fractional digits.
+Every timestamp retains an exact ISO UTC `<time datetime>`. Audit list rows show hours and
+minutes, with the date in the day heading (or in each UTC fallback when JavaScript is unavailable).
+JavaScript uses the browser timezone; the tooltip retains the exact local timestamp.
 Details display both local and exact UTC timestamps. Invalid/unsupported localization preserves
 the server fallback. No locale-dependent date parsing is used.
 
-JavaScript enhances date filters to native local date/time controls. Native controls support
-milliseconds: unchanged fields retain the original full-precision UTC value, including the second
-occurrence of a repeated daylight-saving hour. Editing a field selects a new instant at the
-control's precision. Newly entered repeated hours use the first occurrence; nonexistent local
-times during the spring transition produce a focused error. Without JavaScript or usable `Intl`
+JavaScript enhances date filters to native local date/time controls with one-minute steps.
+Seconds and fractions are hidden, not rounded. Untouched fields retain the original full-precision
+UTC value from the URL, including the second occurrence of a repeated daylight-saving hour.
+Editing a field selects the start of the chosen minute, even when returning to the displayed
+minute of the original filter. Newly entered repeated hours use the first occurrence; nonexistent
+local times during the spring transition produce a focused error. Without JavaScript or usable `Intl`
 timezone support, date controls remain explicit-offset text inputs. Invalid calendar timestamps
 are not silently normalized to another day. Without JavaScript, explicit ISO UTC
 or offset input and direct full-page details remain available.
@@ -217,7 +219,16 @@ both engines. `test_audit_history_review.py` adds simultaneous writer/read coord
 insert semantics, demotion/session forgery, every resolver type, hostile filters, guard sabotage
 and read-stage failures with no commits. `test_audit_time_javascript.py` covers six timezones, date boundaries, both DST
 transitions, invalid/unsupported timestamps and duplicate registration. Existing pane tests remain
-part of pytest. The optional browser fixture/script tests native controls/dialog behavior:
+part of pytest. Minute-filter regressions cover untouched precise links, edits back to the
+displayed minute, empty/invalid input and exact inclusive/exclusive boundaries on both databases.
+The focused browser case checks native minute controls and keyboard steps in five timezones,
+list/detail presentation, DST gap feedback and no-JavaScript filtering:
+
+```sh
+.venv/bin/python tests/run_browser_tests.py audit_minutes
+```
+
+The broader browser fixture/script tests cross-page navigation and dialog behavior:
 
 ```sh
 .venv/bin/python tests/browser_audit_history_app.py

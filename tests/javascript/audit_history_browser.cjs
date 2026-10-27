@@ -28,15 +28,15 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       assert.equal(await page.locator('tbody tr td:nth-child(5)').first().textContent(), 'No name to display');
       const utc = await page.locator('tbody time').first().getAttribute('datetime');
       const local = await page.locator('tbody time').first().textContent();
-      // Rows show the local time to the second; the exact instant stays in the title.
+      // Rows show the local time to the minute; the exact instant stays in the title.
       const exact = await page.locator('tbody time').first().getAttribute('title');
       assert(exact.includes('123456') && exact.includes('GMT') && local !== utc + ' UTC');
-      assert.match(local, /^\d{2}:\d{2}:\d{2}$/);
+      assert.match(local, /^\d{2}:\d{2}$/);
       assert(await page.locator('tbody tr.table-day-row th[scope="rowgroup"]').count() >= 1);
       assert.equal(await page.locator('thead [data-local-timezone]').textContent(), `(${timezoneId})`);
       const date = new Date(utc);
       const expected = new Intl.DateTimeFormat('en-GB', {timeZone: timezoneId,
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'}).format(date);
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(date);
       assert(local.includes(expected), `${timezoneId}: ${local} vs ${expected}`);
       const links = page.locator('tbody a[data-panel-url]');
       const names = await links.allTextContents();
@@ -154,7 +154,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       assert(await page.evaluate(() => window.auditTestOriginal === window.refrncrLocalTime));
       if (timezoneId === 'Europe/Amsterdam') {
         await page.goto(base + '/settings/audit-log?start=2026-10-25T01%3A30%3A00.123456Z');
-        assert.equal(await page.getByLabel('Start date and time').inputValue(), '2026-10-25T02:30:00.123');
+        assert.equal(await page.getByLabel('Start date and time').inputValue(), '2026-10-25T02:30');
         await page.getByRole('button', {name: 'Apply filters'}).click();
         await page.waitForLoadState('load');
         assert.equal(new URL(page.url()).searchParams.get('start'), '2026-10-25T01:30:00.123456+00:00');
@@ -164,7 +164,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       const noJS = await browser.newContext({storageState: await context.storageState(), javaScriptEnabled: false});
       const fallback = await noJS.newPage();
       await fallback.goto(base + '/settings/audit-log?object_type=dataset_record');
-      assert((await fallback.locator('tbody time').first().textContent()).includes('+00:00 UTC'));
+      assert((await fallback.locator('tbody time').first().textContent()).match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$/));
       await fallback.locator('tbody a[data-panel-url]').first().click();
       assert((await fallback.locator('main').textContent()).includes('Exact UTC timestamp'));
       await noJS.close();

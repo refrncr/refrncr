@@ -4,6 +4,9 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Simplify audit time filters and list times to minute precision (REF-257). Preserve
+  exact event details and untouched filter links, including daylight-saving offsets.
+
 - Require safe Excel XML parsing as a runtime dependency (REF-48). Refuse webapp
   startup before migrations and direct Excel imports when protection is unavailable.
   Preserve import limits and export contracts; verify a runtime-only wheel installation in CI.

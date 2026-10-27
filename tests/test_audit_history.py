@@ -96,6 +96,34 @@ def test_filters_and_inclusive_exclusive_boundaries(database_history):
     assert parse_audit_time("2026-03-29T01:59:59.123456+01:00") == INSTANT
 
 
+def test_minute_filter_bounds_keep_exact_order_and_detail(database_history):
+    h = database_history
+    start = INSTANT.replace(second=0, microsecond=0)
+    end = start + timedelta(minutes=1)
+    seed(h, 1, first=1, timestamp=start - timedelta(microseconds=1))
+    first = seed(h, 1, first=2, timestamp=start)[0]
+    last = seed(h, 1, first=3, timestamp=end - timedelta(microseconds=1))[0]
+    seed(h, 1, first=4, timestamp=end)
+    browser = client(h, h.admin)
+    response = browser.get(
+        "/settings/audit-log",
+        query_string={"start": start.isoformat(timespec="minutes"), "end": end.isoformat()},
+        base_url="https://localhost",
+    )
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    links = re.findall(r'href="/settings/audit-log/([a-f0-9-]+)"', html)
+    assert links == [last, first]
+    times = re.findall(r'<time datetime="([^"]+)" data-local-time="minute">([^<]+)</time>', html)
+    assert times == [
+        ((end - timedelta(microseconds=1)).isoformat(), "2026-03-29 00:59 UTC"),
+        (start.isoformat(timespec="microseconds"), "2026-03-29 00:59 UTC"),
+    ]
+    detail = browser.get(f"/settings/audit-log/{last}", base_url="https://localhost")
+    assert (end - timedelta(microseconds=1)).isoformat() in detail.get_data(as_text=True)
+    assert "Exact UTC timestamp" in detail.get_data(as_text=True)
+
+
 @pytest.mark.parametrize(
     "pairs",
     [

@@ -13,7 +13,7 @@
     return parts.map((part) => part.type === "fractionalSecond" ? value.slice(20, 26) : part.value).join("");
   };
   // One compact notation across lists: "11 Sep 2026, 15:18:35" or, inside a
-  // day group, "15:18:35". The exact local instant stays available as the title.
+  // day group, "15:18:35"; audit rows use "15:18". Exact instants stay in the title.
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const compactTime = (value, mode) => {
     const date = new Date(value);
@@ -22,10 +22,10 @@
       year: "numeric", month: "numeric", day: "numeric", weekday: "long",
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
     }).formatToParts(date).forEach((part) => { parts[part.type] = part.value; });
-    const time = `${parts.hour}:${parts.minute}:${parts.second}`;
+    const time = `${parts.hour}:${parts.minute}` + (mode === "minute" ? "" : `:${parts.second}`);
     const day = `${Number(parts.day)} ${months[Number(parts.month) - 1]} ${parts.year}`;
     return {key: `${parts.year}-${parts.month}-${parts.day}`, day, weekday: parts.weekday,
-      text: mode === "time" ? time : `${day}, ${time}`};
+      text: mode !== "datetime" ? time : `${day}, ${time}`};
   };
   window.refrncrLocalTime = (root) => {
     root.querySelectorAll("time[data-local-time]").forEach((element) => {
@@ -34,7 +34,7 @@
         const formatted = formatTime(value);
         if (!formatted) return;
         const mode = element.dataset?.localTime;
-        if (mode === "time" || mode === "datetime") {
+        if (mode === "time" || mode === "datetime" || mode === "minute") {
           const local = compactTime(value, mode);
           element.textContent = local.text;
           element.title = formatted;
@@ -52,7 +52,7 @@
     const source = table.tBodies?.[0];
     if (!source?.rows) return;
     const rows = [...source.rows];
-    const times = rows.map((row) => row.querySelector('time[data-local-time="time"]'));
+    const times = rows.map((row) => row.querySelector('time[data-local-time="time"], time[data-local-time="minute"]'));
     if (!rows.length || times.some((time) => !time?.dataset.localDayKey)) {
       // Never leave a bare time without its date.
       times.forEach((time) => { if (time?.dataset.localDayKey) time.textContent = `${time.dataset.localDay}, ${time.textContent}`; });
@@ -85,7 +85,7 @@
   } catch { /* Keep the UTC label. */ }
 
   const pad = (value) => String(value).padStart(2, "0");
-  const localValue = (date, fraction) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${fraction}`;
+  const localValue = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   document.querySelectorAll("form[data-audit-filters]").forEach((form) => {
     let timezone;
     try {
@@ -98,12 +98,13 @@
       const utc = input.value;
       const date = utc ? new Date(utc) : null;
       input.type = "datetime-local";
-      input.step = "0.001";
-      // Native datetime-local controls accept milliseconds, not microseconds.
-      // Keep the original full-precision instant until this displayed value changes.
-      input.value = date ? localValue(date, (utc.match(/\.(\d+)/)?.[1] || "").padEnd(3, "0").slice(0, 3)) : "";
-      // Preserve the exact instant of an unchanged filter during DST's repeated hour.
-      originals.set(input, {local: input.value, utc});
+      input.step = "60";
+      // Display whole minutes, but retain the precise instant of an untouched link,
+      // including the second occurrence of a repeated daylight-saving hour.
+      input.value = date ? localValue(date) : "";
+      const original = {local: input.value, utc, edited: false};
+      originals.set(input, original);
+      input.addEventListener("input", () => { original.edited = true; });
     });
     document.getElementById("audit-time-help").textContent = `Dates use your browser timezone (${timezone}). Start is inclusive; end is exclusive. A newly entered repeated daylight-saving hour uses its first occurrence.`;
     form.addEventListener("submit", (event) => {
@@ -119,16 +120,15 @@
         }
         if (!input.value) { params.delete(input.name); return; }
         const original = originals.get(input);
-        if (input.value === original.local) { params.set(input.name, original.utc); return; }
-        const match = input.value.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/);
+        if (!original.edited && input.value === original.local) { params.set(input.name, original.utc); return; }
         const date = new Date(input.value);
-        const fraction = (match?.[3] || "").padEnd(6, "0");
-        if (!match || !Number.isFinite(date.getTime()) || localValue(date, fraction) !== `${match[1]}:${match[2] || "00"}.${fraction}`) {
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input.value) ||
+            !Number.isFinite(date.getTime()) || localValue(date) !== input.value) {
           invalid = true;
           input.setAttribute("aria-invalid", "true");
           return;
         }
-        params.set(input.name, date.toISOString().replace(/\.\d{3}Z$/, `.${fraction}Z`));
+        params.set(input.name, date.toISOString());
       });
       if (invalid) {
         const error = document.getElementById("audit-date-error");
