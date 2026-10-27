@@ -28,6 +28,7 @@ DATA_PATHS = {
     "/api/v1/datasets/{dataset_key}": Detail[DatasetDetail],
     "/api/v1/datasets/{dataset_key}/records": RecordCollection | HierarchyRecordCollection,
     "/api/v1/datasets/{dataset_key}/records/{identifier}": RecordDetail,
+    "/api/v1/datasets/{dataset_key}/lookup": RecordDetail,
     "/api/v1/datasets/{dataset_key}/hierarchy": HierarchyResponse,
 }
 
@@ -105,6 +106,15 @@ def test_schema_matches_registered_routes_and_contracts(api):
         expected_query = {"effective_date", "version"}
         if collection:
             expected_query |= {"offset", "limit"}
+        if path.endswith("/lookup"):
+            expected_query.add("source")
+            assert params["source"]["required"] is True
+            assert params["source"]["schema"]["examples"] == ["1001"]
+            assert "1001" in op["description"] and "AMS-SALES" in op["description"]
+            assert "not a general filter" in op["description"]
+            example = op["responses"]["200"]["content"]["application/json"]["example"]
+            RecordDetail.model_validate(example)
+            assert example["data"]["values"] == {"code": 1001, "target": "AMS-SALES"}
         assert {n for n, p in params.items() if p["in"] == "query"} == expected_query
         effective_date = params["effective_date"]
         assert "YYYY-MM-DD" in effective_date["description"]
@@ -137,10 +147,13 @@ def test_schema_matches_registered_routes_and_contracts(api):
         "number",
         "published_at",
         "effective_from",
+        "source",
     }
     for response_model in ("Dataset", "RecordCollection", "RecordDetail"):
         assert "version" in models[response_model]["properties"]
         assert "current_version" not in models[response_model]["properties"]
+    assert "source" not in models["VersionMetadata"]["required"]
+    assert "mapping_role" not in models["FieldMetadata"]["required"]
     assert "HTTPValidationError" not in models
 
     # Every reference in the generated document resolves locally.

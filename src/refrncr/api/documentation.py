@@ -51,6 +51,17 @@ snapshot is not paginated so it can be reconstructed independently. Hierarchy se
 uses the same version/effective-date, authorization, error, ETag and cache rules as the
 other published-data endpoints.
 
+For mappings, `/api/v1/datasets/{dataset_key}/lookup?source=1001` looks up one source
+value, for example `1001 → AMS-SALES`. This is a targeted lookup, not general filtering.
+The value is parsed using the selected version's `source_identifier` Field datatype.
+Invalid values return 400; unknown values and non-mapping datasets return 404. Unmapped
+source values return 200 with the Record and null target values. The response is the same
+RecordDetail as `/records/{identifier}`, with the same version selectors and caching rules.
+Field metadata includes `mapping_role`: `source_identifier`, `source_context`, or
+`mapping_target`; it is null outside mappings. Version metadata includes `source` with
+`dataset_key` and `version` for mappings, otherwise null. The source key and version are
+visible to anyone with export access to the mapping; source dataset access is not required.
+
 Every successful data response supplies a strong ETag and publication-based Last-Modified.
 Send If-None-Match to revalidate; matching tags (including weak/list matches and `*`)
 return 304 only after authentication, authorization and existence checks. ETags also track
@@ -60,8 +71,9 @@ Last-Modified is unchanged. Dataset lists use the page's latest publication time
 epoch for an empty page. Private caches must revalidate every use; shared caching is forbidden.
 
 **Excluded:** Concepts, Cancelled versions, history listing, search/filtering/sorting, writes,
-import/export and mappings. The hierarchy endpoint is read-only and does not expose concept
-data, internal IDs as record identifiers, cross-dataset references or aggregations.
+import/export, reverse mapping lookup and batch lookup. The hierarchy endpoint is read-only
+and does not expose concept data, internal IDs as record identifiers, cross-dataset references
+or aggregations.
 """.strip()
 
 CONDITIONAL_PARAMETERS = [
@@ -80,6 +92,19 @@ CONDITIONAL_PARAMETERS = [
         "description": "Optional HTTP date. Conservative secondary validator; prefer ETags.",
     },
 ]
+
+MAPPING_LOOKUP_EXAMPLE = {
+    "data": {
+        "identifier": "AAAABWkxMDAx",
+        "values": {"code": 1001, "target": "AMS-SALES"},
+    },
+    "version": {
+        "number": 1,
+        "published_at": "2026-10-27T12:00:00Z",
+        "effective_from": "2026-10-27",
+        "source": {"dataset_key": "sap-cost-centres", "version": 1},
+    },
+}
 
 RESPONSE_HEADERS = {
     "ETag": {"schema": {"type": "string"}, "description": "Strong representation validator."},

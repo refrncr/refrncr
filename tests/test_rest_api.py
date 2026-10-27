@@ -106,6 +106,7 @@ def test_endpoints_and_contract(api):
         display_position=1,
         definition=None,
         unit=None,
+        mapping_role=None,
     )
     response = get(c, "/audit/records")
     assert response.status_code == 200, response.text
@@ -371,6 +372,7 @@ def test_effective_date_version_validation_and_cache_isolation(database_api):
         "number": 2,
         "published_at": "2026-09-10T12:00:00Z",
         "effective_from": "2026-10-01",
+        "source": None,
     }
     assert second.number == 2
     assert len({first.headers["etag"], september.headers["etag"], october.headers["etag"]}) == 3
@@ -643,7 +645,7 @@ def test_pydantic_models_and_source_schema():
     with pytest.raises(ModelValidationError):
         Record(identifier="opaque", values={"invalid": []})
     schema = create_api(None, None).openapi()
-    assert len(schema["paths"]) == 5
+    assert len(schema["paths"]) == 6
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert all(item["get"]["security"] for item in schema["paths"].values())
 

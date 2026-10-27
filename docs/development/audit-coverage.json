@@ -5976,7 +5976,8 @@
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
         "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
-        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy",
+        "refrncr.api.routes.lookup GET /datasets/{dataset_key}/lookup"
       ],
       "kind": "mutation",
       "classification": "security-audited",
@@ -6009,7 +6010,9 @@
         "tests/test_api_keys.py::test_success_has_no_durable_audit_and_throttles_last_used",
         "tests/test_api_keys.py::test_last_used_update_failure_rolls_back_and_fails_closed",
         "tests/test_rest_api.py::test_success_log_is_safe_and_304_updates_last_used",
-        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke"
+        "tests/test_api_keys.py::test_authentication_waits_for_committing_revoke",
+        "tests/test_mapping_lookup_api.py::test_lookup_uses_mapping_export_access_in_each_policy",
+        "tests/test_mapping_lookup_api.py::test_lookup_conditional_requests_and_revoked_mapping_grant"
       ],
       "implementation_status": "REF-169 implemented locally; validation is recorded in the archived REF-169 report.",
       "exclusion_reason": "REF-169 keeps durable failed-authentication coverage; successful requests use only safe operational request completion metadata."
@@ -6023,7 +6026,8 @@
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
         "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
-        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy",
+        "refrncr.api.routes.lookup GET /datasets/{dataset_key}/lookup"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6046,7 +6050,9 @@
         "tests/test_rest_api.py::test_endpoints_and_contract",
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
         "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one",
-        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors"
+        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors",
+        "tests/test_mapping_lookup_api.py::test_lookup_uses_mapping_export_access_in_each_policy",
+        "tests/test_mapping_lookup_api.py::test_lookup_conditional_requests_and_revoked_mapping_grant"
       ],
       "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
@@ -6901,7 +6907,8 @@
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
         "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
-        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy",
+        "refrncr.api.routes.lookup GET /datasets/{dataset_key}/lookup"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6923,7 +6930,9 @@
       "tests": [
         "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors",
         "tests/test_api_export_access.py::test_revocation_invalidates_detail_and_list_caches",
-        "tests/test_api_export_access.py::test_filtered_pagination_deduplicates_grants_without_n_plus_one"
+        "tests/test_api_export_access.py::test_filtered_pagination_deduplicates_grants_without_n_plus_one",
+        "tests/test_mapping_lookup_api.py::test_lookup_uses_mapping_export_access_in_each_policy",
+        "tests/test_mapping_lookup_api.py::test_lookup_conditional_requests_and_revoked_mapping_grant"
       ],
       "implementation_status": "Implemented in REF-306.",
       "exclusion_reason": "Bulk current export authority for published API reads; no mutation or domain event.",

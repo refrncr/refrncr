@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-from refrncr.datatypes import DATATYPES, DatatypeError
+from refrncr.datatypes import DATATYPES, DatatypeError, get_datatype
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import StoredRecord
 from refrncr.record_identity import (
@@ -14,7 +14,7 @@ from refrncr.record_identity import (
     decode_record_identifier,
     encode_record_identifier,
 )
-from refrncr.version_contracts import PublishedVersion, SnapshotField
+from refrncr.version_contracts import PublishedVersion, SnapshotField, SourceVersion
 
 
 def encode_identifier(key: bytes) -> str:
@@ -45,6 +45,15 @@ def decode_identifier(identifier: str) -> bytes:
         raise ValueError("Invalid identifier") from None
 
 
+def mapping_identifier(source, fields):
+    """Encode a source value using the selected publication's source Field datatype."""
+    field = next(field for field in fields if field.mapping_role == "source_identifier")
+    canonical = get_datatype(field.data_type).canonicalize(source)
+    if canonical is None:
+        raise DatatypeError("Source identifier is required")
+    return encode_identifier(encode_record_identifier({field.key: canonical[1]}))
+
+
 def record_identifier(record, fields):
     values = {value.field_key: value.canonical_key for value in record.values}
     return encode_identifier(
@@ -64,6 +73,7 @@ class CurrentPublication:
     kind: str
     metadata_updated_at: datetime
     version: PublishedVersion
+    source: SourceVersion | None = None
 
 
 @dataclass(frozen=True, slots=True)

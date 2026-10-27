@@ -69,12 +69,18 @@ class Links(Contract):
     previous: str | None
 
 
+class SourceMetadata(Contract):
+    dataset_key: str
+    version: int = Field(ge=1)
+
+
 class VersionMetadata(Contract):
     """Selected immutable publication metadata."""
 
     number: int = Field(ge=1)
     published_at: str = Field(examples=["2000-01-01T00:00:00Z"])
     effective_from: str = Field(examples=["2000-01-01"])
+    source: SourceMetadata | None = None
 
 
 class Dataset(Contract):
@@ -104,6 +110,7 @@ class FieldMetadata(Contract):
     display_position: int = Field(ge=1)
     definition: str | None
     unit: str | None
+    mapping_role: Literal["source_identifier", "source_context", "mapping_target"] | None = None
 
 
 class DatasetDetail(Dataset):

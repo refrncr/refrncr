@@ -4,7 +4,7 @@ import re
 from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request, Security
+from fastapi import Depends, FastAPI, Query, Request, Security
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import ValidationError as ModelValidationError
@@ -32,9 +32,15 @@ from refrncr.api.contracts import (
     RecordCollection,
     RecordDetail,
     SelectionQuery,
+    SourceMetadata,
     VersionMetadata,
 )
-from refrncr.api.documentation import CONDITIONAL_PARAMETERS, DESCRIPTION, RESPONSE_HEADERS
+from refrncr.api.documentation import (
+    CONDITIONAL_PARAMETERS,
+    DESCRIPTION,
+    MAPPING_LOOKUP_EXAMPLE,
+    RESPONSE_HEADERS,
+)
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead
 from refrncr.api_keys import ApiKeyAuthenticationError
 from refrncr.clock import SYSTEM_CLOCK, Clock
@@ -50,6 +56,11 @@ def _version(publication):
         number=version.number,
         published_at=get_datatype("timestamp").text(version.published_at),
         effective_from=version.effective_date.isoformat(),
+        source=SourceMetadata(
+            dataset_key=publication.source.dataset_key, version=publication.source.version
+        )
+        if publication.source
+        else None,
     )
 
 
@@ -113,18 +124,22 @@ def _hierarchy_record(record, fields, nodes_by_id, paths):
     )
 
 
-def _query(request, collection):
+def _query(request, collection, *, lookup=False):
     pairs = list(request.query_params.multi_items())
     allowed = {"effective_date", "version"}
     if collection:
         allowed |= {"offset", "limit"}
+    if lookup:
+        allowed.add("source")
     values = {}
     if len(request.scope.get("query_string", b"")) > 256:
         raise ValidationError("Invalid request")
     for key, value in pairs:
         if key not in allowed or key in values:
             raise ValidationError("Invalid request")
-        if key == "effective_date":
+        if key == "source":
+            values[key] = value
+        elif key == "effective_date":
             try:
                 parsed = date.fromisoformat(value)
             except ValueError:
@@ -136,6 +151,7 @@ def _query(request, collection):
             if re.fullmatch(r"0|[1-9][0-9]{0,9}", value) is None:
                 raise ValidationError("Invalid request")
             values[key] = int(value)
+    values.pop("source", None)
     if collection:
         query = CollectionQuery(**values)
         page = query
@@ -230,14 +246,16 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
         code = "method_not_allowed" if error.status_code == 405 else "not_found"
         return CanonicalJSONResponse(Error(error=code), status_code=error.status_code)
 
-    def read(request, actor, kind, key=None, identifier=None):
-        page, effective_date, version_number = _query(request, kind in {"datasets", "records"})
+    def read(request, actor, kind, key=None, identifier=None, source=None):
+        page, effective_date, version_number = _query(
+            request, kind in {"datasets", "records"}, lookup=kind == "lookup"
+        )
         condition = ConditionalRead(
             request,
             actor_id=actor.id,
             kind=kind,
             key=key,
-            identifier=identifier,
+            identifier=source if kind == "lookup" else identifier,
             page=page,
             effective_date=effective_date,
             version_number=version_number,
@@ -250,6 +268,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
             limit=page.limit,
             records=kind == "records",
             identifier=identifier,
+            source=source,
             unchanged=condition,
             effective_date=effective_date,
             version_number=version_number,
@@ -277,6 +296,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
                     display_position=f.display_position,
                     definition=f.definition,
                     unit=f.unit,
+                    mapping_role=f.mapping_role,
                 )
                 for f in result.fields
             )
@@ -342,6 +362,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
                             display_position=f.display_position,
                             definition=f.definition,
                             unit=f.unit,
+                            mapping_role=f.mapping_role,
                         )
                         for f in result.fields
                     ),
@@ -458,6 +479,43 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
         selection: Annotated[SelectionQuery, Depends()] = None,
     ):
         return read(request, actor, "record", dataset_key, identifier)
+
+    @app.get(
+        "/datasets/{dataset_key}/lookup",
+        response_model=RecordDetail,
+        responses={
+            **errors,
+            200: {
+                **errors[200],
+                "content": {"application/json": {"example": MAPPING_LOOKUP_EXAMPLE}},
+            },
+        },
+        summary="Look up a mapping by source value",
+        tags=["Published data"],
+        openapi_extra=conditional,
+        description=(
+            "Targeted mapping lookup, not a general filter. For example, source=1001 "
+            "returns the mapping record with target AMS-SALES. The source value uses the "
+            "source_identifier Field datatype of the selected publication. Invalid values "
+            "return 400; unknown values and non-mapping datasets return 404. An unmapped "
+            "source returns 200 with null target values. Uses the same version selection, "
+            "export access and conditional requests as a Record read; access to the source "
+            "dataset is not required."
+        ),
+    )
+    def lookup(
+        request: Request,
+        dataset_key: str,
+        source: Annotated[
+            str,
+            Query(
+                description="One source identifier value, e.g. 1001 → AMS-SALES.", examples=["1001"]
+            ),
+        ],
+        actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        selection: Annotated[SelectionQuery, Depends()] = None,
+    ):
+        return read(request, actor, "lookup", dataset_key, source=source)
 
     @app.get(
         "/datasets/{dataset_key}/hierarchy",

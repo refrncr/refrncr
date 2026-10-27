@@ -25,6 +25,7 @@ from refrncr.version_contracts import (
     PublishedVersion,
     SnapshotContent,
     SnapshotField,
+    SourceVersion,
     SummaryCounts,
 )
 
@@ -90,6 +91,17 @@ class SqlAlchemyVersionOperations:
             ):
                 result[row.dataset_id].append(self._version(row))
         return dict(result)
+
+    def source_references(self, source_version_ids):
+        """Only public source keys/numbers, batched within the caller's read snapshot."""
+        if not source_version_ids:
+            return {}
+        rows = self.session.execute(
+            select(DatasetVersion.id, Dataset.key, DatasetVersion.number)
+            .join(Dataset, Dataset.id == DatasetVersion.dataset_id)
+            .where(DatasetVersion.id.in_(source_version_ids))
+        )
+        return {version_id: SourceVersion(key, number) for version_id, key, number in rows}
 
     def source_updates(self, source_version_ids):
         if not source_version_ids:
