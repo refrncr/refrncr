@@ -1,6 +1,11 @@
 version: 2
 
 updates:
+  - package-ecosystem: "npm"
+    directory: "/tests/javascript"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

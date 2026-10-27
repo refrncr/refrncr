@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Enforce same-origin CSP and browser security headers on the webapp (REF-49), including
+  frame protection, HTTPS-only HSTS and nosniff on downloads. Add a mandatory CSP browser
+  smoke test while preserving the separate API and documentation policies.
+
 - Fix individual API reads of hierarchy records without business identifiers (REF-309).
   Identifiers from record lists and hierarchy snapshots now resolve within the selected
   version, preserving the existing response, authorization and conditional-read contracts.

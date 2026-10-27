@@ -38,6 +38,7 @@ from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
+    WEB_HTML_HEADERS,
     BrowserCookiePolicy,
 )
 from refrncr.change_status import (
@@ -400,6 +401,17 @@ def create_flask_app(
         if settings is None:
             abort(403, description="Authenticated browser access requires HTTPS")
         return settings
+
+    @app.after_request
+    def protect_browser_response(response):
+        # Flask only: the mounted API and documentation own their response policies.
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        if request.is_secure:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        if response.mimetype == "text/html":
+            response.headers.update(WEB_HTML_HEADERS)
+            response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
 
     @app.after_request
     def clear_stale_session_cookie(response):

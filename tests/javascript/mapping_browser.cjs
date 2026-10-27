@@ -1,6 +1,6 @@
 /* Disposable loopback browser checks for the shared mapping table variant. */
 const assert = require('node:assert/strict');
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5193';
 if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw Error('Loopback only');
 (async () => {

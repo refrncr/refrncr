@@ -1,5 +1,5 @@
 // Run against tests/browser_mapping_usage_app.py with an existing Playwright installation.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 (async () => {
   const browser = await chromium.launch({executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE, headless:true});

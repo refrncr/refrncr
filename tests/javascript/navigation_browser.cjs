@@ -1,6 +1,6 @@
 // Optional real-browser regression check; no Playwright dependency is added to the project.
 // Run against a disposable, initialized local app with an administrator account.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL;
 const email = process.env.REFRNCR_BROWSER_EMAIL;
 const password = process.env.REFRNCR_BROWSER_PASSWORD;

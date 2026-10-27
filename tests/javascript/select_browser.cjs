@@ -1,13 +1,13 @@
 // REF-246: run tests/browser_select_app.py, then this script with the existing optional Playwright setup.
 // REFRNCR_AXE_SOURCE adds axe-core checks; REFRNCR_CHROMIUM points at a local Chromium if needed.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5246';
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw Error('Loopback fixture required');
 
 async function axe(page, label) {
   if (!process.env.REFRNCR_AXE_SOURCE) return;
-  if (!await page.evaluate(() => Boolean(window.axe))) await page.addScriptTag({path: process.env.REFRNCR_AXE_SOURCE});
+  if (!await page.evaluate(() => Boolean(window.axe))) await require('./browser_policy.cjs').injectAxe(page);
   const violations = await page.evaluate(async () => (await axe.run(document, {preload: false, runOnly: {type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']}})).violations.map(v => ({id: v.id, nodes: v.nodes.map(n => n.target)})));
   assert.deepEqual(violations, [], `${label}: accessibility violations`);
 }

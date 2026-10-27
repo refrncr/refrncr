@@ -1,5 +1,5 @@
 // REF-158 real Chrome regression. Start tests/browser_source_formats_app.py first.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const {spawnSync} = require('node:child_process');
 const nativeWorkbook = spawnSync(process.env.REFRNCR_PYTHON || '.venv/bin/python', ['-c', `

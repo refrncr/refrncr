@@ -1,9 +1,11 @@
 """Disposable in-memory REF-246 browser fixture for the Select component; never use real data."""
 
-from flask import jsonify, request, url_for
+from pathlib import Path
+
+from flask import jsonify, request, send_from_directory, url_for
 from support import dataset_browser
 
-from refrncr.web import authenticated_route, create_flask_app
+from refrncr.web import authenticated_route, create_flask_app, public_route
 
 factory, s, admin, _ = dataset_browser.__wrapped__()
 for i in range(3):
@@ -57,9 +59,11 @@ PAGE = """<!doctype html>
   <title>Select fixture</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
   <script src="{{ url_for('static', filename='js/select.js') }}" defer></script>
+  <link rel="stylesheet" href="/fixture-assets/select-fixture.css">
+  <script src="/fixture-assets/select-fixture.js" defer></script>
 </head>
 <body>
-<main id="content" style="max-width: 40rem; padding: 24px;">
+<main id="content">
   <h1>Select fixture</h1>
   <form id="fixture-form" action="{{ url_for('select_fixture_echo') }}" method="get">
     {{ select_field('Country', 'country', 'country', countries, placeholder='Choose a country',
@@ -68,9 +72,8 @@ PAGE = """<!doctype html>
     {{ select_field('Target field', 'target', 'target', fields, compact=true, noun='fields') }}
     <button class="button button-primary" type="submit">Send</button>
   </form>
-  <div id="fixture-panel"
-       style="height: 320px; margin-top: 24px; overflow-y: auto; border: 1px solid;">
-    <div style="height: 240px;"></div>
+  <div id="fixture-panel">
+    <div class="fixture-spacer"></div>
     {{ select_field('Owner team', 'team', 'team', teams) }}
   </div>
   <label>Data type <select name="data_type" data-select>
@@ -81,26 +84,15 @@ PAGE = """<!doctype html>
   <button class="button button-secondary" type="button" id="focus-native">Focus native</button>
   <p id="changes">0</p>
 </main>
-<script>
-  document.getElementById("add-option").addEventListener("click", () => {
-    const option = document.createElement("option");
-    option.value = "late";
-    option.textContent = "Late team";
-    document.getElementById("team").append(option);
-  });
-  document.getElementById("set-value").addEventListener("click", () => {
-    document.getElementById("country").value = "DE";
-  });
-  document.getElementById("focus-native").addEventListener("click", () => {
-    document.getElementById("status").focus();
-  });
-  document.getElementById("status").addEventListener("change", () => {
-    const counter = document.getElementById("changes");
-    counter.textContent = String(Number(counter.textContent) + 1);
-  });
-</script>
+
 </body>
 </html>"""
+
+
+@app.get("/fixture-assets/<path:filename>")
+@public_route
+def fixture_asset(filename):
+    return send_from_directory(Path(__file__).parent / "browser_assets", filename)
 
 
 @app.get("/select-fixture")

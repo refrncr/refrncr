@@ -110,3 +110,56 @@ checks and rejected signed review/import workflow identities are recorded in the
 administrator-only Audit history. Events contain no cookie, session ID, CSRF value, password,
 submitted account identifier, client IP, raw path or request data. Ordinary required-field and
 other non-security form validation remains outside the security audit.
+
+## Browser response policy
+
+Flask HTML responses, including login, redirects and error pages, enforce a same-origin
+Content Security Policy. Scripts, styles, fonts and connections use local assets; images
+also allow data URLs. Inline scripts, inline handlers, inline styles, embedded objects,
+base-URL overrides and framing are prohibited. Forms submit to the same origin.
+`X-Frame-Options: DENY` supplements `frame-ancestors 'none'`. HTML responses also disable
+camera, microphone and geolocation through Permissions-Policy and use
+`Cross-Origin-Opener-Policy: same-origin`. The default Referrer-Policy is `same-origin`;
+existing `no-referrer` rules for sensitive pages remain stricter.
+
+Every Flask response, including downloads, static assets and conditional responses, sends
+`X-Content-Type-Options: nosniff`. Every HTTPS Flask response sends
+`Strict-Transport-Security: max-age=31536000`, without `includeSubDomains` or `preload`.
+Loopback HTTP does not send HSTS. Scheme detection uses the existing trusted request
+scheme; forwarding headers do not enable HSTS. If TLS terminates at a proxy and the
+application sees HTTP, the proxy must supply HSTS on its HTTPS responses. Transport and
+proxy deployment guidance belongs to REF-46; this policy does not enable proxy-header
+trust or TLS termination in the application.
+
+The separately mounted API and API documentation retain their own security headers and
+CSP. No API response contract or authentication/authorization rule changes.
+
+## CSP verification
+
+`tests/test_web_security_headers.py` verifies real responses and guards production
+HTML templates against inline scripts, event handlers, style attributes and style blocks.
+The mandatory `browser-csp` CI job runs a pinned Playwright Chromium smoke test. It exercises
+login, external scripts/styles, keyboard controls and form submission, checks that normal
+navigation raises no CSP violations, and verifies that inline script/style injection and
+framing are blocked. Keep this job required in branch protection alongside the existing CI
+checks when enabling it on GitHub.
+
+Install browser-only test dependencies and run the same smoke test locally:
+
+```shell
+npm ci --ignore-scripts --prefix tests/javascript
+node tests/javascript/node_modules/playwright/cli.js install chromium
+.venv/bin/python tests/run_browser_tests.py web_csp
+```
+
+Run all existing acceptance scripts against fresh disposable, loopback-only applications:
+
+```shell
+.venv/bin/python tests/run_browser_tests.py --all
+```
+
+These acceptance scripts share a CSP violation guard. Test assets use same-origin URLs;
+optional axe accessibility injection also uses a same-origin intercepted test URL, without
+disabling CSP. A specific existing Playwright installation or Chromium executable can be
+selected with `REFRNCR_PLAYWRIGHT_MODULE` or `REFRNCR_BROWSER_EXECUTABLE`. Playwright is a
+test-only Node dependency and is not included in the Python runtime package.

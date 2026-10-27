@@ -1,6 +1,6 @@
 // REF-141: use a fresh tests/browser_table_rows_app.py disposable fixture.
 // REF-165: Delete dataset lives in Settings; editing is inline, not a panel.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
