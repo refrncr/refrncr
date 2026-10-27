@@ -42,6 +42,8 @@
     "refrncr.hierarchy_import.HierarchyImportService.preview",
     "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
     "refrncr.hierarchy_import.HierarchyImportService.state",
+    "refrncr.installation_settings.InstallationSettingsService.change_policy",
+    "refrncr.installation_settings.InstallationSettingsService.get_policy",
     "refrncr.overview.OverviewService.read",
     "refrncr.overview.OverviewService.record_visit",
     "refrncr.record_import.DatasetRecordImportService.active",
@@ -1543,6 +1545,20 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.SessionService.resolve_with_session",
         "refrncr.overview.OverviewService.read"
+      ]
+    },
+    {
+      "symbol": "refrncr.web.dataset_access_settings",
+      "path": "/settings/dataset-access",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "operations": [
+        "refrncr.installation_settings.InstallationSettingsService.change_policy",
+        "refrncr.installation_settings.InstallationSettingsService.get_policy",
+        "refrncr.services.AuthorizationService.has_capability",
+        "refrncr.services.SessionService.resolve_with_session"
       ]
     }
   ],

@@ -104,6 +104,7 @@ def test_historical_action_names_and_object_types_are_stable():
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted restored",
         "dataset_export_access": "granted revoked",
+        "installation_settings": "export_access_policy_changed",
     }
     assert set(EVENTS) == {
         (kind, action) for kind, actions in expected.items() for action in actions.split()
@@ -271,6 +272,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.hierarchy.HierarchyService.update_node_and_values",
             "refrncr.hierarchy.HierarchyService.update_values",
             "refrncr.hierarchy_import.HierarchyImportService.confirm",
+            "refrncr.installation_settings.InstallationSettingsService.change_policy",
         }
     )
     assert behaviors == {

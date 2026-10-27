@@ -419,3 +419,12 @@ Keys use the existing `[a-z0-9][a-z0-9_]{0,99}` contract and cannot repeat. This
 metadata is derived from the active schema; names, source headers and Record values are excluded.
 Historical events without this property remain readable and are not rewritten. The single
 summary stays transactional with the import, including on rollback or stale confirmation.
+
+## Installation export policy (REF-294)
+
+A successful policy transition writes `installation_settings:export_access_policy_changed`
+with the singleton UUID and exactly `previous_policy` and `policy`, restricted to
+`everyone`, `team_grants`, and `admin_grants`. The policy update and event commit together.
+Rejected, unconfirmed, stale and no-op requests do not emit a domain event. Existing
+`dataset_export_access:granted` and `:revoked` events also cover delegated team-member
+administration. Read-only inspection of grants by owning-team members emits no event.

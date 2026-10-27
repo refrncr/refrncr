@@ -405,7 +405,7 @@ def test_history_and_record_reads_have_constant_query_count(database_context):
     assert grown_history == history_queries
     assert grown_records == record_queries
     assert history_queries == 10
-    assert record_queries == 14  # Includes current view/maintenance/export capability reads.
+    assert record_queries == 15  # Includes one installation policy read for export authorization.
 
 
 @pytest.mark.parametrize("state", ["inactive", "deleted"])

@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 from argon2 import PasswordHasher
 from argon2.low_level import Type
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_owned_dataset, use_admin_export_policy
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
@@ -297,8 +297,10 @@ def database_audit_db(request, tmp_path):
     yield from _build_audit_db(request.param, tmp_path)
 
 
-def _audit_context(database):
+def _audit_context(database, *, export_policy="admin_grants"):
     engine, sessions, services = database
+    if export_policy == "admin_grants":
+        use_admin_export_policy(services)
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     owner = services.teams.create_team(admin.id, "Domain")
@@ -330,6 +332,7 @@ def database_context(database_audit_db):
 
 def _audit_history(database):
     engine, sessions, services = database
+    use_admin_export_policy(services)
     admin, reader = str(uuid4()), str(uuid4())
     with sessions.begin() as session:
         for uid, role in ((admin, "admin"), (reader, "user")):
@@ -368,6 +371,7 @@ def record_services():
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
+    use_admin_export_policy(services)
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin(
         "admin@example.com", "Admin", "correct horse battery staple"
@@ -388,6 +392,7 @@ def postgresql_record_services():
         Base.metadata.create_all(engine)
         factory = create_session_factory(engine)
         services = create_community_services(factory, ResourceTypeRegistry())
+        use_admin_export_policy(services)
         services.users.bootstrap_organisation()
         admin = services.users.create_initial_admin(
             "admin@example.com", "Admin", "correct horse battery staple"
@@ -422,6 +427,7 @@ def _build_governance(database, tmp_path):
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
+    use_admin_export_policy(services)
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     owner = services.teams.create_team(admin.id, "Data domain")
@@ -459,3 +465,13 @@ def pytest_collection_modifyitems(config, items):
             continue
         if not postgres_configured:
             item.add_marker(pytest.mark.skip(reason=POSTGRES_SKIP_REASON))
+
+
+@pytest.fixture
+def installation_context(database_audit_db):
+    return _audit_context(database_audit_db, export_policy="everyone")
+
+
+@pytest.fixture
+def installation_ui_context(audit_db):
+    return _audit_context(audit_db, export_policy="everyone")

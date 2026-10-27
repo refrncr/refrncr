@@ -645,6 +645,8 @@ def test_source_update_notes_schema_preserves_existing_draft(database_context):
 
     c = database_context
     fixture(c, publish=False)
+    # Round-trip the migration default; REF-294 deliberately resets older installs to Everyone.
+    c.s.installation_settings.change_policy(c.a.id, "admin_grants", "everyone", confirmed=True)
     before = snapshot(c)
     with c.engine.connect() as connection:
         config = config_for(connection)

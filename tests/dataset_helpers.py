@@ -41,7 +41,13 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
-        if current in {"0031_ref_239", "0032_ref_239", "0033_ref_301", "0034_ref_238"}:
+        if current in {
+            "0031_ref_239",
+            "0032_ref_239",
+            "0033_ref_301",
+            "0034_ref_238",
+            "0035_ref_294",
+        }:
             command.downgrade(config, "0030_ref_205")
             current = "0030_ref_205"
         if current == "0030_ref_205":
@@ -212,3 +218,10 @@ def create_mapping_dataset(
         source_dataset_id=source.id,
         source_field_key=source_key,
     )
+
+
+def use_admin_export_policy(services):
+    """Seed restrictive fixture policy for pre-REF-294 grant/authorization regressions."""
+    with services.users.uow(write=True, serialized=True) as work:
+        current = work.installation_settings.get_policy(for_update=True)
+        work.installation_settings.change_policy(current, "admin_grants")
