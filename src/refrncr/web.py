@@ -133,6 +133,7 @@ from refrncr.services import (
 )
 from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.xml_security import require_xml_protection
 
 
 def merge_error_messages(*messages):
@@ -249,6 +250,7 @@ def create_flask_app(
     api_keys: ApiKeyService | None = None,
     clock: Clock | None = None,
 ) -> Flask:
+    require_xml_protection()
     app = Flask(__name__)
     clock = clock or getattr(
         api_keys, "clock", getattr(getattr(users, "uow", None), "clock", SYSTEM_CLOCK)

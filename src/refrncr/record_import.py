@@ -16,7 +16,6 @@ from datetime import date, datetime
 from datetime import time as datetime_time
 from pathlib import PurePath
 from types import MappingProxyType
-from xml.etree.ElementTree import ParseError
 
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
@@ -47,6 +46,7 @@ from refrncr.source_formats import (
     temporal_controls,
 )
 from refrncr.upload_names import safe_upload_filename
+from refrncr.xml_security import require_xml_protection
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_DATA_ROWS = 10_000
@@ -947,11 +947,14 @@ def _inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
 
 
 def inspect_xlsx(content: bytes, worksheet: str | None = None) -> ParsedSource:
+    require_xml_protection()
     try:
         return _inspect_xlsx(content, worksheet)
     except ImportValidationError:
         raise
-    except (EOFError, InvalidFileException, KeyError, OSError, ParseError, ValueError) as exc:
+    # SyntaxError covers ElementTree.ParseError and the optional lxml.XMLSyntaxError.
+    # DefusedXmlException derives from ValueError, including during worksheet iteration.
+    except (EOFError, InvalidFileException, KeyError, OSError, SyntaxError, ValueError) as exc:
         raise ImportValidationError(UNREADABLE_XLSX_MESSAGE) from exc
 
 
