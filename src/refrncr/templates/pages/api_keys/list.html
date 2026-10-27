@@ -4,6 +4,7 @@
 {% block settings_actions %}{% if not unavailable %}{{ button("Create API key", url_for("api_key_create")) }}{% endif %}{% endblock %}
 {% block settings_content %}
   {% if unavailable %}{{ feedback("API keys require server configuration. Contact your administrator.") }}{% else %}
+  {% if requires_export_access %}<p>A key reads the datasets you can export.</p>{% endif %}
   {% if revoked %}{{ feedback("API key permanently revoked.", "success", id="key-status", focus=true) }}{% endif %}
   <p>Keys use your current permissions. Keep at most five active keys. To rotate, create a replacement, update your integration, then revoke the old key.</p>
   {% if keys %}

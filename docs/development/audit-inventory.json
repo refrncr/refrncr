@@ -44,6 +44,7 @@
     "refrncr.hierarchy_import.HierarchyImportService.state",
     "refrncr.installation_settings.InstallationSettingsService.change_policy",
     "refrncr.installation_settings.InstallationSettingsService.get_policy",
+    "refrncr.installation_settings.InstallationSettingsService.requires_export_access",
     "refrncr.overview.OverviewService.read",
     "refrncr.overview.OverviewService.record_visit",
     "refrncr.record_import.DatasetRecordImportService.active",
@@ -76,6 +77,7 @@
     "refrncr.services.DatasetAuthorizationService.can_manage_export_access",
     "refrncr.services.DatasetAuthorizationService.can_view_dataset",
     "refrncr.services.DatasetAuthorizationService.creation_teams",
+    "refrncr.services.DatasetAuthorizationService.exportable_resources",
     "refrncr.services.DatasetAuthorizationService.maintainable_resources",
     "refrncr.services.DatasetAuthorizationService.viewable_resources",
     "refrncr.services.DatasetBusinessKeyService.get_business_key",
@@ -1361,6 +1363,7 @@
       ],
       "operations": [
         "refrncr.api_keys.ApiKeyService.list_keys",
+        "refrncr.installation_settings.InstallationSettingsService.requires_export_access",
         "refrncr.services.SessionService.resolve_with_session"
       ]
     },
@@ -1400,7 +1403,7 @@
       "operations": [
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
-        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
       ]
     },
     {
@@ -1412,7 +1415,7 @@
       "operations": [
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
-        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
       ]
     },
     {
@@ -1424,7 +1427,7 @@
       "operations": [
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
-        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
       ]
     },
     {
@@ -1436,7 +1439,7 @@
       "operations": [
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
-        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
       ]
     },
     {
@@ -1448,7 +1451,7 @@
       "operations": [
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
-        "refrncr.services.DatasetAuthorizationService.viewable_resources"
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
       ]
     },
     {

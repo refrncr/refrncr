@@ -24,6 +24,13 @@ class InstallationSettingsService:
                 raise AuthorizationError("Administrator access required")
             return work.installation_settings.get_policy()
 
+    def requires_export_access(self, actor_id):
+        """Limited policy information for the active user's API-key explanation."""
+        with self.uow() as work:
+            if not self.authorization.can_access_community(actor_id, uow=work):
+                raise AuthorizationError("Active user access required")
+            return work.installation_settings.get_policy() != "everyone"
+
     def change_policy(self, actor_id, expected_policy, policy, *, confirmed=False):
         with self.uow(write=True, serialized=True) as work:
             current = work.installation_settings.get_policy(for_update=True)

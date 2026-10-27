@@ -846,6 +846,12 @@ _register(
     "intentionally excluded",
     rationale="Bulk current Community Dataset view decision; no mutation or domain event.",
 )
+_register(
+    "DatasetAuthorizationService",
+    "exportable_resources",
+    "intentionally excluded",
+    rationale="Bulk current export authority for published API reads; no mutation or domain event.",
+)
 
 _register(
     "OverviewService",
@@ -868,6 +874,13 @@ _register(
     "intentionally excluded",
     module="installation_settings",
     rationale="Administrator-only installation policy read; no mutation or domain event.",
+)
+_register(
+    "InstallationSettingsService",
+    "requires_export_access",
+    "intentionally excluded",
+    module="installation_settings",
+    rationale="Active-user policy explanation flag; no settings mutation or domain event.",
 )
 _audited(
     "InstallationSettingsService",

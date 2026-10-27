@@ -422,7 +422,7 @@ def test_missing_unpublished_cancelled_and_denied(api, monkeypatch):
     assert get(c, "/unpublished").status_code == 404
     assert len(get(c).json()["data"]) == 1
     prior = get(c, "/audit")
-    monkeypatch.setattr(c.service.authorization, "can_view_dataset", lambda *a, **kw: False)
+    monkeypatch.setattr(c.service.authorization, "can_export_dataset", lambda *a, **kw: False)
     denied = get(c, "/audit", headers={**c.headers, "If-None-Match": prior.headers["etag"]})
     assert denied.status_code == 404
     assert denied.content == get(c, "/missing").content
