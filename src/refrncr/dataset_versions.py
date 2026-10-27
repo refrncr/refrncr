@@ -199,7 +199,7 @@ class DatasetVersionService:
         with self.uow(translate_errors=True) as uow:
             uow.begin_export_snapshot()
             if key is None:
-                allowed = self.authorization.viewable_resources(actor_id, uow=uow)
+                allowed = self.authorization.exportable_resources(actor_id, uow=uow)
                 dataset_ids = None if allowed.all_resources else allowed.resource_ids
                 if effective_date is not None:
                     pairs, total = uow.versions.selected_page(
@@ -236,7 +236,7 @@ class DatasetVersionService:
                     dataset is None
                     or (hierarchy and dataset.kind != "hierarchy")
                     or (not allow_hierarchy and dataset.kind == "hierarchy")
-                    or not self.authorization.can_view_dataset(actor_id, dataset.id, uow=uow)
+                    or not self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
                 ):
                     raise NotFoundError("Dataset not found")
                 if effective_date is not None:

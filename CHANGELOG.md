@@ -4,6 +4,11 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- For rc1, add Settings → Dataset access for file export and API reads (REF-294/REF-306).
+  New and upgraded installations default to Everyone: every active user can consume
+  published datasets. Stricter modes require owning-team membership or an explicit grant,
+  with administrators retaining access. API keys follow their owner's current rights;
+  app reading and API version selection remain unchanged.
 - Use “dataset” terminology and “Type” labels consistently; return hierarchy API nodes in a fixed order.
 - Centralize change statuses in a domain enum and map them to the Added/Changed/Deleted UI labels.
 - Give incomplete and oversized Record identifiers distinct, actionable validation messages.

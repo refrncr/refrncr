@@ -23,5 +23,14 @@ from administrators to team members takes effect without confirmation. Existing 
 are always kept and apply again when a stricter mode is selected. If someone changes the
 setting while your form is open, reload the page before trying again.
 
+API keys use their owner's current dataset export rights. In either stricter mode, the
+API keys page explains this below Create API key. Lists include only permitted datasets;
+a direct request for another dataset returns 404. Changes to grants, team membership,
+ownership or this setting apply to the next API request. A read already in progress may
+finish. The API still supports Scheduled publications selected by version or future date;
+file export keeps its existing version restrictions.
+
+Access to a mapping includes the source identifiers and context values copied into it.
+It does not grant access to the source dataset itself.
+
 Release note: this setting and API enforcement (REF-306) are released together in rc1.
-REF-294 alone changes file export; it must not be released without REF-306.

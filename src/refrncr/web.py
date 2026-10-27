@@ -732,7 +732,12 @@ def create_flask_app(
         if api_keys is None:
             return api_key_page(keys=(), unavailable=True), 503
         return api_key_page(
-            keys=api_keys.list_keys(actor.id), revoked=request.args.get("revoked") == "1"
+            keys=api_keys.list_keys(actor.id),
+            revoked=request.args.get("revoked") == "1",
+            requires_export_access=(
+                installation_settings is not None
+                and installation_settings.requires_export_access(actor.id)
+            ),
         )
 
     def api_key_creation_form(actor, session, *, error=None, status=200):

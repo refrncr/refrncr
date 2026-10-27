@@ -614,6 +614,10 @@ class DatasetExportAccessOperations(Protocol):
 
     def applies(self, dataset_id: str, user_id: str, team_ids: tuple[str, ...]) -> bool: ...
 
+    def exportable_dataset_ids(self, user_id: str, team_ids: tuple[str, ...]) -> tuple[str, ...]:
+        """Datasets owned by the user's teams or explicitly granted to the user/teams."""
+        ...
+
     def create(
         self, dataset_id: str, subject_type: str, subject_id: str
     ) -> DatasetExportAccessRecord: ...

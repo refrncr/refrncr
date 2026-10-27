@@ -1,7 +1,8 @@
 # Dataset governance (REF-73)
 
 Teams are data domains in the single Community installation. Every Dataset has one owning team.
-All active, non-deleted users can discover/read metadata, schema, identifiers and records.
+All active, non-deleted users can discover/read metadata, schema, identifiers and records
+in the app. API reading follows current dataset export authority (REF-306).
 Creating a Dataset requires a current membership in its chosen team; administrators may choose
 any existing team. One eligible team is selected automatically, multiple teams require a choice,
 and zero teams blocks creation with a link to Teams. Teams and memberships are never auto-created.
@@ -12,7 +13,8 @@ REF-294 makes export and grant administration depend on the installation policy:
 (the default) permits export by every active user and disables grant administration;
 `team_grants` permits administrators and owning-team members to manage grants;
 `admin_grants` reserves that management for administrators. In either stricter mode, a direct
-user or team export entry permits CSV, Excel and JSON downloads but no maintenance. Removing one entry leaves other applicable access intact. Inactive
+user or team export entry permits CSV, Excel and JSON downloads and API reads, but no
+maintenance. Removing one entry leaves other applicable access intact. Inactive
 and deleted users have no capabilities, even if memberships/export entries remain stored.
 
 `DatasetAuthorizationService` is the authoritative framework-independent decision layer. Mutation

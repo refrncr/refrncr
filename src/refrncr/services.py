@@ -735,6 +735,20 @@ class DatasetAuthorizationService:
                 raise NotFoundError("Dataset not found")
             return AuthorizedResourceSet(True, ())
 
+    def exportable_resources(self, actor_id, *, uow=None):
+        """Bulk export authority in the same snapshot as the published API read."""
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            actor = work.users.get(actor_id)
+            if not self.active(actor):
+                raise NotFoundError("Dataset not found")
+            policy = work.installation_settings.get_policy()
+            if policy == "everyone" or actor.role == "admin":
+                return AuthorizedResourceSet(True, ())
+            teams = work.memberships.team_ids_for_user(actor_id)
+            return AuthorizedResourceSet(
+                False, work.dataset_export_access.exportable_dataset_ids(actor_id, teams)
+            )
+
     def maintainable_resources(self, actor_id, *, uow=None):
         with nullcontext(uow) if uow is not None else self.uow() as work:
             actor = work.users.get(actor_id)

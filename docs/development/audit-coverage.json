@@ -6035,7 +6035,7 @@
       "object_identifier": "Stable Dataset UUID.",
       "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
       "allowed_context": {},
-      "success": "Current-only bounded read; no domain event or per-request successful-authentication audit.",
+      "success": "Bounded selected-publication read after current export authorization; no domain event.",
       "validation_failure": "No change or success event.",
       "authorization_failure": "Non-disclosing not found; no mutation or event.",
       "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
@@ -6045,7 +6045,8 @@
       "tests": [
         "tests/test_rest_api.py::test_endpoints_and_contract",
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
-        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
+        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one",
+        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors"
       ],
       "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
@@ -6056,11 +6057,7 @@
       "operation": "viewable_resources",
       "service": "refrncr.services.DatasetAuthorizationService.viewable_resources",
       "interface_entrypoints": [
-        "refrncr.api.routes.datasets GET /datasets",
-        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
-        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
-        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
-        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+        "Internal Community dataset view decision (no HTTP entrypoint)."
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6894,6 +6891,75 @@
       ],
       "implementation_status": "Implemented in REF-294.",
       "exclusion_reason": ""
+    },
+    {
+      "capability": "DatasetAuthorizationService",
+      "operation": "exportable_resources",
+      "service": "refrncr.services.DatasetAuthorizationService.exportable_resources",
+      "interface_entrypoints": [
+        "refrncr.api.routes.datasets GET /datasets",
+        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing bearer authentication and non-disclosing API authorization errors.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
+      "allowed_context": {},
+      "success": "Return all-resource authority or deduplicated Dataset IDs from current ownership and grants.",
+      "validation_failure": "No mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Current authority is evaluated in the caller read snapshot; subsequent reads observe committed changes.",
+      "no_op": "Read-only decision; repeated reads add no domain event.",
+      "rollback": "No business mutation to commit or roll back.",
+      "duplicate_retry": "Read-only retries evaluate current authority.",
+      "tests": [
+        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors",
+        "tests/test_api_export_access.py::test_revocation_invalidates_detail_and_list_caches",
+        "tests/test_api_export_access.py::test_filtered_pagination_deduplicates_grants_without_n_plus_one"
+      ],
+      "implementation_status": "Implemented in REF-306.",
+      "exclusion_reason": "Bulk current export authority for published API reads; no mutation or domain event.",
+      "persistence_scope": "Read-only installation policy, active user, ownership, membership and explicit export access."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "requires_export_access",
+      "service": "refrncr.installation_settings.InstallationSettingsService.requires_export_access",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_list GET /settings/api-keys"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication; settings mutation remains administrator-only.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active browser user.",
+      "allowed_context": {},
+      "success": "Return only whether export access is restricted, for the API keys explanation.",
+      "validation_failure": "No mutation or domain audit event.",
+      "authorization_failure": "Inactive or deleted users are denied; no settings are changed.",
+      "stale_input": "Current authority is evaluated in the caller read snapshot; subsequent reads observe committed changes.",
+      "no_op": "Read-only decision; repeated reads add no domain event.",
+      "rollback": "No business mutation to commit or roll back.",
+      "duplicate_retry": "Read-only retries evaluate current authority.",
+      "tests": [
+        "tests/test_api_export_access.py::test_api_key_page_explains_restricted_policy",
+        "tests/test_api_export_access.py::test_inactive_users_cannot_read_policy_or_exportable_resources"
+      ],
+      "implementation_status": "Implemented in REF-306.",
+      "exclusion_reason": "Active-user policy explanation flag; no settings mutation or domain event.",
+      "persistence_scope": "Read-only installation policy, active user, ownership, membership and explicit export access."
     }
   ]
 }

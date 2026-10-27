@@ -155,6 +155,13 @@ operational authentication/audit failures return a fixed 503. CLI access logs re
 the entire API target so business identifiers and query attempts are not recorded.
 This local implementation supersedes the future-adapter wording above; public
 OpenAPI/Swagger is public under REF-109; see [documentation security](rest-api.md#public-openapi-and-swagger-ref-109).
+
+REF-306 makes data reads follow the owner's current dataset export right under the
+installation policy. In either stricter mode, Settings → API keys shows “Keys use your
+current permissions and read only the datasets you can export.” below Create API key,
+for administrators and ordinary users. Everyone keeps the shorter sentence “Keys use
+your current permissions.” Key creation and ownership rules remain unchanged;
+the explanation grants no authority to read or change administrator-only settings.
 # Security audit boundary
 
 Creation, revocation and successful authentication retain their existing transactional `api_key.*`

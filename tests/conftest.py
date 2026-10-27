@@ -88,6 +88,11 @@ def dataset_browser():
 
 
 def _build_api(c):
+    # Existing API contracts run in the default Everyone mode. Restricted-policy
+    # authorization has its own explicit role/transition matrix.
+    with c.s.users.uow(write=True) as work:
+        policy = work.installation_settings.get_policy()
+        work.installation_settings.change_policy(policy, "everyone")
     setup(c)
     with c.sessions.begin() as session:
         session.get(Dataset, c.d.id).updated_at = NOW - timedelta(seconds=1)

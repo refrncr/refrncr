@@ -1611,6 +1611,21 @@ class SqlAlchemyDatasetExportAccessOperations:
             is not None
         )
 
+    def exportable_dataset_ids(self, user_id, team_ids):
+        granted = select(DatasetExportAccess.dataset_id).where(
+            or_(
+                DatasetExportAccess.user_id == user_id,
+                DatasetExportAccess.team_id.in_(team_ids),
+            )
+        )
+        return tuple(
+            self.session.scalars(
+                select(Dataset.id)
+                .where(or_(Dataset.owner_team_id.in_(team_ids), Dataset.id.in_(granted)))
+                .order_by(Dataset.id)
+            )
+        )
+
     def create(self, dataset_id, subject_type, subject_id):
         entry = DatasetExportAccess(
             dataset_id=dataset_id,

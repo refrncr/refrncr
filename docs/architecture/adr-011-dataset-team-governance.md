@@ -95,3 +95,26 @@ retained grants survive. No other installation settings or Cloud infrastructure 
 **Release condition:** REF-294 and REF-306 must ship together in `0.1.0rc1`. The interface
 uses its final export-and-API wording. REF-294 does not change API authorization; REF-306
 must make API reads follow the policy before this functionality is released to testers.
+
+## Amendment: API reads follow dataset export authority (REF-306)
+
+All published-data API reads use current export authority, including lists, metadata,
+records, individual records, hierarchies and existing mapping reads. Lists are filtered
+before counting and pagination; a denied detail uses the uniform missing-resource 404.
+Authentication, authorization and resource existence precede conditional 304 responses.
+Authority and content share one read snapshot. Committed changes to grants, memberships,
+ownership or installation policy apply to the next request; an in-flight read may finish.
+
+Dataset authority is separate from version visibility. API version/effective-date
+selection retains Current, Expired and explicitly selected Scheduled publications.
+Concepts and Cancelled publications remain excluded. File export retains its existing
+Scheduled restriction, and browser reading retains its existing view rule.
+
+A mapping's own export right is sufficient to read its copied source identifiers and
+context values from the pinned source snapshot. No additional source export right is
+required. This does not grant independent access to the source Dataset. REF-92 owns the
+new mapping response metadata; REF-306 only governs existing reads.
+
+Active users may read a boolean indicating whether export access is restricted, for the
+API keys explanation. Reading the full installation setting in Settings and changing it
+remain administrator-only. API reads and this explanation add no domain audit events.
