@@ -180,16 +180,14 @@ cffi==2.1.1 \
 click==8.5.0 \
     --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360 \
     --hash=sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34
-    # via
-    #   flask
-    #   uvicorn
+    # via flask, uvicorn
 et-xmlfile==2.0.0 \
     --hash=sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa \
     --hash=sha256:dab3f4764309081ce75662649be815c4c9081e88f0837825f90fd28317d4da54
     # via openpyxl
-fastapi==0.142.2 \
-    --hash=sha256:06366626f2e70576367714d9ab2fe8472e6c8456dba69b399f9f797ab5e92570 \
-    --hash=sha256:bd5f4d81f1e93a88bcd77caf4dfe3c2dbffc3805407a0007e9a114c18b3a670b
+fastapi==0.156.4 \
+    --hash=sha256:a09d29fdd6635e94ae00199bae331a04350e0e46ba4334d50809007cd3119db5 \
+    --hash=sha256:e7dd3889a6d6f0c2976a89d6fb34be92fb3ee77bb5f9d1a40e68e9af09c96968
     # via -r requirements/release.in
 flask==3.1.3 \
     --hash=sha256:0ef0e52b8a9cd932855379197dd8f94047b359ca0a78695144304cb45f87c9eb \
@@ -305,11 +303,7 @@ markupsafe==3.0.3 \
     --hash=sha256:f71a396b3bf33ecaa1626c255855702aca4d3d9fea5e051b41ac59a9c1c41edc \
     --hash=sha256:f9e130248f4462aaa8e2552d547f36ddadbeaa573879158d721bbd33dfe4743a \
     --hash=sha256:fed51ac40f757d41b7c48425901843666a6677e3e8eb0abcff09e4ba6e664f50
-    # via
-    #   flask
-    #   jinja2
-    #   mako
-    #   werkzeug
+    # via flask, jinja2, mako, werkzeug
 openpyxl==3.1.5 \
     --hash=sha256:5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2 \
     --hash=sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050
@@ -318,7 +312,7 @@ opentelemetry-api==1.45.1 \
     --hash=sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75 \
     --hash=sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb
     # via fastapi
-psycopg[binary]==3.3.6 \
+psycopg==3.3.6 \
     --hash=sha256:a1db9f7148b06a28606767efaca51fa6f9398c5c0a3810519be69d7000bdb631 \
     --hash=sha256:c081f2250df751a943036e42db6df4571c66cd0aabe8291a7a506512b12007d2
     # via -r requirements/release.in
@@ -397,9 +391,7 @@ pycparser==3.0 \
 pydantic==2.14.1 \
     --hash=sha256:9195d967ec791692a04438115466764fb8b9a27b31f14a760437694f40d6b454 \
     --hash=sha256:94f478203dd03404682a1ada216965651dd74b1d2d5ffd62e00e0837caab5c26
-    # via
-    #   -r requirements/release.in
-    #   fastapi
+    # via -r requirements/release.in, fastapi
 pydantic-core==2.50.1 \
     --hash=sha256:0036473f5583e6a60e50b8b21651511564277a3f05cc5dab8cf579f552cd5f6c \
     --hash=sha256:0048b6dddc8ef4b64fccaad878bd143b0c3882ea9936279dc11d613f6b7dd1bc \
@@ -612,9 +604,7 @@ sqlalchemy==2.1.5 \
     --hash=sha256:f5173a6e60a15090f9e2348a8ca94cc13de72796c16733f3b62fbb22acba07b8 \
     --hash=sha256:f5bc7fb93f1c17efefeb062bc4d2742ad1b71d56c36e6e2898a371ac6a56839a \
     --hash=sha256:fb8dcd5e1cc12fdd4d490819ec7a56e8c02e86ca9087a472e28b422ff932bae0
-    # via
-    #   -r requirements/release.in
-    #   alembic
+    # via -r requirements/release.in, alembic
 starlette==1.6.0 \
     --hash=sha256:a86dd39d14bb45f85a3d18525215a9ef0cfd1f192ac793220e72598c90335f0c \
     --hash=sha256:d4e3ac5e546444960c710297a3c9fc3f7ebae1b7e963f3d36173b49da535be9b
@@ -622,23 +612,11 @@ starlette==1.6.0 \
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
-    # via
-    #   alembic
-    #   anyio
-    #   fastapi
-    #   opentelemetry-api
-    #   psycopg
-    #   pydantic
-    #   pydantic-core
-    #   sqlalchemy
-    #   starlette
-    #   typing-inspection
+    # via alembic, anyio, fastapi, opentelemetry-api, psycopg, pydantic, pydantic-core, sqlalchemy, starlette, typing-inspection
 typing-inspection==0.4.4 \
     --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47 \
     --hash=sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147
-    # via
-    #   fastapi
-    #   pydantic
+    # via fastapi, pydantic
 uvicorn==0.54.0 \
     --hash=sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf \
     --hash=sha256:a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620
