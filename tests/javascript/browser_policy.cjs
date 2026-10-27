@@ -6,6 +6,14 @@ const playwright = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright'
 async function guardContext(context, violations) {
   await context.exposeBinding('__recordCspViolation', (_source, directive) => violations.push(directive));
   await context.addInitScript(() => {
+    // An outgoing cross-document transition is skipped when its document is hidden
+    // or the destination does not opt in (for example a JSON form response).
+    // Handle only that transition's ready promise, not general page errors.
+    window.addEventListener('pageswap', event => {
+      event.viewTransition?.ready.catch(error => {
+        if (!['AbortError', 'InvalidStateError'].includes(error.name)) throw error;
+      });
+    });
     document.addEventListener('securitypolicyviolation', event => {
       window.__recordCspViolation(event.effectiveDirective);
     });
