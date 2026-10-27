@@ -49,7 +49,7 @@ jobs:
           npm ci --ignore-scripts --prefix tests/javascript
           node tests/javascript/node_modules/playwright/cli.js install --with-deps chromium
       - name: Test enforced browser CSP
-        run: python tests/run_browser_tests.py web_csp
+        run: python tests/run_browser_tests.py web_csp view_transitions
 
   test-sqlite:
     runs-on: ubuntu-latest

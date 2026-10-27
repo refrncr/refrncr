@@ -57,6 +57,7 @@ PAGE = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Select fixture</title>
+  <script src="{{ url_for('static', filename='js/view-transitions.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
   <script src="{{ url_for('static', filename='js/select.js') }}" defer></script>
   <link rel="stylesheet" href="/fixture-assets/select-fixture.css">
@@ -65,7 +66,8 @@ PAGE = """<!doctype html>
 <body>
 <main id="content">
   <h1>Select fixture</h1>
-  <form id="fixture-form" action="{{ url_for('select_fixture_echo') }}" method="get">
+  <form id="fixture-form" data-no-view-transition
+        action="{{ url_for('select_fixture_echo') }}" method="get">
     {{ select_field('Country', 'country', 'country', countries, placeholder='Choose a country',
                     required=true, noun='countries') }}
     {{ select_field('Status', 'status', 'status', statuses, selected='published') }}

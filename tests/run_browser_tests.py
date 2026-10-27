@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Each script gets a fresh in-memory application, including scripts sharing a fixture.
 CASES = {
     "web_csp": ("select", 5246),
+    "view_transitions": ("table_rows", 5144),
     "access_management": ("table_rows", 5144),
     "api_docs": ("rest_api", 5147),
     "api_keys": ("api_keys", 5140),

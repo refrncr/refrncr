@@ -526,6 +526,8 @@ def test_shared_navigation_controls_and_local_bootstrap(dataset_browser, path):
     script = '<script src="/static/js/navigation.js"></script>'
     assert script in page
     assert page.index(script) < page.index('<link rel="stylesheet"')
+    lifecycle = '<script src="/static/js/view-transitions.js"></script>'
+    assert page.index(lifecycle) < page.index(script)
 
 
 def test_shared_shell_navigation_follows_effective_role(dataset_browser):

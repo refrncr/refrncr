@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}REFRNCR{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
+    <script src="{{ url_for('static', filename='js/view-transitions.js') }}"></script>
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     {# Preload the Latin fonts every page paints first, so a page load does not show a
        fallback font and then shift when the web font arrives. #}

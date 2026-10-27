@@ -4,6 +4,7 @@ from dataset_helpers import create_owned_dataset, publish_dataset
 from support import _dataset_browser as dataset_browser
 from support import create_dataset, create_field
 
+from refrncr.api_keys import ApiKeyService
 from refrncr.web import create_flask_app
 
 _factory, s, admin, _ = dataset_browser()
@@ -88,6 +89,7 @@ app = create_flask_app(
     s.teams,
     s.memberships,
     authorization=s.authorization,
+    api_keys=ApiKeyService(s.users.uow, pepper=b"disposable-browser-fixture-pepper"),
     datasets=s.datasets,
     dataset_fields=s.dataset_fields,
     dataset_business_keys=s.dataset_business_keys,

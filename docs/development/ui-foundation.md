@@ -12,6 +12,57 @@ business rules, templates own markup, and the shared CSS and JavaScript own
 reusable presentation and interaction behaviour. New screens should extend
 these existing patterns instead of creating parallel conventions.
 
+## Cross-document navigation lifecycle
+
+The shared shell retains CSS cross-document transitions (`navigation: auto`)
+with no root animation. This keeps the old page visible until the new page is
+ready, avoiding a flash during criteria changes. It does not introduce animated
+navigation. Browsers without this capability use ordinary navigation; the
+controller skips transitions when reduced motion is requested.
+
+`view-transitions.js` is a blocking, same-origin head script, loaded before
+styles and the navigation controller. It observes the current incoming
+`document.activeViewTransition` immediately, then `pageswap` and `pagereveal`.
+These are separate transition objects in the departing and arriving documents.
+Only the expected rejection of each transition's `ready` promise is handled:
+
+- `AbortError` when explicitly skipped, departing, or hidden;
+- Chromium's `InvalidStateError` ending in `ViewTransition opt-in disabled`.
+
+Other failures, including duplicate transition names, are rethrown. There is no
+global `error` or `unhandledrejection` suppression. Panel operations retain the
+existing native-dialog behaviour; they do not start a second transition.
+
+API-key pages keep their CSS `navigation: none` security boundary. Their
+navigation link also has `data-no-view-transition`. Use that attribute on links
+or forms with known non-HTML destinations, which cannot run an incoming script.
+Normal HTML links and forms keep the shared no-flash behaviour. Downloads do not
+replace the document and retain their existing behaviour.
+
+### REF-311 reproduction and regression
+
+With the former test-only `pageswap` handler removed, submit the select fixture
+(`/select-fixture`) to its JSON echo response. Chromium 156.0.8078.4 reproduced
+`InvalidStateError: ... ViewTransition opt-in disabled` on eight consecutive
+submissions. The incoming transition existed at document initialization but
+was already cleared at `pagereveal`. Observing only the departing transition,
+or waiting for `pagereveal`, therefore missed the rejected promise. The fixture
+now uses the production head script and marks its JSON form as a non-HTML
+destination; the shared browser helper only checks CSP.
+
+Run `python tests/run_browser_tests.py web_csp view_transitions audit_export`.
+The required CI `browser-csp` job runs both `web_csp` and `view_transitions`.
+The latter checks repeated native criteria submissions, pagination, history,
+record-panel keyboard focus and scroll restoration, API-key snapshot exclusion,
+and ordinary navigation with both motion preferences. Repeat it three times
+with fresh fixtures when changing the lifecycle controller. It observes browser
+events without handling transition promises or filtering page errors. The Node
+controller tests also verify fallback and unexpected-error propagation.
+
+The existing `select` acceptance script currently stops at an independent
+Country-to-Status Tab-focus failure. That legacy browser issue belongs to
+REF-310, not this lifecycle change.
+
 ## Brand, typography, and assets
 
 - Brand assets and fonts are local repository assets. Do not add runtime CDN

@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Handle expected cross-document ViewTransition cancellations in the application (REF-311),
+  preserving instant no-flash navigation and API-key snapshot exclusions. Add mandatory
+  browser coverage for criteria, history, panels and reduced motion without test-side masking.
+
 - Simplify audit time filters and list times to minute precision (REF-257). Preserve
   exact event details and untouched filter links, including daylight-saving offsets.
 
