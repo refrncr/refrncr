@@ -1227,7 +1227,6 @@
       "operation": "list_dataset_overview",
       "service": "refrncr.services.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
@@ -1307,10 +1306,7 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
-        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
+        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2432,7 +2428,8 @@
           "changed": "version_count",
           "unchanged": "version_count",
           "deleted": "version_count",
-          "total_processed": "version_count"
+          "total_processed": "version_count",
+          "unmapped_fields": "field_keys"
         },
         "dataset:dataset.mapping_targets_updated": {
           "format": "import_format",
@@ -2972,7 +2969,9 @@
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
-        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update",
+        "refrncr.web.attention_overview GET /attention",
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3228,7 +3227,6 @@
       "operation": "can_create_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_create_dataset",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets"
       ],
       "kind": "read",
@@ -4175,7 +4173,8 @@
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
         "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -5120,7 +5119,8 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5787,7 +5787,10 @@
         "refrncr.web.update_dataset POST /datasets/<key>",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/records",
+        "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6032,7 +6035,7 @@
       "object_identifier": "Stable Dataset UUID.",
       "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
       "allowed_context": {},
-      "success": "Current-only bounded read; no domain event or per-request successful-authentication audit.",
+      "success": "Bounded selected-publication read after current export authorization; no domain event.",
       "validation_failure": "No change or success event.",
       "authorization_failure": "Non-disclosing not found; no mutation or event.",
       "stale_input": "Publication checks expected Dataset revision under lock; cancellation rechecks calendar boundary.",
@@ -6042,7 +6045,8 @@
       "tests": [
         "tests/test_rest_api.py::test_endpoints_and_contract",
         "tests/test_rest_api.py::test_missing_unpublished_cancelled_and_denied",
-        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one"
+        "tests/test_rest_api.py::test_sql_pagination_no_n_plus_one",
+        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors"
       ],
       "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
@@ -6053,11 +6057,7 @@
       "operation": "viewable_resources",
       "service": "refrncr.services.DatasetAuthorizationService.viewable_resources",
       "interface_entrypoints": [
-        "refrncr.api.routes.datasets GET /datasets",
-        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
-        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
-        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
-        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+        "Internal Community dataset view decision (no HTTP entrypoint)."
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6431,7 +6431,8 @@
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
         "refrncr.web.team_members GET /teams/<team_id>/members",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6592,7 +6593,6 @@
       "operation": "mapping_source",
       "service": "refrncr.services.DatasetService.mapping_source",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
@@ -6714,7 +6714,6 @@
       "operation": "mapping_usage",
       "service": "refrncr.services.DatasetService.mapping_usage",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.dataset_detail GET /datasets/<key>",
@@ -6755,6 +6754,212 @@
       "implementation_status": "Implemented for REF-302 source-side dependency lists and counts.",
       "exclusion_reason": "Ordinary authorized read; no business state change.",
       "persistence_scope": "Read snapshot; count query or batched publication metadata, without mapping records or new persistence."
+    },
+    {
+      "capability": "Private Overview",
+      "operation": "read",
+      "service": "refrncr.overview.OverviewService.read",
+      "interface_entrypoints": [
+        "refrncr.web.index GET /",
+        "refrncr.web.attention_overview GET /attention"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication and authorization boundaries reject denied requests.",
+      "technical_logging": "Safe fixed diagnostic only; do not log browsing history or record contents.",
+      "events": [],
+      "allowed_context": {},
+      "object_identifier": "Authenticated user UUID and dataset UUID.",
+      "actor_source": "Authenticated browser principal; active user rechecked in the service.",
+      "success": "Private attention/recent projection.",
+      "validation_failure": "No navigation history is stored for an unknown dataset.",
+      "authorization_failure": "Inactive or deleted actors are rejected; only admins may request all owners.",
+      "stale_input": "Visibility is re-evaluated at read time; visits never grant access.",
+      "no_op": "Reads do not mutate; revisiting updates the existing row.",
+      "rollback": "Visit upsert and eviction share one serialized transaction.",
+      "duplicate_retry": "Unique user/dataset key and user lock prevent duplicate rows.",
+      "tests": [
+        "tests/test_overview.py::test_team_ownership_admin_override_and_explicit_grants",
+        "tests/test_overview.py::test_recent_visits_are_private_bounded_and_not_audited"
+      ],
+      "implementation_status": "Implemented by REF-238.",
+      "exclusion_reason": "Authorized private Overview projection; no business mutation or domain event.",
+      "persistence_scope": "dataset_visits only; business datasets and AuditEvent are unchanged."
+    },
+    {
+      "capability": "Private Overview",
+      "operation": "record_visit",
+      "service": "refrncr.overview.OverviewService.record_visit",
+      "interface_entrypoints": [
+        "Successful dataset HTML GET: refrncr.web.record_dataset_visit"
+      ],
+      "kind": "mutation",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication and authorization boundaries reject denied requests.",
+      "technical_logging": "Safe fixed diagnostic only; do not log browsing history or record contents.",
+      "events": [],
+      "allowed_context": {},
+      "object_identifier": "Authenticated user UUID and dataset UUID.",
+      "actor_source": "Authenticated browser principal; active user rechecked in the service.",
+      "success": "Update one visit and atomically evict entries beyond twenty; no audit event.",
+      "validation_failure": "No navigation history is stored for an unknown dataset.",
+      "authorization_failure": "Inactive or deleted actors are rejected; only admins may request all owners.",
+      "stale_input": "Visibility is re-evaluated at read time; visits never grant access.",
+      "no_op": "Reads do not mutate; revisiting updates the existing row.",
+      "rollback": "Visit upsert and eviction share one serialized transaction.",
+      "duplicate_retry": "Unique user/dataset key and user lock prevent duplicate rows.",
+      "tests": [
+        "tests/test_overview.py::test_team_ownership_admin_override_and_explicit_grants",
+        "tests/test_overview.py::test_recent_visits_are_private_bounded_and_not_audited"
+      ],
+      "implementation_status": "Implemented by REF-238.",
+      "exclusion_reason": "REF-238 private navigation history is explicitly excluded from the audit log.",
+      "persistence_scope": "dataset_visits only; business datasets and AuditEvent are unchanged."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "get_policy",
+      "service": "refrncr.installation_settings.InstallationSettingsService.get_policy",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Administrator-only browser capability with CSRF on POST.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active administrator.",
+      "allowed_context": {},
+      "success": "Return the configured policy without a domain event.",
+      "validation_failure": "No change; reject unknown policies or missing required confirmation.",
+      "authorization_failure": "403, no change for non-administrators.",
+      "stale_input": "Compare submitted previous policy; conflict changes nothing.",
+      "no_op": "Unchanged policy produces no event.",
+      "rollback": "Policy and event share one transaction.",
+      "duplicate_retry": "Stale retry is rejected; unchanged policy is a no-op.",
+      "tests": [
+        "tests/test_installation_settings.py::test_policy_transition_confirmation_and_audit",
+        "tests/test_installation_settings.py::test_policy_errors_and_grant_preservation"
+      ],
+      "implementation_status": "Implemented in REF-294.",
+      "exclusion_reason": "Administrator-only installation policy read; no mutation or domain event."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "change_policy",
+      "service": "refrncr.installation_settings.InstallationSettingsService.change_policy",
+      "interface_entrypoints": [
+        "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "Administrator-only browser capability with CSRF on POST.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [
+        [
+          "installation_settings",
+          "export_access_policy_changed"
+        ]
+      ],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active administrator.",
+      "allowed_context": {
+        "installation_settings:export_access_policy_changed": {
+          "previous_policy": "export_policy",
+          "policy": "export_policy"
+        }
+      },
+      "success": "One policy change and one event in the same transaction.",
+      "validation_failure": "No change; reject unknown policies or missing required confirmation.",
+      "authorization_failure": "403, no change for non-administrators.",
+      "stale_input": "Compare submitted previous policy; conflict changes nothing.",
+      "no_op": "Unchanged policy produces no event.",
+      "rollback": "Policy and event share one transaction.",
+      "duplicate_retry": "Stale retry is rejected; unchanged policy is a no-op.",
+      "tests": [
+        "tests/test_installation_settings.py::test_policy_transition_confirmation_and_audit",
+        "tests/test_installation_settings.py::test_policy_errors_and_grant_preservation"
+      ],
+      "implementation_status": "Implemented in REF-294.",
+      "exclusion_reason": ""
+    },
+    {
+      "capability": "DatasetAuthorizationService",
+      "operation": "exportable_resources",
+      "service": "refrncr.services.DatasetAuthorizationService.exportable_resources",
+      "interface_entrypoints": [
+        "refrncr.api.routes.datasets GET /datasets",
+        "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
+        "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
+        "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing bearer authentication and non-disclosing API authorization errors.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; authorization rechecked in the read snapshot.",
+      "allowed_context": {},
+      "success": "Return all-resource authority or deduplicated Dataset IDs from current ownership and grants.",
+      "validation_failure": "No mutation or domain audit event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "Current authority is evaluated in the caller read snapshot; subsequent reads observe committed changes.",
+      "no_op": "Read-only decision; repeated reads add no domain event.",
+      "rollback": "No business mutation to commit or roll back.",
+      "duplicate_retry": "Read-only retries evaluate current authority.",
+      "tests": [
+        "tests/test_api_export_access.py::test_policy_roles_and_all_version_selectors",
+        "tests/test_api_export_access.py::test_revocation_invalidates_detail_and_list_caches",
+        "tests/test_api_export_access.py::test_filtered_pagination_deduplicates_grants_without_n_plus_one"
+      ],
+      "implementation_status": "Implemented in REF-306.",
+      "exclusion_reason": "Bulk current export authority for published API reads; no mutation or domain event.",
+      "persistence_scope": "Read-only installation policy, active user, ownership, membership and explicit export access."
+    },
+    {
+      "capability": "InstallationSettingsService",
+      "operation": "requires_export_access",
+      "service": "refrncr.installation_settings.InstallationSettingsService.requires_export_access",
+      "interface_entrypoints": [
+        "refrncr.web.api_key_list GET /settings/api-keys"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "Existing browser authentication; settings mutation remains administrator-only.",
+      "technical_logging": "Fixed diagnostic only; no request payloads.",
+      "events": [],
+      "object_identifier": "Singleton UUID 00000000-0000-0000-0000-000000000001.",
+      "actor_source": "Authenticated active browser user.",
+      "allowed_context": {},
+      "success": "Return only whether export access is restricted, for the API keys explanation.",
+      "validation_failure": "No mutation or domain audit event.",
+      "authorization_failure": "Inactive or deleted users are denied; no settings are changed.",
+      "stale_input": "Current authority is evaluated in the caller read snapshot; subsequent reads observe committed changes.",
+      "no_op": "Read-only decision; repeated reads add no domain event.",
+      "rollback": "No business mutation to commit or roll back.",
+      "duplicate_retry": "Read-only retries evaluate current authority.",
+      "tests": [
+        "tests/test_api_export_access.py::test_api_key_page_explains_restricted_policy",
+        "tests/test_api_export_access.py::test_inactive_users_cannot_read_policy_or_exportable_resources"
+      ],
+      "implementation_status": "Implemented in REF-306.",
+      "exclusion_reason": "Active-user policy explanation flag; no settings mutation or domain event.",
+      "persistence_scope": "Read-only installation policy, active user, ownership, membership and explicit export access."
     }
   ]
 }

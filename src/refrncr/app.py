@@ -16,6 +16,7 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
+from refrncr.installation_settings import InstallationSettingsService
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.operational import (
     LOGGER_NAME,
@@ -47,6 +48,7 @@ from refrncr.web import create_flask_app
 
 @dataclass(frozen=True)
 class CommunityServices:
+    installation_settings: InstallationSettingsService
     api_keys: ApiKeyService | None
     dataset_versions: DatasetVersionService
     audit_history: AuditHistoryService
@@ -84,6 +86,7 @@ def create_community_services(
     versions = DatasetVersionService(uow, authorization.datasets, clock=clock)
     dataset_records = DatasetRecordService(uow, authorization, versions=versions)
     return CommunityServices(
+        installation_settings=InstallationSettingsService(uow, authorization.datasets),
         api_keys=configured_api_keys(uow, clock=clock),
         dataset_versions=versions,
         audit_history=AuditHistoryService(uow, clock=clock),

@@ -7,8 +7,10 @@
 {% macro versions_action(key) -%}
 <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>
 {%- endmacro %}
-{% macro current_version_action(key) -%}
+{% macro current_version_action(key, has_current) -%}
+{% if has_current %}
 <a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
+{% endif %}
 {%- endmacro %}
 {% macro discard_action(key, ui, panel_id='concept-discard-panel') -%}
 {% if ui.discard_unavailable %}
@@ -41,10 +43,10 @@
 <section class='concept-banner' aria-label='Draft context'>
 <div class='concept-banner-text'>
 <div class='concept-banner-line'><h2>{{ status_badge('Stale' if ui.stale else 'Draft') }} You’re working on a draft</h2><p>{% if ui.baseline %}Based on Version {{ ui.baseline.version.number }}{% else %}No published version yet{% endif %} · {% if ui.stale %}<strong>Stale — the basis version was cancelled.</strong> Your changes are preserved. Publication is blocked.{% if ui.has_current %} You can discard this Draft to return to Current.{% endif %}{% elif ui.has_changes %}Changes in progress{% else %}No changes yet{% endif %}</p></div>
-<p class='concept-banner-note'>Changes are not visible in the current published version until you publish them.</p>
+<p class='concept-banner-note'>{% if ui.baseline %}Changes are not visible in any published version until you publish them.{% else %}Nothing is published yet. Publishing creates Version 1.{% endif %}</p>
 </div>
 <div class='page-actions'>
-{% if show_current %}{{ current_version_action(key) }}{% endif %}
+{% if show_current %}{{ current_version_action(key, ui.has_current) }}{% endif %}
 {% if caller is defined %}{{ caller() }}{% endif %}
 {% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_review", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Review &amp; publish</a>{% endif %}
 {% if actions %}{{ concept_actions(key, ui, ui.can_review, true) }}{% endif %}

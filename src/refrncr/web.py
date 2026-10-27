@@ -59,6 +59,8 @@ from refrncr.hierarchy import (
 )
 from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.hierarchy_import import HierarchyImportService
+from refrncr.installation_policy import EXPORT_POLICIES
+from refrncr.installation_settings import InstallationSettingsService, PolicyConfirmationRequired
 from refrncr.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -66,6 +68,7 @@ from refrncr.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
+from refrncr.overview import REASON_LABELS, OverviewService
 from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
 from refrncr.presentation import (
     DISPLAY_STATUSES,
@@ -373,7 +376,13 @@ def create_flask_app(
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
+    overview_service = (
+        OverviewService(datasets.uow, authorization.datasets) if dataset_ui_enabled else None
+    )
     dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
+    installation_settings = (
+        InstallationSettingsService(users.uow, authorization.datasets) if authorization else None
+    )
     cookie_policy = BrowserCookiePolicy(
         session_max_age=int(sessions.lifetime.total_seconds()),
         allow_loopback_http=allow_loopback_http,
@@ -596,7 +605,10 @@ def create_flask_app(
                 abort(404)
             except ConflictError as error:
                 return render_authenticated_template(
-                    "pages/datasets/concept_required.html", key=values["key"], error=str(error)
+                    "pages/datasets/concept_required.html",
+                    key=values["key"],
+                    error=str(error),
+                    has_current=dataset_versions.history(actor.id, values["key"]).has_current,
                 ), 409
 
     @app.context_processor
@@ -720,7 +732,12 @@ def create_flask_app(
         if api_keys is None:
             return api_key_page(keys=(), unavailable=True), 503
         return api_key_page(
-            keys=api_keys.list_keys(actor.id), revoked=request.args.get("revoked") == "1"
+            keys=api_keys.list_keys(actor.id),
+            revoked=request.args.get("revoked") == "1",
+            requires_export_access=(
+                installation_settings is not None
+                and installation_settings.requires_export_access(actor.id)
+            ),
         )
 
     def api_key_creation_form(actor, session, *, error=None, status=200):
@@ -961,27 +978,15 @@ def create_flask_app(
         return response
 
     @app.get("/")
+    @no_store_route
     @authenticated_route
+    @version_errors
     def index():
         resolved = authenticated()
         actor = resolved[0] if resolved else None
         csrf = resolved[1].csrf_token if resolved else None
         if resolved and dataset_ui_enabled:
-            authorization, dataset_service, *_dependencies = require_dataset_dependencies()
-            return render_mapping_template(
-                "pages/datasets/list.html",
-                actor=actor,
-                may_create=authorization.datasets.can_create_dataset(actor.id),
-                datasets=dataset_service.list_dataset_overview(actor.id),
-                deletion_notice=False,
-                page_title="Overview",
-                empty_dataset_label="datasets",
-                dataset_kind=None,
-                current_actor=actor,
-                current_csrf=csrf,
-                active_navigation="home",
-                dataset_ui_enabled=dataset_ui_enabled,
-            )
+            return render_overview(actor)
         return render_template(
             "pages/index.html",
             resolved=resolved,
@@ -990,6 +995,80 @@ def create_flask_app(
             active_navigation=active_navigation(),
             dataset_ui_enabled=dataset_ui_enabled,
         )
+
+    @dataset_route("/attention", capability="can_access_community", methods=["GET"])
+    @no_store_route
+    @version_errors
+    def attention_overview():
+        actor, _session = require_authenticated()
+        return render_overview(actor, full=True)
+
+    def render_overview(actor, *, full=False):
+        owners = request.args.getlist("all_owners")
+        reasons = request.args.getlist("reason")
+        if len(owners) > 1 or (owners and owners[0] != "1"):
+            abort(400)
+        if len(reasons) > 1 or (
+            reasons and reasons[0] not in {"", *(str(n) for n in REASON_LABELS)}
+        ):
+            abort(400)
+        reason = int(reasons[0]) if reasons and reasons[0] and full else None
+        overview = overview_service.read(actor.id, all_owners=bool(owners))
+        cards = [
+            card
+            for card in overview.attention
+            if reason is None or any(r.number == reason for r in card.reasons)
+        ]
+
+        def destination(card, selected=None):
+            draft = selected.draft if selected else card.version is None and card.has_draft
+            return url_for(
+                "dataset_records_view",
+                key=card.dataset.key,
+                concept=True if draft else None,
+                version_id=None
+                if draft
+                else selected.version_id
+                if selected
+                else card.version.id
+                if card.version
+                else None,
+                mapping_status=selected.mapping_status if selected else None,
+            )
+
+        return render_authenticated_template(
+            "pages/overview.html",
+            overview=overview,
+            attention_cards=cards,
+            full=full,
+            reason=reason,
+            reason_labels=REASON_LABELS,
+            card_destination=destination,
+            active_navigation="home",
+        )
+
+    @app.after_request
+    def record_dataset_visit(response):
+        values = request.view_args or {}
+        if (
+            dataset_ui_enabled
+            and request.method == "GET"
+            and response.status_code == 200
+            and response.mimetype == "text/html"
+            and request.path.startswith("/datasets/")
+            and (values.get("key") or values.get("dataset_id"))
+        ):
+            resolved = authenticated()
+            if resolved:
+                try:
+                    overview_service.record_visit(
+                        resolved[0].id, key=values.get("key"), dataset_id=values.get("dataset_id")
+                    )
+                except (AuthorizationError, PersistenceConflictError):
+                    # Concurrent deletion/revocation or a history-write conflict must not
+                    # replace an already-authorized page with a telemetry failure.
+                    logging.getLogger(__name__).warning("Dataset visit could not be recorded")
+        return response
 
     @dataset_route("/datasets", capability="can_access_community", methods=["GET"])
     def dataset_list():
@@ -1266,7 +1345,7 @@ def create_flask_app(
             state, identifier = None, None
             fields, field_states = (), {}
             editable = configuration.may_maintain
-            may_govern = configuration.may_govern
+            may_change_owner = configuration.may_govern
             may_edit_key = configuration.may_edit_key
             may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
             schema_admin, may_start_concept = False, False
@@ -1281,7 +1360,7 @@ def create_flask_app(
                 mapping_configuration = datasets.get_dataset_configuration(actor.id, key).dataset
             editable = view.may_maintain
             schema_admin = view.state is None and view.may_maintain
-            may_govern = editable and authorization.datasets.can_change_dataset_owner(
+            may_change_owner = editable and authorization.datasets.can_change_dataset_owner(
                 actor.id, dataset.id
             )
             context, state, identifier = view.context, view.state, view.identifier
@@ -1319,13 +1398,16 @@ def create_flask_app(
         )
         if edit_mode and not editable:
             abort(404)
-        if edit_mode == "ownership" and not may_govern:
+        if edit_mode == "ownership" and not may_change_owner:
             abort(404)
         access_teams, access_users, access_entries = [], [], []
         access_grant_teams, access_grant_users = [], []
-        if may_govern:
-            _, access_teams, access_users, access_entries = datasets.export_access_context(
-                actor.id, key
+        may_view_access = editable
+        may_manage_export = False
+        export_policy = None
+        if may_view_access:
+            _, access_teams, access_users, access_entries, export_policy, may_manage_export = (
+                datasets.export_access_context(actor.id, key)
             )
             granted_subjects = {
                 (entry.subject_type, entry.subject_id) for entry, _ in access_entries
@@ -1341,6 +1423,7 @@ def create_flask_app(
         return render_mapping_template(
             "pages/datasets/detail.html",
             dataset=dataset,
+            concept=concept,
             mapping_configuration=mapping_configuration,
             source_context_available=identifier is not None,
             context=context,
@@ -1375,7 +1458,10 @@ def create_flask_app(
             ),
             schema_admin=schema_admin,
             may_start_concept=may_start_concept,
-            may_govern=may_govern,
+            may_change_owner=may_change_owner,
+            may_view_access=may_view_access,
+            may_manage_export=may_manage_export,
+            export_policy=export_policy,
             may_export=may_export,
             draft_in_progress=draft_in_progress,
             access_teams=access_teams,
@@ -1415,6 +1501,7 @@ def create_flask_app(
                 key=key,
                 error=str(error),
                 already_active=True,
+                has_current=dataset_versions.history(actor.id, key).has_current,
             ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
@@ -2147,9 +2234,11 @@ def create_flask_app(
                 else [field.key for field in view.fields[:6]]
             ),
             version_state=view.state,
+            may_cancel_scheduled=view.may_maintain,
             may_export=view.may_export,
             may_edit=view.state is None and view.may_maintain,
-            may_govern=authorization.datasets.can_change_dataset_owner(
+            may_view_access=view.may_maintain,
+            may_change_owner=authorization.datasets.can_change_dataset_owner(
                 actor_id, view.context.dataset.id
             ),
             draft_in_progress=view.concept is not None,
@@ -2471,7 +2560,7 @@ def create_flask_app(
                 raise RecordSearchError(
                     "Record criteria exceed the URL limit. Clear all to start again."
                 )
-            if datasets.get_dataset(actor.id, key).kind == "hierarchy":
+            if datasets.get_dataset_configuration(actor.id, key).dataset.kind == "hierarchy":
                 return render_hierarchy(
                     dataset_versions.read(
                         actor.id, key, version_id, page=None, prefer_concept=concept
@@ -2536,8 +2625,35 @@ def create_flask_app(
             if version_id is not None or concept:
                 raise
             history = dataset_versions.history(actor.id, key)
+            if history.concept:
+                return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+            scheduled = [state for state in history.entries if state.status == "Scheduled"]
+            available = [
+                state for state in history.entries if state.status in {"Expired", "Cancelled"}
+            ]
+            selected = (
+                min(
+                    scheduled,
+                    key=lambda state: (state.version.effective_date, state.version.number),
+                )
+                if scheduled
+                else max(available, key=lambda state: state.version.number, default=None)
+            )
+            if selected:
+                if selected.status == "Cancelled":
+                    return redirect(url_for("dataset_versions_view", key=key), code=303)
+                return redirect(
+                    url_for("dataset_records_view", key=key, version_id=selected.version.id),
+                    code=303,
+                )
             return render_authenticated_template(
-                "pages/datasets/no_current.html", dataset=history.context.dataset, history=history
+                "pages/datasets/empty_records.html",
+                dataset=history.context.dataset,
+                may_maintain=history.may_maintain,
+                may_view_access=history.may_maintain,
+                may_change_owner=authorization.datasets.can_change_dataset_owner(
+                    actor.id, history.context.dataset.id
+                ),
             )
 
         context, fields, identifier, page = view.context, view.fields, view.identifier, view.page
@@ -2653,7 +2769,9 @@ def create_flask_app(
             may_add_record=may_add_record,
             may_export=view.may_export,
             version_state=view.state,
-            may_govern=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
+            may_cancel_scheduled=view.may_maintain,
+            may_view_access=view.may_maintain,
+            may_change_owner=authorization.datasets.can_change_dataset_owner(actor.id, dataset.id),
             draft_in_progress=view.concept is not None,
             may_configure=may_configure,
             may_start_concept=(
@@ -2871,7 +2989,7 @@ def create_flask_app(
                 identifier_keys = assistance.identifier_keys
                 if error or source_format_issues:
                     for issue in assistance.errors:
-                        message = mapping_issue_message(issue, mode)
+                        message = mapping_issue_message(issue)
                         if issue.column_index is None:
                             if message:
                                 step_mapping_errors.append(message)
@@ -2903,7 +3021,7 @@ def create_flask_app(
                 if preview.non_row_errors:
                     step = 3
                     preview_messages = [
-                        mapping_issue_message(item, mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     ]
                     error = " ".join(dict.fromkeys(preview_messages))
@@ -2926,7 +3044,7 @@ def create_flask_app(
             format_columns = list(assistance.format_columns)
         format_columns = show_source_format_issues(format_columns, source_format_issues)
         for issue in source_format_issues:
-            message = mapping_issue_message(issue, mode)
+            message = mapping_issue_message(issue)
             if not message:
                 continue
             step_mapping_errors.append(message)
@@ -2997,6 +3115,11 @@ def create_flask_app(
             required_keys=required_keys,
             identifier_keys=identifier_keys,
             preview_fields=preview_fields,
+            unmapped_fields=(
+                tuple(field for field in fields if field.key not in preview.mapping)
+                if preview and mode == "new_version"
+                else ()
+            ),
             preview_rows=preview_rows,
             report_rows=report_rows,
             success=success,
@@ -3007,7 +3130,8 @@ def create_flask_app(
             mapping_reason_text=(
                 "Map the source identifier to match existing rows; target columns are optional."
                 if mode == "mapping_update"
-                else "This import replaces all records in the draft, so every field must be mapped."
+                else "Map every required and identifier field. "
+                "Optional fields may be left unmapped."
             ),
         ), status
 
@@ -3319,7 +3443,7 @@ def create_flask_app(
                 step=3,
                 error=merge_error_messages(
                     *(
-                        mapping_issue_message(item, state.mode) or item.message
+                        mapping_issue_message(item) or item.message
                         for item in preview.non_row_errors
                     )
                 ),
@@ -4442,6 +4566,44 @@ def create_flask_app(
         response = redirect(url_for("index"))
         response.delete_cookie(settings.session_name, **settings.common_options)
         return response
+
+    @app.route("/settings/dataset-access", methods=["GET", "POST"])
+    @capability_route("can_administer_installation")
+    def dataset_access_settings():
+        actor, login_session = require_capability("can_administer_installation")
+        require_dataset_dependencies()
+        policy = installation_settings.get_policy(actor.id)
+        expected, selected = policy, policy
+        error, confirmation, status = None, None, 200
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            expected = request.form.get("expected_policy", "")
+            selected = request.form.get("policy", "")
+            try:
+                installation_settings.change_policy(
+                    actor.id,
+                    expected,
+                    selected,
+                    confirmed=request.form.get("confirmed") == "yes",
+                )
+            except PolicyConfirmationRequired as exc:
+                confirmation = str(exc)
+            except ConflictError as exc:
+                error, status = str(exc), 409
+            except ValidationError as exc:
+                error, status = str(exc), 400
+            else:
+                return redirect(url_for("dataset_access_settings", notice="saved"), code=303)
+        return render_authenticated_template(
+            "pages/settings/dataset_access.html",
+            active_navigation="dataset_access",
+            policies=EXPORT_POLICIES,
+            selected=selected,
+            expected=expected,
+            error=error,
+            confirmation=confirmation,
+            current_csrf=login_session.csrf_token,
+        ), status
 
     @app.post("/settings/theme")
     @authenticated_route

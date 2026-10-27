@@ -3,7 +3,9 @@
 Dataset overview and detail context are authorized service reads. REF-83 now delegates
 content selection to `DatasetVersionService`. Normal browser routes use Current snapshot
 content/counts with current Dataset name, description and icon for every user. Administrators
-select active concept content through explicit concept routes.
+select active concept content through explicit concept routes. If Current is absent, the
+browser Records route redirects maintainers to an available Draft or version; see the
+[selection rules](dataset-versions.md#explicit-concept-lifecycle-and-migration-0016).
 No Current means no visible Dataset for ordinary users. Selection and current authority share
 one coherent read transaction. Current snapshots use a batched window query and active
 concept identities use one batched query, without per-Dataset lookups. `current_overview` itself still counts

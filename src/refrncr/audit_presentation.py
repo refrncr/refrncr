@@ -40,6 +40,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("security", "security.workflow_token_rejected"): ActionPresentation(
             "Protected workflow token rejected", False
         ),
+        ("installation_settings", "export_access_policy_changed"): ActionPresentation(
+            "Export and API access policy changed", False
+        ),
         ("user", "created"): ActionPresentation("User created", False),
         ("user", "email_changed"): ActionPresentation("User email changed", False),
         ("user", "disabled"): ActionPresentation("User disabled", False),
@@ -136,6 +139,7 @@ OBJECTS = MappingProxyType(
         "membership": ObjectPresentation("Team membership", None),
         "grant": ObjectPresentation("Access grant", None),
         "dataset": ObjectPresentation("Dataset", "dataset"),
+        "installation_settings": ObjectPresentation("Installation settings", None),
         "dataset_export_access": ObjectPresentation("Dataset export access", None),
         "dataset_field": ObjectPresentation("Dataset field", "dataset_field"),
         "dataset_record": ObjectPresentation("Record", None),
@@ -143,6 +147,8 @@ OBJECTS = MappingProxyType(
 )
 CONTEXT_LABELS = MappingProxyType(
     {
+        "previous_policy": "Previous access policy",
+        "policy": "Access policy",
         "owner_team_id": "Owning team ID",
         "previous_owner_team_id": "Previous owning team ID",
         "creator_user_id": "Creator user ID",
@@ -177,6 +183,7 @@ CONTEXT_LABELS = MappingProxyType(
         "deleted": "Deleted",
         "removals": "Hierarchy nodes removed",
         "total_processed": "Total processed",
+        "unmapped_fields": "Fields not mapped",
         "rejected_row_count": "Rows rejected",
     }
 )
@@ -191,6 +198,8 @@ FORMAT_KINDS = frozenset(
         "dataset_name",
         "version_count",
         "calendar_date",
+        "field_keys",
+        "export_policy",
     }
 )
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
@@ -279,6 +288,13 @@ def safe_context(event):
     # Iterate the bounded catalog, not arbitrary historical payloads. Validate a
     # complete candidate with the production validator; unknown keys never escape.
     candidate = {key: event.details.get(key) for key, _kind in contract.context}
+    if (event.object_type, event.action) == (
+        "dataset",
+        "dataset.new_version_imported",
+    ) and "unmapped_fields" not in event.details:
+        # Before REF-260 every active Field had to be mapped. Preserve historical
+        # counts without rewriting old events or accepting malformed new context.
+        candidate["unmapped_fields"] = []
     try:
         validated = (
             validate_event(
@@ -299,7 +315,11 @@ def safe_context(event):
             else "Records imported"
             if key == "record_count" and event.action == "dataset.records_imported"
             else CONTEXT_LABELS.get(key, "Additional detail"),
-            str(validated[key]).capitalize() if kind == "subject" else str(validated[key]),
+            str(validated[key]).capitalize()
+            if kind == "subject"
+            else ", ".join(validated[key]) or "None"
+            if kind == "field_keys"
+            else str(validated[key]),
         )
         for key, kind in contract.context
     )

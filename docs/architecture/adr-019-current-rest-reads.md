@@ -23,9 +23,11 @@ Extend `DatasetVersionService` and its existing version operations port/adapter.
 Authentication commits its existing audit separately; all content selection,
 current Dataset authorization, conditional validation and bounded content reads
 share the existing explicit SQLite/repeatable-read PostgreSQL snapshot. The bulk
-view operation belongs to the existing Dataset authorization service. Active
-Community users read all Current Datasets under REF-73; no legacy Grant policy,
-per-key scope, Cloud tenancy or parallel business layer is introduced.
+export operation belongs to the existing Dataset authorization service. Under REF-306,
+API reads use the owner's current dataset export right and REF-294 installation policy.
+Everyone permits every active user; stricter modes permit administrators, owning-team
+members and explicitly granted users/teams. App reading retains REF-73's view rule.
+No legacy Grant policy, per-key scope, Cloud tenancy or parallel business layer is introduced.
 
 SQL selects one eligible non-cancelled Current version per Dataset and paginates
 Datasets by key. Record SQL orders correlated canonical identifier components in
@@ -84,6 +86,14 @@ request is valid only when that version is the effective result for the date. Se
 are part of pagination links and the strong ETag identity, so cache entries cannot cross
 representations. REF-176 renames the formerly Current-only `current_version` property to
 `version`; it includes `effective_from` and accurately describes every selected publication.
+
+REF-306 preserves this version selection, including Scheduled publications selected by
+number or future effective date. Only dataset authority changes. The same export check
+applies before version selection and conditional validation; concepts and Cancelled
+publications remain excluded. A bulk ownership/grant query supplies authorized Dataset
+IDs to all three page queries, before SQL counting and pagination. No per-Dataset
+authorization query or access cache is introduced. An old detail ETag cannot bypass lost
+access, and filtered list totals and page membership contribute to the list ETag.
 
 ## Alternatives considered
 

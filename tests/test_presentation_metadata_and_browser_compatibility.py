@@ -87,7 +87,7 @@ def test_export_forms_have_a_safe_get_fallback(dataset_browser):
     page = body(request(client, "get", "/datasets/fallback/concept"))
     targets = re.findall(r"data-inline-refresh='([^']+)'", page)
     assert targets == [
-        "/datasets/fallback?tab=access-management#access-management" for _ in range(2)
+        "/datasets/fallback/concept?tab=access-management#access-management" for _ in range(2)
     ]
     assert request(client, "get", targets[0]).status_code == 200
     legacy = request(client, "get", "/datasets/fallback/configure")

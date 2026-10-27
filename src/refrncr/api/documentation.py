@@ -15,6 +15,15 @@ this API. Use Authorize to enter the key alone; it is retained only in this page
 Missing, invalid, expired or revoked keys return 401. Missing and inaccessible resources
 both return 404. All data responses are JSON; 304 has no body.
 
+Keys use their owner's current dataset export rights. The installation's Dataset access
+policy defaults to Everyone, allowing every active user to read published datasets.
+In either stricter mode, administrators, owning-team members and explicitly granted users
+or teams can read them. Dataset lists contain only authorized datasets; other datasets
+return 404. Revoked grants, changed team membership or ownership, and policy changes apply
+to the next request. An in-flight consistent read may finish. This dataset-level check
+does not change version selection: Scheduled publications remain available by version or
+future effective date, even though file export does not offer them.
+
 All operations accept optional `effective_date=YYYY-MM-DD` and `version=<number>` selectors.
 The former chooses the latest publication effective on or before that business date; the
 latter chooses an immutable published version. When combined, that version must be effective

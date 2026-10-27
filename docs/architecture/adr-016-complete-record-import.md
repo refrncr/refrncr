@@ -23,13 +23,22 @@ The existing Python service's create-only mode remains for compatibility with ex
 programmatic callers; no product entry point selects it. Stored mode/audit identifiers
 remain stable. This UX consolidation adds no schema migration or dependency.
 
-Every active Field still needs mapping, and confirmation is bound to the full difference.
-For a Concept with at least one non-cancelled version, one completed import or any Record
-mutation blocks another import in the same Concept, including a first import into an empty
-table. For a new Concept on a Dataset with no non-cancelled version, Record mutations and
-completed imports do not block later imports: each preview compares against the current Draft,
-and confirmation replaces the prior import result. A legacy Concept whose `records_mutated`
-marker is null remains ineligible because its history cannot be verified. Eligibility is checked
+REF-260 permits omitted optional Fields. Required and identifier Fields still need
+mapping. For matching active Records, omitted Fields retain their current Draft values
+without a write; mapped blank optional cells clear their values. Added Records have no
+value in omitted Fields, including when their identifier matches a retained Deleted
+Record. The complete Record set stays: active identifiers absent from the file become
+Deleted. Confirmation remains bound to the full difference, including retained values
+and revisions. This amends the original all-Fields rule; it does not change the
+eligibility decisions below.
+
+For a Concept with at least one non-cancelled version,
+one completed import or any Record mutation blocks another import in the same Concept,
+including a first import into an empty table. For a new Concept on a Dataset with no
+non-cancelled version, Record mutations and completed imports do not block later
+imports: each preview compares against the current Draft, and confirmation replaces
+the prior import result. A legacy Concept whose `records_mutated` marker is null
+remains ineligible because its history cannot be verified. Eligibility is checked
 again under the Dataset lock at confirmation. Published versions remain immutable.
 
 Keep the existing Record identity, ports, Unit of Work, canonical values, snapshots and

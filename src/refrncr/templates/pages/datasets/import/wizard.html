@@ -41,10 +41,11 @@
           {% set missing_fields = fields|selectattr('key', 'in', required_keys)|rejectattr('key', 'in', mapped_keys)|list %}
           {% set missing_labels = missing_fields|map(attribute='name')|list %}
           {% set unselected_columns = assistance.completeness.unmapped_columns %}
+          {% set not_in_file = fields|rejectattr('key', 'in', mapped_keys)|list|length if mode == 'new_version' else 0 %}
           {% set mapping_ready = not unselected_columns and not missing_labels %}
           <p class='mapping-status' data-mapping-status data-state='{{ "ready" if mapping_ready else "pending" }}' role='status' aria-live='polite' aria-atomic='true'>
             <span class='mapping-status-icons' aria-hidden='true'><span class='mapping-status-icon-pending'>{{ circle_alert_icon() }}</span><span class='mapping-status-icon-ready'>{{ circle_check_icon() }}</span></span>
-            <span class='mapping-status-copy'><span class='mapping-status-line' data-mapping-status-text>{% if unselected_columns %}<button type='button' class='mapping-jump' data-mapping-jump>{{ unselected_columns }} {{ 'column' if unselected_columns == 1 else 'columns' }}</button> still {{ 'needs' if unselected_columns == 1 else 'need' }} a choice{% if missing_labels %} · {% endif %}{% endif %}{% if missing_labels %}{{ mapping_status_text(0, missing_labels, 0, 0) }} {{ mapping_missing_fields(missing_labels) }}{% endif %}{% if mapping_ready %}{{ mapping_status_text(0, [], assistance.completeness.ignored_columns, mapped_keys|length) }}{% endif %}</span></span>
+            <span class='mapping-status-copy'><span class='mapping-status-line' data-mapping-status-text>{% if unselected_columns %}<button type='button' class='mapping-jump' data-mapping-jump>{{ unselected_columns }} {{ 'column' if unselected_columns == 1 else 'columns' }}</button> still {{ 'needs' if unselected_columns == 1 else 'need' }} a choice{% if missing_labels %} · {% endif %}{% endif %}{% if missing_labels %}{{ mapping_status_text(0, missing_labels, 0, 0) }} {{ mapping_missing_fields(missing_labels) }}{% endif %}{% if mapping_ready %}{{ mapping_status_text(0, [], assistance.completeness.ignored_columns, mapped_keys|length, not_in_file) }}{% endif %}</span></span>
           </p>
           <p class='mapping-reason help-text' data-mapping-reason{% if not missing_fields %} hidden{% endif %}>{{ mapping_reason_text }}</p>
         {% endif %}

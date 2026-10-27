@@ -189,7 +189,7 @@ def test_dataset_and_team_grants_do_not_authorize(database_history, permission):
 def test_all_contracts_have_safe_presentations(database_history):
     h = database_history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 53
+    assert len(EVENTS) == len(ACTION_LABELS) == 54
     assert (
         ACTION_LABELS[("dataset", "dataset.mapping_targets_updated")] == "Mapping targets updated"
     )
@@ -224,6 +224,8 @@ def test_all_contracts_have_safe_presentations(database_history):
             "import_mode": "new_version",
             "export_format": "JSON",
             "dataset_name": "Historical Dataset name",
+            "field_keys": ["note", "label"],
+            "export_policy": "everyone",
         }
         details = {key: values[formatter] for key, formatter in contract.context}
         eid = seed(h, 1, first=i, kind=kind, action=action, details=details)[0]
@@ -518,3 +520,28 @@ def test_chronology_query_plan(database_history):
         f"\n{h.engine.dialect.name} 10,000 events, 51-row projected continuation:\n"
         f"without index:\n{unindexed}\nwith index:\n{indexed}"
     )
+
+
+@pytest.mark.parametrize("unmapped", ["historical", [], ["note", "label"]])
+def test_import_history_keeps_counts_and_displays_omitted_schema_keys(database_history, unmapped):
+    h = database_history
+    details = dict(
+        mode="new_version",
+        format="CSV",
+        added=1,
+        changed=2,
+        unchanged=3,
+        deleted=4,
+        total_processed=10,
+    )
+    if unmapped != "historical":
+        details["unmapped_fields"] = unmapped
+    eid = seed(h, 1, kind="dataset", action="dataset.new_version_imported", details=details)[0]
+    context = dict(h.service.get_event(h.admin, eid).context)
+    assert context["Changed"] == "2"
+    assert context["Total processed"] == "10"
+    assert context["Fields not mapped"] == (
+        "note, label" if unmapped == ["note", "label"] else "None"
+    )
+    with h.sessions() as session:
+        assert session.get(AuditEvent, eid).details == details

@@ -104,6 +104,7 @@ def test_historical_action_names_and_object_types_are_stable():
         "dataset_field": "created definition_updated deleted",
         "dataset_record": "created updated deleted restored",
         "dataset_export_access": "granted revoked",
+        "installation_settings": "export_access_policy_changed",
     }
     assert set(EVENTS) == {
         (kind, action) for kind, actions in expected.items() for action in actions.split()
@@ -271,6 +272,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.hierarchy.HierarchyService.update_node_and_values",
             "refrncr.hierarchy.HierarchyService.update_values",
             "refrncr.hierarchy_import.HierarchyImportService.confirm",
+            "refrncr.installation_settings.InstallationSettingsService.change_policy",
         }
     )
     assert behaviors == {
@@ -452,3 +454,39 @@ def test_guard_checks_nested_documentation_operation(monkeypatch):
     monkeypatch.setattr(Path, "read_text", missing)
     with pytest.raises(AuditContractError):
         verify_inventory(ROOT)
+
+
+@pytest.mark.parametrize(
+    "keys", [None, "label", ["label", "label"], ["x" * 101], ["<script>"], [None]]
+)
+def test_import_audit_rejects_invalid_omitted_field_keys(keys):
+    details = dict(
+        mode="new_version",
+        format="CSV",
+        added=0,
+        changed=0,
+        unchanged=1,
+        deleted=0,
+        total_processed=1,
+        unmapped_fields=keys,
+    )
+    with pytest.raises(AuditContractError):
+        validate_event(**event(action="dataset.new_version_imported", details=details))
+
+
+def test_import_audit_keeps_schema_key_order_and_copies_the_list():
+    keys = ["z_note", "a_label"]
+    details = dict(
+        mode="new_version",
+        format="CSV",
+        added=0,
+        changed=0,
+        unchanged=1,
+        deleted=0,
+        total_processed=1,
+        unmapped_fields=keys,
+    )
+    result = validate_event(**event(action="dataset.new_version_imported", details=details))
+    assert result["unmapped_fields"] == keys
+    keys.clear()
+    assert result["unmapped_fields"] == ["z_note", "a_label"]

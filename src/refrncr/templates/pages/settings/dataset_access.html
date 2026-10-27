@@ -1,0 +1,28 @@
+{% extends "layouts/settings.html" %}
+{% from "components.html" import feedback %}
+{% set settings_title = "Dataset access" %}
+{% block settings_content %}
+{{ feedback(error, focus=true) }}
+{% if request.args.get('notice') == 'saved' %}<p class="alert alert-success" role="status">Dataset access policy saved.</p>{% endif %}
+<form {{ non_login_form_attrs() }} class="form" method="post" action="{{ url_for('dataset_access_settings') }}">
+  <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
+  <input type="hidden" name="expected_policy" value="{{ expected }}">
+  {% if confirmation %}
+    <h2>Confirm dataset access change</h2>
+    <p>{{ policies[selected] }}</p>
+    <p class="alert alert-warning">{{ confirmation }}</p>
+    <input type="hidden" name="policy" value="{{ selected }}">
+    <button class="button button-primary" type="submit" name="confirmed" value="yes">Confirm change</button>
+    <a class="button button-secondary" href="{{ url_for('dataset_access_settings') }}">Cancel</a>
+  {% else %}
+    <div class="form-field">
+      <label for="export-access-policy">Who can export and use the API</label>
+      <select id="export-access-policy" name="policy" data-select required aria-describedby="policy-help">
+        {% for value, label in policies.items() %}<option value="{{ value }}"{% if value == selected %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <p class="help-text" id="policy-help">Applies to every dataset. Reading in the app stays available to all active users. Existing grants are kept when this setting changes.</p>
+    </div>
+    <button class="button button-primary" type="submit">Save</button>
+  {% endif %}
+</form>
+{% endblock %}

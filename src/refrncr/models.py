@@ -67,6 +67,30 @@ def _stamp_database_timestamps(session, _flush_context, _instances) -> None:
             instance.updated_at = now
 
 
+class InstallationSettings(Base):
+    __tablename__ = "installation_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "id = '00000000-0000-0000-0000-000000000001'", name="ck_installation_settings_singleton"
+        ),
+        CheckConstraint(
+            "export_access_policy IN ('everyone', 'team_grants', 'admin_grants')",
+            name="ck_installation_settings_export_access_policy",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    export_access_policy: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+@event.listens_for(InstallationSettings.__table__, "after_create")
+def _seed_installation_settings(table, connection, **_kw):
+    from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+
+    connection.execute(
+        table.insert().values(id=INSTALLATION_SETTINGS_ID, export_access_policy="everyone")
+    )
+
+
 class Organisation(Base):
     __tablename__ = "organisations"
     __table_args__ = (
@@ -303,6 +327,21 @@ def _prevent_dataset_key_update(_mapper, _connection, dataset: Dataset) -> None:
 
 class ImmutableDatasetFieldKeyError(ValueError):
     """A persisted Dataset field key was changed."""
+
+
+class DatasetVisit(Base):
+    """Private, bounded navigation history; deliberately outside business audit."""
+
+    __tablename__ = "dataset_visits"
+    __table_args__ = (Index("ix_dataset_visits_recent", "user_id", "last_visited_at"),)
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    dataset_id: Mapped[str] = mapped_column(
+        ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True
+    )
+    last_visited_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
 
 class DatasetField(Base):

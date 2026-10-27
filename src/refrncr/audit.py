@@ -11,6 +11,8 @@ from types import MappingProxyType
 from unicodedata import category, normalize
 from uuid import UUID, uuid4
 
+from refrncr.field_contracts import FIELD_KEY_PATTERN
+
 
 class AuditContractError(ValueError):
     """An event or operation is not covered by the approved audit policy."""
@@ -47,6 +49,8 @@ class EventContract:
                 "dataset_name",
                 "version_count",
                 "calendar_date",
+                "field_keys",
+                "export_policy",
             }
             for _key, kind in self.context
         ):
@@ -54,6 +58,11 @@ class EventContract:
 
 
 _EVENTS = (
+    EventContract(
+        "installation_settings",
+        "export_access_policy_changed",
+        (("previous_policy", "export_policy"), ("policy", "export_policy")),
+    ),
     *(
         EventContract("api_key", action)
         for action in ("api_key.created", "api_key.revoked", "api_key.authenticated")
@@ -153,7 +162,8 @@ _EVENTS = (
         + tuple(
             (key, "version_count")
             for key in ("added", "changed", "unchanged", "deleted", "total_processed")
-        ),
+        )
+        + (("unmapped_fields", "field_keys"),),
     ),
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
     EventContract(
@@ -253,6 +263,16 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                 date.fromisoformat(value)
             except ValueError:
                 raise AuditContractError("Invalid effective date") from None
+        elif kind == "field_keys":
+            # Schema keys only, in configured order; never names or record values.
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or re.fullmatch(FIELD_KEY_PATTERN, item) is None
+                for item in value
+            ):
+                raise AuditContractError("Invalid field keys")
+            if len(set(value)) != len(value):
+                raise AuditContractError("Duplicate field keys")
+            value = list(value)
         elif kind == "dataset_name":
             # The bounded business-name exception shared by REF-141 and REF-83.
             # Bound before any processing;
@@ -267,6 +287,9 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                 raise AuditContractError("Invalid structural audit context")
             value = normalize("NFC", value.strip()).casefold()
             allowed = {
+                "export_policy": {
+                    value: value for value in ("everyone", "team_grants", "admin_grants")
+                },
                 "subject": {"user": "user", "team": "team"},
                 "import_mode": {"new_version": "new_version"},
                 "import_format": {"csv": "CSV", "xlsx": "Excel", "excel": "Excel"},
@@ -822,6 +845,48 @@ _register(
     "viewable_resources",
     "intentionally excluded",
     rationale="Bulk current Community Dataset view decision; no mutation or domain event.",
+)
+_register(
+    "DatasetAuthorizationService",
+    "exportable_resources",
+    "intentionally excluded",
+    rationale="Bulk current export authority for published API reads; no mutation or domain event.",
+)
+
+_register(
+    "OverviewService",
+    "read",
+    "intentionally excluded",
+    module="overview",
+    rationale="Authorized private Overview projection; no business mutation or domain event.",
+)
+_register(
+    "OverviewService",
+    "record_visit",
+    "intentionally excluded",
+    module="overview",
+    rationale="REF-238 private navigation history is explicitly excluded from the audit log.",
+)
+
+_register(
+    "InstallationSettingsService",
+    "get_policy",
+    "intentionally excluded",
+    module="installation_settings",
+    rationale="Administrator-only installation policy read; no mutation or domain event.",
+)
+_register(
+    "InstallationSettingsService",
+    "requires_export_access",
+    "intentionally excluded",
+    module="installation_settings",
+    rationale="Active-user policy explanation flag; no settings mutation or domain event.",
+)
+_audited(
+    "InstallationSettingsService",
+    "change_policy",
+    ("installation_settings", "export_access_policy_changed"),
+    module="installation_settings",
 )
 
 OPERATIONS = MappingProxyType(OPERATIONS)

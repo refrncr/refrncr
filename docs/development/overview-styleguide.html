@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Overview components · refrncr</title><link rel="stylesheet" href="../../src/refrncr/static/css/refrncr.css"></head>
+<body><main class="overview-content" style="padding:var(--space-lg);max-width:80rem;margin:auto">
+<h1>Overview components</h1>
+<p>Overview is a deliberate exception to the data-first rule: cards form a starting point, while tables, mappings, hierarchies and diffs remain the working surfaces. These specimens use the application stylesheet.</p>
+<p><label class="switch"><input type="checkbox" role="switch" id="forest"> Forest theme</label></p>
+<!-- REF-238 specimens begin -->
+<section class="ov-section overview-content" id="overview-components">
+<div class="section-heading"><h2>Needs your attention <span class="count" aria-label="2 datasets">2</span></h2><div class="section-heading-end"><a class="section-link" href="#overview-components">View all</a><label class="switch"><input type="checkbox" role="switch"> Show all owners</label></div></div>
+<p>Count pills are neutral. A native switch has a visible label, a 44px target and a focus ring. Feedback is static and contains meaningful text; color only reinforces its severity.</p>
+<ul class="card-grid card-grid-attention">
+<li><article class="dataset-card">
+<div class="dataset-card-name"><h3 class="dataset-card-title"><a class="dataset-card-link" href="#overview-components" title="Country mapping">Country mapping</a></h3><span class="dataset-card-kind">Mapping</span></div>
+<div class="dataset-card-head"><span class="dataset-icon-tile"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 9v12"></path></svg></span><details class="export-menu dataset-card-actions"><summary class="button button-icon-only" aria-label="Actions for Country mapping">⋯</summary><div class="export-menu-options"><a href="#overview-components">Settings</a><a href="#overview-components">Versions</a></div></details></div>
+<p class="dataset-card-desc" tabindex="0">Maps local country codes to the shared reporting standard.</p>
+<div class="dataset-card-meta"><span>V2 · <time datetime="2026-10-20">20 Oct 2026</time></span><span class="dataset-card-records"><b>249</b> records</span></div>
+<div class="dataset-card-feedback"><p class="callout callout-warning">Uses V13 · Countries V14 is Current</p><p class="dataset-card-note">Draft already uses V14. Review and publish.</p><p class="dataset-card-more">+1 more: Draft untouched for 14 days</p></div>
+</article></li>
+<li><article class="dataset-card">
+<div class="dataset-card-name"><h3 class="dataset-card-title"><a class="dataset-card-link" href="#overview-components">Currencies</a></h3><span class="dataset-card-kind">Reference</span></div>
+<div class="dataset-card-head"><span class="dataset-icon-tile"><svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 9v12"></path></svg></span><details class="export-menu dataset-card-actions"><summary class="button button-icon-only" aria-label="Actions for Currencies">⋯</summary><div class="export-menu-options"><a href="#overview-components">Settings</a><a href="#overview-components">Versions</a></div></details></div>
+<p class="dataset-card-desc" tabindex="0">Shared currency codes used across the organisation.</p>
+<div class="dataset-card-meta"><span>V2 · <time datetime="2026-10-20">20 Oct 2026</time></span><span class="dataset-card-records"><b>180</b> records</span></div>
+<div class="dataset-card-feedback"><p class="callout callout-info">V3 takes effect tomorrow</p><p class="dataset-card-note">Check or cancel it before then.</p></div>
+</article></li>
+</ul>
+<p class="callout callout-error">Can't update to Countries V15</p>
+<h3 class="ov-group-title">To finish</h3><ul class="tally"><li><a href="#overview-components"><span class="count">1</span>Drafts untouched for 14 days</a></li><li><a href="#overview-components"><span class="count">2</span>Incomplete mapping drafts</a></li></ul>
+<p>Names occupy the full card width and wrap to two lines. Descriptions stay visible beside attention feedback. The primary link has a 3px card focus outline; the borderless menu and Export are separate controls. Hover changes the border only. Full titles and descriptions remain available on keyboard focus. The attention grid has three columns at desktop widths, two from 768px, and one below 768px.</p>
+</section>
+<!-- REF-238 specimens end -->
+<section><h2>New semantic tokens</h2><dl>
+<dt><code>--card-grid-min-width</code></dt><dd>16rem</dd><dt><code>--card-padding-compact</code></dt><dd>var(--space-md)</dd><dt><code>--color-card-hover-border</code></dt><dd>var(--color-link)</dd><dt><code>--color-count-surface</code></dt><dd>var(--color-action-secondary)</dd><dt><code>--color-count-text</code></dt><dd>var(--color-text-secondary)</dd><dt><code>--switch-track-width</code></dt><dd>2.25rem</dd><dt><code>--switch-track-height</code></dt><dd>1.25rem</dd><dt><code>--color-switch-off</code></dt><dd>var(--color-control-border)</dd><dt><code>--color-switch-on</code></dt><dd>var(--color-action-primary)</dd>
+</dl><p>Aliases resolve against the active Light or Forest theme. No new color primitives. Forest icon tiles use <code>--color-link</code>.</p></section>
+</main><script>document.getElementById('forest').addEventListener('change', event => {document.documentElement.dataset.theme = event.target.checked ? 'dark' : 'light';});</script></body></html>

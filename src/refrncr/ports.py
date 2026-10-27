@@ -432,7 +432,13 @@ class DatasetRecordOperations(Protocol):
         identifier_key: bytes,
     ) -> bool: ...
 
-    def replace_values(self, record: DatasetRecordRow, values: tuple[RecordValue, ...]) -> None: ...
+    def replace_values(
+        self,
+        record: DatasetRecordRow,
+        values: tuple[RecordValue, ...],
+        *,
+        field_ids: tuple[str, ...] | None = None,
+    ) -> None: ...
 
     def delete_if_revision(
         self, dataset_id: str, record_id: str, expected_revision: int
@@ -501,9 +507,28 @@ class HierarchyOperations(Protocol):
     def field_has_values(self, dataset_id: str, field_id: str) -> bool: ...
 
 
+class OverviewOperations(Protocol):
+    def recent_ids(self, user_id: str) -> tuple[str, ...]: ...
+
+    def record_visit(self, user_id: str, dataset_id: str, now: datetime) -> None: ...
+
+    def version_fields(self, version_ids): ...
+
+    def draft_counts(self, dataset_ids) -> dict[str, tuple[int, int]]: ...
+
+    def version_unmapped(self, version_ids) -> dict[str, int]: ...
+
+
+class InstallationSettingsOperations(Protocol):
+    def get_policy(self, *, for_update: bool = False) -> str: ...
+    def change_policy(self, expected: str, policy: str) -> bool: ...
+
+
 class UnitOfWork(Protocol):
+    installation_settings: InstallationSettingsOperations
     write: bool
     api_keys: ApiKeyOperations
+    overview: OverviewOperations
     concepts: ConceptOperations
     version_diff: VersionDiffOperations
     versions: VersionOperations
@@ -588,6 +613,10 @@ class DatasetExportAccessOperations(Protocol):
     def list_for_dataset(self, dataset_id: str) -> list[DatasetExportAccessRecord]: ...
 
     def applies(self, dataset_id: str, user_id: str, team_ids: tuple[str, ...]) -> bool: ...
+
+    def exportable_dataset_ids(self, user_id: str, team_ids: tuple[str, ...]) -> tuple[str, ...]:
+        """Datasets owned by the user's teams or explicitly granted to the user/teams."""
+        ...
 
     def create(
         self, dataset_id: str, subject_type: str, subject_id: str

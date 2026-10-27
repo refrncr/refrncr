@@ -91,9 +91,13 @@ version.
 Supply exactly one `Authorization: Bearer <api-key>` header. Browser sessions,
 cookies and URL/query credentials never authenticate API requests. The key uses
 its owner's current Dataset rights through `DatasetAuthorizationService` in the
-content read snapshot. REF-73 currently permits every active, nondeleted Community
-user to view all Current Datasets; losing maintenance/team/export access alone does
-not remove read rights. Deactivating/deleting the key owner causes authentication
+content read snapshot. REF-306 uses the owner's current dataset export right for all API
+reads and filters dataset lists before counting and paginating. Under REF-294's default
+`Everyone` policy, every active user can read published datasets. In either stricter mode,
+administrators, owning-team members and users/teams with an explicit export grant can read
+them. A grant revocation, removed team membership, changed owning team or stricter policy
+applies from the next request. An already-running consistent read may finish. App reading
+remains open to active users. Deactivating/deleting the key owner causes authentication
 401. A Dataset read denied after authentication returns 404, including conditional
 requests; no per-key scope or legacy Grant authority is introduced.
 

@@ -19,7 +19,7 @@ def test_every_orm_datetime_column_uses_utc_datetime_type():
         for column in table.columns
         if isinstance(column.type, UTCDateTime)
     ]
-    assert len(columns) == 28
+    assert len(columns) == 29
 
 
 def test_database_roundtrip_normalizes_aware_value_and_rejects_naive(database_record_services):

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% from "components/concept.html" import new_concept with context %}
+{% from "components/concept.html" import new_concept, current_version_action with context %}
 {% block content %}
 <h1>Draft unavailable</h1>
 <p class='alert alert-info'>{{ error }}</p>
 <div class='page-actions'>
 <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>Versions</a>
-<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
+{{ current_version_action(key, has_current) }}
 {% if not already_active %}{{ new_concept(key) }}{% endif %}
 </div>
 {% endblock %}

@@ -44,6 +44,17 @@
   --motion-duration-panel: 180ms; --motion-duration-layout: 180ms; --motion-easing-standard: ease-out;
   /* Reference breakpoints; CSS media-query conditions cannot consume custom properties. */
   --breakpoint-mobile: 320px; --breakpoint-tablet: 768px; --breakpoint-desktop: 1024px; --breakpoint-wide: 1440px;
+  /* Overview sizes and semantic roles; aliases resolve in both Light and Forest. */
+  --card-grid-min-width: 16rem;
+  --card-padding-compact: var(--space-md);
+  --color-card-hover-border: var(--color-link);
+  --color-count-surface: var(--color-action-secondary);
+  --color-count-text: var(--color-text-secondary);
+  --switch-track-width: 2.25rem;
+  --switch-track-height: 1.25rem;
+  --color-switch-off: var(--color-control-border);
+  --color-switch-on: var(--color-action-primary);
+
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
