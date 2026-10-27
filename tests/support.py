@@ -101,6 +101,9 @@ def _dataset_browser():
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     services = create_community_services(factory, ResourceTypeRegistry())
+    from dataset_helpers import use_admin_export_policy
+
+    use_admin_export_policy(services)
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Administrator", PASSWORD)
     services.teams.create_team(admin.id, "Test data domain")
@@ -313,7 +316,10 @@ def audits(context):
 
 
 def context_from_audit_db(audit_db):
+    from dataset_helpers import use_admin_export_policy
+
     engine, sessions, services = audit_db
+    use_admin_export_policy(services)
     admin = services.users.create_initial_admin("admin@example.com", "Admin", "valid password")
     user = services.users.create_user(admin.id, "user@example.com", "User", "valid password")
     owner = services.teams.create_team(admin.id, "Domain")
@@ -333,7 +339,7 @@ def context_from_audit_db(audit_db):
     )
 
 
-def snapshot(context):
+def snapshot(context, *, include_visits=True):
     with context.sessions() as session:
         return {
             table.name: sorted(
@@ -345,6 +351,7 @@ def snapshot(context):
                 )
             )
             for table in Base.metadata.sorted_tables
+            if include_visits or table.name != "dataset_visits"
         }
 
 

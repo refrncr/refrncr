@@ -24,7 +24,7 @@
     <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>
     {% if settings_return_version_id %}<input type='hidden' name='settings_return_version_id' value='{{ settings_return_version_id }}'>{% endif %}
     <div class='dataset-edit-pair'>
-      {% if may_govern %}
+      {% if may_change_owner %}
         <div>
           {{ team_choice(teams, selected_team_id) }}
           <input type='hidden' name='expected_owner_team_id' value='{{ expected_owner_team_id }}'>

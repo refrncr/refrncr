@@ -39,6 +39,7 @@ from refrncr.models import (
     DatasetRecordValue,
     DatasetVersion,
     Grant,
+    InstallationSettings,
     LoginSession,
     Membership,
     Organisation,
@@ -798,13 +799,20 @@ class SqlAlchemyDatasetRecordOperations:
             raise PersistenceConflictError(_safe_constraint_name(exc)) from None
         return result.rowcount == 1
 
-    def replace_values(self, record: DatasetRecord, values: tuple[RecordValue, ...]) -> None:
-        self.session.execute(
-            delete(DatasetRecordValue).where(
-                DatasetRecordValue.dataset_id == record.dataset_id,
-                DatasetRecordValue.record_id == record.id,
-            )
+    def replace_values(
+        self,
+        record: DatasetRecord,
+        values: tuple[RecordValue, ...],
+        *,
+        field_ids: tuple[str, ...] | None = None,
+    ) -> None:
+        statement = delete(DatasetRecordValue).where(
+            DatasetRecordValue.dataset_id == record.dataset_id,
+            DatasetRecordValue.record_id == record.id,
         )
+        if field_ids is not None:
+            statement = statement.where(DatasetRecordValue.field_id.in_(field_ids))
+        self.session.execute(statement)
         self.add_values(record, values)
 
     def delete_if_revision(self, dataset_id: str, record_id: str, expected_revision: int) -> bool:
@@ -1340,6 +1348,40 @@ class SqlAlchemyAuditReadOperations:
         return {key: AuditObjectRecord(key in names, names.get(key)) for key in ids}
 
 
+class SqlAlchemyInstallationSettingsOperations:
+    def __init__(self, session):
+        self.session = session
+
+    def get_policy(self, *, for_update=False):
+        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+
+        row = self.session.scalar(
+            _locked(
+                select(InstallationSettings).where(
+                    InstallationSettings.id == INSTALLATION_SETTINGS_ID
+                ),
+                self.session,
+                for_update,
+            )
+        )
+        if row is None:
+            raise RuntimeError("Installation settings are missing; run database migrations")
+        return row.export_access_policy
+
+    def change_policy(self, expected, policy):
+        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+
+        result = self.session.execute(
+            update(InstallationSettings)
+            .where(
+                InstallationSettings.id == INSTALLATION_SETTINGS_ID,
+                InstallationSettings.export_access_policy == expected,
+            )
+            .values(export_access_policy=policy)
+        )
+        return result.rowcount == 1
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(
         self,
@@ -1370,6 +1412,7 @@ class SqlAlchemyUnitOfWork:
             if self.translate_errors:
                 raise PersistenceConflictError() from None
             raise
+        self.installation_settings = SqlAlchemyInstallationSettingsOperations(self.session)
         self.users = SqlAlchemyUserOperations(self.session)
         self.api_keys = SqlAlchemyApiKeyOperations(self.session)
         self.audit_history = SqlAlchemyAuditReadOperations(self.session)
@@ -1393,6 +1436,9 @@ class SqlAlchemyUnitOfWork:
         from refrncr.concept_persistence import SqlAlchemyConceptOperations
 
         self.concepts = SqlAlchemyConceptOperations(self.session)
+        from refrncr.overview_persistence import SqlAlchemyOverviewOperations
+
+        self.overview = SqlAlchemyOverviewOperations(self.session)
         return self
 
     def __exit__(
@@ -1563,6 +1609,21 @@ class SqlAlchemyDatasetExportAccessOperations:
                 .limit(1)
             )
             is not None
+        )
+
+    def exportable_dataset_ids(self, user_id, team_ids):
+        granted = select(DatasetExportAccess.dataset_id).where(
+            or_(
+                DatasetExportAccess.user_id == user_id,
+                DatasetExportAccess.team_id.in_(team_ids),
+            )
+        )
+        return tuple(
+            self.session.scalars(
+                select(Dataset.id)
+                .where(or_(Dataset.owner_team_id.in_(team_ids), Dataset.id.in_(granted)))
+                .order_by(Dataset.id)
+            )
         )
 
     def create(self, dataset_id, subject_type, subject_id):

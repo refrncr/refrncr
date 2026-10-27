@@ -101,7 +101,7 @@ def test_dataset_pages_are_bounded_and_permissions_are_bulk(api, monkeypatch):
     first = get(c)
     monkeypatch.setattr(
         c.service.authorization,
-        "viewable_resources",
+        "exportable_resources",
         lambda *a, **kw: AuthorizedResourceSet(False, (c.d.id,)),
     )
     restricted = get(c, headers={**c.headers, "If-None-Match": first.headers["etag"]})

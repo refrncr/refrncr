@@ -1,15 +1,20 @@
 # Dataset governance (REF-73)
 
 Teams are data domains in the single Community installation. Every Dataset has one owning team.
-All active, non-deleted users can discover/read metadata, schema, identifiers and records.
+All active, non-deleted users can discover/read metadata, schema, identifiers and records
+in the app. API reading follows current dataset export authority (REF-306).
 Creating a Dataset requires a current membership in its chosen team; administrators may choose
 any existing team. One eligible team is selected automatically, multiple teams require a choice,
 and zero teams blocks creation with a link to Teams. Teams and memberships are never auto-created.
 
 Current owning-team members maintain metadata, fields, identifiers and records, including imports,
-and may export. Community administrators maintain/export all Datasets and alone reassign ownership
-or manage extra export access. A direct user or team export entry permits CSV, Excel and JSON
-downloads but no maintenance. Removing one entry leaves other applicable access intact. Inactive
+and may export. Community administrators maintain/export all Datasets and alone reassign ownership.
+REF-294 makes export and grant administration depend on the installation policy: `everyone`
+(the default) permits export by every active user and disables grant administration;
+`team_grants` permits administrators and owning-team members to manage grants;
+`admin_grants` reserves that management for administrators. In either stricter mode, a direct
+user or team export entry permits CSV, Excel and JSON downloads and API reads, but no
+maintenance. Removing one entry leaves other applicable access intact. Inactive
 and deleted users have no capabilities, even if memberships/export entries remain stored.
 
 `DatasetAuthorizationService` is the authoritative framework-independent decision layer. Mutation
@@ -89,8 +94,14 @@ cleanup followed by an empty downgrade is only appropriate for disposable databa
 
 Owning-team display names appear in overview, breadcrumbs and configuration. Creation reuses the
 existing sidepanel, form and feedback components with a full-page fallback. Administrators change the
-owning team in the Dataset details edit form and manage export access on the Access management tab.
+owning team in the Dataset details edit form. Administrators and owning-team members see the
+Access tab; grant administration follows the installation policy independently of ownership.
+Under `admin_grants`, owning-team members inspect the grants as a read-only list. Under
+`everyone`, both roles see the owning team and open-access explanation without retained grants.
 Read-only users can open configuration; maintenance and export actions follow separate capabilities.
+See [Dataset access](../user-guide/dataset-access.md) and the REF-294 amendment to ADR-011.
+The REF-73 migration procedure below describes its historical restrictive baseline; migration
+`0035_ref_294` deliberately selects `everyone` for both new and existing installations.
 No design tokens or separate JavaScript controller are added. The shared controller has opt-in selection behavior. The shared `page-header-actions-end` variant
 keeps the configuration header actions right-aligned, including after wrapping. The team-choice macro
 shares creation/reassignment markup.

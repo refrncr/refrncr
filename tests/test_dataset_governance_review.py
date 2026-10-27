@@ -87,7 +87,7 @@ def test_each_service_boundary(governance, kind):
         token = staged[0].token
         assert s.record_imports.preview(actor, "review", d.key, token, ("code", None)).valid
         assert s.record_imports.confirm(actor, "review", d.key, token) == 1
-    check(lambda: s.datasets.export_access_context(actor, d.key), kind == "admin")
+    check(lambda: s.datasets.export_access_context(actor, d.key), maintainer)
     check(lambda: s.datasets.grant_export_access(actor, d.key, "user", a.id), kind == "admin")
     check(lambda: s.datasets.revoke_export_access(actor, d.key, entry.id), kind == "admin")
     check(lambda: s.datasets.change_owner(actor, d.key, owner.id, other.id), kind == "admin")

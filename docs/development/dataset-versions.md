@@ -29,7 +29,8 @@ For published versions, only cancellation actor/timestamp is persisted as lifecy
 Expired are computed on reads, requiring no scheduler. Cancelled snapshots never activate.
 One Scheduled version blocks further publication until its date arrives or it is cancelled.
 Cancellation rechecks the UTC day under the lock and preserves snapshot and number.
-A missing Current snapshot has no historical/future fallback.
+Service reads and exports without an explicit version never fall back when Current is absent.
+The browser Records route may redirect to an explicitly selected view as described below.
 
 Publication/cancellation linearize at their authorized, locked calendar check. Validation,
 complete copy and audit are synchronous and commit atomically. A failure rolls everything
@@ -191,7 +192,25 @@ These are explicit limits, not a claim of constant-time or unlimited-size perfor
 
 ## Explicit concept lifecycle and migration 0016
 
-Normal links and breadcrumbs select Current. **Versions** is a header action with the
+Normal links and breadcrumbs select Current. When Current is absent, the browser Records
+route redirects with HTTP 303 to the maintainer's active Draft, otherwise to the earliest
+Scheduled version or the most recent historical version. A latest Cancelled version redirects
+to Versions; its content and exports remain inaccessible. Ordinary viewers without Current
+still receive the non-disclosing 404, including for metadata. This fallback changes browser
+navigation only, not service/API default selection or export rules.
+
+A maintainer's Dataset with neither Draft nor versions shows the standard Records header,
+Dataset metadata and tabs, plus Versions and a CSRF-protected Create draft action. Fields,
+Access and Settings explicitly retain their selected Draft in the Records link, editing
+links and Draft banner. Scheduled and Expired views share a status bar across the content
+and configuration tabs: Scheduled uses the existing info colours and links to the cancellation
+confirmation; Expired shows its effective period. The shared **View current version** action
+appears only when a Current version exists, including in Draft and Versions views.
+A Draft without a baseline says **Nothing is published yet. Publishing creates Version 1.**;
+its Review & publish subtitle is **This draft will become Version 1.**
+No new schema, permission, audit event or dependency is introduced.
+
+**Versions** is a header action with the
 existing history icon; no standalone tab remains. Versions exposes **+ New version**
 (the authoritative concept-create operation) only to administrators with no active concept.
 Its aligned **Concept** row always appears first, followed by published versions in
@@ -283,8 +302,11 @@ For a Dataset with no non-cancelled version, a non-legacy Concept remains import
 Record changes or a completed import. Every new preview compares with the current Draft and
 the latest import replaces the previous result. For Datasets with a non-cancelled version,
 Record mutations and completed imports continue to block further imports in that Concept.
-Field-only changes preserve eligibility. New import deletions, including Records added to an
-unpublished Draft, remain visible as Deleted and can be undone. See
+Field-only changes preserve eligibility. Reference Dataset lists and Deleted counts include
+only removals from the pinned baseline, matching Review & publish. A Record added and then
+removed within the Draft is omitted from the list, totals and filters, whether removed
+manually or by import. Retained deletion data and the Mapping Dataset rule remain unchanged.
+Import previews and their confirmation still account for every Draft Record being removed. See
 [ADR-016](../architecture/adr-016-complete-record-import.md) and
 [import security](record-import-security.md#complete-new-version-imports-ref-160).
 

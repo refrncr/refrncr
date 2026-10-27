@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_mapping_dataset, create_owned_dataset
 from openpyxl import Workbook
 from support import PASSWORD, html_elements, html_tag_texts, html_text
 
@@ -494,7 +494,7 @@ def test_preview_keeps_required_and_source_format_errors_together(wizard):
     wizard.upload(b"code,amount,stamp\nA,1,2024-10-27 02:30:00\n")
     page = wizard.preview(("code", "", "stamp"))
     text = html_text(page.text)
-    assert "Map every active Field exactly once." in text
+    assert "Map every required and identifier field." in text
     assert "Choose an unambiguous source format for this field." in text
 
 
@@ -557,9 +557,11 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
     optional_field(wizard, "function")
     missing = wizard.upload()
     attributes, message = status(missing)
-    assert message == "1 field not mapped: Function"
-    assert "data-state='pending'" in attributes
-    assert "hidden" not in re.search(
+    assert message == (
+        "Ready to continue · 2 fields mapped, 0 columns not imported · 1 field not in file"
+    )
+    assert "data-state='ready'" in attributes
+    assert "hidden" in re.search(
         r"<p class='mapping-reason help-text'([^>]*)>", missing.text
     ).group(1)
 
@@ -587,7 +589,9 @@ def test_mapping_instruction_and_readiness_are_visible_near_continue(wizard):
 
 def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions(wizard):
     for key in ("active", "subgroup", "region", "category"):
-        optional_field(wizard, key)
+        wizard.services.dataset_fields.create_field(
+            wizard.admin.id, wizard.dataset.key, key, key.title(), "string", True
+        )
     page = wizard.upload(b"code,amount\nA,1\n")
     page = wizard.preview(("", ""))
     status_text = html_text(
@@ -604,7 +608,76 @@ def test_mapping_status_limits_field_names_and_cancel_is_left_of_forward_actions
     )
     assert (
         page.text.count(
-            "This import replaces all records in the draft, so every field must be mapped."
+            "Map every required and identifier field. Optional fields may be left unmapped."
         )
         == 2
     )
+
+
+@pytest.mark.parametrize("existing", [None, "matching", "deleted"])
+def test_optional_fields_preview_explains_preserved_and_empty_values(wizard, existing):
+    wizard.services.dataset_fields.create_field(
+        wizard.admin.id, wizard.dataset.key, "function", "Function <script>", "string"
+    )
+    if existing:
+        wizard.services.dataset_records.create_record(
+            wizard.admin.id,
+            wizard.dataset.key,
+            {"code": "A" if existing == "matching" else "B", "amount": "1", "function": "Kept"},
+        )
+    wizard.upload()
+    page = wizard.preview()
+    assert page.status_code == 200
+    explanation = (
+        "Existing records keep their values; new records leave these fields empty."
+        if existing == "matching"
+        else "These fields stay empty."
+    )
+    assert f"Not in file: Function <script>. {explanation}" in html_text(page.text)
+    if existing != "matching":
+        assert "Existing records keep their values" not in page.text
+    assert "<code>Function &lt;script&gt;</code>" in page.text
+    assert "Import records" in page.text
+    assert "every field must be mapped" not in page.text
+    wizard.get(wizard.path + "/step/4")
+    imported = wizard.post(wizard.path + "/confirm", {"acknowledge_deletions": "yes"})
+    assert imported.status_code == 200
+    assert wizard.count() == (2 if existing == "deleted" else 1)
+
+
+@pytest.mark.parametrize("omitted", [0, 1, 2])
+def test_ready_mapping_status_counts_fields_not_in_file(wizard, omitted):
+    for key in ("active", "day")[:omitted]:
+        optional_field(wizard, key)
+    wizard.upload(b"code,amount,extra\nA,1,ignored\n")
+    wizard.preview(("code", "amount", "__ignored__"))
+    page = wizard.get(wizard.path + "/step/3")
+    assert page.status_code == 200
+    status = html_text(
+        re.search(r"<span class='mapping-status-line'.*?</span>", page.text, re.S).group()
+    ).strip()
+    expected = "Ready to continue · 2 fields mapped, 1 column not imported"
+    if omitted:
+        expected += f" · {omitted} {'field' if omitted == 1 else 'fields'} not in file"
+    assert status == expected
+    assert "data-import-mode='new_version'" in page.text
+
+
+def test_ready_mapping_target_update_does_not_count_fields_not_in_file(wizard):
+    dataset = create_mapping_dataset(
+        wizard.services, wizard.admin, "target-import", "Target import", records=("A",)
+    )
+    for key in ("target", "note"):
+        wizard.services.dataset_fields.create_field(
+            wizard.admin.id, dataset.key, key, key.title(), "string"
+        )
+    page = wizard.post(
+        f"/datasets/{dataset.key}/records/import",
+        {"file": (io.BytesIO(b"code,target\nA,updated\n"), "targets.csv")},
+    )
+    assert page.status_code == 200
+    status = html_text(
+        re.search(r"<span class='mapping-status-line'.*?</span>", page.text, re.S).group()
+    ).strip()
+    assert status == "Ready to continue · 2 fields mapped, 0 columns not imported"
+    assert "data-import-mode='mapping_update'" in page.text

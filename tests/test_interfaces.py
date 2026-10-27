@@ -241,6 +241,7 @@ def test_renamed_views_keep_csrf_and_capability_checks():
 
 def _route_matrix_expectations():
     community = {
+        "attention_overview",
         "api_key_list",
         "api_key_create",
         "api_key_revoke",
@@ -250,7 +251,7 @@ def _route_matrix_expectations():
         "team_list",
         "theme_preference",
     }
-    installation_admin = {"audit_list", "audit_detail"}
+    installation_admin = {"audit_list", "audit_detail", "dataset_access_settings"}
     access_admin = {
         "user_list",
         "create_user",
@@ -372,6 +373,9 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
         "record_services" if database_backend == "sqlite" else "postgresql_record_services"
     )
     _, _, services, admin = services_fixture
+    from dataset_helpers import use_admin_export_policy
+
+    use_admin_export_policy(services)
     viewer = services.users.create_user(
         admin.id, "matrix-viewer@example.com", "Viewer", "valid password"
     )
@@ -1162,12 +1166,12 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert "Access management" in secondary
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
     secondary_elements = html_elements(secondary)
-    assert sum(tag == "a" for tag, _ in secondary_elements) == 5
+    assert sum(tag == "a" for tag, _ in secondary_elements) == 6
     assert re.search(r'href="/settings/api-keys">.*?</svg>API keys</a>', secondary, re.S)
     assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
     assert sum(attrs.get("aria-current") == "page" for _, attrs in secondary_elements) == 1
-    assert sum(attrs.get("aria-hidden") == "true" for _, attrs in secondary_elements) == 5
+    assert sum(attrs.get("aria-hidden") == "true" for _, attrs in secondary_elements) == 6
     assert re.search(
         r'<a class="settings-back" href="/">.*?</svg>Back to app</a>',
         body,

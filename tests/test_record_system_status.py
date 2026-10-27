@@ -36,7 +36,8 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     added = c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "new"})
     browser, csrf = client(c)
     ordinary, _ = client(c, c.u)
-    before = snapshot(c)
+    # Successful GETs record visits; keep all business/audit immutability assertions.
+    before = snapshot(c, include_visits=False)
     view = c.service.read(c.a.id, c.d.key, prefer_concept=True)
     assert view.record_states == {
         c.record.id: "Changed",
@@ -73,7 +74,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
     assert "This Record will be removed when you publish" in panel
     assert "data-panel-mode=" not in panel and "data-panel-view='edit'" not in panel
     assert "Content change" in panel and "Content validation" in panel
-    assert snapshot(c) == before  # Read/search/details do not write or audit.
+    assert snapshot(c, include_visits=False) == before  # Read/search/details do not write or audit.
     for operation in (
         lambda: c.s.dataset_records.update_record(c.a.id, c.d.key, deleted.id, 1, content),
         lambda: c.s.dataset_records.delete_record(c.a.id, c.d.key, deleted.id, 1),
@@ -89,7 +90,7 @@ def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(con
         )
         assert rejected.status_code == 404
     assert request(ordinary, "get", f"/datasets/{c.d.key}/concept/records?q=old").status_code == 404
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     publish(c)
     current = c.service.read(c.a.id, c.d.key)
     assert current.deleted_count == 0 and current.page.total == 3

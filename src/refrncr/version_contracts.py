@@ -111,6 +111,7 @@ class VersionState:
     version: PublishedVersion
     status: str
     valid_until: date | None
+    has_current: bool = False
 
     @property
     def end_date(self):
@@ -128,6 +129,7 @@ def version_states(versions, today):
         for i, version in enumerate(active)
     }
     result = []
+    has_current = any(version.effective_date <= today for version in active)
     for version in versions:
         end = boundaries.get(version.id)
         status = (
@@ -139,7 +141,7 @@ def version_states(versions, today):
             if end is not None and end <= today
             else "Current"
         )
-        result.append(VersionState(version, status, end))
+        result.append(VersionState(version, status, end, has_current))
     return tuple(result)
 
 
@@ -195,3 +197,7 @@ class VersionHistory:
     may_maintain: bool
     concept: ActiveConcept | None = None
     concept_summary: object = None
+
+    @property
+    def has_current(self):
+        return any(state.status == "Current" for state in self.entries)

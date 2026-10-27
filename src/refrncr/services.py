@@ -23,6 +23,7 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.errors import UserManagementError, ValidationError
+from refrncr.field_contracts import FIELD_KEY_PATTERN
 from refrncr.models import LoginSession, User
 from refrncr.ports import (
     AuditEntry,
@@ -251,7 +252,7 @@ def validate_dataset_description(description: str) -> str:
 
 
 def validate_dataset_field_key(key: str) -> str:
-    if not isinstance(key, str) or re.fullmatch(r"[a-z0-9][a-z0-9_]{0,99}", key) is None:
+    if not isinstance(key, str) or re.fullmatch(FIELD_KEY_PATTERN, key) is None:
         raise ValidationError(
             "Field key must contain 1-100 lowercase ASCII letters, numbers, or underscores"
         )
@@ -707,9 +708,15 @@ class DatasetAuthorizationService:
             actor = work.users.get(actor_id, for_update=mutation)
             if not self.active(actor):
                 return False
+            if capability in {"export", "manage_export"}:
+                policy = work.installation_settings.get_policy()
+                if policy == "everyone":
+                    return capability == "export"
+                if capability == "manage_export" and policy == "admin_grants":
+                    return actor.role == "admin"
             if capability == "view" or actor.role == "admin":
                 return True
-            if capability in {"change_owner", "manage_export"}:
+            if capability == "change_owner":
                 return False
             teams = work.memberships.team_ids_for_user(actor_id)
             if dataset.owner_team_id in teams:
@@ -727,6 +734,20 @@ class DatasetAuthorizationService:
             if not self.active(work.users.get(actor_id)):
                 raise NotFoundError("Dataset not found")
             return AuthorizedResourceSet(True, ())
+
+    def exportable_resources(self, actor_id, *, uow=None):
+        """Bulk export authority in the same snapshot as the published API read."""
+        with nullcontext(uow) if uow is not None else self.uow() as work:
+            actor = work.users.get(actor_id)
+            if not self.active(actor):
+                raise NotFoundError("Dataset not found")
+            policy = work.installation_settings.get_policy()
+            if policy == "everyone" or actor.role == "admin":
+                return AuthorizedResourceSet(True, ())
+            teams = work.memberships.team_ids_for_user(actor_id)
+            return AuthorizedResourceSet(
+                False, work.dataset_export_access.exportable_dataset_ids(actor_id, teams)
+            )
 
     def maintainable_resources(self, actor_id, *, uow=None):
         with nullcontext(uow) if uow is not None else self.uow() as work:
@@ -1355,10 +1376,16 @@ class DatasetService:
         with self.uow() as uow:
             uow.begin_export_snapshot()
             dataset = uow.datasets.find_by_key(key)
-            if dataset is None or not self.authorization.datasets.can_manage_export_access(
+            if dataset is None or not self.authorization.datasets.can_maintain_dataset(
                 actor_id, dataset.id, uow=uow
             ):
                 raise NotFoundError("Dataset not found")
+            policy = uow.installation_settings.get_policy()
+            may_manage = self.authorization.datasets.can_manage_export_access(
+                actor_id, dataset.id, uow=uow
+            )
+            if policy == "everyone":
+                return dataset, [], [], [], policy, may_manage
             teams = uow.teams.list_by_name()
             users = uow.users.list_by_email()
             names = {("team", team.id): team.name for team in teams}
@@ -1372,6 +1399,8 @@ class DatasetService:
                 teams,
                 [user for user in users if user.is_active and not user.is_deleted],
                 entries,
+                policy,
+                may_manage,
             )
 
     def grant_export_access(self, actor_id, key, subject_type, subject_id):
@@ -1379,6 +1408,8 @@ class DatasetService:
         if not _valid_identity(actor_id):
             raise NotFoundError("Dataset not found")
         with self.uow(write=True, serialized=True) as uow:
+            # Serialize grant changes with policy changes before any Dataset/user locks.
+            uow.installation_settings.get_policy(for_update=True)
             dataset = uow.datasets.find_by_key(key, for_update=True)
             valid = False
             if subject_type == "team" and _valid_identity(subject_id):
@@ -1424,6 +1455,8 @@ class DatasetService:
     def revoke_export_access(self, actor_id, key, access_id):
         key = self._validated_lookup_key(key)
         with self.uow(write=True, serialized=True) as uow:
+            # Serialize grant changes with policy changes before any Dataset/user locks.
+            uow.installation_settings.get_policy(for_update=True)
             dataset = uow.datasets.find_by_key(key, for_update=True)
             if dataset is None or not self.authorization.datasets.can_manage_export_access(
                 actor_id, dataset.id, uow=uow

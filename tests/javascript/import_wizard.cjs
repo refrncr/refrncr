@@ -31,7 +31,7 @@ const advance = element({disabled:false});
 const statusText = element();
 const status = element({dataset:{},querySelector:selector => selector === '[data-mapping-status-text]' ? statusText : null});
 const reason = element({hidden:true});
-const mapping = element({dataset:{requiredKeys:'["code","amount"]'},
+const mapping = element({dataset:{importMode:'new_version',requiredKeys:'["code","amount"]'},
   querySelectorAll: () => selects, querySelector: selector => ({"[data-mapping-status]":status, "[data-mapping-reason]":reason})[selector]});
 const submit = element({type:'submit',disabled:false});
 const confirm = element({elements:[submit]});
@@ -87,7 +87,7 @@ assert.equal(selects[1].scrollOptions.block, 'center');
 assert.equal(document.activeElement, selects[1]);
 selects[1].value='amount'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported · 4 fields not in file');
 assert.equal(status.dataset.state, 'ready');
 assert.equal(reason.hidden,true);
 selects[0].value=''; selects[2].value=''; mapping.handlers.change();
@@ -113,7 +113,7 @@ assert.equal(selects[2].options[1].hidden, true);
 assert.equal(advance.disabled,true);
 selects[0].value='code'; mapping.handlers.change();
 assert.equal(advance.disabled,false);
-assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported');
+assert.equal(statusText.textContent, 'Ready to continue · 2 fields mapped, 1 column not imported · 4 fields not in file');
 assert.equal(statusText.children.some(child => child.dataset?.mappingJump !== undefined), false);
 tip.handlers.mouseenter();
 assert.equal(tip.open,true);
@@ -151,4 +151,25 @@ assert.equal(document.activeElement,opener);
 opener.handlers.click({});
 // Native Escape emits close: the controller restores the same opener.
 dialog.close(); assert.equal(document.activeElement,opener);
+// Ready status updates omitted fields after every mapping change, only for draft imports.
+for (const key of ['subgroup', 'subgroup_range', 'function']) {
+  selects.push(element({value:key, querySelectorAll:() => [],
+    closest:() => ({querySelector:() => element()})}));
+}
+selects[2].value='active';
+mapping.dataset.importMode='new_version';
+vm.runInNewContext(fs.readFileSync(process.argv[2], 'utf8'), {
+  document:{...document, refrncrInitialized:false,
+    querySelectorAll:selector => selector === '[data-import-mapping]' ? [mapping] : []},
+  JSON:{parse:() => requiredKeys}, window:{addEventListener(){}},
+});
+assert.equal(statusText.textContent, 'Ready to continue · 6 fields mapped, 0 columns not imported');
+selects[2].value='__ignored__'; mapping.handlers.change();
+assert.equal(statusText.textContent, 'Ready to continue · 5 fields mapped, 1 column not imported · 1 field not in file');
+selects[3].value='__ignored__'; mapping.handlers.change();
+assert.equal(statusText.textContent, 'Ready to continue · 4 fields mapped, 2 columns not imported · 2 fields not in file');
+for (const mode of ['mapping_update', 'create']) {
+  mapping.dataset.importMode=mode; mapping.handlers.change();
+  assert.equal(statusText.textContent, 'Ready to continue · 4 fields mapped, 2 columns not imported');
+}
 console.log('Mapping, single submission, modal focus wrapping and restoration passed');

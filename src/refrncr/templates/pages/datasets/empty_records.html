@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "components/concept.html" import new_concept, versions_action with context %}
+{% from "components/dataset_navigation.html" import dataset_navigation with context %}
+{% from "layouts/page.html" import page_context %}
+{% block title %}Records · {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
+{% block content %}
+  <div class='page-header'>
+    {% call page_context(dataset.name|dataset_title, '', icon=rendered_dataset_icon(dataset.icon, dataset.kind)) %}
+      {% include "pages/datasets/_breadcrumbs.html" %}
+    {% endcall %}
+    <div class='page-actions'>{{ versions_action(dataset.key) }}</div>
+  </div>
+  <p class='metadata'><code>{{ dataset.key }}</code> · {{ dataset.kind|dataset_kind_label }} · {{ dataset.owner_team_name }}</p>
+  {{ dataset_navigation(dataset, 'records', may_view_access=may_view_access) }}
+  <div class='empty-state'>
+    <p>This dataset has no records yet. Create a draft to add fields and records.</p>
+    {% if may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
+  </div>
+{% endblock %}

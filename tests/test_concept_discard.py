@@ -52,7 +52,8 @@ def test_current_required_preserves_first_metadata(context, published):
         c.service.create_concept(c.a.id, c.d.id)
     c.s.datasets.update_dataset(c.a.id, c.d.key, "First unpublished name", "Keep description")
     browser, csrf = client(c)
-    before = snapshot(c)
+    # Successful dataset GETs now update private visits; business data must stay unchanged.
+    before = snapshot(c, include_visits=False)
     for operation in (
         lambda: c.service.review_discard(c.a.id, c.d.id),
         lambda: c.service.discard_concept(c.a.id, c.d.id, None),
@@ -80,7 +81,7 @@ def test_current_required_preserves_first_metadata(context, published):
         },
     )
     assert response.status_code == 404
-    assert snapshot(c) == before
+    assert snapshot(c, include_visits=False) == before
     assert active(c) is not None
 
 
