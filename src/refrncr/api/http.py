@@ -64,8 +64,9 @@ class ConditionalRead:
     ):
         self.request = request
         self.clock = clock
+        # The additive metadata changes response bytes; pre-metadata ETags must revalidate.
         self.selection = (
-            "refrncr-json-v1",
+            "refrncr-json-v1-mapping-metadata",
             actor_id,
             kind,
             key,
@@ -90,6 +91,7 @@ class ConditionalRead:
                 p.version.number,
                 p.version.published_at.isoformat(),
                 p.version.effective_date.isoformat(),
+                (p.source.dataset_key, p.source.version) if p.source else None,
             )
             for p in publications
         ]

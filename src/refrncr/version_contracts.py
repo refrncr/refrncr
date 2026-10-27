@@ -84,6 +84,12 @@ class SummaryCounts:
 
 
 @dataclass(frozen=True, slots=True)
+class SourceVersion:
+    dataset_key: str
+    version: int
+
+
+@dataclass(frozen=True, slots=True)
 class PublishedVersion:
     id: str
     dataset_id: str

@@ -1443,6 +1443,18 @@
       ]
     },
     {
+      "symbol": "refrncr.api.routes.lookup",
+      "path": "/datasets/{dataset_key}/lookup",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_current",
+        "refrncr.services.DatasetAuthorizationService.exportable_resources"
+      ]
+    },
+    {
       "symbol": "refrncr.api.routes.hierarchy",
       "path": "/datasets/{dataset_key}/hierarchy",
       "methods": [

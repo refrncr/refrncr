@@ -23,7 +23,12 @@ from refrncr.ports import (
     StoredRecord,
 )
 from refrncr.presentation import DISPLAY_STATUSES, record_label, status_label
-from refrncr.published_contracts import CurrentPublication, CurrentRead, decode_identifier
+from refrncr.published_contracts import (
+    CurrentPublication,
+    CurrentRead,
+    decode_identifier,
+    mapping_identifier,
+)
 from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
     ConflictError,
@@ -175,6 +180,7 @@ class DatasetVersionService:
         limit=50,
         records=False,
         identifier=None,
+        source=None,
         unchanged=None,
         effective_date=None,
         version_number=None,
@@ -234,6 +240,7 @@ class DatasetVersionService:
                 dataset = uow.datasets.find_by_key(key)
                 if (
                     dataset is None
+                    or (source is not None and dataset.kind != "mapping")
                     or (hierarchy and dataset.kind != "hierarchy")
                     or (not allow_hierarchy and dataset.kind == "hierarchy")
                     or not self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
@@ -257,16 +264,33 @@ class DatasetVersionService:
                 if version is None:
                     raise NotFoundError("Dataset not found")
                 pairs, total = ((dataset, version),), version.record_count
+            sources = uow.versions.source_references(
+                tuple(v.source_version_id for d, v in pairs if d.kind == "mapping")
+            )
             result = CurrentRead(
                 tuple(
                     CurrentPublication(
-                        d.key, d.name, d.description, d.icon, d.kind, d.updated_at, v
+                        d.key,
+                        d.name,
+                        d.description,
+                        d.icon,
+                        d.kind,
+                        d.updated_at,
+                        v,
+                        sources.get(v.source_version_id) if d.kind == "mapping" else None,
                     )
                     for d, v in pairs
                 ),
                 total,
             )
             record_id = None
+            fields = None
+            if source is not None:
+                fields = uow.versions.fields(version)
+                try:
+                    identifier = mapping_identifier(source, fields)
+                except DatatypeError:
+                    raise ValidationError("Invalid source identifier") from None
             if identifier is not None:
                 try:
                     encoded = decode_identifier(identifier)
@@ -279,7 +303,8 @@ class DatasetVersionService:
                 return replace(result, not_modified=True)
             if key is None:
                 return result
-            fields = uow.versions.fields(version)
+            if fields is None:
+                fields = uow.versions.fields(version)
             rows = ()
             if record_id is not None:
                 rows = tuple(uow.versions.iterate_records(version, record_ids=(record_id,)))

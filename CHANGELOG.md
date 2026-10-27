@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Add published mapping lookup by typed source value, mapping field roles and pinned source
+  version metadata to the API (REF-92). Lookup follows mapping export access and existing
+  version selection and caching; unmapped source values return records with null targets.
+
 - For rc1, add Settings → Dataset access for file export and API reads (REF-294/REF-306).
   New and upgraded installations default to Everyone: every active user can consume
   published datasets. Stricter modes require owning-team membership or an explicit grant,

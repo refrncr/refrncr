@@ -14,17 +14,21 @@ OpenAPI 3.1 contract generated from the registered FastAPI routes and Pydantic m
 | `/api/v1/datasets/{dataset_key}` | Dataset summary plus ordered `fields` | None |
 | `/api/v1/datasets/{dataset_key}/records` | Array of Records | `version`, `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}/records/{identifier}` | One Record | `version` |
+| `/api/v1/datasets/{dataset_key}/lookup?source=<value>` | One mapping Record | `version` |
 | `/api/v1/datasets/{dataset_key}/hierarchy` | Complete flat hierarchy snapshot | `version` |
 
 A Dataset summary has `key`, `name`, `description`, `icon` (nullable), and
 `version` (`number`, `published_at`, canonical UTC timestamp, and `effective_from`,
-ISO calendar date) describes the selected immutable published version.
+ISO calendar date) describes the selected immutable published version. Its nullable
+`source` contains `{dataset_key, version}` for mappings and is null for other dataset kinds.
 Name/description/icon are current Dataset metadata per ADR-017. Fields and Records
 come exclusively from its immutable Current publication. No internal Dataset,
 Field or Record UUID, publisher identity, release note or Scheduled end boundary is returned.
 
 Field metadata, in published display order: `key`, `name`, `datatype`,
-`is_identifier`, `is_required`, `is_unique`, `display_position`, `definition`, `unit`.
+`is_identifier`, `is_required`, `is_unique`, `display_position`, `definition`, `unit`,
+and nullable `mapping_role` (`source_identifier`, `source_context`, or `mapping_target`
+for mappings; null for other kinds).
 Definition/unit are nullable plain text. No output-format configuration exists yet;
 the implemented required/unique/order metadata is retained without invented settings.
 
@@ -63,9 +67,29 @@ arbitrary supplied querystrings. Reverse proxies should preserve the `/api/v1` p
 Dataset order is key ascending. Records retain typed canonical identifier order and
 stable internal tie-breaking. Offset beyond the result set succeeds with an empty
 array and the correct total. No Concept, Cancelled or fallback working copy is available.
-Unsupported search, filters, sort, writes/imports/exports/mappings are not part of v1.
+Unsupported search, general filters, sort and writes/imports/exports are not part of v1.
 Hierarchy reads are available only through the dedicated endpoint below. Incompatible future
 changes require a new API version.
+
+### Mapping source lookup (REF-92)
+
+`GET /api/v1/datasets/{dataset_key}/lookup?source=1001` is a targeted lookup on one
+mapping source identifier, not a general filter. For example, SAP cost centre `1001`
+can resolve to target `AMS-SALES`. URL encode the source value. Parsing and canonicalization
+use the selected mapping version's `source_identifier` Field datatype; string identifiers
+retain significant leading zeroes. Invalid values return 400 `invalid_request`; an unknown
+value or a reference/hierarchy dataset returns 404 `not_found`. An existing, unmapped source
+value returns 200 with null target values. Missing/duplicate `source` and unknown parameters
+return 400; the existing 256-byte querystring limit also applies.
+
+The response is the same `RecordDetail` as `/records/{identifier}`: the opaque identifier,
+canonical values and selected version. `version` and `effective_date`, including Scheduled
+selection, work as above. Authentication, mapping export access, ETag/304 and private caching
+reuse the existing Record read. Access to the source dataset is not required. The mapping's
+`version.source` exposes the pinned source dataset key and version number even when the caller
+cannot read the source dataset. It never follows the source's latest version automatically.
+
+Reverse lookup, many-to-many mapping, batch lookup and general filtering remain out of scope.
 
 ### Published hierarchy snapshots (REF-182)
 
