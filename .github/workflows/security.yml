@@ -25,25 +25,6 @@ jobs:
           python-version: "3.12"
       - name: Install security tooling
         run: python -m pip install pip-audit==2.10.1 pip-tools==7.6.2
-      - name: Generate updated locks for PR 136
-        run: |
-          python - <<'PY'
-          import re
-          from pathlib import Path
-          path = Path("requirements/release.txt")
-          path.write_text(re.sub(r"^fastapi==.*?(?=^[a-z])", "", path.read_text(), flags=re.M | re.S))
-          PY
-          python tools/compile_release_lock.py
-          python tools/compile_dev_lock.py
-      - name: Save generated locks for review
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: pr-136-canonical-locks
-          path: |
-            requirements/release.txt
-            requirements/dev.txt
-          if-no-files-found: error
-          retention-days: 1
       - name: Verify reproducible release lock
         run: |
           python tools/compile_release_lock.py
