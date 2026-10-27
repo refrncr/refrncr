@@ -1,5 +1,5 @@
 // Disposable REF-40 browser acceptance. Never print or screenshot the secret.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = 'http://127.0.0.1:5140';
 const runId = Date.now();

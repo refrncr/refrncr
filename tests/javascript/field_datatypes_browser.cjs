@@ -1,6 +1,6 @@
 // REF-145 real-browser regression; start browser_field_datatypes_app.py first.
 // Uses the repository's optional external Playwright convention.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');

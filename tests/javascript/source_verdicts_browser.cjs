@@ -1,5 +1,5 @@
 // REF-159 real Chrome acceptance; uses the disposable source-format fixture.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5154';
 if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw Error('Use a disposable loopback fixture');

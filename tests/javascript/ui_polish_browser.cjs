@@ -1,5 +1,5 @@
 // REF-162: use browser_ui_polish_app.py and the existing optional Playwright setup.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5162';
@@ -16,7 +16,7 @@ async function login(page) {
 async function layout(page, label) {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${label}: page overflow`);
   if (process.env.REFRNCR_AXE_SOURCE && !label.startsWith('no-JavaScript')) {
-    if (!await page.evaluate(() => Boolean(window.axe))) await page.addScriptTag({path: process.env.REFRNCR_AXE_SOURCE});
+    if (!await page.evaluate(() => Boolean(window.axe))) await require('./browser_policy.cjs').injectAxe(page);
     const result = await page.evaluate(async () => {
       const result = await axe.run(document, {runOnly: {type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']}});
       return {violations: result.violations.map(v => ({id: v.id, impact: v.impact, nodes: v.nodes.map(n => ({target:n.target, summary:n.failureSummary}))})), incomplete: result.incomplete.map(v => v.id)};

@@ -27,3 +27,6 @@ htmlcov/
 # VS Code local settings
 .vscode/*
 !.vscode/settings.json
+
+# Browser test dependencies
+node_modules/

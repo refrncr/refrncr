@@ -1,6 +1,6 @@
 // Optional REF-149 browser smoke test against tests/browser_table_rows_app.py.
 // Uses the existing external Playwright convention; no project dependency is added.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5144';
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {

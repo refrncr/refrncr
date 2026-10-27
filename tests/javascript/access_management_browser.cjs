@@ -1,6 +1,6 @@
 // Optional browser acceptance for the Access tab (REF-165).
 // Start tests/browser_table_rows_app.py with fresh fixture data first.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5144';

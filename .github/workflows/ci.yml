@@ -10,6 +10,29 @@ permissions:
   contents: read
 
 jobs:
+  browser-csp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - name: Install locked test tools
+        run: |
+          python -m pip install --require-hashes -r requirements/dev.txt
+          python -m pip install --no-deps -e .
+          npm ci --ignore-scripts --prefix tests/javascript
+          node tests/javascript/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Test enforced browser CSP
+        run: python tests/run_browser_tests.py web_csp
+
   test-sqlite:
     runs-on: ubuntu-latest
     timeout-minutes: 20

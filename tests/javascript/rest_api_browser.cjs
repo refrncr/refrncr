@@ -1,5 +1,5 @@
 // Disposable ASGI acceptance. Never print keys, Record values or response bodies.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = 'http://127.0.0.1:5147';
 (async () => {

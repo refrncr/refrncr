@@ -1,5 +1,5 @@
 // Real Chrome acceptance against browser_rest_api_app.py. Synthetic keys never printed.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const base = 'http://127.0.0.1:5147';

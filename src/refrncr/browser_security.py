@@ -9,6 +9,17 @@ LOOPBACK_SESSION_COOKIE = "refrncr_session"
 HTTPS_ANONYMOUS_CSRF_COOKIE = "__Host-refrncr_csrf"
 LOOPBACK_ANONYMOUS_CSRF_COOKIE = "refrncr_csrf"
 
+WEB_HTML_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+        "form-action 'self'; frame-ancestors 'none'"
+    ),
+    "X-Frame-Options": "DENY",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
+
 
 def is_loopback_host(value: str | None) -> bool:
     """Recognize only literal loopback IPs and localhost, without DNS lookup."""

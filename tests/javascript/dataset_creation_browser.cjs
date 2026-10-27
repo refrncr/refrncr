@@ -1,5 +1,5 @@
 // REF-73 creation/maintenance matrix against the disposable browser_table_rows_app fixture.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5144';

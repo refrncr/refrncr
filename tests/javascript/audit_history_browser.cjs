@@ -1,5 +1,5 @@
 // Optional REF-39 browser regression, using the existing external Playwright convention.
-const {chromium} = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');
+const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');
