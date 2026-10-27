@@ -1167,7 +1167,9 @@ def test_settings_layout_navigation_and_context(interface, path, title):
     assert re.findall(r">(Users|Teams)</a>", secondary) == ["Users", "Teams"]
     secondary_elements = html_elements(secondary)
     assert sum(tag == "a" for tag, _ in secondary_elements) == 6
-    assert re.search(r'href="/settings/api-keys">.*?</svg>API keys</a>', secondary, re.S)
+    assert re.search(
+        r'href="/settings/api-keys" data-no-view-transition>.*?</svg>API keys</a>', secondary, re.S
+    )
     assert re.search(r'href="/settings/audit-log">.*?</svg>Audit log</a>', secondary, re.S)
     assert re.search(rf'aria-current="page">.*?</svg>{title}</a>', secondary, re.S)
     assert sum(attrs.get("aria-current") == "page" for _, attrs in secondary_elements) == 1
