@@ -4,6 +4,9 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Simplify audit time filters and list times to minute precision (REF-257). Preserve
+  exact event details and untouched filter links, including daylight-saving offsets.
+
 - Use the same navigation arrow tabs on desktop and small screens (REF-236), with
   generous touch targets. Remove the mobile app topbar and share the drawer controls
   with Settings while preserving its fixed desktop sidebar.

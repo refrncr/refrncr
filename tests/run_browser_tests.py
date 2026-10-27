@@ -19,6 +19,7 @@ CASES = {
     "api_keys": ("api_keys", 5140),
     "audit_export": ("table_rows", 5144),
     "audit_history": ("audit_history", 5145),
+    "audit_minutes": ("audit_history", 5145),
     "concept": ("concept", 5185),
     "concept_discard": ("discard", 5186),
     "dataset_creation": ("table_rows", 5144),
