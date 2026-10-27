@@ -293,9 +293,13 @@ class DatasetVersionService:
                     raise ValidationError("Invalid source identifier") from None
             if identifier is not None:
                 try:
-                    encoded = decode_identifier(identifier)
+                    encoded = decode_identifier(
+                        identifier, allow_hierarchy=dataset.kind == "hierarchy"
+                    )
                 except ValueError:
                     raise NotFoundError("Record not found") from None
+                # Match only the selected snapshot's key. A synthetic key is absent
+                # when that version uses business identifiers, even for the same leaf.
                 record_id = uow.versions.record_identity(version, encoded)
                 if record_id is None:
                     raise NotFoundError("Record not found")

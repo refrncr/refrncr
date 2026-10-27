@@ -102,6 +102,15 @@ additional records. The records use the existing opaque identifier and canonical
 values. When a hierarchy has no business-key fields, the opaque identifier is derived from
 the persisted hierarchy leaf identity and is not an internal UUID or authorization token.
 
+Identifiers from the hierarchy response and hierarchy record list can be used with
+`/records/{identifier}`. That endpoint retains the standard `RecordDetail`: the same
+`identifier` and `values`, plus version metadata, without the hierarchy-specific fields.
+The synthetic identifier stays the same across publications without business-key fields.
+Lookup only searches the selected snapshot: if a later version introduces business-key
+fields, the old synthetic identifier returns 404 there, while earlier versions remain
+readable using `version` or `effective_date`. There is no fallback to an older snapshot.
+The existing authorization, ETag and 304 rules apply to these detail reads as well.
+
 Nodes are ordered by stable node identifier. Records use the existing canonical identifier
 ordering. The endpoint reuses `effective_date` and `version` selection, bearer-only
 authentication, DatasetAuthorizationService authorization, safe 400/401/404/503 responses,

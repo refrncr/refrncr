@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Fix individual API reads of hierarchy records without business identifiers (REF-309).
+  Identifiers from record lists and hierarchy snapshots now resolve within the selected
+  version, preserving the existing response, authorization and conditional-read contracts.
+
 - Add published mapping lookup by typed source value, mapping field roles and pinned source
   version metadata to the API (REF-92). Lookup follows mapping export access and existing
   version selection and caching; unmapped source values return records with null targets.

@@ -21,8 +21,8 @@ def encode_identifier(key: bytes) -> str:
     return base64.urlsafe_b64encode(key).rstrip(b"=").decode("ascii")
 
 
-def decode_identifier(identifier: str) -> bytes:
-    """Decode the complete existing length-prefixed key; never parse a display label."""
+def decode_identifier(identifier: str, *, allow_hierarchy: bool = False) -> bytes:
+    """Decode a business key, or an existing synthetic hierarchy leaf key when allowed."""
     if not isinstance(identifier, str) or not 1 <= len(identifier) <= 2667:
         raise ValueError("Invalid identifier")
     if re.fullmatch(r"[A-Za-z0-9_-]+", identifier) is None:
@@ -33,6 +33,10 @@ def decode_identifier(identifier: str) -> bytes:
         )
         if len(key) > MAX_RECORD_IDENTIFIER_BYTES or encode_identifier(key) != identifier:
             raise ValueError
+        if allow_hierarchy and re.fullmatch(
+            rb"hierarchy:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", key
+        ):
+            return key
         for component in decode_record_identifier(key):
             if len(component) < 2:
                 raise ValueError
