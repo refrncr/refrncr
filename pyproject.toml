@@ -16,7 +16,7 @@ dependencies = [
     "sqlalchemy>=2.0,<3",
     "alembic>=1.13,<2",
     "argon2-cffi>=23.1,<26",
-    "fastapi>=0.141.1,<0.157",
+    "fastapi>=0.141.1,<0.163",
     "pydantic>=2.13.5,<2.15",
     "flask>=3.1,<4",
     "openpyxl>=3.1,<4",
@@ -39,7 +39,7 @@ dev = [
     "pre-commit==4.7.0",
     "pytest==9.1.1",
     "pyyaml==6.0.3",
-    "ruff==0.17.1",
+    "ruff==0.17.2",
     "setuptools==84.2.1",
     "twine==7.0.0",
 ]
