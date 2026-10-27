@@ -24,6 +24,32 @@ read-only mode with formulas left unevaluated. A ZIP preflight bounds entry coun
 and compression ratio and rejects macros, external links, and external data connections. Only
 visible worksheets can be selected and mapped formula cells are rejected.
 
+Excel XML protection (REF-48) is a runtime requirement: `defusedxml` is installed with
+the application. The CLI checks openpyxl's active protection before migrations, and
+both application factories check it before constructing the webapp. Direct Excel
+parsing repeats the check, including hierarchy imports. Missing protection or an
+`OPENPYXL_DEFUSEDXML` value other than `True` prevents startup/Excel parsing with an
+actionable configuration error. Help and administrator commands remain available.
+Restore the runtime dependencies and remove the disabling override, then restart;
+changing the environment cannot replace a parser already selected by openpyxl.
+
+XML entity violations at workbook opening and XML errors during worksheet streaming
+become the existing safe unreadable-workbook validation message. Parser details and
+uploaded content are not returned to the browser. Tests use small, uncompressed XML
+fixtures and verify the underlying parser rejection, independently of ZIP limits.
+
+Existing limits remain unchanged: 10 MiB per upload, 10,000 non-empty data rows,
+250 columns, 1,000 ZIP entries, 100 MiB expanded data, compression ratio at most
+100:1, and 50 MiB total staged content. Excel additionally bounds physical source
+rows at 100,001 (including the header). CSV apostrophe escaping and Excel literal
+text cells remain export defenses; JSON preserves original strings, including
+formula-like values and hierarchy names.
+
+The `installed-runtime` CI job builds the wheel and installs it with only runtime
+dependencies in a fresh virtual environment. It runs `tests/installed_xml_smoke.py`
+with isolated Python (`-I`), verifies dependency origins, imports a normal workbook,
+and confirms XML-entity rejection without borrowing development packages.
+
 The transient store is deliberately process-local because the supported Community server profile
 uses one worker. Multi-worker deployments require sticky routing for the complete import flow;
 without it, a later step safely reports the token as expired or unavailable and requires a new

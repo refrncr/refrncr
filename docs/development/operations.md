@@ -35,6 +35,11 @@ configuration in protected deployment configuration.
 
 ## Existing migration-before-start behavior
 
+Excel XML protection is checked before database preparation (REF-48). If startup
+reports that protection is unavailable, restore the application's runtime dependencies
+(including `defusedxml`), remove any disabling `OPENPYXL_DEFUSEDXML` override, and
+restart. Help and administrator commands remain available for diagnosis and recovery.
+
 `refrncr start` retains its existing fail-closed contract. Before Uvicorn starts,
 it creates the configured SQLite parent directory when needed, runs the existing
 Alembic upgrade/preflights and bootstraps the Community installation. A failure in

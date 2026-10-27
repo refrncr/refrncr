@@ -8,5 +8,6 @@ fastapi>=0.141.1,<0.163
 pydantic>=2.13.5,<2.15
 flask>=3.1,<4
 openpyxl>=3.1,<4
+defusedxml>=0.7.1,<1
 psycopg[binary]>=3.2,<4
 uvicorn>=0.35,<1

@@ -132,6 +132,13 @@ def test_json_contract_preserves_native_types_decimal_and_order():
     ]
 
 
+@pytest.mark.parametrize("prefix", ["=", "+", "-", "@", " \t="])
+def test_json_preserves_formula_like_strings_without_spreadsheet_escaping(prefix):
+    raw = prefix + "1+1"
+    payload = content(generate_export("json", FIELDS, [stored(code=raw)], "safe"))
+    assert json.loads(payload)[0]["code"] == raw
+
+
 @pytest.mark.parametrize("formula_like", ["=1+1", "+1+1", "-1+1", "@SUM(A1:A2)"])
 def test_excel_contract_uses_typed_non_formula_cells(formula_like):
     payload = content(generate_export("xlsx", FIELDS, [stored(code=formula_like)], "bad/name"))

@@ -28,6 +28,7 @@ from refrncr.login_security import SourceIdentityResolver
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
 from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
 from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
+from refrncr.xml_security import require_xml_protection
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
@@ -372,6 +373,7 @@ def build_application(
 
 
 def start(configuration: StartConfiguration) -> None:
+    require_xml_protection()
     try:
         prepare_database(configuration.database_url)
         application = build_application(

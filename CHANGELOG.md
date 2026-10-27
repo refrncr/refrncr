@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Require safe Excel XML parsing as a runtime dependency (REF-48). Refuse webapp
+  startup before migrations and direct Excel imports when protection is unavailable.
+  Preserve import limits and export contracts; verify a runtime-only wheel installation in CI.
+
 - Enforce same-origin CSP and browser security headers on the webapp (REF-49), including
   frame protection, HTTPS-only HSTS and nosniff on downloads. Add a mandatory CSP browser
   smoke test while preserving the separate API and documentation policies.

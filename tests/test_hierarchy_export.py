@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
 from openpyxl import load_workbook
 
 from refrncr.dataset_export import generate_export
@@ -41,6 +42,35 @@ def typed_value(field, raw):
 
 def read_csv(artifact):
     return list(csv.reader(io.TextIOWrapper(artifact.content, encoding="utf-8-sig")))
+
+
+@pytest.mark.parametrize("prefix", ["=", "+", "-", "@"])
+@pytest.mark.parametrize("format_name", ["csv", "xlsx", "json"])
+def test_hierarchy_formula_like_names_and_values_keep_format_contract(prefix, format_name):
+    raw = prefix + "1+1"
+    fields = (field("f1", "code", "leaves"),)
+    nodes = (node("root", "Root"), node("leaf", raw, "root", (value("f1", "code", raw),)))
+    artifact = generate_export(format_name, fields, (), "hierarchy", hierarchy_nodes=nodes)
+    try:
+        if format_name == "csv":
+            rows = read_csv(artifact)
+            assert rows[2][2] == "'" + raw
+            assert rows[2][-1] == "'" + raw
+        elif format_name == "json":
+            data = json.load(artifact.content)["nodes"][1]
+            assert data["name"] == raw
+            assert data["values"]["code"] == raw
+        else:
+            workbook = load_workbook(artifact.content, data_only=False)
+            try:
+                for sheet in workbook:
+                    matches = [cell for row in sheet for cell in row if cell.value == raw]
+                    assert matches, sheet.title
+                    assert all(cell.data_type == "s" for cell in matches)
+            finally:
+                workbook.close()
+    finally:
+        artifact.content.close()
 
 
 def test_hierarchy_csv_data_contains_all_nodes_and_direct_parent():

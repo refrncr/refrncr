@@ -552,6 +552,54 @@ def test_xlsx_zip_bomb_ratio_is_rejected():
         parse_source("records.xlsx", stream.getvalue())
 
 
+def test_upload_byte_limit_rejects_before_parsing():
+    with pytest.raises(ImportValidationError, match="must not exceed 10 MiB"):
+        parse_source("records.xlsx", b"PK\x03\x04" + b"x" * (10 * 1024 * 1024 - 3))
+
+
+@pytest.mark.parametrize("format_name", ["csv", "xlsx"])
+@pytest.mark.parametrize("row_count", [10_000, 10_001])
+def test_existing_data_row_limit(format_name, row_count):
+    if format_name == "csv":
+        content = b"code,label\n" + b"A,example\n" * row_count
+    else:
+        workbook = Workbook(write_only=True)
+        sheet = workbook.create_sheet("Records")
+        sheet.append(["code", "label"])
+        for _ in range(row_count):
+            sheet.append(["A", "example"])
+        output = io.BytesIO()
+        workbook.save(output)
+        workbook.close()
+        content = output.getvalue()
+    if row_count == 10_001:
+        with pytest.raises(ImportValidationError, match="more than 10,000 data rows"):
+            parse_source(f"records.{format_name}", content, "Records")
+    else:
+        assert len(parse_source(f"records.{format_name}", content, "Records").rows) == row_count
+
+
+@pytest.mark.parametrize("format_name", ["csv", "xlsx"])
+@pytest.mark.parametrize("column_count", [250, 251])
+def test_existing_column_limit(format_name, column_count):
+    headers = [f"field_{index}" for index in range(column_count)]
+    if format_name == "csv":
+        content = (",".join(headers) + "\n" + ",".join(["A"] * column_count) + "\n").encode()
+    else:
+        workbook = Workbook()
+        workbook.active.append(headers)
+        workbook.active.append(["A"] * column_count)
+        output = io.BytesIO()
+        workbook.save(output)
+        workbook.close()
+        content = output.getvalue()
+    if column_count == 251:
+        with pytest.raises(ImportValidationError, match="250 columns"):
+            parse_source(f"records.{format_name}", content, "Sheet")
+    else:
+        assert len(parse_source(f"records.{format_name}", content, "Sheet").headers) == column_count
+
+
 @pytest.mark.parametrize(
     "unsafe_name",
     ["../escape.xml", "xl/externalLinks/externalLink1.xml", "xl/connections.xml"],

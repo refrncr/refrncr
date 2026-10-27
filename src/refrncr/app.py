@@ -44,6 +44,7 @@ from refrncr.services import (
     create_deprecated_grant_service,
 )
 from refrncr.web import create_flask_app
+from refrncr.xml_security import require_xml_protection
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,7 @@ def create_application(
     api_keys: ApiKeyService | None = None,
     readiness_engine: Engine | None = None,
 ) -> FastAPI:
+    require_xml_protection()
     users.bootstrap_organisation()
 
     @asynccontextmanager
