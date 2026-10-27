@@ -157,9 +157,10 @@ This local implementation supersedes the future-adapter wording above; public
 OpenAPI/Swagger is public under REF-109; see [documentation security](rest-api.md#public-openapi-and-swagger-ref-109).
 
 REF-306 makes data reads follow the owner's current dataset export right under the
-installation policy. In either stricter mode, Settings → API keys shows “A key reads
-the datasets you can export.” below Create API key, for administrators and ordinary users.
-Everyone hides this explanation. Key creation and ownership rules remain unchanged;
+installation policy. In either stricter mode, Settings → API keys shows “Keys use your
+current permissions and read only the datasets you can export.” below Create API key,
+for administrators and ordinary users. Everyone keeps the shorter sentence “Keys use
+your current permissions.” Key creation and ownership rules remain unchanged;
 the explanation grants no authority to read or change administrator-only settings.
 # Security audit boundary
 

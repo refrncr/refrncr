@@ -232,8 +232,11 @@ def test_api_key_page_explains_restricted_policy(database_api, mode, role):
     c.client.cookies.set(SESSION_COOKIE, token)
     page = c.client.get("/settings/api-keys")
     assert page.status_code == 200, page.text
-    explanation = "A key reads the datasets you can export."
+    explanation = "Keys use your current permissions and read only the datasets you can export."
     assert (explanation in page.text) == (mode != "everyone")
+    assert page.text.count("Keys use your current permissions") == 1
+    assert "A key reads the datasets you can export." not in page.text
+    assert ("Keys use your current permissions." in page.text) == (mode == "everyone")
     if mode != "everyone":
         assert page.text.index("Create API key") < page.text.index(explanation)
     if role == "user":
