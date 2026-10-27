@@ -508,10 +508,7 @@ def test_shared_navigation_controls_and_local_bootstrap(dataset_browser, path):
     login(client)
     page = body(request(client, "get", path))
     target = "settings-sidebar" if path in ("/users", "/teams") else "application-navigation"
-    for expanded, action, icon, arrow in (
-        ("true", "Collapse", "close", "m16 15-3-3 3-3"),
-        ("false", "Expand", "open", "m14 9 3 3-3 3"),
-    ):
+    for expanded, action in (("true", "Collapse"), ("false", "Expand")):
         button = re.search(
             rf'<button[^>]*aria-label="{action} navigation".*?</button>', page, re.S
         ).group()
@@ -519,9 +516,11 @@ def test_shared_navigation_controls_and_local_bootstrap(dataset_browser, path):
         assert f'title="{action} navigation"' in button
         assert f'aria-expanded="{expanded}"' in button
         assert f'aria-controls="{target}"' in button
-        assert f'data-icon="panel-left-{icon}"' in button
-        assert f'<path d="{arrow}"/>' in button
-        assert 'aria-hidden="true" focusable="false"' in button
+        assert '<span class="navigation-tab" aria-hidden="true"></span>' in button
+        assert "<svg" not in button
+    assert 'class="mobile-bar"' not in page
+    assert 'class="mobile-bar-brand"' not in page
+    assert 'class="mobile-bar-title"' not in page
     assert f'id="{target}"' in page
     assert '<dialog class="navigation-drawer" aria-label="Navigation"' in page
     script = '<script src="/static/js/navigation.js"></script>'

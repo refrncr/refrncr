@@ -29,6 +29,7 @@ CASES = {
     "mapping": ("mapping", 5193),
     "mapping_usage": ("mapping_usage", 5194),
     "navigation": ("table_rows", 5144),
+    "navigation_tabs": ("mapping", 5193),
     "new_version": ("new_version", 5187),
     "overview": ("overview", 5195),
     "record_search": ("record_search", 5136),
