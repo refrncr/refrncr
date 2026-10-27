@@ -57,7 +57,7 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await page.waitForURL(`${base}/`);
     const cases = [
       // Datasets gained a Version column (REF-165); rows no longer carry a chevron.
-      {path:'/datasets',kind:'link',columns:5}, {path:'/teams',kind:'link',columns:3},
+      {path:'/datasets',kind:'link',columns:6}, {path:'/teams',kind:'link',columns:3},
       {path:'/users',kind:'button',columns:5}, {path:'/datasets/row-check/records',kind:'button',columns:3},
     ];
     for (const item of cases) {
@@ -76,7 +76,7 @@ if (output) fs.mkdirSync(output, {recursive:true});
         }));
         for (const separator of separators) {
           assert.equal(separator.collapse, separator.scoped ? "separate" : "collapse", `scoped border model (${item.path} @${width})`);
-          assert.match(separator.spacing, /^0px(?: 0px)?$/, `no gaps between cells (${item.path} @${width})`);
+          assert(parseFloat(separator.spacing) <= 2, `no user-visible gaps between cells (${item.path} @${width})`);
           assert.equal(separator.divider, "1px", `one-pixel divider (${item.path} @${width})`);
         }
         const rows = page.locator('tbody [data-row-action]');

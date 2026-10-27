@@ -39,11 +39,11 @@ async function evidence(page, name) {
   if(output) await page.screenshot({path:path.join(output,name+'.png'),fullPage:true});
 }
 async function open(page) {
-  const menu=page.getByText('Concept actions',{exact:true});
+  const menu=page.locator('[data-concept-actions] summary[aria-label="Draft actions"]');
   if(!await menu.evaluate(el=>el.parentElement.open)) {await menu.focus();await page.keyboard.press('Enter');}
-  const link=page.getByRole('link',{name:'Discard concept',exact:true});
+  const link=page.getByRole('link',{name:'Discard draft',exact:true});
   await link.focus(); await page.keyboard.press('Enter');
-  const dialog=page.getByRole('dialog',{name:'Discard concept',exact:true});
+  const dialog=page.getByRole('dialog',{name:'Discard draft',exact:true});
   await dialog.locator('#discard-concept-form').waitFor({state:'attached'});
   await page.waitForFunction(()=>document.activeElement.hasAttribute('data-initial-focus'));
   assert.match(await dialog.getAttribute('aria-describedby'),/description/);
@@ -53,10 +53,10 @@ async function open(page) {
 async function confirmByKeyboard(page, dialog) {
   // Reach the destructive control through the native tab order only.
   for(let n=0;n<10;n++) {
-    if(await dialog.getByRole('button',{name:'Discard concept',exact:true}).evaluate(el=>el===document.activeElement)) break;
+    if(await dialog.getByRole('button',{name:'Discard draft',exact:true}).evaluate(el=>el===document.activeElement)) break;
     await page.keyboard.press('Tab');
   }
-  assert(await dialog.getByRole('button',{name:'Discard concept',exact:true}).evaluate(el=>el===document.activeElement));
+  assert(await dialog.getByRole('button',{name:'Discard draft',exact:true}).evaluate(el=>el===document.activeElement));
   assert(await page.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle!=='none'));
   await evidence(page,`confirm-${page.viewportSize().width}-${measurements.length}`);
   await page.keyboard.press('Enter');
@@ -90,7 +90,7 @@ async function confirmByKeyboard(page, dialog) {
         await page.keyboard.press('Escape');
         await dialog.waitFor({state:'hidden'});
         await page.waitForFunction(()=>document.activeElement.matches('a[data-dialog-open="concept-discard-panel"]'));
-        assert(await page.getByText('Concept actions',{exact:true}).evaluate(el=>el.parentElement.open));
+        assert(await page.locator('[data-concept-actions] summary[aria-label="Draft actions"]').evaluate(el=>el.parentElement.open));
         dialog=await open(page);
         await dialog.getByRole('link',{name:'Cancel',exact:true}).click();
         await dialog.waitFor({state:'hidden'});
@@ -121,10 +121,10 @@ async function confirmByKeyboard(page, dialog) {
         }
         await confirmByKeyboard(page,dialog);
         await page.waitForURL(`${base}/datasets/${key}?notice=discarded`);
-        await page.getByText('Concept discarded. Current was not changed.',{exact:true}).waitFor();
+        await page.getByText('Draft discarded. Current was not changed.',{exact:true}).waitFor();
         await evidence(page,`success-${kind}-${width}`);
         await page.reload();
-        assert.equal(await page.getByRole('button',{name:'Create concept',exact:true}).count(),1);
+        assert.equal(await page.getByRole('button',{name:'Create draft',exact:true}).count(),1);
         await page.goBack();
         await page.reload();
         assert.equal(await page.locator('#discard-concept-form').count(),0);
@@ -133,17 +133,17 @@ async function confirmByKeyboard(page, dialog) {
         assert.match(await page.locator('tbody').innerText(),/Retained value/);
         assert(!/Unpublished value|Added/.test(await page.locator('tbody').innerText()));
         await page.goto(`${base}/datasets/${key}?notice=discarded`);
-        await page.getByRole('button',{name:'Create concept',exact:true}).focus();
+        await page.getByRole('button',{name:'Create draft',exact:true}).focus();
         await page.keyboard.press('Enter');
         await page.waitForURL(concept);
         assert.match(await page.locator('.concept-banner:visible').innerText(),/No changes yet/);
       }
       await page.goto(`${base}/datasets/discard-first-${width}/concept/records`);
-      await page.getByText('Concept actions',{exact:true}).click();
-      const disabled=page.getByRole('button',{name:'Discard concept',exact:true});
+      await page.locator('[data-concept-actions] summary[aria-label="Draft actions"]').click();
+      const disabled=page.getByRole('button',{name:'Discard draft',exact:true});
       assert.equal(await disabled.getAttribute('aria-disabled'),'true');
       await disabled.focus();
-      const explanation='This Concept contains the Dataset’s first unpublished version. There is no Current version to return to. Publish it first or delete the Dataset.';
+      const explanation='This Draft contains the Dataset’s first unpublished version. There is no Current version to return to. Publish it first or delete the Dataset.';
       assert.equal(await page.locator('#concept-discard-panel-unavailable').innerText(),explanation);
       await evidence(page,`disabled-${width}`);
       await page.keyboard.press('Enter');
@@ -153,11 +153,11 @@ async function confirmByKeyboard(page, dialog) {
       const fallback=await nojs.newPage();await login(fallback);
       const key=`discard-fallback-${width}`;
       await fallback.goto(`${base}/datasets/${key}/concept/records`);
-      await fallback.getByText('Concept actions',{exact:true}).click();
-      await fallback.getByRole('link',{name:'Discard concept',exact:true}).click();
+      await fallback.locator('[data-concept-actions] summary[aria-label="Draft actions"]').click();
+      await fallback.getByRole('link',{name:'Discard draft',exact:true}).click();
       await fallback.waitForURL(`${base}/datasets/${key}/concept/discard`);
       await evidence(fallback,`nojs-${width}`);
-      await fallback.getByRole('button',{name:'Discard concept',exact:true}).click();
+      await fallback.getByRole('button',{name:'Discard draft',exact:true}).click();
       await fallback.waitForURL(`${base}/datasets/${key}?notice=discarded`);
       await nojs.close();
     }

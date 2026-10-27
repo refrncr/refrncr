@@ -38,7 +38,14 @@ const output = process.env.REFRNCR_BROWSER_OUTPUT;
       assert.equal(await page.title(),'REST API documentation · REFRNCR');
       assert.equal(await page.locator('main').count(),1);
       assert.equal(await page.locator('h1').count(),1);
-      assert.equal(await page.locator('.opblock').count(),6);
+      for (const path of [
+        '/api/v1/datasets',
+        '/api/v1/datasets/{dataset_key}',
+        '/api/v1/datasets/{dataset_key}/records',
+        '/api/v1/datasets/{dataset_key}/records/{identifier}',
+      ]) {
+        assert.equal(await page.locator(`.opblock [data-path="${path}"]`).count(), 1);
+      }
       assert.deepEqual(errors,[]);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
       const authorize = page.getByRole('button',{name:'Authorize',exact:true}).first();

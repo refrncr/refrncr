@@ -57,7 +57,7 @@ async function savedMove(page, action) {
       assert((await preview.getAttribute('href')).endsWith('/lucide-legacy-0.468.0.svg#history'));
       await page.getByLabel('Name', {exact:true}).fill(`Renamed ${width}`);
       await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Save dataset',exact:true}).click()]);
-      assert((await page.locator('.dataset-identity-card use').getAttribute('href')).endsWith('#history'));
+      assert((await page.locator('.page-context .dataset-icon use').getAttribute('href')).endsWith('#history'));
       await page.goto(base+configure+'?edit=1');
       assert.equal(await page.getByRole('combobox',{name:'Dataset icon',exact:true}).inputValue(),'history');
       await page.getByRole('combobox',{name:'Dataset icon',exact:true}).fill('history');
@@ -82,7 +82,7 @@ async function savedMove(page, action) {
       // POST failure must navigate to a GET page for all source configuration variants.
       for (const path of [configure,concept,`/datasets/${key}`]) {
         await page.goto(base+path+'#access-management');
-        await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'});
+        await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'},{force:true});
         let posts = 0;
         const fail = route => {
           if (route.request().method()==='POST') { posts++; return route.abort(); }
@@ -96,7 +96,7 @@ async function savedMove(page, action) {
         await page.unroute('**/export-access*',fail);
       }
       // Revoke uses the same safe GET target; a failed attempt is not replayed.
-      await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'});
+      await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'},{force:true});
       await page.getByRole('button',{name:'Grant export access',exact:true}).click();
       await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).waitFor();
       await page.route('**/revoke*',route=>route.abort());

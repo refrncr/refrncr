@@ -49,11 +49,14 @@ const scrollPosition = page => page.locator('#content').evaluate(node => node.sc
         const secondPage = page.url();
         assert.equal(await page.locator('.record-table tbody tr').count(), 2);
         await page.goBack({waitUntil: 'load'});
+        await page.locator('.record-table tbody tr').first().waitFor();
         assert.equal(await page.locator('.record-table tbody tr').count(), 50);
         await page.goForward({waitUntil: 'load'});
+        await page.locator('.record-table tbody tr').first().waitFor();
         assert.equal(page.url(), secondPage);
         assert.equal(await page.locator('.record-table tbody tr').count(), 2);
         await page.goBack({waitUntil: 'load'});
+        await page.locator('.record-table tbody tr').first().waitFor();
         // Opening a panel is not navigation; closing restores its keyboard opener.
         const primary = page.getByRole('button', {name: /^View record /}).first();
         await primary.focus();

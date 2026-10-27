@@ -30,6 +30,7 @@ async function login(page) {
     page.on('pageerror', error => errors.push(error.message));
     await login(page);
     await page.goto(base + '/datasets/types/concept');
+    await page.getByRole('tab', {name: 'Fields', exact: true}).click();
     for (const [id, label] of types) {
       await page.getByRole('link', {name: 'Add field', exact: true}).click();
       const panel = page.locator('dialog[open]');
@@ -50,7 +51,7 @@ async function login(page) {
         assert.equal(await required.evaluate(el => getComputedStyle(el).cursor), 'not-allowed');
         assert(Number(await required.evaluate(el => getComputedStyle(el).opacity)) < 1);
         assert.match(await panel.locator('[data-identifier-status]').textContent(), /checked and locked/);
-        await required.click();
+        await required.evaluate(element => element.click());
         assert(await required.isChecked(), 'the required constraint stays checked while locked');
         assert.equal(await panel.locator('[data-required-mirror]').count(), 1);
         assert.equal(await unique.isChecked(), false, 'identifier membership does not imply uniqueness');

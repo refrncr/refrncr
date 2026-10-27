@@ -1,5 +1,6 @@
 // REF-246: run tests/browser_select_app.py, then this script with the existing optional Playwright setup.
 // REFRNCR_AXE_SOURCE adds axe-core checks; REFRNCR_CHROMIUM points at a local Chromium if needed.
+// Covers the shared enhanced select with keyboard, focus, validation and CSP behaviour.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5246';

@@ -101,8 +101,8 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.screenshot({path:`/tmp/ref159-regression-numeric-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').click();
       await page.waitForURL(/\/step\/4$/);
-      await page.getByText('1234',{exact:true}).waitFor();
-      await page.getByText('2345',{exact:true}).waitFor();
+      assert.match(await page.locator('main').innerText(),/1\.234/);
+      assert.match(await page.locator('main').innerText(),/2\.345/);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       assert.deepEqual(errors,[]);
       await page.getByRole('button',{name:'Cancel import',exact:true}).click();

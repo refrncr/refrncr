@@ -42,13 +42,11 @@ async function capture(page, name) {
       await login(page,'owner@example.com');
       const versions = `${base}/datasets/diff-${width}/versions`;
       await page.goto(versions);
-      await page.locator('[data-concept-actions] summary').click();
-      const reviewEntry=page.getByRole('link',{name:'Review changes',exact:true});
+      const reviewEntry=page.getByRole('link',{name:'Review & publish',exact:true});
       await reviewEntry.focus(); await reviewEntry.press('Enter');
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       const summary = page.url();
-      assert.match(await page.locator('main').innerText(),/You’re working on a concept/);
-      await page.getByText('Read full value',{exact:true}).click();
+      assert.match(await page.locator('main').innerText(),/You’re working on a draft/);
       assert.match(await page.locator('main').innerText(),/<b>Concept description<\/b>/);
       await capture(page,`summary-${width}`);
       await page.getByRole('link',{name:'Fields',exact:true}).click();
@@ -183,7 +181,7 @@ async function capture(page, name) {
       await page.goto(summary);
       const publish = page.getByRole('link',{name:'Publish version',exact:true});
       await publish.click(); await page.locator('#publication-date').waitFor();
-      await page.locator('dialog[open]').getByRole('link',{name:'Review changes',exact:true}).click();
+      await page.locator('dialog[open]').getByRole('link',{name:'Review & publish',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       // A second tab changes concept metadata through the existing UI.
       const edit=await context.newPage();
@@ -229,7 +227,7 @@ async function capture(page, name) {
     const deniedContext=await browser.newContext();const denied=await deniedContext.newPage();
     await login(denied,'reader@example.com');
     await denied.goto(`${base}/datasets/diff-1440/versions`);
-    assert.equal(await denied.getByRole('link',{name:'Review changes',exact:true}).count(),0);
+    assert.equal(await denied.getByRole('link',{name:'Review & publish',exact:true}).count(),0);
     const response=await denied.goto(`${base}/datasets/diff-1440/versions/review`);
     assert.equal(response.status(),404);
     await deniedContext.close();

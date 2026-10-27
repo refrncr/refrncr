@@ -33,11 +33,12 @@ async function focused(page, locator) {
     await signIn(page);
     for (const width of [320, 768, 1440]) {
       await page.setViewportSize({width,height:900});
-      // Editing is inline; an unsaved draft has to survive the deletion detour.
+      // Editing is inline. Destructive settings are unavailable until editing ends.
       await page.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
       await page.locator('#dataset-description').fill('Unsaved draft must survive cancel');
-      await page.locator('[data-section-tabs]').getByRole('tab', {name:'Dataset details', exact:true}).click();
-      assert.equal(await page.locator('#dataset-description').inputValue(), 'Unsaved draft must survive cancel');
+      assert.equal(await page.locator('#danger-zone').count(), 0);
+      await page.getByRole('link',{name:'Cancel',exact:true}).click();
+      await page.locator('#danger-zone').waitFor();
 
       // The tab states what a deletion removes before anything is confirmed.
       assert.equal(await page.locator('#danger-zone .danger-counts').count(),0);
@@ -90,10 +91,9 @@ async function focused(page, locator) {
         fs.mkdirSync(output,{recursive:true});
         await page.screenshot({path:path.join(output,`delete-${width}.png`)});
       }
-      // Escape, Cancel and Close all return to the trigger and keep the draft.
+      // Escape, Cancel and Close all return focus to the trigger.
       await page.keyboard.press('Escape');
       await focused(page,trigger);
-      assert.equal(await page.locator('#dataset-description').inputValue(),'Unsaved draft must survive cancel');
       await trigger.click();
       await confirmField('Row check').waitFor();
       await dialog.getByRole('link',{name:'Cancel',exact:true}).click();
@@ -114,7 +114,7 @@ async function focused(page, locator) {
     await other.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
     await other.getByLabel('Name',{exact:true}).fill('Renamed dataset');
     await other.getByRole('button',{name:'Save dataset',exact:true}).click();
-    await other.waitForURL(url => url.pathname === '/datasets/row-check/configure');
+    await other.waitForURL(url => url.pathname === '/datasets/row-check/concept');
     await name.fill('Row check');
     await dialog.getByRole('button',{name:'Delete dataset',exact:true}).click();
     await dialog.getByRole('alert').filter({hasText:'Dataset changed'}).waitFor();

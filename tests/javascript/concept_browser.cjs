@@ -1,4 +1,5 @@
 /* Explicit lifecycle in real Chrome, against disposable loopback data only. */
+// Covers current and draft Concept records, actions, responsive layout and accessibility.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -39,19 +40,19 @@ async function login(page,email) {
       assert.equal(await page.getByRole('link',{name:'Import',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Versions',exact:true}).count(),1);
       assert.equal(await page.locator('.page-header .page-actions').getByRole('link',{name:'Versions',exact:true}).count(),1);
-      assert.deepEqual(await page.locator("tbody td.record-system-status .badge-published").allTextContents(),["Published","Published","Published"]);
+      assert.deepEqual(await page.locator("tbody td.record-system-status .badge-published").allTextContents(),[]);
       await shot(page,`current-${width}`);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
-      assert.equal(await page.getByRole('link',{name:'View concept',exact:true}).count(),0);
-      assert.equal(await page.getByRole('link',{name:'Review changes',exact:true}).count(),0);
+      assert.equal(await page.getByRole('link',{name:'Open draft',exact:true}).count(),0);
+      assert.equal(await page.getByRole('link',{name:'Review & publish',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Publish version',exact:true}).count(),0);
       await shot(page,`versions-before-${width}`);
-      const start=page.getByRole('button',{name:'+ New version',exact:true});await start.focus();await start.press('Enter');
+      const start=page.getByRole('button',{name:'Create draft',exact:true});await start.focus();await start.press('Enter');
       await page.waitForURL(`${base}/datasets/${key}/concept/records`);
-      await page.getByRole('heading',{name:'You’re working on a concept',exact:true}).waitFor();
+      await page.getByRole('heading',{name:/You’re working on a draft/,exact:true}).waitFor();
       assert.match(await page.locator('.concept-banner').first().innerText(),/No changes yet/);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
-      await page.getByRole('link',{name:'Concept',exact:true}).click();
+      await page.getByRole('link',{name:'Open draft',exact:true}).click();
       const opener=page.getByRole('button',{name:/Edit record Betaling/});await opener.focus();await opener.press('Enter');
       await page.locator('dialog[open]').waitFor();
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
@@ -102,10 +103,10 @@ async function login(page,email) {
       assert(!/Edited concept value/.test(await page.locator('table').innerText()));
       await page.getByRole('link',{name:'Versions',exact:true}).click();
       await shot(page,`versions-active-${width}`);
-      assert.equal(await page.getByRole('button',{name:'+ New version',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Create draft',exact:true}).count(),0);
       await page.goto(base+'/datasets');await shot(page,`list-active-${width}`);
-      assert.match(await page.locator('table').innerText(),/Concept in progress/);
-      await page.goto(versions);await page.getByRole('link',{name:'Concept',exact:true}).click();await page.locator('.concept-banner:visible [data-concept-actions] summary').click();await page.getByRole('link',{name:'Review changes',exact:true}).click();
+      assert.match(await page.locator('table').innerText(),/Draft in progress/);
+      await page.goto(versions);await page.getByRole('link',{name:'Open draft',exact:true}).click();await page.getByRole('link',{name:'Review & publish',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();await shot(page,`review-${width}`);
       const publish=page.getByRole('link',{name:'Publish version',exact:true});await publish.focus();await publish.press('Enter');
       await page.locator('#publication-date').waitFor();
@@ -115,17 +116,17 @@ async function login(page,email) {
       await publish.click();await page.locator('#publication-confirmed').check();
       await page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click();
       await page.waitForURL(versions+'?notice=published');
-      assert.equal(await page.getByRole('link',{name:'Concept',exact:true}).count(),0);
-      assert.equal(await page.getByRole('button',{name:'+ New version',exact:true}).count(),1);
+      assert.equal(await page.getByRole('link',{name:'Open draft',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Create draft',exact:true}).count(),1);
       await page.getByRole('link',{name:'Version 2',exact:true}).click();
       assert.match(await page.locator('table').innerText(),/Edited concept value/);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
-      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),['Published','Published','Published']);
+      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),[]);
       assert.equal(await page.getByRole('button',{name:/Verwijderen/}).count(),0);
       await shot(page,`published-status-${width}`);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
       await page.getByRole('link',{name:'Version 1',exact:true}).click();
-      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),['Published','Published','Published']);
+      assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),[]);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
       assert.match(await page.locator('tbody').innerText(),/Published value/);
@@ -134,7 +135,7 @@ async function login(page,email) {
       results.push({width,passed:true});await context.close();
     }
     const context=await browser.newContext();const page=await context.newPage();await login(page,'reader@example.com');
-    await page.goto(base+'/datasets');assert.equal(await page.getByText('Concept in progress',{exact:true}).count(),0);
+    await page.goto(base+'/datasets');assert.equal(await page.getByText('Draft in progress',{exact:true}).count(),0);
     const response=await page.goto(base+'/datasets/lifecycle-1440/concept/records');assert.equal(response.status(),404);
     await context.close();assert.deepEqual(errors,[]);
     const report={browser:await browser.version(),results,denied:404,pageErrors:errors};

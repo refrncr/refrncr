@@ -45,12 +45,12 @@ const fs = require('node:fs');
     await page.keyboard.press('Enter');
     await page.getByRole('link', {name: 'View all', exact: true}).click();
     await page.waitForURL(`${base}/attention?all_owners=1`);
-    await page.getByLabel('Reason', {exact: true}).selectOption('6');
+    await page.locator('#attention-reason').selectOption('6');
     await page.waitForURL(/reason=6/);
     assert(await page.getByRole('switch').isChecked());
-    await page.getByLabel('Reason', {exact: true}).selectOption('');
+    await page.locator('#attention-reason').selectOption('');
     await page.waitForURL(/reason=$/);
-    assert(await page.getByRole('heading', {name: 'Needs your attention', exact: true}).isVisible());
+    assert(await page.getByRole('heading', {name: /^Needs your attention/}).isVisible());
     for (const theme of ['light', 'dark']) {
       for (const width of [375, 768, 1440]) {
         await page.setViewportSize({width, height: width === 1440 ? 2000 : 1100});
