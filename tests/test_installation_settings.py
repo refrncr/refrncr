@@ -5,7 +5,7 @@ from threading import Event
 
 import pytest
 from sqlalchemy import select
-from support import dataset_version_client, publish, request, setup
+from support import dataset_version_client, html_tag_texts, publish, request, setup
 
 from refrncr.installation_policy import EXPORT_POLICIES
 from refrncr.installation_settings import PolicyConfirmationRequired
@@ -148,6 +148,10 @@ def test_access_tab_per_policy_and_role(installation_ui_context, policy, role):
     assert ("Change owning team" in page.text) == (role == "admin")
     if can_view:
         assert c.owner.name in page.text
+        access_html = page.text.split("id='access-management'", 1)[1]
+        description = html_tag_texts(access_html, "p")[0]
+        assert description.startswith("Applies to the whole dataset, not to one version.")
+        assert ("Changes take effect right away." in description) == (can_manage or role == "admin")
     if role == "owner" and policy == "admin_grants":
         assert c.u.email in page.text
         assert f"/datasets/{c.d.key}/export-access" not in page.text
@@ -165,6 +169,33 @@ def test_access_tab_per_policy_and_role(installation_ui_context, policy, role):
         browser, "post", root + f"/export-access/{entry.id}/revoke", data={"csrf_token": csrf}
     )
     assert revoked.status_code == (302 if can_manage else 404)
+
+
+@pytest.mark.parametrize("policy", EXPORT_POLICIES)
+@pytest.mark.parametrize("role", ["owner", "other"])
+def test_non_admin_cannot_read_or_post_policy_settings(installation_context, policy, role):
+    c = installation_context
+    set_policy(c, policy)
+    team = c.owner if role == "owner" else c.other
+    c.s.memberships.create_membership(c.a.id, c.u.id, team.id)
+    before = len(events(c))
+    browser, csrf = dataset_version_client(c, c.u)
+    path = "/settings/dataset-access"
+    assert request(browser, "get", path).status_code == 403
+    response = request(
+        browser,
+        "post",
+        path,
+        data={
+            "csrf_token": csrf,
+            "expected_policy": policy,
+            "policy": "admin_grants" if policy == "everyone" else "everyone",
+            "confirmed": "yes",
+        },
+    )
+    assert response.status_code == 403
+    assert c.s.installation_settings.get_policy(c.a.id) == policy
+    assert len(events(c)) == before
 
 
 def test_policy_errors_and_grant_preservation(installation_context, monkeypatch):
@@ -197,14 +228,6 @@ def test_policy_errors_and_grant_preservation(installation_context, monkeypatch)
         c.s.datasets.revoke_export_access(c.a.id, c.d.key, grant.id)
     set_policy(c, "team_grants")
     assert c.s.datasets.export_access_context(c.a.id, c.d.key)[3][0][0].id == grant.id
-    browser, csrf = dataset_version_client(c, c.u)
-    for method in ("get", "post"):
-        assert (
-            request(
-                browser, method, "/settings/dataset-access", data={"csrf_token": csrf}
-            ).status_code
-            == 403
-        )
     browser, _ = dataset_version_client(c)
     assert (
         request(

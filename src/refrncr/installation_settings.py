@@ -27,8 +27,9 @@ class InstallationSettingsService:
     def change_policy(self, actor_id, expected_policy, policy, *, confirmed=False):
         with self.uow(write=True, serialized=True) as work:
             current = work.installation_settings.get_policy(for_update=True)
-            actor = work.users.get(actor_id, for_update=True)
-            if not self.authorization.active(actor) or actor.role != "admin":
+            # Keep the actor locked while the shared capability check authorizes the write.
+            work.users.get(actor_id, for_update=True)
+            if not self.authorization.can_administer_installation(actor_id, uow=work):
                 raise AuthorizationError("Administrator access required")
             if expected_policy not in EXPORT_POLICIES or policy not in EXPORT_POLICIES:
                 raise ValidationError("Choose an available access policy.")
