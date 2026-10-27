@@ -29,15 +29,22 @@
 /* Both authenticated shells share the same sidebar and drawer state contract. */
 .app-shell > [data-navigation] { grid-column: 1; grid-row: 1 / -1; }
 .app-shell > .app-main { grid-column: 2; }
-.navigation-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-shrink: 0; min-height: calc(var(--control-height) + var(--space-md)); margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-sm)) var(--space-lg); padding-block: var(--space-sm); }
+.navigation-heading { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); flex-shrink: 0; min-height: calc(var(--control-height) + var(--space-md)); margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-sm)) var(--space-lg); padding-block: var(--space-sm); }
 .navigation-heading .brand { min-width: 0; }
 .navigation-heading .brand img { width: 125px; max-width: 100%; height: auto; }
-.navigation-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: var(--control-height); min-height: var(--control-height); padding: var(--space-sm); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; }
-.navigation-button:hover { background: var(--color-action-secondary); color: var(--color-text); }
-.navigation-button:active { background: var(--color-action-secondary-hover); }
+.navigation-button { display: inline-flex; flex-shrink: 0; align-items: center; width: var(--control-height); height: var(--control-height); min-height: var(--control-height); padding: 0; border: 0; background: transparent; color: var(--color-text-secondary); cursor: pointer; transform: translateY(-50%); }
 .navigation-button:focus-visible { outline-offset: -3px; }
-.navigation-button .button-icon { width: var(--space-md); height: var(--space-md); margin: 0; color: var(--color-text-muted); }
-[data-nav-open] { display: none; }
+.navigation-tab { display: flex; align-items: center; justify-content: center; width: var(--navigation-tab-width); height: var(--navigation-tab-height); border: 1px solid var(--color-border); background: var(--color-surface-subtle); }
+.navigation-button:hover .navigation-tab { background: var(--color-action-secondary); }
+.navigation-button:active .navigation-tab { background: var(--color-action-secondary-hover); }
+.navigation-tab::before { content: ""; width: 0; height: 0; border-style: solid; }
+[data-nav-open] .navigation-tab { border-left: 0; border-radius: 0 var(--navigation-tab-radius) var(--navigation-tab-radius) 0; }
+[data-nav-close] .navigation-tab { border-right: 0; border-radius: var(--navigation-tab-radius) 0 0 var(--navigation-tab-radius); }
+[data-nav-open] .navigation-tab::before { border-width: 4px 0 4px 5px; border-color: transparent transparent transparent var(--color-text-secondary); }
+[data-nav-close] .navigation-tab::before { border-width: 4px 5px 4px 0; border-color: transparent var(--color-text-secondary) transparent transparent; }
+.app-shell:not(.settings-shell) .navigation-heading .brand { margin-left: var(--space-sm); }
+[data-nav-close] { position: absolute; top: 50%; right: calc(var(--space-sm) - var(--space-lg)); justify-content: flex-end; }
+[data-nav-open] { position: fixed; z-index: 10; top: calc(var(--space-sm) + var(--control-height) / 2); left: 0; margin: 0; display: none; }
 .navigation-drawer { position: fixed; inset: 0 auto 0 0; width: min(var(--sidebar-width), calc(100vw - var(--space-xl))); max-width: none; height: 100%; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-xl); }
 .navigation-drawer::backdrop { background: var(--color-overlay); }
 .navigation-drawer [data-navigation] { display: flex; height: 100%; overflow-y: auto; }
@@ -71,35 +78,11 @@
   .app-main:not(.app-main-anonymous) { min-height: 100vh; min-height: 100dvh; }
 }
 .app-shell:not(.settings-shell) { grid-template-rows: minmax(0, 1fr); }
-.app-main > [data-nav-open], .mobile-bar > [data-nav-open] { margin-bottom: var(--space-sm); }
-/* Below 1024px a slim bar carries the menu, the logo and the page name. On desktop the bar
-   dissolves: only the expand control remains, shown when navigation is collapsed (REF-84). */
-.mobile-bar { display: contents; }
-.mobile-bar-brand, .mobile-bar-title { display: none; }
+/* Reserve room for the edge control's full touch target, without a mobile topbar. */
 @media (max-width: 1023px) {
-  .mobile-bar { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; margin: calc(-1 * var(--app-main-padding)) calc(-1 * var(--app-main-padding)) var(--app-main-padding); padding: var(--space-sm) var(--app-main-padding); border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
-  .mobile-bar > [data-nav-open] { flex-shrink: 0; margin: 0 0 0 calc(-1 * var(--space-sm)); }
-  .mobile-bar-brand { display: flex; flex-shrink: 0; align-items: center; gap: var(--space-xs); text-decoration: none; }
-  .mobile-bar-brand img { display: block; width: auto; height: 1.75rem; }
-  .mobile-bar-title { display: block; min-width: 0; margin-left: var(--space-xs); padding-left: var(--space-md); border-left: 1px solid var(--color-border); overflow: hidden; color: var(--color-text-secondary); font-size: var(--font-size-body-sm); font-weight: var(--font-weight-semibold); text-overflow: ellipsis; white-space: nowrap; }
+  .app-shell:not(.settings-shell) .app-main { padding-block-start: max(var(--app-main-padding), calc(var(--control-height) + var(--space-sm))); }
+  .settings-shell .settings-header { padding-inline-start: calc(var(--control-height) + var(--space-sm)); }
 }
-/* Desktop: collapse/expand controls are slim tabs on the sidebar edge, level with the logo.
-   Open: tab inside the sidebar against its border, arrow left. Collapsed: tab on the screen edge, arrow right. */
 @media (min-width: 1024px) {
-  .app-shell:not(.settings-shell) .navigation-heading { position: relative; }
-  /* The logo starts on the same line as the navigation items and their selection background. */
-  .app-shell:not(.settings-shell) .navigation-heading .brand { margin-left: var(--space-sm); }
-  .app-shell:not(.settings-shell) [data-nav-close],
-  .app-shell:not(.settings-shell) [data-nav-open] { width: 14px; height: 33px; min-height: 0; padding: 0; border: 1px solid var(--color-border); background: var(--color-surface-subtle); transform: translateY(-50%); }
-  .app-shell:not(.settings-shell) [data-nav-close] { position: absolute; top: 50%; right: calc(var(--space-sm) - var(--space-lg)); border-right: 0; border-radius: 6px 0 0 6px; }
-  .app-shell:not(.settings-shell) [data-nav-open] { position: fixed; z-index: 10; top: calc(var(--space-sm) + var(--control-height) / 2); left: 0; margin: 0; border-left: 0; border-radius: 0 6px 6px 0; }
-  .app-shell:not(.settings-shell) [data-nav-close] .button-icon,
-  .app-shell:not(.settings-shell) [data-nav-open] .button-icon { display: none; }
-  .app-shell:not(.settings-shell) [data-nav-close]::before,
-  .app-shell:not(.settings-shell) [data-nav-open]::before { content: ""; width: 0; height: 0; border-style: solid; }
-  .app-shell:not(.settings-shell) [data-nav-close]::before { border-width: 4px 5px 4px 0; border-color: transparent var(--color-text-muted) transparent transparent; }
-  .app-shell:not(.settings-shell) [data-nav-open]::before { border-width: 4px 0 4px 5px; border-color: transparent transparent transparent var(--color-text-muted); }
-  .app-shell:not(.settings-shell) [data-nav-close]:hover,
-  .app-shell:not(.settings-shell) [data-nav-open]:hover { background: var(--color-action-secondary); }
-  .navigation-collapsed .app-shell:not(.settings-shell) [data-nav-open] { display: flex; }
+  .navigation-collapsed .app-shell:not(.settings-shell) .app-main { padding-block-start: max(var(--app-main-padding), calc(var(--control-height) + var(--space-sm))); }
 }
