@@ -125,12 +125,12 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           assert.equal(requests,1);
           page.off('request',count);
           assert.equal(await row(3).getAttribute('data-state'),'transformed');
-          assert.equal(await page.evaluate(()=>document.activeElement.name),'source_3');
+          assert.equal(await page.evaluate(()=>document.activeElement.id),'source-3-trigger');
           assert.match(await page.locator('[data-format-status]').textContent(),/Stored as updated/);
           // Replaced markup binds its own toggle and keeps keyboard focus visible.
           await row(3).getByRole('button',{name:'Done',exact:true}).click();
           await row(3).getByRole('button',{name:'Change',exact:true}).click();
-          assert.equal(await page.evaluate(()=>document.activeElement.id),'source-3');
+          assert.equal(await page.evaluate(()=>document.activeElement.id),'source-3-trigger');
           await row(2).getByRole('button',{name:'Change',exact:true}).click();
           await review(()=>page.getByLabel('Date format for day',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption('v1-date-dmy-slash'));
           assert.equal(await row(2).getAttribute('data-state'),'failing');
@@ -154,12 +154,12 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         }
         await page.locator('[data-mapping-continue]').focus();await page.keyboard.press('Enter');
         await page.waitForURL(/\/step\/4$/);
-        await page.getByText('2026-02-01T12:34:56',{exact:true}).waitFor();
+        await page.getByText('2026-02-01T12:34:56',{exact:true}).waitFor({state:'attached'});
         await page.getByRole('link',{name:'Back',exact:true}).click();
         await page.waitForURL(/\/step\/3$/);
         await page.reload();
         assert.equal(await row(3).getAttribute('data-state'),'transformed');
-        assert.equal(await page.getByLabel('Date format for moment',{exact:true}).inputValue(),'v1-date-dmy-slash');
+        assert.equal(await row(3).locator('select[name="date_3"]').inputValue(),'v1-date-dmy-slash');
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
         if (!javaScriptEnabled) {
           await row(2).locator('[data-format-details] > summary').click();

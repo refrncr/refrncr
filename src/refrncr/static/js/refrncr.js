@@ -609,7 +609,10 @@
         if (!response.ok || response.redirected) throw new Error("Format review unavailable");
         const page = new DOMParser().parseFromString(await response.text(), "text/html");
         if (current !== generation) return;
-        const focusName = document.activeElement?.name;
+        const focused = document.activeElement;
+        const focusState = focused?.form === form && focused.name
+          ? {id: focused.id, name: focused.name, value: focused.value}
+          : null;
         page.querySelectorAll("[data-source-formats]").forEach((replacement) => {
           const original = form.querySelector(`[data-source-formats="${replacement.dataset.sourceFormats}"]`);
           const disclosure = replacement.querySelector("[data-format-details]");
@@ -618,11 +621,19 @@
         });
         bind();
         const affected = form.querySelector(`[data-source-formats="${index}"] [data-format-error]`);
-        const previousFocus = focusName && form.elements.namedItem(focusName);
+        let previousFocus = focusState?.id ? document.getElementById(focusState.id) : null;
+        if (previousFocus && !form.contains(previousFocus)) previousFocus = null;
+        if (!previousFocus && focusState) {
+          const named = form.elements.namedItem(focusState.name);
+          previousFocus = typeof named?.focus === "function"
+            ? named
+            : [...(named || [])].find((control) => control.value === focusState.value)
+              || [...(named || [])].find((control) => control.checked);
+        }
         const row = form.querySelector(`[data-source-formats="${index}"]`);
         const announcement = form.querySelector("[data-format-status]");
         if (announcement) announcement.textContent = `${row.querySelector("legend")?.textContent || "Source format"}: ${row.querySelector("[data-effective-format]")?.textContent || "Updated"}. Examples from source and Stored as updated. ${row.querySelector(".error-text")?.textContent || ""}`;
-        if (affected && focusName?.startsWith("mapping_")) affected.focus();
+        if (affected && focusState?.name.startsWith("mapping_")) affected.focus();
         else if (previousFocus?.focus && !previousFocus.disabled && !previousFocus.closest("[hidden]")) previousFocus.focus();
         else if (affected) affected.focus();
       } catch (error) {
