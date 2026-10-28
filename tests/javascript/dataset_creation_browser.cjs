@@ -65,7 +65,10 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         await page.goto(`${base}/datasets/row-check`);
         assert.equal(await page.getByRole('link',{name:'Access',exact:true}).count(),0);
         assert.equal(await page.locator('#dataset-general').getByRole('link',{name:'Edit',exact:true}).count(),kind==='row'?0:1);
-        await page.getByRole('link',{name:'Records',exact:true}).click();
+        await Promise.all([
+          page.waitForURL('**/datasets/row-check/**/records'),
+          page.getByRole('link',{name:'Records',exact:true}).click(),
+        ]);
         assert.equal(await page.locator('.export-menu').count(),kind==='row'?0:1);
         assert.equal(await page.getByRole('button',{name:'Add record',exact:true}).count(),0);
         console.log(`PASS: ${kind} at ${width}px: creation eligibility, persisted owner, read/maintenance controls, no overflow`);
