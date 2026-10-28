@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Let record search controls wrap naturally when space runs out, keeping mapping and
+  hierarchy controls and the hierarchy column menu usable at narrow widths (REF-317).
 - Preserve keyboard focus on the chosen source-format control while refreshed import
   examples replace its markup (REF-318).
 - Keep Tab and Shift+Tab navigation moving through the form when an open enhanced select closes (REF-316).

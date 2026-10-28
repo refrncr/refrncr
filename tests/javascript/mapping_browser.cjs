@@ -6,7 +6,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
 (async () => {
   const browser = await chromium.launch({headless: true, executablePath: process.env.REFRNCR_BROWSER_EXECUTABLE});
   try {
-    for (const width of [320, 768, 1440]) {
+    for (const width of [320, 767, 768, 1023, 1024, 1440]) {
       const context = await browser.newContext({viewport: {width, height: 1000}, reducedMotion: 'reduce'});
       const page = await context.newPage();
       await page.goto(base + '/login');
@@ -25,7 +25,7 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       assert(layout.scroll <= width, JSON.stringify(layout));
       for (const button of await page.locator('.record-criteria-toolbar button').all()) {
         const box = await button.boundingBox();
-        if (box) assert(box.x + box.width <= width, `Clipped record control at ${width}`);
+        if (box) assert(box.x >= 0 && box.x + box.width <= width, `Clipped record control at ${width}`);
       }
       if (width === 320) {
         assert.equal(layout.row, 'block');

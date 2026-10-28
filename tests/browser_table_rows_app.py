@@ -53,6 +53,10 @@ def add_hierarchy_node(name, parent_id=None):
 root = add_hierarchy_node("Executive")
 branch = add_hierarchy_node("Commercial", root.id)
 add_hierarchy_node("West", branch.id)
+for key, name in (("region", "Region"), ("manager", "Manager")):
+    s.dataset_fields.create_field(
+        admin.id, hierarchy.key, key, name, "string", hierarchy_scope="all_nodes"
+    )
 create_dataset(s, admin, "empty-check", "Empty check")
 create_dataset(s, admin, "long-check", "Long" * 18 + " <img src=x onerror=alert(1)>")
 s.teams.create_team(admin.id, "Row team")

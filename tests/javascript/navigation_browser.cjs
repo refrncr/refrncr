@@ -65,6 +65,27 @@ const assert = require('node:assert/strict');
     await page.getByRole('link',{name:'Back to app',exact:true}).click(); await page.waitForURL(`${base}/`); await page.waitForLoadState('load');
     assert(!(await nav.isVisible()),'app navigation still collapsed after Settings'); await open.click();
     const resize = async size => { await page.setViewportSize(size); await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))); };
+    for (const width of [320,767,768,1023,1024,1440]) {
+      await resize({width,height:900});
+      await page.goto(`${base}/datasets/reporting-check/concept/records?view=table`);
+      await page.evaluate(()=>document.fonts.ready);
+      await overflow();
+      const controls = page.locator('.record-criteria-toolbar :is(input:not([type="hidden"]), button, summary)');
+      for (const control of await controls.all()) {
+        const box = await control.boundingBox();
+        if (box) assert(box.x >= 0 && box.x + box.width <= width, `clipped hierarchy control at ${width}`);
+      }
+      const search = page.getByRole('searchbox',{name:'Search hierarchy'});
+      await search.focus(); await page.keyboard.press('Tab');
+      assert(await page.getByRole('button',{name:'Search',exact:true}).evaluate(e=>e===document.activeElement), `search tab order at ${width}`);
+      const columns = page.locator('.hierarchy-columns');
+      await columns.locator('summary').click();
+      const menu = columns.locator('fieldset');
+      const menuBox = await menu.boundingBox();
+      assert(menuBox && menuBox.x >= 0 && menuBox.x + menuBox.width <= width, `clipped hierarchy column menu at ${width}`);
+      await columns.locator('summary').click();
+    }
+    await page.goto(`${base}/`);
     for (const width of [320,767,768,1023,1024]) {
       await resize({width,height:900});
       await overflow();
