@@ -1,0 +1,2 @@
+/* The transition observer is unavailable without scripts, so do not opt into transitions. */
+@view-transition { navigation: none; }
