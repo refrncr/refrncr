@@ -5,7 +5,6 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 ## [Unreleased]
 
 - Keep Tab and Shift+Tab navigation moving through the form when an open enhanced select closes (REF-316).
-
 - Disable view transitions on pages without JavaScript, preventing console errors
   during navigation such as signing in (REF-324).
 
