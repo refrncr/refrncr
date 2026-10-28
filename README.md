@@ -139,8 +139,8 @@ GitHub Actions runs the regular and slow suites as separate jobs on every pull r
 `test-sqlite`, `test-sqlite-slow`, `test-postgres`, and `test-postgres-slow`. The regular SQLite job
 has a 25-minute limit; the other jobs have 15 minutes for slow tests and 20 minutes for regular
 PostgreSQL tests. The `coverage` job combines artifacts from the two regular-suite jobs, while the
-slow-suite jobs remain independent checks. The four database jobs should be made required checks
-through the branch-protection update tracked in REF-59.
+slow-suite jobs remain independent checks and should be configured as required checks in repository
+branch protection.
 
 To run the suite with branch coverage locally, use the installed development extra:
 
