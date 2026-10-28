@@ -81,6 +81,15 @@ async function login(page) {
     assert.match(await activeOption(page, '#status-trigger'), /Published/i);
     await page.keyboard.press('Escape');
 
+    // A select inside its label: the label names the trigger and clicking the text opens the list.
+    const datatype = page.getByRole('combobox', {name: /^Data type/});
+    assert.equal(await datatype.count(), 1);
+    await page.locator('label', {has: page.locator('select[name=data_type]')}).click({position: {x: 4, y: 6}});
+    assert.equal(await datatype.getAttribute('aria-expanded'), 'true');
+    await page.getByRole('option', {name: 'Whole number'}).click();
+    assert.equal(await page.locator('select[name=data_type]').inputValue(), 'integer');
+    assert.equal(await datatype.getAttribute('aria-expanded'), 'false');
+
     // More than 10 options: a search field that filters on name and code, with a count and an empty state.
     await country.click();
     assert.equal(await activeId(page), 'country-search');
@@ -107,11 +116,45 @@ async function login(page) {
     assert.equal(await expanded(country), 'false');
     assert.equal(await activeId(page), 'status-trigger');
 
+    // Tab and Shift+Tab from an open short list move according to native form order.
+    await status.focus();
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await page.locator('#status-popup .select-search').isVisible(), false);
+    await page.keyboard.press('Tab');
+    assert.equal(await expanded(status), 'false');
+    assert.equal(await activeId(page), 'after-status', 'Tab leaves a non-searchable select for a text input');
+    await status.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await expanded(status), 'false');
+    assert.equal(await activeId(page), 'country-trigger', 'Shift+Tab leaves a non-searchable select for the previous select');
+
+    // Searchable list: Shift+Tab goes to the preceding ordinary input.
+    await country.click();
+    assert.equal(await activeId(page), 'country-search');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await expanded(country), 'false');
+    assert.equal(await activeId(page), 'before-country', 'Shift+Tab leaves a searchable select for a text input');
+
     // Compact variant in dense tables.
     const compact = await page.locator('#target-trigger').boundingBox();
     assert.equal(Math.round(compact.height), 36);
+    assert.equal(await page.locator('#target').evaluate(select => Boolean(select.closest('table'))), true);
+    await page.locator('#target-trigger').click();
+    assert.equal(await activeId(page), 'target-search');
+    await page.keyboard.press('Tab');
+    assert.equal(await activeId(page), 'after-compact', 'Tab leaves a searchable compact select for a button');
     const regular = await page.locator('#country-trigger').boundingBox();
     assert.equal(Math.round(regular.height), 44);
+
+    // The last field in a form still tabs onward to the next page control.
+    const lastField = page.getByRole('combobox', {name: 'Last field'});
+    await lastField.focus();
+    await page.keyboard.press('ArrowDown');
+    assert.equal(await page.locator('#last_field-popup .select-search').isVisible(), false);
+    await page.keyboard.press('Tab');
+    assert.equal(await lastField.getAttribute('aria-expanded'), 'false');
+    assert.equal(await activeId(page), 'after-last-form');
 
     // Near the bottom of a scrolling panel the popup opens upward and stays in view.
     await page.locator('#fixture-panel').evaluate(panel => { panel.scrollTop = 0; });
@@ -146,15 +189,6 @@ async function login(page) {
     await page.locator('#focus-native').click();
     assert.equal(await activeId(page), 'status-trigger');
 
-    // A select inside its label: the label names the trigger and clicking the text opens the list.
-    const datatype = page.getByRole('combobox', {name: /^Data type/});
-    assert.equal(await datatype.count(), 1);
-    await page.locator('label', {has: page.locator('select[name=data_type]')}).click({position: {x: 4, y: 6}});
-    assert.equal(await datatype.getAttribute('aria-expanded'), 'true');
-    await page.getByRole('option', {name: 'Whole number'}).click();
-    assert.equal(await page.locator('select[name=data_type]').inputValue(), 'integer');
-    assert.equal(await datatype.getAttribute('aria-expanded'), 'false');
-
     // Required without a value: no submission, the field is marked and focused; a choice clears it.
     await page.goto(base + '/select-fixture');
     await page.getByRole('button', {name: 'Send'}).click();
@@ -171,7 +205,9 @@ async function login(page) {
     await page.getByRole('option', {name: 'valid_from'}).click();
     await page.getByRole('button', {name: 'Send'}).click();
     await page.waitForURL(/echo/);
-    assert.deepEqual(JSON.parse(await page.locator('body').innerText()), {country: 'SE', status: 'published', target: 'valid_from'});
+    assert.deepEqual(JSON.parse(await page.locator('body').innerText()), {
+      before_country: '', country: 'SE', status: 'published', after_status: '', target: 'valid_from',
+    });
 
     // Dark (Forest): the same checks for contrast.
     await page.goto(base + '/select-fixture');

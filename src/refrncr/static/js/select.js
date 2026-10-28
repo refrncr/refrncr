@@ -323,7 +323,7 @@
       window.addEventListener("resize", onResize);
     };
 
-    function close(restoreFocus = true) {
+    function close(restoreFocus = true, deferSearchDisable = false) {
       if (!isOpen) return;
       isOpen = false;
       popup.classList.remove("is-open");
@@ -331,7 +331,13 @@
       trigger.setAttribute("aria-expanded", "false");
       trigger.removeAttribute("aria-activedescendant");
       searchInput.removeAttribute("aria-activedescendant");
-      searchInput.disabled = true;
+      if (deferSearchDisable) {
+        // Disabling the focused search input cancels the browser's pending Tab default action.
+        // Let sequential focus navigation complete from the trigger before disabling it.
+        setTimeout(() => { if (!isOpen) searchInput.disabled = true; }, 0);
+      } else {
+        searchInput.disabled = true;
+      }
       document.removeEventListener("pointerdown", onOutsidePointer, true);
       document.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
@@ -411,8 +417,8 @@
         event.stopPropagation();
         close(true);
       } else if (event.key === "Tab") {
-        // Move focus to the trigger first, so the browser's Tab continues from the field itself.
-        close(false);
+        // Preserve the browser's Tab default action; disabling its focused event target cancels it.
+        close(false, true);
         trigger.focus();
       } else if (onTrigger && isPrintable(event)) {
         event.preventDefault();

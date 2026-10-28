@@ -66,21 +66,34 @@ PAGE = """<!doctype html>
 <body>
 <main id="content">
   <h1>Select fixture</h1>
+  <label>Data type <select name="data_type" data-select>
+    <option value="string">Text</option><option value="integer">Whole number</option>
+  </select></label>
   <form id="fixture-form" data-no-view-transition
         action="{{ url_for('select_fixture_echo') }}" method="get">
+    <label for="before-country">Previous field</label>
+    <input id="before-country" name="before_country" type="text">
     {{ select_field('Country', 'country', 'country', countries, placeholder='Choose a country',
                     required=true, noun='countries') }}
     {{ select_field('Status', 'status', 'status', statuses, selected='published') }}
-    {{ select_field('Target field', 'target', 'target', fields, compact=true, noun='fields') }}
+    <label for="after-status">Next text field</label>
+    <input id="after-status" name="after_status" type="text">
+    <table id="compact-select-table"><tbody><tr><td>
+      {{ select_field('Target field', 'target', 'target', fields, compact=true, noun='fields') }}
+    </td></tr></tbody></table>
+    <button class="button button-secondary" type="button" id="after-compact">Next button</button>
     <button class="button button-primary" type="submit">Send</button>
   </form>
+  <form id="last-select-form">
+    {{ select_field('Last field', 'last_field', 'last_field', last_options, searchable=false) }}
+  </form>
+  <button class="button button-secondary" type="button" id="after-last-form">
+    After last form field
+  </button>
   <div id="fixture-panel">
     <div class="fixture-spacer"></div>
     {{ select_field('Owner team', 'team', 'team', teams) }}
   </div>
-  <label>Data type <select name="data_type" data-select>
-    <option value="string">Text</option><option value="integer">Whole number</option>
-  </select></label>
   <button class="button button-secondary" type="button" id="add-option">Add option</button>
   <button class="button button-secondary" type="button" id="set-value">Set value</button>
   <button class="button button-secondary" type="button" id="focus-native">Focus native</button>
@@ -110,6 +123,7 @@ def select_fixture():
             {"value": "removed", "label": "Removed", "badge": "removed", "disabled": True},
         ],
         fields=[(field, field) for field in FIELDS],
+        last_options=[("one", "One"), ("two", "Two")],
         teams=[(f"team-{i}", f"Team {i}") for i in range(6)],
     )
 
