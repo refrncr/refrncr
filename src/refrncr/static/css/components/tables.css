@@ -108,7 +108,8 @@ thead .table-sticky-actions { z-index: 2; background: var(--color-table-heading)
 .record-toolbar-search { flex-wrap: wrap; }
 .record-toolbar-search .record-criteria { flex: 1 1 28rem; }
 .record-search-form { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
-.record-criteria-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: start; }
+.record-criteria-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: start; min-width: 0; }
+.record-criteria-toolbar > button { flex: 0 0 auto; }
 .record-toolbar-search .record-search-form { flex: 1 1 20rem; min-width: 0; max-width: 24rem; }
 .record-toolbar-search .record-search-form .search-field { flex: 1 1 12rem; min-width: 0; max-width: none; }
 /* Record status: two independent toggles on the search row (Active, Deleted). */
