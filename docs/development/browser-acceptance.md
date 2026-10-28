@@ -17,7 +17,7 @@ The browser acceptance suite exercises the rendered Community application in rea
 | `dataset_creation` | Creation eligibility, saved ownership and reader/maintainer access. | Yes | [dataset_creation_browser.cjs](../../tests/javascript/dataset_creation_browser.cjs) |
 | `dataset_deletion` | Deletion confirmation, stale-state rejection, focus restoration and data integrity. | Yes | [dataset_deletion_browser.cjs](../../tests/javascript/dataset_deletion_browser.cjs) |
 | `dataset_diff` | Draft review summaries, field and record diffs, reordering and publication. | No | [dataset_diff_browser.cjs](../../tests/javascript/dataset_diff_browser.cjs) |
-| `dataset_versions` | Draft publication, cancellation, version snapshots, imports and reader access. | No | [dataset_versions_browser.cjs](../../tests/javascript/dataset_versions_browser.cjs) |
+| `dataset_versions` | Draft publication, cancellation, version snapshots, imports and reader visibility for private/future publications. | No | [dataset_versions_browser.cjs](../../tests/javascript/dataset_versions_browser.cjs) |
 | `field_datatypes` | Supported field types, identifier constraints, validation and typed records. | No | [field_datatypes_browser.cjs](../../tests/javascript/field_datatypes_browser.cjs) |
 | `mapping` | Mapping-table layout, source updates, record interactions and field reordering. | No | [mapping_browser.cjs](../../tests/javascript/mapping_browser.cjs) |
 | `mapping_usage` | Mapping usage summaries, source and target navigation and responsive presentation. | No | [mapping_usage_browser.cjs](../../tests/javascript/mapping_usage_browser.cjs) |

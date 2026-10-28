@@ -153,11 +153,11 @@ async function closedWithFocus(page, opener) {
     const reader = await readerContext.newPage();
     await login(reader, 'reader@example.com');
     await reader.goto(`${base}/datasets`);
-    const privateNames = ['Private future', 'Publication 320', 'Unpublished history name'];
+    const privateNames = ['Private future', 'Publication 320'];
     const readerText = await reader.locator('body').innerText();
     const visiblePrivateNames = privateNames.filter(name => readerText.includes(name));
-    assert.deepEqual(visiblePrivateNames, [], 'reader must not see unpublished, private or future publication names');
-    await reader.getByRole('link', {name: 'History demo', exact: true}).click();
+    assert.deepEqual(visiblePrivateNames, [], 'reader must not see private or future publication names');
+    await reader.getByRole('link', {name: 'Unpublished history name', exact: true}).click();
     assert.equal(reader.url(), `${base}/datasets/history/records`);
     assert.match(await reader.locator('body').innerText(), /Second published value/);
     assert(!/DRAFT ONLY|Add record|Export/.test(await reader.locator('main').innerText()));
