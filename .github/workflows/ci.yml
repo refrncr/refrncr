@@ -53,7 +53,7 @@ jobs:
 
   test-sqlite:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       COVERAGE_FILE: coverage-sqlite.dat
     steps:
@@ -83,11 +83,6 @@ jobs:
           --durations=30 --timeout=300 --timeout-method=thread -q
           --cov --cov-report= --cov-fail-under=0
 
-      - name: Test SQLite slow cases without coverage
-        run: >-
-          python -m pytest --run-slow -n auto -m 'not postgres and slow'
-          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
-
       - name: Upload coverage data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -95,6 +90,32 @@ jobs:
           path: coverage-sqlite.dat
           if-no-files-found: error
           retention-days: 1
+
+  test-sqlite-slow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install project and development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install --require-hashes -r requirements/dev.txt
+
+      - name: Collect SQLite slow cases
+        run: python -m pytest --collect-only -q -m 'not postgres and slow'
+
+      - name: Test SQLite slow cases
+        run: >-
+          python -m pytest --run-slow -n auto -m 'not postgres and slow'
+          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
 
   test-postgres:
     runs-on: ubuntu-24.04
@@ -148,11 +169,6 @@ jobs:
           --durations=30 --timeout=300 --timeout-method=thread -q
           --cov --cov-report= --cov-fail-under=0
 
-      - name: Test PostgreSQL slow cases without coverage
-        run: >-
-          python -m pytest --run-slow -n auto -m 'postgres and slow'
-          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
-
       - name: Upload coverage data
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -160,6 +176,56 @@ jobs:
           path: coverage-postgres.dat
           if-no-files-found: error
           retention-days: 1
+
+  test-postgres-slow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REFRNCR_TEST_POSTGRES_URL: postgresql+psycopg://refrncr:refrncr@localhost:5432/refrncr_test
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: refrncr_test
+          POSTGRES_USER: refrncr
+          POSTGRES_PASSWORD: refrncr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U refrncr -d refrncr_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install PostgreSQL 16 client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client-16
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+
+      - name: Install project and development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install --require-hashes -r requirements/dev.txt
+
+      - name: Collect PostgreSQL slow cases
+        run: python -m pytest --collect-only -q -m 'postgres and slow'
+
+      - name: Test PostgreSQL slow cases
+        run: >-
+          python -m pytest --run-slow -n auto -m 'postgres and slow'
+          --durations=20 --timeout=300 --timeout-method=thread -q --no-cov
 
   coverage:
     needs: [test-sqlite, test-postgres]
