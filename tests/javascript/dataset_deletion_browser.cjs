@@ -1,5 +1,4 @@
-// REF-141: use a fresh tests/browser_table_rows_app.py disposable fixture.
-// REF-165: Delete dataset lives in Settings; editing is inline, not a panel.
+// Checks dataset deletion confirmation, stale-state rejection, focus return and unchanged data.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -22,34 +21,49 @@ async function focused(page, locator) {
 (async () => {
   const browser = await chromium.launch({headless:true, executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
   console.log('Chrome ' + browser.version());
-  const context = await browser.newContext({colorScheme:'light'});
-  const page = await context.newPage();
+  let context = await browser.newContext({colorScheme:'light',viewport:{width:320,height:900}});
+  let page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  const dialog = page.getByRole('dialog');
+  let dialog = page.getByRole('dialog');
   // The confirmation label carries the Dataset's own name, in its own casing.
   const confirmField = name => dialog.getByLabel(`Type ${name} to confirm`, {exact:true});
   try {
     await signIn(page);
     for (const width of [320, 768, 1440]) {
+      if (width !== 320) {
+        const storageState = await context.storageState();
+        await context.close();
+        context = await browser.newContext({storageState,colorScheme:'light',viewport:{width,height:900}});
+        page = await context.newPage();
+        page.on('pageerror', error => errors.push(error.message));
+        dialog = page.getByRole('dialog');
+      }
       await page.setViewportSize({width,height:900});
-      // Editing is inline; an unsaved draft has to survive the deletion detour.
+      // Editing is inline. Destructive settings are unavailable until editing ends.
       await page.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
       await page.locator('#dataset-description').fill('Unsaved draft must survive cancel');
-      await page.locator('[data-section-tabs]').getByRole('tab', {name:'Dataset details', exact:true}).click();
-      assert.equal(await page.locator('#dataset-description').inputValue(), 'Unsaved draft must survive cancel');
+      assert.equal(await page.locator('#danger-zone').count(), 0);
+      await page.getByRole('link',{name:'Cancel',exact:true}).click();
+      await page.locator('#danger-zone').waitFor();
 
       // The tab states what a deletion removes before anything is confirmed.
       assert.equal(await page.locator('#danger-zone .danger-counts').count(),0);
       assert(await page.locator('#danger-zone').getByText('This cannot be undone.',{exact:true}).isVisible());
 
       const trigger = page.getByRole('link', {name:'Delete dataset', exact:true});
-      const deleteStyle = await trigger.evaluate(element => ({
-        border: getComputedStyle(element).borderTopColor,
-        whiteSpace: getComputedStyle(element).whiteSpace,
-      }));
-      assert.notEqual(deleteStyle.border, 'rgba(0, 0, 0, 0)');
-      assert.equal(deleteStyle.whiteSpace, 'nowrap');
+      const deleteLabel = await trigger.evaluate(element => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const bounds = element.getBoundingClientRect();
+        return {text: element.innerText, textRects: [...range.getClientRects()].map(rect => ({
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+        })), bounds: {left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom}};
+      });
+      assert.match(deleteLabel.text, /Delete dataset/);
+      assert(deleteLabel.textRects.every(rect => rect.left >= deleteLabel.bounds.left &&
+        rect.right <= deleteLabel.bounds.right && rect.top >= deleteLabel.bounds.top &&
+        rect.bottom <= deleteLabel.bounds.bottom), 'delete action label is fully visible');
       await trigger.focus();
       await page.keyboard.press('Enter');
       const name = confirmField('Row check');
@@ -90,10 +104,9 @@ async function focused(page, locator) {
         fs.mkdirSync(output,{recursive:true});
         await page.screenshot({path:path.join(output,`delete-${width}.png`)});
       }
-      // Escape, Cancel and Close all return to the trigger and keep the draft.
+      // Escape, Cancel and Close all return focus to the trigger.
       await page.keyboard.press('Escape');
       await focused(page,trigger);
-      assert.equal(await page.locator('#dataset-description').inputValue(),'Unsaved draft must survive cancel');
       await trigger.click();
       await confirmField('Row check').waitFor();
       await dialog.getByRole('link',{name:'Cancel',exact:true}).click();
@@ -104,6 +117,17 @@ async function focused(page, locator) {
       await focused(page,trigger);
       console.log(`${width}px: counts, name, keyboard, containment, Cancel/Escape/close and draft/focus restoration passed`);
     }
+    // Run the remaining navigation and audit checks in a fresh reduced-motion
+    // context. Changing the media preference mid-document races Chromium's
+    // cross-document view-transition lifecycle and is unrelated to deletion.
+    assert.deepEqual(errors, [], 'delete confirmation flows must not raise script errors');
+    const storageState = await context.storageState();
+    await context.close();
+    errors.length = 0;
+    context = await browser.newContext({storageState,reducedMotion:'reduce'});
+    page = await context.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    dialog = page.getByRole('dialog');
 
     // A server metadata change while the confirmation is open rejects the old state.
     await page.goto(base + '/datasets/row-check/configure#dataset-details');
@@ -114,7 +138,7 @@ async function focused(page, locator) {
     await other.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
     await other.getByLabel('Name',{exact:true}).fill('Renamed dataset');
     await other.getByRole('button',{name:'Save dataset',exact:true}).click();
-    await other.waitForURL(url => url.pathname === '/datasets/row-check/configure');
+    await other.waitForURL(url => url.pathname === '/datasets/row-check/concept');
     await name.fill('Row check');
     await dialog.getByRole('button',{name:'Delete dataset',exact:true}).click();
     await dialog.getByRole('alert').filter({hasText:'Dataset changed'}).waitFor();

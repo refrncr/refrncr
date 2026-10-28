@@ -1,4 +1,4 @@
-// REF-73 creation/maintenance matrix against the disposable browser_table_rows_app fixture.
+// Checks dataset creation eligibility, owner persistence and reader/maintainer access.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -43,14 +43,15 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
           await panel.getByLabel('Key',{exact:true}).fill(`review-${kind}-${width}`);
           await panel.getByLabel('Name',{exact:true}).fill(`Review ${kind} ${width}`);
           await panel.getByRole('button',{name:'Create dataset',exact:true}).click();
-          await page.waitForURL(`${base}/datasets/review-${kind}-${width}`);
+          await page.waitForURL(`${base}/datasets/review-${kind}-${width}/concept?tab=fields`);
+          await page.getByRole('tab',{name:'Settings',exact:true}).click();
           const ownership = page.locator('#dataset-ownership');
           await ownership.getByText('Test data domain',{exact:true}).waitFor();
           assert.equal(await ownership.getByRole('link',{name:'Edit',exact:true}).count(),0);
           await page.keyboard.press('Escape');
-          await page.getByRole('link',{name:'View records',exact:true}).click();
+          await page.getByRole('link',{name:'Records',exact:true}).click();
           await page.getByRole('button',{name:'Add record',exact:true}).waitFor();
-          assert.equal(await page.locator('.export-menu').count(),1);
+          assert.equal(await page.locator('.export-menu summary').filter({hasText:'Export'}).count(),1);
         }
         assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
         if(output) await page.screenshot({path:`${output}/${kind}-${width}.png`});
@@ -62,11 +63,11 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         }
         // The fixture explicitly publishes row-check; current REF-73 permissions still apply.
         await page.goto(`${base}/datasets/row-check`);
-        assert.equal(await page.getByRole('link',{name:'Access management',exact:true}).count(),0);
+        assert.equal(await page.getByRole('link',{name:'Access',exact:true}).count(),0);
         assert.equal(await page.locator('#dataset-general').getByRole('link',{name:'Edit',exact:true}).count(),kind==='row'?0:1);
-        await page.getByRole('link',{name:'View records',exact:true}).click();
+        await page.getByRole('link',{name:'Records',exact:true}).click();
         assert.equal(await page.locator('.export-menu').count(),kind==='row'?0:1);
-        assert.equal(await page.getByRole('button',{name:'Add record',exact:true}).count(),kind==='row'?0:1);
+        assert.equal(await page.getByRole('button',{name:'Add record',exact:true}).count(),0);
         console.log(`PASS: ${kind} at ${width}px: creation eligibility, persisted owner, read/maintenance controls, no overflow`);
       }
       assert.deepEqual(errors,[]);

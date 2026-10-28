@@ -1,4 +1,4 @@
-"""Run disposable browser fixtures with CSP enforced; defaults to the CI smoke test."""
+"""Run disposable Chromium acceptance fixtures, individually, as core set, or in full."""
 
 import argparse
 import os
@@ -45,6 +45,19 @@ CASES = {
     "ui_polish": ("ui_polish", 5162),
     "ui_refresh": ("ui_refresh", 5186),
 }
+
+# Short pull-request gate: CSP/navigation, critical dataset lifecycle, search and
+# access control, plus the REF-294 REST installation policy. The nightly job runs
+# every case so this list can stay intentionally focused and fast.
+CORE_CASES = (
+    "web_csp",
+    "view_transitions",
+    "dataset_creation",
+    "new_version",
+    "dataset_deletion",
+    "access_management",
+    "rest_api",
+)
 
 
 def run(name):
@@ -102,9 +115,18 @@ def run(name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cases", nargs="*", help="case names (default: web_csp)")
-    parser.add_argument("--all", action="store_true", help="run all local acceptance scripts")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--core", action="store_true", help="run the pull-request core set")
+    group.add_argument("--all", action="store_true", help="run the complete acceptance suite")
     args = parser.parse_args()
-    names = list(CASES) if args.all else args.cases or ["web_csp"]
+    if args.cases and (args.core or args.all):
+        parser.error("case names cannot be combined with --core or --all")
+    if args.all:
+        names = list(CASES)
+    elif args.core:
+        names = list(CORE_CASES)
+    else:
+        names = args.cases or ["web_csp"]
     if set(names) - CASES.keys():
         parser.error("Unknown case; choose from " + ", ".join(CASES))
     failed = []

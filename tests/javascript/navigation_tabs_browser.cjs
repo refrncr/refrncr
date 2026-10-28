@@ -1,4 +1,4 @@
-// Focused responsive-navigation regression checks against a disposable mapping fixture.
+// Checks dataset tab navigation, responsive behavior and keyboard focus across sections.
 const assert = require('node:assert/strict');
 const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL;

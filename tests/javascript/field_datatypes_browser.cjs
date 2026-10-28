@@ -1,5 +1,4 @@
-// REF-145 real-browser regression; start browser_field_datatypes_app.py first.
-// Uses the repository's optional external Playwright convention.
+// Checks all supported field types, identifier constraints, validation and typed record values.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -30,15 +29,19 @@ async function login(page) {
     page.on('pageerror', error => errors.push(error.message));
     await login(page);
     await page.goto(base + '/datasets/types/concept');
+    await page.getByRole('tab', {name: 'Fields', exact: true}).click();
     for (const [id, label] of types) {
       await page.getByRole('link', {name: 'Add field', exact: true}).click();
       const panel = page.locator('dialog[open]');
       const select = panel.locator('select[name=data_type]');
-      await select.waitFor();
+      await select.waitFor({state: 'attached'});
       assert.deepEqual(await select.locator('option').evaluateAll(es => es.map(e => [e.value, e.textContent])), types);
       await panel.getByLabel('Key', {exact: true}).fill(id);
       await panel.getByLabel('Name', {exact: true}).fill(label);
-      await select.selectOption(id);
+      const dataType = panel.getByRole('combobox', {name: 'Data type', exact: true});
+      await dataType.click();
+      await page.getByRole('option', {name: label, exact: true}).click();
+      assert.equal(await select.inputValue(), id);
       assert.equal(await panel.getByLabel('Part of record identifier', {exact: true}).isDisabled(), id === 'float');
       if (id === 'string') {
         const identifier = panel.getByLabel('Part of record identifier', {exact: true});
@@ -50,7 +53,7 @@ async function login(page) {
         assert.equal(await required.evaluate(el => getComputedStyle(el).cursor), 'not-allowed');
         assert(Number(await required.evaluate(el => getComputedStyle(el).opacity)) < 1);
         assert.match(await panel.locator('[data-identifier-status]').textContent(), /checked and locked/);
-        await required.click();
+        await required.evaluate(element => element.click());
         assert(await required.isChecked(), 'the required constraint stays checked while locked');
         assert.equal(await panel.locator('[data-required-mirror]').count(), 1);
         assert.equal(await unique.isChecked(), false, 'identifier membership does not imply uniqueness');
@@ -68,14 +71,14 @@ async function login(page) {
       }
       assert.equal(await panel.getByLabel('Output format', {exact: true}).count(), 0);
       await panel.getByRole('button', {name: 'Add field', exact: true}).click();
-      await page.waitForURL(base + '/datasets/types/concept');
+      await page.waitForURL(base + '/datasets/types/concept?tab=fields');
       await page.locator(`a[href='/datasets/types/fields/${id}/edit']`).waitFor();
       await page.locator(`a[href='/datasets/types/fields/${id}/edit']`).click();
       await page.locator('dialog[open] select[name=data_type]').waitFor();
       assert.equal(await page.locator('dialog[open] select[name=data_type]').inputValue(), id);
       await page.locator('dialog[open]').getByLabel('Name', {exact: true}).fill(label + ' reviewed');
       await page.getByRole('button', {name: 'Save field', exact: true}).click();
-      await page.waitForURL(base + '/datasets/types/concept');
+      await page.waitForURL(base + '/datasets/types/concept?tab=fields');
       await page.getByText(label + ' reviewed', {exact: true}).waitFor();
       console.log('PASS create/edit ' + label);
     }
@@ -135,8 +138,10 @@ async function login(page) {
       await nojs.goto(base + `/datasets/types/fields/${id}/edit`);
       assert.equal(await nojs.locator('select[name=data_type]').inputValue(), id);
       await nojs.getByLabel('Name', {exact: true}).fill(label + ' nojs');
-      await nojs.getByRole('button', {name: 'Save field', exact: true}).click();
-      await nojs.waitForURL(base + '/datasets/types/concept');
+      await Promise.all([
+        nojs.waitForURL(url => url.pathname === '/datasets/types/concept' && url.searchParams.get('tab') === 'fields'),
+        nojs.getByRole('button', {name: 'Save field', exact: true}).click(),
+      ]);
       await nojs.getByText(label + ' nojs', {exact: true}).waitFor();
     }
     await plain.close();

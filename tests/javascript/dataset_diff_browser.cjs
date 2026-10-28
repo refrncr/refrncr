@@ -1,4 +1,4 @@
-/* REF-84 real Chrome regression. External Playwright; disposable loopback only. */
+// Checks draft review summaries, field and record diffs, reordering, publication and access.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -42,17 +42,16 @@ async function capture(page, name) {
       await login(page,'owner@example.com');
       const versions = `${base}/datasets/diff-${width}/versions`;
       await page.goto(versions);
-      await page.locator('[data-concept-actions] summary').click();
-      const reviewEntry=page.getByRole('link',{name:'Review changes',exact:true});
+      const reviewEntry=page.getByRole('link',{name:'Review & publish',exact:true});
       await reviewEntry.focus(); await reviewEntry.press('Enter');
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       const summary = page.url();
-      assert.match(await page.locator('main').innerText(),/You’re working on a concept/);
-      await page.getByText('Read full value',{exact:true}).click();
-      assert.match(await page.locator('main').innerText(),/<b>Concept description<\/b>/);
+      assert.match(await page.locator('main').innerText(),/You’re working on a draft/);
+      assert.equal(await page.getByRole('table',{name:'Change counts'}).count(),1);
+      assert.equal(await page.getByRole('rowheader',{name:'Fields',exact:true}).count(),1);
       await capture(page,`summary-${width}`);
       await page.getByRole('link',{name:'Fields',exact:true}).click();
-      assert.match(await page.locator('main').innerText(),/Renamed label/);
+      assert.match(await page.locator('main').innerText(),/Renamed review field/);
       assert.equal(await page.getByRole('columnheader',{name:'Field',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),0);
       assert.equal(await page.getByRole('columnheader',{name:'Property',exact:true}).count(),1);
@@ -81,7 +80,7 @@ async function capture(page, name) {
         await capture(page,`fields-${theme}-${width}`);
       }
       await page.locator('html').evaluate(el=>delete el.dataset.theme);
-      await page.getByRole('link',{name:'Renamed label',exact:true}).click();
+      await page.getByRole('link',{name:'Renamed review field',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
@@ -114,7 +113,7 @@ async function capture(page, name) {
       await page.getByRole('button',{name:/^Added/}).click();
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       await page.getByRole('link',{name:'Clear search'}).click();
-      assert.equal(new URL(page.url()).searchParams.has('q'),false);
+      assert.equal(new URL(page.url()).searchParams.get('q') ?? '', '');
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       await page.getByRole('button',{name:/^Added/}).click();
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),[]);
@@ -183,7 +182,7 @@ async function capture(page, name) {
       await page.goto(summary);
       const publish = page.getByRole('link',{name:'Publish version',exact:true});
       await publish.click(); await page.locator('#publication-date').waitFor();
-      await page.locator('dialog[open]').getByRole('link',{name:'Review changes',exact:true}).click();
+      await page.locator('dialog[open]').getByRole('link',{name:'Review & publish',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       // A second tab changes concept metadata through the existing UI.
       const edit=await context.newPage();
@@ -193,7 +192,7 @@ async function capture(page, name) {
       await edit.waitForURL(url=>!url.pathname.endsWith('/edit'));
       await page.getByRole('link',{name:'Records',exact:true}).click();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
-      assert(!/Before value|Renamed label/.test(await page.locator('main').innerText()));
+      assert(!/Before value|Renamed review field/.test(await page.locator('main').innerText()));
       await page.goBack();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
       await page.reload();
@@ -229,7 +228,7 @@ async function capture(page, name) {
     const deniedContext=await browser.newContext();const denied=await deniedContext.newPage();
     await login(denied,'reader@example.com');
     await denied.goto(`${base}/datasets/diff-1440/versions`);
-    assert.equal(await denied.getByRole('link',{name:'Review changes',exact:true}).count(),0);
+    assert.equal(await denied.getByRole('link',{name:'Review & publish',exact:true}).count(),0);
     const response=await denied.goto(`${base}/datasets/diff-1440/versions/review`);
     assert.equal(response.status(),404);
     await deniedContext.close();

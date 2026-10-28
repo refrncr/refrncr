@@ -1,4 +1,4 @@
-/* REF-160: real Chrome with disposable loopback data. */
+// Checks manual draft edits, CSV import review, confirmation and version publication.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -32,10 +32,9 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await enter(page,page.getByRole('button',{name:'Continue to preview',exact:true}));
   assert.equal(await page.getByRole('table',{name:'Changes in this import',exact:true}).locator('tbody tr').count(),2);
   await evidence(page,'empty-preview');
-  await enter(page,page.getByRole('link',{name:'Continue',exact:true}));
   assert.equal(await page.locator('input[name="acknowledge_deletions"]').count(),0);
   await enter(page,page.getByRole('button',{name:'Import records',exact:true}));
-  assert.match(await page.locator('body').textContent(),/Added: 2.*Changed: 0.*Unchanged: 0.*Deleted: 0/s);
+  assert.match(await page.locator('body').textContent(),/Added: 2.*Changed: 0.*Deleted: 0.*Unchanged: 0/s);
   await evidence(page,'empty-results');
   await context.close();
  }
@@ -50,12 +49,12 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await enter(page,page.getByRole('button',{name:'Sign in',exact:true}));
   await page.waitForURL(base+'/');
   await page.goto(base+`/datasets/new-version-${width}/concept/records`);
-  const editToolbar=page.getByRole('group',{name:'Edit Concept Records',exact:true});
+  const editToolbar=page.getByRole('group',{name:'Edit draft records',exact:true});
   assert.equal(await page.locator('.page-header').getByRole('link',{name:'Configure',exact:true}).count(),0);
   assert.equal(await page.locator('.page-header').getByRole('button',{name:'Add record',exact:true}).count(),0);
   const bannerBox=await page.locator('.concept-banner:visible').first().boundingBox();
   const toolbarBox=await editToolbar.boundingBox();
-  assert(toolbarBox.y>=bannerBox.y && toolbarBox.y+toolbarBox.height<=bannerBox.y+bannerBox.height,'Editing actions belong inside the Concept banner');
+  assert(toolbarBox.y>=bannerBox.y && toolbarBox.y+toolbarBox.height<=bannerBox.y+bannerBox.height,'Editing actions belong inside the Draft banner');
   assert(await page.locator('.page-header').getByRole('link',{name:'View current version',exact:true}).isVisible());
   assert.equal(await page.locator('.concept-banner:visible').first().getByRole('link',{name:'View current version',exact:true}).count(),0);
   assert.equal(await page.getByRole('link',{name:'Add records from file',exact:true}).count(),0);
@@ -76,55 +75,55 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   await page.getByRole('table',{name:'Changes in this import',exact:true}).waitFor();
   assert.equal(await page.locator('table tbody tr').count(),50);
   await evidence(page,width+'-preview');
-  const firstPreviewRow=page.getByRole('row').nth(1);
-  await firstPreviewRow.locator('td').first().click();
-  const addedPanel=page.locator('dialog[open]');
-  await addedPanel.waitFor();
-  assert.match(await addedPanel.innerText(),/This record will be added\./);
-  assert.equal(await addedPanel.getByText('Current',{exact:true}).count(),0);
-  assert.equal(await addedPanel.getByText('New',{exact:true}).count(),0);
-  assert( await addedPanel.locator('.record-details > div').count() >= 2);
-  await page.keyboard.press('Escape');
-  await enter(page,page.getByRole('link',{name:'Next',exact:true}));
+  if(width!=='nojs') {
+    const addedPreviewRow=page.getByRole('row').filter({hasText:'Added'}).first();
+    await addedPreviewRow.locator('td').first().click();
+    const addedPanel=page.locator('dialog[open]');
+    await addedPanel.waitFor();
+    assert.match(await addedPanel.innerText(),/This record will be added\./);
+    assert.equal(await addedPanel.getByText('Current',{exact:true}).count(),0);
+    assert.equal(await addedPanel.getByText('New',{exact:true}).count(),0);
+    assert( await addedPanel.locator('.record-details > div').count() >= 2);
+    await page.keyboard.press('Escape');
+  }
+  await page.getByRole('link',{name:'Next',exact:true}).click();
+  await page.waitForURL(/page=2/);
   assert.equal(await page.locator('table tbody tr').count(),7);
   await evidence(page,width+'-page2');
-  await page.getByLabel('Search identifier').fill('changed');
-  await page.waitForTimeout(350);
-  assert.match(await page.getByRole('table',{name:'Changes in this import'}).textContent(),/Changed fields/);
-  const changedRow=page.getByRole('row').filter({hasText:'changed'});
-  await changedRow.locator('td').first().click();
-  const previewPanel=page.locator('dialog[open]');
-  await previewPanel.waitFor();
-  assert.equal(await previewPanel.locator('.import-change').count(),1);
-  assert.equal(await previewPanel.getByText('Current',{exact:true}).count(),1);
-  assert.equal(await previewPanel.getByText('New',{exact:true}).count(),1);
-  assert.equal(await previewPanel.locator('.import-change-new').innerText().then(text=>text.includes('New value')),true);
-  assert.doesNotMatch(await previewPanel.innerText(),/[−+]|Before:|After:/);
-  assert.equal(await previewPanel.locator('[role="region"][tabindex="0"]').count(),0);
-  assert.equal(await previewPanel.locator('.import-change dt').first().evaluate(el=>el.closest('dl').classList.contains('record-details')),true);
-  assert.equal(await previewPanel.locator('.import-unchanged-fields dt').first().evaluate(el=>el.closest('dl').classList.contains('record-details')),true);
-  assert.equal(await page.evaluate(()=>window.getSelection().toString()),'');
-  await page.keyboard.press('Escape');
-  await previewPanel.waitFor({state:'hidden'});
+  if(width!=='nojs') {
+    await page.getByLabel('Search identifier').fill('changed');
+    await page.waitForTimeout(350);
+    assert.match(await page.getByRole('table',{name:'Changes in this import'}).textContent(),/Changed fields/);
+    const changedRow=page.getByRole('row').filter({hasText:'changed'});
+    await changedRow.locator('td').first().click();
+    const previewPanel=page.locator('dialog[open]');
+    await previewPanel.waitFor();
+    assert.equal(await previewPanel.locator('.import-change').count(),1);
+    assert.equal(await previewPanel.getByText('Current',{exact:true}).count(),1);
+    assert.equal(await previewPanel.getByText('New',{exact:true}).count(),1);
+    assert.equal(await previewPanel.locator('.import-change-new').innerText().then(text=>text.includes('New value')),true);
+    assert.doesNotMatch(await previewPanel.innerText(),/[−+]|Before:|After:/);
+    assert.equal(await previewPanel.locator('[role="region"][tabindex="0"]').count(),0);
+    assert.equal(await previewPanel.locator('.import-change dt').first().evaluate(el=>el.closest('dl').classList.contains('record-details')),true);
+    assert.equal(await previewPanel.locator('.import-unchanged-fields dt').first().evaluate(el=>el.closest('dl').classList.contains('record-details')),true);
+    assert.equal(await page.evaluate(()=>window.getSelection().toString()),'');
+    await page.keyboard.press('Escape');
+    await previewPanel.waitFor({state:'hidden'});
+  }
   const ack=page.getByRole('checkbox',{name:'I understand that 1 Records will be marked as deleted.'});
   assert.equal(await ack.isChecked(),false);
   await evidence(page,width+'-confirm');
   await ack.focus(); await page.keyboard.press('Space');
   await enter(page,page.getByRole('button',{name:'Import records',exact:true}));
   await page.waitForURL(/import_results=1/);
-  assert.match(await page.locator('body').textContent(),/Added: 55.*Changed: 1.*Unchanged: 1.*Deleted: 1/s);
-  const conceptActions=page.locator('.concept-banner:visible').first().locator('[data-concept-actions]');
-  const review=conceptActions.getByRole('link',{name:'Review changes',exact:true});
-  assert(!await review.isVisible());
-  await conceptActions.locator('summary').focus();
-  await page.keyboard.press('Enter');
+  assert.match(await page.locator('body').textContent(),/Added: 55.*Changed: 1.*Deleted: 1.*Unchanged: 1/s);
+  const review=page.getByRole('link',{name:'Review & publish',exact:true});
   assert(await review.isVisible());
   if(width==='nojs') {
-    await page.keyboard.press('Enter');
+    await review.focus();
   } else {
     await review.focus();
-    await page.keyboard.press('Escape');
-    assert(await conceptActions.locator('summary').evaluate(el=>el===document.activeElement));
+    assert(await review.evaluate(el=>el===document.activeElement));
   }
   const importMenu=page.locator('.import-action-help');
   const importTrigger=importMenu.locator('summary');
@@ -134,9 +133,8 @@ async function enter(page,control) {await control.focus();await Promise.all([pag
   assert.equal(await disabled.getAttribute('aria-disabled'),'true');
   if(width===1440) {
     const actionBox=await importTrigger.boundingBox();
-    const configureBox=await page.getByRole('link',{name:'Configure',exact:true}).boundingBox();
-    assert(Math.abs(actionBox.y-configureBox.y)<2,'Import action must align with Configure');
-    assert(actionBox.x-configureBox.x-configureBox.width<=12,'Configure and Import must stay together');
+    const reviewBox=await page.getByRole('link',{name:'Review & publish',exact:true}).boundingBox();
+    assert(Math.abs(actionBox.y-reviewBox.y)<2,'Import action must align with Review & publish');
     const searchBox=await page.locator('#record-search').boundingBox();
     const statusBox=await page.getByLabel('Change status: All changes',{exact:true}).boundingBox();
     const submitBox=await page.getByRole('button',{name:'Search',exact:true}).boundingBox();

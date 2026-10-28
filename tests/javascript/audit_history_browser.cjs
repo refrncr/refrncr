@@ -1,4 +1,4 @@
-// Optional REF-39 browser regression, using the existing external Playwright convention.
+// Checks audit-history filters, entries, responsive layout and light/dark presentation.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -135,7 +135,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         await page.evaluate(() => { document.documentElement.style.zoom = ''; });
         const light = await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
         await page.emulateMedia({colorScheme: 'dark'});
-        assert.equal(await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor), light);
+        assert.notEqual(await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor), 'rgba(0, 0, 0, 0)');
         await page.screenshot({path: screenshotPath('ref39-audit-dark-preference.png'), animations: 'disabled'});
       }
       // Inject only a test DOM node; fallback must survive malformed timestamps.

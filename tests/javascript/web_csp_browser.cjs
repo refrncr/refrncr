@@ -1,4 +1,4 @@
-// Mandatory CI smoke: real interactions must work under the enforced production CSP.
+// Checks real browser interactions and required assets while the production CSP is enforced.
 const assert = require('node:assert/strict');
 const {chromium} = require('./browser_policy.cjs');
 const raw = require(process.env.REFRNCR_PLAYWRIGHT_MODULE || 'playwright');

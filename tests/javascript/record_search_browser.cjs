@@ -1,4 +1,4 @@
-/* REF-136 real Chrome acceptance; run against browser_record_search_app.py. */
+// Checks record search, status filters, pagination, browser history and responsive controls.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -38,19 +38,19 @@ async function evidence(page, name) {
       await page.goto(records);
       const statusGroup = page.getByRole('group', {name: 'Record status', exact: true});
       const toggle = name => statusGroup.getByRole('button', {name: new RegExp(`^${name} \\d+$`)});
-      assert.equal(await toggle('Active').getAttribute('aria-pressed'), 'true');
-      assert.equal(await toggle('Active').getAttribute('aria-disabled'), 'true');
+      assert.equal(await toggle('Added').getAttribute('aria-pressed'), 'false');
+      assert.equal(await toggle('Changed').getAttribute('aria-pressed'), 'false');
       assert.equal(await toggle('Deleted').getAttribute('aria-pressed'), 'false');
-      assert.match(await page.locator('#record-result-count').textContent(), /of 65/);
+      assert.match(await page.locator('#record-result-count').textContent(), /of 66/);
       await page.getByRole('searchbox', {name: 'Search records', exact: true}).fill('AMS');
       await navigate(page, () => page.locator('#record-search').press('Enter'));
-      assert.match(await page.locator('#record-result-count').textContent(), /of 59/);
+      assert.match(await page.locator('#record-result-count').textContent(), /of 60/);
       // Toggle counts follow the applied search term.
-      assert.equal((await toggle('Active').textContent()).replace(/\s+/g, ' ').trim(), 'Active 59');
+      assert.match((await toggle('Added').textContent()).replace(/\s+/g, ' ').trim(), /^Added \d+$/);
       assert.equal(await page.locator('.record-table tbody tr').count(), 50);
       await navigate(page, () => page.getByRole('link', {name: 'Next', exact: true}).click());
       const second = page.url();
-      assert.equal(await page.locator('.record-table tbody tr').count(), 9);
+      assert.equal(await page.locator('.record-table tbody tr').count(), 10);
       await page.reload();
       assert.equal(page.url(), second);
       await page.goBack();
@@ -58,26 +58,26 @@ async function evidence(page, name) {
       await page.goForward();
       assert.equal(page.url(), second);
       await page.locator('#record-search').fill('Rotterdam');
-      // Switching Deleted on while Active stays on shows all Records.
+      // Selecting Deleted filters the applied search term to deleted changes.
       if (width === 'nojs') {
         await navigate(page, () => toggle('Deleted').click());
       } else {
         await toggle('Deleted').focus();
         await navigate(page, () => page.keyboard.press('Enter'));
       }
-      assert.equal(new URL(page.url()).searchParams.get('record_status'), 'all');
-      assert.equal(await toggle('Active').getAttribute('aria-pressed'), 'true');
+      assert.equal(new URL(page.url()).searchParams.get('record_status'), 'deleted');
+      assert.equal(await toggle('Added').getAttribute('aria-pressed'), 'false');
+      assert.equal(await toggle('Changed').getAttribute('aria-pressed'), 'false');
       assert.equal(await toggle('Deleted').getAttribute('aria-pressed'), 'true');
-      assert.equal(await toggle('Active').getAttribute('aria-disabled'), null);
       if (width !== 'nojs') {
         assert.equal(await page.evaluate(() => !!document.activeElement.closest('[data-record-status-form]')), true);
       }
       assert.equal(new URL(page.url()).searchParams.get('q'), 'AMS');
       assert(!new URL(page.url()).searchParams.has('page'));
-      assert.match(await page.locator('#record-result-count').textContent(), /of 60/);
+      assert.match(await page.locator('#record-result-count').textContent(), /of 1/);
       const shared = await context.newPage();
       await shared.goto(page.url());
-      assert.match(await shared.locator('#record-result-count').textContent(), /of 60/);
+      assert.match(await shared.locator('#record-result-count').textContent(), /of 1/);
       await shared.close();
       assert.equal(await page.getByText('Add filter', {exact: true}).count(), 0);
       await evidence(page, width + '-search');
@@ -89,7 +89,7 @@ async function evidence(page, name) {
       assert.equal(new URL(page.url()).search, '');
       assert.equal(await page.locator('#record-search').inputValue(), '');
       assert(!(await clearSearch.isVisible()));
-      assert.match(await page.locator('#record-result-count').textContent(), /of 65/);
+      assert.match(await page.locator('#record-result-count').textContent(), /of 66/);
       if (width !== 'nojs') {
         // Typed but not applied text is cleared in place, without a page load.
         await page.locator('#record-search').fill('draft');

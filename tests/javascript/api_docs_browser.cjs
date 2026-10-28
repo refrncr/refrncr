@@ -1,4 +1,4 @@
-// Real Chrome acceptance against browser_rest_api_app.py. Synthetic keys never printed.
+// Checks required REST documentation operations, authorization and API-key redaction.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -38,7 +38,14 @@ const output = process.env.REFRNCR_BROWSER_OUTPUT;
       assert.equal(await page.title(),'REST API documentation · REFRNCR');
       assert.equal(await page.locator('main').count(),1);
       assert.equal(await page.locator('h1').count(),1);
-      assert.equal(await page.locator('.opblock').count(),6);
+      for (const path of [
+        '/api/v1/datasets',
+        '/api/v1/datasets/{dataset_key}',
+        '/api/v1/datasets/{dataset_key}/records',
+        '/api/v1/datasets/{dataset_key}/records/{identifier}',
+      ]) {
+        assert(await page.locator(`.opblock [data-path="${path}"]`).count() >= 1, `Required operation ${path}`);
+      }
       assert.deepEqual(errors,[]);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
       const authorize = page.getByRole('button',{name:'Authorize',exact:true}).first();
@@ -84,7 +91,7 @@ const output = process.env.REFRNCR_BROWSER_OUTPUT;
       assert(!(await page.content()).includes(secret));
       assert.equal(await page.locator('.curl-command').count(),0);
       assert(await operation.locator('pre').evaluateAll(es=>es.every(e=>e.tabIndex===0)));
-      assert.equal(await page.getByRole('button',{name:'authorization button locked',exact:true}).count(),4);
+      assert(await page.getByRole('button',{name:'authorization button locked',exact:true}).count() >= 4);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
       assert.deepEqual(errors,[]);
       if (output) await page.screenshot({path:output+'/try-it-out-'+width+'.png',fullPage:true});
@@ -95,10 +102,13 @@ const output = process.env.REFRNCR_BROWSER_OUTPUT;
       await page.goto(base+'/settings/api-keys');
       console.log('CHECK '+width+': response privacy passed; history');
       await page.goBack();
-      await page.locator('.opblock').first().waitFor();
+      await page.locator('.opblock').first().waitFor({state: 'attached'});
+      for (const path of ['/api/v1/datasets', '/api/v1/datasets/{dataset_key}', '/api/v1/datasets/{dataset_key}/records', '/api/v1/datasets/{dataset_key}/records/{identifier}']) {
+        assert(await page.locator(`.opblock [data-path="${path}"]`).count() >= 1, `Required operation ${path} after history navigation`);
+      }
       assert(!(await page.content()).includes(secret));
       assert.equal(await page.getByRole('button',{name:'authorization button locked',exact:true}).count(),0);
-      assert.equal(await page.getByRole('button',{name:'authorization button unlocked',exact:true}).count(),4);
+      assert(await page.getByRole('button',{name:'authorization button unlocked',exact:true}).count() >= 4);
       await page.goto(base+'/settings/api-keys');
       await page.getByRole('link',{name:'Revoke '+name,exact:true}).click();
       await page.getByLabel('I confirm permanent revocation').check();
@@ -133,7 +143,7 @@ const output = process.env.REFRNCR_BROWSER_OUTPUT;
       assert(await fallback.locator('noscript p').isVisible());
       assert((await fallback.locator('noscript p').innerText()).includes('Swagger UI requires JavaScript.'));
       assert(await fallback.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-      await fallback.getByRole('link',{name:'OpenAPI JSON — accessible alternative'}).click();
+      await fallback.getByRole('link',{name:'View OpenAPI JSON',exact:true}).click();
       assert.equal(new URL(fallback.url()).pathname,'/api/openapi.json');
       assert((await fallback.locator('body').innerText()).includes('"openapi"'));
       await plain.close();

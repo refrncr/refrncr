@@ -1,4 +1,4 @@
-// Run against tests/browser_mapping_usage_app.py with an existing Playwright installation.
+// Checks mapping usage summaries, source and target navigation, and responsive presentation.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 (async () => {

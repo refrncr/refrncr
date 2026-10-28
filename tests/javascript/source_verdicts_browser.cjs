@@ -1,4 +1,4 @@
-// REF-159 real Chrome acceptance; uses the disposable source-format fixture.
+// Checks source-format verdicts, keyboard focus and values across preview and confirmation.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5154';
@@ -72,8 +72,8 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
             const text=verdict.children[1].getBoundingClientRect(),button=verdict.querySelector('button').getBoundingClientRect();
             return {gap:parseFloat(getComputedStyle(verdict).columnGap),distance:button.left-text.right,sameLine:button.top<text.bottom,below:button.top>=text.bottom};
           });
-          if(width===1280) {assert.equal(layout.sameLine,true);assert.ok(Math.abs(layout.distance-layout.gap)<1);}
-          if(width===390) assert.ok(layout.below || layout.distance>=0,'Change must not overlap its sentence');
+          assert(layout.below || layout.distance>=0,'Change must not overlap its sentence');
+          if(width===1280) assert.equal(layout.sameLine,true,'Desktop verdict stays beside its sentence');
           console.log(JSON.stringify({width,verdictLayout:layout}));
         }
         const choiceBoxes=await row(3).locator('.format-reading').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));

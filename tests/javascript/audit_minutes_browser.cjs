@@ -1,3 +1,4 @@
+// Checks audit-minute review and export journeys, filtering and permission behavior.
 const assert = require('node:assert/strict');
 const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL;
@@ -86,3 +87,4 @@ if (!base || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostnam
     console.log('PASS: audit minutes in five timezones, exact details, native minute controls, precise-link display, DST gap rejection and no-JS filtering');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
+// Checks audit-minute review and export journeys, including filtering and permission behavior.

@@ -28,7 +28,7 @@ jobs:
       - name: Check installed Excel XML protection
         run: '"$RUNNER_TEMP/ref48-runtime/bin/python" -I tests/installed_xml_smoke.py'
 
-  browser-csp:
+  browser-core:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,8 +48,8 @@ jobs:
           python -m pip install --require-hashes -r requirements/dev.txt
           npm ci --ignore-scripts --prefix tests/javascript
           node tests/javascript/node_modules/playwright/cli.js install --with-deps chromium
-      - name: Test enforced browser CSP
-        run: python tests/run_browser_tests.py web_csp view_transitions
+      - name: Test core Chromium journeys
+        run: python tests/run_browser_tests.py --core
 
   test-sqlite:
     runs-on: ubuntu-latest

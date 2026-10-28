@@ -1,3 +1,4 @@
+// Checks security and cache headers on browser responses and static assets (REF-259).
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5162';
