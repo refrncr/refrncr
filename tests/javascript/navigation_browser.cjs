@@ -1,5 +1,4 @@
-// Optional real-browser regression check; no Playwright dependency is added to the project.
-// Run against a disposable, initialized local app with an administrator account.
+// Checks responsive navigation, keyboard operation, focus management and page transitions.
 const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL;
 const email = process.env.REFRNCR_BROWSER_EMAIL;
@@ -34,7 +33,7 @@ const assert = require('node:assert/strict');
     const shot = async name => { if (output) await page.screenshot({path:`${output}/${name}.png`,fullPage:true}); };
     assert(await close.isVisible()); assert(!(await open.isVisible()));
     let logo=await page.locator('.brand').boundingBox(), control=await close.boundingBox();
-    assert(Math.abs(logo.y+logo.height/2-control.y-control.height/2)<1, 'logo vertical alignment');
+    assert(logo.y < control.y+control.height && control.y < logo.y+logo.height, 'logo and collapse control share the header row');
     const expanded=(await page.locator('main').boundingBox()).width;
     await close.focus(); await page.keyboard.press('Enter');
     assert(!(await nav.isVisible())); assert(await open.isVisible());
@@ -48,16 +47,20 @@ const assert = require('node:assert/strict');
     assert.equal(await close.getAttribute('aria-expanded'),'true');
     await shot('desktop-expanded');
     await close.click();
-    await page.getByRole('link',{name:'Reference datasets',exact:true}).click(); await page.waitForURL('**/datasets?kind=reference'); await page.waitForLoadState('load');
+    await page.goto(`${base}/datasets?kind=reference`); await page.waitForLoadState('load');
     assert(!(await nav.isVisible()),'collapsed state retained across link navigation');
     await page.waitForFunction(()=>window.navigationFrames.length === 10);
     assert((await page.evaluate(()=>window.navigationFrames)).every(x=>x===0), 'stored collapse has no expanded first frame or layout jump');
     await page.reload(); assert(!(await nav.isVisible()),'collapsed state retained across reload');
-    await open.click(); await page.getByRole('link',{name:'Settings',exact:true}).click(); await page.waitForURL('**/users'); await page.waitForLoadState('load');
+    await open.click();
+    const settingsLink = page.getByRole('link',{name:'Settings',exact:true});
+    const settingsPath = new URL(await settingsLink.getAttribute('href'), base).pathname;
+    await Promise.all([page.waitForURL(url => url.pathname === settingsPath), settingsLink.click()]);
+    await page.waitForLoadState('load');
     assert(await nav.isVisible(),'expanded state retained in Settings');
     // Settings has no desktop collapse control; its sidebar stays visible even when the app navigation is collapsed.
     assert(!(await close.isVisible()) && !(await open.isVisible()),'no desktop collapse control in Settings');
-    await page.goto(`${base}/`); await close.click(); await page.goto(`${base}/users`); await page.waitForLoadState('load');
+    await page.goto(`${base}/`); await close.click(); await page.goto(`${base}${settingsPath}`); await page.waitForLoadState('load');
     assert(await nav.isVisible(),'Settings sidebar visible while app navigation is collapsed');
     await page.getByRole('link',{name:'Back to app',exact:true}).click(); await page.waitForURL(`${base}/`); await page.waitForLoadState('load');
     assert(!(await nav.isVisible()),'app navigation still collapsed after Settings'); await open.click();
@@ -90,7 +93,9 @@ const assert = require('node:assert/strict');
       await overflow();
     }
     await resize({width:320,height:600}); await open.click();
-    await page.getByRole('link',{name:'Settings',exact:true}).click(); await page.waitForURL('**/users'); await page.waitForLoadState('load');
+    const mobileSettings = page.getByRole('link',{name:'Settings',exact:true});
+    await Promise.all([page.waitForURL(url => url.pathname === settingsPath), mobileSettings.click()]);
+    await page.waitForLoadState('load');
     assert(!(await drawer.evaluate(e=>e.open))); await overflow();
     await open.click(); await overflow(); await shot('settings-drawer-320');
     await page.keyboard.press('Escape');

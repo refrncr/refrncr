@@ -1,5 +1,4 @@
-// Optional browser acceptance for the Access tab (REF-165).
-// Start tests/browser_table_rows_app.py with fresh fixture data first.
+// Checks Access-tab grants, revocation, keyboard use and responsive behavior.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

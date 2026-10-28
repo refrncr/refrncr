@@ -1,5 +1,4 @@
-/* Explicit lifecycle in real Chrome, against disposable loopback data only. */
-// Covers current and draft Concept records, actions, responsive layout and accessibility.
+// Checks current and draft Concept records, record actions, responsive layout and accessibility.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');

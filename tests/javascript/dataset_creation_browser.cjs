@@ -1,4 +1,4 @@
-// REF-73 creation/maintenance matrix against the disposable browser_table_rows_app fixture.
+// Checks dataset creation eligibility, owner persistence and reader/maintainer access.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

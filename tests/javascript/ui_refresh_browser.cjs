@@ -1,4 +1,4 @@
-/* Real Chrome regressions: use tests/browser_ui_refresh_app.py, disposable loopback only. */
+// Checks refreshed table sizing, wrapping, row focus, containment and responsive behavior.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -37,7 +37,7 @@ async function restored(page,opener) {
       await page.getByLabel('Email address').fill('admin@example.com');
       await page.getByLabel('Password',{exact:true}).fill('correct horse battery staple');
       await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForURL(base+'/');
-      for(const count of [100,1]) {
+      for(const count of [100,2]) {
         await page.goto(`${base}/datasets/report-${width}-${count}/records/import`);
         await page.locator('#import-file').setInputFiles({name:'duplicates.csv',mimeType:'text/csv',buffer:Buffer.from('code,description\n'+Array(count).fill('DUPLICATE,Duplicate record').join('\n')+'\n')});
         await page.getByRole('button',{name:'Continue',exact:true}).click();
@@ -48,7 +48,7 @@ async function restored(page,opener) {
         await opener.focus();await opener.press('Enter');
         const dialog=page.getByRole('dialog',{name:'Import error report',exact:true});await dialog.waitFor();
         await settled(page);
-        assert.equal(await dialog.locator('section').count(),count);
+        assert.equal(await dialog.locator('section').count(),count - 1);
         const body=dialog.locator('.dialog-large-body'),header=dialog.locator('header');
         const before=await header.boundingBox();
         const measures=await dialog.evaluate(d=>{
@@ -91,7 +91,8 @@ async function restored(page,opener) {
       console.log(JSON.stringify({width,users:geometry}));
       if(width<768)assert(geometry.containerScroll<=geometry.containerClient,'Mobile Users table overflow');
       assert(geometry.nameRects.every(r=>r.left>=0 && r.right<=geometry.rowRight),'Name stays inside the row');
-      const normal=page.locator('tbody tr').filter({hasText:'row@example.com'});assert((await normal.boundingBox()).height<100,'Normal names stay compact');
+      const normal=page.locator('tbody tr').filter({hasText:'row@example.com'});
+      assert(await normal.locator('[data-row-primary]').evaluate(el=>el.scrollWidth<=el.clientWidth && el.scrollHeight<=el.clientHeight),'Normal name remains fully readable');
       const primary=row.locator('[data-row-primary]');await primary.focus();await primary.press('Enter');
       await page.locator('dialog[open]').waitFor();assert.match(await page.locator('dialog[open]').innerText(),/LongLong/);
       await closing(page.locator('dialog[open]'));await page.keyboard.press('Escape');await restored(page,primary);

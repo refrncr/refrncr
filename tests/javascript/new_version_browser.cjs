@@ -1,4 +1,4 @@
-/* REF-160: real Chrome with disposable loopback data. */
+// Checks manual draft edits, CSV import review, confirmation and version publication.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');

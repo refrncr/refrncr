@@ -1,4 +1,4 @@
-/* REF-84 real Chrome regression. External Playwright; disposable loopback only. */
+// Checks draft review summaries, field and record diffs, reordering, publication and access.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -47,10 +47,11 @@ async function capture(page, name) {
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       const summary = page.url();
       assert.match(await page.locator('main').innerText(),/You’re working on a draft/);
-      assert.match(await page.locator('main').innerText(),/<b>Concept description<\/b>/);
+      assert.equal(await page.getByRole('table',{name:'Change counts'}).count(),1);
+      assert.equal(await page.getByRole('rowheader',{name:'Fields',exact:true}).count(),1);
       await capture(page,`summary-${width}`);
       await page.getByRole('link',{name:'Fields',exact:true}).click();
-      assert.match(await page.locator('main').innerText(),/Renamed label/);
+      assert.match(await page.locator('main').innerText(),/Renamed review field/);
       assert.equal(await page.getByRole('columnheader',{name:'Field',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),0);
       assert.equal(await page.getByRole('columnheader',{name:'Property',exact:true}).count(),1);
@@ -79,7 +80,7 @@ async function capture(page, name) {
         await capture(page,`fields-${theme}-${width}`);
       }
       await page.locator('html').evaluate(el=>delete el.dataset.theme);
-      await page.getByRole('link',{name:'Renamed label',exact:true}).click();
+      await page.getByRole('link',{name:'Renamed review field',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
@@ -112,7 +113,7 @@ async function capture(page, name) {
       await page.getByRole('button',{name:/^Added/}).click();
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       await page.getByRole('link',{name:'Clear search'}).click();
-      assert.equal(new URL(page.url()).searchParams.has('q'),false);
+      assert.equal(new URL(page.url()).searchParams.get('q') ?? '', '');
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       await page.getByRole('button',{name:/^Added/}).click();
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),[]);
@@ -191,7 +192,7 @@ async function capture(page, name) {
       await edit.waitForURL(url=>!url.pathname.endsWith('/edit'));
       await page.getByRole('link',{name:'Records',exact:true}).click();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
-      assert(!/Before value|Renamed label/.test(await page.locator('main').innerText()));
+      assert(!/Before value|Renamed review field/.test(await page.locator('main').innerText()));
       await page.goBack();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
       await page.reload();

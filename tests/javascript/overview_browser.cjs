@@ -1,4 +1,4 @@
-// Run against tests/browser_overview_app.py with an existing Playwright installation.
+// Checks overview sections, filtering, responsive cards, accessibility and color contrast.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,4 +1,4 @@
-// Optional REF-39 browser regression, using the existing external Playwright convention.
+// Checks audit-history filters, entries, responsive layout and light/dark presentation.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');

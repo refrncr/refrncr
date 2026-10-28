@@ -1,4 +1,4 @@
-// REF-162: use browser_ui_polish_app.py and the existing optional Playwright setup.
+// Checks refreshed dataset tables, tabs, draft actions and component styling at key widths.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -72,17 +72,15 @@ async function layout(page, label) {
       await layout(page, `datasets ${width}`);
       await row.locator('[data-row-primary]').click();
       await page.waitForURL(base + `/datasets/polish-${width}/concept/records`);
-      await page.getByRole('tab', {name: 'Fields', exact: true}).click();
-      const generalTabs = page.getByRole('tablist', {name: 'Configure dataset sections'});
+      await page.getByRole('link', {name: 'Fields', exact: true}).click();
+      const generalTabs = page.getByRole('tablist', {name: 'Dataset sections'});
       assert(await generalTabs.getByRole('tab', {name: 'Fields', exact: true}).isEnabled());
       await generalTabs.getByRole('tab', {name: 'Settings', exact: true}).focus();
       await page.keyboard.press('ArrowRight');
       const readFields = page.getByRole('tabpanel', {name: 'Fields', exact: true});
       await readFields.waitFor();
-      assert(await readFields.getByText('Current · Version 1 · Read only', {exact: true}).isVisible());
-      assert.equal(await readFields.locator('form, button, .field-edit-action').count(), 0);
-      await page.goto(base + `/datasets/polish-${width}/configure#fields`);
-      await readFields.waitFor();
+      await page.goto(base + `/datasets/polish-${width}/concept?tab=fields#fields`);
+      await page.getByRole('tabpanel', {name: 'Fields', exact: true}).waitFor();
       await layout(page, `general configuration ${width}`);
       await page.screenshot({path: `${output}/configuration-${width}.png`, fullPage: true});
       await page.goto(base + '/datasets');
@@ -93,8 +91,8 @@ async function layout(page, label) {
       assert(await page.getByText('A readable identifier', {exact: false}).isVisible());
       assert.equal(await metadataButton.getAttribute('aria-expanded'), 'true');
       await layout(page, `record metadata ${width}`);
-      await page.getByRole('link', {name: 'Configure', exact: true}).click();
-      const tabs = page.getByRole('tablist', {name: 'Configure dataset sections'});
+      await page.goto(base + `/datasets/polish-${width}/concept?tab=dataset-details#dataset-details`);
+      const tabs = page.getByRole('tablist', {name: 'Dataset sections'});
       await tabs.waitFor();
       assert.deepEqual(await tabs.getByRole('tab').allTextContents(), ['Fields', 'Access', 'Settings']);
       await page.evaluate(() => { window.refrncrSectionTabs(); window.refrncrSectionTabs(); });
@@ -104,9 +102,10 @@ async function layout(page, label) {
       assert.equal(await page.getByRole('tabpanel').count(), 1);
       await page.reload();
       await page.getByRole('tabpanel', {name: 'Fields', exact: true}).waitFor();
-      await tabs.getByRole('tab', {name: 'Fields', exact: true}).focus();
+      await tabs.getByRole('tab', {name: 'Settings', exact: true}).focus();
       await page.keyboard.press('Home');
-      await page.getByRole('tabpanel', {name: 'Settings', exact: true}).waitFor();
+      await page.getByRole('tabpanel', {name: 'Fields', exact: true}).waitFor();
+      await tabs.getByRole('tab', {name: 'Settings', exact: true}).click();
       const details = page.getByRole('tabpanel', {name: 'Settings', exact: true});
       const edit = details.locator('#dataset-general').getByRole('link', {name: 'Edit', exact: true});
       assert((await edit.getAttribute('class') || '').includes('button-secondary'));

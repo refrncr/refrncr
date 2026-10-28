@@ -1,4 +1,4 @@
-// Required CI regression: production lifecycle handlers, no test-side promise catches.
+// Checks navigation history, scroll restoration, reduced motion and focus across page changes.
 const assert = require('node:assert/strict');
 const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5144';

@@ -4,7 +4,7 @@ from browser_table_rows_app import admin, app, s
 from support import create_dataset, create_field
 
 for width in (320, 768, 1440):
-    for count in (1, 100):
+    for count in (2, 100):
         dataset = create_dataset(s, admin, f"report-{width}-{count}", "Report sizing")
         create_field(s, admin, dataset, "code", "Code", is_required=True)
         create_field(s, admin, dataset, "description", "Description")

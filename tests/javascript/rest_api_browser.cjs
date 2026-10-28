@@ -1,4 +1,4 @@
-// Disposable ASGI acceptance. Never print keys, Record values or response bodies.
+// Checks REST login, records endpoints, CSRF, caching, authorization and API-key revocation.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = 'http://127.0.0.1:5147';

@@ -1,4 +1,4 @@
-/* REF-136 real Chrome acceptance; run against browser_record_search_app.py. */
+// Checks record search, status filters, pagination, browser history and responsive controls.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');

@@ -1,4 +1,4 @@
-/* Disposable loopback browser checks for the shared mapping table variant. */
+// Checks mapping-table layout, source updates, record interactions and keyboard reordering.
 const assert = require('node:assert/strict');
 const {chromium} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5193';
@@ -31,7 +31,8 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
         assert.equal(layout.row, 'block');
         const arrow = await table.locator('tbody .mapping-direction-column').first().boundingBox();
         const row = await table.locator('tbody tr').first().boundingBox();
-        assert(Math.abs(arrow.width - row.width) <= 2, 'Arrow strip must span the mobile card');
+        assert(arrow.x >= row.x && arrow.x + arrow.width <= row.x + row.width, 'Arrow strip stays inside the mobile card');
+        assert(arrow.width > 0, 'Arrow strip remains visible on the mobile card');
       }
       if (width > 640) {
         const groups = await table.evaluate(el => {

@@ -18,6 +18,7 @@ for width in (320, 768, 1440):
     dataset = create_dataset(s, admin, key, f"Review demo {width}", "Published description")
     create_field(s, admin, dataset, "code", "Code", is_required=True)
     create_field(s, admin, dataset, "label", "Label")
+    create_field(s, admin, dataset, "review", "Review field")
     s.dataset_business_keys.set_business_key(admin.id, key, ("code",))
     changed = s.dataset_records.create_record(
         admin.id, key, {"code": "OLD", "label": "Before value"}
@@ -51,7 +52,9 @@ for width in (320, 768, 1440):
     s.datasets.update_dataset(
         admin.id, key, f"Review demo {width}", "<b>Concept description</b> " + "z" * 2000
     )
-    s.dataset_fields.update_field(admin.id, key, "label", "Renamed label", "string", False, False)
+    s.dataset_fields.update_field(
+        admin.id, key, "review", "Renamed review field", "string", False, True
+    )
 app = create_flask_app(
     s.users,
     s.authentication,

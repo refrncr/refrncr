@@ -1,4 +1,4 @@
-// Run with tests/browser_presentation_metadata_app.py; every mutation is confined to its in-memory data.
+// Checks export-access workflows, metadata presentation and recovery after failed requests.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5165';
@@ -50,15 +50,16 @@ async function savedMove(page, action) {
       await layout(page);
       await login(page);
       const key = `ref165-${width}`;
-      const configure = `/datasets/${key}/configure`;
-      const concept = `/datasets/${key}/concept`;
-      await page.goto(base+configure+'?edit=1');
+      const configure = `/datasets/${key}?tab=access-management#access-management`;
+      const editConfigure = `/datasets/${key}?edit=1`;
+      const concept = `/datasets/${key}/concept?tab=access-management#access-management`;
+      await page.goto(base+editConfigure);
       const preview = page.locator('[data-icon-preview] use');
       assert((await preview.getAttribute('href')).endsWith('/lucide-legacy-0.468.0.svg#history'));
       await page.getByLabel('Name', {exact:true}).fill(`Renamed ${width}`);
       await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Save dataset',exact:true}).click()]);
       assert((await page.locator('.page-context .dataset-icon use').getAttribute('href')).endsWith('#history'));
-      await page.goto(base+configure+'?edit=1');
+      await page.goto(base+editConfigure);
       assert.equal(await page.getByRole('combobox',{name:'Dataset icon',exact:true}).inputValue(),'history');
       await page.getByRole('combobox',{name:'Dataset icon',exact:true}).fill('history');
       await page.waitForFunction(()=>document.querySelector('[data-icon-preview] use').getAttribute('href').endsWith('/lucide-legacy-0.468.0.svg#history'));
@@ -79,9 +80,10 @@ async function savedMove(page, action) {
       assert.deepEqual(await names(page),['Code','Label']);
       await layout(page);
 
-      // POST failure must navigate to a GET page for all source configuration variants.
-      for (const path of [configure,concept,`/datasets/${key}`]) {
-        await page.goto(base+path+'#access-management');
+      // POST failure must recover to a GET page from both published and draft views.
+      for (const path of [configure,concept]) {
+        const before = page.url();
+        await page.goto(base+path);
         await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'},{force:true});
         let posts = 0;
         const fail = route => {
@@ -89,9 +91,26 @@ async function savedMove(page, action) {
           return route.continue();
         };
         await page.route('**/export-access*',fail);
-        const [response] = await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Grant export access',exact:true}).click()]);
-        assert.equal(response.status(),200); assert.equal(posts,1);
-        assert.equal(page.url(),base+configure+'#access-management');
+        const fallback = page.waitForResponse(response => {
+          const url = new URL(response.url());
+          return response.request().method() === 'GET' && url.pathname.startsWith(`/datasets/${key}`);
+        });
+        const grant = page.getByRole('button',{name:'Grant export access',exact:true});
+        assert(await grant.isEnabled(), 'grant action is enabled after selecting a user');
+        const [fallbackResponse] = await Promise.all([
+          fallback,
+          grant.click(),
+        ]);
+        assert.equal(fallbackResponse.status(),200);
+        await page.waitForURL(url => url.href !== before && url.pathname.startsWith(`/datasets/${key}`) && url.searchParams.get('tab') === 'access-management' && url.hash === '#access-management');
+        await fallbackResponse.finished();
+        await page.locator('#access-management-heading').waitFor({state:'visible'});
+        await page.waitForLoadState('networkidle');
+        assert.equal(posts,1);
+        const returned = new URL(page.url());
+        assert(returned.pathname.startsWith(`/datasets/${key}`));
+        assert.equal(returned.searchParams.get('tab'),'access-management');
+        assert.equal(returned.hash,'#access-management');
         assert.deepEqual(await visiblePanels(page),['access-management']);
         await page.unroute('**/export-access*',fail);
       }
@@ -101,8 +120,21 @@ async function savedMove(page, action) {
       await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).waitFor();
       await page.route('**/revoke*',route=>route.abort());
       page.once('dialog',dialog=>dialog.accept());
-      const [revoked] = await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Remove export access for Row user',exact:true}).click()]);
-      assert.equal(revoked.status(),200); assert.equal(page.url(),base+configure+'#access-management');
+      const revokeFallback = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET' && url.pathname.startsWith(`/datasets/${key}`);
+      });
+      const [revokeResponse] = await Promise.all([
+        revokeFallback,
+        page.getByRole('button',{name:'Remove export access for Row user',exact:true}).click(),
+      ]);
+      assert.equal(revokeResponse.status(),200);
+      await revokeResponse.finished();
+      await page.locator('#access-management-heading').waitFor({state:'visible'});
+      const returned = new URL(page.url());
+      assert(returned.pathname.startsWith(`/datasets/${key}`));
+      assert.equal(returned.searchParams.get('tab'),'access-management');
+      assert.equal(returned.hash,'#access-management');
       assert(await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).isVisible());
       await page.unroute('**/revoke*');
 

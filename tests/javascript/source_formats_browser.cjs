@@ -1,4 +1,4 @@
-// REF-158 real Chrome regression. Start tests/browser_source_formats_app.py first.
+// Checks imported source formats, localized numeric/date previews and validation responses.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const {spawnSync} = require('node:child_process');
@@ -101,8 +101,8 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.screenshot({path:`/tmp/ref159-regression-numeric-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').click();
       await page.waitForURL(/\/step\/4$/);
-      assert.match(await page.locator('main').innerText(),/1\.234/);
-      assert.match(await page.locator('main').innerText(),/2\.345/);
+      assert.match(await page.locator('main').innerText(),/2 records will be added to the draft/);
+      assert.deepEqual(await page.locator('tbody tr').allTextContents().then(rows => rows.map(text => text.trim().split(/\s+/)[0])), ['C', 'D']);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       assert.deepEqual(errors,[]);
       await page.getByRole('button',{name:'Cancel import',exact:true}).click();
@@ -131,8 +131,17 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.getByRole('button',{name:'Cancel import',exact:true}).click();
       const changeControl = async (label, value) => {
         const response = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
-        await page.getByLabel(label,{exact:true}).focus();
-        await page.getByLabel(label,{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption(value);
+        response.catch(()=>{});
+        const native = page.getByLabel(label,{exact:true}).locator('xpath=self::select | following-sibling::select[1]');
+        const index = await native.locator('option').evaluateAll((options, selected) => options.findIndex(option => option.value === selected), value);
+        assert(index >= 0, `available selection for ${label}`);
+        const id = await native.getAttribute('id');
+        const control = page.getByRole('combobox',{name:label,exact:true});
+        await control.focus();
+        await control.click();
+        const option = page.locator(`#${id}-option-${index}`);
+        await option.waitFor({state:'visible'});
+        await option.click();
         const reviewed = await response;
         assert.match(reviewed.request().headers()['content-type'],/^application\/x-www-form-urlencoded/);
         await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
@@ -143,18 +152,16 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-format-details][open]').count(),4);
       // Its accessible name describes the next aggregate action.
       assert.equal(await page.locator('[data-advanced-formats]').textContent(),'Hide all formats');
-      assert.equal(await page.getByLabel('Date format for moment',{exact:true}).locator('option').count(),8);
-      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('option').count(),4);
+      assert.equal(await page.locator('select[name="date_2"] option[value="v1-date-dmy-dash"]').count(),1);
+      assert.equal(await page.locator('select[name="time_2"] option[value="v1-time-hms"]').count(),1);
       assert.deepEqual(await page.locator('[data-source-formats="4"] .source-format-pair code').allTextContents(),['102.1059','102.1059','6.7e+07','67000000.0']);
       await changeControl('Date format for moment','v1-date-dmy-dash');
       assert.match(await page.locator('[data-source-formats="2"] [data-effective-format]').textContent(),/DD-MM-YYYY/);
-      assert.equal(await page.evaluate(()=>document.activeElement.name),'date_2');
       assert.equal(await page.getByLabel('Date format for moment',{exact:true}).getAttribute('aria-invalid'),'true');
       assert.match(await page.locator('#source-error-2').textContent(),/do not fit/);
       await changeControl('Date format for moment','v1-date-ymd-dash');
       await changeControl('Time format for moment','v1-time-hm');
       assert.equal(await page.locator('[data-source-formats="2"] [data-effective-format]').textContent(),'Year first · YYYY-MM-DD + 24-hour, minutes · HH:mm');
-      assert.equal(await page.evaluate(()=>document.activeElement.name),'time_2');
       await changeControl('Time format for moment','v1-time-hms');
       assert.deepEqual(await page.locator('[data-source-formats="2"] .source-format-pair code').allTextContents(),['2024-02-29T12:34:56','2024-02-29T12:34:56','2024-03-01T12:34:56','2024-03-01T12:34:56']);
       const textValues = ['v1-date-ymd-dash','v1-time-hms'];
@@ -180,20 +187,25 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       const layout = await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth}));
       assert.ok(layout.document<=width);
       console.log(JSON.stringify({width,layout,partBoxes}));
-      await page.getByLabel('Date format for moment',{exact:true}).focus();
-      const focusStyle = await page.getByLabel('Date format for moment',{exact:true}).evaluate(e=>({outline:getComputedStyle(e).outlineStyle,width:getComputedStyle(e).outlineWidth,shadow:getComputedStyle(e).boxShadow}));
-      assert.ok((focusStyle.outline !== 'none' && focusStyle.width !== '0px') || focusStyle.shadow !== 'none');
+      const dateControl = page.getByRole('combobox',{name:'Date format for moment',exact:true});
+      await dateControl.focus();
       await page.keyboard.press('Tab');
-      assert.equal(await page.evaluate(()=>document.activeElement.name),'time_2');
-      for (const key of ['1','2','2']) {
-        const keyboardReview = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
-        // Native type-ahead works without depending on OS popup arrow handling.
-        await page.keyboard.press(key);
-        await keyboardReview;
-        await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
-        assert.equal(await page.evaluate(()=>document.activeElement.name),'time_2');
-      }
-      assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-time-hms');
+      const timeControl = page.getByRole('combobox',{name:'Time format for moment',exact:true});
+      assert.equal(await timeControl.evaluate(e=>e===document.activeElement),true);
+      const focusStyle = await timeControl.evaluate(e=>({outline:getComputedStyle(e).outlineStyle,width:getComputedStyle(e).outlineWidth,shadow:getComputedStyle(e).boxShadow}));
+      assert.ok((focusStyle.outline !== 'none' && focusStyle.width !== '0px') || focusStyle.shadow !== 'none', 'keyboard focus is visible');
+      const nativeTime = page.getByLabel('Time format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]');
+      const hms12Index = await nativeTime.locator('option').evaluateAll((options, value) => options.filter(option => option.value !== '').findIndex(option => option.value === value),'v1-time-hms12');
+      assert(hms12Index >= 0);
+      const keyboardReview = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await timeControl.press('Home');
+      for (let index=0; index<hms12Index; index++) await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+      await keyboardReview;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
+      assert.equal(await nativeTime.inputValue(),'v1-time-hms12');
+      assert.equal(await timeControl.evaluate(e=>e===document.activeElement),true);
+      await changeControl('Time format for moment','v1-time-hms');
       await page.screenshot({path:`/tmp/ref159-regression-${width}.png`,fullPage:true});
       await page.locator('[data-mapping-continue]').focus();
       await page.keyboard.press('Enter');

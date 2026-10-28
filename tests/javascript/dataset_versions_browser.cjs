@@ -1,4 +1,4 @@
-/* Real Chrome REF-83 checks; external Playwright, disposable loopback fixture. */
+// Checks draft publication, cancellation, version snapshots, import behavior and reader access.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -72,7 +72,7 @@ async function closedWithFocus(page, opener) {
       await page.locator('#publication-date').waitFor({state: 'visible'});
       await page.locator('dialog[open]').getByRole('link', {name: 'Cancel', exact: true}).click();
       await closedWithFocus(page, opener);
-      await page.getByRole('link', {name: 'Versions', exact: true}).click();
+      await page.locator('.page-actions').getByRole('link', {name: 'Versions', exact: true}).click();
       assert.equal(await page.locator('table tbody tr').count(), 1, 'close mutated versions');
       assert.equal(await page.getByRole('link', {name: 'Open draft', exact: true}).count(), 1);
       assert.equal(await page.getByRole('link', {name: 'Version 1', exact: true}).count(), 0);
@@ -100,7 +100,7 @@ async function closedWithFocus(page, opener) {
       let release;
       const held = new Promise(resolve => { release = resolve; });
       let posts = 0;
-      await page.route(`**/datasets/publish-${width}/versions/publish`, async route => {
+      await page.route('**/versions/publish*', async route => {
         if (route.request().method() === 'POST') { posts++; await held; }
         await route.continue();
       });
@@ -113,8 +113,8 @@ async function closedWithFocus(page, opener) {
       await screenshot(page, `busy-${width}`);
       release();
       await page.waitForURL(`${versionsURL}?notice=published`);
-      assert.equal(posts, 1, 'duplicate POST');
-      await page.unroute(`**/datasets/publish-${width}/versions/publish`);
+      assert.equal(posts, 1, `duplicate POST (observed ${posts})`);
+      await page.unroute('**/versions/publish*');
       assert.equal(await page.locator('table tbody tr').count(), 1);
       assert.match(await page.locator('table tbody').innerText(), /Scheduled/);
       assert.equal(await page.evaluate(() => window.ref83Unsafe), undefined);
@@ -153,7 +153,10 @@ async function closedWithFocus(page, opener) {
     const reader = await readerContext.newPage();
     await login(reader, 'reader@example.com');
     await reader.goto(`${base}/datasets`);
-    assert(!/Private future|Publication 320|Unpublished history name/.test(await reader.locator('body').innerText()));
+    const privateNames = ['Private future', 'Publication 320', 'Unpublished history name'];
+    const readerText = await reader.locator('body').innerText();
+    const visiblePrivateNames = privateNames.filter(name => readerText.includes(name));
+    assert.deepEqual(visiblePrivateNames, [], 'reader must not see unpublished, private or future publication names');
     await reader.getByRole('link', {name: 'History demo', exact: true}).click();
     assert.equal(reader.url(), `${base}/datasets/history/records`);
     assert.match(await reader.locator('body').innerText(), /Second published value/);

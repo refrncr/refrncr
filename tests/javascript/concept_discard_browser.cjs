@@ -1,4 +1,4 @@
-/* REF-155: real Chrome, disposable loopback data, no timing sleeps. */
+// Checks draft discard confirmation, cancellation, success feedback and keyboard focus return.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
