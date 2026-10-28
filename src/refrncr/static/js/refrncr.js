@@ -610,8 +610,11 @@
         const page = new DOMParser().parseFromString(await response.text(), "text/html");
         if (current !== generation) return;
         const focused = document.activeElement;
-        const focusState = focused?.form === form && focused.name
-          ? {id: focused.id, name: focused.name, value: focused.value}
+        const focusedControl = focused?.form === form && focused.name
+          ? focused
+          : focused?.id === `${event.target.id}-trigger` ? event.target : null;
+        const focusState = focusedControl
+          ? {id: focusedControl.id, name: focusedControl.name, value: focusedControl.value}
           : null;
         page.querySelectorAll("[data-source-formats]").forEach((replacement) => {
           const original = form.querySelector(`[data-source-formats="${replacement.dataset.sourceFormats}"]`);

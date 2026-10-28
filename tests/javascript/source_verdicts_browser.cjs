@@ -154,11 +154,22 @@ if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw E
         }
         await page.locator('[data-mapping-continue]').focus();await page.keyboard.press('Enter');
         await page.waitForURL(/\/step\/4$/);
-        await page.getByText('2026-02-01T12:34:56',{exact:true}).waitFor({state:'attached'});
+        const previewValues=page.locator('.diff-value').filter({hasText:'2026-02-01T12:34:56'});
+        await previewValues.first().waitFor({state:'attached'});
+        assert.equal(await previewValues.evaluateAll(values=>values.every(value=>!value.checkVisibility())),true,'Simple preview keeps field values hidden');
+        if(javaScriptEnabled) {
+          await page.getByRole('button',{name:'View A — Added',exact:true}).click();
+          await page.locator('dialog[open]').getByText('2026-02-01T12:34:56',{exact:true}).waitFor({state:'visible'});
+          await page.locator('dialog[open]').getByRole('button',{name:'Close panel',exact:true}).click();
+        }
         await page.getByRole('link',{name:'Back',exact:true}).click();
         await page.waitForURL(/\/step\/3$/);
         await page.reload();
         assert.equal(await row(3).getAttribute('data-state'),'transformed');
+        if(javaScriptEnabled) {
+          await row(3).getByRole('button',{name:'Change',exact:true}).click();
+          assert.equal(await page.getByRole('combobox',{name:'Date format for moment',exact:true}).isVisible(),true);
+        }
         assert.equal(await row(3).locator('select[name="date_3"]').inputValue(),'v1-date-dmy-slash');
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
         if (!javaScriptEnabled) {
