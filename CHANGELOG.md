@@ -4,6 +4,9 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Disable view transitions on pages without JavaScript, preventing console errors
+  during navigation such as signing in (REF-324).
+
 - Handle expected cross-document ViewTransition cancellations in the application (REF-311),
   preserving instant no-flash navigation and API-key snapshot exclusions. Add mandatory
   browser coverage for criteria, history, panels and reduced motion without test-side masking.

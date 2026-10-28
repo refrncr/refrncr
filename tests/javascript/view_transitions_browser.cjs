@@ -98,5 +98,29 @@ const scrollPosition = page => page.locator('#content').evaluate(node => node.sc
       await context.close();
       console.log(`PASS ${reducedMotion}: navigation, criteria, history, panel focus/scroll, API-key opt-out`);
     }
+
+    // Without scripts the stylesheet still opts into cross-document transitions,
+    // but there is no observer to consume transition.ready rejections. Exercise
+    // ordinary sign-in redirects repeatedly because Chromium can surface this race.
+    const noJavaScriptErrors = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const context = await browser.newContext({
+        viewport: {width: 1440, height: 700},
+        javaScriptEnabled: false,
+      });
+      const page = await context.newPage();
+      page.on('pageerror', error => noJavaScriptErrors.push(error.message));
+      await page.goto(base + '/login');
+      await page.getByLabel('Email address').fill('admin@example.com');
+      await page.getByLabel('Password', {exact: true}).fill('correct horse battery staple');
+      await Promise.all([
+        page.waitForURL(base + '/'),
+        page.getByRole('button', {name: 'Sign in', exact: true}).click(),
+      ]);
+      await page.waitForTimeout(250);
+      await context.close();
+    }
+    assert.deepEqual(noJavaScriptErrors, [], 'no-JavaScript sign-in must not raise page errors');
+    console.log('PASS no JavaScript: repeated sign-in redirects have no page errors');
   } finally { await browser.close(); } // Shared guard asserts production CSP throughout.
 })().catch(error => { console.error(error); process.exitCode = 1; });

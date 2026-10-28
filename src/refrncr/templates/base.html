@@ -17,6 +17,7 @@
     <link rel="preload" href="{{ url_for('static', filename='fonts/' ~ font ~ '.woff2') }}" as="font" type="font/woff2" crossorigin>
     {% endfor %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/refrncr.css') }}">
+    <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/no-script-view-transitions.css') }}"></noscript>
     <script src="{{ url_for('static', filename='js/key-generation.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/icon-picker.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/select.js') }}" defer></script>
