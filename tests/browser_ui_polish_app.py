@@ -12,7 +12,7 @@ for i in range(4):
     team = s.teams.create_team(admin.id, f"Domain {i}")
     s.memberships.create_membership(admin.id, user.id, team.id)
     s.memberships.create_membership(admin.id, admin.id, team.id)
-for width in (320, 768, 1440):
+for width in (320, 375, 767, 768, 1440):
     d = create_dataset(s, admin, f"polish-{width}", f"Polish {width}")
     s.dataset_fields.create_field(
         admin.id,
