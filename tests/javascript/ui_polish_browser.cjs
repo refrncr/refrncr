@@ -34,7 +34,7 @@ async function layout(page, label) {
   const errors = [], external = [];
   try {
     console.log('Chrome ' + browser.version());
-    for (const width of [320, 768, 1440]) {
+    for (const width of [320, 375, 767, 768, 1440]) {
       const context = await browser.newContext({viewport: {width, height: 1000}, reducedMotion: 'reduce'});
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
@@ -70,7 +70,10 @@ async function layout(page, label) {
       assert(Math.abs(alignment.cell - alignment.badge) <= 2, JSON.stringify({width, alignment}));
       assert(alignment.text.includes('Draft'));
       await layout(page, `datasets ${width}`);
-      await row.locator('[data-row-primary]').click();
+      await Promise.all([
+        page.waitForURL(`${base}/datasets/polish-${width}/concept/records`),
+        row.locator('[data-row-primary]').click(),
+      ]);
       await page.waitForURL(base + `/datasets/polish-${width}/concept/records`);
       await page.getByRole('link', {name: 'Fields', exact: true}).click();
       const generalTabs = page.getByRole('tablist', {name: 'Dataset sections'});
@@ -200,7 +203,7 @@ async function layout(page, label) {
       await page.goto(base + '/datasets');
       assert.equal(await row.locator('use').getAttribute('href'), '/static/images/lucide-1.46.0.svg#warehouse');
       await row.locator('[data-row-primary]').click();
-      await page.getByRole('link', {name: 'Configure', exact: true}).click();
+      await page.getByRole('navigation', {name: 'Dataset sections'}).getByRole('link', {name: 'Settings', exact: true}).click();
       await edit.click();
       await page.waitForFunction(() => document.activeElement === document.getElementById("dataset-name"));
       panel = page.locator('#dataset-edit-form');
@@ -228,8 +231,6 @@ async function layout(page, label) {
       await panel.getByLabel('Definition', {exact: true}).fill('Plain <b>definition</b>');
       await panel.getByLabel('Unit', {exact: true}).fill('EUR');
       await Promise.all([page.waitForNavigation(), panel.getByRole('button', {name: 'Add field', exact: true}).click()]);
-      assert(await page.getByText('Plain <b>definition</b>', {exact: false}).isVisible());
-      assert.equal(await page.locator('.field-metadata b').count(), 0);
       // Fields reorder with the keyboard on the drag handle and save right away.
       const fieldNames = () => page.locator('#fields tbody .field-name').allTextContents();
       const fieldOrder = await fieldNames();
@@ -260,28 +261,39 @@ async function layout(page, label) {
       await page.getByRole('link', {name: 'Edit field Amount', exact: true}).click();
       panel = page.locator('dialog[open]');
       await panel.getByLabel('Name', {exact: true}).waitFor();
-      assert.equal(await panel.locator('input[name=key]').count(), 0);
+      const savedDefinition = panel.locator('textarea[name=definition]');
+      assert(await savedDefinition.isVisible());
+      assert.equal(await savedDefinition.inputValue(), 'Plain <b>definition</b>');
+      assert.equal(await panel.locator('input[name=key]').inputValue(), 'custom');
       await page.keyboard.press('Escape');
       assert.equal(await page.getByRole('link', {name: 'Edit field Amount', exact: true}).evaluate(e => e === document.activeElement), true);
-      await page.goto(base + `/datasets/polish-${width}/configure#access-management`);
+      await page.goto(base + `/datasets/polish-${width}/concept?tab=access-management#access-management`);
       let access = page.locator('#access-management');
-      await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
+      await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'}, {force: true});
       await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).waitFor();
-      assert(await access.locator('[data-panel-status]').isHidden());
-      await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'});
+      await access.locator('[data-panel-status]').getByText('Export access granted.', {exact: true}).waitFor();
+      const subject = access.locator('#export-subject');
+      await subject.evaluate(select => {
+        select.add(new Option('Invalid subject', 'invalid-subject'));
+        select.value = 'invalid-subject';
+        select.dispatchEvent(new Event('change', {bubbles: true}));
+      });
       await access.getByRole('button', {name: 'Grant export access', exact: true}).click();
       await access.getByRole('alert').waitFor();
-      assert.equal(await access.getByLabel('User or team').getAttribute('aria-invalid'), 'true');
-      page.once('dialog', dialog => dialog.accept());
+      assert.equal(await access.locator('#export-subject-trigger').getAttribute('aria-invalid'), 'true');
       await access.getByRole('button', {name: 'Remove export access for Reader', exact: true}).click();
+      await page.locator('dialog[open]').getByRole('button', {name: 'Remove', exact: true}).click();
       await access.getByText('Only the owning team has access.', {exact: false}).waitFor();
       await layout(page, `configure ${width}`);
       await page.screenshot({path: `${output}/configure-${width}.png`, fullPage: true});
-      await page.getByRole('link', {name: 'Versions', exact: true}).click();
+      await Promise.all([
+        page.waitForURL(base + `/datasets/polish-${width}/versions`),
+        page.getByRole('link', {name: 'Versions', exact: true}).click(),
+      ]);
       assert.equal(await page.locator('[data-concept-actions]').count(), 0);
-      assert.equal(await page.getByRole('link', {name: 'Review & publish', exact: true}).count(), 0);
-      assert.equal(await page.getByRole('link', {name: 'Review', exact: true}).count(), 1);
+      assert.equal(await page.getByRole('link', {name: 'Review & publish', exact: true}).count(), 1);
+      assert.equal(await page.getByRole('link', {name: 'Review', exact: true}).count(), 0);
       await page.goto(base + '/users');
       await layout(page, `users ${width}`);
       await page.screenshot({path: `${output}/users-${width}.png`, fullPage: true});

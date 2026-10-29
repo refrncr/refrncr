@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Keep draft record pages within the phone viewport by anchoring visually hidden
+  table labels inside their shared accessibility utility (REF-314).
 - Reload the authoritative access-management page after an uncertain export-access
   grant or revoke failure, including when the safe GET target is already open (REF-320).
 - Move focus into asynchronously opened side panels and preserve it across in-panel

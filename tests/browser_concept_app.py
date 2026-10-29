@@ -14,7 +14,7 @@ owner = services.users.create_user(admin.id, "owner@example.com", "Dataset owner
 reader = services.users.create_user(admin.id, "reader@example.com", "Reader", password)
 team = next(t for t in services.teams.list_teams(admin.id) if t.name == "Test data domain")
 services.memberships.create_membership(admin.id, owner.id, team.id)
-for width in (320, 768, 1440):
+for width in (320, 375, 767, 768, 1440):
     dataset = create_dataset(
         services,
         admin,

@@ -65,7 +65,7 @@ async function confirmByKeyboard(page, dialog) {
   if(output) await fs.mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true,executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
   try {
-    for(const width of [320,768,1440]) {
+    for(const width of [320,375,767,768,1440]) {
       const context=await browser.newContext({viewport:{width,height:950}});
       const page=await context.newPage();
       page.on('pageerror',e=>errors.push(e.message));
@@ -98,15 +98,17 @@ async function confirmByKeyboard(page, dialog) {
         dialog=await open(page);
         if(kind==='mixed') {
           const other=await context.newPage();
-          await other.goto(`${base}/datasets/${key}/edit`);
-          await other.locator('#dataset-name').fill(`Changed while reviewing ${width}`);
-          await other.getByRole('button',{name:'Save dataset',exact:true}).click();
-          await other.waitForURL(`${base}/datasets/${key}/concept`);
+          await other.goto(`${base}/datasets/${key}/fields/label/edit`);
+          await other.getByLabel('Name',{exact:true}).fill(`Changed while reviewing ${width}`);
+          await Promise.all([
+            other.waitForURL(url=>url.pathname===`/datasets/${key}/concept` && url.searchParams.get('tab')==='fields'),
+            other.getByRole('button',{name:'Save field',exact:true}).click(),
+          ]);
           await other.close();
           await confirmByKeyboard(page,dialog);
           await dialog.getByText(/confirm discard again/).waitFor();
           await page.waitForFunction(()=>document.activeElement.matches('[data-error-focus]'));
-          assert.equal(await dialog.locator('dd').first().innerText(),'1');
+          assert.equal(await dialog.getByText('Fields changed',{exact:true}).locator('..').locator('dd').innerText(),'1');
           await evidence(page,`stale-${width}`);
           // One controlled 503 exercises the shared safe server-error path.
           await page.route(`**/datasets/${key}/concept/discard`, async route=>{
@@ -143,7 +145,7 @@ async function confirmByKeyboard(page, dialog) {
       const disabled=page.getByRole('button',{name:'Discard draft',exact:true});
       assert.equal(await disabled.getAttribute('aria-disabled'),'true');
       await disabled.focus();
-      const explanation='This Draft contains the Dataset’s first unpublished version. There is no Current version to return to. Publish it first or delete the Dataset.';
+      const explanation='This Concept contains the Dataset’s first unpublished version. There is no Current version to return to. Publish it first or delete the Dataset.';
       assert.equal(await page.locator('#concept-discard-panel-unavailable').innerText(),explanation);
       await evidence(page,`disabled-${width}`);
       await page.keyboard.press('Enter');
@@ -169,7 +171,7 @@ async function confirmByKeyboard(page, dialog) {
     // retain them with exact expected HTTP evidence, reject all other console errors.
     const unexpected=consoleErrors.filter(e=>!/^Failed to load resource: the server responded with a status of (409|503) /.test(e));
     assert.deepEqual(unexpected,[]);
-    const result={browser:await browser.version(),widths:[320,768,1440],measurements,pageErrors:errors,consoleErrors,expectedResponses,denied:404};
+    const result={browser:await browser.version(),widths:[320,375,767,768,1440],measurements,pageErrors:errors,consoleErrors,expectedResponses,denied:404};
     if(output)await fs.writeFile(path.join(output,'results.json'),JSON.stringify(result,null,2));
     console.log(JSON.stringify({browser:result.browser,widths:result.widths,measurements:measurements.length,pageErrors:errors,unexpectedConsoleErrors:unexpected,expectedHttpErrors:expectedResponses.length}));
   } finally {await browser.close();}

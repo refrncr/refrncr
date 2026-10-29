@@ -21,12 +21,16 @@ async function login(page,email) {
   await page.locator('#login-password').fill('correct horse battery staple');
   await page.getByRole('button',{name:'Sign in',exact:true}).click(); await page.waitForURL(base+'/');
 }
+async function settleViewTransition(page) {
+  await page.evaluate(async()=>{try{await document.activeViewTransition?.finished;}catch{}});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
+}
 (async()=>{
   if(output) await fs.mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true,executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
   const results=[],errors=[];
   try {
-    for(const width of [320,768,1440]) {
+    for(const width of [320,375,767,768,1440]) {
       const context=await browser.newContext({viewport:{width,height:950},colorScheme:'light'});
       const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
       await login(page,'owner@example.com');
@@ -41,7 +45,10 @@ async function login(page,email) {
       assert.equal(await page.locator('.page-header .page-actions').getByRole('link',{name:'Versions',exact:true}).count(),1);
       assert.deepEqual(await page.locator("tbody td.record-system-status .badge-published").allTextContents(),[]);
       await shot(page,`current-${width}`);
-      await page.getByRole('link',{name:'Versions',exact:true}).click();
+      await Promise.all([
+        page.waitForURL(versions),
+        page.getByRole('link',{name:'Versions',exact:true}).click(),
+      ]);
       assert.equal(await page.getByRole('link',{name:'Open draft',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Review & publish',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Publish version',exact:true}).count(),0);
@@ -52,36 +59,45 @@ async function login(page,email) {
       assert.match(await page.locator('.concept-banner').first().innerText(),/No changes yet/);
       await page.getByRole('link',{name:'Versions',exact:true}).click();
       await page.getByRole('link',{name:'Open draft',exact:true}).click();
+      await page.waitForLoadState('load');
       const opener=page.getByRole('button',{name:/Edit record Betaling/});await opener.focus();await opener.press('Enter');
       await page.locator('dialog[open]').waitFor();
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await opener.evaluate(el=>el===document.activeElement));
       await opener.press('Enter');
       await page.locator('dialog[open] [data-panel-view="edit"] input[name="label"]').fill('Edited concept value');
-      await page.locator('dialog[open]').getByRole('button',{name:'Save record',exact:true}).click();
-      await page.waitForURL(`${base}/datasets/${key}/concept/records`);
+      await Promise.all([
+        page.waitForNavigation({url:`${base}/datasets/${key}/concept/records`}),
+        page.locator('dialog[open]').getByRole('button',{name:'Save record',exact:true}).click(),
+      ]);
       const row=page.locator('table.record-table tbody tr').filter({hasText:'Betaling'});
       await row.getByText('Edited concept value',{exact:true}).waitFor();
       assert.match(await row.innerText(),/Complete/);assert.match(await row.innerText(),/Changed/);
-      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
+      assert.equal(await page.locator('th').filter({has:page.locator('.column-heading-label').getByText('Status',{exact:true})}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
       assert.deepEqual(await page.locator('table .record-system-status .badge-published').allTextContents(),[]);
       const remove=page.getByRole('button',{name:/Edit record Verwijderen/});
       await remove.click();await page.locator('dialog[open]').getByRole('button',{name:'Delete',exact:true}).click();
-      await page.locator('dialog[open] [data-panel-view="delete"]').getByRole('button',{name:'Delete record',exact:true}).click();
-      await page.waitForURL(`${base}/datasets/${key}/concept/records`);
+      await Promise.all([
+        page.waitForNavigation({url:`${base}/datasets/${key}/concept/records`}),
+        page.locator('dialog[open] [data-panel-view="delete"]').getByRole('button',{name:'Delete record',exact:true}).click(),
+      ]);
       await page.getByRole('button',{name:'Add record',exact:true}).click();
       await page.locator('dialog[open] input[name="code"]').fill('Toegevoegd');
-      await page.locator('dialog[open]').getByRole('button',{name:'Create record',exact:true}).click();
-      await page.waitForURL(`${base}/datasets/${key}/concept/records`);
+      await Promise.all([
+        page.waitForNavigation({url:`${base}/datasets/${key}/concept/records`}),
+        page.locator('dialog[open]').getByRole('button',{name:'Create record',exact:true}).click(),
+      ]);
       assert.match(await page.locator('.page-context .metadata').innerText(),/3 records.*1 marked for deletion/s);
       assert.deepEqual(await page.locator('tbody td.record-system-status').allTextContents(),['Changed','','Added','Deleted']);
       await shot(page,`concept-${width}`);
       await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).scrollIntoViewIfNeeded();
       await shot(page,`system-status-${width}`);
-      await page.getByLabel('Search identifier',{exact:true}).fill('verwijderen');
-      await page.getByRole('button',{name:'Search',exact:true}).click();
-      await page.waitForURL(/q=verwijderen/);
+      await page.getByRole('searchbox',{name:'Search records',exact:true}).fill('verwijderen');
+      await Promise.all([
+        page.waitForURL(/q=verwijderen/),
+        page.getByRole('button',{name:'Search',exact:true}).click(),
+      ]);
       assert.equal(await page.locator('table.record-table tbody tr').count(),1);
       const tombstone=page.getByRole('button',{name:/View deleted record Verwijderen/});
       await tombstone.focus();await tombstone.press('Enter');
@@ -89,13 +105,16 @@ async function login(page,email) {
       assert.match(await page.locator('dialog[open]').innerText(),/will be removed when you publish/);
       assert.match(await page.locator('dialog[open]').innerText(),/Content change/);
       assert.equal(await page.locator('dialog[open]').getByRole('button',{name:'Edit',exact:true}).count(),0);
-      assert.equal(await page.locator('dialog[open] form').count(),0);
+      assert.equal(await page.locator('dialog[open] form[data-panel-view]').count(),0);
+      assert.equal(await page.locator('dialog[open]').getByRole('button',{name:'Undo delete',exact:true}).count(),1);
       await shot(page,`deleted-panel-${width}`);
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await tombstone.evaluate(el=>el===document.activeElement));
-      await page.getByLabel('Search identifier',{exact:true}).fill('');
-      await page.getByLabel('Search identifier',{exact:true}).press('Enter');
-      await page.waitForURL(`${base}/datasets/${key}/concept/records?q=`);
+      await page.getByRole('searchbox',{name:'Search records',exact:true}).fill('');
+      await Promise.all([
+        page.waitForURL(`${base}/datasets/${key}/concept/records`),
+        page.getByRole('searchbox',{name:'Search records',exact:true}).press('Enter'),
+      ]);
       assert.equal(await page.locator('table.record-table tbody tr').count(),4);
       await page.getByRole('link',{name:'View current version',exact:true}).click();
       assert.equal(page.url(),current);assert.match(await page.locator('table').innerText(),/Published value/);
@@ -107,27 +126,44 @@ async function login(page,email) {
       assert.match(await page.locator('table').innerText(),/Draft in progress/);
       await page.goto(versions);await page.getByRole('link',{name:'Open draft',exact:true}).click();await page.getByRole('link',{name:'Review & publish',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();await shot(page,`review-${width}`);
+      await settleViewTransition(page);
       const publish=page.getByRole('link',{name:'Publish version',exact:true});await publish.focus();await publish.press('Enter');
       await page.locator('#publication-date').waitFor();
       for(let i=0;i<15;i++){await page.keyboard.press('Tab');assert(await page.evaluate(()=>!!document.activeElement.closest('dialog[open]')));}
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await publish.evaluate(el=>el===document.activeElement));
-      await publish.click();await page.locator('#publication-confirmed').check();
-      await page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click();
-      await page.waitForURL(versions+'?notice=published');
+      await Promise.all([
+        page.waitForResponse(response=>response.request().method()==='GET' && response.url().includes('/versions/publish?review=')),
+        publish.click(),
+      ]);
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
+      const currentDate=await page.locator('#publication-date').inputValue();
+      const nextDate=new Date(`${currentDate}T00:00:00Z`);nextDate.setUTCDate(nextDate.getUTCDate()+1);
+      await page.locator('#publication-date').fill(nextDate.toISOString().slice(0,10));
+      await page.locator('#publication-confirmed').check();
+      await Promise.all([
+        page.waitForURL(versions+'?notice=published'),
+        page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click(),
+      ]);
       assert.equal(await page.getByRole('link',{name:'Open draft',exact:true}).count(),0);
       assert.equal(await page.getByRole('button',{name:'Create draft',exact:true}).count(),1);
-      await page.getByRole('link',{name:'Version 2',exact:true}).click();
+      await Promise.all([
+        page.waitForURL(/\/versions\/[^/]+\/records$/),
+        page.getByRole('link',{name:'Version 2',exact:true}).click(),
+      ]);
       assert.match(await page.locator('table').innerText(),/Edited concept value/);
-      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),0);
       assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),[]);
       assert.equal(await page.getByRole('button',{name:/Verwijderen/}).count(),0);
       await shot(page,`published-status-${width}`);
-      await page.getByRole('link',{name:'Versions',exact:true}).click();
-      await page.getByRole('link',{name:'Version 1',exact:true}).click();
+      await Promise.all([page.waitForURL(versions),page.getByRole('link',{name:'Versions',exact:true}).click()]);
+      await Promise.all([
+        page.waitForURL(/\/versions\/[^/]+\/records$/),
+        page.getByRole('link',{name:'Version 1',exact:true}).click(),
+      ]);
       assert.deepEqual(await page.locator('tbody td.record-system-status .badge-published').allTextContents(),[]);
-      assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),1);
-      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),1);
+      assert.equal(await page.locator('th').filter({has:page.locator('.column-heading-label').getByText('Status',{exact:true})}).count(),1);
+      assert.equal(await page.getByRole('columnheader',{name:'Status (application metadata)',exact:true}).count(),0);
       assert.match(await page.locator('tbody').innerText(),/Published value/);
       assert(!/Edited concept value/.test(await page.locator('tbody').innerText()));
       await shot(page,`historical-status-${width}`);

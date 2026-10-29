@@ -2,7 +2,7 @@
 
 from browser_concept_app import admin, app, create_dataset, create_field, now, services
 
-for width in (320, 768, 1440):
+for width in (320, 375, 767, 768, 1440):
     for kind in ("unchanged", "mixed", "first", "fallback"):
         dataset = create_dataset(
             services,
