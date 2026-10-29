@@ -63,7 +63,10 @@ async function capture(page, name) {
       assert.equal(await page.getByRole('table',{name:'Change counts'}).count(),1);
       assert.equal(await page.getByRole('rowheader',{name:'Fields',exact:true}).count(),1);
       await capture(page,`summary-${width}`);
-      await page.getByRole('link',{name:'Fields',exact:true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Fields',exact:true}).click(),
+      ]);
       assert.match(await page.locator('main').innerText(),/Renamed review field/);
       assert.equal(await page.getByRole('columnheader',{name:'Field',exact:true}).count(),1);
       assert.equal(await page.getByRole('columnheader',{name:'Status',exact:true}).count(),0);
@@ -99,7 +102,10 @@ async function capture(page, name) {
       await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
-      await page.getByRole('link',{name:'Records',exact:true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Records',exact:true}).click(),
+      ]);
       assert.equal(await page.locator('.review-record-toolbar .search-field').count(),1);
       assert.equal(await page.locator('.review-record-toolbar .status-toggle').count(),3);
       assert.equal(await page.locator('.review-record-toolbar .status-toggle[aria-pressed="false"]').count(),3);
@@ -110,7 +116,10 @@ async function capture(page, name) {
       await page.locator('html').evaluate(el=>delete el.dataset.theme);
       const reviewSearch = page.getByRole('searchbox',{name:'Search old or new identifier'});
       await reviewSearch.fill('ADDED00');
-      await reviewSearch.press('Enter');
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        reviewSearch.press('Enter'),
+      ]);
       assert.equal(new URL(page.url()).searchParams.get('q'),'ADDED00');
       assert.equal(await page.locator('table tbody tr').count(),1);
       const chipCounts = async () => Object.fromEntries(await Promise.all(['Added','Changed','Deleted'].map(async status => {
@@ -118,24 +127,45 @@ async function capture(page, name) {
         return [status, Number(label.match(/\d+/)?.[0] ?? 0)];
       })));
       const countsBeforeStatusFilter = await chipCounts();
-      await page.getByRole('button',{name:/^Added/}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Added/}).click(),
+      ]);
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
       assert.equal(await page.locator('table tbody tr').count(),1);
       assert.deepEqual(await chipCounts(),countsBeforeStatusFilter);
-      await page.getByRole('button',{name:/^Changed/}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Changed/}).click(),
+      ]);
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Changed']);
       assert.equal(await page.locator('table tbody tr').count(),0);
-      await page.getByRole('button',{name:/^Added/}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Added/}).click(),
+      ]);
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
-      await page.getByRole('link',{name:'Clear search'}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Clear search'}).click(),
+      ]);
       assert.equal(new URL(page.url()).searchParams.get('q') ?? '', '');
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),['Added']);
-      await page.getByRole('button',{name:/^Added/}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Added/}).click(),
+      ]);
       assert.deepEqual(new URL(page.url()).searchParams.getAll('status'),[]);
       assert.equal(await page.locator('table tbody tr').count(),50);
-      await page.getByRole('link',{name:'Next page',exact:true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Next page',exact:true}).click(),
+      ]);
       assert.equal(await page.locator('table tbody tr').count(),3);
-      await page.getByRole('link',{name:'Previous page',exact:true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Previous page',exact:true}).click(),
+      ]);
       assert.equal(await page.locator('table tbody tr').count(),50);
       await page.waitForLoadState('load');
       const opener = page.getByRole('link',{name:'Review record ADDED00',exact:true});
@@ -166,7 +196,10 @@ async function capture(page, name) {
       await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await opener.evaluate(el=>el===document.activeElement),'Close focus restoration');
       page.off('request',observe); assert(!requests.includes('POST'),'Read-only panel mutated');
-      await page.getByRole('button',{name:/^Changed/}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Changed/}).click(),
+      ]);
       assert.equal(await page.locator('table tbody tr').count(),1);
       for (const term of ['OLD','NEW']) {
         await page.getByLabel('Search old or new identifier',{exact:true}).fill(term);
@@ -190,10 +223,18 @@ async function capture(page, name) {
       await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert.equal(page.url(),changedURL);
       assert(await changed.evaluate(el=>el===document.activeElement));
-      await page.getByRole('link',{name:'Clear search',exact:true}).click();
-      await page.getByRole('button',{name:/^Changed/}).click();
-      await page.getByRole('button',{name:/^Deleted/}).click();
-      await page.waitForLoadState('load');
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Clear search',exact:true}).click(),
+      ]);
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Changed/}).click(),
+      ]);
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('button',{name:/^Deleted/}).click(),
+      ]);
       await page.getByRole('link',{name:'Review record REMOVED',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
       await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');

@@ -62,7 +62,10 @@ const assert = require('node:assert/strict');
     assert(!(await close.isVisible()) && !(await open.isVisible()),'no desktop collapse control in Settings');
     await page.goto(`${base}/`); await close.click(); await page.goto(`${base}${settingsPath}`); await page.waitForLoadState('load');
     assert(await nav.isVisible(),'Settings sidebar visible while app navigation is collapsed');
-    await page.getByRole('link',{name:'Back to app',exact:true}).click(); await page.waitForURL(`${base}/`); await page.waitForLoadState('load');
+    await Promise.all([
+      page.waitForURL(`${base}/`),
+      page.getByRole('link',{name:'Back to app',exact:true}).click(),
+    ]);
     assert(!(await nav.isVisible()),'app navigation still collapsed after Settings'); await open.click();
     const resize = async size => { await page.setViewportSize(size); await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))); };
     for (const width of [320,767,768,1023,1024,1440]) {

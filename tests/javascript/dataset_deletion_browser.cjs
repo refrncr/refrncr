@@ -12,8 +12,10 @@ async function signIn(page, email='admin@example.com') {
   await page.goto(base + '/login');
   await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Password', {exact:true}).fill('correct horse battery staple');
-  await page.getByRole('button', {name:'Sign in', exact:true}).click();
-  await page.waitForURL(base + '/');
+  await Promise.all([
+    page.waitForURL(base + '/'),
+    page.getByRole('button', {name:'Sign in', exact:true}).click(),
+  ]);
 }
 async function focused(page, locator) {
   assert(await locator.evaluate(e => e === document.activeElement));
@@ -44,7 +46,10 @@ async function focused(page, locator) {
       await page.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
       await page.locator('#dataset-description').fill('Unsaved draft must survive cancel');
       assert.equal(await page.locator('#danger-zone').count(), 0);
-      await page.getByRole('link',{name:'Cancel',exact:true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil:'load'}),
+        page.getByRole('link',{name:'Cancel',exact:true}).click(),
+      ]);
       await page.locator('#danger-zone').waitFor();
 
       // The tab states what a deletion removes before anything is confirmed.
@@ -137,8 +142,10 @@ async function focused(page, locator) {
     const other = await context.newPage();
     await other.goto(base + '/datasets/row-check/configure?edit=1#dataset-name');
     await other.getByLabel('Name',{exact:true}).fill('Renamed dataset');
-    await other.getByRole('button',{name:'Save dataset',exact:true}).click();
-    await other.waitForURL(url => url.pathname === '/datasets/row-check/concept');
+    await Promise.all([
+      other.waitForURL(url => url.pathname === '/datasets/row-check/concept'),
+      other.getByRole('button',{name:'Save dataset',exact:true}).click(),
+    ]);
     await name.fill('Row check');
     await dialog.getByRole('button',{name:'Delete dataset',exact:true}).click();
     await dialog.getByRole('alert').filter({hasText:'Dataset changed'}).waitFor();
@@ -158,8 +165,10 @@ async function focused(page, locator) {
     await name.fill('Renamed dataset');
     let deletes = 0;
     page.on('request', request => {if (request.method()==='POST' && request.url().endsWith('/delete')) deletes++;});
-    await dialog.getByRole('button',{name:'Delete dataset',exact:true}).dblclick();
-    await page.waitForURL(base + '/datasets?deleted=1');
+    await Promise.all([
+      page.waitForURL(base + '/datasets?deleted=1'),
+      dialog.getByRole('button',{name:'Delete dataset',exact:true}).dblclick(),
+    ]);
     assert.equal(deletes,1);
     await page.getByRole('status').filter({hasText:'Dataset deleted permanently.'}).waitFor();
     assert.equal(await page.getByRole('link',{name:'Renamed dataset',exact:true}).count(),0);
@@ -180,8 +189,10 @@ async function focused(page, locator) {
     assert((await dialog.locator('#dataset-delete-form label').innerText()).includes('<img'));
     name = confirmField(longName);
     await name.fill(longName);
-    await dialog.getByRole('button',{name:'Delete dataset',exact:true}).click();
-    await page.waitForURL(base + '/datasets?deleted=1');
+    await Promise.all([
+      page.waitForURL(base + '/datasets?deleted=1'),
+      dialog.getByRole('button',{name:'Delete dataset',exact:true}).click(),
+    ]);
     await page.goto(base + '/settings/audit-log');
     const auditRow = page.getByRole('row').filter({hasText:longName + ' (deleted)'});
     assert.equal(await auditRow.count(),1);

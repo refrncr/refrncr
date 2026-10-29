@@ -119,7 +119,9 @@ if (output) fs.mkdirSync(output, {recursive:true});
         if(item.kind==='button') {
           for(const key of ['Enter','Space']) {await page.keyboard.press(key); assert.equal(await openedPanel().count(),1); await overflow(); await closePanel(primary);}
         } else {
-          const href=await primary.getAttribute('href'); await page.keyboard.press('Enter'); await page.waitForURL(base+href); await page.goBack();
+          const href=await primary.getAttribute('href');
+          await Promise.all([page.waitForURL(base+href), page.keyboard.press('Enter')]);
+          await page.goBack();
         }
         record(`${item.path} at ${width}px: semantics, columns, chevron, focus, keyboard, no page overflow`);
       }
@@ -132,9 +134,15 @@ if (output) fs.mkdirSync(output, {recursive:true});
       assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),selection,'selected text can be copied');
       await emptySelection();
       const destination=await primary.getAttribute('href');
-      const cell=row.locator('td').last(); await cell.click({position:{x:8,y:8}});
-      if(item.kind==='link') {await page.waitForURL(base+destination); await page.goBack();}
-      else {assert.equal(await openedPanel().count(),1); await closePanel(primary);}
+      const cell=row.locator('td').last();
+      if(item.kind==='link') {
+        await Promise.all([page.waitForURL(base+destination), cell.click({position:{x:8,y:8}})]);
+        await page.goBack();
+      }
+      else {
+        await cell.click({position:{x:8,y:8}});
+        assert.equal(await openedPanel().count(),1); await closePanel(primary);
+      }
       if(item.kind==='link') {
         await page.goto(base+item.path); row=page.locator('[data-row-action]').first(); primary=row.locator('[data-row-primary]');
         const href=await primary.getAttribute('href');
@@ -148,7 +156,8 @@ if (output) fs.mkdirSync(output, {recursive:true});
         assert.deepEqual(await page.evaluate(()=>window.rowContext),{prevented:false,href:base+href});
         await page.keyboard.press('Escape');
         const nojs=await browser.newContext({javaScriptEnabled:false,storageState:await context.storageState()});
-        const fallback=await nojs.newPage(); await fallback.goto(base+item.path); await fallback.locator('[data-row-primary]').first().click();
+        const fallback=await nojs.newPage(); await fallback.goto(base+item.path);
+        await Promise.all([fallback.waitForURL(base+href), fallback.locator('[data-row-primary]').first().click()]);
         assert.equal(fallback.url(),base+href); await nojs.close();
       }
       if (item.kind === 'button') {
@@ -182,8 +191,10 @@ if (output) fs.mkdirSync(output, {recursive:true});
     await row.locator('td').last().click({position:{x:8,y:8}}); assert.equal(await openedPanel().count(),0,'disabled primary cannot be activated from row space');
     await primary.evaluate(e=>{e.disabled=false;});
     await primary.click(); assert.equal(await openedPanel().count(),1); await closePanel(primary);
-    await page.getByRole('link',{name:'Next',exact:true}).click(); assert.equal(await page.locator('[data-row-action]').count(),2);
-    await page.getByRole('link',{name:'Previous',exact:true}).click(); assert.equal(await page.locator('[data-row-action]').count(),50);
+    await Promise.all([page.waitForNavigation({waitUntil:'load'}), page.getByRole('link',{name:'Next',exact:true}).click()]);
+    assert.equal(await page.locator('[data-row-action]').count(),2);
+    await Promise.all([page.waitForNavigation({waitUntil:'load'}), page.getByRole('link',{name:'Previous',exact:true}).click()]);
+    assert.equal(await page.locator('[data-row-action]').count(),50);
     record('Nested native/custom controls, handled events, selection in secondary cells, modifiers and pagination');
     await page.goto(base+'/datasets/row-check/concept/records');
     const changedRow = page.locator('.record-row:has(> .record-system-status .badge-draft)').first();
