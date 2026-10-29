@@ -210,9 +210,12 @@ const response = (content, status=200) => ({ok:status===200,status,redirected:fa
   fetchImpl=async()=>response(content); await remote.fire('click'); await settle();
   const detailPage = new Element({'data-panel-page':''}); detailPage.href='https://localhost/review?detail_page=2';
   detailPage.closest = selector => selector === '[data-panel-page]' ? detailPage : null;
+  second.host.contains = element => element === detailPage;
+  detailPage.focus();
   fetchImpl=async()=>response({dataset:{panelTitle:'Record changes'},candidates:[field]});
   await second.host.fire('click',{target:detailPage}); await settle();
   assert.equal(second.title.textContent,'Record changes');
+  assert.equal(document.activeElement,second.title,'paging falls back to the panel title when its link is replaced');
   assert.equal(requests.at(-1)[1].method ?? 'GET','GET');
   assert.equal(requests.at(-1)[0],detailPage.href);
   let pagingEscapePrevented=false;
