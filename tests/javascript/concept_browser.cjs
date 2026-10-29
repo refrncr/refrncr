@@ -110,10 +110,9 @@ async function settleViewTransition(page) {
       await shot(page,`deleted-panel-${width}`);
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await tombstone.evaluate(el=>el===document.activeElement));
-      await page.getByRole('searchbox',{name:'Search records',exact:true}).fill('');
       await Promise.all([
         page.waitForURL(`${base}/datasets/${key}/concept/records`),
-        page.getByRole('searchbox',{name:'Search records',exact:true}).press('Enter'),
+        page.getByRole('link',{name:'Clear search',exact:true}).click(),
       ]);
       assert.equal(await page.locator('table.record-table tbody tr').count(),4);
       await page.getByRole('link',{name:'View current version',exact:true}).click();

@@ -267,6 +267,11 @@ async function layout(page, label) {
       assert.equal(await panel.locator('input[name=key]').inputValue(), 'custom');
       await page.keyboard.press('Escape');
       assert.equal(await page.getByRole('link', {name: 'Edit field Amount', exact: true}).evaluate(e => e === document.activeElement), true);
+      await page.goto(base + `/datasets/polish-${width}/concept/records`);
+      await page.getByRole('button', {name: 'About Amount', exact: true}).click();
+      const displayedDefinition = page.locator('.field-metadata-popover:popover-open');
+      assert((await displayedDefinition.innerText()).includes('Plain <b>definition</b>'));
+      assert.equal(await displayedDefinition.locator('b').count(), 0);
       await page.goto(base + `/datasets/polish-${width}/concept?tab=access-management#access-management`);
       let access = page.locator('#access-management');
       await access.getByLabel('User or team', {exact: true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label: 'Reader (reader@example.com)'}, {force: true});
