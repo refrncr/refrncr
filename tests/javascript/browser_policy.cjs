@@ -50,3 +50,10 @@ module.exports.injectAxe = async page => {
   }));
   await page.addScriptTag({url});
 };
+
+module.exports.settleViewTransition = async page => {
+  await page.evaluate(async () => {
+    try { await document.activeViewTransition?.finished; } catch {}
+  });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve())));
+};

@@ -60,8 +60,14 @@ async function closedWithFocus(page, opener) {
       await login(page, 'owner@example.com');
       const versionsURL = `${base}/datasets/publish-${width}/versions`;
       await page.goto(versionsURL);
-      await page.getByRole('link', {name: 'Open draft', exact: true}).click();
-      await page.getByRole('link', {name: 'Review & publish', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Open draft', exact: true}).click(),
+      ]);
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Review & publish', exact: true}).click(),
+      ]);
       const opener = page.getByRole('link', {name: 'Publish version', exact: true});
       await openPanel(page, opener, '#publication-date');
       await noOverflow(page);
@@ -72,13 +78,21 @@ async function closedWithFocus(page, opener) {
       await page.locator('#publication-date').waitFor({state: 'visible'});
       await page.locator('dialog[open]').getByRole('link', {name: 'Cancel', exact: true}).click();
       await closedWithFocus(page, opener);
-      await page.locator('.page-actions').getByRole('link', {name: 'Versions', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.locator('.page-actions').getByRole('link', {name: 'Versions', exact: true}).click(),
+      ]);
       assert.equal(await page.locator('table tbody tr').count(), 1, 'close mutated versions');
       assert.equal(await page.getByRole('link', {name: 'Open draft', exact: true}).count(), 1);
       assert.equal(await page.getByRole('link', {name: 'Version 1', exact: true}).count(), 0);
-      await page.getByRole('link', {name: 'Open draft', exact: true}).click();
-      await page.waitForLoadState('load');
-      await page.getByRole('link', {name: 'Review & publish', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Open draft', exact: true}).click(),
+      ]);
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Review & publish', exact: true}).click(),
+      ]);
       await opener.click();
       await page.locator('#publication-date').waitFor({state: 'visible'});
       await page.locator('dialog[open]').getByRole('button', {name: 'Publish version', exact: true}).click();
@@ -120,11 +134,17 @@ async function closedWithFocus(page, opener) {
       assert.equal(await page.evaluate(() => window.ref83Unsafe), undefined);
       await noOverflow(page);
       await screenshot(page, `scheduled-${width}`);
-      await page.getByRole('link', {name: 'Version 1', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Version 1', exact: true}).click(),
+      ]);
       assert.match(await page.locator('body').innerText(), /Published value/);
       assert.equal(await page.getByRole('button', {name: 'Add record', exact: true}).count(), 0);
       assert.equal(await page.getByText('Export', {exact: true}).count(), 0, 'Scheduled export exposed');
-      await page.getByRole('link', {name: 'Versions', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Versions', exact: true}).click(),
+      ]);
       const cancel = page.getByRole('link', {name: 'Cancel Version 1', exact: true});
       await openPanel(page, cancel, '#cancellation-confirmed');
       assert.match(await page.locator('dialog[open]').innerText(), /number will never be reused/);
@@ -138,9 +158,14 @@ async function closedWithFocus(page, opener) {
       await page.waitForURL(`${versionsURL}?notice=cancelled`);
       assert.match(await page.locator('table tbody').innerText(), /Cancelled/);
       assert.equal(await page.getByRole('link', {name: 'Version 1', exact: true}).count(), 0);
-      await page.getByRole('button', {name: 'Create draft', exact: true}).click();
-      await page.waitForLoadState('load');
-      await page.getByRole('link', {name: 'Review & publish', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('button', {name: 'Create draft', exact: true}).click(),
+      ]);
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Review & publish', exact: true}).click(),
+      ]);
       await page.getByRole('link', {name: 'Publish version', exact: true}).click();
       await page.locator('#publication-date').waitFor({state: 'visible'});
       assert.match(await page.locator('dialog[open]').innerText(), /Version 2/);
@@ -157,13 +182,22 @@ async function closedWithFocus(page, opener) {
     const readerText = await reader.locator('body').innerText();
     const visiblePrivateNames = privateNames.filter(name => readerText.includes(name));
     assert.deepEqual(visiblePrivateNames, [], 'reader must not see private or future publication names');
-    await reader.getByRole('link', {name: 'Unpublished history name', exact: true}).click();
+    await Promise.all([
+      reader.waitForURL(`${base}/datasets/history/records`),
+      reader.getByRole('link', {name: 'Unpublished history name', exact: true}).click(),
+    ]);
     assert.equal(reader.url(), `${base}/datasets/history/records`);
     assert.match(await reader.locator('body').innerText(), /Second published value/);
     assert(!/DRAFT ONLY|Add record|Export/.test(await reader.locator('main').innerText()));
-    await reader.getByRole('link', {name: 'Versions', exact: true}).click();
+    await Promise.all([
+      reader.waitForNavigation({waitUntil: 'load'}),
+      reader.getByRole('link', {name: 'Versions', exact: true}).click(),
+    ]);
     assert.match(await reader.locator('table tbody').innerText(), /Expired/);
-    await reader.getByRole('link', {name: 'Version 1', exact: true}).click();
+    await Promise.all([
+      reader.waitForNavigation({waitUntil: 'load'}),
+      reader.getByRole('link', {name: 'Version 1', exact: true}).click(),
+    ]);
     assert.match(await reader.locator('body').innerText(), /Published value/);
     assert(!/Second published value|DRAFT ONLY/.test(await reader.locator('body').innerText()));
     await reader.getByRole('button', {name: /^View record FIRST /}).click();
@@ -180,7 +214,10 @@ async function closedWithFocus(page, opener) {
     await login(exporter, 'exporter@example.com');
     for (const version of [2, 1]) {
       await exporter.goto(`${base}/datasets/history/versions`);
-      await exporter.getByRole('link', {name: `Version ${version}`, exact: true}).click();
+      await Promise.all([
+        exporter.waitForNavigation({waitUntil: 'load'}),
+        exporter.getByRole('link', {name: `Version ${version}`, exact: true}).click(),
+      ]);
       for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
         await exporter.locator('.export-menu summary').click();
         const promise = exporter.waitForEvent('download');
@@ -202,7 +239,10 @@ async function closedWithFocus(page, opener) {
     const importer = await importContext.newPage();
     await login(importer, 'owner@example.com');
     await importer.goto(`${base}/datasets/future-only/versions`);
-    await importer.getByRole('button', {name: 'Create draft', exact: true}).click();
+    await Promise.all([
+      importer.waitForNavigation({waitUntil: 'load'}),
+      importer.getByRole('button', {name: 'Create draft', exact: true}).click(),
+    ]);
     await importer.goto(`${base}/datasets/future-only/records/import`);
     await importer.locator('#import-file').setInputFiles({name: 'records.csv', mimeType: 'text/csv', buffer: Buffer.from('code,label\nIMPORTED,Concept import only\n')});
     await importer.getByRole('button', {name: 'Continue', exact: true}).click();
@@ -218,12 +258,20 @@ async function closedWithFocus(page, opener) {
     assert(await deletedPanel.locator('.record-details > div').count() >= 2);
     await importer.keyboard.press('Escape');
     await importer.getByRole('checkbox', {name: 'I understand that 1 Records will be marked as deleted.'}).check();
-    await importer.getByRole('button', {name: 'Import records', exact: true}).click();
-    await importer.waitForURL(/import_results=1/);
+    await Promise.all([
+      importer.waitForURL(/import_results=1/),
+      importer.getByRole('button', {name: 'Import records', exact: true}).click(),
+    ]);
     assert.match(await importer.locator('main').innerText(), /Added: 1.*Deleted: 1/s);
     assert.match(await importer.locator('main').innerText(), /Concept import only/);
-    await importer.getByRole('link', {name: 'Versions', exact: true}).click();
-    await importer.getByRole('link', {name: 'Version 1', exact: true}).click();
+    await Promise.all([
+      importer.waitForNavigation({waitUntil: 'load'}),
+      importer.getByRole('link', {name: 'Versions', exact: true}).click(),
+    ]);
+    await Promise.all([
+      importer.waitForNavigation({waitUntil: 'load'}),
+      importer.getByRole('link', {name: 'Version 1', exact: true}).click(),
+    ]);
     assert.match(await importer.locator('main').innerText(), /Published value/);
     assert(!/Concept import only|IMPORTED/.test(await importer.locator('main').innerText()));
     await noOverflow(importer);
@@ -234,10 +282,22 @@ async function closedWithFocus(page, opener) {
     const nojs = await nojsContext.newPage();
     await login(nojs, 'owner@example.com');
     await nojs.goto(`${base}/datasets/publish-nojs/versions`);
-    await nojs.getByRole('link', {name: 'Open draft', exact: true}).click();
-    await nojs.getByRole('link', {name: 'Review & publish', exact: true}).click();
-    await nojs.getByRole('link', {name: 'Publish version', exact: true}).click();
-    await nojs.getByRole('button', {name: 'Publish version', exact: true}).click();
+    await Promise.all([
+      nojs.waitForNavigation({waitUntil: 'load'}),
+      nojs.getByRole('link', {name: 'Open draft', exact: true}).click(),
+    ]);
+    await Promise.all([
+      nojs.waitForNavigation({waitUntil: 'load'}),
+      nojs.getByRole('link', {name: 'Review & publish', exact: true}).click(),
+    ]);
+    await Promise.all([
+      nojs.waitForNavigation({waitUntil: 'load'}),
+      nojs.getByRole('link', {name: 'Publish version', exact: true}).click(),
+    ]);
+    await Promise.all([
+      nojs.waitForNavigation({waitUntil: 'load'}),
+      nojs.getByRole('button', {name: 'Publish version', exact: true}).click(),
+    ]);
     assert.match(await nojs.locator('#publication-error').innerText(), /Confirm/);
     await nojs.locator('#publication-confirmed').check();
     await Promise.all([nojs.waitForURL('**/versions?notice=published'), nojs.getByRole('button', {name: 'Publish version', exact: true}).click()]);

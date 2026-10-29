@@ -1,5 +1,5 @@
 // Checks overview sections, filtering, responsive cards, accessibility and color contrast.
-const {chromium} = require('./browser_policy.cjs');
+const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 (async () => {
@@ -14,14 +14,18 @@ const fs = require('node:fs');
     await target.goto(`${base}/login`);
     await target.getByLabel('Email address').fill('admin@example.com');
     await target.getByLabel('Password', {exact: true}).fill('correct horse battery staple');
-    await target.getByRole('button', {name: 'Sign in', exact: true}).click();
-    await target.waitForURL(`${base}/`);
+    await Promise.all([
+      target.waitForURL(`${base}/`),
+      target.getByRole('button', {name: 'Sign in', exact: true}).click(),
+    ]);
   };
   try {
     await login(page);
     assert(await page.getByRole('heading', {name: "You're not in a team yet"}).isVisible());
-    await page.getByRole('switch', {name: 'Show all owners'}).check();
-    await page.waitForURL(`${base}/?all_owners=1`);
+    await Promise.all([
+      page.waitForURL(`${base}/?all_owners=1`),
+      page.getByRole('switch', {name: 'Show all owners'}).check(),
+    ]);
     assert(await page.getByRole('heading', {name: /^Needs action/}).isVisible());
     assert(await page.getByRole('heading', {name: /^Coming up/}).isVisible());
     assert(await page.getByRole('heading', {name: 'To finish'}).isVisible());
@@ -43,19 +47,25 @@ const fs = require('node:fs');
     await page.keyboard.press('Enter');
     assert(await visitedCard.getByRole('link', {name:'CSV', exact:true}).isVisible());
     await page.keyboard.press('Enter');
-    await page.getByRole('link', {name: 'View all', exact: true}).click();
-    await page.waitForURL(`${base}/attention?all_owners=1`);
-    await page.locator('#attention-reason').selectOption('6');
-    await page.waitForURL(/reason=6/);
+    await Promise.all([
+      page.waitForURL(`${base}/attention?all_owners=1`),
+      page.getByRole('link', {name: 'View all', exact: true}).click(),
+    ]);
+    await Promise.all([
+      page.waitForURL(/reason=6/),
+      page.locator('#attention-reason').selectOption('6'),
+    ]);
     assert(await page.getByRole('switch').isChecked());
-    await page.locator('#attention-reason').selectOption('');
-    await page.waitForURL(/reason=$/);
+    await Promise.all([
+      page.waitForURL(/reason=$/),
+      page.locator('#attention-reason').selectOption(''),
+    ]);
     assert(await page.getByRole('heading', {name: /^Needs your attention/}).isVisible());
     for (const theme of ['light', 'dark']) {
       for (const width of [375, 768, 1440]) {
         await page.setViewportSize({width, height: width === 1440 ? 2000 : 1100});
         await page.goto(`${base}/?all_owners=1`);
-        await page.waitForTimeout(200); // Let the app's cross-document view transition settle.
+        await settleViewTransition(page);
         await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
         await page.evaluate(() => document.fonts.ready);
         const metrics = await page.evaluate(() => {
@@ -126,8 +136,10 @@ const fs = require('node:fs');
     const native = await nojs.newPage();
     await login(native);
     await native.getByRole('switch').check();
-    await native.getByRole('button', {name:'Apply', exact:true}).click();
-    await native.waitForURL(`${base}/?all_owners=1`);
+    await Promise.all([
+      native.waitForURL(`${base}/?all_owners=1`),
+      native.getByRole('button', {name:'Apply', exact:true}).click(),
+    ]);
     assert(await native.getByRole('heading', {name:/^Needs action/}).isVisible());
     await nojs.close();
     assert.deepEqual(errors, []);

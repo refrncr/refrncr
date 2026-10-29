@@ -1,5 +1,5 @@
 // Checks security and cache headers on browser responses and static assets (REF-259).
-const {chromium} = require('./browser_policy.cjs');
+const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5162';
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw Error('Loopback fixture required');
@@ -114,8 +114,17 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
     assert(await darkPopover.evaluate(element => getComputedStyle(element).backgroundColor !== 'rgba(0, 0, 0, 0)'));
     assert(await textContrast(darkPopover.locator('.fmp-chip-identifier')) >= 4.5, 'dark identifier chip text contrast is below 4.5:1');
     await page.setViewportSize({width: 1024, height: 320});
-    await first.evaluate(button => window.scrollTo(0, window.scrollY + button.getBoundingClientRect().top - 250));
-    await page.waitForTimeout(50);
+    await first.evaluate(button => {
+      const scroller = document.querySelector('main');
+      scroller.scrollTop += button.getBoundingClientRect().top - 250;
+    });
+    await settleViewTransition(page);
+    await page.waitForFunction(() => {
+      const popover = document.querySelector('.record-table thead .field-metadata-popover:popover-open');
+      if (!popover) return false;
+      const rect = popover.getBoundingClientRect();
+      return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+    });
     const shortViewportBounds = await bounds();
     const viewportHeight = await page.evaluate(() => window.innerHeight);
     assert(shortViewportBounds.top >= 0 && shortViewportBounds.bottom <= viewportHeight, `popover escapes short viewport ${viewportHeight}: ${JSON.stringify(shortViewportBounds)}`);

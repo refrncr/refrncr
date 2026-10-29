@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const {chromium} = require('./browser_policy.cjs');
+const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5185';
 if (!['127.0.0.1','localhost','[::1]'].includes(new URL(base).hostname)) throw Error('Disposable loopback only');
 const output = process.env.REFRNCR_BROWSER_OUTPUT;
@@ -21,10 +21,6 @@ async function login(page,email) {
   await page.locator('#login-password').fill('correct horse battery staple');
   await page.getByRole('button',{name:'Sign in',exact:true}).click(); await page.waitForURL(base+'/');
 }
-async function settleViewTransition(page) {
-  await page.evaluate(async()=>{try{await document.activeViewTransition?.finished;}catch{}});
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
-}
 (async()=>{
   if(output) await fs.mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true,executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
@@ -36,7 +32,10 @@ async function settleViewTransition(page) {
       await login(page,'owner@example.com');
       await page.goto(base+'/datasets'); await shot(page,`list-before-${width}`);
       const key=`lifecycle-${width}`, current=`${base}/datasets/${key}/records`, versions=`${base}/datasets/${key}/versions`;
-      await page.getByRole('link',{name:`Payments and detailed reference classifications ${width}`,exact:true}).click();
+      await Promise.all([
+        page.waitForURL(current),
+        page.getByRole('link',{name:`Payments and detailed reference classifications ${width}`,exact:true}).click(),
+      ]);
       assert.equal(page.url(),current);
       assert.equal(await page.getByRole('button',{name:'Add record',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Configure',exact:true}).count(),0);
@@ -53,13 +52,21 @@ async function settleViewTransition(page) {
       assert.equal(await page.getByRole('link',{name:'Review & publish',exact:true}).count(),0);
       assert.equal(await page.getByRole('link',{name:'Publish version',exact:true}).count(),0);
       await shot(page,`versions-before-${width}`);
-      const start=page.getByRole('button',{name:'Create draft',exact:true});await start.focus();await start.press('Enter');
-      await page.waitForURL(`${base}/datasets/${key}/concept/records`);
+      const start=page.getByRole('button',{name:'Create draft',exact:true});await start.focus();
+      await Promise.all([
+        page.waitForURL(`${base}/datasets/${key}/concept/records`),
+        start.press('Enter'),
+      ]);
       await page.getByRole('heading',{name:/You’re working on a draft/,exact:true}).waitFor();
       assert.match(await page.locator('.concept-banner').first().innerText(),/No changes yet/);
-      await page.getByRole('link',{name:'Versions',exact:true}).click();
-      await page.getByRole('link',{name:'Open draft',exact:true}).click();
-      await page.waitForLoadState('load');
+      await Promise.all([
+        page.waitForURL(versions),
+        page.getByRole('link',{name:'Versions',exact:true}).click(),
+      ]);
+      await Promise.all([
+        page.waitForURL(`${base}/datasets/${key}/concept/records`),
+        page.getByRole('link',{name:'Open draft',exact:true}).click(),
+      ]);
       const opener=page.getByRole('button',{name:/Edit record Betaling/});await opener.focus();await opener.press('Enter');
       await page.locator('dialog[open]').waitFor();
       await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
@@ -115,10 +122,16 @@ async function settleViewTransition(page) {
         page.getByRole('link',{name:'Clear search',exact:true}).click(),
       ]);
       assert.equal(await page.locator('table.record-table tbody tr').count(),4);
-      await page.getByRole('link',{name:'View current version',exact:true}).click();
+      await Promise.all([
+        page.waitForURL(current),
+        page.getByRole('link',{name:'View current version',exact:true}).click(),
+      ]);
       assert.equal(page.url(),current);assert.match(await page.locator('table').innerText(),/Published value/);
       assert(!/Edited concept value/.test(await page.locator('table').innerText()));
-      await page.getByRole('link',{name:'Versions',exact:true}).click();
+      await Promise.all([
+        page.waitForURL(versions),
+        page.getByRole('link',{name:'Versions',exact:true}).click(),
+      ]);
       await shot(page,`versions-active-${width}`);
       assert.equal(await page.getByRole('button',{name:'Create draft',exact:true}).count(),0);
       await page.goto(base+'/datasets');await shot(page,`list-active-${width}`);

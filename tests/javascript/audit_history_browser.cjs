@@ -21,8 +21,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await page.goto(base + '/login');
       await page.getByLabel('Email address').fill('admin@example.com');
       await page.getByLabel('Password', {exact: true}).fill('correct horse battery staple');
-      await page.getByRole('button', {name: 'Sign in', exact: true}).click();
-      await page.waitForURL(base + '/');
+      await Promise.all([
+        page.waitForURL(base + '/'),
+        page.getByRole('button', {name: 'Sign in', exact: true}).click(),
+      ]);
       await page.goto(base + '/settings/audit-log?object_type=dataset_record');
       assert.equal(await page.locator('tbody tr:has(td)').count(), 50);
       assert.equal(await page.locator('tbody tr td:nth-child(5)').first().textContent(), 'No name to display');
@@ -94,7 +96,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => !document.querySelector('dialog[data-modal-side-panel]').open);
       const firstIds = await links.evaluateAll(es => es.map(e => e.getAttribute('href')));
-      await page.getByRole('link', {name: 'Older events', exact: true}).click();
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Older events', exact: true}).click(),
+      ]);
       assert(new URL(page.url()).searchParams.get('cursor'));
       assert.equal(new URL(page.url()).searchParams.get('object_type'), 'dataset_record');
       const secondIds = await page.locator('tbody a[data-panel-url]').evaluateAll(es => es.map(e => e.getAttribute('href')));
@@ -106,8 +111,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       assert.equal(await page.locator('tbody a[data-panel-url]').first().getAttribute('href'), firstIds[0]);
       await page.goForward();
       assert.equal(page.url(), secondURL);
-      await page.getByRole('link', {name: 'Clear filters', exact: true}).click();
-      await page.waitForLoadState('load');
+      await Promise.all([
+        page.waitForNavigation({waitUntil: 'load'}),
+        page.getByRole('link', {name: 'Clear filters', exact: true}).click(),
+      ]);
       assert.equal(new URL(page.url()).search, '');
       if (timezoneId === 'Europe/Amsterdam') {
         await page.getByLabel('Start date and time').fill('2026-03-29T02:30');
@@ -115,9 +122,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         assert(await page.locator('#audit-date-error').isVisible());
         assert.equal(new URL(page.url()).search, '');
         await page.getByLabel('Start date and time').fill('2026-03-29T03:00');
-        await page.getByRole('button', {name: 'Apply filters'}).click();
-        await page.waitForURL(url => url.searchParams.has('start'));
-        await page.waitForLoadState('load');
+        await Promise.all([
+          page.waitForURL(url => url.searchParams.has('start')),
+          page.getByRole('button', {name: 'Apply filters'}).click(),
+        ]);
         assert.equal(new Date(new URL(page.url()).searchParams.get('start')).toISOString(), '2026-03-29T01:00:00.000Z');
         assert.equal(await page.getByLabel('Start date and time').inputValue(), '2026-03-29T03:00');
         await page.screenshot({path: screenshotPath('ref39-audit-list.png'), animations: 'disabled'});
@@ -155,8 +163,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       if (timezoneId === 'Europe/Amsterdam') {
         await page.goto(base + '/settings/audit-log?start=2026-10-25T01%3A30%3A00.123456Z');
         assert.equal(await page.getByLabel('Start date and time').inputValue(), '2026-10-25T02:30');
-        await page.getByRole('button', {name: 'Apply filters'}).click();
-        await page.waitForLoadState('load');
+        await Promise.all([
+          page.waitForNavigation({waitUntil: 'load'}),
+          page.getByRole('button', {name: 'Apply filters'}).click(),
+        ]);
         assert.equal(new URL(page.url()).searchParams.get('start'), '2026-10-25T01:30:00.123456+00:00');
       }
       assert.deepEqual(errors, []);
@@ -165,7 +175,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       const fallback = await noJS.newPage();
       await fallback.goto(base + '/settings/audit-log?object_type=dataset_record');
       assert((await fallback.locator('tbody time').first().textContent()).match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$/));
-      await fallback.locator('tbody a[data-panel-url]').first().click();
+      await Promise.all([
+        fallback.waitForNavigation({waitUntil: 'load'}),
+        fallback.locator('tbody a[data-panel-url]').first().click(),
+      ]);
       assert((await fallback.locator('main').textContent()).includes('Exact UTC timestamp'));
       await noJS.close();
       if (timezoneId === 'Europe/Amsterdam') {
@@ -186,8 +199,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
           const detailURL = base + await target.getAttribute('href');
           await page.route(detailURL, route => route.fulfill({status, contentType: 'text/html',
             body: '<main><h1>Audit unavailable</h1></main>'}));
-          await target.click();
-          await page.waitForURL(detailURL);
+          await Promise.all([
+            page.waitForURL(detailURL),
+            target.click(),
+          ]);
           assert.equal(await page.getByRole('heading', {name: 'Audit unavailable'}).count(), 1);
           assert.equal(await page.locator('dialog[open]').count(), 0);
           await page.unroute(detailURL);
@@ -198,14 +213,18 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         await plain.goto(base + '/settings/audit-log');
         assert.equal(await plain.getByLabel('Start date and time').getAttribute('type'), 'text');
         await plain.getByLabel('Start date and time').fill('2026-03-29T01:00:00Z');
-        await plain.getByRole('button', {name: 'Apply filters'}).click();
-        await plain.waitForURL(url => url.searchParams.has('start'));
+        await Promise.all([
+          plain.waitForURL(url => url.searchParams.has('start')),
+          plain.getByRole('button', {name: 'Apply filters'}).click(),
+        ]);
         assert.equal(await plain.locator('tbody tr').count(), 50);
         await unsupported.close();
         await page.goto(base + '/settings/audit-log');
         await context.clearCookies();
-        await page.locator('tbody a[data-panel-url]').first().click();
-        await page.waitForURL(url => url.pathname === '/login');
+        await Promise.all([
+          page.waitForURL(url => url.pathname === '/login'),
+          page.locator('tbody a[data-panel-url]').first().click(),
+        ]);
         assert.equal(await page.getByRole('button', {name: 'Sign in', exact: true}).count(), 1);
         console.log('PASS: 403/503 panel fallback, lost session, unsupported Intl native ISO form, light under dark preference, small viewport and 200% CSS zoom');
       }
