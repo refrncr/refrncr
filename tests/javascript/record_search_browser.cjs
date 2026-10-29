@@ -102,11 +102,11 @@ async function evidence(page, name) {
         assert.equal(await page.evaluate(() => document.activeElement.id), 'record-search');
       }
       if (width !== 'nojs') {
-        await page.getByRole('button', {name: /Edit record id-000/}).focus();
+        await page.getByRole('button', {name: /View record id-000/}).focus();
         await page.keyboard.press('Enter');
         assert(await page.getByRole('dialog').isVisible());
         await page.keyboard.press('Escape');
-        assert.match(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), /Edit record id-000/);
+        assert.match(await page.evaluate(() => document.activeElement.getAttribute('aria-label')), /View record id-000/);
       }
       await page.goto(base + `/datasets/search-${width}/records?q=AMS`);
       assert.match(await page.locator('#record-result-count').textContent(), /of 60/);
