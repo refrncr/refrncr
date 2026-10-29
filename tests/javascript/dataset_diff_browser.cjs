@@ -24,6 +24,19 @@ async function noOverflow(page) {
   });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Horizontal page overflow');
 }
+async function renameReviewField(page, width, name) {
+  const fields = `${base}/datasets/diff-${width}/concept?tab=fields`;
+  await page.goto(fields);
+  await page.waitForLoadState('load');
+  await page.locator(`a[href='/datasets/diff-${width}/fields/review/edit']`).click();
+  const panel = page.locator('dialog[open]');
+  await panel.getByLabel('Name',{exact:true}).fill(name);
+  await Promise.all([
+    page.waitForNavigation({waitUntil:'load'}),
+    panel.getByRole('button',{name:'Save field',exact:true}).click(),
+  ]);
+  assert.equal(page.url(),fields);
+}
 async function capture(page, name) {
   await page.waitForLoadState("load");
   await page.evaluate(()=>document.fonts.ready);
@@ -80,8 +93,10 @@ async function capture(page, name) {
         await capture(page,`fields-${theme}-${width}`);
       }
       await page.locator('html').evaluate(el=>delete el.dataset.theme);
+      await page.waitForLoadState('load');
       await page.getByRole('link',{name:'Renamed review field',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
+      await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');
       assert.equal(await page.locator('dialog[open]').getByRole('columnheader',{name:'Before',exact:true}).count(),1);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
       await page.getByRole('link',{name:'Records',exact:true}).click();
@@ -122,10 +137,11 @@ async function capture(page, name) {
       assert.equal(await page.locator('table tbody tr').count(),3);
       await page.getByRole('link',{name:'Previous page',exact:true}).click();
       assert.equal(await page.locator('table tbody tr').count(),50);
+      await page.waitForLoadState('load');
       const opener = page.getByRole('link',{name:'Review record ADDED00',exact:true});
       await opener.focus(); await opener.press('Enter');
       await page.locator('#diff-detail-heading').waitFor();
-      assert.equal(await page.evaluate(()=>document.activeElement.id),'diff-detail-heading');
+      await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');
       assert.equal(await page.locator('dialog[open] table tbody tr').count(),50);
       assert.match(await page.locator('dialog[open]').innerText(),/No value/);
       const requests=[];
@@ -133,7 +149,8 @@ async function capture(page, name) {
       page.on('request',observe);
       await page.getByRole('link',{name:'Next values',exact:true}).click();
       await page.locator('dialog[open]').getByText(/Page 2/).waitFor();
-      assert.equal(await page.locator('dialog[open] table tbody tr').count(),3);
+      await page.waitForFunction(()=>document.activeElement.id === 'review-panel-title');
+      assert.equal(await page.locator('dialog[open] table tbody tr').count(),4);
       await page.getByRole('link',{name:'Previous values',exact:true}).click();
       await page.locator('dialog[open]').getByText(/Page 1/).waitFor();
       for (let n=0;n<12;n++) {
@@ -149,13 +166,14 @@ async function capture(page, name) {
       await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert(await opener.evaluate(el=>el===document.activeElement),'Close focus restoration');
       page.off('request',observe); assert(!requests.includes('POST'),'Read-only panel mutated');
-      await page.getByLabel('Added',{exact:true}).uncheck();
-      await page.getByLabel('Deleted',{exact:true}).uncheck();
-      await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+      await page.getByRole('button',{name:/^Changed/}).click();
       assert.equal(await page.locator('table tbody tr').count(),1);
       for (const term of ['OLD','NEW']) {
         await page.getByLabel('Search old or new identifier',{exact:true}).fill(term);
-        await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+        await Promise.all([
+          page.waitForURL(url=>new URL(url).searchParams.get('q')===term),
+          page.getByRole('button',{name:'Search',exact:true}).click(),
+        ]);
         assert.equal(await page.locator('table tbody tr').count(),1);
       }
       const changedURL=page.url();
@@ -163,6 +181,7 @@ async function capture(page, name) {
       const changed=page.getByRole('link',{name:'Review record NEW',exact:true});
       await changed.focus(); await changed.press('Enter');
       await page.locator('#diff-detail-heading').waitFor();
+      await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');
       assert.equal(await page.locator('dialog[open] table tbody tr').count(),2);
       assert.match(await page.locator('dialog[open]').innerText(),/Before value/);
       assert.equal(await page.evaluate(()=>window.unsafe),undefined);
@@ -171,12 +190,13 @@ async function capture(page, name) {
       await page.locator('dialog[open]').waitFor({state:'hidden'});
       assert.equal(page.url(),changedURL);
       assert(await changed.evaluate(el=>el===document.activeElement));
-      await page.getByRole('link',{name:'Clear filters',exact:true}).click();
-      await page.getByLabel('Added',{exact:true}).uncheck();
-      await page.getByLabel('Changed',{exact:true}).uncheck();
-      await page.getByRole('button',{name:'Apply filters',exact:true}).click();
+      await page.getByRole('link',{name:'Clear search',exact:true}).click();
+      await page.getByRole('button',{name:/^Changed/}).click();
+      await page.getByRole('button',{name:/^Deleted/}).click();
+      await page.waitForLoadState('load');
       await page.getByRole('link',{name:'Review record REMOVED',exact:true}).click();
       await page.locator('#diff-detail-heading').waitFor();
+      await page.waitForFunction(()=>document.activeElement.id === 'diff-detail-heading');
       assert.match(await page.locator('dialog[open]').innerText(),/Removed value/);
       await page.keyboard.press('Escape'); await page.locator('dialog[open]').waitFor({state:'hidden'});
       await page.goto(summary);
@@ -184,17 +204,18 @@ async function capture(page, name) {
       await publish.click(); await page.locator('#publication-date').waitFor();
       await page.locator('dialog[open]').getByRole('link',{name:'Review & publish',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
-      // A second tab changes concept metadata through the existing UI.
+      // A second tab changes versioned field metadata through the existing UI.
       const edit=await context.newPage();
-      await edit.goto(`${base}/datasets/diff-${width}/edit`);
-      await edit.locator('#dataset-name').fill(`Changed in another tab ${width}`);
-      await edit.getByRole('button',{name:'Save dataset',exact:true}).click();
-      await edit.waitForURL(url=>!url.pathname.endsWith('/edit'));
+      await renameReviewField(edit,width,`Changed in another tab ${width}`);
       await page.getByRole('link',{name:'Records',exact:true}).click();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
       assert(!/Before value|Renamed review field/.test(await page.locator('main').innerText()));
+      // Programmatic history navigation can overlap Chromium's synthetic
+      // cross-document transition; reduced motion keeps this a Back-flow test.
+      await page.emulateMedia({reducedMotion:'reduce'});
       await page.goBack();
       await page.getByRole('heading',{name:'Review unavailable',exact:true}).waitFor();
+      await page.emulateMedia({reducedMotion:'no-preference'});
       await page.reload();
       await page.getByRole('link',{name:'Reload review',exact:true}).click();
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
@@ -202,10 +223,7 @@ async function capture(page, name) {
       await page.getByRole('link',{name:'Publish version',exact:true}).click();
       await page.locator('#publication-date').waitFor();
       const reviewedRevision=await page.locator('#publication-form input[name="expected_revision"]').inputValue();
-      await edit.goto(`${base}/datasets/diff-${width}/edit`);
-      await edit.locator('#dataset-name').fill(`Changed after publication panel ${width}`);
-      await edit.getByRole('button',{name:'Save dataset',exact:true}).click();
-      await edit.waitForURL(url=>!url.pathname.endsWith('/edit'));
+      await renameReviewField(edit,width,`Changed after publication panel ${width}`);
       assert.equal(await page.locator('#publication-form input[name="expected_revision"]').inputValue(),reviewedRevision);
       await page.locator('#publication-confirmed').check();
       await page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click();
@@ -215,13 +233,16 @@ async function capture(page, name) {
       await page.getByRole('heading',{name:'Summary',exact:true}).waitFor();
       await page.getByRole('link',{name:'Publish version',exact:true}).click();
       await page.locator('#publication-date').waitFor();
+      const currentDate=await page.locator('#publication-date').inputValue();
+      const tomorrow=new Date(Date.parse(`${currentDate}T00:00:00Z`)+86400000).toISOString().slice(0,10);
+      await page.locator('#publication-date').fill(tomorrow);
       await page.locator('#publication-confirmed').check();
       await page.locator('dialog[open]').getByRole('button',{name:'Publish version',exact:true}).click();
       await page.waitForURL(`${versions}?notice=published`);
       const publishedVersion = page.getByRole('rowheader').getByRole('link',{name:'Version 2',exact:true});
       assert.equal(await publishedVersion.count(),1);
       assert.equal(await publishedVersion.isVisible(),true);
-      assert.match(await publishedVersion.locator('xpath=ancestor::tr').innerText(),/Current/);
+      assert.match(await publishedVersion.locator('xpath=ancestor::tr').innerText(),/Scheduled/);
       results.push({width, scenarios:['Versions and Publish entrypoints','Summary/Fields/Records','filters','old/new search','pagination','broad detail pagination','null and long values','keyboard/focus/Escape/Close','read-only GET','second-tab stale','Back/Refresh/Reload','stale publication POST rejected','existing publication','no overflow']});
       await context.close();
     }

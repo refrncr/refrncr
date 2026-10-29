@@ -732,6 +732,10 @@
     if (panelLoads.get(dialog) !== load) return true;
     const content = page.querySelector("[data-side-panel-content]");
     if (!content) return false;
+    if (load.focus === "initial" && typeof window.requestAnimationFrame === "function") {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+      if (panelLoads.get(dialog) !== load) return true;
+    }
     const title = document.getElementById(dialog.getAttribute("aria-labelledby"));
     title.textContent = content.dataset.panelTitle;
     const eyebrow = dialog.querySelector("[data-panel-eyebrow]");
@@ -764,12 +768,31 @@
       }
       heading.replaceWith(nested);
     });
-    if (dialog.open) focusSidePanel(dialog);
+    if (dialog.open && load.focus === "initial") focusSidePanel(dialog);
+    else if (dialog.open && load.focus === "preserve" && load.focusedInHost) {
+      const controls = [...host.querySelectorAll("[id], [name]")];
+      const previousFocus = controls.find((element) =>
+        (load.focusedId && element.id === load.focusedId) ||
+        (load.focusedName && element.getAttribute("name") === load.focusedName &&
+          element.getAttribute("value") === load.focusedValue)
+      );
+      if (previousFocus && visibleControl(previousFocus)) previousFocus.focus();
+      else title.focus();
+    }
     return true;
   };
 
-  const loadPanel = async (dialog, trigger) => {
-    const load = {};
+  const loadPanel = async (dialog, trigger, focus = "initial") => {
+    const host = dialog.querySelector("[data-panel-host]");
+    const focused = document.activeElement;
+    const focusedInHost = focus === "preserve" && host.contains?.(focused);
+    const load = {
+      focus,
+      focusedInHost,
+      focusedId: focusedInHost ? focused.id : "",
+      focusedName: focusedInHost ? focused.getAttribute("name") : "",
+      focusedValue: focusedInHost ? focused.getAttribute("value") : "",
+    };
     panelLoads.set(dialog, load);
     document.getElementById(dialog.getAttribute("aria-labelledby")).textContent = "Loading…";
     const eyebrow = dialog.querySelector("[data-panel-eyebrow]");
@@ -854,7 +877,7 @@
       if (page) {
         if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
         event.preventDefault();
-        if (!pendingForms.has(dialog)) loadPanel(dialog, page);
+        if (!pendingForms.has(dialog)) loadPanel(dialog, page, "preserve");
         return;
       }
       const next = event.target.closest("[data-panel-next]");
