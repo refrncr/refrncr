@@ -114,6 +114,18 @@
   initializeSelectionForms(document);
 
   const inlinePending = new WeakSet();
+  const authoritativeGet = (target) => {
+    const fallback = new URL(target, window.location.href);
+    const current = new URL(window.location.href);
+    if (fallback.origin === current.origin &&
+        fallback.pathname === current.pathname &&
+        fallback.search === current.search) {
+      if (fallback.hash !== current.hash) window.location.hash = fallback.hash;
+      window.location.reload();
+      return;
+    }
+    window.location.assign(fallback.href);
+  };
   const confirmedForms = new WeakSet();
   const confirmationDialog = document.querySelector("[data-confirm-dialog]");
   let pendingConfirmation = null;
@@ -179,7 +191,7 @@
       const page = new DOMParser().parseFromString(await response.text(), "text/html");
       const replacement = page.querySelector("[data-export-access]");
       if (!replacement) {
-        window.location.assign(response.redirected ? response.url : form.dataset.inlineRefresh);
+        authoritativeGet(response.redirected ? response.url : form.dataset.inlineRefresh);
         return;
       }
       const content = document.importNode(replacement, true);
@@ -205,7 +217,7 @@
       }
     } catch {
       // Do not replay an uncertain POST. A safe GET shows the authoritative state.
-      window.location.assign(form.dataset.inlineRefresh);
+      authoritativeGet(form.dataset.inlineRefresh);
     } finally {
       inlinePending.delete(host);
       form.removeAttribute("aria-busy");
