@@ -3,7 +3,7 @@ const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5165';
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw Error('Disposable loopback fixture required');
-const panels = ['dataset-details', 'fields', 'access-management', 'danger-zone'];
+const publishedPanels = ['dataset-details', 'fields', 'access-management'];
 const visiblePanels = page => page.locator('[data-tab-panels] > section:visible').evaluateAll(es => es.map(e=>e.id));
 const names = page => page.locator('#fields tbody .field-name').allTextContents();
 async function login(page) {
@@ -118,15 +118,24 @@ async function savedMove(page, action) {
       await page.getByLabel('User or team',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').selectOption({label:'Row user (row@example.com)'},{force:true});
       await page.getByRole('button',{name:'Grant export access',exact:true}).click();
       await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).waitFor();
-      await page.route('**/revoke*',route=>route.abort());
-      page.once('dialog',dialog=>dialog.accept());
+      let revokePosts = 0;
+      await page.route('**/revoke*',route=>{
+        if (route.request().method()==='POST') {
+          revokePosts++;
+          return route.abort();
+        }
+        return route.continue();
+      });
+      await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).click();
+      const confirmation = page.locator('dialog[data-confirm-dialog][open]');
+      await confirmation.waitFor({state:'visible'});
       const revokeFallback = page.waitForResponse(response => {
         const url = new URL(response.url());
         return response.request().method() === 'GET' && url.pathname.startsWith(`/datasets/${key}`);
       });
       const [revokeResponse] = await Promise.all([
         revokeFallback,
-        page.getByRole('button',{name:'Remove export access for Row user',exact:true}).click(),
+        confirmation.getByRole('button',{name:'Remove',exact:true}).click(),
       ]);
       assert.equal(revokeResponse.status(),200);
       await revokeResponse.finished();
@@ -135,6 +144,7 @@ async function savedMove(page, action) {
       assert(returned.pathname.startsWith(`/datasets/${key}`));
       assert.equal(returned.searchParams.get('tab'),'access-management');
       assert.equal(returned.hash,'#access-management');
+      assert.equal(revokePosts,1);
       assert(await page.getByRole('button',{name:'Remove export access for Row user',exact:true}).isVisible());
       await page.unroute('**/revoke*');
 
@@ -146,23 +156,24 @@ async function savedMove(page, action) {
         if (mode==='initialization-error') await plain.addInitScript(()=>{
           const original = Element.prototype.setAttribute;
           Element.prototype.setAttribute = function(name,value) {
-            if (!window.injectedTabFailure && this.id==='tab-access-management' && name==='aria-selected') {
+            if (!window.injectedTabFailure && this.id==='tab-access' && name==='aria-selected') {
               window.injectedTabFailure=true; throw Error('Injected tab initialization failure');
             }
             return original.call(this,name,value);
           };
         });
-        await plain.goto(base+configure+'?edit=1#access-management');
-        assert.deepEqual(await visiblePanels(plain),panels,mode+': content remains available');
-        if (mode==='initialization-error') assert(await plain.evaluate(()=>window.injectedTabFailure));
+        await plain.goto(base+editConfigure+'#access-management');
+        const recovered = mode === 'initialization-error';
+        assert.deepEqual(await visiblePanels(plain),publishedPanels,mode+': content remains available');
+        if (recovered) assert(await plain.evaluate(()=>window.injectedTabFailure));
         else {
           assert(!(await plain.locator('[data-icon-suggestions]').isVisible()));
           assert(!(await plain.locator('[data-icon-preview]').isVisible()));
         }
         await layout(plain);
         await plain.goto(base+concept+'#fields');
-        assert.deepEqual(await visiblePanels(plain),panels);
-        if (mode!=='initialization-error') assert.equal(await plain.locator('.field-drag-handle:visible').count(),0);
+        assert.deepEqual(await visiblePanels(plain),publishedPanels);
+        if (!recovered) assert.equal(await plain.locator('.field-drag-handle:visible').count(),0);
         assert.equal(await plain.getByRole('button',{name:/^Move Code (up|down)$/}).count(),0);
         await fallback.close();
       }
