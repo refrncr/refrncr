@@ -2,13 +2,17 @@
 const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 (async () => {
   const browser = await chromium.launch({executablePath: process.env.REFRNCR_BROWSER_EXECUTABLE, headless: true});
   const page = await browser.newPage({viewport: {width: 1440, height: 1100}});
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const base = 'http://127.0.0.1:5195';
-  const evidence = process.env.REFRNCR_BROWSER_EVIDENCE || '/private/tmp/ref238-review-evidence';
+  const evidence = process.env.REFRNCR_BROWSER_EVIDENCE
+    || process.env.REFRNCR_BROWSER_OUTPUT
+    || path.join(os.tmpdir(), 'ref238-review-evidence');
   fs.mkdirSync(evidence, {recursive: true});
   const login = async target => {
     await target.goto(`${base}/login`);

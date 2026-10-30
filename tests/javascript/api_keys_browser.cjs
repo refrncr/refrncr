@@ -1,7 +1,12 @@
 // Checks API-key creation, one-time secret display, lifecycle actions and safe redaction.
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const base = 'http://127.0.0.1:5140';
+const output = process.env.REFRNCR_BROWSER_OUTPUT || os.tmpdir();
+fs.mkdirSync(output, {recursive: true});
 const runId = Date.now();
 (async () => {
   const browser = await chromium.launch({headless:true, executablePath:process.env.REFRNCR_BROWSER_EXECUTABLE});
@@ -54,7 +59,7 @@ const runId = Date.now();
         page = await context.newPage();
         await page.setViewportSize({width,height:900});
         await page.goto(base + '/settings/api-keys');
-        await page.screenshot({path:'/private/tmp/ref40-' + width + '-' + javaScriptEnabled + '.png'});
+        await page.screenshot({path:path.join(output, `ref40-${width}-${javaScriptEnabled}.png`)});
         const revoke = page.getByRole('link',{name:'Revoke ' + name,exact:true});
         await revoke.focus();
         await page.keyboard.press('Enter');
