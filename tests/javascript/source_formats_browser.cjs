@@ -49,6 +49,12 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
         await page.getByRole('button',{name:'Continue',exact:true}).click();
         await page.waitForURL(/\/step\/3$/);
       };
+      const cancelImport = async target => {
+        await Promise.all([
+          target.waitForURL(base+'/datasets/imports/concept/records'),
+          target.getByRole('button',{name:'Cancel import',exact:true}).click(),
+        ]);
+      };
       await upload('code;unused\nA;12.50\n');
       assert.equal(await page.locator('[data-format-details]').count(),0);
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false,'No inert Show all formats button');
@@ -65,7 +71,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await ignoredReview;
       await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       assert.equal(await page.locator('[data-advanced-formats]').isVisible(),false);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       await upload('code;amount;day\nA;1.234,56;2024-02-29\nB;2.345,67;2024-03-01\n');
       // The aggregate action controls the native format disclosures.
       const advanced=page.locator('[data-advanced-formats]');
@@ -98,7 +104,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.locator('[data-format-details][open]').count(),0);
       assert.equal(await change.evaluate(e=>document.activeElement===e),true);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       await upload('code;amount;day\nC;1.234;2024-02-29\nD;2.345;2024-03-01\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
       assert.equal(await page.evaluate(()=>document.activeElement.id),'source-1-0');
@@ -114,7 +120,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.deepEqual(await page.locator('tbody tr').allTextContents().then(rows => rows.map(text => text.trim().split(/\s+/)[0])), ['C', 'D']);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       assert.deepEqual(errors,[]);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       await upload('code;amount;day;stamp\nE;12.50;2024-02-29;2024-02-29 12:00:00\n');
       let releaseReview, reviewReached, reviewFinished;
       const gate=new Promise(resolve=>{releaseReview=resolve;});
@@ -137,7 +143,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await zone.inputValue(),'Europe/London','A late review must preserve newly typed timezone text');
       assert.equal(await zone.evaluate(e=>document.activeElement===e),true);
       await page.unroute('**/formats',holdReview);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       const changeControl = async (label, value) => {
         const response = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
         response.catch(()=>{});
@@ -232,7 +238,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.reload();
       await page.waitForURL(/\/step\/3$/);
       assert.deepEqual(await Promise.all(['Date','Time'].map(part=>page.getByLabel(part+' format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue())),textValues);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       await upload('code;amount;moment\nH;1;01/02/2024 12:34:56\n');
       assert.equal(await page.locator('[data-format-details][open]').count(),1);
       assert.equal(await page.evaluate(()=>document.activeElement.id),'source-2-0');
@@ -243,7 +249,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.getByLabel('Date format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-date-dmy-slash');
       assert.equal(await page.getByLabel('Time format for moment',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'v1-time-hms');
       assert.match(await page.locator('[data-source-formats="2"] .source-format-pair').textContent(),/2024-02-01T12:34:56/);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       assert.deepEqual(errors,[]);
       await page.goto(base+'/datasets/imports/records/import');
       await page.getByLabel('CSV or Excel file').setInputFiles({name:'native.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:nativeWorkbook.stdout});
@@ -260,7 +266,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await page.locator('[data-mapping-continue]').click();
       await page.waitForURL(/\/step\/4$/);
       await page.getByText('2024-02-29T12:34:56',{exact:true}).waitFor({state:'attached'});
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       await upload('code;amount;stamp\nZ;1;2024-02-29T12:00:00Z\nOffset;1;2024-02-29T13:00:00+01:00\n');
       await page.getByRole('button',{name:'Show all formats',exact:true}).click();
       assert.equal(await page.getByLabel('Source type for stamp',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'offset');
@@ -277,7 +283,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).inputValue(),'');
       assert.equal(await page.getByLabel('Repeated local times',{exact:true}).locator('xpath=self::select | following-sibling::select[1]').inputValue(),'');
       assert.equal(await page.getByLabel('IANA source timezone (required for local timestamps)',{exact:true}).isVisible(),false);
-      await page.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(page);
       assert.deepEqual(errors,[]);
       console.log(`PASS ${width}: disclosure, labels, paired conversion, keyboard/Escape/focus, ambiguity, Preview, no overflow`);
       await context.close();
@@ -301,7 +307,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await plainPage.locator('[data-mapping-continue]').click();
       await plainPage.waitForURL(/\/step\/4$/);
       await plainPage.getByText('2024-02-29T12:34:56',{exact:true}).waitFor({state:'attached'});
-      await plainPage.getByRole('button',{name:'Cancel import',exact:true}).click();
+      await cancelImport(plainPage);
       console.log(`PASS no-JavaScript ${width}: detected temporal Preview and explanatory fallback`);
       await plain.close();
     }
