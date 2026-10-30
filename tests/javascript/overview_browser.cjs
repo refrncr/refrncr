@@ -67,6 +67,9 @@ const path = require('node:path');
     assert(await page.getByRole('heading', {name: /^Needs your attention/}).isVisible());
     for (const theme of ['light', 'dark']) {
       for (const width of [375, 768, 1440]) {
+        // Resizing aborts an active view transition in Chromium. Wait for the
+        // preceding navigation/filter transition before changing the viewport.
+        await settleViewTransition(page);
         await page.setViewportSize({width, height: width === 1440 ? 2000 : 1100});
         await page.goto(`${base}/?all_owners=1`);
         await settleViewTransition(page);

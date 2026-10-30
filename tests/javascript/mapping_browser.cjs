@@ -1,6 +1,6 @@
 // Checks mapping-table layout, source updates, record interactions and keyboard reordering.
 const assert = require('node:assert/strict');
-const {chromium} = require('./browser_policy.cjs');
+const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5193';
 if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw Error('Loopback only');
 (async () => {
@@ -87,13 +87,17 @@ if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await page.getByRole('dialog').getByText('Field role', {exact: true}).count(), 0);
       await page.keyboard.press('Escape');
       await page.getByRole('dialog').waitFor({state: 'hidden'});
+      await settleViewTransition(page);
       await page.waitForFunction(() => document.activeElement?.textContent.trim() === 'Add target field');
       await page.locator('[data-field-order-ready]').waitFor();
       const handles = page.locator('.mapping-fields-block').last().locator('.field-drag-handle');
-      await handles.last().focus();
+      const lastHandle = handles.last();
+      await lastHandle.waitFor({state: 'visible'});
+      await lastHandle.focus();
+      assert(await lastHandle.evaluate(element => element === document.activeElement));
       await Promise.all([
         page.waitForResponse(r => r.request().method() === 'POST' && r.url().includes('/fields/order')),
-        handles.last().press('ArrowUp')
+        lastHandle.press('ArrowUp')
       ]);
       assert.match(await page.locator('#field-order-status').textContent(), /moved/);
       if (process.env.REFRNCR_BROWSER_OUTPUT) await page.screenshot({path: `${process.env.REFRNCR_BROWSER_OUTPUT}/fields-${width}.png`, fullPage: true, animations: 'disabled'});

@@ -148,7 +148,7 @@ if (output) fs.mkdirSync(output, {recursive:true});
         const href=await primary.getAttribute('href');
         for(const click of [{modifiers:['ControlOrMeta']},{button:'middle'}]) {
           const [popup]=await Promise.all([context.waitForEvent('page'),primary.click(click)]);
-          await popup.waitForLoadState(); assert.equal(popup.url(),base+href); await popup.close();
+          await popup.waitForURL(base+href); assert.equal(popup.url(),base+href); await popup.close();
           assert.equal(page.url(),base+item.path);
         }
         await page.evaluate(()=>document.addEventListener('contextmenu',e=>{window.rowContext={prevented:e.defaultPrevented,href:e.target.closest('a')?.href};},{once:true}));
@@ -229,9 +229,14 @@ if (output) fs.mkdirSync(output, {recursive:true});
       await primary.click();
       const editForm = page.locator(`form[data-focus-return-record-id='${recordId}']`);
       await editForm.locator("input[name='description']").fill(`Edited from panel by ${mode}`);
+      const focusReturn = page.waitForURL(url =>
+        url.pathname === '/datasets/row-check/concept/records'
+        && url.searchParams.get('focus_record') === recordId
+        && url.searchParams.get('focus_mode') === mode
+      );
       if (mode === 'pointer') await editForm.getByRole('button', {name:'Save record'}).click();
       else await editForm.locator("input[name='description']").press('Enter');
-      await page.waitForURL(url => url.pathname === '/datasets/row-check/concept/records');
+      await focusReturn;
       const restored = page.locator(`#record-row-${recordId}`);
       await page.waitForFunction(id => document.activeElement === document.querySelector(`#record-row-${id} [data-row-primary]`), recordId);
       assert.equal(await restored.locator('[data-row-primary]').getAttribute('data-keyboard-restored-focus') !== null, mode === 'keyboard');
