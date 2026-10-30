@@ -3542,7 +3542,14 @@ def create_flask_app(
         require_csrf(login_session.csrf_token)
         if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
             abort(400)
-        record_imports.cancel(actor.id, login_session.id, key, token)
+        try:
+            record_imports.cancel(actor.id, login_session.id, key, token)
+        except ConflictError as error:
+            return render_authenticated_template(
+                "pages/datasets/import/unavailable.html",
+                error=str(error),
+                return_url=url_for("dataset_import_step", key=key, token=token, step=1),
+            ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @import_route(
@@ -3677,7 +3684,19 @@ def create_flask_app(
         require_csrf(login_session.csrf_token)
         if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
             abort(400)
-        hierarchy_imports.cancel(actor.id, login_session.id, key, token)
+        try:
+            hierarchy_imports.cancel(actor.id, login_session.id, key, token)
+        except ConflictError as error:
+            dataset = dataset_records.get_dataset_for_add(actor.id, key)
+            state = hierarchy_imports.active(actor.id, login_session.id, key)
+            return render_authenticated_template(
+                "pages/datasets/hierarchy_import.html",
+                dataset=dataset,
+                state=state,
+                preview=None,
+                current_csrf=login_session.csrf_token,
+                error=str(error),
+            ), 409
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     def render_record_form(

@@ -267,6 +267,21 @@ def test_resume_cancel_expiry_and_new_session(wizard):
     assert not wizard.services.record_imports.store._states
 
 
+def test_busy_cancel_timeout_is_readable_and_preserves_the_import(wizard):
+    store = TransientImportStore(cancel_wait_seconds=0.01)
+    wizard.services.record_imports.store = store
+    wizard.upload()
+    state = store._states[wizard.token]
+    claimed = store.claim(state)
+
+    response = wizard.post(wizard.path + "/cancel")
+
+    assert response.status_code == 409
+    assert "This import is still processing. Try cancelling again in a moment." in response.text
+    assert store.get(state.token, state.actor_id, state.session_id, state.dataset_id) == claimed
+    store.finish(claimed)
+
+
 @pytest.mark.parametrize(
     "headers,expected",
     [
