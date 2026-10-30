@@ -25,6 +25,10 @@ jobs:
           python -m pip wheel --no-deps . --wheel-dir "$RUNNER_TEMP/ref48-dist"
           python -m venv "$RUNNER_TEMP/ref48-runtime"
           "$RUNNER_TEMP/ref48-runtime/bin/python" -m pip install "$RUNNER_TEMP"/ref48-dist/refrncr-*.whl
+      - name: Check wheel license metadata
+        run: >-
+          python tests/verify_distribution_license.py
+          "$RUNNER_TEMP"/ref48-dist/refrncr-*.whl LICENSE
       - name: Check installed Excel XML protection
         run: '"$RUNNER_TEMP/ref48-runtime/bin/python" -I tests/installed_xml_smoke.py'
 
