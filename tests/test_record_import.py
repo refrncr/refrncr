@@ -4,6 +4,7 @@ import re
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from threading import Barrier
 from types import SimpleNamespace
 
@@ -32,7 +33,7 @@ from refrncr.record_import import (
     rank_mapping_candidates,
     validate_source_format_components,
 )
-from refrncr.services import NotFoundError, ResourceTypeRegistry
+from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
 
 PASSWORD = "correct horse battery staple"
@@ -1237,6 +1238,33 @@ def test_cancel_and_double_consume_cleanup_are_isolated():
     assert store.consume(second.token, "actor", "two", "dataset") == second
     with pytest.raises(NotFoundError):
         store.consume(second.token, "actor", "two", "dataset")
+
+
+def test_cancel_waits_for_busy_import_to_finish_before_consuming_it():
+    store = TransientImportStore(cancel_wait_seconds=1)
+    state = store.create("actor", "session", "dataset", "one.csv", b"one", "csv")
+    claimed = store.claim(state)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        cancelling = executor.submit(store.cancel, state.token, "actor", "session", "dataset")
+        with pytest.raises(FuturesTimeoutError):
+            cancelling.result(timeout=0.05)
+        store.finish(claimed)
+        cancelling.result(timeout=0.5)
+
+    with pytest.raises(NotFoundError):
+        store.get(state.token, "actor", "session", "dataset")
+
+
+def test_cancel_timeout_reports_conflict_without_consuming_busy_import():
+    store = TransientImportStore(cancel_wait_seconds=0.01)
+    state = store.create("actor", "session", "dataset", "one.csv", b"one", "csv")
+    claimed = store.claim(state)
+
+    with pytest.raises(ConflictError, match="still processing"):
+        store.cancel(state.token, "actor", "session", "dataset")
+
+    assert store.get(state.token, "actor", "session", "dataset") == claimed
 
 
 def test_transient_capacity_is_atomic_and_does_not_evict_existing_state():

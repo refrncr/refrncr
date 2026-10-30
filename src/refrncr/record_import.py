@@ -28,6 +28,7 @@ from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     MAX_RECORD_REVISION,
+    ConflictError,
     DatasetFieldService,
     DatasetRecordService,
     NotFoundError,
@@ -63,6 +64,7 @@ PROFILE_SCAN_ROWS = 100
 PROFILE_SAMPLE_VALUES = 25
 DISPLAY_SAMPLE_VALUES = 3
 DISPLAY_SAMPLE_CHARS = 80
+CANCEL_WAIT_SECONDS = 5.0
 
 UNREADABLE_XLSX_MESSAGE = (
     "We couldn't read this modern Excel workbook. Open it in Excel or LibreOffice, save a new "
@@ -354,14 +356,17 @@ class TransientImportStore:
         ttl: int = IMPORT_TTL_SECONDS,
         capacity: int = 100,
         max_bytes: int = MAX_STAGED_BYTES,
+        cancel_wait_seconds: float = CANCEL_WAIT_SECONDS,
     ):
         self.clock = clock
         self.ttl = ttl
         self.capacity = capacity
         self.max_bytes = max_bytes
+        self.cancel_wait_seconds = cancel_wait_seconds
         self._states: dict[str, StagedImport] = {}
         self._expired: dict[str, tuple[str, str, str, float, str]] = {}
         self._lock = threading.Lock()
+        self._finished = threading.Condition(self._lock)
 
     @staticmethod
     def _same_state(current, expected):
@@ -488,22 +493,31 @@ class TransientImportStore:
             current = self._states.get(claimed.token)
             if self._same_state(current, claimed):
                 self._states[claimed.token] = replace(current, busy=False, **changes)
+                self._finished.notify_all()
 
     def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
         with self._lock:
-            self._cleanup()
-            state = self._states.get(token)
-            if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
-                actor_id,
-                session_id,
-                dataset_id,
-            ):
-                expired = self._expired.get(token)
-                if expired and expired[:3] == (actor_id, session_id, dataset_id):
-                    raise ImportExpiredError("Import expired")
-                raise NotFoundError("Import not found")
-            if state.busy:
-                raise NotFoundError("Import not found")
+            deadline = time.monotonic() + self.cancel_wait_seconds
+            while True:
+                self._cleanup()
+                state = self._states.get(token)
+                if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
+                    actor_id,
+                    session_id,
+                    dataset_id,
+                ):
+                    expired = self._expired.get(token)
+                    if expired and expired[:3] == (actor_id, session_id, dataset_id):
+                        raise ImportExpiredError("Import expired")
+                    raise NotFoundError("Import not found")
+                if not state.busy:
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise ConflictError(
+                        "This import is still processing. Try cancelling again in a moment."
+                    )
+                self._finished.wait(timeout=remaining)
             self._states.pop(token)
             return state
 
@@ -518,6 +532,7 @@ class TransientImportStore:
                 self._states.pop(token, None)
             for token in [key for key, value in self._expired.items() if value[1] == session_id]:
                 self._expired.pop(token, None)
+            self._finished.notify_all()
 
     def revoke_concept(self, concept_id):
         with self._lock:
@@ -525,6 +540,7 @@ class TransientImportStore:
                 self._states.pop(token, None)
             for token in [key for key, value in self._expired.items() if value[4] == concept_id]:
                 self._expired.pop(token, None)
+            self._finished.notify_all()
 
     def _cleanup(self):
         now = self.clock()

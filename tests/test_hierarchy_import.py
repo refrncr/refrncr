@@ -1,12 +1,15 @@
 """Editable hierarchy workbook import behavior."""
 
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+
 import pytest
 from support import revision
 
 from refrncr.dataset_export import generate_export
 from refrncr.hierarchy_contracts import HierarchyNode
-from refrncr.record_import import ImportValidationError
-from refrncr.services import StaleRecordError
+from refrncr.record_import import ImportValidationError, TransientImportStore
+from refrncr.services import NotFoundError, StaleRecordError
 
 
 def prepare(c):
@@ -129,3 +132,28 @@ def test_hierarchy_import_rejects_stale_concept(database_context):
             confirmation=state.confirmation,
             acknowledge_removals=False,
         )
+
+
+def test_hierarchy_import_cancel_waits_for_busy_operation(database_context):
+    c = database_context
+    root = prepare(c)
+    service = c.s.hierarchy_imports
+    service.store = TransientImportStore(cancel_wait_seconds=1)
+    state = service.begin(
+        c.a.id,
+        "session-cancel",
+        c.d.key,
+        "export.xlsx",
+        workbook((), imported_nodes(root)),
+    )
+    claimed = service.store.claim(state)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        cancelling = executor.submit(service.cancel, c.a.id, "session-cancel", c.d.key, state.token)
+        with pytest.raises(FuturesTimeoutError):
+            cancelling.result(timeout=0.05)
+        service.store.finish(claimed)
+        cancelling.result(timeout=0.5)
+
+    with pytest.raises(NotFoundError, match="Import not found"):
+        service.store.get(state.token, state.actor_id, state.session_id, state.dataset_id)
