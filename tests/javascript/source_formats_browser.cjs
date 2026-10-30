@@ -1,5 +1,5 @@
 // Checks imported source formats, localized numeric/date previews and validation responses.
-const {chromium} = require('./browser_policy.cjs');
+const {chromium, settleViewTransition} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const {spawnSync} = require('node:child_process');
 const python = process.env.REFRNCR_PYTHON;
@@ -49,11 +49,13 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
         await page.getByRole('button',{name:'Continue',exact:true}).click();
         await page.waitForURL(/\/step\/3$/);
       };
-      const cancelImport = async target => {
+      const cancelImport = async (target, javaScriptEnabled = true) => {
         await Promise.all([
           target.waitForURL(base+'/datasets/imports/concept/records'),
           target.getByRole('button',{name:'Cancel import',exact:true}).click(),
         ]);
+        await target.waitForLoadState('networkidle');
+        if (javaScriptEnabled) await settleViewTransition(target);
       };
       await upload('code;unused\nA;12.50\n');
       assert.equal(await page.locator('[data-format-details]').count(),0);
@@ -307,7 +309,7 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       await plainPage.locator('[data-mapping-continue]').click();
       await plainPage.waitForURL(/\/step\/4$/);
       await plainPage.getByText('2024-02-29T12:34:56',{exact:true}).waitFor({state:'attached'});
-      await cancelImport(plainPage);
+      await cancelImport(plainPage, false);
       console.log(`PASS no-JavaScript ${width}: detected temporal Preview and explanatory fallback`);
       await plain.close();
     }
