@@ -2,7 +2,9 @@
 const {chromium} = require('./browser_policy.cjs');
 const assert = require('node:assert/strict');
 const {spawnSync} = require('node:child_process');
-const nativeWorkbook = spawnSync(process.env.REFRNCR_PYTHON || '.venv/bin/python', ['-c', `
+const python = process.env.REFRNCR_PYTHON;
+assert(python, 'REFRNCR_PYTHON must be set by tests/run_browser_tests.py');
+const nativeWorkbook = spawnSync(python, ['-c', `
 import io, sys
 from datetime import datetime, time
 from openpyxl import Workbook
@@ -14,7 +16,14 @@ book.save(output)
 book.close()
 sys.stdout.buffer.write(output.getvalue())
 `]);
-assert.equal(nativeWorkbook.status,0,nativeWorkbook.stderr.toString());
+if (nativeWorkbook.error) {
+  throw new Error(`Could not start REFRNCR_PYTHON (${python}): ${nativeWorkbook.error.message}`);
+}
+assert.equal(
+  nativeWorkbook.status,
+  0,
+  nativeWorkbook.stderr?.toString() || `REFRNCR_PYTHON exited with status ${nativeWorkbook.status}`,
+);
 const base = process.env.REFRNCR_BROWSER_URL || 'http://127.0.0.1:5154';
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw Error('Use the disposable loopback fixture');
 (async () => {

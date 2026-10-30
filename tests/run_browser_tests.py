@@ -69,6 +69,7 @@ def run(name):
             "REFRNCR_BROWSER_URL": base,
             "REFRNCR_BROWSER_EMAIL": "admin@example.com",
             "REFRNCR_BROWSER_PASSWORD": "correct horse battery staple",
+            "REFRNCR_PYTHON": sys.executable,
             "REFRNCR_BROWSER_OUTPUT": (
                 str(Path(directory) / "mapping-usage.png") if name == "mapping_usage" else directory
             ),
