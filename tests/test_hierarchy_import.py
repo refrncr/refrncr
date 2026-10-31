@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from threading import Event
 
 import pytest
 from support import revision
@@ -154,6 +155,45 @@ def test_hierarchy_import_cancel_waits_for_busy_operation(database_context):
             cancelling.result(timeout=0.05)
         service.store.finish(claimed)
         cancelling.result(timeout=0.5)
+
+    with pytest.raises(NotFoundError, match="Import not found"):
+        service.store.get(state.token, state.actor_id, state.session_id, state.dataset_id)
+
+
+def test_hierarchy_import_cancel_waits_for_active_preview(database_context, monkeypatch):
+    c = database_context
+    root = prepare(c)
+    service = c.s.hierarchy_imports
+    service.store = TransientImportStore(cancel_wait_seconds=1)
+    state = service.begin(
+        c.a.id,
+        "session-preview-cancel",
+        c.d.key,
+        "export.xlsx",
+        workbook((), imported_nodes(root)),
+    )
+    entered, release = Event(), Event()
+    original = service._preview_for
+
+    def held_preview(*args, **kwargs):
+        entered.set()
+        assert release.wait(timeout=1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(service, "_preview_for", held_preview)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        previewing = executor.submit(
+            service.preview, c.a.id, "session-preview-cancel", c.d.key, state.token
+        )
+        assert entered.wait(timeout=1)
+        cancelling = executor.submit(
+            service.cancel, c.a.id, "session-preview-cancel", c.d.key, state.token
+        )
+        with pytest.raises(FuturesTimeoutError):
+            cancelling.result(timeout=0.05)
+        release.set()
+        previewing.result(timeout=1)
+        cancelling.result(timeout=1)
 
     with pytest.raises(NotFoundError, match="Import not found"):
         service.store.get(state.token, state.actor_id, state.session_id, state.dataset_id)

@@ -145,6 +145,10 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) throw
       assert.equal(await zone.inputValue(),'Europe/London','A late review must preserve newly typed timezone text');
       assert.equal(await zone.evaluate(e=>document.activeElement===e),true);
       await page.unroute('**/formats',holdReview);
+      const timezoneReview=page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);
+      await zone.press('Tab');
+      await timezoneReview;
+      await page.waitForFunction(()=>!document.querySelector('[data-import-mapping]').hasAttribute('aria-busy'));
       await cancelImport(page);
       const changeControl = async (label, value) => {
         const response = page.waitForResponse(r=>r.url().endsWith('/formats') && r.status()===200);

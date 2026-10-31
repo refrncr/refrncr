@@ -5,7 +5,7 @@ import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
-from threading import Barrier
+from threading import Barrier, Event
 from types import SimpleNamespace
 
 import pytest
@@ -1254,6 +1254,48 @@ def test_cancel_waits_for_busy_import_to_finish_before_consuming_it():
 
     with pytest.raises(NotFoundError):
         store.get(state.token, "actor", "session", "dataset")
+
+
+def test_cancel_closes_admission_and_waits_for_active_operations():
+    store = TransientImportStore(cancel_wait_seconds=1)
+    state = store.create("actor", "session", "dataset", "one.csv", b"one", "csv")
+    entered, release = Event(), Event()
+
+    def operate():
+        with store._operation(state.token, "actor", "session", "dataset"):
+            entered.set()
+            assert release.wait(timeout=1)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        operation = executor.submit(operate)
+        assert entered.wait(timeout=1)
+        cancelling = executor.submit(store.cancel, state.token, "actor", "session", "dataset")
+        with pytest.raises(FuturesTimeoutError):
+            cancelling.result(timeout=0.05)
+        with pytest.raises(ConflictError, match="being cancelled"):
+            with store._operation(state.token, "actor", "session", "dataset"):
+                pass
+        with pytest.raises(ConflictError, match="being cancelled"):
+            store.claim(store.get(state.token, "actor", "session", "dataset"))
+        release.set()
+        operation.result(timeout=0.5)
+        cancelling.result(timeout=0.5)
+
+    with pytest.raises(NotFoundError):
+        store.get(state.token, "actor", "session", "dataset")
+
+
+def test_cancel_operation_timeout_reopens_intact_import():
+    store = TransientImportStore(cancel_wait_seconds=0.01)
+    state = store.create("actor", "session", "dataset", "one.csv", b"one", "csv")
+
+    with store._operation(state.token, "actor", "session", "dataset"):
+        with pytest.raises(ConflictError, match="still processing"):
+            store.cancel(state.token, "actor", "session", "dataset")
+
+    with store._operation(state.token, "actor", "session", "dataset") as available:
+        assert available.token == state.token
+    store.cancel(state.token, "actor", "session", "dataset")
 
 
 def test_cancel_timeout_reports_conflict_without_consuming_busy_import():

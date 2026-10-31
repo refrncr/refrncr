@@ -317,16 +317,18 @@ class HierarchyImportService:
         self.store.revoke_session(session_id)
 
     def preview(self, actor_id, session_id, dataset_key, token):
-        state = self.state(actor_id, session_id, dataset_key, token)
-        _dataset_id, revision = self._target(actor_id, dataset_key)
-        preview = self._preview_for(state.dataset_id, state.content, state.filename, revision)
-        self.store.update(
-            state,
-            schema_fingerprint=("hierarchy", revision),
-            difference_digest=self._digest(preview),
-            validation_valid=preview.valid,
-        )
-        return preview
+        dataset_id, revision = self._target(actor_id, dataset_key)
+        with self.store._operation(token, actor_id, session_id, dataset_id) as state:
+            if state.mode != "hierarchy" or state.busy:
+                raise NotFoundError("Import not found")
+            preview = self._preview_for(state.dataset_id, state.content, state.filename, revision)
+            self.store.update(
+                state,
+                schema_fingerprint=("hierarchy", revision),
+                difference_digest=self._digest(preview),
+                validation_valid=preview.valid,
+            )
+            return preview
 
     def confirm(
         self, actor_id, session_id, dataset_key, token, *, confirmation, acknowledge_removals

@@ -282,6 +282,53 @@ def test_busy_cancel_timeout_is_readable_and_preserves_the_import(wizard):
     store.finish(claimed)
 
 
+def test_formats_route_holds_operation_until_cancel_can_consume(wizard, monkeypatch):
+    wizard.upload()
+    service = wizard.services.record_imports
+    state = service.store._states[wizard.token]
+    entered, release, cancel_started, cancel_done = Event(), Event(), Event(), Event()
+    original = service.submitted_source_format_assistance
+
+    def held_assistance(*args, **kwargs):
+        entered.set()
+        assert release.wait(timeout=1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(service, "submitted_source_format_assistance", held_assistance)
+    form = {
+        "mapping_0": "code",
+        "mapping_1": "amount",
+        "source_0": "v1-text",
+        "source_1": "v1-plain",
+        "timezone_0": "",
+        "timezone_1": "",
+        "fold_0": "",
+        "fold_1": "",
+    }
+
+    def cancel_during_formats():
+        assert entered.wait(timeout=1)
+        cancel_started.set()
+        service.store.cancel(state.token, state.actor_id, state.session_id, state.dataset_id)
+        cancel_done.set()
+
+    def release_formats():
+        assert entered.wait(timeout=1)
+        assert cancel_started.wait(timeout=1)
+        assert not cancel_done.wait(timeout=0.05)
+        release.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        cancelling = executor.submit(cancel_during_formats)
+        releasing = executor.submit(release_formats)
+        assert wizard.post(wizard.path + "/formats", form).status_code == 200
+        releasing.result(timeout=1)
+        cancelling.result(timeout=1)
+
+    with pytest.raises(NotFoundError):
+        service.store.get(state.token, state.actor_id, state.session_id, state.dataset_id)
+
+
 @pytest.mark.parametrize(
     "headers,expected",
     [

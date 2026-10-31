@@ -2951,6 +2951,12 @@ def create_flask_app(
                         ),
                         404,
                     )
+                except ConflictError as error:
+                    return render_authenticated_template(
+                        "pages/datasets/import/unavailable.html",
+                        error=str(error),
+                        return_url=url_for("import_dataset_records", key=kwargs.get("key", "")),
+                    ), 409
                 except ImportValidationError as error:
                     return render_authenticated_template(
                         "pages/datasets/import/unavailable.html", error=str(error)
@@ -3311,38 +3317,38 @@ def create_flask_app(
     def review_source_formats(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
-        state = record_imports.state(actor.id, login_session.id, key, token)
-        if state.mapping is None:
-            raise NotFoundError("Import not found")
-        column_count = len(state.mapping)
-        expected = {
-            f"{prefix}_{index}"
-            for prefix in ("mapping", "source", "timezone", "fold")
-            for index in range(column_count)
-        } | {"csrf_token"}
-        expected |= submitted_component_names(column_count)
-        if set(request.form) != expected or any(
-            len(request.form.getlist(name)) != 1 for name in expected
-        ):
-            abort(400)
-        mapping = tuple(
-            None
-            if request.form[f"mapping_{index}"] == "__ignored__"
-            else request.form[f"mapping_{index}"]
-            for index in range(column_count)
-        )
-        _state, _source, assistance, issues = record_imports.submitted_source_format_assistance(
-            actor.id,
-            login_session.id,
-            key,
-            token,
-            mapping,
-            submitted_source_format_components(mapping),
-        )
-        columns = show_source_format_issues(assistance.format_columns, issues)
-        return render_template(
-            "pages/datasets/import/source_format_fragments.html", format_columns=columns
-        )
+        with record_imports.source_format_review(actor.id, login_session.id, key, token) as state:
+            if state.mapping is None:
+                raise NotFoundError("Import not found")
+            column_count = len(state.mapping)
+            expected = {
+                f"{prefix}_{index}"
+                for prefix in ("mapping", "source", "timezone", "fold")
+                for index in range(column_count)
+            } | {"csrf_token"}
+            expected |= submitted_component_names(column_count)
+            if set(request.form) != expected or any(
+                len(request.form.getlist(name)) != 1 for name in expected
+            ):
+                abort(400)
+            mapping = tuple(
+                None
+                if request.form[f"mapping_{index}"] == "__ignored__"
+                else request.form[f"mapping_{index}"]
+                for index in range(column_count)
+            )
+            _state, _source, assistance, issues = record_imports.submitted_source_format_assistance(
+                actor.id,
+                login_session.id,
+                key,
+                token,
+                mapping,
+                submitted_source_format_components(mapping),
+            )
+            columns = show_source_format_issues(assistance.format_columns, issues)
+            return render_template(
+                "pages/datasets/import/source_format_fragments.html", format_columns=columns
+            )
 
     @import_route(
         "/datasets/<key>/records/import/<token>/mapping",
