@@ -4,7 +4,7 @@ Status: Accepted. REF-73 merged into main in PR #41.
 
 ## Context
 
-[REF-73](https://cleverhorizons.atlassian.net/browse/REF-73) replaces Dataset-specific
+REF-73 replaces Dataset-specific
 viewer/editor/admin authorization from earlier stories. Community teams represent data domains.
 Every active installation user must read all Datasets, while maintenance follows current team
 membership and export is a separate capability. Existing Dataset metadata/schema mutations do

@@ -1,10 +1,10 @@
 # Administrator audit history (REF-39)
 
-[REF-39](https://cleverhorizons.atlassian.net/browse/REF-39) adds **Settings → Audit log**
+REF-39 adds **Settings → Audit log**
 for active Community administrators. It reads all retained successful domain events from
 the existing REF-149 catalog and `audit_events` table. Access is installation-wide;
 Dataset grants and team membership confer no audit access. This is Community functionality,
-without Cloud tenant composition. [REF-31](https://cleverhorizons.atlassian.net/browse/REF-31)
+without Cloud tenant composition. REF-31
 continues to own security-event logging. The [audit policy](audit-policy.md) remains authoritative
 for production, safe payloads and transaction boundaries.
 

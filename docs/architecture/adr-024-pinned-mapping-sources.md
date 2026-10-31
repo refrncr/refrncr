@@ -58,5 +58,5 @@ partial in each source/target block.
 - Convert historical mappings automatically: needs product decisions about their intended
   source version and contradicts the agreed manual cleanup.
 
-See [mapping operations](../development/mapping-tables.md) and
-[REF-239](https://cleverhorizons.atlassian.net/browse/REF-239).
+See [mapping operations](../development/mapping-tables.md). REF-239 established this pinned-source
+design and the explicit manual cleanup requirement for incompatible existing mappings.

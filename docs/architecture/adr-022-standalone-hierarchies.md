@@ -4,7 +4,7 @@ Status: Accepted.
 
 ## Context
 
-[REF-179](https://cleverhorizons.atlassian.net/browse/REF-179) introduces one standalone
+REF-179 introduces one standalone
 hierarchy per Community Dataset. Its structure must exist before optional custom Fields
 and values. Nodes retain their identities through renames and moves. Records defaults to
 a reference table containing every node, with Name, direct Parent and own applicable
