@@ -3317,7 +3317,7 @@ def create_flask_app(
     def review_source_formats(key: str, token: str):
         actor, login_session = require_authenticated()
         require_csrf(login_session.csrf_token)
-        with record_imports._operation(actor.id, login_session.id, key, token) as state:
+        with record_imports.source_format_review(actor.id, login_session.id, key, token) as state:
             if state.mapping is None:
                 raise NotFoundError("Import not found")
             column_count = len(state.mapping)

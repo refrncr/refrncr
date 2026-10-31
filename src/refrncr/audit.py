@@ -530,7 +530,7 @@ _audited(
 )
 _register(
     "DatasetRecordImportService",
-    "eligibility active state begin navigate select_worksheet "
+    "eligibility active state source_format_review begin navigate select_worksheet "
     "mapping_assistance format_assistance submitted_source_formats "
     "submitted_source_format_assistance preview saved_preview cancel revoke_session",
     "intentionally excluded",

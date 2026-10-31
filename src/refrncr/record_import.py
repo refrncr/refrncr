@@ -1137,7 +1137,7 @@ class DatasetRecordImportService:
         return state
 
     @contextmanager
-    def _operation(self, actor_id, session_id, dataset_key, token):
+    def source_format_review(self, actor_id, session_id, dataset_key, token):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
         with self.store._operation(token, actor_id, session_id, dataset.id) as state:
             state = self._validate_bound_state(state, dataset.id)
