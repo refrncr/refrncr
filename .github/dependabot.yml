@@ -5,15 +5,30 @@ updates:
     directory: "/tests/javascript"
     schedule:
       interval: "weekly"
+    groups:
+      playwright-toolchain:
+        patterns:
+          - "playwright*"
 
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
     groups:
+      pytest-toolchain:
+        patterns:
+          - "pytest*"
+      python-quality-tools:
+        patterns:
+          - "pre-commit"
+          - "ruff"
       python-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "pre-commit"
+          - "pytest*"
+          - "ruff"
 
   - package-ecosystem: "github-actions"
     directory: "/"
