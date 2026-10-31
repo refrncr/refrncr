@@ -6,6 +6,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 - Let cancelling a record or hierarchy import briefly wait for an in-progress
   operation, with a clear retry message if it cannot finish safely (REF-333).
+- Keep cancellation coordinated with active source-format previews, so leaving a
+  format field while cancelling cannot produce a missing-import error (REF-335).
 - Keep draft record pages within the phone viewport by anchoring visually hidden
   table labels inside their shared accessibility utility (REF-314).
 - Reload the authoritative access-management page after an uncertain export-access

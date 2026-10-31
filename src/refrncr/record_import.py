@@ -11,6 +11,7 @@ import time
 import unicodedata
 import zipfile
 from collections.abc import Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from datetime import time as datetime_time
@@ -365,6 +366,8 @@ class TransientImportStore:
         self.cancel_wait_seconds = cancel_wait_seconds
         self._states: dict[str, StagedImport] = {}
         self._expired: dict[str, tuple[str, str, str, float, str]] = {}
+        self._operations: dict[str, int] = {}
+        self._cancelling: set[str] = set()
         self._lock = threading.Lock()
         self._finished = threading.Condition(self._lock)
 
@@ -484,7 +487,16 @@ class TransientImportStore:
             return state
 
     def claim(self, state):
-        return self.update(state, busy=True)
+        with self._lock:
+            self._cleanup()
+            current = self._states.get(state.token)
+            if not self._same_state(current, state) or state.busy:
+                raise NotFoundError("Import not found")
+            if state.token in self._cancelling:
+                raise ConflictError("This import is being cancelled. Try again in a moment.")
+            claimed = replace(state, expires_at=self.clock() + self.ttl, busy=True)
+            self._states[state.token] = claimed
+            return claimed
 
     def finish(self, claimed, **changes):
         # A concurrent logout/expiry must never resurrect an import.
@@ -495,56 +507,107 @@ class TransientImportStore:
                 self._states[claimed.token] = replace(current, busy=False, **changes)
                 self._finished.notify_all()
 
-    def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
+    @contextmanager
+    def _operation(self, token, actor_id, session_id, dataset_id):
+        """Keep a staged import alive while a request derives work from it."""
         with self._lock:
+            self._cleanup()
+            state = self._states.get(token)
+            if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
+                actor_id,
+                session_id,
+                dataset_id,
+            ):
+                expired = self._expired.get(token)
+                if expired and expired[:3] == (actor_id, session_id, dataset_id):
+                    raise ImportExpiredError("Import expired")
+                raise NotFoundError("Import not found")
+            if token in self._cancelling:
+                raise ConflictError("This import is being cancelled. Try again in a moment.")
+            state = replace(state, expires_at=self.clock() + self.ttl)
+            self._states[token] = state
+            self._operations[token] = self._operations.get(token, 0) + 1
+        try:
+            yield state
+        finally:
+            with self._lock:
+                active = self._operations.get(token, 0) - 1
+                if active > 0:
+                    self._operations[token] = active
+                else:
+                    self._operations.pop(token, None)
+                self._finished.notify_all()
+
+    def consume(self, token, actor_id, session_id, dataset_id) -> StagedImport:
+        with self._finished:
             deadline = time.monotonic() + self.cancel_wait_seconds
-            while True:
-                self._cleanup()
-                state = self._states.get(token)
-                if state is None or (state.actor_id, state.session_id, state.dataset_id) != (
-                    actor_id,
-                    session_id,
-                    dataset_id,
-                ):
-                    expired = self._expired.get(token)
-                    if expired and expired[:3] == (actor_id, session_id, dataset_id):
-                        raise ImportExpiredError("Import expired")
-                    raise NotFoundError("Import not found")
-                if not state.busy:
-                    break
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise ConflictError(
-                        "This import is still processing. Try cancelling again in a moment."
-                    )
-                self._finished.wait(timeout=remaining)
-            self._states.pop(token)
-            return state
+            owns_cancellation = False
+            try:
+                while True:
+                    self._cleanup()
+                    state = self._states.get(token)
+                    if state is None or (
+                        state.actor_id,
+                        state.session_id,
+                        state.dataset_id,
+                    ) != (actor_id, session_id, dataset_id):
+                        expired = self._expired.get(token)
+                        if expired and expired[:3] == (actor_id, session_id, dataset_id):
+                            raise ImportExpiredError("Import expired")
+                        raise NotFoundError("Import not found")
+                    if not owns_cancellation:
+                        if token in self._cancelling:
+                            raise ConflictError(
+                                "This import is already being cancelled. Try again in a moment."
+                            )
+                        self._cancelling.add(token)
+                        owns_cancellation = True
+                    if not state.busy and not self._operations.get(token, 0):
+                        self._states.pop(token)
+                        return state
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise ConflictError(
+                            "This import is still processing. Try cancelling again in a moment."
+                        )
+                    self._finished.wait(timeout=remaining)
+            finally:
+                if owns_cancellation:
+                    self._cancelling.discard(token)
+                    self._finished.notify_all()
 
     def cancel(self, token, actor_id, session_id, dataset_id) -> None:
         self.consume(token, actor_id, session_id, dataset_id)
 
     def revoke_session(self, session_id: str) -> None:
         with self._lock:
-            for token in [
-                key for key, value in self._states.items() if value.session_id == session_id
-            ]:
+            tokens = [key for key, value in self._states.items() if value.session_id == session_id]
+            for token in tokens:
                 self._states.pop(token, None)
+                self._cancelling.discard(token)
             for token in [key for key, value in self._expired.items() if value[1] == session_id]:
                 self._expired.pop(token, None)
             self._finished.notify_all()
 
     def revoke_concept(self, concept_id):
         with self._lock:
-            for token in [k for k, state in self._states.items() if state.concept_id == concept_id]:
+            tokens = [k for k, state in self._states.items() if state.concept_id == concept_id]
+            for token in tokens:
                 self._states.pop(token, None)
+                self._cancelling.discard(token)
             for token in [key for key, value in self._expired.items() if value[4] == concept_id]:
                 self._expired.pop(token, None)
             self._finished.notify_all()
 
     def _cleanup(self):
         now = self.clock()
-        for token in [key for key, value in self._states.items() if value.expires_at <= now]:
+        for token in [
+            key
+            for key, value in self._states.items()
+            if value.expires_at <= now
+            and not self._operations.get(key, 0)
+            and key not in self._cancelling
+        ]:
             state = self._states.pop(token)
             self._expired[token] = (
                 state.actor_id,
@@ -1061,6 +1124,9 @@ class DatasetRecordImportService:
 
     def _bound_state(self, token, actor_id, session_id, dataset_id):
         state = self.store.get(token, actor_id, session_id, dataset_id)
+        return self._validate_bound_state(state, dataset_id)
+
+    def _validate_bound_state(self, state, dataset_id):
         with self.uow() as uow:
             concept = uow.concepts.get(dataset_id)
             if concept is None or state.concept_id != concept.id:
@@ -1069,6 +1135,15 @@ class DatasetRecordImportService:
             if state.mode == "new_version" and state.imported_count is None:
                 self._require_eligible(concept, uow=uow)
         return state
+
+    @contextmanager
+    def _operation(self, actor_id, session_id, dataset_key, token):
+        dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
+        with self.store._operation(token, actor_id, session_id, dataset.id) as state:
+            state = self._validate_bound_state(state, dataset.id)
+            if state.busy:
+                raise NotFoundError("Import not found")
+            yield state
 
     def active(self, actor_id, session_id, dataset_key):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
