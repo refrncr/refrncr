@@ -161,7 +161,8 @@ def test_current_and_historical_pages_use_only_snapshot_content(context):
     concept = request(owner_browser, "get", f"/datasets/{c.d.key}/concept/records")
     assert "Private value" in concept.text and "Draft" in concept.text
     historical = request(owner_browser, "get", f"/datasets/{c.d.key}/versions/{version.id}/records")
-    assert "Private" not in historical.text and "Edit" not in historical.text
+    assert "Private" not in historical.text
+    assert "Edit field" not in historical.text and "Add record" not in historical.text
 
 
 @pytest.mark.parametrize("format_name", ["csv", "xlsx", "json"])

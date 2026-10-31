@@ -218,10 +218,14 @@ async function closedWithFocus(page, opener) {
         exporter.waitForNavigation({waitUntil: 'load'}),
         exporter.getByRole('link', {name: `Version ${version}`, exact: true}).click(),
       ]);
+      const reportingGroup = exporter.locator('.export-menu-group', {hasText: 'Reporting table'});
       for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
         await exporter.locator('.export-menu summary').click();
         const promise = exporter.waitForEvent('download');
-        await exporter.getByRole('link', {name: label, exact: true}).click();
+        const link = label === 'JSON'
+          ? exporter.locator('.export-menu-group', {hasText: 'For systems'}).getByRole('link', {name: label, exact: true})
+          : reportingGroup.getByRole('link', {name: label, exact: true});
+        await link.click();
         const download = await promise;
         assert.equal(download.suggestedFilename(), `history-v${version}.${extension}`);
         assert.equal(await download.failure(), null);

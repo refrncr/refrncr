@@ -65,6 +65,11 @@ def test_access_policy_capabilities(installation_context, policy, role):
     assert auth.can_manage_export_access(actor.id, c.d.id) == can_manage
     assert auth.can_change_dataset_owner(actor.id, c.d.id) == (role == "admin")
     assert auth.can_maintain_dataset(actor.id, c.d.id) == (role in {"admin", "owner"})
+    browser, _csrf = dataset_version_client(c, actor)
+    dataset_page = request(browser, "get", f"/datasets/{c.d.key}/records").text
+    overview_page = request(browser, "get", "/").text
+    assert ("Export</summary>" in dataset_page) is can_export
+    assert ('class="dataset-card-foot"' in overview_page) is can_export
     if can_export:
         c.s.dataset_records.export_dataset(actor.id, c.d.key, "csv").content.close()
     else:
