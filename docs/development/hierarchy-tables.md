@@ -1,7 +1,7 @@
 # Standalone hierarchy tables (REF-179)
 
-Product scope and acceptance criteria remain in
-[REF-179](https://cleverhorizons.atlassian.net/browse/REF-179).
+REF-179 defines one standalone hierarchy per Community Dataset, with stable node identities,
+optional custom Fields and versioned publication alongside the Dataset.
 The persistence decision is [ADR-022](../architecture/adr-022-standalone-hierarchies.md).
 
 ## Workflow

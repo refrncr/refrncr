@@ -1,6 +1,6 @@
 # Audit coverage and contracts (REF-149)
 
-[REF-149](https://cleverhorizons.atlassian.net/browse/REF-149) owns event production and
+REF-149 owns event production and
 coverage for the current Community/core installation. The
 [coverage matrix](audit-coverage.json) is the authoritative current audit decision for every
 operation. The [functional inventory](audit-inventory.json) maps HTTP methods/routes, CLI commands,
@@ -40,7 +40,7 @@ audit records never contain exceptions, raw SQL or traces.
 
 Community remains installation-scoped, with no tenant/organisation columns or Cloud composition.
 Cloud tenant-specific audit isolation and SIEM/log shipping belong to `refrncr-cloud`.
-[REF-39](https://cleverhorizons.atlassian.net/browse/REF-39) adds administrator-only
+REF-39 adds administrator-only
 [audit-history presentation](audit-history.md), without before/after Record contents or Dataset
 descriptions. It preserves REF-149's contracts and introduces no retention infrastructure,
 tamper-evident ledger or audit API.
@@ -167,7 +167,7 @@ semantics. Automatic OPTIONS only describes routing and creates no event.
 
 ## REF-31 security audit implementation
 
-[REF-31](https://cleverhorizons.atlassian.net/browse/REF-31) implements centralized, durable security
+REF-31 implements centralized, durable security
 auditing in the existing `AuditEvent` history. Each relevant matrix row contains the disposition.
 Stable content-free events are `security.login_failed`, `security.session_rejected`,
 `security.authorization_denied`, `security.csrf_rejected` and

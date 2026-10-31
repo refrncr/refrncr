@@ -2,13 +2,13 @@
 
 Harmony Individual Contributor License Agreement, based on Version 1.0 of the Harmony template.
 
-Thank you for your interest in contributing to Refrncr, maintained by Clever Horizons B.V., trading
-as DataMisu ("We" or "Us").
+Thank you for your interest in contributing to Refrncr, maintained by DataMisu, a trading name of
+Clever Horizons B.V. ("We" or "Us").
 
 This contributor agreement ("Agreement") documents the rights granted by contributors to Us. To
 make this document effective, please agree to it by electronic submission, following the
 instructions in
-[CONTRIBUTING.md](https://github.com/refrncr/refrncr/blob/main/CONTRIBUTING.md#contributor-license-agreement).
+[CONTRIBUTING.md](CONTRIBUTING.md#contributor-license-agreement).
 This is a legally binding document, so please read it carefully before agreeing to it. The
 Agreement may cover more than one software project managed by Us.
 
@@ -19,7 +19,7 @@ Agreement may cover more than one software project managed by Us.
 "Contribution" means any work of authorship that is Submitted by You to Us in which You own or
 assert ownership of the Copyright. If You do not own the Copyright in the entire work of
 authorship, please follow the instructions in
-[CONTRIBUTING.md](https://github.com/refrncr/refrncr/blob/main/CONTRIBUTING.md#third-party-material).
+[CONTRIBUTING.md](CONTRIBUTING.md#third-party-material).
 
 "Copyright" means all rights protecting works of authorship owned or controlled by You, including
 copyright, moral and neighboring rights, as appropriate, for the full term of their existence

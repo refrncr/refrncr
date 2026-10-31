@@ -10,6 +10,12 @@ offer Refrncr to third parties as a hosted or managed service that gives them ac
 substantial set of its features, circumvent any license key functionality, or remove licensing
 and copyright notices. See [LICENSE](LICENSE) for the full terms.
 
+## Security
+
+Report suspected vulnerabilities privately to **security@refrncr.org**. See
+[SECURITY.md](SECURITY.md) for what to include and the responsible-disclosure process. Do not open
+a public issue, pull request or discussion for a suspected vulnerability.
+
 Third-party dependencies are not bundled: pip installs them separately from their own
 distributions, and they remain under their own licenses. This includes the PostgreSQL driver
 `psycopg`, which is licensed under the LGPL-3.0. Licenses for assets shipped with Refrncr are
@@ -80,9 +86,9 @@ refrncr start --database-url postgresql+psycopg://user:password@localhost/refrnc
 
 The corresponding environment variables are `REFRNCR_DATABASE_URL`, `REFRNCR_HOST`, and
 `REFRNCR_PORT`. `--database-path` is a convenient SQLite-only override; `--database-url` supports
-any configured SQLAlchemy database URL. PostgreSQL remains an alternative persistence profile
-handled by related stories rather than a quick-start requirement. Explicit trusted reverse proxies
-can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options or the comma-separated
+any configured SQLAlchemy database URL. SQLite is the zero-configuration default; PostgreSQL is
+supported for deployments that configure a PostgreSQL SQLAlchemy URL. Explicit trusted reverse
+proxies can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options or the comma-separated
 `REFRNCR_TRUSTED_PROXIES` environment variable; direct Community use requires no proxy setting.
 Configuring a trusted proxy disables plain-HTTP loopback cookies, so proxy deployments require
 HTTPS.

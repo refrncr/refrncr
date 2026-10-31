@@ -47,9 +47,9 @@ that sequence prevents the HTTP process from starting; no probe is then availabl
 
 After a successful start, `/readyz` detects a later database outage or revision
 change and returns `503`, while `/healthz` remains independent of the database.
-[REF-168](https://cleverhorizons.atlassian.net/browse/REF-168) owns any future
-separation of migration and server startup. REF-70 adds neither a migration command
-nor a change to quick-start/package behavior.
+Migration and server startup intentionally remain one sequence. REF-168 records the possible
+future separation; REF-70 adds neither a migration command nor a change to quick-start/package
+behavior.
 
 ## Request IDs
 

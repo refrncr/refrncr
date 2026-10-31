@@ -1,8 +1,8 @@
 # Overview
 
 REF-238 replaces the sign-in landing dataset list with an attention overview, four recently
-visited datasets and four recently created readable datasets. Product decisions remain in
-[Jira REF-238](https://cleverhorizons.atlassian.net/browse/REF-238).
+visited datasets and four recently created readable datasets. The overview is an authorized,
+installation-local projection and does not introduce a separate activity feed or Cloud service.
 
 ## Service and authorization
 
