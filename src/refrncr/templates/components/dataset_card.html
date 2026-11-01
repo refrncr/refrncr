@@ -38,7 +38,7 @@
       {% if card.reasons|length > 1 %}<p class="dataset-card-more">+{{ card.reasons|length - 1 }} more: {% for extra in card.reasons if extra != reason %}{{ extra.label }}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
     </div>
   {% endif %}
-  {% if export and card.may_export %}<div class="dataset-card-foot">{{ export_action(dataset=dataset, version_state={'version': card.version}, label='Export', may_export=card.may_export) }}</div>{% endif %}
+  {% if export and card.may_export %}<div class="dataset-card-foot">{{ export_action(dataset=dataset, version_state={'version': card.version}, label='Export', may_export=card.may_export, may_import=card.may_maintain) }}</div>{% endif %}
 </article>
 {%- endmacro %}
 

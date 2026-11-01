@@ -39,6 +39,9 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
         'For systems › Same structure as the API JSON',
       ],
     };
+    const exportOnlyGroupText = Object.fromEntries(
+      Object.entries(groupText).map(([kind, groups]) => [kind, [groups[0], groups[2]]]),
+    );
     async function assertMenu(path, kind, label) {
       await page.goto(base + path);
       const action = page.locator('.export-menu').filter({has: page.getByText(label, {exact: true})});
@@ -59,6 +62,8 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await assertMenu(`/datasets/${key}/concept/records`, kind, 'Export draft');
       await assertMenu(`/datasets/${key}/records`, kind, 'Export');
     }
+    await assertMenu('/datasets/row-check/concept', 'reference', 'Export draft');
+    await assertMenu('/datasets/row-check', 'reference', 'Export');
     console.log('PASS: reference, mapping and hierarchy share grouped draft and published menus');
     for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
       await page.goto(base + '/datasets/row-check/records');
@@ -123,6 +128,41 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     );
     assert.equal(await cardExport.locator('summary').innerText(), 'Export');
     console.log('PASS: dataset card uses the same export menu as the published dataset page');
+    const exportOnly = await browser.newContext();
+    const exportOnlyPage = await exportOnly.newPage();
+    await login(exportOnlyPage, 'exporter-only@example.com');
+    async function assertExportOnlyMenu(path, kind) {
+      await exportOnlyPage.goto(base + path);
+      const action = exportOnlyPage.locator('.export-menu')
+        .filter({has: exportOnlyPage.getByText('Export', {exact: true})});
+      await action.locator('summary').click();
+      assert.deepEqual(
+        (await action.locator('.export-menu-group').allInnerTexts())
+          .map(text => text.replace(/\s+/g, ' ').trim()),
+        exportOnlyGroupText[kind],
+      );
+      assert.equal(await action.getByText('File for editing', {exact: true}).count(), 0);
+    }
+    for (const [kind, key] of [
+      ['reference', 'row-check'],
+      ['mapping', 'mapping-check'],
+      ['hierarchy', 'reporting-check'],
+    ]) {
+      await assertExportOnlyMenu(`/datasets/${key}/records`, kind);
+      const draft = await exportOnlyPage.goto(`${base}/datasets/${key}/concept/records`);
+      assert.equal(draft.status(), 404, 'export-only users cannot view a draft');
+    }
+    await assertExportOnlyMenu('/datasets/row-check', 'reference');
+    await exportOnlyPage.goto(base + '/');
+    const exportOnlyCard = exportOnlyPage.locator('.dataset-card[data-dataset-key="row-check"]');
+    await exportOnlyCard.locator('.dataset-card-foot .export-menu summary').click();
+    assert.deepEqual(
+      (await exportOnlyCard.locator('.export-menu-group').allInnerTexts())
+        .map(text => text.replace(/\s+/g, ' ').trim()),
+      exportOnlyGroupText.reference,
+    );
+    console.log('PASS: export-only user sees reporting/system groups on pages and card, but no editing group or draft');
+    await exportOnly.close();
     const denied = await browser.newContext();
     const deniedPage = await denied.newPage();
     await login(deniedPage, 'row@example.com');

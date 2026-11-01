@@ -2250,6 +2250,7 @@ def create_flask_app(
             version_state=view.state,
             may_cancel_scheduled=view.may_maintain,
             may_export=view.may_export,
+            may_import=view.may_maintain,
             may_edit=view.state is None and view.may_maintain,
             may_view_access=view.may_maintain,
             may_change_owner=authorization.datasets.can_change_dataset_owner(
@@ -2782,6 +2783,7 @@ def create_flask_app(
             may_edit=may_edit,
             may_add_record=may_add_record,
             may_export=view.may_export,
+            may_import=view.may_maintain,
             version_state=view.state,
             may_cancel_scheduled=view.may_maintain,
             may_view_access=view.may_maintain,

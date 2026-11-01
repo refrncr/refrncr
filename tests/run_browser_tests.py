@@ -18,7 +18,7 @@ CASES = {
     "access_management": ("table_rows", 5144),
     "api_docs": ("rest_api", 5147),
     "api_keys": ("api_keys", 5140),
-    "audit_export": ("table_rows", 5144),
+    "audit_export": ("audit_export", 5144),
     "audit_history": ("audit_history", 5145),
     "audit_minutes": ("audit_history", 5145),
     "concept": ("concept", 5185),
