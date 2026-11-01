@@ -835,7 +835,14 @@ _register(
 
 _register(
     "DatasetVersionService",
-    "read_current read_versions",
+    "read_current",
+    "intentionally excluded",
+    module="dataset_versions",
+    rationale="Authorized bounded Current read; no per-request durable success audit.",
+)
+_register(
+    "DatasetVersionService",
+    "read_versions",
     "intentionally excluded",
     module="dataset_versions",
     rationale="Authorized bounded published-version reads; no per-request durable success audit.",

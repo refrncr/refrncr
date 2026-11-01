@@ -1421,6 +1421,17 @@
       ]
     },
     {
+      "symbol": "refrncr.api.routes.dataset_versions",
+      "path": "/datasets/{dataset_key}/versions",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_versions"
+      ]
+    },
+    {
       "symbol": "refrncr.api.routes.records",
       "path": "/datasets/{dataset_key}/records",
       "methods": [
