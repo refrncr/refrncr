@@ -69,6 +69,7 @@ class OverviewCard:
     record_count: int
     last_updated: object
     has_draft: bool
+    may_maintain: bool = False
     reasons: list[AttentionReason] = field(default_factory=list)
     may_export: bool = False
 
@@ -180,6 +181,7 @@ class OverviewService:
                     hierarchy_counts.get(version.id, version.record_count) if version else 0,
                     version.published_at if version else dataset.created_at,
                     dataset.id in concepts,
+                    dataset.id in maintain,
                 )
             owned = [
                 card for card in cards.values() if all_owners or card.dataset.owner_team_id in teams
