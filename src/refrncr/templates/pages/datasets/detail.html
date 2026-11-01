@@ -27,7 +27,7 @@
     <div class='page-actions record-page-actions'>
       {% if not version_state %}{{ current_version_action(dataset.key, concept_ui and concept_ui.has_current) }}{% endif %}
       {{ versions_action(dataset.key) }}
-      {{ export_action(dataset, version_state, may_export, 'Export draft' if not version_state else 'Export') }}
+      {{ export_action(dataset=dataset, version_state=version_state, label='Export draft' if not version_state else 'Export', may_export=may_export) }}
       {% if may_start_concept %}{{ new_concept(dataset.key, 'Create draft') }}{% endif %}
       {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
     </div>

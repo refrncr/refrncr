@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Give reference, mapping and hierarchy exports the same purpose-based menu, with grouped
+  reporting, editing and system formats on dataset pages and overview cards (REF-336).
 - Let cancelling a record or hierarchy import briefly wait for an in-progress
   operation, with a clear retry message if it cannot finish safely (REF-333).
 - Keep cancellation coordinated with active source-format previews, so leaving a

@@ -1,10 +1,11 @@
 """Disposable in-memory app for the optional REF-144 browser regression script."""
 
-from dataset_helpers import create_owned_dataset, publish_dataset
+from dataset_helpers import create_mapping_dataset, create_owned_dataset, publish_dataset
 from support import _dataset_browser as dataset_browser
 from support import create_dataset, create_field
 
 from refrncr.api_keys import ApiKeyService
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.web import create_flask_app
 
 _factory, s, admin, _ = dataset_browser()
@@ -57,6 +58,15 @@ for key, name in (("region", "Region"), ("manager", "Manager")):
     s.dataset_fields.create_field(
         admin.id, hierarchy.key, key, name, "string", hierarchy_scope="all_nodes"
     )
+hierarchy_revision = s.datasets.get_dataset(admin.id, hierarchy.key).revision
+s.dataset_versions.publish(admin.id, hierarchy.id, SYSTEM_CLOCK.today(), "", hierarchy_revision)
+s.dataset_versions.create_concept(admin.id, hierarchy.id)
+mapping = create_mapping_dataset(
+    s, admin, "mapping-check", "Mapping check", records=("ITEM-00", "ITEM-01")
+)
+s.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+publish_dataset(s, admin.id, mapping)
+s.dataset_versions.create_concept(admin.id, mapping.id)
 create_dataset(s, admin, "empty-check", "Empty check")
 create_dataset(s, admin, "long-check", "Long" * 18 + " <img src=x onerror=alert(1)>")
 s.teams.create_team(admin.id, "Row team")

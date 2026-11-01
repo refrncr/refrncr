@@ -22,11 +22,50 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
       await target.waitForURL(base + '/');
     }
     await login(page, 'admin@example.com');
+    const groupText = {
+      reference: [
+        'Reporting table › Ready for BI tools and pivot tables Excel CSV',
+        'File for editing › Edit the records and import them again Excel',
+        'For systems › Same structure as the API JSON',
+      ],
+      mapping: [
+        'Reporting table › Ready for BI tools and pivot tables Excel CSV',
+        'File for editing › Edit the mappings and import them again Excel',
+        'For systems › Same structure as the API JSON',
+      ],
+      hierarchy: [
+        'Reporting table › Ready for BI tools and pivot tables Excel CSV',
+        'File for editing › Edit the hierarchy and import it again Excel',
+        'For systems › Same structure as the API JSON',
+      ],
+    };
+    async function assertMenu(path, kind, label) {
+      await page.goto(base + path);
+      const action = page.locator('.export-menu').filter({has: page.getByText(label, {exact: true})});
+      await action.locator('summary').click();
+      const groups = action.locator('.export-menu-group');
+      assert.equal(await groups.count(), 3, `${kind} ${path} has three export groups`);
+      assert.deepEqual(
+        (await groups.allInnerTexts()).map(text => text.replace(/\s+/g, ' ').trim()),
+        groupText[kind],
+      );
+      return action;
+    }
+    for (const [kind, key] of [
+      ['reference', 'row-check'],
+      ['mapping', 'mapping-check'],
+      ['hierarchy', 'reporting-check'],
+    ]) {
+      await assertMenu(`/datasets/${key}/concept/records`, kind, 'Export draft');
+      await assertMenu(`/datasets/${key}/records`, kind, 'Export');
+    }
+    console.log('PASS: reference, mapping and hierarchy share grouped draft and published menus');
     for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
       await page.goto(base + '/datasets/row-check/records');
       await page.locator('.export-menu summary').click();
       const pending = page.waitForEvent('download');
-      await page.getByRole('link', {name: label, exact: true}).click();
+      const group = label === 'JSON' ? 2 : 0;
+      await page.locator('.export-menu-group').nth(group).getByRole('link', {name: label, exact: true}).click();
       const download = await pending;
       assert.equal(await download.failure(), null);
       assert(download.suggestedFilename().endsWith('.' + extension));
@@ -48,13 +87,15 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     const menu = hierarchyExport.locator('.export-menu-options');
     assert.match(await menu.innerText(), /Reporting table ›\s+Ready for BI tools and pivot tables/);
     assert.match(await menu.innerText(), /File for editing ›\s+Edit the hierarchy and import it again/);
-    assert.equal(await menu.getByRole('link', {name: 'JSON', exact: true}).count(), 0);
+    assert.match(await menu.innerText(), /For systems ›\s+Same structure as the API/);
+    assert.equal(await menu.getByRole('link', {name: 'JSON', exact: true}).count(), 1);
     assert.equal((await menu.innerText()).includes('Copy API link'), false);
     const groups = menu.locator('.export-menu-group');
     for (const [groupIndex, label, filename] of [
       [0, 'Excel', 'reporting-check-concept-reporting.xlsx'],
       [0, 'CSV', 'reporting-check-concept-reporting.csv'],
       [1, 'Excel', 'reporting-check.xlsx'],
+      [2, 'JSON', 'reporting-check.json'],
     ]) {
       const pending = page.waitForEvent('download');
       await groups.nth(groupIndex).getByRole('link', {name: label, exact: true}).click();
@@ -69,7 +110,19 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     await page.reload();
     await hierarchyExport.locator('summary').click();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-    console.log('PASS: hierarchy export menu exposes reporting CSV/Excel and editable Excel only');
+    console.log('PASS: hierarchy menu keeps reporting/editing variants and exposes its existing JSON export');
+    await page.goto(base + '/datasets/row-check/records');
+    await page.goto(base + '/');
+    const card = page.locator('.dataset-card[data-dataset-key="row-check"]');
+    const cardExport = card.locator('.dataset-card-foot .export-menu');
+    await cardExport.locator('summary').click();
+    assert.deepEqual(
+      (await cardExport.locator('.export-menu-group').allInnerTexts())
+        .map(text => text.replace(/\s+/g, ' ').trim()),
+      groupText.reference,
+    );
+    assert.equal(await cardExport.locator('summary').innerText(), 'Export');
+    console.log('PASS: dataset card uses the same export menu as the published dataset page');
     const denied = await browser.newContext();
     const deniedPage = await denied.newPage();
     await login(deniedPage, 'row@example.com');

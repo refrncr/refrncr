@@ -9,7 +9,7 @@ from threading import Barrier, Event
 from types import SimpleNamespace
 
 import pytest
-from dataset_helpers import create_owned_dataset
+from dataset_helpers import create_mapping_dataset, create_owned_dataset
 from openpyxl import Workbook
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
@@ -315,6 +315,38 @@ def test_import_service_exposes_mapping_and_source_format_error_codes(import_con
     assert [(issue.code, issue.column_index) for issue in issues] == [
         ("source_format_incomplete", 1)
     ]
+
+
+def test_exported_mapping_excel_round_trips_through_import(import_context):
+    _, services, admin, _reference = import_context
+    mapping = create_mapping_dataset(
+        services, admin, "mapping-roundtrip", "Mapping roundtrip", records=("A", "B")
+    )
+    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
+    first_mapping = services.dataset_records.list_records(admin.id, mapping.key).records[0]
+    services.dataset_records.update_record(
+        admin.id, mapping.key, first_mapping.id, first_mapping.revision, {"target": "Mapped"}
+    )
+
+    artifact = services.dataset_records.export_dataset(
+        admin.id, mapping.key, "xlsx", prefer_concept=True
+    )
+    try:
+        workbook = artifact.content.read()
+    finally:
+        artifact.content.close()
+    state, _, advice = services.record_imports.begin(
+        admin.id, "roundtrip-mapping", mapping.key, artifact.download_name, workbook
+    )
+    preview = services.record_imports.preview(
+        admin.id, "roundtrip-mapping", mapping.key, state.token, advice.mapping
+    )
+    assert preview.valid, preview.errors
+    assert {key: preview.counts[key] for key in ("Added", "Changed", "Deleted")} == {
+        "Added": 0,
+        "Changed": 0,
+        "Deleted": 0,
+    }
 
 
 def test_submitted_format_helpers_require_a_bound_import_state(import_context):

@@ -107,7 +107,7 @@ def test_hierarchy_pages_show_export_menu(dataset_browser):
     )
     assert f"/datasets/{dataset.key}/concept/records/export?format=xlsx" in page
     assert "format=csv_zip" not in page
-    assert "format=json" not in page
+    assert f"/datasets/{dataset.key}/concept/records/export?format=json" in page
     assert "Copy API link" not in page
     export = request(
         client,
