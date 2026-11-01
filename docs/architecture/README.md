@@ -26,3 +26,4 @@ decision rather than duplicating the backlog.
 - [ADR-022: Standalone hierarchies](adr-022-standalone-hierarchies.md)
 - [ADR-023: UTC-aware database time and a shared application clock](adr-023-utc-aware-database-time.md)
 - [ADR-024: Pinned mapping source versions](adr-024-pinned-mapping-sources.md)
+- [ADR-025: Record validity periods for consumers](adr-025-record-validity-periods.md)
