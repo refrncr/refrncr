@@ -33,6 +33,7 @@ from refrncr.api.contracts import (
     RecordDetail,
     SelectionQuery,
     SourceMetadata,
+    VersionListItem,
     VersionMetadata,
 )
 from refrncr.api.documentation import (
@@ -63,6 +64,10 @@ def _version(publication):
         if publication.source
         else None,
     )
+
+
+def _listed_version(publication):
+    return VersionListItem(**_version(publication).model_dump(), status=publication.status)
 
 
 def _dataset(publication):
@@ -125,9 +130,9 @@ def _hierarchy_record(record, fields, nodes_by_id, paths):
     )
 
 
-def _query(request, collection, *, lookup=False):
+def _query(request, collection, *, lookup=False, selectors=True):
     pairs = list(request.query_params.multi_items())
-    allowed = {"effective_date", "version"}
+    allowed = {"effective_date", "version"} if selectors else set()
     if collection:
         allowed |= {"offset", "limit"}
     if lookup:
@@ -153,13 +158,16 @@ def _query(request, collection, *, lookup=False):
                 raise ValidationError("Invalid request")
             values[key] = int(value)
     values.pop("source", None)
-    if collection:
+    if collection and selectors:
         query = CollectionQuery(**values)
+        page = query
+    elif collection:
+        query = PageQuery(**values)
         page = query
     else:
         query = SelectionQuery(**values)
         page = PageQuery()
-    return page, query.effective_date, query.version
+    return page, getattr(query, "effective_date", None), getattr(query, "version", None)
 
 
 def _pagination(page, total, path, effective_date=None, version_number=None):
@@ -249,7 +257,10 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
 
     def read(request, actor, kind, key=None, identifier=None, source=None):
         page, effective_date, version_number = _query(
-            request, kind in {"datasets", "records"}, lookup=kind == "lookup"
+            request,
+            kind in {"datasets", "records", "versions"},
+            lookup=kind == "lookup",
+            selectors=kind != "versions",
         )
         condition = ConditionalRead(
             request,
@@ -262,23 +273,37 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
             version_number=version_number,
             clock=clock,
         )
-        result = versions.read_current(
-            actor.id,
-            key,
-            offset=page.offset,
-            limit=page.limit,
-            records=kind == "records",
-            identifier=identifier,
-            source=source,
-            unchanged=condition,
-            effective_date=effective_date,
-            version_number=version_number,
-            hierarchy=kind == "hierarchy",
-            allow_hierarchy=True,
-        )
+        if kind == "versions":
+            result = versions.read_versions(
+                actor.id,
+                key,
+                offset=page.offset,
+                limit=page.limit,
+                unchanged=condition,
+            )
+        else:
+            result = versions.read_current(
+                actor.id,
+                key,
+                offset=page.offset,
+                limit=page.limit,
+                records=kind == "records",
+                identifier=identifier,
+                source=source,
+                unchanged=condition,
+                effective_date=effective_date,
+                version_number=version_number,
+                hierarchy=kind == "hierarchy",
+                allow_hierarchy=True,
+            )
         if result.not_modified:
             return Response(status_code=304, headers=condition.headers)
-        if kind == "datasets":
+        if kind == "versions":
+            payload = Collection[VersionListItem](
+                data=tuple(_listed_version(p) for p in result.publications),
+                **_pagination(page, result.total, f"/api/v1/datasets/{key}/versions"),
+            )
+        elif kind == "datasets":
             payload = Collection[Dataset](
                 data=tuple(_dataset(p) for p in result.publications),
                 **_pagination(
@@ -444,6 +469,26 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
         selection: Annotated[SelectionQuery, Depends()] = None,
     ):
         return read(request, actor, "dataset", dataset_key)
+
+    @app.get(
+        "/datasets/{dataset_key}/versions",
+        response_model=Collection[VersionListItem],
+        responses=errors,
+        summary="List published Dataset versions",
+        tags=["Published data"],
+        openapi_extra=conditional,
+        description=(
+            "Non-cancelled publications ordered by effective_from and version number, "
+            "including Scheduled versions. Offset pagination; no version selector."
+        ),
+    )
+    def dataset_versions(
+        request: Request,
+        dataset_key: str,
+        actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        page: Annotated[PageQuery, Depends()] = None,
+    ):
+        return read(request, actor, "versions", dataset_key)
 
     @app.get(
         "/datasets/{dataset_key}/records",

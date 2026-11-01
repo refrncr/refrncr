@@ -94,6 +94,7 @@ class ConditionalRead:
                 p.valid_until.isoformat() if p.valid_until else None,
                 (p.source.dataset_key, p.source.version) if p.source else None,
             )
+            + ((p.status,) if p.status is not None else ())
             for p in publications
         ]
         etag = (
@@ -138,7 +139,7 @@ class ConditionalRead:
             return False
         # Collection deletion/page membership and independently mutable metadata cannot
         # be proven unchanged by a publication date. ETags cover both exactly.
-        if self.selection[2] == "datasets" or any(
+        if self.selection[2] in {"datasets", "versions"} or any(
             p.metadata_updated_at > since
             or datetime.combine(p.version.effective_date, datetime.min.time(), UTC) > since
             for p in publications

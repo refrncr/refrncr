@@ -104,6 +104,17 @@ def test_typed_lookup_matches_record_detail_and_preserves_unmapped_rows(mapping_
         assert lookup(m, "01001").json() == lookup(m, "1001").json()
 
 
+def test_mapping_version_list_includes_source(mapping_api):
+    m = mapping_api
+    response = m.c.client.get(f"/api/v1/datasets/{m.mapping.key}/versions", headers=m.c.headers)
+
+    assert response.status_code == 200
+    assert response.json()["data"][0]["source"] == {
+        "dataset_key": m.source.key,
+        "version": m.source_version.number,
+    }
+
+
 def test_lookup_invalid_unknown_and_missing_source(mapping_api):
     m = mapping_api
     assert lookup(m, "9999").status_code == 404

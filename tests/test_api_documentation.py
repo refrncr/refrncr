@@ -18,6 +18,7 @@ from refrncr.api.contracts import (
     HierarchyResponse,
     RecordCollection,
     RecordDetail,
+    VersionListItem,
 )
 from refrncr.api.http import SAFE_HEADERS
 from refrncr.api.routes import create_api
@@ -26,6 +27,7 @@ from refrncr.models import AuditEvent
 DATA_PATHS = {
     "/api/v1/datasets": Collection[Dataset],
     "/api/v1/datasets/{dataset_key}": Detail[DatasetDetail],
+    "/api/v1/datasets/{dataset_key}/versions": Collection[VersionListItem],
     "/api/v1/datasets/{dataset_key}/records": RecordCollection | HierarchyRecordCollection,
     "/api/v1/datasets/{dataset_key}/records/{identifier}": RecordDetail,
     "/api/v1/datasets/{dataset_key}/lookup": RecordDetail,
@@ -102,8 +104,8 @@ def test_schema_matches_registered_routes_and_contracts(api):
             }
         params = {p["name"]: p for p in op["parameters"]}
         assert params["If-None-Match"]["in"] == params["If-Modified-Since"]["in"] == "header"
-        collection = path.endswith(("datasets", "records"))
-        expected_query = {"effective_date", "version"}
+        collection = path.endswith(("datasets", "records", "versions"))
+        expected_query = set() if path.endswith("versions") else {"effective_date", "version"}
         if collection:
             expected_query |= {"offset", "limit"}
         if path.endswith("/lookup"):
@@ -116,14 +118,15 @@ def test_schema_matches_registered_routes_and_contracts(api):
             RecordDetail.model_validate(example)
             assert example["data"]["values"] == {"code": 1001, "target": "AMS-SALES"}
         assert {n for n, p in params.items() if p["in"] == "query"} == expected_query
-        effective_date = params["effective_date"]
-        assert "YYYY-MM-DD" in effective_date["description"]
-        assert "2026-09-30" in effective_date["description"]
-        assert effective_date["schema"]["anyOf"][0] == {
-            "type": "string",
-            "format": "date",
-        }
-        assert effective_date["example"] == "2026-09-30"
+        if not path.endswith("versions"):
+            effective_date = params["effective_date"]
+            assert "YYYY-MM-DD" in effective_date["description"]
+            assert "2026-09-30" in effective_date["description"]
+            assert effective_date["schema"]["anyOf"][0] == {
+                "type": "string",
+                "format": "date",
+            }
+            assert effective_date["example"] == "2026-09-30"
         if collection:
             for name, default, lower, upper in [
                 ("offset", 0, 0, 2147483647),
@@ -150,6 +153,15 @@ def test_schema_matches_registered_routes_and_contracts(api):
         "effective_to",
         "source",
     }
+    assert set(models["VersionListItem"]["properties"]) == {
+        *models["VersionMetadata"]["properties"],
+        "status",
+    }
+    assert models["VersionListItem"]["properties"]["status"]["enum"] == [
+        "Current",
+        "Scheduled",
+        "Expired",
+    ]
     for response_model in ("Dataset", "RecordCollection", "RecordDetail"):
         assert "version" in models[response_model]["properties"]
         assert "current_version" not in models[response_model]["properties"]

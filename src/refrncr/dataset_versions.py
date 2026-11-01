@@ -339,6 +339,69 @@ class DatasetVersionService:
                 ),
             )
 
+    def read_versions(self, actor_id, key, *, offset=0, limit=50, unchanged=None):
+        """List non-cancelled publications in effective-period order."""
+        if type(offset) is not int or not 0 <= offset <= 2147483647:
+            raise ValidationError("Invalid pagination")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValidationError("Invalid pagination")
+        try:
+            key = validate_dataset_key(key)
+        except ValidationError:
+            raise NotFoundError("Dataset not found") from None
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(key)
+            if dataset is None or not self.authorization.can_export_dataset(
+                actor_id, dataset.id, uow=uow
+            ):
+                raise NotFoundError("Dataset not found")
+            states = tuple(
+                state
+                for state in version_states(
+                    uow.versions.list_for_dataset(dataset.id), self.clock.today()
+                )
+                if state.status != "Cancelled"
+            )
+            if not states:
+                raise NotFoundError("Dataset not found")
+            states = tuple(
+                sorted(
+                    states,
+                    key=lambda state: (state.version.effective_date, state.version.number),
+                )
+            )
+            total = len(states)
+            states = states[offset : offset + limit]
+            sources = uow.versions.source_references(
+                tuple(
+                    state.version.source_version_id
+                    for state in states
+                    if dataset.kind == "mapping" and state.version.source_version_id
+                )
+            )
+            result = CurrentRead(
+                tuple(
+                    CurrentPublication(
+                        dataset.key,
+                        dataset.name,
+                        dataset.description,
+                        dataset.icon,
+                        dataset.kind,
+                        dataset.updated_at,
+                        state.version,
+                        state.valid_until,
+                        sources.get(state.version.source_version_id),
+                        state.status,
+                    )
+                    for state in states
+                ),
+                total,
+            )
+            if unchanged is not None and unchanged(result):
+                return replace(result, not_modified=True)
+            return result
+
     def _discard_review(self, uow, actor_id, dataset):
         from refrncr.services import _require_concept
 

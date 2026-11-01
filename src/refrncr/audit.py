@@ -841,6 +841,13 @@ _register(
     rationale="Authorized bounded Current read; no per-request durable success audit.",
 )
 _register(
+    "DatasetVersionService",
+    "read_versions",
+    "intentionally excluded",
+    module="dataset_versions",
+    rationale="Authorized bounded published-version reads; no per-request durable success audit.",
+)
+_register(
     "DatasetAuthorizationService",
     "viewable_resources",
     "intentionally excluded",

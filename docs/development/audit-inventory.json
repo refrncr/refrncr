@@ -27,6 +27,7 @@
     "refrncr.dataset_versions.DatasetVersionService.publish",
     "refrncr.dataset_versions.DatasetVersionService.read",
     "refrncr.dataset_versions.DatasetVersionService.read_current",
+    "refrncr.dataset_versions.DatasetVersionService.read_versions",
     "refrncr.dataset_versions.DatasetVersionService.review",
     "refrncr.dataset_versions.DatasetVersionService.review_discard",
     "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
@@ -1417,6 +1418,17 @@
         "refrncr.api_keys.ApiKeyService.authenticate",
         "refrncr.dataset_versions.DatasetVersionService.read_current",
         "refrncr.services.DatasetAuthorizationService.exportable_resources"
+      ]
+    },
+    {
+      "symbol": "refrncr.api.routes.dataset_versions",
+      "path": "/datasets/{dataset_key}/versions",
+      "methods": [
+        "GET"
+      ],
+      "operations": [
+        "refrncr.api_keys.ApiKeyService.authenticate",
+        "refrncr.dataset_versions.DatasetVersionService.read_versions"
       ]
     },
     {

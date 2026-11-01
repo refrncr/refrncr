@@ -6004,6 +6004,7 @@
         "Trusted programmatic caller",
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
+        "refrncr.api.routes.dataset_versions GET /datasets/{dataset_key}/versions",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
         "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
         "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy",
@@ -6087,6 +6088,38 @@
       "implementation_status": "REF-107 local implementation; validation recorded in the archived REF-107 report.",
       "exclusion_reason": "Authorized bounded Current read; no per-request durable success audit.",
       "persistence_scope": "Dataset version tables and existing append-only AuditEvent."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "read_versions",
+      "service": "refrncr.dataset_versions.DatasetVersionService.read_versions",
+      "interface_entrypoints": [
+        "refrncr.api.routes.dataset_versions GET /datasets/{dataset_key}/versions"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no driver details, Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; export authorization is rechecked in the read snapshot.",
+      "allowed_context": {},
+      "success": "Bounded published-version list after current export authorization; no domain event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "The export snapshot supplies one consistent version-state view.",
+      "no_op": "An empty page is returned without mutation or event.",
+      "rollback": "Read-only snapshot ends without domain persistence.",
+      "duplicate_retry": "Read-only operation; repeated requests remain safe and are covered by conditional caching.",
+      "tests": [
+        "tests/test_rest_api.py::test_version_list_status_sort_pagination_etag_and_authorization",
+        "tests/test_mapping_lookup_api.py::test_mapping_version_list_includes_source"
+      ],
+      "implementation_status": "REF-341 implemented and covered by the API regression suite.",
+      "exclusion_reason": "Authorized bounded published-version reads; no per-request durable success audit.",
+      "persistence_scope": "Read-only Dataset version snapshot; no domain persistence."
     },
     {
       "capability": "DatasetAuthorizationService",
