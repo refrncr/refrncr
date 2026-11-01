@@ -12,9 +12,10 @@ and copyright notices. See [LICENSE](LICENSE) for the full terms.
 
 ## Security
 
-Report suspected vulnerabilities privately to **security@refrncr.org**. See
-[SECURITY.md](SECURITY.md) for what to include and the responsible-disclosure process. Do not open
-a public issue, pull request or discussion for a suspected vulnerability.
+Report suspected vulnerabilities privately through the process in
+[SECURITY.md](SECURITY.md). It explains the preferred confidential channel, what to include
+and the coordinated-disclosure process. Do not open a public issue, pull request or discussion
+for a suspected vulnerability.
 
 Third-party dependencies are not bundled: pip installs them separately from their own
 distributions, and they remain under their own licenses. This includes the PostgreSQL driver
