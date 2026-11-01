@@ -1,10 +1,12 @@
 """Editable hierarchy workbook import behavior."""
 
+import io
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from threading import Event
 
 import pytest
+from openpyxl import load_workbook
 from support import revision
 
 from refrncr.dataset_export import generate_export
@@ -44,6 +46,83 @@ def imported_nodes(*items):
 def stored_nodes(c):
     with c.s.hierarchy.uow() as uow:
         return tuple(uow.hierarchy.list_for_dataset(c.d.id))
+
+
+def exported(c, format_name):
+    artifact = c.s.dataset_records.export_dataset(c.a.id, c.d.key, format_name, prefer_concept=True)
+    try:
+        return artifact.download_name, artifact.content.read()
+    finally:
+        artifact.content.close()
+
+
+def changed_workbook(content, field_key, value):
+    workbook = load_workbook(io.BytesIO(content))
+    try:
+        worksheet = workbook["Data"]
+        headers = [cell.value for cell in worksheet[1]]
+        worksheet.cell(2, headers.index(field_key) + 1, value)
+        target = io.BytesIO()
+        workbook.save(target)
+        return target.getvalue()
+    finally:
+        workbook.close()
+
+
+def test_exported_hierarchy_excel_round_trips_and_detects_one_change(database_context):
+    c = database_context
+    root = prepare(c)
+    branch = node(c, "Branch", root)
+    leaf = node(c, "Leaf", branch)
+    for key, name, data_type in (
+        ("valid_on", "Valid on", "date"),
+        ("opens_at", "Opens at", "time"),
+    ):
+        c.s.dataset_fields.create_field(
+            c.a.id, c.d.key, key, name, data_type, hierarchy_scope="all_nodes"
+        )
+    for index, item in enumerate((root, branch, leaf), start=1):
+        c.s.hierarchy.update_values(
+            c.a.id,
+            c.d.key,
+            item.id,
+            {
+                "valid_on": f"2026-0{index}-0{index + 1}",
+                "opens_at": f"0{index}:30:00",
+            },
+            expected_revision=revision(c),
+        )
+
+    filename, content = exported(c, "xlsx")
+    service = c.s.hierarchy_imports
+    state = service.begin(c.a.id, "hierarchy-same", c.d.key, filename, content)
+    preview = service.preview(c.a.id, "hierarchy-same", c.d.key, state.token)
+    service.cancel(c.a.id, "hierarchy-same", c.d.key, state.token)
+    assert preview.valid
+    assert (preview.additions, preview.edits, preview.moves, preview.removals) == (0, 0, 0, 0)
+    assert preview.unchanged == 3
+
+    state = service.begin(
+        c.a.id,
+        "hierarchy-changed",
+        c.d.key,
+        filename,
+        changed_workbook(content, "valid_on", "2027-12-31"),
+    )
+    preview = service.preview(c.a.id, "hierarchy-changed", c.d.key, state.token)
+    assert preview.valid
+    assert (preview.additions, preview.edits, preview.moves, preview.removals) == (0, 1, 0, 0)
+    assert preview.unchanged == 2
+
+
+def test_hierarchy_csv_is_not_an_editable_import(database_context):
+    c = database_context
+    root = prepare(c)
+    node(c, "Child", root)
+    filename, content = exported(c, "csv")
+
+    with pytest.raises(ImportValidationError, match="Upload the editable \\.xlsx hierarchy export"):
+        c.s.hierarchy_imports.begin(c.a.id, "hierarchy-csv", c.d.key, filename, content)
 
 
 def test_hierarchy_import_applies_atomic_difference(database_context):
