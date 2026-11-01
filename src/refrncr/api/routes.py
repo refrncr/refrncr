@@ -56,6 +56,7 @@ def _version(publication):
         number=version.number,
         published_at=get_datatype("timestamp").text(version.published_at),
         effective_from=version.effective_date.isoformat(),
+        effective_to=publication.valid_until.isoformat() if publication.valid_until else None,
         source=SourceMetadata(
             dataset_key=publication.source.dataset_key, version=publication.source.version
         )

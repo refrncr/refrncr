@@ -147,6 +147,7 @@ def test_schema_matches_registered_routes_and_contracts(api):
         "number",
         "published_at",
         "effective_from",
+        "effective_to",
         "source",
     }
     for response_model in ("Dataset", "RecordCollection", "RecordDetail"):
