@@ -18,6 +18,7 @@ from refrncr.api.contracts import (
     HierarchyResponse,
     RecordCollection,
     RecordDetail,
+    RecordInterval,
     VersionListItem,
 )
 from refrncr.api.http import SAFE_HEADERS
@@ -29,6 +30,7 @@ DATA_PATHS = {
     "/api/v1/datasets/{dataset_key}": Detail[DatasetDetail],
     "/api/v1/datasets/{dataset_key}/versions": Collection[VersionListItem],
     "/api/v1/datasets/{dataset_key}/records": RecordCollection | HierarchyRecordCollection,
+    "/api/v1/datasets/{dataset_key}/records/history": Collection[RecordInterval],
     "/api/v1/datasets/{dataset_key}/records/{identifier}": RecordDetail,
     "/api/v1/datasets/{dataset_key}/lookup": RecordDetail,
     "/api/v1/datasets/{dataset_key}/hierarchy": HierarchyResponse,
@@ -104,8 +106,14 @@ def test_schema_matches_registered_routes_and_contracts(api):
             }
         params = {p["name"]: p for p in op["parameters"]}
         assert params["If-None-Match"]["in"] == params["If-Modified-Since"]["in"] == "header"
-        collection = path.endswith(("datasets", "records", "versions"))
-        expected_query = set() if path.endswith("versions") else {"effective_date", "version"}
+        collection = path.endswith(("datasets", "records", "versions", "history"))
+        expected_query = (
+            {"valid_from", "valid_to"}
+            if path.endswith("history")
+            else set()
+            if path.endswith("versions")
+            else {"effective_date", "version"}
+        )
         if collection:
             expected_query |= {"offset", "limit"}
         if path.endswith("/lookup"):
@@ -118,7 +126,7 @@ def test_schema_matches_registered_routes_and_contracts(api):
             RecordDetail.model_validate(example)
             assert example["data"]["values"] == {"code": 1001, "target": "AMS-SALES"}
         assert {n for n, p in params.items() if p["in"] == "query"} == expected_query
-        if not path.endswith("versions"):
+        if not path.endswith(("versions", "history")):
             effective_date = params["effective_date"]
             assert "YYYY-MM-DD" in effective_date["description"]
             assert "2026-09-30" in effective_date["description"]

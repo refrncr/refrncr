@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import os
+import re
 import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -463,6 +464,36 @@ def test_browser_download_headers_parameter_validation_and_request_audit():
     for suffix in ("", "?format=pdf", "?format=csv&format=json", "?format="):
         rejected = client.get("/datasets/countries/concept/records/export" + suffix, base_url=HTTPS)
         assert rejected.status_code == 400
+
+
+def test_period_export_form_keeps_direct_exports_and_downloads_history():
+    _factory, services, admin, client = browser_setup()
+    dataset = create_owned_dataset(services.datasets, admin.id, "periods", "Periods", "")
+    services.dataset_fields.create_field(
+        admin.id, dataset.key, "code", "Code", "string", True, False
+    )
+    services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
+    services.dataset_records.create_record(admin.id, dataset.key, {"code": "CC-1001"})
+    published = publish_dataset(services, admin.id, dataset)
+
+    page = client.get(f"/datasets/{dataset.key}/records", base_url=HTTPS)
+    assert b">Excel</a>" in page.data and b">CSV</a>" in page.data
+    assert b">Period\xe2\x80\xa6</a>" in page.data
+
+    form = client.get(f"/datasets/{dataset.key}/records/export/period", base_url=HTTPS)
+    assert form.status_code == 200
+    token = re.search(rb"name='csrf_token' value='([^']+)'", form.data).group(1).decode()
+    download = client.post(
+        f"/datasets/{dataset.key}/records/export/period",
+        data={"csrf_token": token, "format": "csv", "open_end": "9999"},
+        base_url=HTTPS,
+    )
+    assert download.status_code == 200
+    assert download.headers["Content-Disposition"] == "attachment; filename=periods-history.csv"
+    assert list(csv.reader(io.StringIO(download.data[3:].decode()))) == [
+        ["code", "valid_from", "valid_to", "version"],
+        ["CC-1001", published.effective_date.isoformat(), "9999-12-31", "1"],
+    ]
 
 
 def test_response_construction_failure_closes_generated_artifact(monkeypatch):

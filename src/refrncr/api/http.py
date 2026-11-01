@@ -60,6 +60,8 @@ class ConditionalRead:
         page,
         effective_date,
         version_number,
+        valid_from=None,
+        valid_to=None,
         clock: Clock = SYSTEM_CLOCK,
     ):
         self.request = request
@@ -75,6 +77,8 @@ class ConditionalRead:
             page.limit,
             effective_date.isoformat() if effective_date is not None else None,
             version_number,
+            valid_from.isoformat() if valid_from is not None else None,
+            valid_to.isoformat() if valid_to is not None else None,
         )
         self.headers = {}
 
@@ -139,7 +143,7 @@ class ConditionalRead:
             return False
         # Collection deletion/page membership and independently mutable metadata cannot
         # be proven unchanged by a publication date. ETags cover both exactly.
-        if self.selection[2] in {"datasets", "versions"} or any(
+        if self.selection[2] in {"datasets", "versions", "history"} or any(
             p.metadata_updated_at > since
             or datetime.combine(p.version.effective_date, datetime.min.time(), UTC) > since
             for p in publications

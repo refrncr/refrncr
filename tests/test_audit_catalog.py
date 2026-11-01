@@ -94,6 +94,7 @@ def test_historical_action_names_and_object_types_are_stable():
             "created owner_changed metadata_updated business_key_defined "
             "business_key_updated field_order_updated dataset.records_imported "
             "dataset.export_requested dataset.deleted "
+            "dataset.history_export_requested "
             "dataset.version_published dataset.version_cancelled "
             "dataset.version_diff_viewed dataset.concept_created dataset.concept_discarded "
             "dataset.new_version_imported dataset.mapping_targets_updated "
@@ -259,6 +260,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.dataset_versions.DatasetVersionService.publish",
             "refrncr.dataset_versions.DatasetVersionService.cancel",
             "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
+            "refrncr.dataset_versions.DatasetVersionService.export_history",
             "refrncr.api_keys.ApiKeyService.create_key",
             "refrncr.api_keys.ApiKeyService.revoke_key",
             "refrncr.services.UserService.create_initial_admin",

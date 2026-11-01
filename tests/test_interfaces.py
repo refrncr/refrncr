@@ -275,7 +275,7 @@ def _route_matrix_expectations():
         "dataset_hierarchy_node_values",
         "dataset_records_view",
     }
-    dataset_export = {"export_dataset_records"}
+    dataset_export = {"export_dataset_history", "export_dataset_records"}
     dataset_export_admin = {"dataset_export_access", "revoke_dataset_export_access"}
     dataset_maintain = {
         "dataset_mapping_source_update",

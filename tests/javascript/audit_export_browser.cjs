@@ -24,12 +24,12 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     await login(page, 'admin@example.com');
     const groupText = {
       reference: [
-        'Reporting table › Ready for BI tools and pivot tables Excel CSV',
+        'Reporting table › Ready for BI tools and pivot tables Excel CSV Period…',
         'File for editing › Edit the records and import them again Excel',
         'For systems › Same structure as the API JSON',
       ],
       mapping: [
-        'Reporting table › Ready for BI tools and pivot tables Excel CSV',
+        'Reporting table › Ready for BI tools and pivot tables Excel CSV Period…',
         'File for editing › Edit the mappings and import them again Excel',
         'For systems › Same structure as the API JSON',
       ],
@@ -65,6 +65,18 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     await assertMenu('/datasets/row-check/concept', 'reference', 'Export draft');
     await assertMenu('/datasets/row-check', 'reference', 'Export');
     console.log('PASS: reference, mapping and hierarchy share grouped draft and published menus');
+    await page.goto(base + '/datasets/row-check/records');
+    await page.locator('.export-menu summary').click();
+    await page.getByRole('link', {name: 'Period…', exact: true}).click();
+    const periodPanel = page.locator('#period-export-panel');
+    await periodPanel.getByRole('heading', {name: 'Export a reporting period'}).waitFor();
+    await periodPanel.getByLabel('CSV').check();
+    const periodDownloadPending = page.waitForEvent('download');
+    await periodPanel.getByRole('button', {name: 'Export period'}).click();
+    const periodDownload = await periodDownloadPending;
+    assert.equal(await periodDownload.failure(), null);
+    assert.equal(periodDownload.suggestedFilename(), 'row-check-history.csv');
+    console.log('PASS: Period opens as a panel and downloads the interval export');
     for (const [label, extension] of [['CSV', 'csv'], ['Excel', 'xlsx'], ['JSON', 'json']]) {
       await page.goto(base + '/datasets/row-check/records');
       await page.locator('.export-menu summary').click();
@@ -170,6 +182,8 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
     assert.equal(await deniedPage.locator('.export-menu').count(), 0);
     const response = await denied.request.get(base + '/datasets/row-check/records/export?format=json');
     assert.equal(response.status(), 404);
+    const periodResponse = await denied.request.get(base + '/datasets/row-check/records/export/period');
+    assert.equal(periodResponse.status(), 404);
     assert.deepEqual(errors, []);
     console.log('PASS: ordinary reader cannot export; server denies direct URL; no script errors');
   } finally {

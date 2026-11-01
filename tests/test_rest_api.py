@@ -1,12 +1,15 @@
 """REF-107 real service/HTTP contracts, run on SQLite and PostgreSQL 16."""
 
+import csv
+import io
 import json
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from urllib.parse import quote
 
 import pytest
+from openpyxl import load_workbook
 from pydantic import ValidationError as ModelValidationError
 from sqlalchemy import event, select
 from support import NOW, publish
@@ -119,6 +122,99 @@ def test_endpoints_and_contract(api):
     assert lookup.json()["data"] == row
     assert lookup.json()["version"]["number"] == 1
     assert get(c, "/audit/records/" + c.record.id).status_code == 404
+
+
+def test_record_history_current_interval_and_bounds(api):
+    c = api
+    response = get(c, "/audit/records/history?valid_from=2026-09-01&valid_to=2026-10-01")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["pagination"] == {"offset": 0, "limit": 50, "total": 1}
+    assert body["data"] == [
+        {
+            "identifier": get(c, "/audit/records").json()["data"][0]["identifier"],
+            "values": {"code": "a", "label": "Café"},
+            "valid_from": "2026-09-10",
+            "valid_to": None,
+            "version": 1,
+        }
+    ]
+    invalid = get(c, "/audit/records/history?valid_from=2026-10-01&valid_to=2026-10-01")
+    assert invalid.status_code == 400
+
+
+def test_record_history_scheduled_cancel_etag_and_authorization(database_api, monkeypatch):
+    c = database_api
+    c.service.create_concept(c.a.id, c.d.id)
+    row = c.s.dataset_records.list_records(c.a.id, c.d.key).records[0]
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, row.id, row.revision, {"code": "a", "label": "Future"}
+    )
+    scheduled = publish(c, day=c.service.clock.today() + timedelta(days=10))
+
+    response = get(c, "/audit/records/history")
+    assert response.status_code == 200
+    assert [
+        (row["values"]["label"], row["valid_to"], row["version"]) for row in response.json()["data"]
+    ] == [
+        ("Café", scheduled.effective_date.isoformat(), 1),
+        ("Future", None, 2),
+    ]
+    before_scheduled = get(
+        c,
+        "/audit/records/history?valid_to="
+        + (c.service.clock.today() + timedelta(days=5)).isoformat(),
+    ).json()["data"]
+    assert [(row["values"]["label"], row["valid_to"]) for row in before_scheduled] == [
+        ("Café", scheduled.effective_date.isoformat())
+    ]
+    etag = response.headers["etag"]
+    assert (
+        get(c, "/audit/records/history", headers={**c.headers, "If-None-Match": etag}).status_code
+        == 304
+    )
+
+    c.service.cancel(c.a.id, c.d.id, scheduled.id)
+    cancelled = get(c, "/audit/records/history")
+    assert cancelled.headers["etag"] != etag
+    assert [(row["values"]["label"], row["valid_to"]) for row in cancelled.json()["data"]] == [
+        ("Café", None)
+    ]
+
+    monkeypatch.setattr(c.service.authorization, "can_export_dataset", lambda *a, **kw: False)
+    denied = get(c, "/audit/records/history")
+    assert denied.status_code == 404
+    assert denied.content == get(c, "/missing/records/history").content
+
+
+def test_history_csv_export_has_same_rows_as_api(database_api):
+    c = database_api
+    response = get(c, "/audit/records/history")
+    artifact = c.service.export_history(c.a.id, c.d.key, "csv", open_end=True)
+    rows = list(csv.DictReader(io.TextIOWrapper(artifact.content, encoding="utf-8-sig")))
+
+    api_row = response.json()["data"][0]
+    assert rows == [
+        {
+            "code": api_row["values"]["code"],
+            "label": api_row["values"]["label"],
+            "valid_from": api_row["valid_from"],
+            "valid_to": "9999-12-31",
+            "version": str(api_row["version"]),
+        }
+    ]
+
+    excel = c.service.export_history(c.a.id, c.d.key, "xlsx")
+    workbook = load_workbook(excel.content, read_only=True, data_only=True)
+    try:
+        sheet = workbook.active
+        values = list(sheet.values)
+        assert values[0] == ("code", "label", "valid_from", "valid_to", "version")
+        assert values[1][:2] == ("a", "Café")
+        assert values[1][2].date() == date(2026, 9, 10)
+        assert values[1][3:] == (None, 1)
+    finally:
+        workbook.close()
 
 
 def test_hierarchy_endpoint_returns_complete_flat_snapshot(hierarchy_api):
@@ -753,7 +849,7 @@ def test_pydantic_models_and_source_schema():
     with pytest.raises(ModelValidationError):
         Record(identifier="opaque", values={"invalid": []})
     schema = create_api(None, None).openapi()
-    assert len(schema["paths"]) == 7
+    assert len(schema["paths"]) == 8
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert all(item["get"]["security"] for item in schema["paths"].values())
 

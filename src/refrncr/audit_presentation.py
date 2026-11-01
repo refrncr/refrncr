@@ -95,6 +95,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("dataset", "dataset.export_requested"): ActionPresentation(
             "Dataset export requested", False
         ),
+        ("dataset", "dataset.history_export_requested"): ActionPresentation(
+            "Dataset period export requested", False
+        ),
         ("dataset_export_access", "granted"): ActionPresentation(
             "Dataset export access granted", False
         ),
@@ -172,6 +175,9 @@ CONTEXT_LABELS = MappingProxyType(
         "subject_type": "Subject type",
         "subject_id": "Subject ID",
         "format": "Format",
+        "valid_from": "Period from",
+        "valid_to": "Period to",
+        "open_end": "Open end",
         "record_count": "Records",
         "mode": "Import mode",
         "added": "Added",
@@ -200,6 +206,8 @@ FORMAT_KINDS = frozenset(
         "calendar_date",
         "field_keys",
         "export_policy",
+        "period_bound",
+        "open_end",
     }
 )
 # REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.

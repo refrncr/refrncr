@@ -910,6 +910,7 @@
     });
     host.addEventListener("submit", async (event) => {
       const form = event.target;
+      if (form.hasAttribute("data-native-submit")) return;
       event.preventDefault();
       if (form.hasAttribute("data-exact-confirmation") && !form.reportValidity()) return;
       if (pendingForms.has(dialog)) return;

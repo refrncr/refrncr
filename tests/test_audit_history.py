@@ -217,7 +217,7 @@ def test_dataset_and_team_grants_do_not_authorize(database_history, permission):
 def test_all_contracts_have_safe_presentations(database_history):
     h = database_history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 54
+    assert len(EVENTS) == len(ACTION_LABELS) == 55
     assert (
         ACTION_LABELS[("dataset", "dataset.mapping_targets_updated")] == "Mapping targets updated"
     )
@@ -254,6 +254,8 @@ def test_all_contracts_have_safe_presentations(database_history):
             "dataset_name": "Historical Dataset name",
             "field_keys": ["note", "label"],
             "export_policy": "everyone",
+            "period_bound": "2026-09-10",
+            "open_end": "empty",
         }
         details = {key: values[formatter] for key, formatter in contract.context}
         eid = seed(h, 1, first=i, kind=kind, action=action, details=details)[0]

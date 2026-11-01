@@ -1,7 +1,7 @@
 # ADR-025: Record validity periods for consumers
 
-Status: proposed for REF-339 (subtasks REF-340, REF-341, REF-342). Product owner decisions
-recorded on 2026-11-01. Not implemented.
+Status: accepted for REF-339 (subtasks REF-340, REF-341 and REF-343). Product owner
+decisions recorded on 2026-11-01. Implemented by PRs #167, #169 and the REF-343 PR.
 
 ## Context
 
@@ -38,7 +38,7 @@ Keep the version model unchanged and add a derived, read-only interval view in t
 2. **Version list endpoint** (REF-341): published, non-cancelled versions of a dataset with
    number, publication time, `effective_from`, `effective_to` and status, ordered by
    effective date, paginated like other collections.
-3. **Record intervals** (REF-342): one row per record state with `identifier`, `values`,
+3. **Record intervals** (REF-343): one row per record state with `identifier`, `values`,
    `valid_from`, `valid_to` and `version` (the version in which the state started), through
    the API and through the export dialog described below.
 
@@ -84,18 +84,16 @@ dataset (`_visible_state` in `dataset_versions.py`). This difference is intentio
 (product owner, 2026-11-01): API consumers need to see upcoming changes in time, and
 content that must stay confidential remains in a draft until it may be published.
 
-### Export dialog
+### Period export
 
-The **Reporting table** group of the export menu offers one item, *Reporting table…*, that
-opens a dialog:
+The **Reporting table** group keeps the direct Excel and CSV snapshot links and additionally
+offers *Period…* for reference and mapping datasets. It opens a side-panel form for an
+optional From/To range (empty means the whole history), Excel or CSV, and an open end written
+as empty (default) or `9999-12-31`. Its ordinary link and form remain the no-JavaScript
+fallback. History in JSON is available through the API. Hierarchies have no *Period* option.
 
-- *This version* (default) produces the existing snapshot export of the version or draft
-  being viewed.
-- *Period* produces the interval rows across all published versions, without draft
-  changes, for an optional From/To range (empty means the whole history). The open end is
-  written as empty (default) or `9999-12-31`.
-- File format: Excel or CSV. History in JSON is available through the API. Hierarchies have
-  no *Period* option.
+Customer Field keys remain unchanged in exports. When one collides with `valid_from`,
+`valid_to` or `version`, the added metadata header receives the ` (period)` suffix.
 
 ### Consumer contract
 
@@ -112,9 +110,10 @@ join cost_centres k
 
 - Consumers no longer need to know version numbers or change dates, and every consumer
   derives the same periods.
-- Version snapshots remain the single source of truth; intervals are computed from them and
-  need no new mutable state. Whether they are computed at read time or materialized is an
-  implementation choice for REF-342.
+- Version snapshots remain the single source of truth. Intervals are computed at read time
+  with no new mutable state or schema. Cost is linear in the number of snapshot records and
+  result intervals. A worst-case local measurement of 10 versions × 10,000 records, all
+  changed in every version, took 5.10 seconds on SQLite and 5.58 seconds on PostgreSQL 16.
 - Removing a populated field creates an extra row for every record that had a value. This
   is accepted because field removal is rare and correctness on any date takes precedence.
 - Authorization, ETag and caching follow ADR-019; ETags must change when `effective_to`
@@ -138,9 +137,9 @@ join cost_centres k
   ended; consumers can clip themselves.
 - **Mandatory period on history requests.** Rejected: warehouse loads need the full
   history; pagination bounds response size.
-- **A separate History export item.** Rejected: users choose between one moment and a
-  period in a single *Reporting table…* dialog, and do not need to know that history is a
-  different export.
+- **Replace the direct exports with one Reporting table dialog.** Rejected: the common
+  snapshot export should remain one click. *Period…* is an additional option only where
+  interval export exists.
 - **Hide Scheduled successors from API readers who cannot maintain the dataset**, matching
   the browser UI. Rejected on 2026-11-01: it would close existing API access to Scheduled
   versions and complicate the version list and interval view, for a confidentiality need

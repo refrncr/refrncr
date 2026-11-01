@@ -4,6 +4,10 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Add a record-history API and Excel/CSV Period export with half-open validity periods,
+  merged unchanged states, and explicit handling of removals (REF-343).
+- Record-history reads derive all matching intervals from published snapshots before
+  pagination; very large, frequently changing histories can take several seconds (REF-343).
 - Add a paginated API endpoint for discovering every published Dataset version, including
   its status and effective period (REF-341).
 - Include the exclusive `effective_to` date in published-version API metadata, including

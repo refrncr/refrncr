@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "components.html" import feedback %}
+{% from "components/side_panel.html" import panel_form_actions %}
+{% block title %}Export a reporting period · REFRNCR{% endblock %}
+{% block content %}
+<h1>Export a reporting period</h1>
+<div class='side-panel-view' data-side-panel-content data-panel-title='Export a reporting period' data-panel-eyebrow='Reporting table'>
+  <div class='side-panel-body'>
+    <p>One row per record for each period in which it did not change, across all published versions. Draft changes are not included.</p>
+    {{ feedback(error, id='period-export-error', focus=true) }}
+    <form {{ non_login_form_attrs() }} id='period-export-form' method='post' action='{{ url_for("export_dataset_history", key=request.view_args.key) }}' data-native-submit>
+      <div class='form-grid'>
+        <label for='period-from'>From <span class='field-hint'>Optional, inclusive</span></label>
+        <input id='period-from' name='valid_from' type='date' value='{{ values.valid_from }}'>
+        <label for='period-to'>To <span class='field-hint'>Optional, exclusive</span></label>
+        <input id='period-to' name='valid_to' type='date' value='{{ values.valid_to }}'>
+        <fieldset><legend>Open end</legend>
+          <label><input type='radio' name='open_end' value='empty' {% if values.open_end != '9999' %}checked{% endif %}> Leave empty</label>
+          <label><input type='radio' name='open_end' value='9999' {% if values.open_end == '9999' %}checked{% endif %}> Use 9999-12-31</label>
+        </fieldset>
+        <fieldset><legend>File format</legend>
+          <label><input type='radio' name='format' value='xlsx' {% if values.format != 'csv' %}checked{% endif %}> Excel</label>
+          <label><input type='radio' name='format' value='csv' {% if values.format == 'csv' %}checked{% endif %}> CSV</label>
+        </fieldset>
+      </div>
+      <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
+    </form>
+  </div>
+  {% call panel_form_actions() %}
+    <a class='button button-secondary' href='{{ return_url }}' data-panel-cancel>Cancel</a>
+    <button class='button button-primary' type='submit' form='period-export-form'>Export period</button>
+  {% endcall %}
+</div>
+{% endblock %}
