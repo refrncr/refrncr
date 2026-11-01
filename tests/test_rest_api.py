@@ -335,7 +335,9 @@ def test_pagination_current_only_and_publication(api):
     c.s.dataset_records.create_record(c.a.id, c.d.key, {"code": "b", "label": "Private concept"})
     assert get(c, "/audit/records").content == first.content
     scheduled = publish(c, day=NOW.date() + timedelta(days=1))
-    assert get(c, "/audit/records").content == first.content
+    with_scheduled = get(c, "/audit/records")
+    assert with_scheduled.json()["version"]["effective_to"] == scheduled.effective_date.isoformat()
+    assert with_scheduled.headers["etag"] != first.headers["etag"]
     c.service.clock.set(NOW + timedelta(days=1))
     current = get(c, "/audit/records?limit=1")
     assert current.json()["pagination"]["total"] == 2
@@ -346,6 +348,26 @@ def test_pagination_current_only_and_publication(api):
     assert get(c, "?offset=1").json()["data"] == []
     assert current.headers["etag"] != first.headers["etag"]
     assert current.json()["version"]["number"] == scheduled.number
+
+
+def test_scheduled_successor_updates_effective_to_and_etag_until_cancelled(api):
+    c = api
+    first = get(c, "/audit/records?version=1")
+    assert first.json()["version"]["effective_to"] is None
+
+    c.service.create_concept(c.a.id, c.d.id)
+    c.s.dataset_records.update_record(
+        c.a.id, c.d.key, c.record.id, 1, {"code": "a", "label": "Scheduled"}
+    )
+    scheduled = publish(c, day=NOW.date() + timedelta(days=21))
+    bounded = get(c, "/audit/records?version=1")
+    assert bounded.json()["version"]["effective_to"] == scheduled.effective_date.isoformat()
+    assert bounded.headers["etag"] != first.headers["etag"]
+
+    c.service.cancel(c.a.id, c.d.id, scheduled.id)
+    restored = get(c, "/audit/records?version=1")
+    assert restored.json()["version"]["effective_to"] is None
+    assert restored.headers["etag"] == first.headers["etag"]
 
 
 def test_effective_date_version_validation_and_cache_isolation(database_api):
@@ -372,6 +394,7 @@ def test_effective_date_version_validation_and_cache_isolation(database_api):
         "number": 2,
         "published_at": "2026-09-10T12:00:00Z",
         "effective_from": "2026-10-01",
+        "effective_to": None,
         "source": None,
     }
     assert second.number == 2

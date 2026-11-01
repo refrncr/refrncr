@@ -91,6 +91,7 @@ class ConditionalRead:
                 p.version.number,
                 p.version.published_at.isoformat(),
                 p.version.effective_date.isoformat(),
+                p.valid_until.isoformat() if p.valid_until else None,
                 (p.source.dataset_key, p.source.version) if p.source else None,
             )
             for p in publications

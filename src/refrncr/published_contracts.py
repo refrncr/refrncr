@@ -4,7 +4,7 @@ import base64
 import binascii
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from refrncr.datatypes import DATATYPES, DatatypeError, get_datatype
 from refrncr.hierarchy_contracts import HierarchyNode
@@ -77,6 +77,7 @@ class CurrentPublication:
     kind: str
     metadata_updated_at: datetime
     version: PublishedVersion
+    valid_until: date | None
     source: SourceVersion | None = None
 
 

@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Include the exclusive `effective_to` date in published-version API metadata, including
+  boundaries created by Scheduled versions (REF-340).
 - Show the editable export only to people who can also maintain and import the Dataset
   (REF-338).
 - Give reference, mapping and hierarchy exports the same purpose-based menu, with grouped

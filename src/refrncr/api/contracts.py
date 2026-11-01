@@ -75,11 +75,15 @@ class SourceMetadata(Contract):
 
 
 class VersionMetadata(Contract):
-    """Selected immutable publication metadata."""
+    """Selected publication metadata with a half-open effective period."""
 
     number: int = Field(ge=1)
     published_at: str = Field(examples=["2000-01-01T00:00:00Z"])
     effective_from: str = Field(examples=["2000-01-01"])
+    effective_to: str | None = Field(
+        examples=["2001-01-01"],
+        description="Exclusive end; null when no later non-cancelled version exists.",
+    )
     source: SourceMetadata | None = None
 
 

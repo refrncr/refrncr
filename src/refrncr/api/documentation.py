@@ -35,6 +35,11 @@ Dataset order is key ascending; Records use canonical typed business-identifier 
 Links are application-relative; next/previous may be null. Separate pages are not a pinned
 snapshot: check selected-version metadata when traversing pages.
 
+Version metadata describes a half-open effective period. `effective_from` is inclusive;
+`effective_to` is the exclusive effective date of the next non-cancelled version, including
+a Scheduled successor, and is null when no such successor exists. Cancelling a Scheduled
+version therefore restores the preceding version's open end.
+
 Record values are canonical, keyed by Field key: String and Boolean are native JSON;
 Integer, Decimal (`number`) and Float are JSON numbers. Use an exact JSON number parser
 for large integers and decimals. Date, Time and DateTime are canonical strings;
@@ -102,6 +107,7 @@ MAPPING_LOOKUP_EXAMPLE = {
         "number": 1,
         "published_at": "2026-10-27T12:00:00Z",
         "effective_from": "2026-10-27",
+        "effective_to": "2027-01-01",
         "source": {"dataset_key": "sap-cost-centres", "version": 1},
     },
 }

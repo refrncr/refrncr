@@ -267,6 +267,13 @@ class DatasetVersionService:
             sources = uow.versions.source_references(
                 tuple(v.source_version_id for d, v in pairs if d.kind == "mapping")
             )
+            validity = {
+                state.version.id: state.valid_until
+                for versions in uow.versions.list_for_datasets(
+                    tuple(dataset.id for dataset, _version in pairs)
+                ).values()
+                for state in version_states(versions, self.clock.today())
+            }
             result = CurrentRead(
                 tuple(
                     CurrentPublication(
@@ -277,6 +284,7 @@ class DatasetVersionService:
                         d.kind,
                         d.updated_at,
                         v,
+                        validity[v.id],
                         sources.get(v.source_version_id) if d.kind == "mapping" else None,
                     )
                     for d, v in pairs
