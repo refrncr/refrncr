@@ -1,7 +1,7 @@
 # ADR-025: Record validity periods for consumers
 
 Status: accepted for REF-339 (subtasks REF-340, REF-341 and REF-343). Product owner
-decisions recorded on 2026-11-01. Implemented by PRs #167, #169 and the REF-343 PR.
+decisions recorded on 2026-11-01. Implemented by PRs #167, #169 and #170.
 
 ## Context
 
