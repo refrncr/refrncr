@@ -38,9 +38,9 @@ Keep the version model unchanged and add a derived, read-only interval view in t
 2. **Version list endpoint** (REF-341): published, non-cancelled versions of a dataset with
    number, publication time, `effective_from`, `effective_to` and status, ordered by
    effective date, paginated like other collections.
-3. **Record intervals and History export** (REF-342): one row per record state with
-   `identifier`, `values`, `valid_from`, `valid_to` and `version` (the version in which the
-   state started). The same rows are offered as a "History" export.
+3. **Record intervals** (REF-342): one row per record state with `identifier`, `values`,
+   `valid_from`, `valid_to` and `version` (the version in which the state started), through
+   the API and through the export dialog described below.
 
 ### Period semantics
 
@@ -71,6 +71,31 @@ some point in the returned periods.
 | Field removed, record had a value | value → null | yes |
 | Field removed, record was already empty | null → null | no |
 | Nothing changes for the record | unchanged | no |
+
+### Visibility of Scheduled versions
+
+Scheduled versions are visible to API readers with export access, as they already were
+through `version=` and a future `effective_date`. `effective_to` therefore shows a Scheduled
+successor's effective date, the version list includes Scheduled versions, and the interval
+view includes them when the requested period overlaps them.
+
+The browser UI deliberately hides Scheduled successors from users who cannot maintain the
+dataset (`_visible_state` in `dataset_versions.py`). This difference is intentional
+(product owner, 2026-11-01): API consumers need to see upcoming changes in time, and
+content that must stay confidential remains in a draft until it may be published.
+
+### Export dialog
+
+The **Reporting table** group of the export menu offers one item, *Reporting table…*, that
+opens a dialog:
+
+- *This version* (default) produces the existing snapshot export of the version or draft
+  being viewed.
+- *Period* produces the interval rows across all published versions, without draft
+  changes, for an optional From/To range (empty means the whole history). The open end is
+  written as empty (default) or `9999-12-31`.
+- File format: Excel or CSV. History in JSON is available through the API. Hierarchies have
+  no *Period* option.
 
 ### Consumer contract
 
@@ -113,5 +138,12 @@ join cost_centres k
   ended; consumers can clip themselves.
 - **Mandatory period on history requests.** Rejected: warehouse loads need the full
   history; pagination bounds response size.
+- **A separate History export item.** Rejected: users choose between one moment and a
+  period in a single *Reporting table…* dialog, and do not need to know that history is a
+  different export.
+- **Hide Scheduled successors from API readers who cannot maintain the dataset**, matching
+  the browser UI. Rejected on 2026-11-01: it would close existing API access to Scheduled
+  versions and complicate the version list and interval view, for a confidentiality need
+  that rarely applies to reference data.
 - **Publication-time (`known_at`) queries.** Deferred: unnecessary while effective dates
   cannot be in the past. Revisit if retroactive publication is ever allowed.
