@@ -1,3 +1,4 @@
+import csv
 import io
 import os
 import re
@@ -9,8 +10,8 @@ from threading import Barrier, Event
 from types import SimpleNamespace
 
 import pytest
-from dataset_helpers import create_mapping_dataset, create_owned_dataset
-from openpyxl import Workbook
+from dataset_helpers import create_mapping_dataset, create_owned_dataset, publish_dataset
+from openpyxl import Workbook, load_workbook
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
@@ -317,36 +318,142 @@ def test_import_service_exposes_mapping_and_source_format_error_codes(import_con
     ]
 
 
-def test_exported_mapping_excel_round_trips_through_import(import_context):
-    _, services, admin, _reference = import_context
-    mapping = create_mapping_dataset(
-        services, admin, "mapping-roundtrip", "Mapping roundtrip", records=("A", "B")
-    )
-    services.dataset_fields.create_field(admin.id, mapping.key, "target", "Target", "string")
-    first_mapping = services.dataset_records.list_records(admin.id, mapping.key).records[0]
-    services.dataset_records.update_record(
-        admin.id, mapping.key, first_mapping.id, first_mapping.revision, {"target": "Mapped"}
-    )
-
+def _exported_content(services, admin, dataset, format_name):
     artifact = services.dataset_records.export_dataset(
-        admin.id, mapping.key, "xlsx", prefer_concept=True
+        admin.id, dataset.key, format_name, prefer_concept=True
     )
     try:
-        workbook = artifact.content.read()
+        return artifact.download_name, artifact.content.read()
     finally:
         artifact.content.close()
-    state, _, advice = services.record_imports.begin(
-        admin.id, "roundtrip-mapping", mapping.key, artifact.download_name, workbook
+
+
+def _replace_exported_value(content, format_name, field_key, value):
+    if format_name == "csv":
+        rows = list(csv.reader(io.StringIO(content.decode("utf-8-sig"))))
+        rows[1][rows[0].index(field_key)] = value
+        target = io.StringIO(newline="")
+        csv.writer(target, lineterminator="\r\n").writerows(rows)
+        return b"\xef\xbb\xbf" + target.getvalue().encode()
+    workbook = load_workbook(io.BytesIO(content))
+    try:
+        worksheet = workbook.active
+        headers = [cell.value for cell in worksheet[1]]
+        worksheet.cell(2, headers.index(field_key) + 1, value)
+        target = io.BytesIO()
+        workbook.save(target)
+        return target.getvalue()
+    finally:
+        workbook.close()
+
+
+def _roundtrip_preview(services, admin, dataset, format_name, content, session, mode):
+    state, _source, advice = services.record_imports.begin(
+        admin.id,
+        session,
+        dataset.key,
+        f"{dataset.key}.{format_name}",
+        content,
+        mode=mode,
     )
+    assert state.mode == mode
     preview = services.record_imports.preview(
-        admin.id, "roundtrip-mapping", mapping.key, state.token, advice.mapping
+        admin.id, session, dataset.key, state.token, advice.mapping
     )
+    services.record_imports.cancel(admin.id, session, dataset.key, state.token)
     assert preview.valid, preview.errors
-    assert {key: preview.counts[key] for key in ("Added", "Changed", "Deleted")} == {
+    return preview
+
+
+@pytest.mark.parametrize("format_name", ["xlsx", "csv"])
+@pytest.mark.parametrize("kind", ["reference", "mapping"])
+def test_exported_records_round_trip_and_detect_one_change(import_context, kind, format_name):
+    _, services, admin, reference = import_context
+    if kind == "reference":
+        dataset = reference
+        services.dataset_fields.create_field(admin.id, dataset.key, "opens_at", "Opens at", "time")
+        for code, amount, active, day, opens_at in (
+            ("A", "1.25", "true", "2026-01-02", "01:30:00"),
+            ("B", "2.50", "false", "2026-02-03", "02:30:00"),
+            ("C", "3.75", "true", "2026-03-04", "03:30:00"),
+        ):
+            services.dataset_records.create_record(
+                admin.id,
+                dataset.key,
+                {
+                    "code": code,
+                    "amount": amount,
+                    "active": active,
+                    "day": day,
+                    "opens_at": opens_at,
+                },
+            )
+        publish_dataset(services, admin.id, dataset)
+        services.dataset_versions.create_concept(admin.id, dataset.id)
+        mode = "new_version"
+        changed_field, changed_value = "active", "false"
+    else:
+        dataset = create_mapping_dataset(
+            services,
+            admin,
+            "mapping-roundtrip",
+            "Mapping roundtrip",
+            records=("A", "B", "C"),
+        )
+        for key, name, data_type in (
+            ("target", "Target", "string"),
+            ("valid_on", "Valid on", "date"),
+            ("opens_at", "Opens at", "time"),
+        ):
+            services.dataset_fields.create_field(admin.id, dataset.key, key, name, data_type)
+        for index, record in enumerate(
+            services.dataset_records.list_records(admin.id, dataset.key).records, start=1
+        ):
+            services.dataset_records.update_record(
+                admin.id,
+                dataset.key,
+                record.id,
+                record.revision,
+                {
+                    "target": f"Mapped {index}",
+                    "valid_on": f"2026-0{index}-0{index + 1}",
+                    "opens_at": f"0{index}:30:00",
+                },
+            )
+        mode = "mapping_update"
+        changed_field, changed_value = "target", "Changed target"
+
+    filename, content = _exported_content(services, admin, dataset, format_name)
+    unchanged = _roundtrip_preview(
+        services, admin, dataset, format_name, content, f"{kind}-{format_name}-same", mode
+    )
+    assert unchanged.counts == {
         "Added": 0,
         "Changed": 0,
+        "Unchanged": 3,
         "Deleted": 0,
+        "Error": 0,
+        "matching": 0,
     }
+
+    changed = _roundtrip_preview(
+        services,
+        admin,
+        dataset,
+        format_name,
+        _replace_exported_value(content, format_name, changed_field, changed_value),
+        f"{kind}-{format_name}-changed",
+        mode,
+    )
+    assert changed.counts == {
+        "Added": 0,
+        "Changed": 1,
+        "Unchanged": 2,
+        "Deleted": 0,
+        "Error": 0,
+        "matching": 1,
+    }
+    assert filename.endswith(f".{format_name}")
 
 
 def test_submitted_format_helpers_require_a_bound_import_state(import_context):
