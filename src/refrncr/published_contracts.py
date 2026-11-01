@@ -79,6 +79,7 @@ class CurrentPublication:
     version: PublishedVersion
     valid_until: date | None
     source: SourceVersion | None = None
+    status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

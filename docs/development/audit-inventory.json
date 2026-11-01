@@ -27,6 +27,7 @@
     "refrncr.dataset_versions.DatasetVersionService.publish",
     "refrncr.dataset_versions.DatasetVersionService.read",
     "refrncr.dataset_versions.DatasetVersionService.read_current",
+    "refrncr.dataset_versions.DatasetVersionService.read_versions",
     "refrncr.dataset_versions.DatasetVersionService.review",
     "refrncr.dataset_versions.DatasetVersionService.review_discard",
     "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",

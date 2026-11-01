@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Add a paginated API endpoint for discovering every published Dataset version, including
+  its status and effective period (REF-341).
 - Include the exclusive `effective_to` date in published-version API metadata, including
   boundaries created by Scheduled versions (REF-340).
 - Show the editable export only to people who can also maintain and import the Dataset

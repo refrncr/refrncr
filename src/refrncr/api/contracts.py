@@ -87,6 +87,12 @@ class VersionMetadata(Contract):
     source: SourceMetadata | None = None
 
 
+class VersionListItem(VersionMetadata):
+    """One published version in effective-period order."""
+
+    status: Literal["Current", "Scheduled", "Expired"]
+
+
 class Dataset(Contract):
     key: str
     name: str

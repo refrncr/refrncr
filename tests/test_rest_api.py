@@ -270,7 +270,15 @@ def test_success_log_is_safe_and_304_updates_last_used(api, caplog):
 
 
 @pytest.mark.parametrize(
-    "suffix", ["", "/audit", "/audit/records", "/audit/records/invalid", "/audit/hierarchy"]
+    "suffix",
+    [
+        "",
+        "/audit",
+        "/audit/versions",
+        "/audit/records",
+        "/audit/records/invalid",
+        "/audit/hierarchy",
+    ],
 )
 @pytest.mark.parametrize(
     "credential", [None, "", "Bearer unknown", "Basic invalid", "Bearer " + "x" * 10000]
@@ -321,7 +329,7 @@ def test_duplicate_expired_revoked_inactive_keys(api):
     ],
 )
 def test_fail_closed_query(database_api, query):
-    for suffix in ("", "/audit/records"):
+    for suffix in ("", "/audit/versions", "/audit/records"):
         response = get(database_api, suffix + "?" + query)
         assert response.status_code == 400, response.text
         assert response.json() == {"error": "invalid_request"}
@@ -348,6 +356,83 @@ def test_pagination_current_only_and_publication(api):
     assert get(c, "?offset=1").json()["data"] == []
     assert current.headers["etag"] != first.headers["etag"]
     assert current.json()["version"]["number"] == scheduled.number
+
+
+def test_version_list_status_sort_pagination_etag_and_authorization(database_api, monkeypatch):
+    c = database_api
+
+    def change(label):
+        c.service.create_concept(c.a.id, c.d.id)
+        row = c.s.dataset_records.list_records(c.a.id, c.d.key).records[0]
+        c.s.dataset_records.update_record(
+            c.a.id, c.d.key, row.id, row.revision, {"code": "a", "label": label}
+        )
+
+    first = get(c, "/audit/versions")
+    assert first.status_code == 200
+    assert first.json()["data"] == [
+        {
+            "number": 1,
+            "published_at": "2026-09-10T12:00:00Z",
+            "effective_from": "2026-09-10",
+            "effective_to": None,
+            "source": None,
+            "status": "Current",
+        }
+    ]
+
+    change("Current 2")
+    current = publish(c)
+    second = get(c, "/audit/versions")
+    assert second.headers["etag"] != first.headers["etag"]
+    assert [(row["effective_from"], row["number"]) for row in second.json()["data"]] == [
+        ("2026-09-10", 1),
+        (current.effective_date.isoformat(), 2),
+    ]
+    assert [row["status"] for row in second.json()["data"]] == ["Expired", "Current"]
+    assert second.json()["data"][0]["effective_to"] == current.effective_date.isoformat()
+    assert second.json()["data"][1]["effective_to"] is None
+
+    page = get(c, "/audit/versions?offset=1&limit=1").json()
+    assert page["pagination"] == {"offset": 1, "limit": 1, "total": 2}
+    assert [row["number"] for row in page["data"]] == [2]
+    assert page["links"] == {
+        "self": "/api/v1/datasets/audit/versions?offset=1&limit=1",
+        "next": None,
+        "previous": "/api/v1/datasets/audit/versions?offset=0&limit=1",
+    }
+
+    change("Scheduled 3")
+    scheduled = publish(c, day=c.service.clock.today() + timedelta(days=10))
+    with_scheduled = get(c, "/audit/versions")
+    assert with_scheduled.headers["etag"] != second.headers["etag"]
+    assert [row["status"] for row in with_scheduled.json()["data"]] == [
+        "Expired",
+        "Current",
+        "Scheduled",
+    ]
+    assert with_scheduled.json()["data"][1]["effective_to"] == scheduled.effective_date.isoformat()
+    assert (
+        get(
+            c,
+            "/audit/versions",
+            headers={**c.headers, "If-None-Match": with_scheduled.headers["etag"]},
+        ).status_code
+        == 304
+    )
+
+    c.service.cancel(c.a.id, c.d.id, scheduled.id)
+    cancelled = get(c, "/audit/versions")
+    assert cancelled.headers["etag"] != with_scheduled.headers["etag"]
+    assert [row["number"] for row in cancelled.json()["data"]] == [1, 2]
+    assert cancelled.json()["data"][1]["effective_to"] is None
+    assert get(c, "/audit/versions?version=1").status_code == 400
+    assert get(c, "/audit/versions?effective_date=2026-09-10").status_code == 400
+
+    monkeypatch.setattr(c.service.authorization, "can_export_dataset", lambda *a, **kw: False)
+    denied = get(c, "/audit/versions")
+    assert denied.status_code == 404
+    assert denied.content == get(c, "/missing/versions").content
 
 
 def test_scheduled_successor_updates_effective_to_and_etag_until_cancelled(api):
@@ -668,7 +753,7 @@ def test_pydantic_models_and_source_schema():
     with pytest.raises(ModelValidationError):
         Record(identifier="opaque", values={"invalid": []})
     schema = create_api(None, None).openapi()
-    assert len(schema["paths"]) == 6
+    assert len(schema["paths"]) == 7
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"
     assert all(item["get"]["security"] for item in schema["paths"].values())
 

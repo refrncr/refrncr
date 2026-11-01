@@ -39,6 +39,9 @@ Version metadata describes a half-open effective period. `effective_from` is inc
 `effective_to` is the exclusive effective date of the next non-cancelled version, including
 a Scheduled successor, and is null when no such successor exists. Cancelling a Scheduled
 version therefore restores the preceding version's open end.
+`/api/v1/datasets/{dataset_key}/versions` lists every non-cancelled publication in
+effective-date and version-number order, including Scheduled versions. It uses offset/limit
+pagination and does not accept version selectors.
 
 Record values are canonical, keyed by Field key: String and Boolean are native JSON;
 Integer, Decimal (`number`) and Float are JSON numbers. Use an exact JSON number parser
@@ -75,8 +78,8 @@ If-Modified-Since. Date-only validation is conservative and may return 200 even 
 Last-Modified is unchanged. Dataset lists use the page's latest publication time, or Unix
 epoch for an empty page. Private caches must revalidate every use; shared caching is forbidden.
 
-**Excluded:** Concepts, Cancelled versions, history listing, search/filtering/sorting, writes,
-import/export, reverse mapping lookup and batch lookup. The hierarchy endpoint is read-only
+**Excluded:** Concepts, Cancelled versions, record-interval queries, search/filtering/sorting,
+writes, import/export, reverse mapping lookup and batch lookup. The hierarchy endpoint is read-only
 and does not expose concept data, internal IDs as record identifiers, cross-dataset references
 or aggregations.
 """.strip()
