@@ -2824,6 +2824,63 @@ def create_flask_app(
         )
 
     @dataset_route(
+        "/datasets/<key>/records/export/period",
+        capability="can_export_dataset",
+        methods=["GET", "POST"],
+    )
+    @version_errors
+    def export_dataset_history(key: str):
+        actor, login_session = require_authenticated()
+        return_url = url_for("dataset_records_view", key=key)
+        values = {
+            "valid_from": request.form.get("valid_from", ""),
+            "valid_to": request.form.get("valid_to", ""),
+            "open_end": request.form.get("open_end", "empty"),
+            "format": request.form.get("format", "xlsx"),
+        }
+        error = None
+        if request.method == "POST":
+            require_csrf(login_session.csrf_token)
+            try:
+                bounds = []
+                for name in ("valid_from", "valid_to"):
+                    raw = values[name]
+                    parsed = date.fromisoformat(raw) if raw else None
+                    if parsed is not None and parsed.isoformat() != raw:
+                        raise ValueError
+                    bounds.append(parsed)
+                if bounds[0] is not None and bounds[1] is not None and bounds[0] >= bounds[1]:
+                    raise ValueError
+                if values["format"] not in {"csv", "xlsx"} or values["open_end"] not in {
+                    "empty",
+                    "9999",
+                }:
+                    raise ValueError
+                artifact = dataset_versions.export_history(
+                    actor.id,
+                    key,
+                    values["format"],
+                    valid_from=bounds[0],
+                    valid_to=bounds[1],
+                    open_end=values["open_end"] == "9999",
+                )
+                return send_file(
+                    artifact.content,
+                    mimetype=artifact.media_type,
+                    as_attachment=True,
+                    download_name=artifact.download_name,
+                )
+            except ValueError:
+                error = "Choose a valid period and file format. From must be before To."
+        return render_authenticated_template(
+            "pages/datasets/export_period.html",
+            values=values,
+            error=error,
+            current_csrf=login_session.csrf_token,
+            return_url=return_url,
+        ), (422 if error else 200)
+
+    @dataset_route(
         "/datasets/<key>/concept/records/export",
         capability="can_export_dataset",
         methods=["GET"],

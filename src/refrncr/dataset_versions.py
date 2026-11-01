@@ -29,6 +29,7 @@ from refrncr.published_contracts import (
     decode_identifier,
     mapping_identifier,
 )
+from refrncr.record_intervals import HistoryRead, derive_intervals
 from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
     ConflictError,
@@ -401,6 +402,166 @@ class DatasetVersionService:
             if unchanged is not None and unchanged(result):
                 return replace(result, not_modified=True)
             return result
+
+    def read_history(
+        self, actor_id, key, *, valid_from=None, valid_to=None, offset=0, limit=50, unchanged=None
+    ):
+        """Derive record-state intervals from every non-cancelled publication."""
+        if type(offset) is not int or not 0 <= offset <= 2147483647:
+            raise ValidationError("Invalid pagination")
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValidationError("Invalid pagination")
+        if (valid_from is not None and not isinstance(valid_from, date)) or (
+            valid_to is not None and not isinstance(valid_to, date)
+        ):
+            raise ValidationError("Invalid period")
+        if valid_from is not None and valid_to is not None and valid_from >= valid_to:
+            raise ValidationError("Invalid period")
+        try:
+            key = validate_dataset_key(key)
+        except ValidationError:
+            raise NotFoundError("Dataset not found") from None
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(key)
+            if (
+                dataset is None
+                or dataset.kind == "hierarchy"
+                or not self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
+            ):
+                raise NotFoundError("Dataset not found")
+            states = tuple(
+                sorted(
+                    (
+                        state
+                        for state in version_states(
+                            uow.versions.list_for_dataset(dataset.id), self.clock.today()
+                        )
+                        if state.status != "Cancelled"
+                    ),
+                    key=lambda state: (state.version.effective_date, state.version.number),
+                )
+            )
+            if not states:
+                raise NotFoundError("Dataset not found")
+            publications = tuple(
+                CurrentPublication(
+                    dataset.key,
+                    dataset.name,
+                    dataset.description,
+                    dataset.icon,
+                    dataset.kind,
+                    dataset.updated_at,
+                    state.version,
+                    state.valid_until,
+                    None,
+                    state.status,
+                )
+                for state in states
+            )
+            intervals = derive_intervals(
+                (
+                    (
+                        state,
+                        fields,
+                        uow.versions.iterate_records(state.version),
+                    )
+                    for state in states
+                    for fields in (uow.versions.fields(state.version),)
+                ),
+                lower=valid_from,
+                upper=valid_to,
+                offset=offset,
+                limit=limit,
+            )
+            result = HistoryRead(
+                publications, intervals.rows, intervals.field_keys, intervals.total
+            )
+            if unchanged is not None and unchanged(result):
+                return replace(result, not_modified=True)
+            return result
+
+    def export_history(
+        self,
+        actor_id,
+        key,
+        format_name,
+        *,
+        valid_from=None,
+        valid_to=None,
+        open_end=False,
+    ):
+        """Export the same derived interval rows as the history API."""
+        from refrncr.dataset_export import generate_history_export, verify_artifact_readable
+
+        if format_name not in {"csv", "xlsx"} or type(open_end) is not bool:
+            raise ValidationError("Invalid period export")
+        if (valid_from is not None and not isinstance(valid_from, date)) or (
+            valid_to is not None and not isinstance(valid_to, date)
+        ):
+            raise ValidationError("Invalid period export")
+        if valid_from is not None and valid_to is not None and valid_from >= valid_to:
+            raise ValidationError("Invalid period export")
+        try:
+            key = validate_dataset_key(key)
+        except ValidationError:
+            raise NotFoundError("Dataset not found") from None
+        with self.uow(translate_errors=True) as uow:
+            uow.begin_export_snapshot()
+            dataset = uow.datasets.find_by_key(key)
+            if (
+                dataset is None
+                or dataset.kind == "hierarchy"
+                or not self.authorization.can_export_dataset(actor_id, dataset.id, uow=uow)
+            ):
+                raise NotFoundError("Dataset not found")
+            states = tuple(
+                sorted(
+                    (
+                        state
+                        for state in version_states(
+                            uow.versions.list_for_dataset(dataset.id), self.clock.today()
+                        )
+                        if state.status != "Cancelled"
+                    ),
+                    key=lambda state: (state.version.effective_date, state.version.number),
+                )
+            )
+            if not states:
+                raise NotFoundError("Dataset not found")
+            intervals = derive_intervals(
+                (
+                    (state, fields, uow.versions.iterate_records(state.version))
+                    for state in states
+                    for fields in (uow.versions.fields(state.version),)
+                ),
+                lower=valid_from,
+                upper=valid_to,
+                limit=2147483647,
+            )
+            rows, field_keys = intervals.rows, intervals.field_keys
+            dataset_id = dataset.id
+        artifact = generate_history_export(format_name, field_keys, rows, key, open_end=open_end)
+        verify_artifact_readable(artifact)
+        try:
+            with self.uow(write=True, translate_errors=True) as uow:
+                record_audit(
+                    uow,
+                    actor_user_id=actor_id,
+                    object_type="dataset",
+                    object_id=dataset_id,
+                    action="dataset.history_export_requested",
+                    details={
+                        "format": format_name,
+                        "valid_from": valid_from.isoformat() if valid_from else "open",
+                        "valid_to": valid_to.isoformat() if valid_to else "open",
+                        "open_end": "9999-12-31" if open_end else "empty",
+                    },
+                )
+        except BaseException:
+            artifact.content.close()
+            raise
+        return artifact
 
     def _discard_review(self, uow, actor_id, dataset):
         from refrncr.services import _require_concept

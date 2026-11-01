@@ -25,12 +25,14 @@ from refrncr.api.contracts import (
     HierarchyRecord,
     HierarchyRecordCollection,
     HierarchyResponse,
+    HistoryQuery,
     Links,
     PageQuery,
     Pagination,
     Record,
     RecordCollection,
     RecordDetail,
+    RecordInterval,
     SelectionQuery,
     SourceMetadata,
     VersionListItem,
@@ -168,6 +170,53 @@ def _query(request, collection, *, lookup=False, selectors=True):
         query = SelectionQuery(**values)
         page = PageQuery()
     return page, getattr(query, "effective_date", None), getattr(query, "version", None)
+
+
+def _history_query(request):
+    pairs = list(request.query_params.multi_items())
+    if len(pairs) > 4 or len({key for key, _value in pairs}) != len(pairs):
+        raise ValidationError("Invalid request")
+    values = {}
+    for key, value in pairs:
+        if key not in {"valid_from", "valid_to", "offset", "limit"} or not value:
+            raise ValidationError("Invalid request")
+        if key.startswith("valid_"):
+            try:
+                parsed = date.fromisoformat(value)
+            except ValueError:
+                raise ValidationError("Invalid request") from None
+            if parsed.isoformat() != value:
+                raise ValidationError("Invalid request")
+            values[key] = parsed
+        else:
+            if re.fullmatch(r"0|[1-9][0-9]{0,9}", value) is None:
+                raise ValidationError("Invalid request")
+            values[key] = int(value)
+    query = HistoryQuery(**values)
+    if query.valid_from is not None and query.valid_to is not None:
+        if query.valid_from >= query.valid_to:
+            raise ValidationError("Invalid request")
+    return query
+
+
+def _history_pagination(query, total, path):
+    def link(offset):
+        pairs = []
+        if query.valid_from is not None:
+            pairs.append("valid_from=" + query.valid_from.isoformat())
+        if query.valid_to is not None:
+            pairs.append("valid_to=" + query.valid_to.isoformat())
+        pairs.extend((f"offset={offset}", f"limit={query.limit}"))
+        return f"{path}?" + "&".join(pairs)
+
+    return dict(
+        pagination=Pagination(offset=query.offset, limit=query.limit, total=total),
+        links=Links(
+            self=link(query.offset),
+            next=link(query.offset + query.limit) if query.offset + query.limit < total else None,
+            previous=link(max(0, query.offset - query.limit)) if query.offset else None,
+        ),
+    )
 
 
 def _pagination(page, total, path, effective_date=None, version_number=None):
@@ -506,6 +555,72 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
         page: Annotated[CollectionQuery, Depends()] = None,
     ):
         return read(request, actor, "records", dataset_key)
+
+    @app.get(
+        "/datasets/{dataset_key}/records/history",
+        response_model=Collection[RecordInterval],
+        responses=errors,
+        summary="List published Record intervals",
+        tags=["Published data"],
+        openapi_extra=conditional,
+        description=(
+            "Record states whose half-open validity periods overlap the optional bounds. "
+            "Real boundaries are not clipped; unchanged states are merged."
+        ),
+    )
+    def record_history(
+        request: Request,
+        dataset_key: str,
+        actor: Annotated[AuthenticatedPrincipal, Depends(principal)],
+        page: Annotated[PageQuery, Depends()] = None,
+        valid_from: Annotated[
+            date | None, Query(description="Inclusive lower bound in YYYY-MM-DD format.")
+        ] = None,
+        valid_to: Annotated[
+            date | None, Query(description="Exclusive upper bound in YYYY-MM-DD format.")
+        ] = None,
+    ):
+        query = _history_query(request)
+        condition = ConditionalRead(
+            request,
+            actor_id=actor.id,
+            kind="history",
+            key=dataset_key,
+            identifier=None,
+            page=query,
+            effective_date=None,
+            version_number=None,
+            valid_from=query.valid_from,
+            valid_to=query.valid_to,
+            clock=clock,
+        )
+        result = versions.read_history(
+            actor.id,
+            dataset_key,
+            valid_from=query.valid_from,
+            valid_to=query.valid_to,
+            offset=query.offset,
+            limit=query.limit,
+            unchanged=condition,
+        )
+        if result.not_modified:
+            return Response(status_code=304, headers=condition.headers)
+        payload = Collection[RecordInterval](
+            data=tuple(
+                RecordInterval(
+                    identifier=row.identifier,
+                    values=row.values,
+                    valid_from=row.valid_from.isoformat(),
+                    valid_to=row.valid_to.isoformat() if row.valid_to else None,
+                    version=row.version,
+                )
+                for row in result.records
+            ),
+            **_history_pagination(
+                query, result.total, f"/api/v1/datasets/{dataset_key}/records/history"
+            ),
+        )
+        return CanonicalJSONResponse(payload, headers=condition.headers)
 
     @app.get(
         "/datasets/{dataset_key}/records/{identifier}",

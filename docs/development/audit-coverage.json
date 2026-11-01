@@ -2953,6 +2953,7 @@
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
+        "refrncr.web.export_dataset_history GET,POST /datasets/<key>/records/export/period",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
@@ -4166,6 +4167,7 @@
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export",
+        "refrncr.web.export_dataset_history GET,POST /datasets/<key>/records/export/period",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
@@ -4562,6 +4564,7 @@
         "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.export_dataset_history GET,POST /datasets/<key>/records/export/period",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet",
@@ -6005,6 +6008,7 @@
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
         "refrncr.api.routes.dataset_versions GET /datasets/{dataset_key}/versions",
+        "refrncr.api.routes.record_history GET /datasets/{dataset_key}/records/history",
         "refrncr.api.routes.records GET /datasets/{dataset_key}/records",
         "refrncr.api.routes.record GET /datasets/{dataset_key}/records/{identifier}",
         "refrncr.api.routes.hierarchy GET /datasets/{dataset_key}/hierarchy",
@@ -6120,6 +6124,81 @@
       "implementation_status": "REF-341 implemented and covered by the API regression suite.",
       "exclusion_reason": "Authorized bounded published-version reads; no per-request durable success audit.",
       "persistence_scope": "Read-only Dataset version snapshot; no domain persistence."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "read_history",
+      "service": "refrncr.dataset_versions.DatasetVersionService.read_history",
+      "interface_entrypoints": [
+        "refrncr.api.routes.record_history GET /datasets/{dataset_key}/records/history"
+      ],
+      "kind": "read",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied and suspicious attempts; trusted actor/target/reason only.",
+      "technical_logging": "Existing bounded diagnostics; no Record values or request context.",
+      "events": [],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "REF-40 authenticated API-key owner; export authorization is rechecked in the snapshot.",
+      "allowed_context": {},
+      "success": "Derived published-record interval read; no domain event.",
+      "validation_failure": "No change or success event.",
+      "authorization_failure": "Non-disclosing not found; no mutation or event.",
+      "stale_input": "One export snapshot supplies a coherent publication history.",
+      "no_op": "An empty page is returned without mutation or event.",
+      "rollback": "Read-only snapshot ends without domain persistence.",
+      "duplicate_retry": "Read-only conditional requests remain safe.",
+      "tests": [
+        "tests/test_rest_api.py::test_record_history_current_interval_and_bounds",
+        "tests/test_record_intervals.py::test_cc_1001_merges_unchanged_and_returns_real_unclipped_periods"
+      ],
+      "implementation_status": "REF-343 interval projection implemented with regression coverage.",
+      "exclusion_reason": "Authorized derived published-record read; no per-request durable success audit.",
+      "persistence_scope": "Read-only immutable publication snapshots."
+    },
+    {
+      "capability": "DatasetVersionService",
+      "operation": "export_history",
+      "service": "refrncr.dataset_versions.DatasetVersionService.export_history",
+      "interface_entrypoints": [
+        "refrncr.web.export_dataset_history GET,POST /datasets/<key>/records/export/period"
+      ],
+      "kind": "extraction",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": true,
+      "security_handoff": "REF-31 owns denied or suspicious extraction attempts; log no Record values.",
+      "technical_logging": "Fixed safe diagnostics only; no exported content or exception details.",
+      "events": [
+        [
+          "dataset",
+          "dataset.history_export_requested"
+        ]
+      ],
+      "object_identifier": "Stable Dataset UUID.",
+      "actor_source": "Authenticated browser-session actor.",
+      "allowed_context": {
+        "dataset:dataset.history_export_requested": {
+          "format": "export_format",
+          "valid_from": "period_bound",
+          "valid_to": "period_bound",
+          "open_end": "open_end"
+        }
+      },
+      "success": "One event after authorized interval generation and readability preflight.",
+      "validation_failure": "No event or artifact for invalid bounds, format or open-end choice.",
+      "authorization_failure": "Non-disclosing rejection without event.",
+      "stale_input": "One export snapshot supplies coherent immutable publications.",
+      "no_op": "Each authorized empty export is still a distinct audited request.",
+      "rollback": "Preparation or audit failure returns no artifact; audit commit remains atomic.",
+      "duplicate_retry": "Each separately prepared export request is independently audited.",
+      "tests": [
+        "tests/test_record_intervals.py::test_cc_1001_merges_unchanged_and_returns_real_unclipped_periods"
+      ],
+      "implementation_status": "REF-343 period export implemented over the shared interval projection.",
+      "exclusion_reason": "",
+      "persistence_scope": "Immutable publication reads plus append-only AuditEvent."
     },
     {
       "capability": "DatasetAuthorizationService",

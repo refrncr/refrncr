@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/side_panel.html" import form_side_panel %}
 {% from "components/dataset_card.html" import dataset_card, section_heading, owner_switch %}
 {% from "components.html" import breadcrumbs %}
 {% block title %}{{ 'Needs your attention' if full else 'Overview' }} · REFRNCR{% endblock %}
@@ -56,6 +57,7 @@
       </section>
     {% endfor %}
   {% endif %}
+  {% if not full %}{{ form_side_panel('period-export-panel', 'Export a reporting period') }}{% endif %}
 </div>
 {% endblock %}
 {% block scripts %}{% if not full %}<script src="{{ url_for('static', filename='js/overview-greeting.js') }}" defer></script>{% endif %}{% endblock %}

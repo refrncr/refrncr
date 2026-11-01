@@ -24,7 +24,7 @@ to the next request. An in-flight consistent read may finish. This dataset-level
 does not change version selection: Scheduled publications remain available by version or
 future effective date, even though file export does not offer them.
 
-All operations accept optional `effective_date=YYYY-MM-DD` and `version=<number>` selectors.
+Snapshot reads accept optional `effective_date=YYYY-MM-DD` and `version=<number>` selectors.
 The former chooses the latest publication effective on or before that business date; the
 latter chooses an immutable published version. When combined, that version must be effective
 on the date. Collections additionally accept `offset` and `limit`, in canonical ASCII
@@ -42,6 +42,12 @@ version therefore restores the preceding version's open end.
 `/api/v1/datasets/{dataset_key}/versions` lists every non-cancelled publication in
 effective-date and version-number order, including Scheduled versions. It uses offset/limit
 pagination and does not accept version selectors.
+
+`/api/v1/datasets/{dataset_key}/records/history` returns one row per unchanged visible
+Record state. `valid_from` is inclusive and `valid_to` exclusive; an open end is null.
+Optional `valid_from`/`valid_to` query bounds select overlapping states but never clip their
+real boundaries. Consecutive identical states are merged. A removed Record's period ends at
+the removing version without a deletion row; Cancelled versions never split a period.
 
 Record values are canonical, keyed by Field key: String and Boolean are native JSON;
 Integer, Decimal (`number`) and Float are JSON numbers. Use an exact JSON number parser
@@ -78,7 +84,7 @@ If-Modified-Since. Date-only validation is conservative and may return 200 even 
 Last-Modified is unchanged. Dataset lists use the page's latest publication time, or Unix
 epoch for an empty page. Private caches must revalidate every use; shared caching is forbidden.
 
-**Excluded:** Concepts, Cancelled versions, record-interval queries, search/filtering/sorting,
+**Excluded:** Concepts, Cancelled versions, publication-time queries, search/filtering/sorting,
 writes, import/export, reverse mapping lookup and batch lookup. The hierarchy endpoint is read-only
 and does not expose concept data, internal IDs as record identifiers, cross-dataset references
 or aggregations.

@@ -51,6 +51,8 @@ class EventContract:
                 "calendar_date",
                 "field_keys",
                 "export_policy",
+                "period_bound",
+                "open_end",
             }
             for _key, kind in self.context
         ):
@@ -168,6 +170,16 @@ _EVENTS = (
     EventContract("dataset", "dataset.export_requested", (("format", "export_format"),)),
     EventContract(
         "dataset",
+        "dataset.history_export_requested",
+        (
+            ("format", "export_format"),
+            ("valid_from", "period_bound"),
+            ("valid_to", "period_bound"),
+            ("open_end", "open_end"),
+        ),
+    ),
+    EventContract(
+        "dataset",
         "dataset.concept_created",
         (("baseline_version_number", "version_count"), ("concept_revision", "version_count")),
     ),
@@ -253,7 +265,10 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
         elif kind == "version_count":
             if type(value) is not int or not 0 <= value <= 2_147_483_647:
                 raise AuditContractError("Version count is outside the allowed range")
-        elif kind == "calendar_date":
+        elif kind in {"calendar_date", "period_bound"}:
+            if kind == "period_bound" and value == "open":
+                result[key] = value
+                continue
             if (
                 not isinstance(value, str)
                 or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value) is None
@@ -299,6 +314,10 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
                     "xlsx": "Excel",
                     "excel": "Excel",
                     "json": "JSON",
+                },
+                "open_end": {
+                    "empty": "empty",
+                    "9999-12-31": "9999-12-31",
                 },
             }[kind]
             if value not in allowed:
@@ -846,6 +865,19 @@ _register(
     "intentionally excluded",
     module="dataset_versions",
     rationale="Authorized bounded published-version reads; no per-request durable success audit.",
+)
+_register(
+    "DatasetVersionService",
+    "read_history",
+    "intentionally excluded",
+    module="dataset_versions",
+    rationale="Authorized derived published-record read; no per-request durable success audit.",
+)
+_audited(
+    "DatasetVersionService",
+    "export_history",
+    ("dataset", "dataset.history_export_requested"),
+    module="dataset_versions",
 )
 _register(
     "DatasetAuthorizationService",

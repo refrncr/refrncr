@@ -153,6 +153,7 @@
     </section>{% endif %}
   </div>
   {% if editable or schema_admin or may_change_owner or version_state %}{{ form_side_panel() }}{% endif %}
+  {% if may_export and dataset.kind != 'hierarchy' %}{{ form_side_panel('period-export-panel', 'Export a reporting period') }}{% endif %}
 {% endblock %}
 
 {# Not deferred: the tabs are set up while the page is parsed, before it is first shown. #}

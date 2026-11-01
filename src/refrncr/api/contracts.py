@@ -57,6 +57,15 @@ class CollectionQuery(PageQuery, SelectionQuery):
     pass
 
 
+class HistoryQuery(PageQuery):
+    valid_from: date | None = Field(
+        default=None, description="Inclusive lower bound in YYYY-MM-DD format."
+    )
+    valid_to: date | None = Field(
+        default=None, description="Exclusive upper bound in YYYY-MM-DD format."
+    )
+
+
 class Pagination(PageQuery):
     total: int = Field(ge=0)
 
@@ -142,6 +151,16 @@ class Record(Contract):
 
     identifier: str = Field(min_length=1, max_length=2667, pattern=r"^[A-Za-z0-9_-]+$")
     values: dict[str, CanonicalValue]
+
+
+class RecordInterval(Record):
+    """One unchanged visible Record state over a half-open period."""
+
+    valid_from: str = Field(examples=["2026-01-01"])
+    valid_to: str | None = Field(
+        examples=["2026-07-01"], description="Exclusive end; null for an open period."
+    )
+    version: int = Field(ge=1, description="Version in which this state began.")
 
 
 class HierarchyNode(Contract):

@@ -12,14 +12,17 @@ OpenAPI 3.1 contract generated from the registered FastAPI routes and Pydantic m
 | --- | --- | --- |
 | `/api/v1/datasets` | Array of Dataset summaries | `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}` | Dataset summary plus ordered `fields` | None |
+| `/api/v1/datasets/{dataset_key}/versions` | Array of published versions | `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}/records` | Array of Records | `version`, `pagination`, `links` |
+| `/api/v1/datasets/{dataset_key}/records/history` | Array of Record intervals | `pagination`, `links` |
 | `/api/v1/datasets/{dataset_key}/records/{identifier}` | One Record | `version` |
 | `/api/v1/datasets/{dataset_key}/lookup?source=<value>` | One mapping Record | `version` |
 | `/api/v1/datasets/{dataset_key}/hierarchy` | Complete flat hierarchy snapshot | `version` |
 
 A Dataset summary has `key`, `name`, `description`, `icon` (nullable), and
 `version` (`number`, `published_at`, canonical UTC timestamp, and `effective_from`,
-ISO calendar date) describes the selected immutable published version. Its nullable
+ISO calendar date, and exclusive nullable `effective_to`) describes the selected immutable
+published version. Its nullable
 `source` contains `{dataset_key, version}` for mappings and is null for other dataset kinds.
 Name/description/icon are current Dataset metadata per ADR-017. Fields and Records
 come exclusively from its immutable Current publication. No internal Dataset,
@@ -48,7 +51,7 @@ Do not reconstruct it from display labels, truncate it, or substitute an interna
 
 ## Pagination and validation
 
-All endpoints accept `effective_date=YYYY-MM-DD` and `version=<positive number>`.
+Snapshot endpoints accept `effective_date=YYYY-MM-DD` and `version=<positive number>`.
 An effective date selects the latest non-cancelled publication whose `effective_from` is
 on or before that date. A version selects that immutable publication, including a Scheduled
 publication. When combined, the version must be effective on the date or the request returns
@@ -90,6 +93,20 @@ reuse the existing Record read. Access to the source dataset is not required. Th
 cannot read the source dataset. It never follows the source's latest version automatically.
 
 Reverse lookup, many-to-many mapping, batch lookup and general filtering remain out of scope.
+
+### Published versions and Record intervals (REF-341, REF-343)
+
+`GET /api/v1/datasets/{dataset_key}/versions` lists every non-cancelled publication,
+including Scheduled versions, ordered by effective date and version number. It is paginated
+and does not accept snapshot selectors.
+
+`GET /api/v1/datasets/{dataset_key}/records/history` derives one row per unchanged visible
+Record state from the published snapshots. Each row contains `identifier`, the union of
+Field-keyed `values`, inclusive `valid_from`, exclusive nullable `valid_to`, and `version`
+where that state began. Optional `valid_from` and `valid_to` bounds select overlapping rows
+without clipping their real boundaries. Identical consecutive states merge; a removed
+Record's period ends without a deletion row; Cancelled versions never split a period.
+The endpoint is available for reference and mapping datasets, not hierarchies.
 
 ### Published hierarchy snapshots (REF-182)
 
@@ -207,6 +224,14 @@ candidate identifiers, and large offsets cost more. Field metadata and page valu
 consume O(schema + page values) Python memory. This is bounded loading, not a claim
 of constant database CPU or memory. REF-164 owns broader query/index scaling.
 
+Record history is the deliberate exception to bounded page loading: the service scans all
+non-cancelled snapshots and derives and sorts the complete matching interval set before
+applying pagination. Work is linear in snapshot records plus result intervals. In a local
+worst-case measurement, 10 versions × 10,000 records with every value changed produced
+100,000 intervals in 5.10 seconds on SQLite and 5.58 seconds on PostgreSQL 16. Large,
+frequently changing histories can therefore take several seconds; no history materialization
+or supporting schema is part of rc1.
+
 See [ADR-019](../architecture/adr-019-current-rest-reads.md) and
 the archived REF-107 validation/review report.
 
@@ -220,7 +245,7 @@ with public documentation provided by REF-109.
 ## Public OpenAPI and Swagger (REF-109)
 
 `GET /api/openapi.json` and `GET /api/docs` are anonymous read-only documentation
-routes. The document includes the four data operations above and these two
+routes. The document includes the eight data operations above and these two
 public documentation operations; Flask, health, internal and unimplemented routes
 are excluded. OpenAPI is generated in memory from actual registered FastAPI routes
 and the existing Pydantic models, with public mount paths added. There is no stored

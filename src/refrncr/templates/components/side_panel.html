@@ -15,8 +15,8 @@
   </dialog>
 {%- endmacro %}
 
-{% macro form_side_panel(panel_id='configuration-panel') -%}
-  {% call side_panel(panel_id, "Configure", panel_id ~ "-title", eyebrow_slot=true) %}
+{% macro form_side_panel(panel_id='configuration-panel', title='Configure') -%}
+  {% call side_panel(panel_id, title, panel_id ~ "-title", eyebrow_slot=true) %}
     <div class='side-panel-view' data-panel-host></div>
   {% endcall %}
 {%- endmacro %}
