@@ -324,3 +324,27 @@ def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
     assert "release-artifacts/distributions/*.tar.gz" in text
     assert "dist/**" not in text
     assert re.search(r"python -m build --outdir release-artifacts/distributions", text)
+
+
+def test_release_requires_the_actual_main_quality_checks():
+    text = (ROOT / ".github/workflows/release.yml").read_text()
+    match = re.search(r"for check in \\\n(?P<checks>.*?)\n          do", text, re.DOTALL)
+    assert match is not None
+    configured = {
+        line.strip().removesuffix(" \\")
+        for line in match.group("checks").splitlines()
+        if line.strip()
+    }
+    assert configured == {
+        "installed-runtime",
+        "browser-core",
+        "test-sqlite",
+        "test-sqlite-slow",
+        "test-postgres",
+        "test-postgres-slow",
+        "coverage",
+        "dependency-and-policy",
+        "gitleaks-safe-fixture",
+        "analyze-and-gate",
+    }
+    assert '.name == "test"' not in text
