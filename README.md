@@ -4,6 +4,9 @@
 
 Refrncr is a lightweight application for managing reference data that is accurate, shared and easy to consume. Create datasets with defined fields and identifiers, organise ownership through teams, and control who may edit, export or access data through the API. Work safely in Concepts: review changes, import versions, restore deleted records, and publish only when ready. Built-in validation, audit history, versioning and import flows protect data quality without adding enterprise complexity. Teams can browse published data in the web interface, download it as Excel, CSV, JSON or retrieve it through a REST API with personal API keys. Run it locally with your database and deployment setup.
 
+Read the [Refrncr documentation](https://www.refrncr.org/en/docs/) for product guidance,
+concepts and practical workflows.
+
 Refrncr is source-available software licensed under the [Elastic License 2.0](LICENSE) (ELv2).
 You may use, copy, modify and self-host Refrncr, including inside your organisation. You may not
 offer Refrncr to third parties as a hosted or managed service that gives them access to a
@@ -27,8 +30,15 @@ compare a file with the current Draft.
 
 ## Quick start
 
-The PyPI package is not published yet. From a source checkout, create an isolated development
-environment and install the Community application with:
+Install the release candidate from PyPI in an isolated environment with:
+
+```shell
+pipx install --pre refrncr
+refrncr start
+```
+
+For development from a source checkout, create a virtual environment and install the Community
+application with:
 
 ```shell
 python -m venv .venv
