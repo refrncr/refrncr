@@ -102,6 +102,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release upload "${{ github.event.release.tag_name }}"
+          --repo "${{ github.repository }}"
           release-artifacts/SHA256SUMS release-artifacts/refrncr.cdx.json
           release-artifacts/distributions/*
       - name: Publish exact distributions through PyPI Trusted Publishing
