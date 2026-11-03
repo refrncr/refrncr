@@ -1,6 +1,6 @@
 # ADR-020: Verifiable Python release supply chain
 
-Status: Accepted for repository implementation; external release settings remain unconfigured.
+Status: Accepted and operational.
 
 ## Context
 
@@ -16,7 +16,10 @@ Python-SAST gates. Runtime vulnerability exceptions are exact, version-controlle
 most 30 days. A published GitHub Release is the only production trigger. Its workflow builds wheel
 and sdist once, validates that artifact set, generates a CycloneDX SBOM, and passes the unchanged
 files to one protected publication job for attestation, GitHub Release attachment and PyPI Trusted
-Publishing.
+Publishing. Exact distribution hashes are verified after job transfer. Clean `pipx` startup and,
+for stable versions, upgrade from the immediately preceding public version are blocking gates.
+Retries accept existing GitHub/PyPI files only when their names and hashes match the validated
+artifact set.
 
 CodeQL pull-request analysis produces SARIF locally and blocks actionable results without write
 authority. Main/scheduled analysis additionally uploads the same gated SARIF with the narrowly
@@ -27,8 +30,9 @@ scoped `security-events: write` permission.
 Maintainers review a large generated lockfile and update it whenever runtime ranges change.
 Consumer installs keep the compatible ranges from package metadata and are not claimed to resolve
 identically. GitHub code scanning, artifact attestations, the `pypi-production` protected
-environment and PyPI Trusted Publisher still require administrator activation. Until that occurs
-the repository configuration is verifiable, but no release or external protection is claimed.
+environment and PyPI Trusted Publisher require administrator configuration outside the repository.
+Those controls were activated for the first public candidate; the runbook remains authoritative for
+checking them before each release.
 
 ## Alternatives considered
 

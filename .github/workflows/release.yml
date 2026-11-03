@@ -52,24 +52,53 @@ jobs:
       - name: Install locked runtime graph and release tools
         run: |
           python -m pip install --require-hashes -r requirements/release.txt
-          python -m pip install build==1.6.1 cyclonedx-bom==7.5.0 pip-audit==2.10.1 twine==7.0.0
+          python -m pip install build==1.6.1 cyclonedx-bom==7.5.0 pip-audit==2.10.1 pipx==1.7.1 twine==7.0.0
       - name: Gate runtime vulnerabilities
         run: >-
           python tools/supply_chain.py audit-runtime requirements/release.txt
           security/vulnerability-exceptions.json runtime-audit.json
       - name: Build wheel and source distribution once
-        run: python -m build --outdir release-artifacts/distributions
+        run: |
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          python -m build --outdir release-artifacts/distributions
+          python tools/normalize_sdist.py \
+            release-artifacts/distributions/*.tar.gz "$SOURCE_DATE_EPOCH"
       - name: Validate the exact artifacts
         run: |
           python -m twine check release-artifacts/distributions/*
           python -m pip install --no-deps release-artifacts/distributions/*.whl
           python -m pip check
           refrncr --help
-          sha256sum release-artifacts/distributions/*.whl release-artifacts/distributions/*.tar.gz > release-artifacts/SHA256SUMS
+          cd release-artifacts
+          sha256sum distributions/*.whl distributions/*.tar.gz > SHA256SUMS
+      - name: Prove a clean pipx install and packaged startup
+        env:
+          PIPX_HOME: ${{ runner.temp }}/release-pipx-home
+          PIPX_BIN_DIR: ${{ runner.temp }}/release-pipx-bin
+        run: |
+          python -m pipx install release-artifacts/distributions/*.whl
+          database="$RUNNER_TEMP/refrncr-release-smoke.db"
+          log="$RUNNER_TEMP/refrncr-release-smoke.log"
+          "$PIPX_BIN_DIR/refrncr" start --database-path "$database" --port 8765 >"$log" 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill -INT "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          python tools/release_smoke.py http://127.0.0.1:8765
+          test -s "$database"
+      - name: Prove upgrade from the preceding public release for stable versions
+        run: >-
+          python tools/release_upgrade.py
+          release-artifacts/distributions/*.whl "$RUNNER_TEMP/release-upgrade"
       - name: Generate CycloneDX JSON SBOM from locked graph
         run: >-
           cyclonedx-py requirements requirements/release.txt
           --output-format JSON --output-file release-artifacts/refrncr.cdx.json
+      - name: Add the publication verifier to the validated job bundle
+        run: cp tools/release_publication.py release-artifacts/release_publication.py
       - name: Upload the single validated artifact set
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -91,6 +120,9 @@ jobs:
         with:
           name: validated-release-artifacts
           path: release-artifacts
+      - name: Verify transferred artifact hashes
+        working-directory: release-artifacts
+        run: sha256sum --check SHA256SUMS
       - name: Attest exact wheel and source distribution
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -100,12 +132,39 @@ jobs:
       - name: Attach the validated artifact set to the existing GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          repository="${{ github.repository }}"
+          mkdir -p "$RUNNER_TEMP/existing-release-assets"
+          missing=()
+          for asset in \
+            release-artifacts/SHA256SUMS \
+            release-artifacts/refrncr.cdx.json \
+            release-artifacts/distributions/*
+          do
+            name="$(basename "$asset")"
+            if gh release download "$tag" --repo "$repository" \
+              --pattern "$name" --dir "$RUNNER_TEMP/existing-release-assets" 2>/dev/null
+            then
+              cmp --silent "$asset" "$RUNNER_TEMP/existing-release-assets/$name" || {
+                echo "Existing release asset differs: $name" >&2
+                exit 1
+              }
+              echo "Existing release asset is identical: $name"
+            else
+              missing+=("$asset")
+            fi
+          done
+          if ((${#missing[@]})); then
+            gh release upload "$tag" --repo "$repository" "${missing[@]}"
+          fi
+      - id: pypi
+        name: Check for an identical existing PyPI publication
         run: >-
-          gh release upload "${{ github.event.release.tag_name }}"
-          --repo "${{ github.repository }}"
-          release-artifacts/SHA256SUMS release-artifacts/refrncr.cdx.json
-          release-artifacts/distributions/*
+          python release-artifacts/release_publication.py
+          release-artifacts/distributions "$GITHUB_OUTPUT"
       - name: Publish exact distributions through PyPI Trusted Publishing
+        if: steps.pypi.outputs.publish == 'true'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: release-artifacts/distributions/
