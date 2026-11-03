@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from packaging.version import Version
 
 from tools.compile_dev_lock import (
     COMPILE_FLAGS as DEV_COMPILE_FLAGS,
@@ -24,6 +25,9 @@ from tools.compile_release_lock import (
     PIP_TOOLS_VERSION,
     is_canonical_environment,
 )
+from tools.normalize_sdist import normalize_sdist
+from tools.release_publication import publication_required, sha256
+from tools.release_upgrade import preceding_public_version, wheel_identity
 from tools.supply_chain import gate_audit, gate_sarif, load_exceptions, validate_action_pins
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -324,8 +328,113 @@ def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
     assert "release-artifacts/distributions/*.tar.gz" in text
     assert "dist/**" not in text
     assert re.search(r"python -m build --outdir release-artifacts/distributions", text)
-    assert 'gh release upload "${{ github.event.release.tag_name }}"' in text
-    assert '--repo "${{ github.repository }}"' in text
+    assert 'gh release upload "$tag" --repo "$repository"' in text
+    assert 'repository="${{ github.repository }}"' in text
+    assert "python -m pipx install release-artifacts/distributions/*.whl" in text
+    assert "python tools/release_smoke.py http://127.0.0.1:8765" in text
+    assert "python tools/release_upgrade.py" in text
+    assert "python tools/normalize_sdist.py" in text
+    assert "sha256sum --check SHA256SUMS" in text
+    assert "Existing release asset differs" in text
+    assert "cp tools/release_publication.py release-artifacts/release_publication.py" in text
+    assert "python release-artifacts/release_publication.py" in text
+    assert "if: steps.pypi.outputs.publish == 'true'" in text
+
+
+def write_test_wheel(path, *, version="0.1.0rc2"):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(
+            f"refrncr-{version}.dist-info/METADATA",
+            f"Name: refrncr\nVersion: {version}\n",
+        )
+
+
+def test_release_publication_requires_absent_version_and_accepts_identical_replay(
+    tmp_path, monkeypatch
+):
+    directory = tmp_path / "dist"
+    directory.mkdir()
+    wheel = directory / "refrncr-0.1.0rc2-py3-none-any.whl"
+    sdist = directory / "refrncr-0.1.0rc2.tar.gz"
+    write_test_wheel(wheel)
+    sdist.write_bytes(b"source distribution")
+
+    monkeypatch.setattr("tools.release_publication.published_hashes", lambda *_args: None)
+    assert publication_required(directory)
+
+    hashes = {wheel.name: sha256(wheel), sdist.name: sha256(sdist)}
+    monkeypatch.setattr("tools.release_publication.published_hashes", lambda *_args: hashes)
+    assert not publication_required(directory)
+
+
+def test_release_publication_rejects_partial_or_different_existing_version(tmp_path, monkeypatch):
+    directory = tmp_path / "dist"
+    directory.mkdir()
+    wheel = directory / "refrncr-0.1.0rc2-py3-none-any.whl"
+    sdist = directory / "refrncr-0.1.0rc2.tar.gz"
+    write_test_wheel(wheel)
+    sdist.write_bytes(b"source distribution")
+    monkeypatch.setattr(
+        "tools.release_publication.published_hashes",
+        lambda *_args: {wheel.name: "0" * 64},
+    )
+
+    with pytest.raises(RuntimeError, match="partial or different publication"):
+        publication_required(directory)
+
+
+def test_stable_upgrade_selects_immediately_preceding_public_release(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(
+                {
+                    "releases": {
+                        "0.1.0rc1": [],
+                        "0.1.0rc2": [{"filename": "published"}],
+                        "0.1.0": [{"filename": "current"}],
+                        "0.2.0": [{"filename": "future"}],
+                    }
+                }
+            ).encode()
+
+    monkeypatch.setattr(
+        "tools.release_upgrade.urllib.request.urlopen", lambda *_a, **_k: Response()
+    )
+    assert str(preceding_public_version("refrncr", Version("0.1.0"))) == "0.1.0rc2"
+
+
+def test_upgrade_wheel_identity_reads_pep_440_version(tmp_path):
+    wheel = tmp_path / "refrncr-0.1.0-py3-none-any.whl"
+    write_test_wheel(wheel, version="0.1.0")
+
+    name, version = wheel_identity(wheel)
+
+    assert name == "refrncr"
+    assert str(version) == "0.1.0"
+
+
+def test_sdist_normalization_is_reproducible(tmp_path):
+    import tarfile
+
+    archives = []
+    for index in range(2):
+        archive = tmp_path / f"distribution-{index}.tar.gz"
+        payload = tmp_path / f"payload-{index}.txt"
+        payload.write_text("same release content")
+        with tarfile.open(archive, "w:gz") as target:
+            target.add(payload, arcname="refrncr-1.0/payload.txt")
+        normalize_sdist(archive, 1_700_000_000)
+        archives.append(archive)
+
+    assert archives[0].read_bytes() == archives[1].read_bytes()
 
 
 def test_release_requires_the_actual_main_quality_checks():

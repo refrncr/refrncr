@@ -88,10 +88,22 @@ mismatched or expired entries fail the gate; deleting an entry restores the ordi
 
 The repository workflow listens only to a published GitHub Release, validates its tag/version and
 that it targets current `main` with successful CI, then builds wheel and sdist once. It validates
-those files, writes SHA-256 sums, generates `refrncr.cdx.json` from the locked graph, and transfers
-one named artifact bundle. Only the protected `publish` job receives `contents: write`,
-`id-token: write`, and `attestations: write`; it attests and publishes the exact downloaded wheel
-and sdist and attaches the SBOM and checksums.
+those files, performs a clean `pipx` install and HTTP startup smoke test, writes SHA-256 sums,
+generates `refrncr.cdx.json` from the locked graph, and transfers one named artifact bundle. The
+publish job verifies those hashes after download. Only the protected `publish` job receives
+`contents: write`, `id-token: write`, and `attestations: write`; it attests and publishes the exact
+downloaded wheel and sdist and attaches the SBOM and checksums.
+
+The build uses the tagged commit time as `SOURCE_DATE_EPOCH`. On a retry, existing GitHub assets
+and PyPI distributions are accepted only when every filename and SHA-256 digest matches the newly
+validated bundle. Missing GitHub assets are added; different or partial existing publications fail
+closed. An identical PyPI publication is reported and skipped rather than uploaded again.
+
+Pre-releases require clean-install evidence only. For every stable version, the workflow selects
+the greatest published PEP 440 version below the candidate, installs it in a clean environment,
+creates a representative administrator record, installs the candidate wheel, starts the upgraded
+application to execute the complete migration chain, and verifies both the record and migration
+state were preserved.
 
 Before any real release, an administrator must:
 

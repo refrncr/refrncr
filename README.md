@@ -53,8 +53,8 @@ required for this quick start.
 
 Maintainers build releases from a committed, hash-verified runtime lock while the published package
 metadata retains compatible dependency ranges for ordinary consumers. See the
-[release supply-chain guide](docs/development/supply-chain.md); its configured release workflow is
-not evidence that PyPI or GitHub release prerequisites have already been activated.
+[release supply-chain guide](docs/development/supply-chain.md) for the controlled GitHub Release,
+protected-environment approval and PyPI Trusted Publishing process.
 
 ### Create the first administrator
 
