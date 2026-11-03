@@ -4,6 +4,11 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+## [0.1.0rc2] - 2026-11-03
+
+- Correct the controlled-release upload context so validated artifacts can be attached to the
+  GitHub Release before Trusted Publishing sends them to PyPI (REF-60).
+
 ## [0.1.0rc1] - 2026-11-03
 
 - Add a record-history API and Excel/CSV Period export with half-open validity periods,

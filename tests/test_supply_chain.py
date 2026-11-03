@@ -324,6 +324,8 @@ def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
     assert "release-artifacts/distributions/*.tar.gz" in text
     assert "dist/**" not in text
     assert re.search(r"python -m build --outdir release-artifacts/distributions", text)
+    assert 'gh release upload "${{ github.event.release.tag_name }}"' in text
+    assert '--repo "${{ github.repository }}"' in text
 
 
 def test_release_requires_the_actual_main_quality_checks():
