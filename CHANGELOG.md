@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+## [0.1.0rc1] - 2026-11-03
+
 - Add a record-history API and Excel/CSV Period export with half-open validity periods,
   merged unchanged states, and explicit handling of removals (REF-343).
 - Record-history reads derive all matching intervals from published snapshots before
