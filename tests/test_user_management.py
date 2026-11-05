@@ -62,6 +62,42 @@ def test_single_community_organisation_and_initial_admin(services):
         )
 
 
+def test_recover_administrator_password_replaces_credential_and_revokes_sessions(services):
+    factory, users, sessions = services
+    _organisation, admin = initial_admin(users)
+    token, _login = sessions.create(admin)
+
+    recovered = users.recover_administrator_password(" ADMIN@example.com ", "replacement password")
+
+    assert recovered.id == admin.id
+    assert (
+        AuthenticationService(users.uow).authenticate(admin.email, "correct horse battery staple")
+        is None
+    )
+    assert (
+        AuthenticationService(users.uow).authenticate(admin.email, "replacement password")
+        is not None
+    )
+    assert sessions.resolve(token) is None
+    with factory() as session:
+        events = list(session.scalars(select(AuditEvent)))
+        assert len(events) == 1
+        assert "replacement password" not in repr(events)
+
+
+def test_recover_administrator_password_rejects_non_admin_and_invalid_password(services):
+    _factory, users, _sessions = services
+    _organisation, admin = initial_admin(users)
+    users.create_user(admin.id, "person@example.com", "Person", "correct horse battery staple")
+
+    with pytest.raises(NotFoundError, match="Administrator not found"):
+        users.recover_administrator_password("person@example.com", "replacement password")
+    with pytest.raises(NotFoundError, match="Administrator not found"):
+        users.recover_administrator_password("other@example.com", "replacement password")
+    with pytest.raises(UserManagementError):
+        users.recover_administrator_password("admin@example.com", "too short")
+
+
 def test_database_rejects_a_second_organisation(services):
     factory, users, _ = services
     users.bootstrap_organisation()
