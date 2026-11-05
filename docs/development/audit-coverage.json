@@ -377,7 +377,7 @@
         "tests/test_user_management.py::test_recover_administrator_password_rejects_non_admin_and_invalid_password"
       ],
       "implementation_status": "Implemented for RC-29 Community boundary; full local validation passed.",
-      "exclusion_reason": "Trusted cross-repository recovery primitive; the Cloud control plane owns the durable operator audit and Community must remain free of Cloud tenancy concepts.",
+      "exclusion_reason": "Trusted installation recovery primitive. The cloud control plane owns the durable operator, installation, target, reason and result audit without copying secrets into Community; Community atomically changes the credential and revokes sessions.",
       "persistence_scope": "Existing installation database / User.password_hash and Session.revoked_at; no schema change."
     },
     {
