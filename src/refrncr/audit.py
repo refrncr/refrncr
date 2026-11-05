@@ -458,6 +458,17 @@ for _method, _action in (
     ("delete_user", "deleted"),
 ):
     _audited("UserService", _method, ("user", _action))
+
+_register(
+    "UserService",
+    "recover_administrator_password",
+    "technical logging only",
+    rationale=(
+        "Trusted installation recovery primitive. The cloud control plane owns the durable "
+        "operator, installation, target, reason and result audit without copying secrets into "
+        "Community; Community atomically changes the credential and revokes sessions."
+    ),
+)
 _read("UserService", "list_users")
 _read(
     "UserService",
