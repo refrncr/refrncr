@@ -349,6 +349,39 @@
     },
     {
       "capability": "UserService",
+      "operation": "recover_administrator_password",
+      "service": "refrncr.services.UserService.recover_administrator_password",
+      "interface_entrypoints": [
+        "Trusted programmatic Cloud control-plane caller; no direct Community HTTP or CLI entrypoint"
+      ],
+      "kind": "mutation",
+      "classification": "technical logging only",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "RC-29: the trusted Cloud control plane records the durable operator, installation, target, reason and result audit. Community must not receive tenant or organisation identifiers and must never log the submitted password or resulting password hash.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure only; no email address, password, password hash, session token, tenant or organisation identifier, request payload or exception details.",
+      "events": [],
+      "object_identifier": "No Community domain event. The Cloud control plane owns the stable installation and target identifiers for its durable operator audit.",
+      "actor_source": "Trusted Cloud control-plane context; Community deliberately has no cloud-operator principal and does not invent a domain actor.",
+      "allowed_context": {},
+      "success": "No Community domain event. Atomically replace the active administrator credential and revoke that administrator's active sessions within the selected installation.",
+      "validation_failure": "No state change or domain event; reject an invalid password before opening the write transaction.",
+      "authorization_failure": "No state change or domain event; return the same non-disclosing not-found outcome for missing, non-administrator, inactive or deleted targets.",
+      "stale_input": "A compare-and-swap on the existing password hash rejects a concurrent credential change and rolls back session revocation.",
+      "no_op": "No no-op success is exposed; a valid recovery request replaces the credential even when the submitted password matches the previous plaintext value.",
+      "rollback": "Credential replacement and active-session revocation share one serialized Community unit of work; any failure rolls both back.",
+      "duplicate_retry": "A successful retry creates a new password hash and revokes any sessions created since the preceding recovery; the Cloud control plane owns retry correlation and operator auditing.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_user_management.py::test_recover_administrator_password_replaces_credential_and_revokes_sessions",
+        "tests/test_user_management.py::test_recover_administrator_password_rejects_non_admin_and_invalid_password"
+      ],
+      "implementation_status": "Implemented for RC-29 Community boundary; full local validation passed.",
+      "exclusion_reason": "Trusted cross-repository recovery primitive; the Cloud control plane owns the durable operator audit and Community must remain free of Cloud tenancy concepts.",
+      "persistence_scope": "Existing installation database / User.password_hash and Session.revoked_at; no schema change."
+    },
+    {
+      "capability": "UserService",
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [

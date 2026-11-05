@@ -148,6 +148,7 @@
     "refrncr.services.UserService.enable_user",
     "refrncr.services.UserService.has_users",
     "refrncr.services.UserService.list_users",
+    "refrncr.services.UserService.recover_administrator_password",
     "refrncr.services.UserService.update_theme_preference"
   ],
   "routes": [
