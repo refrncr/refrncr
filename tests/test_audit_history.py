@@ -511,7 +511,7 @@ def test_read_boundary_has_no_framework_or_database_imports():
         "audit_history.py",
         "audit_presentation.py",
         "ports.py",
-        "web/__init__.py",
+        "web/audit.py",
     ):
         tree = ast.parse((root / name).read_text())
         imports = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]

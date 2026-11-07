@@ -152,7 +152,7 @@
   ],
   "routes": [
     {
-      "symbol": "refrncr.web.audit_list",
+      "symbol": "refrncr.web.audit.audit_list",
       "path": "/settings/audit-log",
       "methods": [
         "GET"
@@ -165,7 +165,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.audit_detail",
+      "symbol": "refrncr.web.audit.audit_detail",
       "path": "/settings/audit-log/<event_id>",
       "methods": [
         "GET"

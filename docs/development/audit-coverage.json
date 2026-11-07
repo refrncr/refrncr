@@ -2924,8 +2924,8 @@
       "operation": "resolve_with_session",
       "service": "refrncr.services.SessionService.resolve_with_session",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
@@ -4149,8 +4149,8 @@
       "operation": "for_request",
       "service": "refrncr.browser_security.BrowserCookiePolicy.for_request",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
@@ -4726,7 +4726,7 @@
       "operation": "list_history",
       "service": "refrncr.audit_history.AuditHistoryService.list_history",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log"
+        "refrncr.web.audit.audit_list GET /settings/audit-log"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4760,7 +4760,7 @@
       "operation": "get_event",
       "service": "refrncr.audit_history.AuditHistoryService.get_event",
       "interface_entrypoints": [
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6563,8 +6563,8 @@
       "operation": "has_capability",
       "service": "refrncr.services.AuthorizationService.has_capability",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",

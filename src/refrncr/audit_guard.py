@@ -17,7 +17,16 @@ SUPPORT_CLASSES = frozenset(
         "BrowserCookiePolicy",
     }
 )
-ROUTE_DECORATORS = {"app.get", "app.post", "app.route", "dataset_route", "import_route"}
+ROUTE_DECORATORS = {
+    "app.get",
+    "app.post",
+    "app.route",
+    "blueprint.get",
+    "blueprint.post",
+    "blueprint.route",
+    "dataset_route",
+    "import_route",
+}
 
 
 def discover_service_operations(source, module):
@@ -56,7 +65,7 @@ def discover_routes(source, module):
                 raise AuditContractError("Route needs explicit inventory: " + node.name)
             methods = next(
                 (ast.literal_eval(k.value) for k in decorator.keywords if k.arg == "methods"),
-                ["POST"] if name == "app.post" else ["GET"],
+                ["POST"] if name.endswith(".post") else ["GET"],
             )
             routes.append(
                 {

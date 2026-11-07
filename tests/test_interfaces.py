@@ -299,7 +299,11 @@ def _route_matrix_expectations():
         "team_list",
         "theme_preference",
     }
-    installation_admin = {"audit_list", "audit_detail", "dataset_access_settings"}
+    installation_admin = {
+        "audit.audit_list",
+        "audit.audit_detail",
+        "dataset_access_settings",
+    }
     access_admin = {
         "user_list",
         "create_user",
