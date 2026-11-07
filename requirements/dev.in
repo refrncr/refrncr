@@ -1,6 +1,6 @@
 # Exact development-tool input. Runtime dependencies remain in release.txt.
 build==1.6.1
-cyclonedx-bom==7.5.0
+cyclonedx-bom==7.6.0
 httpx==0.28.1
 pip-tools==7.6.2
 pre-commit==4.7.0
