@@ -36,13 +36,7 @@ from werkzeug.exceptions import HTTPException
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.audit import record_security_event
-from refrncr.audit_history import (
-    MAX_AUDIT_DATETIME_LENGTH,
-    AuditHistoryService,
-    filter_values,
-    parse_audit_filters,
-)
-from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
+from refrncr.audit_history import MAX_AUDIT_DATETIME_LENGTH, AuditHistoryService
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
@@ -77,7 +71,7 @@ from refrncr.login_security import (
     canonical_account_key,
 )
 from refrncr.overview import REASON_LABELS, OverviewService
-from refrncr.ports import AuditReadUnavailable, PersistenceConflictError
+from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import (
     DISPLAY_STATUSES,
     dataset_kind_label,
@@ -139,6 +133,7 @@ from refrncr.services import (
 )
 from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.errors import register_error_handlers
 from refrncr.web.helpers import (
     is_safe_login_target,
@@ -380,7 +375,7 @@ def create_flask_app(
         endpoint = request.endpoint or ""
         if endpoint.startswith("api_key_"):
             return "api_keys"
-        if endpoint.startswith("audit_"):
+        if endpoint.startswith("audit."):
             return "audit"
         if endpoint == "index":
             return "home"
@@ -621,62 +616,12 @@ def create_flask_app(
                 return redirect(url_for("api_key_list", revoked="1") + "#key-status", code=303)
         return api_key_page("revoke", key=key, error=error), 400 if error else 200
 
-    def audit_error(message, status=400):
-        return render_authenticated_template("pages/audit/error.html", error=message), status
-
-    @app.get("/settings/audit-log")
-    @capability_route("can_administer_installation")
-    @no_store_route
-    def audit_list():
-        actor, _session = require_capability("can_administer_installation")
-        try:
-            if len(request.query_string) > 4096:
-                raise ValidationError(
-                    "The audit filter URL is too long. Clear filters to start again."
-                )
-            filters, cursor = parse_audit_filters(request.args.items(multi=True))
-            page = audit_history.list_history(actor.id, filters, cursor)
-        except AuthorizationError:
-            abort(403)
-        except ValidationError as error:
-            return audit_error(str(error))
-        except AuditReadUnavailable:
-            return audit_error("Audit history is temporarily unavailable. Try again later.", 503)
-        values = filter_values(filters)
-        return render_authenticated_template(
-            "pages/audit/list.html",
-            page=page,
-            filters=values,
-            next_url=url_for("audit_list", **values, cursor=page.next_cursor)
-            if page.next_cursor
-            else None,
-            previous_url=url_for("audit_list", **values, cursor=page.previous_cursor)
-            if page.previous_cursor
-            else None,
-            actions=sorted(
-                (f"{kind}:{action}", label) for (kind, action), label in ACTION_LABELS.items()
-            ),
-            object_types=sorted((key, value.label) for key, value in OBJECTS.items()),
-        )
-
-    @app.get("/settings/audit-log/<event_id>")
-    @capability_route("can_administer_installation")
-    @no_store_route
-    def audit_detail(event_id):
-        actor, _session = require_capability("can_administer_installation")
-        try:
-            item = audit_history.get_event(actor.id, event_id)
-            if request.args:
-                raise ValidationError("This audit detail link contains unsupported parameters.")
-        except AuthorizationError:
-            abort(403)
-        except NotFoundError:
-            abort(404)
-        except ValidationError as error:
-            return audit_error(str(error))
-        except AuditReadUnavailable:
-            return audit_error("Audit history is temporarily unavailable. Try again later.", 503)
-        return render_authenticated_template("pages/audit/detail.html", item=item)
+    register_audit_blueprint(
+        app,
+        audit_history=audit_history,
+        require_capability=require_capability,
+        render_authenticated_template=render_authenticated_template,
+    )
 
     def require_dataset_dependencies():
         if (

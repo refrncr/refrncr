@@ -4,7 +4,7 @@
 {% set settings_title = "Audit log" %}
 
 {% block settings_content %}
-  <form {{ non_login_form_attrs() }} class="audit-filters" action="{{ url_for('audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
+  <form {{ non_login_form_attrs() }} class="audit-filters" action="{{ url_for('audit.audit_list') }}" method="get" aria-label="Filter audit history" data-audit-filters novalidate>
     <div class="form-field">
       <label for="audit-start">Start date and time<span class="visually-hidden"> (inclusive)</span></label>
       <input id="audit-start" name="start" type="text" value="{{ filters.get('start', '') }}" maxlength="{{ MAX_AUDIT_DATETIME_LENGTH }}" aria-describedby="audit-time-help" data-audit-date>
@@ -16,7 +16,7 @@
     {{ select_field('Actor', 'actor', 'audit-actor', page.actors, selected=filters.get('actor', ''), placeholder='All actors', described_by='audit-actor-help', noun='actors') }}
     {{ select_field('Action', 'action', 'audit-action', actions, selected=filters.get('action', ''), placeholder='All actions', noun='actions') }}
     {{ select_field('Object type', 'object_type', 'audit-type', object_types, selected=filters.get('object_type', ''), placeholder='All object types', noun='object types') }}
-    <div class="audit-filter-actions"><button class="button button-primary" type="submit">Apply filters</button><a class="button button-secondary" href="{{ url_for('audit_list') }}">Clear filters</a></div>
+    <div class="audit-filter-actions"><button class="button button-primary" type="submit">Apply filters</button><a class="button button-secondary" href="{{ url_for('audit.audit_list') }}">Clear filters</a></div>
     <p class="help-text audit-filter-help" id="audit-time-help">Enter ISO date and time with Z for UTC or an explicit offset, for example 2026-09-09T12:00Z.</p>
     <p class="help-text audit-filter-help" id="audit-actor-help">Choose an actor from this page. You can also filter by an actor from any event’s details.</p>
     <p class="error-text audit-filter-help" id="audit-date-error" role="alert" tabindex="-1" hidden></p>
@@ -32,7 +32,7 @@
             <td><bdi>{{ item.actor_label }}</bdi></td><td><span class='audit-action' data-action-kind='{{ "removal" if "delet" in item.action or "remov" in item.action else "addition" if "creat" in item.action or "add" in item.action or "publish" in item.action else "review" if "review" in item.action else "change" }}'>{{ item.action_label }}</span></td>
             <td>{{ item.object_type_label }}</td>
             <td>{% if item.object_status in ('deleted', 'unnamed') %}<i><bdi>{{ item.object_label }}</bdi></i>{% else %}<bdi>{{ item.object_label }}</bdi>{% endif %}</td>
-            <td><a href="{{ url_for('audit_detail', event_id=item.id) }}" data-panel-url data-dialog-open="audit-detail-panel">View details<span class="visually-hidden">: {{ item.action_label }}, {{ item.timestamp }}, event {{ item.id }}</span></a></td>
+            <td><a href="{{ url_for('audit.audit_detail', event_id=item.id) }}" data-panel-url data-dialog-open="audit-detail-panel">View details<span class="visually-hidden">: {{ item.action_label }}, {{ item.timestamp }}, event {{ item.id }}</span></a></td>
           </tr>
         {% endfor %}</tbody>
       </table>
