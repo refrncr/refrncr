@@ -1,3 +1,12 @@
+"""Compose the Community browser application from domain blueprints.
+
+Each blueprint exposes module-level route functions and stores its typed service
+context in ``app.extensions["refrncr.<blueprint>"]``. A
+``register_<blueprint>_blueprint(app, ...)`` function creates that context and
+registers the blueprint. New route modules must follow this pattern so routes
+remain independently importable without introducing module-global services.
+"""
+
 from __future__ import annotations
 
 import hmac
@@ -9,7 +18,6 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
 from types import SimpleNamespace
-from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from flask import (
@@ -24,7 +32,7 @@ from flask import (
     url_for,
 )
 from markupsafe import Markup
-from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
+from werkzeug.exceptions import HTTPException
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.audit import record_security_event
@@ -38,7 +46,6 @@ from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
-    WEB_HTML_HEADERS,
     BrowserCookiePolicy,
 )
 from refrncr.change_status import (
@@ -90,7 +97,6 @@ from refrncr.presentation_metadata import (
     rendered_dataset_icon,
 )
 from refrncr.record_import import (
-    MAX_COLUMNS,
     MAX_UPLOAD_BYTES,
     PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
@@ -133,97 +139,39 @@ from refrncr.services import (
 )
 from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.web.errors import register_error_handlers
+from refrncr.web.helpers import (
+    is_safe_login_target,
+    merge_error_messages,
+    parse_page_parameter,
+)
+from refrncr.web.helpers import (
+    safe_login_target as safe_login_target,
+)
+from refrncr.web.hooks import (
+    register_concept_hooks,
+    register_dataset_visit_hook,
+    register_request_limit_hook,
+    register_response_hooks,
+    register_security_hooks,
+)
+from refrncr.web.routing import (
+    anonymous_csrf_route,
+    authenticated_route,
+    bounded_import_route,
+    capability_route,
+    concept_route,
+    dataset_not_found_route,
+    no_store_route,
+    public_route,
+    upload_limit_route,
+)
 from refrncr.xml_security import require_xml_protection
-
-
-def merge_error_messages(*messages):
-    return " ".join(dict.fromkeys(message for message in messages if message))
-
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
 GENERIC_LOGIN_FAILURE = "Invalid credentials"
 MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
-
-
-def public_route(view):
-    """Mark a browser route that may be reached without an active session."""
-    view.public_route = True
-    return view
-
-
-def anonymous_csrf_route(view):
-    """Mark a route whose state changes use the anonymous CSRF cookie."""
-    view.anonymous_csrf_route = True
-    return view
-
-
-def concept_route(view):
-    """Mark a route that needs concept context and no-store response headers."""
-    view.concept_route = True
-    return view
-
-
-def capability_route(capability):
-    """Declare the capability required by a browser route."""
-
-    def decorate(view):
-        view.required_capability = capability
-        return view
-
-    return decorate
-
-
-def authenticated_route(view):
-    """Declare the capability shared by every authenticated browser route."""
-    return capability_route("can_access_community")(view)
-
-
-def no_store_route(view):
-    view.no_store_route = True
-    return view
-
-
-def upload_limit_route(view):
-    view.upload_limit_route = True
-    return view
-
-
-def bounded_import_route(view):
-    view.bounded_import_route = True
-    return view
-
-
-def dataset_not_found_route(view):
-    view.dataset_not_found_route = True
-    return view
-
-
-def is_safe_login_target(target: str | None) -> bool:
-    """Return whether a login target is a safe root-relative path."""
-    if not target:
-        return True
-    decoded = unquote(target)
-    if (
-        not decoded.startswith("/")
-        or decoded.startswith("//")
-        or any(
-            character.isspace() or ord(character) < 32 or ord(character) == 127
-            for character in decoded
-        )
-        or any(character in decoded for character in "\\%?#")
-        or any(segment in {".", ".."} for segment in decoded.split("/"))
-    ):
-        return False
-    parsed = urlsplit(decoded)
-    if parsed.scheme or parsed.netloc or parsed.path in {"/login", "/logout", "/setup"}:
-        return False
-    return True
-
-
-def safe_login_target(target: str | None) -> str:
-    """Accept only root-relative paths, never URLs or query/fragment payloads."""
-    return target if is_safe_login_target(target) else "/"
 
 
 def create_flask_app(
@@ -251,7 +199,7 @@ def create_flask_app(
     clock: Clock | None = None,
 ) -> Flask:
     require_xml_protection()
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder="../static", template_folder="../templates")
     clock = clock or getattr(
         api_keys, "clock", getattr(getattr(users, "uow", None), "clock", SYSTEM_CLOCK)
     )
@@ -343,16 +291,7 @@ def create_flask_app(
 
     app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
 
-    @app.before_request
-    def import_upload_limit():
-        view = app.view_functions.get(request.endpoint)
-        if getattr(view, "upload_limit_route", False) and request.method == "POST":
-            request.max_content_length = MAX_UPLOAD_BYTES + 64 * 1024
-        elif getattr(view, "bounded_import_route", False) and request.method == "POST":
-            # Six bounded controls per column, plus CSRF and optional navigation.
-            # Multipart framing must fit the existing 250-column upload contract.
-            request.max_content_length = MAX_COLUMNS * 1024
-            request.max_form_parts = MAX_COLUMNS * 6 + 2
+    register_request_limit_hook(app)
 
     login_limiter = login_limiter or LoginAttemptLimiter(clock=clock)
     source_resolver = source_resolver or SourceIdentityResolver()
@@ -404,62 +343,7 @@ def create_flask_app(
             abort(403, description="Authenticated browser access requires HTTPS")
         return settings
 
-    @app.after_request
-    def protect_browser_response(response):
-        # Flask only: the mounted API and documentation own their response policies.
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        if request.is_secure:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        if response.mimetype == "text/html":
-            response.headers.update(WEB_HTML_HEADERS)
-            response.headers.setdefault("Referrer-Policy", "same-origin")
-        return response
-
-    @app.after_request
-    def clear_stale_session_cookie(response):
-        settings = getattr(g, "stale_cookie_settings", None)
-        if settings is not None:
-            response.delete_cookie(settings.session_name, **settings.common_options)
-        return response
-
-    @app.errorhandler(RequestEntityTooLarge)
-    def handle_oversized_request(_error):
-        if request.path == "/login":
-            return GENERIC_LOGIN_FAILURE, 401
-        return "Request is too large", 413
-
-    @app.errorhandler(HTTPException)
-    def handle_http_error(error):
-        if error.code in {403, 404, 405, 500}:
-            messages = {
-                403: "You are not allowed to view this page.",
-                404: "The requested page could not be found.",
-                405: "This action is not supported for this page.",
-                500: "Something went wrong. Please try again.",
-            }
-            return (
-                render_authenticated_template(
-                    "pages/error.html",
-                    error_code=error.code,
-                    error_message=messages[error.code],
-                ),
-                error.code,
-            )
-        return error
-
-    @app.errorhandler(Exception)
-    def handle_unexpected_error(error):
-        logging.getLogger(__name__).exception(
-            "Unhandled web request failed: %s", type(error).__name__
-        )
-        return (
-            render_authenticated_template(
-                "pages/error.html",
-                error_code=500,
-                error_message="Something went wrong. Please try again.",
-            ),
-            500,
-        )
+    register_response_hooks(app)
 
     authentication_cache_missing = object()
 
@@ -482,89 +366,15 @@ def create_flask_app(
         g.authenticated_resolution = resolved
         return resolved
 
-    @app.before_request
-    def redirect_anonymous_browser_request():
-        # Only registered browser endpoints participate; API/health is owned by FastAPI.
-        view = app.view_functions.get(request.endpoint)
-        if (
-            request.endpoint
-            and request.endpoint != "static"
-            and not getattr(view, "public_route", False)
-        ):
-            if authenticated() is None:
-                target = (
-                    safe_login_target(request.path) if request.method in {"GET", "HEAD"} else "/"
-                )
-                return redirect(url_for("login", next=target))
-
-    @app.before_request
-    def enforce_csrf_for_state_changes():
-        """Protect every browser state change independently of endpoint names."""
-        if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
-            return None
-        view = app.view_functions.get(request.endpoint)
-        if request.endpoint is None or view is None:
-            return None
-        settings = cookie_settings()
-        if not getattr(view, "anonymous_csrf_route", False) and (
-            settings is None or request.cookies.get(settings.session_name) is None
-        ):
-            return None
-        resolved = authenticated()
-        expected = (
-            request.cookies.get(settings.anonymous_csrf_name)
-            if getattr(view, "anonymous_csrf_route", False) and settings
-            else resolved[1].csrf_token
-            if resolved is not None
-            else request.cookies.get(settings.anonymous_csrf_name)
-            if settings
-            else None
-        )
-        require_csrf(expected)
-        return None
-
-    @app.before_request
-    def enforce_route_capability():
-        view = app.view_functions.get(request.endpoint)
-        capability = getattr(view, "required_capability", None)
-        if capability is None:
-            return None
-        resolved = authenticated()
-        if resolved is None:
-            return None
-        if capability in {
-            "can_access_community",
-            "can_administer_installation",
-            "can_manage_access",
-            "can_create_dataset",
-        }:
-            require_capability(capability)
-            return None
-        if capability not in {
-            "can_view_dataset",
-            "can_maintain_dataset",
-            "can_export_dataset",
-            "can_create_dataset",
-            "can_manage_export_access",
-        }:
-            abort(500)
-        key = (request.view_args or {}).get("key")
-        dataset_id = (request.view_args or {}).get("dataset_id")
-        if key is None and dataset_id is None:
-            return None
-        if authorization is None or datasets is None:
-            abort(404)
-        with datasets.uow() as uow:
-            dataset = (
-                uow.datasets.get(dataset_id)
-                if dataset_id is not None
-                else uow.datasets.find_by_key(key)
-            )
-        if dataset is None or not authorization.has_capability(
-            resolved[0].id, capability, dataset.id
-        ):
-            abort(404)
-        return None
+    register_security_hooks(
+        app,
+        authenticated=authenticated,
+        cookie_settings=cookie_settings,
+        require_csrf=lambda token: require_csrf(token),
+        require_capability=lambda capability: require_capability(capability),
+        authorization=authorization,
+        datasets=datasets,
+    )
 
     def active_navigation() -> str:
         endpoint = request.endpoint or ""
@@ -600,39 +410,18 @@ def create_flask_app(
             return "teams"
         return ""
 
-    @app.before_request
-    def bind_concept_context():
-        values = request.view_args or {}
-        view = app.view_functions.get(request.endpoint)
-        if (
-            dataset_ui_enabled
-            and values.get("key")
-            and (getattr(view, "concept_route", False) or values.get("concept"))
-        ):
-            actor, session = require_authenticated()
-            if request.method == "POST":
-                require_csrf(session.csrf_token)
-            try:
-                datasets.get_dataset_for_edit(actor.id, values["key"])
-                g.concept_ui = dataset_versions.concept_context(actor.id, values["key"])
-            except NotFoundError:
-                abort(404)
-            except ConflictError as error:
-                return render_authenticated_template(
-                    "pages/datasets/concept_required.html",
-                    key=values["key"],
-                    error=str(error),
-                    has_current=dataset_versions.history(actor.id, values["key"]).has_current,
-                ), 409
-
-    @app.context_processor
-    def concept_template_context():
-        return {"concept_ui": getattr(g, "concept_ui", None)}
-
-    @app.context_processor
-    def theme_template_context():
-        resolved = authenticated()
-        return {"current_theme_preference": resolved[0].theme_preference if resolved else "system"}
+    register_concept_hooks(
+        app,
+        dataset_ui_enabled=dataset_ui_enabled,
+        require_authenticated=lambda: require_authenticated(),
+        require_csrf=lambda token: require_csrf(token),
+        datasets=datasets,
+        dataset_versions=dataset_versions,
+        render_authenticated_template=lambda template, **context: render_authenticated_template(
+            template, **context
+        ),
+        authenticated=authenticated,
+    )
 
     def render_authenticated_template(template_name: str, **context):
         resolved = authenticated()
@@ -689,6 +478,12 @@ def create_flask_app(
                 context["mapping_history_sources"] = context["mapping_source"]["history"]
         return render_authenticated_template(template_name, **context)
 
+    register_error_handlers(
+        app,
+        render_authenticated_template,
+        generic_login_failure=GENERIC_LOGIN_FAILURE,
+    )
+
     def require_capability(capability: str):
         resolved = authenticated()
         allowed = resolved is not None and (
@@ -711,24 +506,6 @@ def create_flask_app(
         if resolved is None:
             abort(403)
         return resolved
-
-    @app.after_request
-    def protect_audit_response(response):
-        endpoint = request.endpoint or ""
-        view = app.view_functions.get(endpoint)
-        if getattr(view, "no_store_route", False):
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["Referrer-Policy"] = "no-referrer"
-            return response
-        if getattr(view, "concept_route", False) or (request.view_args or {}).get("concept", False):
-            response.headers["Cache-Control"] = "no-store"
-            response.headers["Referrer-Policy"] = (
-                "no-referrer" if "review" in request.args else "same-origin"
-            )
-        return response
-
-    def audit_error(message, status=400):
-        return render_authenticated_template("pages/audit/error.html", error=message), status
 
     def api_key_page(template="list", **context):
         return render_authenticated_template("pages/api_keys/" + template + ".html", **context)
@@ -843,6 +620,9 @@ def create_flask_app(
             else:
                 return redirect(url_for("api_key_list", revoked="1") + "#key-status", code=303)
         return api_key_page("revoke", key=key, error=error), 400 if error else 200
+
+    def audit_error(message, status=400):
+        return render_authenticated_template("pages/audit/error.html", error=message), status
 
     @app.get("/settings/audit-log")
     @capability_route("can_administer_installation")
@@ -1061,28 +841,12 @@ def create_flask_app(
             active_navigation="home",
         )
 
-    @app.after_request
-    def record_dataset_visit(response):
-        values = request.view_args or {}
-        if (
-            dataset_ui_enabled
-            and request.method == "GET"
-            and response.status_code == 200
-            and response.mimetype == "text/html"
-            and request.path.startswith("/datasets/")
-            and (values.get("key") or values.get("dataset_id"))
-        ):
-            resolved = authenticated()
-            if resolved:
-                try:
-                    overview_service.record_visit(
-                        resolved[0].id, key=values.get("key"), dataset_id=values.get("dataset_id")
-                    )
-                except (AuthorizationError, PersistenceConflictError):
-                    # Concurrent deletion/revocation or a history-write conflict must not
-                    # replace an already-authorized page with a telemetry failure.
-                    logging.getLogger(__name__).warning("Dataset visit could not be recorded")
-        return response
+    register_dataset_visit_hook(
+        app,
+        dataset_ui_enabled=dataset_ui_enabled,
+        authenticated=authenticated,
+        overview_service=overview_service,
+    )
 
     @dataset_route("/datasets", capability="can_access_community", methods=["GET"])
     def dataset_list():
@@ -2052,14 +1816,6 @@ def create_flask_app(
         return redirect(
             url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
         )
-
-    def parse_page_parameter() -> int:
-        values = request.args.getlist("page")
-        if not values:
-            return 1
-        if len(values) != 1 or re.fullmatch(r"[1-9][0-9]{0,8}", values[0]) is None:
-            abort(400, description="Page must be a canonical positive integer")
-        return int(values[0])
 
     def hierarchy_presentation(view):
         """Arrange a snapshot for templates without changing its structure or values."""
