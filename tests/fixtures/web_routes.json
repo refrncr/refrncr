@@ -1,0 +1,751 @@
+[
+  {
+    "path": "/",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "index"
+  },
+  {
+    "path": "/attention",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "attention_overview"
+  },
+  {
+    "path": "/datasets",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "dataset_list"
+  },
+  {
+    "path": "/datasets",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_create_dataset",
+    "public": false,
+    "endpoint": "create_dataset"
+  },
+  {
+    "path": "/datasets/<key>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_detail"
+  },
+  {
+    "path": "/datasets/<key>",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "update_dataset"
+  },
+  {
+    "path": "/datasets/<key>/concept",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_detail"
+  },
+  {
+    "path": "/datasets/<key>/concept/discard",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_concept_discard"
+  },
+  {
+    "path": "/datasets/<key>/concept/hierarchy-import",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "import_hierarchy_file"
+  },
+  {
+    "path": "/datasets/<key>/concept/hierarchy-import/<token>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "hierarchy_import_preview"
+  },
+  {
+    "path": "/datasets/<key>/concept/hierarchy-import/<token>/cancel",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "cancel_hierarchy_import"
+  },
+  {
+    "path": "/datasets/<key>/concept/hierarchy-import/<token>/confirm",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "confirm_hierarchy_import"
+  },
+  {
+    "path": "/datasets/<key>/concept/new",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_concept_create"
+  },
+  {
+    "path": "/datasets/<key>/concept/nodes/<node_id>/delete",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_hierarchy_node_delete"
+  },
+  {
+    "path": "/datasets/<key>/concept/nodes/<node_id>/edit",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_hierarchy_node_edit"
+  },
+  {
+    "path": "/datasets/<key>/concept/nodes/<node_id>/values",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_hierarchy_node_values"
+  },
+  {
+    "path": "/datasets/<key>/concept/nodes/new",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_hierarchy_node_create"
+  },
+  {
+    "path": "/datasets/<key>/concept/records",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_records_view"
+  },
+  {
+    "path": "/datasets/<key>/concept/records/<record_id>/restore",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "restore_dataset_record"
+  },
+  {
+    "path": "/datasets/<key>/concept/records/export",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_export_dataset",
+    "public": false,
+    "endpoint": "export_dataset_records"
+  },
+  {
+    "path": "/datasets/<key>/concept/records/import-new-version",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "import_dataset_records"
+  },
+  {
+    "path": "/datasets/<key>/configure",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_configuration"
+  },
+  {
+    "path": "/datasets/<key>/edit",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "edit_dataset"
+  },
+  {
+    "path": "/datasets/<key>/export-access",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_export_access",
+    "public": false,
+    "endpoint": "dataset_export_access"
+  },
+  {
+    "path": "/datasets/<key>/export-access/<access_id>/revoke",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_export_access",
+    "public": false,
+    "endpoint": "revoke_dataset_export_access"
+  },
+  {
+    "path": "/datasets/<key>/fields",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "create_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/fields/<field_key>",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "update_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/fields/<field_key>/delete",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "delete_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/fields/<field_key>/edit",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "edit_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/fields/new",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "new_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/fields/order",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "move_dataset_field"
+  },
+  {
+    "path": "/datasets/<key>/records",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_records_view"
+  },
+  {
+    "path": "/datasets/<key>/records",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "create_dataset_record"
+  },
+  {
+    "path": "/datasets/<key>/records/<record_id>/delete",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "delete_dataset_record"
+  },
+  {
+    "path": "/datasets/<key>/records/<record_id>/edit",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "edit_dataset_record"
+  },
+  {
+    "path": "/datasets/<key>/records/export",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_export_dataset",
+    "public": false,
+    "endpoint": "export_dataset_records"
+  },
+  {
+    "path": "/datasets/<key>/records/export/period",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_export_dataset",
+    "public": false,
+    "endpoint": "export_dataset_history"
+  },
+  {
+    "path": "/datasets/<key>/records/import",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "import_dataset_records"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/cancel",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "cancel_record_import"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/confirm",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "confirm_record_import"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/formats",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "review_source_formats"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/mapping",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "review_import_mapping"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/preview",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "preview_record_import"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/step/<int:step>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_import_step"
+  },
+  {
+    "path": "/datasets/<key>/records/import/<token>/worksheet",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "select_import_worksheet"
+  },
+  {
+    "path": "/datasets/<key>/records/new",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "new_dataset_record"
+  },
+  {
+    "path": "/datasets/<key>/source/update",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_mapping_source_update"
+  },
+  {
+    "path": "/datasets/<key>/versions",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_versions_view"
+  },
+  {
+    "path": "/datasets/<key>/versions/<version_id>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_detail"
+  },
+  {
+    "path": "/datasets/<key>/versions/<version_id>/cancel",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_version_cancel"
+  },
+  {
+    "path": "/datasets/<key>/versions/<version_id>/fields/<field_key>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_version_field_detail"
+  },
+  {
+    "path": "/datasets/<key>/versions/<version_id>/records",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_records_view"
+  },
+  {
+    "path": "/datasets/<key>/versions/<version_id>/records/export",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_export_dataset",
+    "public": false,
+    "endpoint": "export_dataset_records"
+  },
+  {
+    "path": "/datasets/<key>/versions/publish",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_version_publish"
+  },
+  {
+    "path": "/datasets/<key>/versions/review",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_version_review"
+  },
+  {
+    "path": "/datasets/<key>/versions/review/fields/<object_id>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_version_field_diff"
+  },
+  {
+    "path": "/datasets/<key>/versions/review/records/<object_id>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_view_dataset",
+    "public": false,
+    "endpoint": "dataset_version_record_diff"
+  },
+  {
+    "path": "/datasets/id/<dataset_id>/delete",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_maintain_dataset",
+    "public": false,
+    "endpoint": "dataset_delete"
+  },
+  {
+    "path": "/datasets/new",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_create_dataset",
+    "public": false,
+    "endpoint": "new_dataset"
+  },
+  {
+    "path": "/login",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": null,
+    "public": true,
+    "endpoint": "login"
+  },
+  {
+    "path": "/logout",
+    "methods": [
+      "POST"
+    ],
+    "capability": null,
+    "public": true,
+    "endpoint": "logout"
+  },
+  {
+    "path": "/settings/api-keys",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_list"
+  },
+  {
+    "path": "/settings/api-keys/<key_id>/revoke",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_revoke"
+  },
+  {
+    "path": "/settings/api-keys/new",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_create"
+  },
+  {
+    "path": "/settings/appearance",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "appearance_settings"
+  },
+  {
+    "path": "/settings/audit-log",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "audit_list"
+  },
+  {
+    "path": "/settings/audit-log/<event_id>",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "audit_detail"
+  },
+  {
+    "path": "/settings/dataset-access",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "dataset_access_settings"
+  },
+  {
+    "path": "/settings/theme",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "theme_preference"
+  },
+  {
+    "path": "/setup",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "capability": null,
+    "public": true,
+    "endpoint": "setup"
+  },
+  {
+    "path": "/teams",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "team_list"
+  },
+  {
+    "path": "/teams",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_team"
+  },
+  {
+    "path": "/teams/<team_id>/delete",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "delete_team"
+  },
+  {
+    "path": "/teams/<team_id>/members",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "team_members"
+  },
+  {
+    "path": "/teams/<team_id>/members",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_membership"
+  },
+  {
+    "path": "/teams/<team_id>/members/<membership_id>/delete",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "delete_membership"
+  },
+  {
+    "path": "/teams/<team_id>/rename",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "rename_team"
+  },
+  {
+    "path": "/users",
+    "methods": [
+      "GET"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "user_list"
+  },
+  {
+    "path": "/users",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_user"
+  },
+  {
+    "path": "/users/<target_id>/<action>",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "change_user_state"
+  },
+  {
+    "path": "/users/<target_id>/email",
+    "methods": [
+      "POST"
+    ],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "change_user_email"
+  }
+]

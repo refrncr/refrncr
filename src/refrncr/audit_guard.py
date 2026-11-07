@@ -76,7 +76,10 @@ def verify_inventory(root):
     for path in (root / "src/refrncr").rglob("*.py"):
         if "migrations" in path.parts:
             continue  # Operator prepare_database owns the complete Alembic revision chain.
-        module = ".".join(path.relative_to(root / "src").with_suffix("").parts)
+        module_parts = path.relative_to(root / "src").with_suffix("").parts
+        if module_parts[-1] == "__init__":
+            module_parts = module_parts[:-1]
+        module = ".".join(module_parts)
         source = path.read_text()
         tree = ast.parse(source)
         if any(
@@ -142,8 +145,13 @@ def verify_inventory(root):
         parts = symbol.split(".")
         module_length = len(parts) - 1
         while module_length > 1:
-            path = (root / "src").joinpath(*parts[:module_length]).with_suffix(".py")
+            module_path = (root / "src").joinpath(*parts[:module_length])
+            path = module_path.with_suffix(".py")
+            package_path = module_path / "__init__.py"
             if path.is_file():
+                break
+            if package_path.is_file():
+                path = package_path
                 break
             module_length -= 1
         else:

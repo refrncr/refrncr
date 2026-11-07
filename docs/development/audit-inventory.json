@@ -1734,7 +1734,7 @@
     "refrncr.dataset_upgrade.ownership_preflight",
     "refrncr.dataset_upgrade.read_owner_mapping",
     "refrncr.dataset_upgrade.require_resolved_ownership",
-    "refrncr.web.handle_oversized_request",
+    "refrncr.web.errors.handle_oversized_request",
     "refrncr.web.index",
     "refrncr.web.require_cookie_settings",
     "refrncr.web.require_csrf",
@@ -1778,12 +1778,12 @@
       "operations": [
         "refrncr.web.require_cookie_settings",
         "refrncr.web.require_csrf",
-        "refrncr.web.handle_oversized_request"
+        "refrncr.web.errors.handle_oversized_request"
       ],
       "reason": "Apply to all applicable protected forms/import/login requests; failures have REF-31 disposition and no success audit."
     },
     {
-      "symbol": "Successful dataset HTML GET: refrncr.web.record_dataset_visit",
+      "symbol": "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit",
       "operations": [
         "refrncr.overview.OverviewService.record_visit"
       ]

@@ -1,7 +1,9 @@
+import json
 import os
 import re
 import uuid
 from itertools import chain, combinations
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -166,6 +168,52 @@ def test_every_browser_route_declares_a_known_capability_or_public_access(interf
         if getattr(view, "public_route", False):
             continue
         assert getattr(view, "required_capability", None) in known, rule.endpoint
+
+
+def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+        dataset_fields,
+        dataset_business_keys,
+    ) = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+    )
+    actual = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = app.view_functions[rule.endpoint]
+        actual.append(
+            {
+                "path": rule.rule,
+                "methods": sorted(rule.methods - {"HEAD", "OPTIONS"}),
+                "capability": getattr(view, "required_capability", None),
+                "public": getattr(view, "public_route", False),
+                # Blueprint prefixes are the one intentional endpoint change in REF-224.
+                "endpoint": rule.endpoint.rsplit(".", 1)[-1],
+            }
+        )
+    expected = json.loads((Path(__file__).parent / "fixtures" / "web_routes.json").read_text())
+
+    assert (
+        sorted(actual, key=lambda row: (row["path"], row["methods"], row["endpoint"])) == expected
+    )
 
 
 def test_renamed_views_keep_csrf_and_capability_checks():
@@ -385,6 +433,9 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
     exporter = services.users.create_user(
         admin.id, "matrix-exporter@example.com", "Exporter", "valid password"
     )
+    managed_user = services.users.create_user(
+        admin.id, "matrix-managed@example.com", "Managed", "valid password"
+    )
     dataset = create_dataset(services, admin, "matrix-dataset")
     owner_team_id = dataset.owner_team_id
     services.memberships.create_membership(admin.id, maintainer.id, owner_team_id)
@@ -444,15 +495,21 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
                 client = app.test_client()
                 client.set_cookie(SESSION_COOKIE, session_token, domain="localhost")
                 calls.clear()
-                path = _route_probe_path(rule, dataset=dataset, team=owner_team_id, user=viewer)
+                path = _route_probe_path(
+                    rule,
+                    dataset=dataset,
+                    team=owner_team_id,
+                    user=managed_user,
+                )
                 response = getattr(client, method.lower())(
                     path,
                     base_url=HTTPS,
                     data={"csrf_token": login_session.csrf_token},
                 )
-                if not calls:
-                    assert response.status_code in {302, 400, 404, 405}
-                    continue
+                assert calls, (
+                    f"{method} {rule.rule} bypassed the central capability hook "
+                    f"with status {response.status_code}"
+                )
                 assert calls[0][1] == expected, f"{method} {rule.rule}"
                 if actor is lower_user and expected in denied_for_lower:
                     assert response.status_code in {403, 404}, f"{method} {rule.rule}"

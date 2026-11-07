@@ -4660,7 +4660,7 @@
     {
       "capability": "web",
       "operation": "handle_oversized_request",
-      "service": "refrncr.web.handle_oversized_request",
+      "service": "refrncr.web.errors.handle_oversized_request",
       "interface_entrypoints": [
         "Browser transport, CSRF, request-size and exception hooks"
       ],
@@ -6941,7 +6941,7 @@
       "operation": "record_visit",
       "service": "refrncr.overview.OverviewService.record_visit",
       "interface_entrypoints": [
-        "Successful dataset HTML GET: refrncr.web.record_dataset_visit"
+        "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",
