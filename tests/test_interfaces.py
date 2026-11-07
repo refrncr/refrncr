@@ -305,10 +305,10 @@ def _route_matrix_expectations():
         "dataset_access_settings",
     }
     access_admin = {
-        "user_list",
-        "create_user",
-        "change_user_state",
-        "change_user_email",
+        "users.user_list",
+        "users.create_user",
+        "users.change_user_state",
+        "users.change_user_email",
         "create_team",
         "rename_team",
         "delete_team",

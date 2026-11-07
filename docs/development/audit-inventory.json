@@ -152,7 +152,7 @@
   ],
   "routes": [
     {
-      "symbol": "refrncr.web.audit_list",
+      "symbol": "refrncr.web.audit.audit_list",
       "path": "/settings/audit-log",
       "methods": [
         "GET"
@@ -165,7 +165,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.audit_detail",
+      "symbol": "refrncr.web.audit.audit_detail",
       "path": "/settings/audit-log/<event_id>",
       "methods": [
         "GET"
@@ -1148,7 +1148,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.user_list",
+      "symbol": "refrncr.web.users.user_list",
       "path": "/users",
       "methods": [
         "GET"
@@ -1162,7 +1162,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_user",
+      "symbol": "refrncr.web.users.create_user",
       "path": "/users",
       "methods": [
         "POST"
@@ -1178,7 +1178,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.change_user_state",
+      "symbol": "refrncr.web.users.change_user_state",
       "path": "/users/<target_id>/<action>",
       "methods": [
         "POST"
@@ -1194,7 +1194,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.change_user_email",
+      "symbol": "refrncr.web.users.change_user_email",
       "path": "/users/<target_id>/email",
       "methods": [
         "POST"
