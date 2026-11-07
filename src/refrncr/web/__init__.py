@@ -163,6 +163,7 @@ from refrncr.web.routing import (
     public_route,
     upload_limit_route,
 )
+from refrncr.web.users import register_users_blueprint
 from refrncr.xml_security import require_xml_protection
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
@@ -401,7 +402,7 @@ def create_flask_app(
             "export_dataset_records",
         }:
             return "datasets"
-        if endpoint.startswith("user_"):
+        if endpoint.startswith("users."):
             return "users"
         if endpoint.startswith("team_"):
             return "teams"
@@ -4429,93 +4430,15 @@ def create_flask_app(
             current_csrf=login_session.csrf_token,
         )
 
-    def render_user_list(*, form_error=None, form_target_id=None, form_data=None, status=200):
-        actor, login_session = require_capability("can_manage_access")
-        managed_users = users.list_users(actor.id)
-        user_teams = {}
-        for relationship in memberships.list_relationships(actor.id):
-            user_teams.setdefault(relationship.user_id, []).append(relationship)
-        form_data = form_data or {}
-        return render_template(
-            "pages/users/list.html",
-            users=managed_users,
-            user_teams=user_teams,
-            open_user=form_target_id or request.args.get("open_user"),
-            form_error=form_error,
-            form_target_id=form_target_id,
-            form_email=form_data.get("invitee_email", form_data.get("email", "")),
-            form_display_name=form_data.get(
-                "invitee_display_name", form_data.get("display_name", "")
-            ),
-            form_role=form_data.get("role", "user"),
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        ), status
-
-    @app.get("/users")
-    @capability_route("can_manage_access")
-    def user_list():
-        return render_user_list()
-
-    @app.post("/users")
-    @capability_route("can_manage_access")
-    def create_user():
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            users.create_user(
-                actor.id,
-                request.form.get("invitee_email", request.form.get("email", "")),
-                request.form.get("invitee_display_name", request.form.get("display_name", "")),
-                request.form.get("invitee_password", request.form.get("password", "")),
-                request.form.get("role", "user"),
-            )
-        except (ValidationError, ConflictError) as error:
-            return render_user_list(
-                form_error=str(error),
-                form_data=request.form,
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("user_list"))
-
-    @app.post("/users/<target_id>/<action>")
-    @capability_route("can_manage_access")
-    def change_user_state(target_id: str, action: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        operations = {
-            "disable": users.disable_user,
-            "enable": users.enable_user,
-            "delete": users.delete_user,
-        }
-        operation = operations.get(action)
-        if operation is None:
-            abort(404)
-        try:
-            operation(actor.id, target_id)
-        except NotFoundError:
-            abort(404)
-        return redirect(url_for("user_list"))
-
-    @app.post("/users/<target_id>/email")
-    @capability_route("can_manage_access")
-    def change_user_email(target_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            users.change_email(actor.id, target_id, request.form.get("email", ""))
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            return render_user_list(
-                form_error=str(error),
-                form_target_id=target_id,
-                form_data=request.form,
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("user_list"))
+    register_users_blueprint(
+        app,
+        users=users,
+        memberships=memberships,
+        require_capability=require_capability,
+        require_csrf=require_csrf,
+        active_navigation=active_navigation,
+        dataset_ui_enabled=dataset_ui_enabled,
+    )
 
     def render_team_list(
         *, form_error=None, membership_error=None, form_target_id=None, form_name="", status=200

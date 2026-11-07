@@ -869,9 +869,7 @@ def test_browser_route_inventory_matches_real_registration(database_context):
         methods = set(row["methods"]) | {"OPTIONS"}
         if "GET" in methods:
             methods.add("HEAD")
-        endpoint = row["symbol"].split(".")[-1]
-        if endpoint in {"audit_list", "audit_detail"}:
-            endpoint = f"audit.{endpoint}"
+        endpoint = row["symbol"].removeprefix("refrncr.web.")
         expected[(endpoint, row["path"])] = methods
     actual = {
         (rule.endpoint, rule.rule): rule.methods
