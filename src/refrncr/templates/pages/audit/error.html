@@ -3,5 +3,5 @@
 {% set settings_title = "Audit log" %}
 {% block settings_content %}
   {{ feedback(error, id='audit-error', focus=true) }}
-  <p><a class="button button-secondary" href="{{ url_for('audit_list') }}">Clear filters</a></p>
+  <p><a class="button button-secondary" href="{{ url_for('audit.audit_list') }}">Clear filters</a></p>
 {% endblock %}

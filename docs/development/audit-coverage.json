@@ -137,7 +137,7 @@
       "operation": "create_user",
       "service": "refrncr.services.UserService.create_user",
       "interface_entrypoints": [
-        "refrncr.web.create_user POST /users"
+        "refrncr.web.users.create_user POST /users"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -180,7 +180,7 @@
       "operation": "change_email",
       "service": "refrncr.services.UserService.change_email",
       "interface_entrypoints": [
-        "refrncr.web.change_user_email POST /users/<target_id>/email"
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -223,7 +223,7 @@
       "operation": "disable_user",
       "service": "refrncr.services.UserService.disable_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -266,7 +266,7 @@
       "operation": "enable_user",
       "service": "refrncr.services.UserService.enable_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -309,7 +309,7 @@
       "operation": "delete_user",
       "service": "refrncr.services.UserService.delete_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -385,9 +385,9 @@
       "operation": "list_users",
       "service": "refrncr.services.UserService.list_users",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_email POST /users/<target_id>/email"
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2924,8 +2924,8 @@
       "operation": "resolve_with_session",
       "service": "refrncr.services.SessionService.resolve_with_session",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
@@ -2981,10 +2981,10 @@
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
         "refrncr.web.logout POST /logout",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
         "refrncr.web.team_list GET /teams",
         "refrncr.web.create_team POST /teams",
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
@@ -4149,8 +4149,8 @@
       "operation": "for_request",
       "service": "refrncr.browser_security.BrowserCookiePolicy.for_request",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
@@ -4194,10 +4194,10 @@
         "refrncr.web.logout POST /logout",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
         "refrncr.web.team_list GET /teams",
         "refrncr.web.create_team POST /teams",
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
@@ -4587,9 +4587,9 @@
         "refrncr.web.setup GET,POST /setup",
         "refrncr.web.login GET,POST /login",
         "refrncr.web.logout POST /logout",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
         "refrncr.web.create_team POST /teams",
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
         "refrncr.web.delete_team POST /teams/<team_id>/delete",
@@ -4726,7 +4726,7 @@
       "operation": "list_history",
       "service": "refrncr.audit_history.AuditHistoryService.list_history",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log"
+        "refrncr.web.audit.audit_list GET /settings/audit-log"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4760,7 +4760,7 @@
       "operation": "get_event",
       "service": "refrncr.audit_history.AuditHistoryService.get_event",
       "interface_entrypoints": [
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5772,10 +5772,10 @@
       "operation": "list_relationships",
       "service": "refrncr.services.MembershipService.list_relationships",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users",
+        "refrncr.web.users.user_list GET /users",
         "refrncr.web.team_list GET /teams",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
         "refrncr.web.create_team POST /teams",
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
         "refrncr.web.create_membership POST /teams/<team_id>/members",
@@ -6563,17 +6563,17 @@
       "operation": "has_capability",
       "service": "refrncr.services.AuthorizationService.has_capability",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
         "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
         "refrncr.web.create_team POST /teams",
         "refrncr.web.rename_team POST /teams/<team_id>/rename",
         "refrncr.web.delete_team POST /teams/<team_id>/delete",

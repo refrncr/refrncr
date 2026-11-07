@@ -399,8 +399,13 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
         "dataset_versions": "DatasetVersionService",
         "dataset_diff": "DatasetDiffService",
     }
-    tree = ast.parse((ROOT / "src/refrncr/web.py").read_text())
-    functions = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+    web_package = ROOT / "src/refrncr/web"
+    functions = {
+        node.name: node
+        for path in sorted(web_package.glob("*.py"))
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.FunctionDef)
+    }
 
     def service_calls(name, seen):
         if name in seen:

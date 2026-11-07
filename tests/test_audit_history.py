@@ -507,12 +507,17 @@ def test_database_failure_is_neutral(database_history, monkeypatch):
 
 def test_read_boundary_has_no_framework_or_database_imports():
     root = Path(__file__).parents[1] / "src/refrncr"
-    for name in ("audit_history.py", "audit_presentation.py", "ports.py", "web.py"):
+    for name in (
+        "audit_history.py",
+        "audit_presentation.py",
+        "ports.py",
+        "web/audit.py",
+    ):
         tree = ast.parse((root / name).read_text())
         imports = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
         imports += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
         assert not any(n and n.startswith("sqlalchemy") for n in imports)
-        if name != "web.py":
+        if not name.startswith("web/"):
             assert not any(n and n.startswith("flask") for n in imports)
 
 

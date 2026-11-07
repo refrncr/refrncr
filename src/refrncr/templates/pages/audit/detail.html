@@ -22,9 +22,9 @@
         <h2 id="audit-context-title" data-panel-section-heading>Additional details</h2>
         {% if item.context %}<dl class="audit-details">{% for label, value in item.context %}<dt>{{ label }}</dt><dd><bdi>{{ value }}</bdi></dd>{% endfor %}</dl>{% else %}<p>No additional details</p>{% endif %}
       </section>
-      {% if item.actor_id != 'Unavailable' %}<p><a href="{{ url_for('audit_list', actor=item.actor_id) }}">Filter by this actor</a></p>{% endif %}
+      {% if item.actor_id != 'Unavailable' %}<p><a href="{{ url_for('audit.audit_list', actor=item.actor_id) }}">Filter by this actor</a></p>{% endif %}
     </div>
-    {% call panel_form_actions(single=true) %}<a class="button button-secondary" href="{{ url_for('audit_list') }}" data-panel-cancel>Close</a>{% endcall %}
+    {% call panel_form_actions(single=true) %}<a class="button button-secondary" href="{{ url_for('audit.audit_list') }}" data-panel-cancel>Close</a>{% endcall %}
   </div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/audit-time.js') }}" defer></script>{% endblock %}
