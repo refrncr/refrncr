@@ -1210,7 +1210,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.team_list",
+      "symbol": "refrncr.web.teams.team_list",
       "path": "/teams",
       "methods": [
         "GET"
@@ -1225,7 +1225,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_team",
+      "symbol": "refrncr.web.teams.create_team",
       "path": "/teams",
       "methods": [
         "POST"
@@ -1243,7 +1243,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.rename_team",
+      "symbol": "refrncr.web.teams.rename_team",
       "path": "/teams/<team_id>/rename",
       "methods": [
         "POST"
@@ -1261,7 +1261,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_team",
+      "symbol": "refrncr.web.teams.delete_team",
       "path": "/teams/<team_id>/delete",
       "methods": [
         "POST"
@@ -1275,7 +1275,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.team_members",
+      "symbol": "refrncr.web.teams.team_members",
       "path": "/teams/<team_id>/members",
       "methods": [
         "GET"
@@ -1289,7 +1289,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_membership",
+      "symbol": "refrncr.web.teams.create_membership",
       "path": "/teams/<team_id>/members",
       "methods": [
         "POST"
@@ -1307,7 +1307,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_membership",
+      "symbol": "refrncr.web.teams.delete_membership",
       "path": "/teams/<team_id>/members/<membership_id>/delete",
       "methods": [
         "POST"

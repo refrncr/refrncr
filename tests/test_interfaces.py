@@ -243,7 +243,7 @@ def test_renamed_views_keep_csrf_and_capability_checks():
     app.add_url_rule(
         "/renamed-teams/<team_id>",
         endpoint="renamed_team_view",
-        view_func=app.view_functions["rename_team"],
+        view_func=app.view_functions["teams.rename_team"],
         methods=["POST"],
     )
     app.add_url_rule(
@@ -296,7 +296,7 @@ def _route_matrix_expectations():
         "appearance_settings",
         "dataset_list",
         "index",
-        "team_list",
+        "teams.team_list",
         "theme_preference",
     }
     installation_admin = {
@@ -309,12 +309,12 @@ def _route_matrix_expectations():
         "users.create_user",
         "users.change_user_state",
         "users.change_user_email",
-        "create_team",
-        "rename_team",
-        "delete_team",
-        "team_members",
-        "create_membership",
-        "delete_membership",
+        "teams.create_team",
+        "teams.rename_team",
+        "teams.delete_team",
+        "teams.team_members",
+        "teams.create_membership",
+        "teams.delete_membership",
     }
     dataset_view = {
         "dataset_detail",

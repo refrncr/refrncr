@@ -1,6 +1,6 @@
 {% macro relationships(items, kind) -%}
 <span class='mobile-cell-label' aria-hidden='true'>{{ 'Teams' if kind == 'team' else 'Users' }}</span>
 {% if items %}<ul class='relationship-list'>
-{% for relation in items %}<li>{% if kind == 'team' %}<a href='{{ url_for("team_list", open_team=relation.team_id) }}'>{{ relation.team_name }}</a>{% else %}<a href='{{ url_for("users.user_list", open_user=relation.user_id) }}'>{{ relation.user_name }}</a>{% endif %}</li>{% endfor %}
+{% for relation in items %}<li>{% if kind == 'team' %}<a href='{{ url_for("teams.team_list", open_team=relation.team_id) }}'>{{ relation.team_name }}</a>{% else %}<a href='{{ url_for("users.user_list", open_user=relation.user_id) }}'>{{ relation.user_name }}</a>{% endif %}</li>{% endfor %}
 </ul>{% else %}<span>{{ 'No teams' if kind == 'team' else 'No users' }}</span>{% endif %}
 {%- endmacro %}

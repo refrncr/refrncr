@@ -163,6 +163,7 @@ from refrncr.web.routing import (
     public_route,
     upload_limit_route,
 )
+from refrncr.web.teams import register_teams_blueprint
 from refrncr.web.users import register_users_blueprint
 from refrncr.xml_security import require_xml_protection
 
@@ -404,7 +405,7 @@ def create_flask_app(
             return "datasets"
         if endpoint.startswith("users."):
             return "users"
-        if endpoint.startswith("team_"):
+        if endpoint.startswith("teams."):
             return "teams"
         return ""
 
@@ -4440,149 +4441,16 @@ def create_flask_app(
         dataset_ui_enabled=dataset_ui_enabled,
     )
 
-    def render_team_list(
-        *, form_error=None, membership_error=None, form_target_id=None, form_name="", status=200
-    ):
-        actor, login_session = require_authenticated()
-        if actor.role != "admin":
-            return render_template(
-                "pages/teams/readonly.html",
-                teams=teams.list_teams(actor.id),
-                current_actor=actor,
-                current_csrf=login_session.csrf_token,
-                active_navigation=active_navigation(),
-                dataset_ui_enabled=dataset_ui_enabled,
-            ), status
-        managed_teams = teams.list_teams(actor.id)
-        team_users = {}
-        for relationship in memberships.list_relationships(actor.id):
-            team_users.setdefault(relationship.team_id, []).append(relationship)
-        open_team = form_target_id or request.args.get("open_team")
-        selected_team = next((team for team in managed_teams if team.id == open_team), None)
-        selected_team_members = (
-            memberships.list_team_members(actor.id, selected_team.id) if selected_team else []
-        )
-        selected_eligible_users = (
-            memberships.list_eligible_users(actor.id, selected_team.id) if selected_team else []
-        )
-        return render_template(
-            "pages/teams/list.html",
-            teams=managed_teams,
-            team_users=team_users,
-            selected_team=selected_team,
-            selected_team_members=selected_team_members,
-            selected_eligible_users=selected_eligible_users,
-            form_error=form_error,
-            membership_error=membership_error,
-            form_target_id=form_target_id,
-            form_name=form_name,
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        ), status
-
-    @app.get("/teams")
-    @authenticated_route
-    def team_list():
-        return render_team_list()
-
-    @app.post("/teams")
-    @capability_route("can_manage_access")
-    def create_team():
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            team_name = request.form.get("team_label", request.form.get("name", ""))
-            teams.create_team(actor.id, team_name)
-        except (ValidationError, ConflictError) as error:
-            return render_team_list(
-                form_error=str(error),
-                form_name=request.form.get("team_label", request.form.get("name", "")),
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("team_list"))
-
-    @app.post("/teams/<team_id>/rename")
-    @capability_route("can_manage_access")
-    def rename_team(team_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            team_name = request.form.get("team_label", request.form.get("name", ""))
-            teams.rename_team(actor.id, team_id, team_name)
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            return render_team_list(
-                form_error=str(error),
-                form_target_id=team_id,
-                form_name=request.form.get("team_label", request.form.get("name", "")),
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("team_list"))
-
-    @app.post("/teams/<team_id>/delete")
-    @capability_route("can_manage_access")
-    def delete_team(team_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            teams.delete_team(actor.id, team_id)
-        except NotFoundError:
-            abort(404)
-        return redirect(url_for("team_list"))
-
-    @app.get("/teams/<team_id>/members")
-    @capability_route("can_manage_access")
-    def team_members(team_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        managed_members = memberships.list_team_members(actor.id, team_id)
-        eligible_users = memberships.list_eligible_users(actor.id, team_id)
-        return render_template(
-            "pages/teams/members.html",
-            members=managed_members,
-            eligible_users=eligible_users,
-            team_id=team_id,
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        )
-
-    @app.post("/teams/<team_id>/members")
-    @capability_route("can_manage_access")
-    def create_membership(team_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            memberships.create_membership(actor.id, request.form["user_id"], team_id)
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            return render_team_list(
-                membership_error=str(error),
-                form_target_id=team_id,
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("team_list", open_team=team_id))
-
-    @app.post("/teams/<team_id>/members/<membership_id>/delete")
-    @capability_route("can_manage_access")
-    def delete_membership(team_id: str, membership_id: str):
-        actor, login_session = require_capability("can_manage_access")
-        require_csrf(login_session.csrf_token)
-        try:
-            memberships.delete_membership(actor.id, team_id, membership_id)
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            return render_team_list(
-                membership_error=str(error),
-                form_target_id=team_id,
-                status=409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(url_for("team_list", open_team=team_id))
+    register_teams_blueprint(
+        app,
+        teams=teams,
+        memberships=memberships,
+        require_authenticated=require_authenticated,
+        require_capability=require_capability,
+        require_csrf=require_csrf,
+        active_navigation=active_navigation,
+        dataset_ui_enabled=dataset_ui_enabled,
+    )
 
     @app.errorhandler(UserManagementError)
     def handle_user_error(error: UserManagementError):
