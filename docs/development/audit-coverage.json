@@ -97,7 +97,7 @@
       "operation": "create_initial_admin",
       "service": "refrncr.services.UserService.create_initial_admin",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
+        "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
       ],
       "kind": "mutation",
@@ -352,7 +352,7 @@
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
+        "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
       ],
       "kind": "read",
@@ -2316,7 +2316,7 @@
       "operation": "revoke_session",
       "service": "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
       "interface_entrypoints": [
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",
@@ -2800,7 +2800,7 @@
       "operation": "revoke_session",
       "service": "refrncr.record_import.DatasetRecordImportService.revoke_session",
       "interface_entrypoints": [
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",
@@ -2831,7 +2831,7 @@
       "operation": "authenticate",
       "service": "refrncr.services.AuthenticationService.authenticate",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -2862,7 +2862,7 @@
       "operation": "create",
       "service": "refrncr.services.SessionService.create",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -2980,7 +2980,7 @@
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.logout POST /logout",
+        "refrncr.web.auth.logout POST /logout",
         "refrncr.web.users.user_list GET /users",
         "refrncr.web.users.create_user POST /users",
         "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
@@ -3033,8 +3033,8 @@
       "operation": "revoke",
       "service": "refrncr.services.SessionService.revoke",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3870,7 +3870,7 @@
       "operation": "resolve",
       "service": "refrncr.login_security.SourceIdentityResolver.resolve",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3901,7 +3901,7 @@
       "operation": "cancel",
       "service": "refrncr.login_security.LoginAttemptReservation.cancel",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3932,7 +3932,7 @@
       "operation": "failed",
       "service": "refrncr.login_security.LoginAttemptReservation.failed",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3963,7 +3963,7 @@
       "operation": "succeeded",
       "service": "refrncr.login_security.LoginAttemptReservation.succeeded",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4025,7 +4025,7 @@
       "operation": "reserve",
       "service": "refrncr.login_security.LoginAttemptLimiter.reserve",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4118,7 +4118,7 @@
       "operation": "try_acquire",
       "service": "refrncr.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4189,9 +4189,9 @@
         "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
         "refrncr.web.users.user_list GET /users",
@@ -4584,9 +4584,9 @@
         "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
         "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
         "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout",
         "refrncr.web.users.create_user POST /users",
         "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
         "refrncr.web.users.change_user_email POST /users/<target_id>/email",
@@ -4629,8 +4629,8 @@
       "operation": "require_cookie_settings",
       "service": "refrncr.web.require_cookie_settings",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
         "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",

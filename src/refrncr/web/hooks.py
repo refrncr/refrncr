@@ -53,7 +53,7 @@ def register_security_hooks(
             and authenticated() is None
         ):
             target = safe_login_target(request.path) if request.method in {"GET", "HEAD"} else "/"
-            return redirect(url_for("login", next=target))
+            return redirect(url_for("auth.login", next=target))
         return None
 
     @app.before_request

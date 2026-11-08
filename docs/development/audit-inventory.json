@@ -1072,7 +1072,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.setup",
+      "symbol": "refrncr.web.auth.setup",
       "path": "/setup",
       "methods": [
         "GET",
@@ -1087,7 +1087,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.login",
+      "symbol": "refrncr.web.auth.login",
       "path": "/login",
       "methods": [
         "GET",
@@ -1109,7 +1109,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.logout",
+      "symbol": "refrncr.web.auth.logout",
       "path": "/logout",
       "methods": [
         "POST"

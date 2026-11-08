@@ -66,11 +66,9 @@ from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.installation_policy import EXPORT_POLICIES
 from refrncr.installation_settings import InstallationSettingsService, PolicyConfirmationRequired
 from refrncr.login_security import (
-    MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,
     SourceIdentityResolver,
-    canonical_account_key,
 )
 from refrncr.overview import REASON_LABELS, OverviewService
 from refrncr.ports import PersistenceConflictError
@@ -136,9 +134,9 @@ from refrncr.services import (
 from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
 from refrncr.web.audit import register_audit_blueprint
+from refrncr.web.auth import register_auth_blueprint
 from refrncr.web.errors import register_error_handlers
 from refrncr.web.helpers import (
-    is_safe_login_target,
     merge_error_messages,
     parse_page_parameter,
 )
@@ -153,16 +151,15 @@ from refrncr.web.hooks import (
     register_security_hooks,
 )
 from refrncr.web.routing import (
-    anonymous_csrf_route,
     authenticated_route,
     bounded_import_route,
     capability_route,
     concept_route,
     dataset_not_found_route,
     no_store_route,
-    public_route,
     upload_limit_route,
 )
+from refrncr.web.routing import public_route as public_route
 from refrncr.web.teams import register_teams_blueprint
 from refrncr.web.users import register_users_blueprint
 from refrncr.xml_security import require_xml_protection
@@ -4214,161 +4211,24 @@ def create_flask_app(
             url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
         )
 
-    @app.route("/setup", methods=["GET", "POST"])
-    @public_route
-    @anonymous_csrf_route
-    def setup():
-        settings = require_cookie_settings()
-        if users.has_users():
-            return redirect(url_for("login"))
-        if request.method == "POST":
-            require_csrf(request.cookies.get(settings.anonymous_csrf_name))
-            try:
-                users.create_initial_admin(
-                    request.form["email"],
-                    request.form["display_name"],
-                    request.form["password"],
-                )
-            except UserManagementError as error:
-                message = str(error)
-                error_field = getattr(error, "field", None)
-                return (
-                    render_anonymous_template(
-                        "pages/auth/setup.html",
-                        csrf_token=request.cookies.get(settings.anonymous_csrf_name),
-                        error=message,
-                        error_field=error_field,
-                        email=request.form["email"],
-                        display_name=request.form["display_name"],
-                    ),
-                    400,
-                )
-            response = redirect(url_for("login"))
-            response.delete_cookie(
-                settings.anonymous_csrf_name,
-                **settings.common_options,
-            )
-            return response
-        return anonymous_csrf_form_response(
-            "pages/auth/setup.html",
-            error_field=None,
-            email=None,
-            display_name=None,
-        )
-
-    @app.route("/login", methods=["GET", "POST"])
-    @public_route
-    @anonymous_csrf_route
-    def login():
-        settings = require_cookie_settings()
-        submitted_target = (
-            request.form.get("next") if request.method == "POST" else request.args.get("next")
-        )
-        # Rebuild the target from a constant root: a checked path stays the same, and the
-        # redirect can never leave this origin (CodeQL py/url-redirection).
-        return_target = "/"
-        if submitted_target and is_safe_login_target(submitted_target):
-            return_target = "/" + submitted_target.removeprefix("/")
-
-        def invalid_credentials_response():
-            return (
-                render_anonymous_template(
-                    "pages/auth/login.html",
-                    csrf_token=request.cookies.get(settings.anonymous_csrf_name),
-                    error=GENERIC_LOGIN_FAILURE,
-                    next_target=return_target,
-                    field_errors={},
-                    email=request.form.get("email", "")[:MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS],
-                ),
-                401,
-            )
-
-        if request.method == "POST":
-            require_csrf(request.cookies.get(settings.anonymous_csrf_name))
-            submitted_email = request.form.get("email", "")
-            submitted_password = request.form.get("password", "")
-            field_errors = {}
-            if not submitted_email.strip():
-                field_errors["email"] = "Enter your email address."
-            if not submitted_password:
-                field_errors["password"] = "Enter your password."
-            oversized_identifier = len(submitted_email) > MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS
-            account_key = canonical_account_key(submitted_email)
-            source_key = source_resolver.resolve(
-                request.remote_addr,
-                request.headers.get("X-Forwarded-For"),
-            )
-            attempt = login_limiter.reserve(source_key, account_key)
-            if attempt is None:
-                audit_security("security.login_failed")
-                return invalid_credentials_response()
-            if oversized_identifier:
-                attempt.failed()
-                audit_security("security.login_failed")
-                return invalid_credentials_response()
-            if field_errors:
-                attempt.failed()
-                return render_anonymous_template(
-                    "pages/auth/login.html",
-                    csrf_token=request.cookies.get(settings.anonymous_csrf_name),
-                    error="Check the required fields below.",
-                    field_errors=field_errors,
-                    email=submitted_email[:MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS],
-                    next_target=return_target,
-                ), 400
-            permit = authentication_admission.try_acquire()
-            if permit is None:
-                attempt.cancel()
-                audit_security("security.login_failed")
-                return invalid_credentials_response()
-            try:
-                with permit:
-                    principal = authentication.authenticate(submitted_email, submitted_password)
-            except Exception:
-                logging.getLogger(__name__).exception("Browser authentication failed")
-                attempt.failed()
-                raise
-            if principal is not None:
-                attempt.succeeded()
-                existing_token = request.cookies.get(settings.session_name)
-                if existing_token:
-                    sessions.revoke(existing_token)
-                token, _ = sessions.create(principal)
-                response = redirect(return_target)
-                response.set_cookie(
-                    settings.session_name,
-                    token,
-                    max_age=settings.session_max_age,
-                    **settings.common_options,
-                )
-                response.delete_cookie(settings.anonymous_csrf_name, **settings.common_options)
-                return response
-            attempt.failed()
-            audit_security("security.login_failed")
-            return invalid_credentials_response()
-        return anonymous_csrf_form_response(
-            "pages/auth/login.html", next_target=return_target, field_errors={}, email=None
-        )
-
-    @app.post("/logout")
-    @public_route
-    def logout():
-        settings = cookie_settings()
-        token = request.cookies.get(settings.session_name) if settings else None
-        if not token:
-            return redirect(url_for("index"))
-        resolved = sessions.resolve_with_session(token)
-        if resolved is None:
-            return redirect(url_for("index"))
-        require_csrf(resolved[1].csrf_token)
-        if record_imports is not None:
-            record_imports.revoke_session(resolved[1].id)
-        if hierarchy_imports is not None:
-            hierarchy_imports.revoke_session(resolved[1].id)
-        sessions.revoke(token)
-        response = redirect(url_for("index"))
-        response.delete_cookie(settings.session_name, **settings.common_options)
-        return response
+    register_auth_blueprint(
+        app,
+        users=users,
+        authentication=authentication,
+        sessions=sessions,
+        record_imports=record_imports,
+        hierarchy_imports=hierarchy_imports,
+        login_limiter=login_limiter,
+        source_resolver=source_resolver,
+        authentication_admission=authentication_admission,
+        cookie_settings=cookie_settings,
+        require_cookie_settings=require_cookie_settings,
+        require_csrf=require_csrf,
+        render_anonymous_template=render_anonymous_template,
+        anonymous_csrf_form_response=anonymous_csrf_form_response,
+        audit_security=audit_security,
+        generic_login_failure=GENERIC_LOGIN_FAILURE,
+    )
 
     @app.route("/settings/dataset-access", methods=["GET", "POST"])
     @capability_route("can_administer_installation")
