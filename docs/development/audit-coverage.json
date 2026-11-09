@@ -2926,7 +2926,7 @@
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log",
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.index GET /",
+        "refrncr.web.overview.index GET /",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
         "refrncr.web.dataset_list GET /datasets",
@@ -3001,7 +3001,7 @@
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
         "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update",
-        "refrncr.web.attention_overview GET /attention",
+        "refrncr.web.overview.attention_overview GET /attention",
         "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
@@ -4151,7 +4151,7 @@
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log",
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.index GET /",
+        "refrncr.web.overview.index GET /",
         "refrncr.web.dataset_list GET /datasets",
         "refrncr.web.new_dataset GET /datasets/new",
         "refrncr.web.create_dataset POST /datasets",
@@ -4206,7 +4206,7 @@
         "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
         "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.attention_overview GET /attention"
+        "refrncr.web.overview.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4525,9 +4525,9 @@
     {
       "capability": "web",
       "operation": "index",
-      "service": "refrncr.web.index",
+      "service": "refrncr.web.overview.index",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
+        "refrncr.web.overview.index GET /",
         "Flask GET /static/<path:filename>",
         "Flask HEAD for GET and OPTIONS"
       ],
@@ -6908,8 +6908,8 @@
       "operation": "read",
       "service": "refrncr.overview.OverviewService.read",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
-        "refrncr.web.attention_overview GET /attention"
+        "refrncr.web.overview.index GET /",
+        "refrncr.web.overview.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "intentionally excluded",

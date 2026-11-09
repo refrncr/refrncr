@@ -70,7 +70,7 @@ from refrncr.login_security import (
     LoginAttemptLimiter,
     SourceIdentityResolver,
 )
-from refrncr.overview import REASON_LABELS, OverviewService
+from refrncr.overview import OverviewService
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import (
     DISPLAY_STATUSES,
@@ -150,6 +150,7 @@ from refrncr.web.hooks import (
     register_response_hooks,
     register_security_hooks,
 )
+from refrncr.web.overview import register_overview_blueprint
 from refrncr.web.routing import (
     authenticated_route,
     bounded_import_route,
@@ -378,7 +379,7 @@ def create_flask_app(
             return "api_keys"
         if endpoint.startswith("audit."):
             return "audit"
-        if endpoint == "index":
+        if endpoint == "overview.index":
             return "home"
         if endpoint.startswith("dataset_") or endpoint in {
             "new_dataset",
@@ -717,75 +718,15 @@ def create_flask_app(
         )
         return response
 
-    @app.get("/")
-    @no_store_route
-    @authenticated_route
-    @version_errors
-    def index():
-        resolved = authenticated()
-        actor = resolved[0] if resolved else None
-        csrf = resolved[1].csrf_token if resolved else None
-        if resolved and dataset_ui_enabled:
-            return render_overview(actor)
-        return render_template(
-            "pages/index.html",
-            resolved=resolved,
-            current_actor=actor,
-            current_csrf=csrf,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        )
-
-    @dataset_route("/attention", capability="can_access_community", methods=["GET"])
-    @no_store_route
-    @version_errors
-    def attention_overview():
-        actor, _session = require_authenticated()
-        return render_overview(actor, full=True)
-
-    def render_overview(actor, *, full=False):
-        owners = request.args.getlist("all_owners")
-        reasons = request.args.getlist("reason")
-        if len(owners) > 1 or (owners and owners[0] != "1"):
-            abort(400)
-        if len(reasons) > 1 or (
-            reasons and reasons[0] not in {"", *(str(n) for n in REASON_LABELS)}
-        ):
-            abort(400)
-        reason = int(reasons[0]) if reasons and reasons[0] and full else None
-        overview = overview_service.read(actor.id, all_owners=bool(owners))
-        cards = [
-            card
-            for card in overview.attention
-            if reason is None or any(r.number == reason for r in card.reasons)
-        ]
-
-        def destination(card, selected=None):
-            draft = selected.draft if selected else card.version is None and card.has_draft
-            return url_for(
-                "dataset_records_view",
-                key=card.dataset.key,
-                concept=True if draft else None,
-                version_id=None
-                if draft
-                else selected.version_id
-                if selected
-                else card.version.id
-                if card.version
-                else None,
-                mapping_status=selected.mapping_status if selected else None,
-            )
-
-        return render_authenticated_template(
-            "pages/overview.html",
-            overview=overview,
-            attention_cards=cards,
-            full=full,
-            reason=reason,
-            reason_labels=REASON_LABELS,
-            card_destination=destination,
-            active_navigation="home",
-        )
+    register_overview_blueprint(
+        app,
+        authenticated=authenticated,
+        require_authenticated=require_authenticated,
+        overview_service=overview_service,
+        render_authenticated_template=render_authenticated_template,
+        audit_security=audit_security,
+        dataset_ui_enabled=dataset_ui_enabled,
+    )
 
     register_dataset_visit_hook(
         app,

@@ -22,6 +22,7 @@ ROUTE_DECORATORS = {
     "app.post",
     "app.route",
     "blueprint.get",
+    "blueprint.dataset_get",
     "blueprint.post",
     "blueprint.route",
     "dataset_route",
@@ -98,15 +99,19 @@ def verify_inventory(root):
             module_commands.append(module)
         discovered.update(discover_service_operations(source, module))
         routes.extend(discover_routes(source, module))
-        if module in {
-            "refrncr.services",
-            "refrncr.record_import",
-            "refrncr.web",
-            "refrncr.dataset_versions",
-            "refrncr.dataset_diff",
-            "refrncr.api_keys",
-            "refrncr.hierarchy",
-        }:
+        if (
+            module
+            in {
+                "refrncr.services",
+                "refrncr.record_import",
+                "refrncr.dataset_versions",
+                "refrncr.dataset_diff",
+                "refrncr.api_keys",
+                "refrncr.hierarchy",
+            }
+            or module == "refrncr.web"
+            or module.startswith("refrncr.web.")
+        ):
             for node in ast.walk(ast.parse(source)):
                 if isinstance(node, ast.Call) and (
                     ast.unparse(node.func) in {"AuditEvent", "uow.add_audit"}

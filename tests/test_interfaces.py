@@ -170,6 +170,25 @@ def test_every_browser_route_declares_a_known_capability_or_public_access(interf
         assert getattr(view, "required_capability", None) in known, rule.endpoint
 
 
+def _browser_route_contract(app):
+    actual = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = app.view_functions[rule.endpoint]
+        actual.append(
+            {
+                "path": rule.rule,
+                "methods": sorted(rule.methods - {"HEAD", "OPTIONS"}),
+                "capability": getattr(view, "required_capability", None),
+                "public": getattr(view, "public_route", False),
+                # Blueprint prefixes are the one intentional endpoint change in REF-224.
+                "endpoint": rule.endpoint.rsplit(".", 1)[-1],
+            }
+        )
+    return sorted(actual, key=lambda row: (row["path"], row["methods"], row["endpoint"]))
+
+
 def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
     (
         _,
@@ -194,26 +213,20 @@ def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
         dataset_fields=dataset_fields,
         dataset_business_keys=dataset_business_keys,
     )
-    actual = []
-    for rule in app.url_map.iter_rules():
-        if rule.endpoint == "static":
-            continue
-        view = app.view_functions[rule.endpoint]
-        actual.append(
-            {
-                "path": rule.rule,
-                "methods": sorted(rule.methods - {"HEAD", "OPTIONS"}),
-                "capability": getattr(view, "required_capability", None),
-                "public": getattr(view, "public_route", False),
-                # Blueprint prefixes are the one intentional endpoint change in REF-224.
-                "endpoint": rule.endpoint.rsplit(".", 1)[-1],
-            }
-        )
     expected = json.loads((Path(__file__).parent / "fixtures" / "web_routes.json").read_text())
 
-    assert (
-        sorted(actual, key=lambda row: (row["path"], row["methods"], row["endpoint"])) == expected
+    assert _browser_route_contract(app) == expected
+
+
+def test_browser_route_contract_without_dataset_ui_matches_snapshot():
+    factory, users, authentication, sessions, teams, memberships = configured_services()
+    app = create_flask_app(users, authentication, sessions, teams, memberships)
+    expected = json.loads(
+        (Path(__file__).parent / "fixtures" / "web_routes_without_datasets.json").read_text()
     )
+
+    assert _browser_route_contract(app) == expected
+    assert app.test_client().get("/attention", follow_redirects=False).status_code == 404
 
 
 def test_renamed_views_keep_csrf_and_capability_checks():
@@ -289,13 +302,13 @@ def test_renamed_views_keep_csrf_and_capability_checks():
 
 def _route_matrix_expectations():
     community = {
-        "attention_overview",
+        "overview.attention_overview",
         "api_key_list",
         "api_key_create",
         "api_key_revoke",
         "appearance_settings",
         "dataset_list",
-        "index",
+        "overview.index",
         "teams.team_list",
         "theme_preference",
     }

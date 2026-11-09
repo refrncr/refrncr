@@ -711,7 +711,7 @@ for _symbol, _classification, _reason in (
         "Operational probes read no business state and never create durable audit history.",
     ),
     (
-        "refrncr.web.index",
+        "refrncr.web.overview.index",
         "intentionally excluded",
         "Authenticated navigation; no data extraction or business mutation.",
     ),

@@ -4,7 +4,7 @@
 {% block layout %}
   <main id="content" class="auth-layout" tabindex="-1">
     <div class="auth-container">
-      <a class="brand" href="{{ url_for('index') }}" aria-label="REFRNCR home">
+      <a class="brand" href="{{ url_for('overview.index') }}" aria-label="REFRNCR home">
         {% block auth_logo %}{{ wordmark(current_theme_preference|default('system', true), 'auth-wordmark', 200, 52) }}{% endblock %}
       </a>
       <section class='card' aria-labelledby='auth-title'>

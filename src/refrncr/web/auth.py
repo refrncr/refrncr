@@ -218,17 +218,17 @@ def logout():
     settings = context.cookie_settings()
     token = request.cookies.get(settings.session_name) if settings else None
     if not token:
-        return redirect(url_for("index"))
+        return redirect(url_for("overview.index"))
     resolved = context.sessions.resolve_with_session(token)
     if resolved is None:
-        return redirect(url_for("index"))
+        return redirect(url_for("overview.index"))
     context.require_csrf(resolved[1].csrf_token)
     if context.record_imports is not None:
         context.record_imports.revoke_session(resolved[1].id)
     if context.hierarchy_imports is not None:
         context.hierarchy_imports.revoke_session(resolved[1].id)
     context.sessions.revoke(token)
-    response = redirect(url_for("index"))
+    response = redirect(url_for("overview.index"))
     response.delete_cookie(settings.session_name, **settings.common_options)
     return response
 

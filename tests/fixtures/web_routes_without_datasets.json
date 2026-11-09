@@ -1,0 +1,163 @@
+[
+  {
+    "path": "/",
+    "methods": ["GET"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "index"
+  },
+  {
+    "path": "/login",
+    "methods": ["GET", "POST"],
+    "capability": null,
+    "public": true,
+    "endpoint": "login"
+  },
+  {
+    "path": "/logout",
+    "methods": ["POST"],
+    "capability": null,
+    "public": true,
+    "endpoint": "logout"
+  },
+  {
+    "path": "/settings/api-keys",
+    "methods": ["GET"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_list"
+  },
+  {
+    "path": "/settings/api-keys/<key_id>/revoke",
+    "methods": ["GET", "POST"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_revoke"
+  },
+  {
+    "path": "/settings/api-keys/new",
+    "methods": ["GET", "POST"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "api_key_create"
+  },
+  {
+    "path": "/settings/appearance",
+    "methods": ["GET"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "appearance_settings"
+  },
+  {
+    "path": "/settings/audit-log",
+    "methods": ["GET"],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "audit_list"
+  },
+  {
+    "path": "/settings/audit-log/<event_id>",
+    "methods": ["GET"],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "audit_detail"
+  },
+  {
+    "path": "/settings/dataset-access",
+    "methods": ["GET", "POST"],
+    "capability": "can_administer_installation",
+    "public": false,
+    "endpoint": "dataset_access_settings"
+  },
+  {
+    "path": "/settings/theme",
+    "methods": ["POST"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "theme_preference"
+  },
+  {
+    "path": "/setup",
+    "methods": ["GET", "POST"],
+    "capability": null,
+    "public": true,
+    "endpoint": "setup"
+  },
+  {
+    "path": "/teams",
+    "methods": ["GET"],
+    "capability": "can_access_community",
+    "public": false,
+    "endpoint": "team_list"
+  },
+  {
+    "path": "/teams",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_team"
+  },
+  {
+    "path": "/teams/<team_id>/delete",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "delete_team"
+  },
+  {
+    "path": "/teams/<team_id>/members",
+    "methods": ["GET"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "team_members"
+  },
+  {
+    "path": "/teams/<team_id>/members",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_membership"
+  },
+  {
+    "path": "/teams/<team_id>/members/<membership_id>/delete",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "delete_membership"
+  },
+  {
+    "path": "/teams/<team_id>/rename",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "rename_team"
+  },
+  {
+    "path": "/users",
+    "methods": ["GET"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "user_list"
+  },
+  {
+    "path": "/users",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "create_user"
+  },
+  {
+    "path": "/users/<target_id>/<action>",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "change_user_state"
+  },
+  {
+    "path": "/users/<target_id>/email",
+    "methods": ["POST"],
+    "capability": "can_manage_access",
+    "public": false,
+    "endpoint": "change_user_email"
+  }
+]

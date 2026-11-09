@@ -314,6 +314,20 @@ def test_ci_guard_fails_on_new_service_in_real_repository(monkeypatch):
         verify_inventory(ROOT)
 
 
+def test_ci_guard_rejects_audit_catalog_bypass_in_blueprint_module(monkeypatch):
+    original = Path.read_text
+
+    def changed(path, *args, **kwargs):
+        source = original(path, *args, **kwargs)
+        if path == ROOT / "src/refrncr/web/auth.py":
+            source += "\ndef bypass(uow):\n    uow.add_audit(action='bypass')\n"
+        return source
+
+    monkeypatch.setattr(Path, "read_text", changed)
+    with pytest.raises(AuditContractError, match="Audit catalog bypass in refrncr.web.auth"):
+        verify_inventory(ROOT)
+
+
 @pytest.mark.parametrize(
     "field,value",
     [

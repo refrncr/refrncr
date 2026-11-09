@@ -178,7 +178,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.index",
+      "symbol": "refrncr.web.overview.index",
       "path": "/",
       "methods": [
         "GET"
@@ -186,7 +186,7 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.index",
+        "refrncr.web.overview.index",
         "refrncr.overview.OverviewService.read"
       ]
     },
@@ -1591,7 +1591,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.attention_overview",
+      "symbol": "refrncr.web.overview.attention_overview",
       "path": "/attention",
       "methods": [
         "GET"
@@ -1735,7 +1735,7 @@
     "refrncr.dataset_upgrade.read_owner_mapping",
     "refrncr.dataset_upgrade.require_resolved_ownership",
     "refrncr.web.errors.handle_oversized_request",
-    "refrncr.web.index",
+    "refrncr.web.overview.index",
     "refrncr.web.require_cookie_settings",
     "refrncr.web.require_csrf",
     "refrncr.version_upgrade.publication_preflight",
@@ -1755,14 +1755,14 @@
     {
       "symbol": "Flask GET /static/<path:filename>",
       "operations": [
-        "refrncr.web.index"
+        "refrncr.web.overview.index"
       ],
       "reason": "Packaged static assets; no business read or mutation."
     },
     {
       "symbol": "Flask HEAD for GET and OPTIONS",
       "operations": [
-        "refrncr.web.index"
+        "refrncr.web.overview.index"
       ],
       "reason": "HEAD executes the corresponding GET handler (including export request auditing); automatic OPTIONS returns routing metadata only."
     },
