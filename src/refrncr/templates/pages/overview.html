@@ -52,8 +52,8 @@
       <section class="ov-section" aria-labelledby="recent-{{ loop.index }}">
         {{ section_heading(title, none if title == 'Recently visited' and not cards else cards|length, id='recent-' ~ loop.index) }}
         {% if cards %}<ul class="card-grid">{% for card in cards %}<li>{{ dataset_card(card, card_destination(card), export=title == 'Recently visited') }}</li>{% endfor %}</ul>
-        {% elif title == 'Recently visited' %}<p class="overview-empty-visits">Datasets you visit will show up here. <a href="{{ url_for('dataset_list') }}">View datasets</a></p>
-        {% else %}<div class="empty-state"><p>{{ 'Datasets you visit will show up here.' if title == 'Recently visited' else 'New datasets will show up here.' }} <a href="{{ url_for('dataset_list') }}">View datasets</a></p></div>{% endif %}
+        {% elif title == 'Recently visited' %}<p class="overview-empty-visits">Datasets you visit will show up here. <a href="{{ url_for('datasets.dataset_list') }}">View datasets</a></p>
+        {% else %}<div class="empty-state"><p>{{ 'Datasets you visit will show up here.' if title == 'Recently visited' else 'New datasets will show up here.' }} <a href="{{ url_for('datasets.dataset_list') }}">View datasets</a></p></div>{% endif %}
       </section>
     {% endfor %}
   {% endif %}

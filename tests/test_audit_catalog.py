@@ -416,7 +416,7 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
     web_package = ROOT / "src/refrncr/web"
     functions = {
         node.name: node
-        for path in sorted(web_package.glob("*.py"))
+        for path in sorted(web_package.rglob("*.py"))
         for node in ast.walk(ast.parse(path.read_text()))
         if isinstance(node, ast.FunctionDef)
     }

@@ -19,7 +19,6 @@ from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
-from types import SimpleNamespace
 from uuid import uuid4
 
 from flask import (
@@ -34,7 +33,6 @@ from flask import (
     url_for,
 )
 from markupsafe import Markup
-from werkzeug.exceptions import HTTPException
 
 from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.audit import record_security_event
@@ -53,7 +51,7 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
-from refrncr.datatypes import DATATYPES, get_datatype
+from refrncr.datatypes import get_datatype
 from refrncr.diff_contracts import MAX_SEARCH, STATUSES, DiffCriteria
 from refrncr.hierarchy import (
     MAX_HIERARCHY_NODE_NAME,
@@ -81,13 +79,11 @@ from refrncr.presentation import (
     status_label,
 )
 from refrncr.presentation_metadata import (
-    DATASET_ICONS,
     MAX_DATASET_ICON_LENGTH,
     MAX_FIELD_DEFINITION,
     MAX_FIELD_UNIT,
     dataset_icon_sprite,
     default_dataset_icon,
-    key_from_name,
     rendered_dataset_icon,
 )
 from refrncr.record_import import (
@@ -108,7 +104,7 @@ from refrncr.record_search import (
     parse_parameters,
     search_term,
 )
-from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review
+from refrncr.review_tokens import decode_review, encode_review
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -123,7 +119,6 @@ from refrncr.services import (
     RecordConflictError,
     RecordValidationError,
     SessionService,
-    StaleFieldOrderError,
     StaleRecordError,
     TeamService,
     UserManagementError,
@@ -135,6 +130,7 @@ from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.version_contracts import mapping_incomplete_message
 from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.auth import register_auth_blueprint
+from refrncr.web.datasets import register_datasets_blueprint
 from refrncr.web.errors import register_error_handlers
 from refrncr.web.helpers import (
     merge_error_messages,
@@ -156,9 +152,11 @@ from refrncr.web.routing import (
     bounded_import_route,
     capability_route,
     concept_route,
-    dataset_not_found_route,
+    dataset_route,
     no_store_route,
+    register_web_routing_context,
     upload_limit_route,
+    version_errors,
 )
 from refrncr.web.routing import public_route as public_route
 from refrncr.web.teams import register_teams_blueprint
@@ -381,7 +379,7 @@ def create_flask_app(
             return "audit"
         if endpoint == "overview.index":
             return "home"
-        if endpoint.startswith("dataset_") or endpoint in {
+        if endpoint.startswith(("dataset_", "datasets.")) or endpoint in {
             "new_dataset",
             "create_dataset",
             "edit_dataset",
@@ -636,47 +634,6 @@ def create_flask_app(
             abort(404)
         return authorization, datasets, dataset_fields, dataset_business_keys, dataset_records
 
-    def dataset_route(rule: str, *, capability: str, **options):
-        if dataset_ui_enabled:
-
-            def decorate(function):
-                function.required_capability = capability
-                return app.route(rule, **options)(function)
-
-            return decorate
-        return lambda function: function
-
-    def version_errors(function):
-        @wraps(function)
-        def secured(*args, **kwargs):
-            try:
-                return function(*args, **kwargs)
-            except AuthorizationError:
-                resolved = getattr(g, "authenticated_resolution", None)
-                audit_security(
-                    "security.authorization_denied",
-                    actor_user_id=resolved[0].id if resolved else None,
-                )
-                abort(403)
-            except NotFoundError:
-                abort(404)
-            except HTTPException:
-                raise
-            except Exception as error:
-                logging.getLogger(__name__).error(
-                    "Dataset version operation failed: %s", type(error).__name__, exc_info=True
-                )
-                return (
-                    render_authenticated_template(
-                        "pages/error.html",
-                        error_code=500,
-                        error_message="Dataset versions could not be loaded. Please try again.",
-                    ),
-                    500,
-                )
-
-        return secured
-
     def require_csrf(expected_token: str | None) -> None:
         submitted_token = request.form.get("csrf_token")
         try:
@@ -718,6 +675,13 @@ def create_flask_app(
         )
         return response
 
+    register_web_routing_context(
+        app,
+        dataset_ui_enabled=dataset_ui_enabled,
+        audit_security=audit_security,
+        render_authenticated_template=render_authenticated_template,
+    )
+
     register_overview_blueprint(
         app,
         authenticated=authenticated,
@@ -735,221 +699,26 @@ def create_flask_app(
         overview_service=overview_service,
     )
 
-    @dataset_route("/datasets", capability="can_access_community", methods=["GET"])
-    def dataset_list():
-        actor, _login_session = require_authenticated()
-        _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        dataset_kind = request.args.get("kind")
-        if dataset_kind not in {None, "reference", "mapping", "hierarchy"}:
-            abort(404)
-        visible_datasets = dataset_service.list_dataset_overview(actor.id)
-        if dataset_kind is not None:
-            visible_datasets = tuple(
-                context for context in visible_datasets if context.dataset.kind == dataset_kind
-            )
-        page_title = {
-            None: "Datasets",
-            "reference": "Reference datasets",
-            "mapping": "Mapping datasets",
-            "hierarchy": "Hierarchy datasets",
-        }[dataset_kind]
-        return render_mapping_template(
-            "pages/datasets/list.html",
-            actor=actor,
-            may_create=_authorization.datasets.can_create_dataset(actor.id),
-            datasets=visible_datasets,
-            deletion_notice=request.args.getlist("deleted") == ["1"],
-            page_title=page_title,
-            empty_dataset_label=page_title.lower(),
-            dataset_kind=dataset_kind,
-            current_actor=actor,
-            current_csrf=_login_session.csrf_token,
-            active_navigation=(
-                f"{dataset_kind}_datasets" if dataset_kind is not None else active_navigation()
-            ),
-            dataset_ui_enabled=dataset_ui_enabled,
-        )
-
-    def render_dataset_create_form(
-        *,
-        key: str = "",
-        name: str = "",
-        description: str = "",
-        initial_kind: str | None = None,
-        error=None,
-        error_field=None,
-    ):
-        actor, login_session = require_authenticated()
-        _auth, service, field_service, *_rest = require_dataset_dependencies()
-        eligible_teams = _auth.datasets.creation_teams(actor.id)
-        available_reference_tables, reference_table_fields = service.mapping_source_choices(
-            actor.id
-        )
-        return render_template(
-            "pages/datasets/create.html",
-            dataset_icon_choices=DATASET_ICONS,
-            selected_icon=request.form.get("icon", ""),
-            teams=eligible_teams,
-            owner_team_id=request.form.get(
-                "owner_team_id", eligible_teams[0].id if len(eligible_teams) == 1 else ""
-            ),
-            key=key or (key_from_name(name) if not error else ""),
-            name=name,
-            description=description,
-            table_kind=request.form.get("kind") or initial_kind or "reference",
-            mapping_mode="linked",
-            source_system=request.form.get("source_system", ""),
-            target_system=request.form.get("target_system", ""),
-            source_dataset_id=request.form.get("source_dataset_id", ""),
-            target_dataset_id=request.form.get("target_dataset_id", ""),
-            source_field_key=request.form.get("source_field_key", ""),
-            target_field_key=request.form.get("target_field_key", ""),
-            available_reference_tables=available_reference_tables,
-            reference_table_fields=reference_table_fields,
-            error=error,
-            error_field=error_field,
-            current_actor=actor,
-            current_csrf=login_session.csrf_token,
-            active_navigation=active_navigation(),
-            dataset_ui_enabled=dataset_ui_enabled,
-        )
-
-    @dataset_route("/datasets/new", capability="can_create_dataset", methods=["GET"])
-    def new_dataset():
-        require_dataset_dependencies()
-        initial_kind = request.args.get("kind")
-        if initial_kind not in {None, "reference", "mapping", "hierarchy"}:
-            abort(404)
-        return render_dataset_create_form(initial_kind=initial_kind)
-
-    @dataset_route("/datasets", capability="can_create_dataset", methods=["POST"])
-    def create_dataset():
-        actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        key = request.form.get("key", "")
-        name = request.form.get("dataset_label", request.form.get("name", ""))
-        description = request.form.get("description", "")
-        try:
-            submitted_teams = request.form.getlist("owner_team_id")
-            if len(submitted_teams) != 1 or not submitted_teams[0]:
-                raise ValidationError("Choose an owning team.")
-            dataset = dataset_service.create_dataset(
-                actor.id,
-                key,
-                name,
-                description,
-                submitted_teams[0],
-                icon=request.form.get("icon", ""),
-                kind=request.form.get("kind", "reference"),
-                mapping_mode=request.form.get("mapping_mode") or None,
-                source_system=request.form.get("source_system") or None,
-                target_system=request.form.get("target_system") or None,
-                source_dataset_id=request.form.get("source_dataset_id") or None,
-                target_dataset_id=request.form.get("target_dataset_id") or None,
-                source_field_key=request.form.get("source_field_key") or None,
-                target_field_key=request.form.get("target_field_key") or None,
-            )
-        except (ValidationError, ConflictError) as error:
-            message = str(error)
-            error_field = error.field
-            response = render_dataset_create_form(
-                key=key,
-                name=name,
-                description=description,
-                error=message,
-                error_field=error_field,
-            )
-            return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(
-            url_for(
-                "dataset_detail",
-                key=dataset.key,
-                concept=True,
-                tab="fields",
-                _anchor="fields",
-            )
-        )
-
-    @dataset_route(
-        "/datasets/<key>/concept",
-        capability="can_view_dataset",
-        methods=["GET"],
-        defaults={"concept": True},
+    register_datasets_blueprint(
+        app,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+        dataset_records=dataset_records,
+        dataset_versions=dataset_versions,
+        record_imports=record_imports,
+        review_secret=review_secret,
+        require_authenticated=require_authenticated,
+        require_csrf=require_csrf,
+        render_authenticated_template=render_authenticated_template,
+        render_mapping_template=render_mapping_template,
+        active_navigation=active_navigation,
+        audit_security=audit_security,
     )
-    @dataset_route(
-        "/datasets/<key>",
-        capability="can_view_dataset",
-        methods=["GET"],
-        defaults={"concept": False},
-    )
-    @dataset_route(
-        "/datasets/<key>/versions/<version_id>",
-        capability="can_view_dataset",
-        methods=["GET"],
-        defaults={"concept": False},
-    )
-    @version_errors
-    def dataset_detail(key: str, version_id=None, concept=False):
-        edit_mode = request.args.get("edit")
-        if edit_mode == "1":
-            edit_mode = "all"
-        if edit_mode not in (None, "general", "ownership", "all"):
-            abort(404)
-        return render_dataset_configuration(
-            key, version_id=version_id, concept=concept, edit_mode=edit_mode
-        )
-
-    def dataset_settings_redirect(key, *, edit_mode=None):
-        actor, _login_session = require_authenticated()
-        try:
-            view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
-        except NotFoundError:
-            try:
-                datasets.get_dataset_configuration(actor.id, key)
-            except NotFoundError:
-                abort(404)
-            version_id = None
-            use_concept = False
-        else:
-            use_concept = view.state is None
-            # Settings describe dataset-wide metadata. Do not send a legacy
-            # configure link to a scheduled/expired snapshot: that would expose
-            # version context (and its release details) instead of Settings.
-            version_id = (
-                view.state.version.id
-                if view.state and view.state.status == "Current" and not use_concept
-                else None
-            )
-            if view.state and view.state.status != "Current":
-                use_concept = False
-        return redirect(
-            url_for(
-                "dataset_detail",
-                key=key,
-                version_id=version_id,
-                concept=True if use_concept else None,
-                edit=edit_mode,
-                tab="dataset-details",
-                _anchor="dataset-details",
-            )
-        )
-
-    @dataset_route("/datasets/<key>/configure", capability="can_view_dataset", methods=["GET"])
-    @version_errors
-    def dataset_configuration(key):
-        edit_mode = request.args.get("edit")
-        if edit_mode == "1":
-            edit_mode = "all"
-        if edit_mode not in (None, "general", "ownership", "all"):
-            abort(404)
-        return dataset_settings_redirect(key, edit_mode=edit_mode)
 
     @dataset_route(
+        app,
         "/datasets/<key>/versions/<version_id>/fields/<field_key>",
         capability="can_view_dataset",
         methods=["GET"],
@@ -968,286 +737,12 @@ def create_flask_app(
             version_state=view.state,
         )
 
-    def render_dataset_configuration(
-        key,
-        *,
-        version_id=None,
-        concept=False,
-        edit_mode=False,
-        name=None,
-        description=None,
-        error=None,
-        error_field=None,
-        access_error=None,
-        access_subject="",
-    ):
-        actor, login_session = require_authenticated()
-        require_dataset_dependencies()
-        field_context_label = None
-        draft_in_progress = False
-        may_edit_key = False
-        mapping_configuration = None
-        try:
-            view = dataset_versions.read(
-                actor.id, key, version_id, page=None, prefer_concept=concept
-            )
-            if (
-                version_id is None
-                and not concept
-                and view.state is not None
-                and view.state.status != "Current"
-            ):
-                # The default version lookup may select Scheduled or Expired
-                # when no Current version exists. Settings are dataset-wide;
-                # show metadata, not a non-current version's release details.
-                raise NotFoundError("No Current version")
-        except NotFoundError:
-            if version_id is not None or concept:
-                raise
-            configuration = datasets.get_dataset_configuration(actor.id, key)
-            dataset = configuration.dataset
-            context = SimpleNamespace(record_count=0, last_updated=dataset.updated_at)
-            state, identifier = None, None
-            fields, field_states = (), {}
-            editable = configuration.may_maintain
-            may_change_owner = configuration.may_govern
-            may_edit_key = configuration.may_edit_key
-            may_export = authorization.datasets.can_export_dataset(actor.id, dataset.id)
-            schema_admin, may_start_concept = False, False
-            field_context_label = "No Current version or active Draft available."
-            if dataset.kind == "mapping":
-                mapping_configuration = dataset
-        else:
-            dataset = view.context.dataset
-            if dataset.kind == "mapping":
-                # PublishedDataset intentionally contains snapshot content, not mutable
-                # mapping configuration. Read the separately authorized current metadata.
-                mapping_configuration = datasets.get_dataset_configuration(actor.id, key).dataset
-            editable = view.may_maintain
-            schema_admin = view.state is None and view.may_maintain
-            may_change_owner = editable and authorization.datasets.can_change_dataset_owner(
-                actor.id, dataset.id
-            )
-            context, state, identifier = view.context, view.state, view.identifier
-            fields = view.fields
-            field_states = {
-                change.id: change.status
-                for change in (g.concept_ui.field_changes if concept else ())
-                if change.status != ChangeStatus.ADDED
-            }
-            may_start_concept = (
-                view.may_maintain
-                and view.concept is None
-                and view.state is not None
-                and view.state.status == "Current"
-            )
-            if editable:
-                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
-            may_export = view.may_export
-            if view.state is not None:
-                field_context_label = (
-                    f"{view.state.status} · Version {view.state.version.number} · Read only"
-                )
-            draft_in_progress = view.concept is not None
-        mapping_source_table = None
-        if mapping_configuration and mapping_configuration.source_dataset_id:
-            try:
-                visible_dataset_lookup = datasets.get_visible_dataset_by_id
-                mapping_source_table = visible_dataset_lookup(
-                    actor.id, mapping_configuration.source_dataset_id
-                )
-            except NotFoundError:
-                mapping_source_table = None
-        mapping_incomplete_text = (
-            mapping_incomplete_message(fields) if dataset.kind == "mapping" else None
-        )
-        if edit_mode and not editable:
-            abort(404)
-        if edit_mode == "ownership" and not may_change_owner:
-            abort(404)
-        access_teams, access_users, access_entries = [], [], []
-        access_grant_teams, access_grant_users = [], []
-        may_view_access = editable
-        may_manage_export = False
-        export_policy = None
-        if may_view_access:
-            _, access_teams, access_users, access_entries, export_policy, may_manage_export = (
-                datasets.export_access_context(actor.id, key)
-            )
-            granted_subjects = {
-                (entry.subject_type, entry.subject_id) for entry, _ in access_entries
-            }
-            access_grant_teams = [
-                team
-                for team in access_teams
-                if team.id != dataset.owner_team_id and ("team", team.id) not in granted_subjects
-            ]
-            access_grant_users = [
-                user for user in access_users if ("user", user.id) not in granted_subjects
-            ]
-        return render_mapping_template(
-            "pages/datasets/detail.html",
-            dataset=dataset,
-            concept=concept,
-            mapping_configuration=mapping_configuration,
-            source_context_available=identifier is not None,
-            context=context,
-            settings_return_context=(
-                "version" if version_id else "concept" if concept else "detail"
-            ),
-            settings_return_version_id=version_id,
-            configuration_url=(
-                url_for(
-                    "dataset_detail",
-                    key=dataset.key,
-                    version_id=version_id,
-                    concept=True if concept else None,
-                    tab="dataset-details",
-                    _anchor="dataset-details",
-                )
-            ),
-            editable=editable,
-            edit_mode=edit_mode,
-            name=dataset.name if name is None else name,
-            technical_key=request.form.get("technical_key", dataset.key),
-            may_edit_key=may_edit_key,
-            description=dataset.description if description is None else description,
-            error=error,
-            error_field=error_field,
-            dataset_icon_choices=DATASET_ICONS,
-            selected_icon=request.form.get("icon", dataset.icon),
-            teams=access_teams,
-            selected_team_id=request.form.get("owner_team_id", dataset.owner_team_id),
-            expected_owner_team_id=request.form.get(
-                "expected_owner_team_id", dataset.owner_team_id
-            ),
-            schema_admin=schema_admin,
-            may_start_concept=may_start_concept,
-            may_change_owner=may_change_owner,
-            may_view_access=may_view_access,
-            may_manage_export=may_manage_export,
-            export_policy=export_policy,
-            may_export=may_export,
-            draft_in_progress=draft_in_progress,
-            access_teams=access_teams,
-            access_users=access_users,
-            access_grant_teams=access_grant_teams,
-            access_grant_users=access_grant_users,
-            access_entries=access_entries,
-            access_error=access_error,
-            access_subject=access_subject,
-            fields=fields,
-            mapping_source_table=mapping_source_table,
-            mapping_incomplete=bool(mapping_incomplete_text),
-            mapping_incomplete_message=mapping_incomplete_text,
-            field_states=field_states,
-            field_context_label=field_context_label,
-            dataset_icon_label=DATASET_ICONS.get(
-                rendered_dataset_icon(dataset.icon, dataset.kind),
-                rendered_dataset_icon(dataset.icon, dataset.kind).replace("-", " ").capitalize(),
-            ),
-            business_key=identifier,
-            version_state=state,
-        )
-
     @dataset_route(
-        "/datasets/<key>/concept/new", capability="can_maintain_dataset", methods=["POST"]
+        app,
+        "/datasets/<key>/versions",
+        capability="can_view_dataset",
+        methods=["GET"],
     )
-    @version_errors
-    def dataset_concept_create(key):
-        actor, session = require_authenticated()
-        require_csrf(session.csrf_token)
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        try:
-            dataset_versions.create_concept(actor.id, dataset.id)
-        except ConflictError as error:
-            return render_authenticated_template(
-                "pages/datasets/concept_required.html",
-                key=key,
-                error=str(error),
-                already_active=True,
-                has_current=dataset_versions.history(actor.id, key).has_current,
-            ), 409
-        return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
-
-    @dataset_route(
-        "/datasets/<key>/source/update", capability="can_maintain_dataset", methods=["POST"]
-    )
-    @version_errors
-    def dataset_mapping_source_update(key):
-        from refrncr.mapping_updates import SourceUpdateBlocked
-
-        actor, session = require_authenticated()
-        require_csrf(session.csrf_token)
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        try:
-            revisions = request.form.getlist("expected_revision")
-            if len(revisions) != 1:
-                raise ValidationError("Reload the mapping before updating its source.")
-            dataset_versions.update_mapping_source(
-                actor.id, dataset.id, parse_expected_revision(revisions[0])
-            )
-        except SourceUpdateBlocked:
-            # Re-render the mapping's shared notice, including newly incompatible sources.
-            return redirect(url_for("dataset_records_view", key=key), code=303)
-        except (ValidationError, ConflictError) as failure:
-            status = 409 if isinstance(failure, ConflictError) else 400
-            return render_authenticated_template(
-                "pages/error.html", error_code=status, error_message=str(failure)
-            ), status
-        return redirect(
-            url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
-            code=303,
-        )
-
-    @dataset_route(
-        "/datasets/<key>/concept/discard",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_concept_discard(key):
-        actor, session = require_authenticated()
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        error, status = None, 200
-        if request.method == "POST":
-            require_csrf(session.csrf_token)
-            if set(request.form) != {"csrf_token", "confirmation", "confirmed"} or any(
-                len(request.form.getlist(key)) != 1 for key in request.form
-            ):
-                return "Review the discard form again.", 400
-            try:
-                identity = decode_discard(request.form["confirmation"], session.id, review_secret)
-            except ValueError:
-                audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-                raise NotFoundError("Concept not found") from None
-            if identity.actor_id != actor.id or identity.dataset_id != dataset.id:
-                audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-                raise NotFoundError("Concept not found")
-            try:
-                if request.form["confirmed"] != "yes":
-                    raise ValidationError("Confirm discard of this Concept.")
-                result = dataset_versions.discard_concept(actor.id, dataset.id, identity)
-                record_imports.store.revoke_concept(result.identity.concept_id)
-                return redirect(url_for("dataset_detail", key=key, notice="discarded"), code=303)
-            except (ConflictError, ValidationError) as failure:
-                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
-        review, token = None, None
-        try:
-            review = dataset_versions.review_discard(actor.id, dataset.id)
-            token = encode_discard(review.identity, session.id, review_secret)
-        except ConflictError as failure:
-            error, status = error or str(failure), 409
-        return render_authenticated_template(
-            "pages/datasets/concepts/discard.html",
-            dataset=dataset,
-            review=review,
-            confirmation=token,
-            error=error,
-        ), status
-
-    @dataset_route("/datasets/<key>/versions", capability="can_view_dataset", methods=["GET"])
     @version_errors
     def dataset_versions_view(key):
         actor, _session = require_authenticated()
@@ -1330,7 +825,10 @@ def create_flask_app(
         return url_for("dataset_version_review", key=key, **values)
 
     @dataset_route(
-        "/datasets/<key>/versions/review", capability="can_view_dataset", methods=["GET"]
+        app,
+        "/datasets/<key>/versions/review",
+        capability="can_view_dataset",
+        methods=["GET"],
     )
     @version_errors
     @concept_route
@@ -1446,6 +944,7 @@ def create_flask_app(
             return review_error(key, str(error), 400)
 
     @dataset_route(
+        app,
         "/datasets/<key>/versions/review/records/<object_id>",
         capability="can_view_dataset",
         methods=["GET"],
@@ -1456,6 +955,7 @@ def create_flask_app(
         return render_diff_detail(key, object_id, "record")
 
     @dataset_route(
+        app,
         "/datasets/<key>/versions/review/fields/<object_id>",
         capability="can_view_dataset",
         methods=["GET"],
@@ -1466,6 +966,7 @@ def create_flask_app(
         return render_diff_detail(key, object_id, "field")
 
     @dataset_route(
+        app,
         "/datasets/<key>/versions/publish",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -1557,6 +1058,7 @@ def create_flask_app(
         ), status
 
     @dataset_route(
+        app,
         "/datasets/<key>/versions/<version_id>/cancel",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -1595,114 +1097,6 @@ def create_flask_app(
             error=error,
             can_cancel=selected.status == "Scheduled",
         ), status
-
-    def access_management_target(key):
-        """Where export access changes return: the dataset's Access tab."""
-        concept = request.args.get("concept") == "1"
-        version_id = request.args.get("version_id") or None
-        return (
-            concept,
-            version_id,
-            url_for(
-                "dataset_detail",
-                key=key,
-                version_id=version_id,
-                concept=concept or None,
-                tab="access-management",
-                _anchor="access-management",
-            ),
-        )
-
-    @dataset_route(
-        "/datasets/<key>/export-access", capability="can_manage_export_access", methods=["POST"]
-    )
-    @dataset_not_found_route
-    def dataset_export_access(key):
-        actor, login_session = require_authenticated()
-        _auth, service, *_rest = require_dataset_dependencies()
-        require_csrf(login_session.csrf_token)
-        concept, version_id, target = access_management_target(key)
-        try:
-            expected = {"csrf_token", "subject"}
-            if set(request.form) != expected or any(
-                len(request.form.getlist(item)) != 1 for item in expected
-            ):
-                raise ValidationError("Choose one user or team.")
-            subject_type, separator, subject_id = request.form["subject"].partition(":")
-            if not separator:
-                raise ValidationError("Choose one user or team.")
-            service.grant_export_access(actor.id, key, subject_type, subject_id)
-        except (ValidationError, ConflictError) as error:
-            # Show the error on the Access management tab the form came from.
-            if concept:
-                try:
-                    g.concept_ui = dataset_versions.concept_context(actor.id, key)
-                except (NotFoundError, ConflictError):
-                    concept = False
-            response = render_dataset_configuration(
-                key,
-                concept=concept,
-                version_id=version_id,
-                access_error=str(error),
-                access_subject=request.form.get("subject", ""),
-            )
-            return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(target)
-
-    @dataset_route(
-        "/datasets/<key>/export-access/<access_id>/revoke",
-        capability="can_manage_export_access",
-        methods=["POST"],
-    )
-    @dataset_not_found_route
-    def revoke_dataset_export_access(key, access_id):
-        actor, login_session = require_authenticated()
-        _auth, service, *_rest = require_dataset_dependencies()
-        require_csrf(login_session.csrf_token)
-        service.revoke_export_access(actor.id, key, access_id)
-        return redirect(access_management_target(key)[2])
-
-    @dataset_route(
-        "/datasets/<key>/fields/order", capability="can_maintain_dataset", methods=["POST"]
-    )
-    @concept_route
-    def move_dataset_field(key: str):
-        actor, login_session = require_authenticated()
-        _authorization, _datasets, field_service, _business_keys, _records = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        if set(request.form) == {"csrf_token", "expected_field_id", "ordered_field_id"}:
-            # Drag and keyboard reordering (field-order.js) submit the complete new order.
-            expected = tuple(request.form.getlist("expected_field_id"))
-            proposed = tuple(request.form.getlist("ordered_field_id"))
-            try:
-                field_service.replace_order(actor.id, key, expected, proposed)
-            except NotFoundError:
-                abort(404)
-            except ValidationError as error:
-                abort(400, description=str(error))
-            except StaleFieldOrderError as error:
-                abort(409, description=str(error))
-            return "", 204
-        if set(request.form) != {"csrf_token", "expected_field_id", "field_id", "direction"}:
-            abort(400, description="Invalid field order request")
-        field_ids = request.form.getlist("field_id")
-        directions = request.form.getlist("direction")
-        expected = tuple(request.form.getlist("expected_field_id"))
-        if len(field_ids) != 1 or len(directions) != 1 or not expected:
-            abort(400, description="Invalid field order request")
-        try:
-            field_service.move_field(actor.id, key, field_ids[0], directions[0], expected)
-        except NotFoundError:
-            abort(404)
-        except ValidationError as error:
-            abort(400, description=str(error))
-        except StaleFieldOrderError as error:
-            abort(409, description=str(error))
-        return redirect(
-            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
-        )
 
     def hierarchy_presentation(view):
         """Arrange a snapshot for templates without changing its structure or values."""
@@ -2008,6 +1402,7 @@ def create_flask_app(
         return selected[0], searches[0], sorts[0], directions[0]
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/nodes/new",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -2033,6 +1428,7 @@ def create_flask_app(
         return render_hierarchy_node_form(view, rows)
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/nodes/<node_id>/edit",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -2079,6 +1475,7 @@ def create_flask_app(
         return render_hierarchy_node_form(view, rows, row)
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/nodes/<node_id>/delete",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -2123,6 +1520,7 @@ def create_flask_app(
         return (response, status) if status != 200 else response
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/nodes/<node_id>/values",
         capability="can_view_dataset",
         methods=["GET", "POST"],
@@ -2191,18 +1589,21 @@ def create_flask_app(
         return render_hierarchy_node_form(view, rows, row, mode="values")
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/records",
         capability="can_view_dataset",
         methods=["GET"],
         defaults={"concept": True},
     )
     @dataset_route(
+        app,
         "/datasets/<key>/records",
         capability="can_view_dataset",
         methods=["GET"],
         defaults={"concept": False},
     )
     @dataset_route(
+        app,
         "/datasets/<key>/versions/<version_id>/records",
         capability="can_view_dataset",
         methods=["GET"],
@@ -2467,6 +1868,7 @@ def create_flask_app(
         )
 
     @dataset_route(
+        app,
         "/datasets/<key>/records/export/period",
         capability="can_export_dataset",
         methods=["GET", "POST"],
@@ -2524,18 +1926,21 @@ def create_flask_app(
         ), (422 if error else 200)
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/records/export",
         capability="can_export_dataset",
         methods=["GET"],
         defaults={"concept": True},
     )
     @dataset_route(
+        app,
         "/datasets/<key>/records/export",
         capability="can_export_dataset",
         methods=["GET"],
         defaults={"concept": False},
     )
     @dataset_route(
+        app,
         "/datasets/<key>/versions/<version_id>/records/export",
         capability="can_export_dataset",
         methods=["GET"],
@@ -2600,7 +2005,12 @@ def create_flask_app(
         def decorate(function):
             function.required_capability = capability
             if getattr(function, "_secured_import", False):
-                return dataset_route(rule, capability=capability, **options)(function)
+                return dataset_route(
+                    app,
+                    rule,
+                    capability=capability,
+                    **options,
+                )(function)
 
             @wraps(function)
             def secured_import(*args, **kwargs):
@@ -2665,7 +2075,12 @@ def create_flask_app(
                     ), 400
 
             secured_import._secured_import = True
-            return dataset_route(rule, capability=capability, **options)(secured_import)
+            return dataset_route(
+                app,
+                rule,
+                capability=capability,
+                **options,
+            )(secured_import)
 
         return decorate
 
@@ -3433,7 +2848,10 @@ def create_flask_app(
         return (response, status) if status != 200 else response
 
     @dataset_route(
-        "/datasets/<key>/records/new", capability="can_maintain_dataset", methods=["GET"]
+        app,
+        "/datasets/<key>/records/new",
+        capability="can_maintain_dataset",
+        methods=["GET"],
     )
     @concept_route
     def new_dataset_record(key: str):
@@ -3452,7 +2870,12 @@ def create_flask_app(
             abort(404)
         return render_record_form(dataset, fields, csrf=login_session.csrf_token)
 
-    @dataset_route("/datasets/<key>/records", capability="can_maintain_dataset", methods=["POST"])
+    @dataset_route(
+        app,
+        "/datasets/<key>/records",
+        capability="can_maintain_dataset",
+        methods=["POST"],
+    )
     @concept_route
     def create_dataset_record(key: str):
         actor, login_session = require_authenticated()
@@ -3537,6 +2960,7 @@ def create_flask_app(
         return parse_expected_revision(values[0])
 
     @dataset_route(
+        app,
         "/datasets/<key>/records/<record_id>/edit",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -3627,6 +3051,7 @@ def create_flask_app(
         )
 
     @dataset_route(
+        app,
         "/datasets/<key>/concept/records/<record_id>/restore",
         capability="can_maintain_dataset",
         methods=["POST"],
@@ -3657,6 +3082,7 @@ def create_flask_app(
         return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
 
     @dataset_route(
+        app,
         "/datasets/<key>/records/<record_id>/delete",
         capability="can_maintain_dataset",
         methods=["GET", "POST"],
@@ -3710,447 +3136,6 @@ def create_flask_app(
             error=error,
         )
         return (response, status) if status != 200 else response
-
-    @dataset_route("/datasets/<key>/edit", capability="can_maintain_dataset", methods=["GET"])
-    def edit_dataset(key: str):
-        actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        try:
-            dataset = dataset_service.get_dataset_for_edit(actor.id, key)
-        except NotFoundError:
-            abort(404)
-        return dataset_settings_redirect(dataset.key, edit_mode="all")
-
-    @dataset_route("/datasets/<key>", capability="can_maintain_dataset", methods=["POST"])
-    def update_dataset(key: str):
-        actor, login_session = require_authenticated()
-        _authorization, dataset_service, _field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        edit_mode = request.form.get("edit_section")
-        if edit_mode not in (None, "general", "ownership"):
-            abort(400)
-        return_context = request.form.get("settings_return_context", "detail")
-        if return_context not in ("concept", "detail", "version"):
-            abort(400)
-        return_concept = return_context == "concept"
-        return_version_id = request.form.get("settings_return_version_id") or None
-        if return_context != "version" and return_version_id:
-            abort(400)
-        try:
-            current = dataset_service.get_dataset_for_edit(actor.id, key)
-            if edit_mode == "ownership":
-                name, description, icon, technical_key = (
-                    current.name,
-                    current.description,
-                    None,
-                    None,
-                )
-            else:
-                name = request.form.get("dataset_label", request.form.get("name", current.name))
-                description = request.form.get("description", current.description)
-                icon = request.form.get("icon")
-                technical_key = request.form.get("technical_key")
-            owner_change = None
-            if edit_mode in (None, "ownership") and {
-                "owner_team_id",
-                "expected_owner_team_id",
-            } & set(request.form):
-                if any(
-                    len(request.form.getlist(field)) != 1
-                    for field in ("owner_team_id", "expected_owner_team_id")
-                ):
-                    raise ValidationError(
-                        "Submit exactly one expected and new owning team. Reopen the form."
-                    )
-                owner_change = (
-                    request.form["expected_owner_team_id"],
-                    request.form["owner_team_id"],
-                )
-            dataset = dataset_service.update_dataset(
-                actor.id,
-                key,
-                name,
-                description,
-                owner_change=owner_change,
-                icon=icon,
-                new_key=technical_key,
-            )
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            try:
-                dataset = dataset_service.get_dataset_for_edit(actor.id, key)
-            except NotFoundError:
-                abort(404)
-            message = str(error)
-            error_field = {"key": "technical_key"}.get(error.field, error.field)
-            if return_concept:
-                try:
-                    g.concept_ui = dataset_versions.concept_context(actor.id, dataset.key)
-                except (NotFoundError, ConflictError):
-                    return_concept = False
-            return (
-                render_dataset_configuration(
-                    dataset.key,
-                    concept=return_concept,
-                    version_id=return_version_id,
-                    edit_mode=edit_mode or "all",
-                    name=name,
-                    description=description,
-                    error=message,
-                    error_field=error_field,
-                ),
-                409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(
-            url_for(
-                "dataset_detail",
-                key=dataset.key,
-                version_id=return_version_id,
-                concept=True if return_concept else None,
-                tab="dataset-details",
-                _anchor="dataset-details",
-            )
-        )
-
-    @dataset_route(
-        "/datasets/id/<dataset_id>/delete",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    def dataset_delete(dataset_id: str):
-        actor, login_session = require_authenticated()
-        _auth, service, *_rest = require_dataset_dependencies()
-        error = None
-        status = 200
-        try:
-            if request.method == "POST":
-                require_csrf(login_session.csrf_token)
-                # A duplicate/missing field cannot select a favorable value.
-                name = request.form.getlist("confirmation_name")
-                expected = request.form.getlist("expected_updated_at")
-                service.delete_dataset(
-                    actor.id,
-                    dataset_id,
-                    name[0] if len(name) == 1 else None,
-                    expected[0] if len(expected) == 1 else None,
-                )
-                return redirect(url_for("dataset_list", deleted="1"), code=303)
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as failure:
-            error = str(failure)
-            status = 409 if isinstance(failure, ConflictError) else 400
-        except PersistenceConflictError:
-            error = (
-                "Dataset deletion could not be completed. Reopen the confirmation and try again."
-            )
-            status = 409
-        try:
-            context = service.get_dataset_for_deletion(actor.id, dataset_id)
-        except NotFoundError:
-            abort(404)
-        except PersistenceConflictError:
-            abort(503, description="Dataset confirmation is temporarily unavailable.")
-        return render_authenticated_template(
-            "pages/datasets/delete.html",
-            deletion=context,
-            error=error,
-        ), status
-
-    def require_dataset_schema_admin(actor_id: str, key: str):
-        (
-            authorization_service,
-            dataset_service,
-            _field_service,
-            _business_key_service,
-            _record_service,
-        ) = require_dataset_dependencies()
-        try:
-            dataset = dataset_service.get_dataset(actor_id, key)
-        except NotFoundError:
-            abort(404)
-        if not authorization_service.has_capability(actor_id, "can_maintain_dataset", dataset.id):
-            audit_security("security.authorization_denied", actor_user_id=actor_id)
-            abort(404)
-        return dataset
-
-    def render_dataset_field_create_form(
-        dataset,
-        *,
-        csrf: str,
-        key: str = "",
-        name: str = "",
-        data_type: str = "string",
-        is_required: bool = False,
-        is_unique: bool = False,
-        is_business_key_component: bool = False,
-        error=None,
-    ):
-        actor, _login_session = require_authenticated()
-        _authorization, dataset_service, field_service, *_rest = require_dataset_dependencies()
-        mapping_fields = (
-            field_service.list_fields(actor.id, dataset.key) if dataset.kind == "mapping" else ()
-        )
-        mapping_source_fields = ()
-        if dataset.kind == "mapping":
-            source = dataset_service.mapping_source(actor.id, dataset.key)
-            existing = {field.source_field_key for field in mapping_fields}
-            mapping_source_fields = tuple(
-                field for field in source["fields"] if field.key not in existing
-            )
-        selected_mapping_role = request.form.get(
-            "mapping_field_role", request.args.get("role", "mapping_target")
-        )
-        if selected_mapping_role not in {"source_context", "mapping_target"}:
-            selected_mapping_role = "mapping_target"
-        return render_mapping_template(
-            "pages/datasets/fields/create.html",
-            definition=request.form.get("definition", ""),
-            unit=request.form.get("unit", ""),
-            dataset=dataset,
-            key=key,
-            name=name,
-            data_type=data_type,
-            is_required=is_required,
-            is_unique=is_unique,
-            is_business_key_component=is_business_key_component,
-            error=error,
-            current_csrf=csrf,
-            type_choices=tuple(DATATYPES.values()),
-            mapping_field_role=selected_mapping_role,
-            mapping_source_field_key=request.form.get("source_field_key", ""),
-            mapping_source_fields=mapping_source_fields,
-            hierarchy_scope=request.form.get("hierarchy_scope", "leaves"),
-        )
-
-    @dataset_route("/datasets/<key>/fields/new", capability="can_maintain_dataset", methods=["GET"])
-    @concept_route
-    def new_dataset_field(key: str):
-        actor, login_session = require_authenticated()
-        dataset = require_dataset_schema_admin(actor.id, key)
-        return render_dataset_field_create_form(dataset, csrf=login_session.csrf_token)
-
-    @dataset_route("/datasets/<key>/fields", capability="can_maintain_dataset", methods=["POST"])
-    @concept_route
-    def create_dataset_field(key: str):
-        actor, login_session = require_authenticated()
-        _authorization, _dataset_service, field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        field_key = request.form.get("key", "")
-        name = request.form.get("field_label", request.form.get("name", ""))
-        data_type = request.form.get("data_type", "")
-        is_required = "is_required" in request.form
-        is_unique = "is_unique" in request.form
-        is_business_key_component = "is_business_key_component" in request.form
-        try:
-            field_service.create_field(
-                actor.id,
-                key,
-                field_key,
-                name,
-                data_type,
-                is_required,
-                is_unique,
-                is_business_key_component,
-                definition=request.form.get("definition", ""),
-                unit=request.form.get("unit", ""),
-                mapping_role=request.form.get("mapping_field_role") or None,
-                source_field_key=request.form.get("source_field_key") or None,
-                hierarchy_scope=request.form.get("hierarchy_scope") or None,
-            )
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            dataset = require_dataset_schema_admin(actor.id, key)
-            response = render_dataset_field_create_form(
-                dataset,
-                csrf=login_session.csrf_token,
-                key=field_key,
-                name=name,
-                data_type=data_type,
-                is_required=is_required,
-                is_unique=is_unique,
-                is_business_key_component=is_business_key_component,
-                error=str(error),
-            )
-            return response, 409 if isinstance(error, ConflictError) else 400
-        return redirect(
-            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
-        )
-
-    def render_dataset_field_edit_form(
-        dataset,
-        field,
-        *,
-        csrf: str,
-        name: str,
-        data_type: str,
-        is_required: bool,
-        is_unique: bool,
-        is_business_key_component: bool,
-        key_value: str,
-        may_edit_key: bool,
-        error=None,
-    ):
-        return render_authenticated_template(
-            "pages/datasets/fields/edit.html",
-            definition=request.form.get("definition", field.definition),
-            unit=request.form.get("unit", field.unit),
-            dataset=dataset,
-            field=field,
-            name=name,
-            data_type=data_type,
-            is_required=is_required,
-            is_unique=is_unique,
-            is_business_key_component=is_business_key_component,
-            key_value=key_value,
-            may_edit_key=may_edit_key,
-            error=error,
-            current_csrf=csrf,
-            type_choices=tuple(DATATYPES.values()),
-            hierarchy_scope=request.form.get("hierarchy_scope", field.hierarchy_scope),
-        )
-
-    @dataset_route(
-        "/datasets/<key>/fields/<field_key>/edit",
-        capability="can_maintain_dataset",
-        methods=["GET"],
-    )
-    @concept_route
-    def edit_dataset_field(key: str, field_key: str):
-        actor, login_session = require_authenticated()
-        dataset = require_dataset_schema_admin(actor.id, key)
-        _authorization, _dataset_service, field_service, business_key_service, record_service = (
-            require_dataset_dependencies()
-        )
-        try:
-            field = field_service.get_field(actor.id, key, field_key)
-            business_key = business_key_service.get_business_key(actor.id, key)
-            may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
-        except NotFoundError:
-            abort(404)
-        return render_dataset_field_edit_form(
-            dataset,
-            field,
-            csrf=login_session.csrf_token,
-            name=field.name,
-            data_type=field.data_type,
-            is_required=field.is_required,
-            is_unique=field.is_unique,
-            is_business_key_component=field.key in business_key.field_keys,
-            key_value=field.key,
-            may_edit_key=may_edit_key,
-        )
-
-    @dataset_route(
-        "/datasets/<key>/fields/<field_key>", capability="can_maintain_dataset", methods=["POST"]
-    )
-    @concept_route
-    def update_dataset_field(key: str, field_key: str):
-        actor, login_session = require_authenticated()
-        _authorization, _dataset_service, field_service, _business_key_service, _record_service = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        name = request.form.get("field_label", request.form.get("name", ""))
-        data_type = request.form.get("data_type", "")
-        is_required = "is_required" in request.form
-        is_unique = "is_unique" in request.form
-        is_business_key_component = "is_business_key_component" in request.form
-        try:
-            field_service.update_field_and_business_key_membership(
-                actor.id,
-                key,
-                field_key,
-                name,
-                data_type,
-                is_required,
-                is_unique,
-                is_business_key_component,
-                new_key=request.form.get("key", field_key),
-                definition=request.form.get("definition", ""),
-                unit=request.form.get("unit", ""),
-                hierarchy_scope=request.form.get("hierarchy_scope") or None,
-            )
-        except NotFoundError:
-            abort(404)
-        except (ValidationError, ConflictError) as error:
-            dataset = require_dataset_schema_admin(actor.id, key)
-            try:
-                field = field_service.get_field(actor.id, key, field_key)
-                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
-            except NotFoundError:
-                abort(404)
-            return (
-                render_dataset_field_edit_form(
-                    dataset,
-                    field,
-                    csrf=login_session.csrf_token,
-                    name=name,
-                    data_type=data_type,
-                    is_required=is_required,
-                    is_unique=is_unique,
-                    is_business_key_component=is_business_key_component,
-                    key_value=request.form.get("key", field.key),
-                    may_edit_key=may_edit_key,
-                    error=str(error),
-                ),
-                409 if isinstance(error, ConflictError) else 400,
-            )
-        return redirect(
-            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
-        )
-
-    @dataset_route(
-        "/datasets/<key>/fields/<field_key>/delete",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    @concept_route
-    def delete_dataset_field(key: str, field_key: str):
-        actor, login_session = require_authenticated()
-        _authorization, _dataset_service, field_service, business_key_service, record_service = (
-            require_dataset_dependencies()
-        )
-        require_csrf(login_session.csrf_token)
-        try:
-            field_service.delete_field(actor.id, key, field_key)
-        except NotFoundError:
-            abort(404)
-        except ValidationError as error:
-            dataset = require_dataset_schema_admin(actor.id, key)
-            try:
-                field = field_service.get_field(actor.id, key, field_key)
-                business_key = business_key_service.get_business_key(actor.id, key)
-                may_edit_key = datasets.get_dataset_configuration(actor.id, key).may_edit_key
-            except NotFoundError:
-                abort(404)
-            return (
-                render_dataset_field_edit_form(
-                    dataset,
-                    field,
-                    csrf=login_session.csrf_token,
-                    name=field.name,
-                    data_type=field.data_type,
-                    is_required=field.is_required,
-                    is_unique=field.is_unique,
-                    is_business_key_component=field.key in business_key.field_keys,
-                    key_value=field.key,
-                    may_edit_key=may_edit_key,
-                    error=str(error),
-                ),
-                400,
-            )
-        return redirect(
-            url_for("dataset_detail", key=key, concept=True, tab="fields", _anchor="fields")
-        )
 
     register_auth_blueprint(
         app,

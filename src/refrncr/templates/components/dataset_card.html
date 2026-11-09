@@ -21,7 +21,7 @@
     <details class="export-menu dataset-card-actions">
       <summary class="button button-icon-only" aria-label="Actions for {{ dataset.name }}">{{ symbol('ellipsis') }}</summary>
       <div class="export-menu-options">
-        <a href="{{ url_for('dataset_detail', key=dataset.key) }}">Settings</a>
+        <a href="{{ url_for('datasets.dataset_detail', key=dataset.key) }}">Settings</a>
         <a href="{{ url_for('dataset_versions_view', key=dataset.key) }}">Versions</a>
       </div>
     </details>

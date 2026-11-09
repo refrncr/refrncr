@@ -1,7 +1,7 @@
 {% from 'components/dataset_icon.html' import icon_picker %}
 {% from 'components.html' import feedback, form_field %}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}
-  <form {{ non_login_form_attrs() }} id='dataset-edit-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <form {{ non_login_form_attrs() }} id='dataset-edit-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("datasets.update_dataset", key=dataset.key) }}'>
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <input type='hidden' name='edit_section' value='general'>
     <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>

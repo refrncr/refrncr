@@ -18,7 +18,7 @@
       <div><dt>{{ label }}</dt><dd>{{ review.counts|attr(name) }}</dd></div>
       {% endfor %}
     </dl>
-    <form {{ non_login_form_attrs() }} id='discard-concept-form' method='post' action='{{ url_for("dataset_concept_discard", key=dataset.key) }}' data-single-submit data-busy-message='Discarding draft…'>
+    <form {{ non_login_form_attrs() }} id='discard-concept-form' method='post' action='{{ url_for("datasets.dataset_concept_discard", key=dataset.key) }}' data-single-submit data-busy-message='Discarding draft…'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='confirmation' value='{{ confirmation }}'>
       <input type='hidden' name='confirmed' value='yes'>

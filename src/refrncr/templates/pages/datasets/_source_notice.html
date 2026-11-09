@@ -7,7 +7,7 @@
   {% elif mapping_source.update_blocker %}
   <p>{{ mapping_source.update_blocker }}</p>
   {% elif mapping_source.may_update %}
-  <form method='post' action='{{ url_for("dataset_mapping_source_update", key=dataset.key) }}' data-single-submit>
+  <form method='post' action='{{ url_for("datasets.dataset_mapping_source_update", key=dataset.key) }}' data-single-submit>
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <input type='hidden' name='expected_revision' value='{{ mapping_source.revision }}'>
     <button class='button button-secondary' type='submit'>Update to V{{ mapping_source.latest_number }}</button>

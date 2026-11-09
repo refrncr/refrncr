@@ -22,7 +22,7 @@ ROUTE_DECORATORS = {
     "app.post",
     "app.route",
     "blueprint.get",
-    "blueprint.dataset_get",
+    "blueprint.dataset_route",
     "blueprint.post",
     "blueprint.route",
     "dataset_route",
@@ -62,7 +62,10 @@ def discover_routes(source, module):
             name = ast.unparse(decorator.func)
             if name not in ROUTE_DECORATORS:
                 continue
-            if not decorator.args or not isinstance(decorator.args[0], ast.Constant):
+            path_argument = 1 if name == "dataset_route" else 0
+            if len(decorator.args) <= path_argument or not isinstance(
+                decorator.args[path_argument], ast.Constant
+            ):
                 raise AuditContractError("Route needs explicit inventory: " + node.name)
             methods = next(
                 (ast.literal_eval(k.value) for k in decorator.keywords if k.arg == "methods"),
@@ -71,7 +74,7 @@ def discover_routes(source, module):
             routes.append(
                 {
                     "symbol": f"{module}.{node.name}",
-                    "path": decorator.args[0].value,
+                    "path": decorator.args[path_argument].value,
                     "methods": sorted(methods),
                 }
             )

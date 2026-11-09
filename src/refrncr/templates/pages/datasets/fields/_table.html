@@ -1,5 +1,5 @@
         <div class='table-scroll configuration-table{{ " configuration-table-editable" if schema_admin else "" }}' role='region' aria-label='Dataset fields' tabindex='0'>
-          <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("move_dataset_field", key=dataset.key) }}'{% endif %}>
+          <table{% if schema_admin %} data-field-order data-order-url='{{ url_for("datasets.move_dataset_field", key=dataset.key) }}'{% endif %}>
             <caption class='visually-hidden'>Dataset fields</caption>
             <thead><tr>{% if schema_admin %}<th scope='col' class='field-order-column'><span class='visually-hidden'>Field order</span></th>{% endif %}<th scope='col' class='field-identity-column'>Field</th><th scope='col' class='field-type-column'>Type</th>{% if dataset.kind == 'hierarchy' %}<th scope='col'>Scope</th>{% endif %}<th scope='col' class='field-constraints-column'>Constraints</th>{% if schema_admin %}<th scope='col' class='field-actions-column'>Actions</th>{% endif %}</tr></thead>
             <tbody>{% for field in fields %}
@@ -25,7 +25,7 @@
                 {% if schema_admin %}
                 <td>
                   <div class='field-actions'>
-                    {% if not inherited_mapping_field %}<a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>{% else %}<span class='field-empty'>Read only</span>{% endif %}
+                    {% if not inherited_mapping_field %}<a class='field-edit-action' aria-label='Edit field {{ field.name }}' data-panel-url data-dialog-open='configuration-panel' href='{{ url_for("datasets.edit_dataset_field", key=dataset.key, field_key=field.key) }}'>{{ file_pen_icon() }}</a>{% else %}<span class='field-empty'>Read only</span>{% endif %}
                   </div>
                 </td>
                 {% endif %}

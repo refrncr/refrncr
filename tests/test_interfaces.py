@@ -262,7 +262,7 @@ def test_renamed_views_keep_csrf_and_capability_checks():
     app.add_url_rule(
         "/renamed-datasets/<key>/fields",
         endpoint="renamed_dataset_field_view",
-        view_func=app.view_functions["create_dataset_field"],
+        view_func=app.view_functions["datasets.create_dataset_field"],
         methods=["POST"],
     )
     client = app.test_client()
@@ -307,7 +307,7 @@ def _route_matrix_expectations():
         "api_key_create",
         "api_key_revoke",
         "appearance_settings",
-        "dataset_list",
+        "datasets.dataset_list",
         "overview.index",
         "teams.team_list",
         "theme_preference",
@@ -330,8 +330,8 @@ def _route_matrix_expectations():
         "teams.delete_membership",
     }
     dataset_view = {
-        "dataset_detail",
-        "dataset_configuration",
+        "datasets.dataset_detail",
+        "datasets.dataset_configuration",
         "dataset_versions_view",
         "dataset_version_review",
         "dataset_version_record_diff",
@@ -341,14 +341,17 @@ def _route_matrix_expectations():
         "dataset_records_view",
     }
     dataset_export = {"export_dataset_history", "export_dataset_records"}
-    dataset_export_admin = {"dataset_export_access", "revoke_dataset_export_access"}
+    dataset_export_admin = {
+        "datasets.dataset_export_access",
+        "datasets.revoke_dataset_export_access",
+    }
     dataset_maintain = {
-        "dataset_mapping_source_update",
-        "dataset_concept_create",
-        "dataset_concept_discard",
+        "datasets.dataset_mapping_source_update",
+        "datasets.dataset_concept_create",
+        "datasets.dataset_concept_discard",
         "dataset_version_publish",
         "dataset_version_cancel",
-        "move_dataset_field",
+        "datasets.move_dataset_field",
         "dataset_hierarchy_node_create",
         "dataset_hierarchy_node_edit",
         "dataset_hierarchy_node_delete",
@@ -369,19 +372,19 @@ def _route_matrix_expectations():
         "edit_dataset_record",
         "restore_dataset_record",
         "delete_dataset_record",
-        "edit_dataset",
-        "update_dataset",
-        "dataset_delete",
-        "new_dataset_field",
-        "create_dataset_field",
-        "edit_dataset_field",
-        "update_dataset_field",
-        "delete_dataset_field",
+        "datasets.edit_dataset",
+        "datasets.update_dataset",
+        "datasets.dataset_delete",
+        "datasets.new_dataset_field",
+        "datasets.create_dataset_field",
+        "datasets.edit_dataset_field",
+        "datasets.update_dataset_field",
+        "datasets.delete_dataset_field",
     }
     expected = {}
     expected.update(dict.fromkeys(community, "can_access_community"))
-    expected["new_dataset"] = "can_create_dataset"
-    expected["create_dataset"] = "can_create_dataset"
+    expected["datasets.new_dataset"] = "can_create_dataset"
+    expected["datasets.create_dataset"] = "can_create_dataset"
     expected.update(dict.fromkeys(installation_admin, "can_administer_installation"))
     expected.update(dict.fromkeys(access_admin, "can_manage_access"))
     expected.update(dict.fromkeys(dataset_view, "can_view_dataset"))

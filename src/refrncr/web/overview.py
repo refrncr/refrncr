@@ -2,37 +2,20 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from functools import wraps
 from typing import Any, Protocol
 
-from flask import Blueprint, Flask, abort, current_app, g, render_template, request, url_for
-from werkzeug.exceptions import HTTPException
+from flask import Flask, abort, current_app, render_template, request, url_for
 
 from refrncr.overview import REASON_LABELS, OverviewService
-from refrncr.services import AuthorizationError, NotFoundError
-from refrncr.web.routing import authenticated_route, capability_route, no_store_route
+from refrncr.web.routing import (
+    DatasetBlueprint,
+    authenticated_route,
+    no_store_route,
+    version_errors,
+)
 
-
-class OverviewBlueprint(Blueprint):
-    def dataset_get(self, rule: str):
-        """Register a GET route only when dataset browser dependencies exist."""
-
-        def decorate(view):
-            self.record(
-                lambda state: (
-                    state.add_url_rule(rule, view_func=view, methods=["GET"])
-                    if state.app.extensions["refrncr.overview"].dataset_ui_enabled
-                    else None
-                )
-            )
-            return view
-
-        return decorate
-
-
-blueprint = OverviewBlueprint("overview", __name__)
+blueprint = DatasetBlueprint("overview", __name__)
 
 
 class AuthenticationResolver(Protocol):
@@ -63,39 +46,6 @@ class OverviewContext:
 
 def _context() -> OverviewContext:
     return current_app.extensions["refrncr.overview"]
-
-
-def _version_errors(function):
-    @wraps(function)
-    def secured(*args, **kwargs):
-        context = _context()
-        try:
-            return function(*args, **kwargs)
-        except AuthorizationError:
-            resolved = getattr(g, "authenticated_resolution", None)
-            context.audit_security(
-                "security.authorization_denied",
-                actor_user_id=resolved[0].id if resolved else None,
-            )
-            abort(403)
-        except NotFoundError:
-            abort(404)
-        except HTTPException:
-            raise
-        except Exception as error:
-            logging.getLogger(__name__).error(
-                "Dataset version operation failed: %s", type(error).__name__, exc_info=True
-            )
-            return (
-                context.render_authenticated_template(
-                    "pages/error.html",
-                    error_code=500,
-                    error_message="Dataset versions could not be loaded. Please try again.",
-                ),
-                500,
-            )
-
-    return secured
 
 
 def _render_overview(actor, *, full=False):
@@ -147,7 +97,7 @@ def _render_overview(actor, *, full=False):
 @blueprint.get("/")
 @no_store_route
 @authenticated_route
-@_version_errors
+@version_errors
 def index():
     context = _context()
     resolved = context.authenticated()
@@ -165,10 +115,9 @@ def index():
     )
 
 
-@blueprint.dataset_get("/attention")
-@capability_route("can_access_community")
+@blueprint.dataset_route("/attention", capability="can_access_community", methods=["GET"])
 @no_store_route
-@_version_errors
+@version_errors
 def attention_overview():
     context = _context()
     actor, _session = context.require_authenticated()

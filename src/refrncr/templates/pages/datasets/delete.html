@@ -16,7 +16,7 @@
       </dl>
       <p class='deletion-retained'>Record identifiers and access settings are removed with them. Audit history is retained.</p>
       {{ feedback(error, id="dataset-delete-error", focus=true) }}
-      <form {{ non_login_form_attrs() }} id='dataset-delete-form' class='form' method='post' action='{{ url_for("dataset_delete", dataset_id=deletion.id) }}' data-exact-confirmation='{{ deletion.name }}'>
+      <form {{ non_login_form_attrs() }} id='dataset-delete-form' class='form' method='post' action='{{ url_for("datasets.dataset_delete", dataset_id=deletion.id) }}' data-exact-confirmation='{{ deletion.name }}'>
         <div class='form-field'>
           <label for='dataset-delete-name'>Type <code>{{ deletion.name }}</code> to confirm</label>
           <input id='dataset-delete-name' name='confirmation_name' type='text' autocomplete='off' required aria-describedby='dataset-delete-name-help{% if error %} dataset-delete-error{% endif %}'{% if error %} aria-invalid='true'{% endif %}>
@@ -27,7 +27,7 @@
       </form>
     </div>
     {% call panel_form_actions() %}
-      <a class='button button-secondary' href='{{ url_for("dataset_detail", key=deletion.key, version_id=request.args.get("version_id"), concept=true if request.args.get("concept") == "1" else none, tab="dataset-details", _anchor="dataset-details") }}' data-panel-cancel>Cancel</a>
+      <a class='button button-secondary' href='{{ url_for("datasets.dataset_detail", key=deletion.key, version_id=request.args.get("version_id"), concept=true if request.args.get("concept") == "1" else none, tab="dataset-details", _anchor="dataset-details") }}' data-panel-cancel>Cancel</a>
       <button class='button button-danger' type='submit' form='dataset-delete-form'>Delete dataset</button>
     {% endcall %}
   </div>

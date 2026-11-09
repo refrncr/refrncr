@@ -8,7 +8,7 @@
 {% block title %}New dataset · REFRNCR{% endblock %}
 
 {% block content %}
-  {{ breadcrumbs([("Datasets", url_for("dataset_list")), ("New dataset", none)]) }}
+  {{ breadcrumbs([("Datasets", url_for("datasets.dataset_list")), ("New dataset", none)]) }}
   {{ page_header("New dataset") }}
   <div class='side-panel-body' data-side-panel-content data-panel-title='New dataset' data-panel-eyebrow='Datasets'>
   {{ feedback(error if not error_field else none, id="dataset-create-error", focus=true) }}
@@ -16,7 +16,7 @@
     <p class='help-text'>{{ 'Create a team before creating a dataset.' if current_actor.role == 'admin' else 'Team membership is required to create a dataset. Ask a Community administrator to add you to a team.' }}</p>
     <a class='button button-secondary' href='{{ url_for("teams.team_list") }}'>Go to Teams</a>
   {% else %}
-  <form class='form' {{ non_login_form_attrs() }} data-generate-key data-mapping-table-form novalidate method='post' action='{{ url_for("create_dataset") }}'>
+  <form class='form' {{ non_login_form_attrs() }} data-generate-key data-mapping-table-form novalidate method='post' action='{{ url_for("datasets.create_dataset") }}'>
     {{ form_field(
       "Name",
       "dataset_label",
@@ -73,7 +73,7 @@
     {{ icon_picker(dataset_icon_choices, selected_icon, kind=table_kind) }}
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <div class='form-actions'>
-      <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_list") }}'>Cancel</a>
+      <a class='button button-secondary' data-panel-cancel href='{{ url_for("datasets.dataset_list") }}'>Cancel</a>
       {{ button("Create dataset", button_type="submit") }}
     </div>
   </form>

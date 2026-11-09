@@ -7,9 +7,9 @@
     {% if may_view_access %}<a class='section-tab' id='tab-access' data-tab-target='access-management' href='#access-management'{% if active == 'access' %} aria-current='page'{% endif %}>Access</a>{% endif %}
     <a class='section-tab' id='tab-settings' data-tab-target='dataset-details' href='#dataset-details'{% if active == 'settings' %} aria-current='page'{% endif %}>Settings</a>
   {% else %}
-    <a class='section-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="fields", _anchor="fields") }}'{% if active == 'fields' %} aria-current='page'{% endif %}>Fields</a>
-    {% if may_view_access %}<a class='section-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="access-management", _anchor="access-management") }}'{% if active == 'access' %} aria-current='page'{% endif %}>Access</a>{% endif %}
-    <a class='section-tab' href='{{ url_for("dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="dataset-details", _anchor="dataset-details") }}'{% if active == 'settings' %} aria-current='page'{% endif %}>Settings</a>
+    <a class='section-tab' href='{{ url_for("datasets.dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="fields", _anchor="fields") }}'{% if active == 'fields' %} aria-current='page'{% endif %}>Fields</a>
+    {% if may_view_access %}<a class='section-tab' href='{{ url_for("datasets.dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="access-management", _anchor="access-management") }}'{% if active == 'access' %} aria-current='page'{% endif %}>Access</a>{% endif %}
+    <a class='section-tab' href='{{ url_for("datasets.dataset_detail", key=dataset.key, version_id=version_id, concept=true if concept else none, tab="dataset-details", _anchor="dataset-details") }}'{% if active == 'settings' %} aria-current='page'{% endif %}>Settings</a>
   {% endif %}
 </nav>
 {%- endmacro %}
