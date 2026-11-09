@@ -6,25 +6,21 @@ from flask import abort, g, redirect, render_template, request, url_for
 
 from refrncr.change_status import ChangeStatus
 from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered_dataset_icon
-from refrncr.review_tokens import decode_discard, encode_discard
 from refrncr.services import ConflictError, NotFoundError, ValidationError, parse_expected_revision
 from refrncr.version_contracts import mapping_incomplete_message
 from refrncr.web.datasets import (
     active_navigation,
-    audit_security,
     authorization,
     blueprint,
     dataset_versions,
     datasets,
-    record_imports,
     render_authenticated_template,
     render_mapping_template,
     require_authenticated,
     require_csrf,
     require_dataset_dependencies,
-    review_secret,
 )
-from refrncr.web.routing import concept_route, version_errors
+from refrncr.web.routing import version_errors
 
 
 @blueprint.dataset_route("/datasets", capability="can_access_community", methods=["GET"])
@@ -426,29 +422,6 @@ def render_dataset_configuration(
 
 
 @blueprint.dataset_route(
-    "/datasets/<key>/concept/new",
-    capability="can_maintain_dataset",
-    methods=["POST"],
-)
-@version_errors
-def dataset_concept_create(key):
-    actor, session = require_authenticated()
-    require_csrf(session.csrf_token)
-    dataset = datasets.get_dataset_for_edit(actor.id, key)
-    try:
-        dataset_versions.create_concept(actor.id, dataset.id)
-    except ConflictError as error:
-        return render_authenticated_template(
-            "pages/datasets/concept_required.html",
-            key=key,
-            error=str(error),
-            already_active=True,
-            has_current=dataset_versions.history(actor.id, key).has_current,
-        ), 409
-    return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
-
-
-@blueprint.dataset_route(
     "/datasets/<key>/source/update",
     capability="can_maintain_dataset",
     methods=["POST"],
@@ -479,53 +452,3 @@ def dataset_mapping_source_update(key):
         url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
         code=303,
     )
-
-
-@blueprint.dataset_route(
-    "/datasets/<key>/concept/discard",
-    capability="can_maintain_dataset",
-    methods=["GET", "POST"],
-)
-@version_errors
-@concept_route
-def dataset_concept_discard(key):
-    actor, session = require_authenticated()
-    dataset = datasets.get_dataset_for_edit(actor.id, key)
-    error, status = None, 200
-    if request.method == "POST":
-        require_csrf(session.csrf_token)
-        if set(request.form) != {"csrf_token", "confirmation", "confirmed"} or any(
-            len(request.form.getlist(key)) != 1 for key in request.form
-        ):
-            return "Review the discard form again.", 400
-        try:
-            identity = decode_discard(request.form["confirmation"], session.id, review_secret())
-        except ValueError:
-            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-            raise NotFoundError("Concept not found") from None
-        if identity.actor_id != actor.id or identity.dataset_id != dataset.id:
-            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-            raise NotFoundError("Concept not found")
-        try:
-            if request.form["confirmed"] != "yes":
-                raise ValidationError("Confirm discard of this Concept.")
-            result = dataset_versions.discard_concept(actor.id, dataset.id, identity)
-            record_imports.store.revoke_concept(result.identity.concept_id)
-            return redirect(
-                url_for("datasets.dataset_detail", key=key, notice="discarded"), code=303
-            )
-        except (ConflictError, ValidationError) as failure:
-            error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
-    review, token = None, None
-    try:
-        review = dataset_versions.review_discard(actor.id, dataset.id)
-        token = encode_discard(review.identity, session.id, review_secret())
-    except ConflictError as failure:
-        error, status = error or str(failure), 409
-    return render_authenticated_template(
-        "pages/datasets/concepts/discard.html",
-        dataset=dataset,
-        review=review,
-        confirmation=token,
-        error=error,
-    ), status

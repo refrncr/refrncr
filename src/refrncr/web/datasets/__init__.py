@@ -10,7 +10,6 @@ from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
 from refrncr.dataset_versions import DatasetVersionService
-from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthorizationService,
     DatasetBusinessKeyService,
@@ -31,8 +30,6 @@ class DatasetsContext:
     dataset_business_keys: DatasetBusinessKeyService
     dataset_records: DatasetRecordService
     dataset_versions: DatasetVersionService
-    record_imports: DatasetRecordImportService
-    review_secret: bytes
     require_authenticated: Callable[[], Any]
     require_csrf: Callable[[str | None], None]
     render_authenticated_template: Callable[..., Any]
@@ -51,11 +48,6 @@ dataset_fields = LocalProxy(lambda: _context().dataset_fields)
 dataset_business_keys = LocalProxy(lambda: _context().dataset_business_keys)
 dataset_records = LocalProxy(lambda: _context().dataset_records)
 dataset_versions = LocalProxy(lambda: _context().dataset_versions)
-record_imports = LocalProxy(lambda: _context().record_imports)
-
-
-def review_secret() -> bytes:
-    return _context().review_secret
 
 
 def require_authenticated():
@@ -102,8 +94,6 @@ def register_datasets_blueprint(
     dataset_business_keys: DatasetBusinessKeyService | None,
     dataset_records: DatasetRecordService | None,
     dataset_versions: DatasetVersionService | None,
-    record_imports: DatasetRecordImportService | None,
-    review_secret: bytes,
     require_authenticated: Callable[[], Any],
     require_csrf: Callable[[str | None], None],
     render_authenticated_template: Callable[..., Any],
@@ -118,7 +108,6 @@ def register_datasets_blueprint(
         dataset_business_keys,
         dataset_records,
         dataset_versions,
-        record_imports,
     )
     if all(dependency is not None for dependency in dependencies):
         app.extensions["refrncr.datasets"] = DatasetsContext(
@@ -128,8 +117,6 @@ def register_datasets_blueprint(
             dataset_business_keys=dataset_business_keys,
             dataset_records=dataset_records,
             dataset_versions=dataset_versions,
-            record_imports=record_imports,
-            review_secret=review_secret,
             require_authenticated=require_authenticated,
             require_csrf=require_csrf,
             render_authenticated_template=render_authenticated_template,

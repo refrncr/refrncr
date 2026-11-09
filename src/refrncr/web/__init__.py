@@ -5,6 +5,11 @@ context in ``app.extensions["refrncr.<blueprint>"]``. A
 ``register_<blueprint>_blueprint(app, ...)`` function creates that context and
 registers the blueprint. New route modules must follow this pattern so routes
 remain independently importable without introducing module-global services.
+Large blueprints or subpackages may expose services through module-level
+``LocalProxy`` names when that keeps a route move substantially literal. Those
+proxies must still resolve through the blueprint's typed context in
+``app.extensions`` and may only be used inside an application or request
+context, never while importing a module.
 The module-level :class:`~flask.Blueprint` object is always named ``blueprint``;
 the audit guard relies on this shared name when discovering registered routes.
 """
@@ -15,7 +20,6 @@ import hmac
 import logging
 import re
 import secrets
-from dataclasses import replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from functools import wraps
@@ -42,17 +46,13 @@ from refrncr.browser_security import (
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
-from refrncr.change_status import (
-    RECORD_STATUS_FILTERS,
-    ChangeStatus,
-    change_status,
-)
+from refrncr.change_status import RECORD_STATUS_FILTERS, ChangeStatus
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
+from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_export import ExportGenerationError, logged_export_stream
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datatypes import get_datatype
-from refrncr.diff_contracts import MAX_SEARCH, STATUSES, DiffCriteria
+from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.hierarchy import (
     MAX_HIERARCHY_NODE_NAME,
     HierarchyService,
@@ -104,7 +104,6 @@ from refrncr.record_search import (
     parse_parameters,
     search_term,
 )
-from refrncr.review_tokens import decode_review, encode_review
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -161,6 +160,7 @@ from refrncr.web.routing import (
 from refrncr.web.routing import public_route as public_route
 from refrncr.web.teams import register_teams_blueprint
 from refrncr.web.users import register_users_blueprint
+from refrncr.web.versions import register_versions_blueprint
 from refrncr.xml_security import require_xml_protection
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
@@ -379,16 +379,7 @@ def create_flask_app(
             return "audit"
         if endpoint == "overview.index":
             return "home"
-        if endpoint.startswith(("dataset_", "datasets.")) or endpoint in {
-            "new_dataset",
-            "create_dataset",
-            "edit_dataset",
-            "update_dataset",
-            "new_dataset_field",
-            "create_dataset_field",
-            "edit_dataset_field",
-            "update_dataset_field",
-            "delete_dataset_field",
+        if endpoint.startswith(("dataset_", "datasets.", "versions.")) or endpoint in {
             "import_dataset_records",
             "select_import_worksheet",
             "review_import_mapping",
@@ -707,8 +698,6 @@ def create_flask_app(
         dataset_business_keys=dataset_business_keys,
         dataset_records=dataset_records,
         dataset_versions=dataset_versions,
-        record_imports=record_imports,
-        review_secret=review_secret,
         require_authenticated=require_authenticated,
         require_csrf=require_csrf,
         render_authenticated_template=render_authenticated_template,
@@ -717,386 +706,19 @@ def create_flask_app(
         audit_security=audit_security,
     )
 
-    @dataset_route(
+    register_versions_blueprint(
         app,
-        "/datasets/<key>/versions/<version_id>/fields/<field_key>",
-        capability="can_view_dataset",
-        methods=["GET"],
+        datasets=datasets,
+        dataset_versions=dataset_versions,
+        dataset_diff=dataset_diff,
+        record_imports=record_imports,
+        review_secret=review_secret,
+        require_authenticated=require_authenticated,
+        require_csrf=require_csrf,
+        render_authenticated_template=render_authenticated_template,
+        render_mapping_template=render_mapping_template,
+        audit_security=audit_security,
     )
-    @version_errors
-    def dataset_version_field_detail(key, version_id, field_key):
-        actor, _login_session = require_authenticated()
-        view = dataset_versions.read(actor.id, key, version_id, page=None)
-        field = next((item for item in view.fields if item.key == field_key), None)
-        if field is None:
-            abort(404)
-        return render_authenticated_template(
-            "pages/datasets/fields/read.html",
-            dataset=view.context.dataset,
-            field=field,
-            version_state=view.state,
-        )
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions",
-        capability="can_view_dataset",
-        methods=["GET"],
-    )
-    @version_errors
-    def dataset_versions_view(key):
-        actor, _session = require_authenticated()
-        history = dataset_versions.history(actor.id, key)
-        notice = {
-            "published": "Dataset version published.",
-            "cancelled": "Scheduled version cancelled.",
-        }.get(request.args.get("notice"))
-        return render_mapping_template(
-            "pages/datasets/versions/list.html",
-            history=history,
-            dataset=history.context.dataset,
-            context=history.context,
-            notice=notice,
-            review_available=bool(history.concept_summary and history.concept_summary.can_review),
-        )
-
-    def review_error(key, message=STALE_MESSAGE, status=409):
-        return render_authenticated_template(
-            "pages/datasets/versions/review_error.html", key=key, error=message
-        ), status
-
-    def review_identity(actor, session, dataset):
-        tokens = request.args.getlist("review")
-        if len(tokens) != 1:
-            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-            raise NotFoundError("Review not found")
-        try:
-            identity = decode_review(tokens[0], session.id, review_secret)
-        except ValueError:
-            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-            raise ConflictError("This review link is no longer valid. Reload the review.") from None
-        if identity.dataset_id != dataset.id or identity.actor_id != actor.id:
-            audit_security("security.workflow_token_rejected", actor_user_id=actor.id)
-            raise NotFoundError("Review not found")
-        return identity, tokens[0]
-
-    def review_parameters(*, detail=False):
-        allowed = {"review", "section", "q", "status", "anchor", "backwards"}
-        if detail:
-            allowed.add("detail_page")
-        if (
-            set(request.args) - allowed
-            or len(request.query_string) > 4096
-            or any(
-                len(request.args.getlist(name)) != 1 for name in request.args if name != "status"
-            )
-        ):
-            raise ValidationError("Choose valid review parameters.")
-        section = request.args.get("section", "Summary")
-        if section not in {"Summary", "Fields", "Records"} or request.args.get(
-            "backwards", "0"
-        ) not in {"0", "1"}:
-            raise ValidationError("Choose valid review parameters.")
-        try:
-            statuses = tuple(change_status(value) for value in request.args.getlist("status"))
-        except ValueError:
-            raise ValidationError("Choose valid review parameters.") from None
-        criteria = DiffCriteria(
-            statuses or STATUSES,
-            request.args.get("q", ""),
-            request.args.get("anchor", ""),
-            request.args.get("backwards", "0") == "1",
-        )
-        # Service revalidates every supplied criterion for trusted programmatic callers.
-        dataset_diff._criteria(criteria)
-        return section, criteria
-
-    def review_url(key, token, section="Summary", criteria=None, **changes):
-        criteria = criteria or DiffCriteria()
-        values = dict(
-            review=token,
-            section=section,
-            q=criteria.search,
-            status=None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses),
-            anchor=criteria.anchor,
-            backwards="1" if criteria.backwards else "0",
-        )
-        values.update(changes)
-        return url_for("dataset_version_review", key=key, **values)
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions/review",
-        capability="can_view_dataset",
-        methods=["GET"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_version_review(key):
-        actor, session = require_authenticated()
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        try:
-            if not request.args:
-                opened = dataset_diff.open_review(actor.id, dataset.id)
-                token = encode_review(opened.identity, session.id, review_secret)
-                return redirect(review_url(key, token), code=303)
-            identity, token = review_identity(actor, session, dataset)
-            section, criteria = review_parameters()
-            result = dataset_diff.review(actor.id, identity, section, criteria)
-            selected_statuses = tuple(
-                dict.fromkeys(change_status(value) for value in request.args.getlist("status"))
-            )
-            field_items = result.items if section == "Fields" else ()
-            if section == "Fields":
-                field_items = tuple(
-                    replace(
-                        item,
-                        properties=tuple(
-                            change
-                            for change in item.properties
-                            if not (
-                                (
-                                    dataset.kind != "mapping"
-                                    and change.name in {"Mapping role", "Source field"}
-                                )
-                                or (dataset.kind != "hierarchy" and change.name == "Applicability")
-                                or (
-                                    item.status == ChangeStatus.ADDED
-                                    and change.before is None
-                                    and change.after is None
-                                )
-                            )
-                        ),
-                    )
-                    for item in result.items
-                )
-            return render_mapping_template(
-                "pages/datasets/versions/review.html",
-                dataset=dataset,
-                identity=identity,
-                token=token,
-                section=section,
-                criteria=criteria,
-                result=result,
-                field_items=field_items,
-                selected_statuses=selected_statuses,
-                sections={
-                    name: review_url(key, token, name) for name in ("Summary", "Fields", "Records")
-                },
-                page_url=lambda **values: review_url(key, token, section, criteria, **values),
-                detail_url=lambda kind, object_id: url_for(
-                    "dataset_version_record_diff"
-                    if kind == "record"
-                    else "dataset_version_field_diff",
-                    key=key,
-                    object_id=object_id,
-                    review=token,
-                    section=section,
-                    q=criteria.search,
-                    status=list(selected_statuses),
-                    anchor=criteria.anchor,
-                    backwards="1" if criteria.backwards else "0",
-                ),
-            )
-        except ConflictError as error:
-            return review_error(key, str(error))
-        except ValidationError as error:
-            return review_error(key, str(error), 400)
-
-    def render_diff_detail(key, object_id, kind):
-        actor, session = require_authenticated()
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        try:
-            identity, token = review_identity(actor, session, dataset)
-            section, criteria = review_parameters(detail=True)
-            if kind == "record":
-                raw_page = request.args.get("detail_page", "1")
-                if len(raw_page) > 10 or not raw_page.isascii() or not raw_page.isdigit():
-                    raise ValidationError("Choose a valid detail page.")
-                item = dataset_diff.record_detail(actor.id, identity, object_id, int(raw_page))
-            else:
-                item = dataset_diff.field_detail(actor.id, identity, object_id)
-            return render_authenticated_template(
-                "pages/datasets/versions/diff_detail.html",
-                dataset=dataset,
-                identity=identity,
-                kind=kind,
-                item=item,
-                return_url=review_url(key, token, section, criteria),
-                detail_page_url=lambda number: url_for(
-                    "dataset_version_record_diff",
-                    key=key,
-                    object_id=object_id,
-                    review=token,
-                    section=section,
-                    q=criteria.search,
-                    status=(
-                        None if set(criteria.statuses) == set(STATUSES) else list(criteria.statuses)
-                    ),
-                    anchor=criteria.anchor,
-                    backwards="1" if criteria.backwards else "0",
-                    detail_page=number,
-                ),
-            )
-        except ConflictError as error:
-            return review_error(key, str(error))
-        except ValidationError as error:
-            return review_error(key, str(error), 400)
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions/review/records/<object_id>",
-        capability="can_view_dataset",
-        methods=["GET"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_version_record_diff(key, object_id):
-        return render_diff_detail(key, object_id, "record")
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions/review/fields/<object_id>",
-        capability="can_view_dataset",
-        methods=["GET"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_version_field_diff(key, object_id):
-        return render_diff_detail(key, object_id, "field")
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions/publish",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_version_publish(key):
-        actor, session = require_authenticated()
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        expected_review, review_token = None, None
-        if request.method == "POST":
-            require_csrf(session.csrf_token)
-        if "review" in request.args:
-            try:
-                expected_review, review_token = review_identity(actor, session, dataset)
-                dataset_diff.review(actor.id, expected_review)
-            except ConflictError as failure:
-                if request.method == "POST":
-                    return redirect(review_url(key, request.args["review"]), code=303)
-                return review_error(key, str(failure))
-        error, status = None, 200
-        effective = request.form.get("effective_date", "")[:10]
-        note = request.form.get("release_note", "")[:2000]
-        if request.method == "POST":
-            if request.form.getlist("dataset_id") != [dataset.id]:
-                raise NotFoundError("Dataset not found")
-            try:
-                if request.form.getlist("confirmed") != ["yes"]:
-                    raise ValidationError(
-                        "Confirm that you reviewed this version before publishing."
-                    )
-                dates = request.form.getlist("effective_date")
-                if len(dates) != 1 or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", dates[0]) is None:
-                    raise ValidationError("Choose an effective calendar date.")
-                try:
-                    effective_date = date.fromisoformat(dates[0])
-                except ValueError:
-                    raise ValidationError("Choose a valid effective calendar date.") from None
-                revisions = request.form.getlist("expected_revision")
-                if len(revisions) != 1 or len(request.form.getlist("release_note")) != 1:
-                    raise ValidationError("Review the publication form again.")
-                expected = parse_expected_revision(revisions[0])
-                dataset_versions.publish(
-                    actor.id,
-                    dataset.id,
-                    effective_date,
-                    request.form["release_note"],
-                    expected,
-                    expected_review=expected_review,
-                )
-                return redirect(
-                    url_for("dataset_versions_view", key=key, notice="published"), code=303
-                )
-            except (ValidationError, ConflictError) as failure:
-                if expected_review is not None and isinstance(failure, ConflictError):
-                    return redirect(review_url(key, review_token), code=303)
-                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
-        review = None
-        try:
-            review = dataset_versions.review(actor.id, dataset.id)
-            if expected_review is not None and review[0] != expected_review.revision:
-                return review_error(key)
-        except (ValidationError, ConflictError) as failure:
-            error, status = error or str(failure), 409
-        today = dataset_versions.clock.today().isoformat()
-        mapping_source = (
-            datasets.mapping_source(actor.id, key) if dataset.kind == "mapping" else None
-        )
-        minimum_date = (
-            max(dataset_versions.clock.today(), mapping_source["effective_date"])
-            if mapping_source
-            else dataset_versions.clock.today()
-        )
-        concept_summary = dataset_versions.history(actor.id, key).concept_summary
-        return render_authenticated_template(
-            "pages/datasets/versions/publish.html",
-            dataset=dataset,
-            review=review,
-            error=error,
-            effective_date=effective or minimum_date.isoformat(),
-            minimum_date=minimum_date,
-            mapping_source=mapping_source,
-            mapping_usage=datasets.mapping_usage(actor.id, key),
-            release_note=note,
-            today=today,
-            review_token=review_token,
-            review_available=bool(review_token)
-            or bool(concept_summary and concept_summary.can_review),
-        ), status
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/versions/<version_id>/cancel",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    def dataset_version_cancel(key, version_id):
-        actor, session = require_authenticated()
-        dataset = datasets.get_dataset_for_edit(actor.id, key)
-        error, status = None, 200
-        if request.method == "POST":
-            require_csrf(session.csrf_token)
-            try:
-                if request.form.getlist("confirmed") != ["yes"]:
-                    raise ValidationError("Confirm cancellation of this Scheduled version.")
-                dataset_versions.cancel(actor.id, dataset.id, version_id)
-                return redirect(
-                    url_for("dataset_versions_view", key=key, notice="cancelled"), code=303
-                )
-            except (ValidationError, ConflictError) as failure:
-                error, status = str(failure), 409 if isinstance(failure, ConflictError) else 400
-        history = dataset_versions.history(actor.id, key)
-        selected = next(
-            (state for state in history.entries if state.version.id == version_id), None
-        )
-        if selected is None:
-            raise NotFoundError("Dataset version not found")
-        if selected.status != "Scheduled":
-            error, status = (
-                "Only a Scheduled version can be cancelled before its effective date.",
-                409,
-            )
-        return render_authenticated_template(
-            "pages/datasets/versions/cancel.html",
-            dataset=dataset,
-            state=selected,
-            error=error,
-            can_cancel=selected.status == "Scheduled",
-        ), status
 
     def hierarchy_presentation(view):
         """Arrange a snapshot for templates without changing its structure or values."""
@@ -1700,7 +1322,7 @@ def create_flask_app(
             )
             if selected:
                 if selected.status == "Cancelled":
-                    return redirect(url_for("dataset_versions_view", key=key), code=303)
+                    return redirect(url_for("versions.dataset_versions_view", key=key), code=303)
                 return redirect(
                     url_for("dataset_records_view", key=key, version_id=selected.version.id),
                     code=303,

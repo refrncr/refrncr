@@ -1371,13 +1371,13 @@
       "service": "refrncr.services.DatasetService.get_dataset_for_edit",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.datasets.core.dataset_concept_create POST /datasets/<key>/concept/new",
-        "refrncr.web.datasets.core.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
@@ -2935,15 +2935,15 @@
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.datasets.core.dataset_concept_create POST /datasets/<key>/concept/new",
-        "refrncr.web.datasets.core.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
@@ -4157,9 +4157,9 @@
         "refrncr.web.datasets.core.create_dataset POST /datasets",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
@@ -4884,7 +4884,7 @@
       "operation": "publish",
       "service": "refrncr.dataset_versions.DatasetVersionService.publish",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -4931,7 +4931,7 @@
       "operation": "cancel",
       "service": "refrncr.dataset_versions.DatasetVersionService.cancel",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -4978,7 +4978,7 @@
       "operation": "review",
       "service": "refrncr.dataset_versions.DatasetVersionService.review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5143,9 +5143,9 @@
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
@@ -5153,7 +5153,7 @@
         "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
         "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.datasets.core.dataset_concept_create POST /datasets/<key>/concept/new"
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5188,7 +5188,7 @@
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
+        "refrncr.web.versions.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
@@ -5232,7 +5232,7 @@
       "operation": "open_review",
       "service": "refrncr.dataset_diff.DatasetDiffService.open_review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review"
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review"
       ],
       "kind": "read",
       "classification": "domain-audited",
@@ -5283,8 +5283,8 @@
       "operation": "review",
       "service": "refrncr.dataset_diff.DatasetDiffService.review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5319,8 +5319,8 @@
       "operation": "field_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.field_detail",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5355,8 +5355,8 @@
       "operation": "record_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.record_detail",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5393,10 +5393,10 @@
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
@@ -5449,7 +5449,7 @@
       "operation": "create_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.create_concept",
       "interface_entrypoints": [
-        "refrncr.web.datasets.core.dataset_concept_create POST /datasets/<key>/concept/new"
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -5588,7 +5588,7 @@
       "operation": "review_discard",
       "service": "refrncr.dataset_versions.DatasetVersionService.review_discard",
       "interface_entrypoints": [
-        "refrncr.web.datasets.core.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5620,7 +5620,7 @@
       "operation": "discard_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.discard_concept",
       "interface_entrypoints": [
-        "refrncr.web.datasets.core.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6745,8 +6745,8 @@
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
@@ -6754,7 +6754,7 @@
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
         "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6866,9 +6866,9 @@
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",

@@ -8,6 +8,6 @@
 <td>—</td>
 <td>—</td>
 <td>—</td>
-<td>{% if review_available %}<a href='{{ url_for("dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a>{% else %}—{% endif %}</td>
+<td>{% if review_available %}<a href='{{ url_for("versions.dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a>{% else %}—{% endif %}</td>
 </tr>
 {% endif %}

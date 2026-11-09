@@ -332,11 +332,11 @@ def _route_matrix_expectations():
     dataset_view = {
         "datasets.dataset_detail",
         "datasets.dataset_configuration",
-        "dataset_versions_view",
-        "dataset_version_review",
-        "dataset_version_record_diff",
-        "dataset_version_field_diff",
-        "dataset_version_field_detail",
+        "versions.dataset_versions_view",
+        "versions.dataset_version_review",
+        "versions.dataset_version_record_diff",
+        "versions.dataset_version_field_diff",
+        "versions.dataset_version_field_detail",
         "dataset_hierarchy_node_values",
         "dataset_records_view",
     }
@@ -347,10 +347,10 @@ def _route_matrix_expectations():
     }
     dataset_maintain = {
         "datasets.dataset_mapping_source_update",
-        "datasets.dataset_concept_create",
-        "datasets.dataset_concept_discard",
-        "dataset_version_publish",
-        "dataset_version_cancel",
+        "versions.dataset_concept_create",
+        "versions.dataset_concept_discard",
+        "versions.dataset_version_publish",
+        "versions.dataset_version_cancel",
         "datasets.move_dataset_field",
         "dataset_hierarchy_node_create",
         "dataset_hierarchy_node_edit",

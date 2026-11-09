@@ -2,10 +2,10 @@
 {% from 'components/side_panel.html' import form_side_panel %}
 {% from 'components.html' import status_badge %}
 {% macro new_concept(key, label='Create draft') -%}
-<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("datasets.dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>{{ label }}</button></form>
+<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("versions.dataset_concept_create", key=key) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-primary' type='submit'>{{ label }}</button></form>
 {%- endmacro %}
 {% macro versions_action(key) -%}
-<a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>
+<a class='button button-secondary' href='{{ url_for("versions.dataset_versions_view", key=key) }}'>{{ history_icon() }}Versions</a>
 {%- endmacro %}
 {% macro current_version_action(key, has_current) -%}
 {% if has_current %}
@@ -19,7 +19,7 @@
   <p class='help-text' id='{{ panel_id }}-unavailable'>{{ ui.discard_unavailable }}</p>
 </div>
 {% else %}
-<a class='button button-danger' href='{{ url_for("datasets.dataset_concept_discard", key=key) }}' data-panel-url data-dialog-open='{{ panel_id }}'>Discard draft</a>
+<a class='button button-danger' href='{{ url_for("versions.dataset_concept_discard", key=key) }}' data-panel-url data-dialog-open='{{ panel_id }}'>Discard draft</a>
 {% endif %}
 {%- endmacro %}
 {% macro discard_panel(panel_id='concept-discard-panel') -%}
@@ -48,7 +48,7 @@
 <div class='page-actions'>
 {% if show_current %}{{ current_version_action(key, ui.has_current) }}{% endif %}
 {% if caller is defined %}{{ caller() }}{% endif %}
-{% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("dataset_version_review", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Review &amp; publish</a>{% endif %}
+{% if actions and ui.may_publish %}<a class='button button-primary' href='{{ url_for("versions.dataset_version_review", key=key) }}'{% if publication_panel %} data-panel-url data-dialog-open='concept-publication-panel'{% endif %}>Review &amp; publish</a>{% endif %}
 {% if actions %}{{ concept_actions(key, ui, ui.can_review, true) }}{% endif %}
 </div></section>
 {% if actions and include_discard_panel %}{{ discard_panel() }}{% endif %}

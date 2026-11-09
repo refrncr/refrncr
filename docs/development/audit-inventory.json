@@ -303,7 +303,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_field_detail",
+      "symbol": "refrncr.web.versions.dataset_version_field_detail",
       "path": "/datasets/<key>/versions/<version_id>/fields/<field_key>",
       "methods": [
         "GET"
@@ -314,7 +314,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.datasets.core.dataset_concept_create",
+      "symbol": "refrncr.web.versions.dataset_concept_create",
       "path": "/datasets/<key>/concept/new",
       "methods": [
         "POST"
@@ -327,7 +327,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.datasets.core.dataset_concept_discard",
+      "symbol": "refrncr.web.versions.dataset_concept_discard",
       "path": "/datasets/<key>/concept/discard",
       "methods": [
         "GET",
@@ -341,7 +341,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_versions_view",
+      "symbol": "refrncr.web.versions.dataset_versions_view",
       "path": "/datasets/<key>/versions",
       "methods": [
         "GET"
@@ -355,7 +355,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_review",
+      "symbol": "refrncr.web.versions.dataset_version_review",
       "path": "/datasets/<key>/versions/review",
       "methods": [
         "GET"
@@ -371,7 +371,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_record_diff",
+      "symbol": "refrncr.web.versions.dataset_version_record_diff",
       "path": "/datasets/<key>/versions/review/records/<object_id>",
       "methods": [
         "GET"
@@ -385,7 +385,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_field_diff",
+      "symbol": "refrncr.web.versions.dataset_version_field_diff",
       "path": "/datasets/<key>/versions/review/fields/<object_id>",
       "methods": [
         "GET"
@@ -399,7 +399,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_publish",
+      "symbol": "refrncr.web.versions.dataset_version_publish",
       "path": "/datasets/<key>/versions/publish",
       "methods": [
         "GET",
@@ -419,7 +419,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_cancel",
+      "symbol": "refrncr.web.versions.dataset_version_cancel",
       "path": "/datasets/<key>/versions/<version_id>/cancel",
       "methods": [
         "GET",

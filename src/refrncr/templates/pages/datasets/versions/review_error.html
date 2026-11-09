@@ -4,5 +4,5 @@
 {% block content %}
 <h1>Review unavailable</h1>
 {{ feedback(error, id='review-error', focus=true) }}
-<div class='page-actions'><a class='button button-primary' href='{{ url_for("dataset_version_review", key=key) }}'>Reload review</a><a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=key) }}'>Versions</a></div>
+<div class='page-actions'><a class='button button-primary' href='{{ url_for("versions.dataset_version_review", key=key) }}'>Reload review</a><a class='button button-secondary' href='{{ url_for("versions.dataset_versions_view", key=key) }}'>Versions</a></div>
 {% endblock %}

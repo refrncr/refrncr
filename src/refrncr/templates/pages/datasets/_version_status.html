@@ -8,7 +8,7 @@
   {% endif %}
   <div class='page-actions'>
     {{ current_version_action(dataset.key, version_state.has_current) }}
-    {% if version_state.status == 'Scheduled' and may_cancel_scheduled %}<a class='button button-danger' href='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=version_state.version.id) }}'>Cancel scheduled version…</a>{% endif %}
+    {% if version_state.status == 'Scheduled' and may_cancel_scheduled %}<a class='button button-danger' href='{{ url_for("versions.dataset_version_cancel", key=dataset.key, version_id=version_state.version.id) }}'>Cancel scheduled version…</a>{% endif %}
   </div>
 </section>
 {% endif %}
