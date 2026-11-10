@@ -20,7 +20,6 @@ import hmac
 import re
 import secrets
 from datetime import UTC, date, datetime
-from functools import wraps
 from uuid import uuid4
 
 from flask import (
@@ -78,12 +77,7 @@ from refrncr.presentation_metadata import (
     default_dataset_icon,
     rendered_dataset_icon,
 )
-from refrncr.record_import import (
-    MAX_UPLOAD_BYTES,
-    DatasetRecordImportService,
-    ImportExpiredError,
-    ImportValidationError,
-)
+from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -96,7 +90,6 @@ from refrncr.services import (
     MembershipService,
     NotFoundError,
     SessionService,
-    StaleRecordError,
     TeamService,
     UserManagementError,
     UserService,
@@ -126,7 +119,6 @@ from refrncr.web.records import register_records_blueprint
 from refrncr.web.routing import (
     authenticated_route,
     capability_route,
-    dataset_route,
     no_store_route,
     register_web_routing_context,
 )
@@ -636,6 +628,7 @@ def create_flask_app(
     register_web_routing_context(
         app,
         dataset_ui_enabled=dataset_ui_enabled,
+        record_imports=record_imports,
         audit_security=audit_security,
         render_authenticated_template=render_authenticated_template,
     )
@@ -698,7 +691,10 @@ def create_flask_app(
         authorization=authorization,
         dataset_versions=dataset_versions,
         hierarchy=hierarchy,
+        hierarchy_imports=hierarchy_imports,
+        dataset_records=dataset_records,
         require_authenticated=require_authenticated,
+        require_csrf=require_csrf,
         render_authenticated_template=render_authenticated_template,
         exact_expected_revision=exact_expected_revision,
     )
@@ -731,240 +727,6 @@ def create_flask_app(
         render_authenticated_template=render_authenticated_template,
         audit_security=audit_security,
     )
-
-    def import_route(rule, *, capability: str, **options):
-        def decorate(function):
-            function.required_capability = capability
-            if getattr(function, "_secured_import", False):
-                return dataset_route(
-                    app,
-                    rule,
-                    capability=capability,
-                    **options,
-                )(function)
-
-            @wraps(function)
-            def secured_import(*args, **kwargs):
-                try:
-                    return function(*args, **kwargs)
-                except AuthorizationError:
-                    resolved = getattr(g, "authenticated_resolution", None)
-                    audit_security(
-                        "security.authorization_denied",
-                        actor_user_id=resolved[0].id if resolved else None,
-                    )
-                    return (
-                        render_authenticated_template(
-                            "pages/error.html",
-                            error_code=403,
-                            error_message="The import is not available to this account.",
-                        ),
-                        403,
-                    )
-                except ImportExpiredError:
-                    resolved = getattr(g, "authenticated_resolution", None)
-                    if resolved is not None:
-                        audit_security(
-                            "security.workflow_token_rejected",
-                            actor_user_id=resolved[0].id,
-                        )
-                    minutes = max(1, (record_imports.store.ttl + 59) // 60)
-                    return render_authenticated_template(
-                        "pages/datasets/import/unavailable.html",
-                        error=(
-                            f"This import expired after {minutes} minutes without activity. "
-                            "Upload the file again to continue."
-                        ),
-                        return_url=url_for(
-                            "imports.import_dataset_records", key=kwargs.get("key", "")
-                        ),
-                    ), 410
-                except NotFoundError:
-                    resolved = getattr(g, "authenticated_resolution", None)
-                    if resolved is not None:
-                        audit_security(
-                            "security.workflow_token_rejected",
-                            actor_user_id=resolved[0].id,
-                        )
-                    return (
-                        render_authenticated_template(
-                            "pages/error.html",
-                            error_code=404,
-                            error_message=(
-                                "The import has expired or is unavailable. Upload the file again."
-                            ),
-                        ),
-                        404,
-                    )
-                except ConflictError as error:
-                    return render_authenticated_template(
-                        "pages/datasets/import/unavailable.html",
-                        error=str(error),
-                        return_url=url_for(
-                            "imports.import_dataset_records", key=kwargs.get("key", "")
-                        ),
-                    ), 409
-                except ImportValidationError as error:
-                    return render_authenticated_template(
-                        "pages/datasets/import/unavailable.html", error=str(error)
-                    ), 400
-
-            secured_import._secured_import = True
-            return dataset_route(
-                app,
-                rule,
-                capability=capability,
-                **options,
-            )(secured_import)
-
-        return decorate
-
-    @import_route(
-        "/datasets/<key>/concept/hierarchy-import",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    def import_hierarchy_file(key: str):
-        if hierarchy_imports is None:
-            abort(404)
-        actor, login_session = require_authenticated()
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        if dataset.kind != "hierarchy":
-            abort(404)
-        state = hierarchy_imports.active(actor.id, login_session.id, key)
-        if request.method == "GET":
-            preview = (
-                hierarchy_imports.preview(actor.id, login_session.id, key, state.token)
-                if state
-                else None
-            )
-            return render_authenticated_template(
-                "pages/datasets/hierarchy_import.html",
-                dataset=dataset,
-                state=state,
-                preview=preview,
-                current_csrf=login_session.csrf_token,
-            )
-        require_csrf(login_session.csrf_token)
-        if (
-            set(request.form) != {"csrf_token"}
-            or set(request.files) != {"file"}
-            or len(request.files.getlist("file")) != 1
-        ):
-            return render_authenticated_template(
-                "pages/datasets/hierarchy_import.html",
-                dataset=dataset,
-                state=state,
-                preview=None,
-                current_csrf=login_session.csrf_token,
-                error="Submit exactly one Excel workbook",
-            ), 400
-        uploaded = request.files["file"]
-        try:
-            state = hierarchy_imports.begin(
-                actor.id,
-                login_session.id,
-                key,
-                uploaded.filename or "",
-                uploaded.stream.read(MAX_UPLOAD_BYTES + 1),
-            )
-        except ImportValidationError as error:
-            return render_authenticated_template(
-                "pages/datasets/hierarchy_import.html",
-                dataset=dataset,
-                state=state,
-                preview=None,
-                current_csrf=login_session.csrf_token,
-                error=str(error),
-            ), 400
-        return redirect(url_for("hierarchy_import_preview", key=key, token=state.token), code=303)
-
-    @import_route(
-        "/datasets/<key>/concept/hierarchy-import/<token>",
-        capability="can_maintain_dataset",
-        methods=["GET"],
-    )
-    def hierarchy_import_preview(key: str, token: str):
-        if hierarchy_imports is None:
-            abort(404)
-        actor, login_session = require_authenticated()
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        state = hierarchy_imports.state(actor.id, login_session.id, key, token)
-        preview = hierarchy_imports.preview(actor.id, login_session.id, key, token)
-        return render_authenticated_template(
-            "pages/datasets/hierarchy_import.html",
-            dataset=dataset,
-            state=state,
-            preview=preview,
-            current_csrf=login_session.csrf_token,
-        )
-
-    @import_route(
-        "/datasets/<key>/concept/hierarchy-import/<token>/confirm",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    def confirm_hierarchy_import(key: str, token: str):
-        if hierarchy_imports is None:
-            abort(404)
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        expected = {"csrf_token", "confirmation"}
-        if "acknowledge_removals" in request.form:
-            expected.add("acknowledge_removals")
-        if set(request.form) != expected or any(
-            len(request.form.getlist(name)) != 1 for name in expected
-        ):
-            abort(400)
-        try:
-            hierarchy_imports.confirm(
-                actor.id,
-                login_session.id,
-                key,
-                token,
-                confirmation=request.form["confirmation"],
-                acknowledge_removals=request.form.get("acknowledge_removals") == "yes",
-            )
-        except (ImportValidationError, StaleRecordError, ConflictError) as error:
-            dataset = dataset_records.get_dataset_for_add(actor.id, key)
-            state = hierarchy_imports.state(actor.id, login_session.id, key, token)
-            preview = hierarchy_imports.preview(actor.id, login_session.id, key, token)
-            return render_authenticated_template(
-                "pages/datasets/hierarchy_import.html",
-                dataset=dataset,
-                state=state,
-                preview=preview,
-                current_csrf=login_session.csrf_token,
-                error=str(error),
-            ), 409
-        return redirect(url_for("records.dataset_records_view", key=key, concept=True), code=303)
-
-    @import_route(
-        "/datasets/<key>/concept/hierarchy-import/<token>/cancel",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    def cancel_hierarchy_import(key: str, token: str):
-        if hierarchy_imports is None:
-            abort(404)
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
-            abort(400)
-        try:
-            hierarchy_imports.cancel(actor.id, login_session.id, key, token)
-        except ConflictError as error:
-            dataset = dataset_records.get_dataset_for_add(actor.id, key)
-            state = hierarchy_imports.active(actor.id, login_session.id, key)
-            return render_authenticated_template(
-                "pages/datasets/hierarchy_import.html",
-                dataset=dataset,
-                state=state,
-                preview=None,
-                current_csrf=login_session.csrf_token,
-                error=str(error),
-            ), 409
-        return redirect(url_for("records.dataset_records_view", key=key, concept=True), code=303)
 
     register_auth_blueprint(
         app,

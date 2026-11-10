@@ -19,7 +19,7 @@
     {% if not version_state %}{{ current_version_action(dataset.key, concept_ui and concept_ui.has_current) }}{% endif %}
     {{ versions_action(dataset.key) }}
     {{ export_action(dataset=dataset, version_state=version_state, label='Export draft' if not version_state else 'Export', may_export=may_export, may_import=may_import) }}
-    {% if may_edit %}<a class='button button-secondary' href='{{ url_for("import_hierarchy_file", key=dataset.key) }}'>Import</a>{% endif %}
+    {% if may_edit %}<a class='button button-secondary' href='{{ url_for("hierarchies.import_hierarchy_file", key=dataset.key) }}'>Import</a>{% endif %}
     {% if may_start_concept %}{{ new_concept(dataset.key) }}{% endif %}
     {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
   </div>

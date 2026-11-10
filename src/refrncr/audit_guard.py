@@ -62,7 +62,7 @@ def discover_routes(source, module):
             name = ast.unparse(decorator.func)
             if name not in ROUTE_DECORATORS:
                 continue
-            path_argument = 1 if name == "dataset_route" else 0
+            path_argument = 1 if name in {"dataset_route", "import_route"} else 0
             if len(decorator.args) <= path_argument or not isinstance(
                 decorator.args[path_argument], ast.Constant
             ):

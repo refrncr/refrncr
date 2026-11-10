@@ -8,15 +8,21 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any
 
-from flask import Blueprint, Flask, abort, current_app, g
+from flask import Blueprint, Flask, abort, current_app, g, url_for
 from werkzeug.exceptions import HTTPException
 
-from refrncr.services import AuthorizationError, NotFoundError
+from refrncr.record_import import (
+    DatasetRecordImportService,
+    ImportExpiredError,
+    ImportValidationError,
+)
+from refrncr.services import AuthorizationError, ConflictError, NotFoundError
 
 
 @dataclass(frozen=True)
 class WebRoutingContext:
     dataset_ui_enabled: bool
+    record_imports: DatasetRecordImportService | None
     audit_security: Callable[..., None]
     render_authenticated_template: Callable[..., Any]
 
@@ -25,11 +31,13 @@ def register_web_routing_context(
     app: Flask,
     *,
     dataset_ui_enabled: bool,
+    record_imports: DatasetRecordImportService | None,
     audit_security: Callable[..., None],
     render_authenticated_template: Callable[..., Any],
 ) -> None:
     app.extensions["refrncr.web.routing"] = WebRoutingContext(
         dataset_ui_enabled=dataset_ui_enabled,
+        record_imports=record_imports,
         audit_security=audit_security,
         render_authenticated_template=render_authenticated_template,
     )
@@ -69,6 +77,83 @@ def dataset_route(
 
         return decorate
     return lambda function: function
+
+
+def import_route(
+    blueprint: DatasetBlueprint,
+    rule: str,
+    *,
+    capability: str,
+    **options: Any,
+):
+    """Register an import workflow route with the shared error and audit policy."""
+
+    def decorate(function):
+        function.required_capability = capability
+        if getattr(function, "_secured_import", False):
+            return blueprint.dataset_route(rule, capability=capability, **options)(function)
+
+        @wraps(function)
+        def secured_import(*args, **kwargs):
+            context = current_app.extensions["refrncr.web.routing"]
+            try:
+                return function(*args, **kwargs)
+            except AuthorizationError:
+                resolved = getattr(g, "authenticated_resolution", None)
+                context.audit_security(
+                    "security.authorization_denied",
+                    actor_user_id=resolved[0].id if resolved else None,
+                )
+                return context.render_authenticated_template(
+                    "pages/error.html",
+                    error_code=403,
+                    error_message="The import is not available to this account.",
+                ), 403
+            except ImportExpiredError:
+                resolved = getattr(g, "authenticated_resolution", None)
+                if resolved is not None:
+                    context.audit_security(
+                        "security.workflow_token_rejected", actor_user_id=resolved[0].id
+                    )
+                if context.record_imports is None:
+                    raise
+                minutes = max(1, (context.record_imports.store.ttl + 59) // 60)
+                return context.render_authenticated_template(
+                    "pages/datasets/import/unavailable.html",
+                    error=(
+                        f"This import expired after {minutes} minutes without activity. "
+                        "Upload the file again to continue."
+                    ),
+                    return_url=url_for("imports.import_dataset_records", key=kwargs.get("key", "")),
+                ), 410
+            except NotFoundError:
+                resolved = getattr(g, "authenticated_resolution", None)
+                if resolved is not None:
+                    context.audit_security(
+                        "security.workflow_token_rejected", actor_user_id=resolved[0].id
+                    )
+                return context.render_authenticated_template(
+                    "pages/error.html",
+                    error_code=404,
+                    error_message=(
+                        "The import has expired or is unavailable. Upload the file again."
+                    ),
+                ), 404
+            except ConflictError as error:
+                return context.render_authenticated_template(
+                    "pages/datasets/import/unavailable.html",
+                    error=str(error),
+                    return_url=url_for("imports.import_dataset_records", key=kwargs.get("key", "")),
+                ), 409
+            except ImportValidationError as error:
+                return context.render_authenticated_template(
+                    "pages/datasets/import/unavailable.html", error=str(error)
+                ), 400
+
+        secured_import._secured_import = True
+        return blueprint.dataset_route(rule, capability=capability, **options)(secured_import)
+
+    return decorate
 
 
 def version_errors(function):

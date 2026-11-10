@@ -15,8 +15,8 @@ from refrncr.record_import import (
 from refrncr.services import ConflictError, NotFoundError, RecordConflictError
 from refrncr.web.helpers import merge_error_messages
 from refrncr.web.imports import (
+    blueprint,
     dataset_records,
-    import_route,
     record_imports,
     render_authenticated_template,
     require_authenticated,
@@ -24,7 +24,12 @@ from refrncr.web.imports import (
     require_dataset_dependencies,
 )
 from refrncr.web.imports.wizard import render_import_wizard, show_source_format_issues
-from refrncr.web.routing import bounded_import_route, concept_route, upload_limit_route
+from refrncr.web.routing import (
+    bounded_import_route,
+    concept_route,
+    import_route,
+    upload_limit_route,
+)
 
 
 def import_redirect(key, state):
@@ -35,12 +40,16 @@ def import_redirect(key, state):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/concept/records/import-new-version",
     capability="can_maintain_dataset",
     methods=["GET", "POST"],
 )
 @import_route(
-    "/datasets/<key>/records/import", capability="can_maintain_dataset", methods=["GET", "POST"]
+    blueprint,
+    "/datasets/<key>/records/import",
+    capability="can_maintain_dataset",
+    methods=["GET", "POST"],
 )
 @upload_limit_route
 @concept_route
@@ -95,6 +104,7 @@ def import_dataset_records(key: str):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/step/<int:step>",
     capability="can_maintain_dataset",
     methods=["GET"],
@@ -109,6 +119,7 @@ def dataset_import_step(key: str, token: str, step: int):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/worksheet",
     capability="can_maintain_dataset",
     methods=["POST"],
@@ -171,6 +182,7 @@ def submitted_component_names(count):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/formats",
     capability="can_maintain_dataset",
     methods=["POST"],
@@ -215,6 +227,7 @@ def review_source_formats(key: str, token: str):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/mapping",
     capability="can_maintain_dataset",
     methods=["GET"],
@@ -226,6 +239,7 @@ def review_import_mapping(key: str, token: str):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/preview",
     capability="can_maintain_dataset",
     methods=["GET", "POST"],
@@ -329,6 +343,7 @@ def preview_record_import(key: str, token: str):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/confirm",
     capability="can_maintain_dataset",
     methods=["POST"],
@@ -393,6 +408,7 @@ def confirm_record_import(key: str, token: str):
 
 
 @import_route(
+    blueprint,
     "/datasets/<key>/records/import/<token>/cancel",
     capability="can_maintain_dataset",
     methods=["POST"],

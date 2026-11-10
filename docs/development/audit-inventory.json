@@ -777,7 +777,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.import_hierarchy_file",
+      "symbol": "refrncr.web.hierarchies.imports.import_hierarchy_file",
       "path": "/datasets/<key>/concept/hierarchy-import",
       "methods": [
         "GET",
@@ -792,7 +792,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.hierarchy_import_preview",
+      "symbol": "refrncr.web.hierarchies.imports.hierarchy_import_preview",
       "path": "/datasets/<key>/concept/hierarchy-import/<token>",
       "methods": [
         "GET"
@@ -805,7 +805,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.confirm_hierarchy_import",
+      "symbol": "refrncr.web.hierarchies.imports.confirm_hierarchy_import",
       "path": "/datasets/<key>/concept/hierarchy-import/<token>/confirm",
       "methods": [
         "POST"
@@ -820,7 +820,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.cancel_hierarchy_import",
+      "symbol": "refrncr.web.hierarchies.imports.cancel_hierarchy_import",
       "path": "/datasets/<key>/concept/hierarchy-import/<token>/cancel",
       "methods": [
         "POST"
