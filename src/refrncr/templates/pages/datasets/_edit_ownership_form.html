@@ -1,7 +1,7 @@
 {% from 'components.html' import feedback %}
 {% from 'pages/datasets/_team_choice.html' import team_choice %}
   {{ feedback(error, id="dataset-edit-error", focus=true) }}
-  <form {{ non_login_form_attrs() }} id='dataset-ownership-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("update_dataset", key=dataset.key) }}'>
+  <form {{ non_login_form_attrs() }} id='dataset-ownership-form' class='form dataset-edit-form' novalidate method='post' action='{{ url_for("datasets.update_dataset", key=dataset.key) }}'>
     <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
     <input type='hidden' name='edit_section' value='ownership'>
     <input type='hidden' name='settings_return_context' value='{{ settings_return_context }}'>

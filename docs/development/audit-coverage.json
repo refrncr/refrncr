@@ -97,7 +97,7 @@
       "operation": "create_initial_admin",
       "service": "refrncr.services.UserService.create_initial_admin",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
+        "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
       ],
       "kind": "mutation",
@@ -137,7 +137,7 @@
       "operation": "create_user",
       "service": "refrncr.services.UserService.create_user",
       "interface_entrypoints": [
-        "refrncr.web.create_user POST /users"
+        "refrncr.web.users.create_user POST /users"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -180,7 +180,7 @@
       "operation": "change_email",
       "service": "refrncr.services.UserService.change_email",
       "interface_entrypoints": [
-        "refrncr.web.change_user_email POST /users/<target_id>/email"
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -223,7 +223,7 @@
       "operation": "disable_user",
       "service": "refrncr.services.UserService.disable_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -266,7 +266,7 @@
       "operation": "enable_user",
       "service": "refrncr.services.UserService.enable_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -309,7 +309,7 @@
       "operation": "delete_user",
       "service": "refrncr.services.UserService.delete_user",
       "interface_entrypoints": [
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>"
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -352,7 +352,7 @@
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
+        "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
       ],
       "kind": "read",
@@ -385,9 +385,9 @@
       "operation": "list_users",
       "service": "refrncr.services.UserService.list_users",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_email POST /users/<target_id>/email"
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -451,7 +451,7 @@
       "operation": "create_team",
       "service": "refrncr.services.TeamService.create_team",
       "interface_entrypoints": [
-        "refrncr.web.create_team POST /teams"
+        "refrncr.web.teams.create_team POST /teams"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -494,7 +494,7 @@
       "operation": "rename_team",
       "service": "refrncr.services.TeamService.rename_team",
       "interface_entrypoints": [
-        "refrncr.web.rename_team POST /teams/<team_id>/rename"
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -537,7 +537,7 @@
       "operation": "create_membership",
       "service": "refrncr.services.MembershipService.create_membership",
       "interface_entrypoints": [
-        "refrncr.web.create_membership POST /teams/<team_id>/members"
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -580,7 +580,7 @@
       "operation": "delete_membership",
       "service": "refrncr.services.MembershipService.delete_membership",
       "interface_entrypoints": [
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -752,7 +752,7 @@
       "operation": "delete_team",
       "service": "refrncr.services.TeamService.delete_team",
       "interface_entrypoints": [
-        "refrncr.web.delete_team POST /teams/<team_id>/delete"
+        "refrncr.web.teams.delete_team POST /teams/<team_id>/delete"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -801,11 +801,11 @@
       "operation": "list_teams",
       "service": "refrncr.services.TeamService.list_teams",
       "interface_entrypoints": [
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -837,12 +837,12 @@
       "operation": "list_team_members",
       "service": "refrncr.services.MembershipService.list_team_members",
       "interface_entrypoints": [
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.teams.team_members GET /teams/<team_id>/members",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -874,12 +874,12 @@
       "operation": "list_eligible_users",
       "service": "refrncr.services.MembershipService.list_eligible_users",
       "interface_entrypoints": [
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.team_members GET /teams/<team_id>/members",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.teams.team_members GET /teams/<team_id>/members",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -911,7 +911,7 @@
       "operation": "create_dataset",
       "service": "refrncr.services.DatasetService.create_dataset",
       "interface_entrypoints": [
-        "refrncr.web.create_dataset POST /datasets"
+        "refrncr.web.datasets.core.create_dataset POST /datasets"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1011,7 +1011,7 @@
       "operation": "update_dataset",
       "service": "refrncr.services.DatasetService.update_dataset",
       "interface_entrypoints": [
-        "refrncr.web.update_dataset POST /datasets/<key>"
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1063,7 +1063,7 @@
       "operation": "grant_export_access",
       "service": "refrncr.services.DatasetService.grant_export_access",
       "interface_entrypoints": [
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access"
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1110,7 +1110,7 @@
       "operation": "revoke_export_access",
       "service": "refrncr.services.DatasetService.revoke_export_access",
       "interface_entrypoints": [
-        "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke"
+        "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1157,13 +1157,13 @@
       "operation": "export_access_context",
       "service": "refrncr.services.DatasetService.export_access_context",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1227,18 +1227,18 @@
       "operation": "list_dataset_overview",
       "service": "refrncr.services.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets",
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.datasets.core.dataset_list GET /datasets",
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1302,11 +1302,11 @@
       "operation": "get_dataset",
       "service": "refrncr.services.DatasetService.get_dataset",
       "interface_entrypoints": [
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1370,15 +1370,15 @@
       "operation": "get_dataset_for_edit",
       "service": "refrncr.services.DatasetService.get_dataset_for_edit",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
@@ -1393,14 +1393,14 @@
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.datasets.core.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1432,7 +1432,7 @@
       "operation": "create_field",
       "service": "refrncr.services.DatasetFieldService.create_field",
       "interface_entrypoints": [
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1529,7 +1529,7 @@
       "operation": "update_field_and_business_key_membership",
       "service": "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
       "interface_entrypoints": [
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>"
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1583,7 +1583,7 @@
       "operation": "delete_field",
       "service": "refrncr.services.DatasetFieldService.delete_field",
       "interface_entrypoints": [
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1626,7 +1626,7 @@
       "operation": "replace_order",
       "service": "refrncr.services.DatasetFieldService.replace_order",
       "interface_entrypoints": [
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order"
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1669,7 +1669,7 @@
       "operation": "move_field",
       "service": "refrncr.services.DatasetFieldService.move_field",
       "interface_entrypoints": [
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order"
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -1712,8 +1712,8 @@
       "operation": "list_fields",
       "service": "refrncr.services.DatasetFieldService.list_fields",
       "interface_entrypoints": [
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets",
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
         "refrncr.web.dataset_import_step GET /datasets/<key>/records/import/<token>/step/<int:step>",
@@ -1722,8 +1722,8 @@
         "refrncr.web.new_dataset_record GET /datasets/<key>/records/new",
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1755,9 +1755,9 @@
       "operation": "get_field",
       "service": "refrncr.services.DatasetFieldService.get_field",
       "interface_entrypoints": [
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -1838,8 +1838,8 @@
       "service": "refrncr.services.DatasetBusinessKeyService.get_business_key",
       "interface_entrypoints": [
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -2316,7 +2316,7 @@
       "operation": "revoke_session",
       "service": "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
       "interface_entrypoints": [
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",
@@ -2800,7 +2800,7 @@
       "operation": "revoke_session",
       "service": "refrncr.record_import.DatasetRecordImportService.revoke_session",
       "interface_entrypoints": [
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",
@@ -2831,7 +2831,7 @@
       "operation": "authenticate",
       "service": "refrncr.services.AuthenticationService.authenticate",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -2862,7 +2862,7 @@
       "operation": "create",
       "service": "refrncr.services.SessionService.create",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -2924,29 +2924,29 @@
       "operation": "resolve_with_session",
       "service": "refrncr.services.SessionService.resolve_with_session",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.index GET /",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.overview.index GET /",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
-        "refrncr.web.dataset_list GET /datasets",
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new",
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.datasets.core.dataset_list GET /datasets",
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new",
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
@@ -2972,27 +2972,27 @@
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.logout POST /logout",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.delete_team POST /teams/<team_id>/delete",
-        "refrncr.web.team_members GET /teams/<team_id>/members",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.auth.logout POST /logout",
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.delete_team POST /teams/<team_id>/delete",
+        "refrncr.web.teams.team_members GET /teams/<team_id>/members",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.api_key_list GET /settings/api-keys",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
         "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
@@ -3000,8 +3000,8 @@
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
         "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
-        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update",
-        "refrncr.web.attention_overview GET /attention",
+        "refrncr.web.datasets.core.dataset_mapping_source_update POST /datasets/<key>/source/update",
+        "refrncr.web.overview.attention_overview GET /attention",
         "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
@@ -3033,8 +3033,8 @@
       "operation": "revoke",
       "service": "refrncr.services.SessionService.revoke",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout"
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3224,8 +3224,8 @@
       "operation": "creation_teams",
       "service": "refrncr.services.DatasetAuthorizationService.creation_teams",
       "interface_entrypoints": [
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets"
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3258,7 +3258,7 @@
       "operation": "can_create_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_create_dataset",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets"
+        "refrncr.web.datasets.core.dataset_list GET /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3386,13 +3386,13 @@
       "operation": "can_export_dataset",
       "service": "refrncr.services.DatasetAuthorizationService.can_export_dataset",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
         "Internal service caller or direct authorized service use"
       ],
       "kind": "read",
@@ -3425,16 +3425,16 @@
       "operation": "can_change_dataset_owner",
       "service": "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -3870,7 +3870,7 @@
       "operation": "resolve",
       "service": "refrncr.login_security.SourceIdentityResolver.resolve",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -3901,7 +3901,7 @@
       "operation": "cancel",
       "service": "refrncr.login_security.LoginAttemptReservation.cancel",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3932,7 +3932,7 @@
       "operation": "failed",
       "service": "refrncr.login_security.LoginAttemptReservation.failed",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -3963,7 +3963,7 @@
       "operation": "succeeded",
       "service": "refrncr.login_security.LoginAttemptReservation.succeeded",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4025,7 +4025,7 @@
       "operation": "reserve",
       "service": "refrncr.login_security.LoginAttemptLimiter.reserve",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4118,7 +4118,7 @@
       "operation": "try_acquire",
       "service": "refrncr.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
       "interface_entrypoints": [
-        "refrncr.web.login GET,POST /login"
+        "refrncr.web.auth.login GET,POST /login"
       ],
       "kind": "mutation",
       "classification": "security logging required",
@@ -4149,20 +4149,20 @@
       "operation": "for_request",
       "service": "refrncr.browser_security.BrowserCookiePolicy.for_request",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.index GET /",
-        "refrncr.web.dataset_list GET /datasets",
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.overview.index GET /",
+        "refrncr.web.datasets.core.dataset_list GET /datasets",
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/records/export",
@@ -4181,32 +4181,32 @@
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout",
         "refrncr.web.theme_preference POST /settings/theme",
         "refrncr.web.appearance_settings GET /settings/appearance",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.delete_team POST /teams/<team_id>/delete",
-        "refrncr.web.team_members GET /teams/<team_id>/members",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.attention_overview GET /attention"
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.delete_team POST /teams/<team_id>/delete",
+        "refrncr.web.teams.team_members GET /teams/<team_id>/members",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.overview.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "security logging required",
@@ -4525,9 +4525,9 @@
     {
       "capability": "web",
       "operation": "index",
-      "service": "refrncr.web.index",
+      "service": "refrncr.web.overview.index",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
+        "refrncr.web.overview.index GET /",
         "Flask GET /static/<path:filename>",
         "Flask HEAD for GET and OPTIONS"
       ],
@@ -4560,10 +4560,10 @@
       "operation": "require_csrf",
       "service": "refrncr.web.require_csrf",
       "interface_entrypoints": [
-        "refrncr.web.create_dataset POST /datasets",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.datasets.core.create_dataset POST /datasets",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke",
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.export_dataset_history GET,POST /datasets/<key>/records/export/period",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -4579,22 +4579,22 @@
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
-        "refrncr.web.logout POST /logout",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.delete_team POST /teams/<team_id>/delete",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
+        "refrncr.web.auth.logout POST /logout",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.delete_team POST /teams/<team_id>/delete",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
         "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
         "refrncr.web.theme_preference POST /settings/theme",
@@ -4629,8 +4629,8 @@
       "operation": "require_cookie_settings",
       "service": "refrncr.web.require_cookie_settings",
       "interface_entrypoints": [
-        "refrncr.web.setup GET,POST /setup",
-        "refrncr.web.login GET,POST /login",
+        "refrncr.web.auth.setup GET,POST /setup",
+        "refrncr.web.auth.login GET,POST /login",
         "Browser transport, CSRF, request-size and exception hooks"
       ],
       "kind": "read",
@@ -4660,7 +4660,7 @@
     {
       "capability": "web",
       "operation": "handle_oversized_request",
-      "service": "refrncr.web.handle_oversized_request",
+      "service": "refrncr.web.errors.handle_oversized_request",
       "interface_entrypoints": [
         "Browser transport, CSRF, request-size and exception hooks"
       ],
@@ -4726,7 +4726,7 @@
       "operation": "list_history",
       "service": "refrncr.audit_history.AuditHistoryService.list_history",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log"
+        "refrncr.web.audit.audit_list GET /settings/audit-log"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4760,7 +4760,7 @@
       "operation": "get_event",
       "service": "refrncr.audit_history.AuditHistoryService.get_event",
       "interface_entrypoints": [
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>"
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4794,7 +4794,7 @@
       "operation": "delete_dataset",
       "service": "refrncr.services.DatasetService.delete_dataset",
       "interface_entrypoints": [
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
+        "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -4843,14 +4843,14 @@
       "operation": "get_dataset_for_deletion",
       "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure"
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -4884,7 +4884,7 @@
       "operation": "publish",
       "service": "refrncr.dataset_versions.DatasetVersionService.publish",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -4931,7 +4931,7 @@
       "operation": "cancel",
       "service": "refrncr.dataset_versions.DatasetVersionService.cancel",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -4978,7 +4978,7 @@
       "operation": "review",
       "service": "refrncr.dataset_versions.DatasetVersionService.review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5076,7 +5076,7 @@
       "operation": "overview",
       "service": "refrncr.dataset_versions.DatasetVersionService.overview",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets"
+        "refrncr.web.datasets.core.dataset_list GET /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5140,20 +5140,20 @@
       "operation": "history",
       "service": "refrncr.dataset_versions.DatasetVersionService.history",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5185,17 +5185,17 @@
       "operation": "read",
       "service": "refrncr.dataset_versions.DatasetVersionService.read",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_version_field_detail GET /datasets/<key>/versions/<version_id>/fields/<field_key>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
         "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
         "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
@@ -5232,7 +5232,7 @@
       "operation": "open_review",
       "service": "refrncr.dataset_diff.DatasetDiffService.open_review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review"
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review"
       ],
       "kind": "read",
       "classification": "domain-audited",
@@ -5283,8 +5283,8 @@
       "operation": "review",
       "service": "refrncr.dataset_diff.DatasetDiffService.review",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5319,8 +5319,8 @@
       "operation": "field_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.field_detail",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5355,8 +5355,8 @@
       "operation": "record_detail",
       "service": "refrncr.dataset_diff.DatasetDiffService.record_detail",
       "interface_entrypoints": [
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5391,14 +5391,14 @@
       "operation": "concept_context",
       "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
-        "refrncr.web.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.move_dataset_field POST /datasets/<key>/fields/order",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
+        "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
@@ -5413,11 +5413,11 @@
         "refrncr.web.create_dataset_record POST /datasets/<key>/records",
         "refrncr.web.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5449,7 +5449,7 @@
       "operation": "create_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.create_concept",
       "interface_entrypoints": [
-        "refrncr.web.dataset_concept_create POST /datasets/<key>/concept/new"
+        "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -5588,7 +5588,7 @@
       "operation": "review_discard",
       "service": "refrncr.dataset_versions.DatasetVersionService.review_discard",
       "interface_entrypoints": [
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5620,7 +5620,7 @@
       "operation": "discard_concept",
       "service": "refrncr.dataset_versions.DatasetVersionService.discard_concept",
       "interface_entrypoints": [
-        "refrncr.web.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
+        "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -5772,14 +5772,14 @@
       "operation": "list_relationships",
       "service": "refrncr.services.MembershipService.list_relationships",
       "interface_entrypoints": [
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.team_list GET /teams",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.teams.team_list GET /teams",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -5811,16 +5811,16 @@
       "operation": "get_dataset_configuration",
       "service": "refrncr.services.DatasetService.get_dataset_configuration",
       "interface_entrypoints": [
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
-        "refrncr.web.edit_dataset GET /datasets/<key>/edit",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.dataset_configuration GET /datasets/<key>/configure",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records"
@@ -6563,23 +6563,23 @@
       "operation": "has_capability",
       "service": "refrncr.services.AuthorizationService.has_capability",
       "interface_entrypoints": [
-        "refrncr.web.audit_list GET /settings/audit-log",
-        "refrncr.web.audit_detail GET /settings/audit-log/<event_id>",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
-        "refrncr.web.update_dataset_field POST /datasets/<key>/fields/<field_key>",
-        "refrncr.web.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
-        "refrncr.web.user_list GET /users",
-        "refrncr.web.create_user POST /users",
-        "refrncr.web.change_user_state POST /users/<target_id>/<action>",
-        "refrncr.web.change_user_email POST /users/<target_id>/email",
-        "refrncr.web.create_team POST /teams",
-        "refrncr.web.rename_team POST /teams/<team_id>/rename",
-        "refrncr.web.delete_team POST /teams/<team_id>/delete",
-        "refrncr.web.team_members GET /teams/<team_id>/members",
-        "refrncr.web.create_membership POST /teams/<team_id>/members",
-        "refrncr.web.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
+        "refrncr.web.audit.audit_list GET /settings/audit-log",
+        "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
+        "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
+        "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete",
+        "refrncr.web.users.user_list GET /users",
+        "refrncr.web.users.create_user POST /users",
+        "refrncr.web.users.change_user_state POST /users/<target_id>/<action>",
+        "refrncr.web.users.change_user_email POST /users/<target_id>/email",
+        "refrncr.web.teams.create_team POST /teams",
+        "refrncr.web.teams.rename_team POST /teams/<team_id>/rename",
+        "refrncr.web.teams.delete_team POST /teams/<team_id>/delete",
+        "refrncr.web.teams.team_members GET /teams/<team_id>/members",
+        "refrncr.web.teams.create_membership POST /teams/<team_id>/members",
+        "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete",
         "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
       ],
       "kind": "read",
@@ -6741,20 +6741,20 @@
       "operation": "mapping_source",
       "service": "refrncr.services.DatasetService.mapping_source",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets",
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.core.dataset_list GET /datasets",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6786,8 +6786,8 @@
       "operation": "mapping_source_choices",
       "service": "refrncr.services.DatasetService.mapping_source_choices",
       "interface_entrypoints": [
-        "refrncr.web.new_dataset GET /datasets/new",
-        "refrncr.web.create_dataset POST /datasets"
+        "refrncr.web.datasets.core.new_dataset GET /datasets/new",
+        "refrncr.web.datasets.core.create_dataset POST /datasets"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6819,7 +6819,7 @@
       "operation": "update_mapping_source",
       "service": "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
       "interface_entrypoints": [
-        "refrncr.web.dataset_mapping_source_update POST /datasets/<key>/source/update"
+        "refrncr.web.datasets.core.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6862,20 +6862,20 @@
       "operation": "mapping_usage",
       "service": "refrncr.services.DatasetService.mapping_usage",
       "interface_entrypoints": [
-        "refrncr.web.dataset_list GET /datasets",
-        "refrncr.web.dataset_detail GET /datasets/<key>/concept",
-        "refrncr.web.dataset_detail GET /datasets/<key>",
-        "refrncr.web.dataset_detail GET /datasets/<key>/versions/<version_id>",
-        "refrncr.web.dataset_versions_view GET /datasets/<key>/versions",
-        "refrncr.web.dataset_version_review GET /datasets/<key>/versions/review",
-        "refrncr.web.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
-        "refrncr.web.dataset_export_access POST /datasets/<key>/export-access",
+        "refrncr.web.datasets.core.dataset_list GET /datasets",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
+        "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/versions/<version_id>",
+        "refrncr.web.versions.dataset_versions_view GET /datasets/<key>/versions",
+        "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
+        "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish",
+        "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access",
         "refrncr.web.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/records",
         "refrncr.web.dataset_records_view GET /datasets/<key>/versions/<version_id>/records",
-        "refrncr.web.update_dataset POST /datasets/<key>",
-        "refrncr.web.new_dataset_field GET /datasets/<key>/fields/new",
-        "refrncr.web.create_dataset_field POST /datasets/<key>/fields"
+        "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
+        "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
+        "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6908,8 +6908,8 @@
       "operation": "read",
       "service": "refrncr.overview.OverviewService.read",
       "interface_entrypoints": [
-        "refrncr.web.index GET /",
-        "refrncr.web.attention_overview GET /attention"
+        "refrncr.web.overview.index GET /",
+        "refrncr.web.overview.attention_overview GET /attention"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6941,7 +6941,7 @@
       "operation": "record_visit",
       "service": "refrncr.overview.OverviewService.record_visit",
       "interface_entrypoints": [
-        "Successful dataset HTML GET: refrncr.web.record_dataset_visit"
+        "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit"
       ],
       "kind": "mutation",
       "classification": "intentionally excluded",

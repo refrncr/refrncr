@@ -111,7 +111,7 @@
   </table>
 </div>
 {% endif %}
-{% if selected_view == 'tree' and not fields and may_edit %}<p class='help-text'>The structure can be published without custom fields. <a href='{{ url_for("dataset_detail", key=dataset.key, concept=true, _anchor="fields") }}'>Define fields</a> to add values.</p>{% endif %}
+{% if selected_view == 'tree' and not fields and may_edit %}<p class='help-text'>The structure can be published without custom fields. <a href='{{ url_for("datasets.dataset_detail", key=dataset.key, concept=true, _anchor="fields") }}'>Define fields</a> to add values.</p>{% endif %}
 {% endif %}
 {% if selected_view == 'tree' or selected_view == 'table' %}
   {% if may_edit %}{{ form_side_panel('hierarchy-panel') }}{% else %}{% include 'pages/datasets/hierarchy/_view_panels.html' %}{% endif %}

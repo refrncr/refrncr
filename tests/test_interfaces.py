@@ -1,7 +1,9 @@
+import json
 import os
 import re
 import uuid
 from itertools import chain, combinations
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -168,6 +170,65 @@ def test_every_browser_route_declares_a_known_capability_or_public_access(interf
         assert getattr(view, "required_capability", None) in known, rule.endpoint
 
 
+def _browser_route_contract(app):
+    actual = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+        view = app.view_functions[rule.endpoint]
+        actual.append(
+            {
+                "path": rule.rule,
+                "methods": sorted(rule.methods - {"HEAD", "OPTIONS"}),
+                "capability": getattr(view, "required_capability", None),
+                "public": getattr(view, "public_route", False),
+                # Blueprint prefixes are the one intentional endpoint change in REF-224.
+                "endpoint": rule.endpoint.rsplit(".", 1)[-1],
+            }
+        )
+    return sorted(actual, key=lambda row: (row["path"], row["methods"], row["endpoint"]))
+
+
+def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
+    (
+        _,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization,
+        datasets,
+        dataset_fields,
+        dataset_business_keys,
+    ) = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+    )
+    expected = json.loads((Path(__file__).parent / "fixtures" / "web_routes.json").read_text())
+
+    assert _browser_route_contract(app) == expected
+
+
+def test_browser_route_contract_without_dataset_ui_matches_snapshot():
+    factory, users, authentication, sessions, teams, memberships = configured_services()
+    app = create_flask_app(users, authentication, sessions, teams, memberships)
+    expected = json.loads(
+        (Path(__file__).parent / "fixtures" / "web_routes_without_datasets.json").read_text()
+    )
+
+    assert _browser_route_contract(app) == expected
+    assert app.test_client().get("/attention", follow_redirects=False).status_code == 404
+
+
 def test_renamed_views_keep_csrf_and_capability_checks():
     (
         _,
@@ -195,13 +256,13 @@ def test_renamed_views_keep_csrf_and_capability_checks():
     app.add_url_rule(
         "/renamed-teams/<team_id>",
         endpoint="renamed_team_view",
-        view_func=app.view_functions["rename_team"],
+        view_func=app.view_functions["teams.rename_team"],
         methods=["POST"],
     )
     app.add_url_rule(
         "/renamed-datasets/<key>/fields",
         endpoint="renamed_dataset_field_view",
-        view_func=app.view_functions["create_dataset_field"],
+        view_func=app.view_functions["datasets.create_dataset_field"],
         methods=["POST"],
     )
     client = app.test_client()
@@ -241,49 +302,56 @@ def test_renamed_views_keep_csrf_and_capability_checks():
 
 def _route_matrix_expectations():
     community = {
-        "attention_overview",
+        "overview.attention_overview",
         "api_key_list",
         "api_key_create",
         "api_key_revoke",
         "appearance_settings",
-        "dataset_list",
-        "index",
-        "team_list",
+        "datasets.dataset_list",
+        "overview.index",
+        "teams.team_list",
         "theme_preference",
     }
-    installation_admin = {"audit_list", "audit_detail", "dataset_access_settings"}
+    installation_admin = {
+        "audit.audit_list",
+        "audit.audit_detail",
+        "dataset_access_settings",
+    }
     access_admin = {
-        "user_list",
-        "create_user",
-        "change_user_state",
-        "change_user_email",
-        "create_team",
-        "rename_team",
-        "delete_team",
-        "team_members",
-        "create_membership",
-        "delete_membership",
+        "users.user_list",
+        "users.create_user",
+        "users.change_user_state",
+        "users.change_user_email",
+        "teams.create_team",
+        "teams.rename_team",
+        "teams.delete_team",
+        "teams.team_members",
+        "teams.create_membership",
+        "teams.delete_membership",
     }
     dataset_view = {
-        "dataset_detail",
-        "dataset_configuration",
-        "dataset_versions_view",
-        "dataset_version_review",
-        "dataset_version_record_diff",
-        "dataset_version_field_diff",
-        "dataset_version_field_detail",
+        "datasets.dataset_detail",
+        "datasets.dataset_configuration",
+        "versions.dataset_versions_view",
+        "versions.dataset_version_review",
+        "versions.dataset_version_record_diff",
+        "versions.dataset_version_field_diff",
+        "versions.dataset_version_field_detail",
         "dataset_hierarchy_node_values",
         "dataset_records_view",
     }
     dataset_export = {"export_dataset_history", "export_dataset_records"}
-    dataset_export_admin = {"dataset_export_access", "revoke_dataset_export_access"}
+    dataset_export_admin = {
+        "datasets.dataset_export_access",
+        "datasets.revoke_dataset_export_access",
+    }
     dataset_maintain = {
-        "dataset_mapping_source_update",
-        "dataset_concept_create",
-        "dataset_concept_discard",
-        "dataset_version_publish",
-        "dataset_version_cancel",
-        "move_dataset_field",
+        "datasets.dataset_mapping_source_update",
+        "versions.dataset_concept_create",
+        "versions.dataset_concept_discard",
+        "versions.dataset_version_publish",
+        "versions.dataset_version_cancel",
+        "datasets.move_dataset_field",
         "dataset_hierarchy_node_create",
         "dataset_hierarchy_node_edit",
         "dataset_hierarchy_node_delete",
@@ -304,19 +372,19 @@ def _route_matrix_expectations():
         "edit_dataset_record",
         "restore_dataset_record",
         "delete_dataset_record",
-        "edit_dataset",
-        "update_dataset",
-        "dataset_delete",
-        "new_dataset_field",
-        "create_dataset_field",
-        "edit_dataset_field",
-        "update_dataset_field",
-        "delete_dataset_field",
+        "datasets.edit_dataset",
+        "datasets.update_dataset",
+        "datasets.dataset_delete",
+        "datasets.new_dataset_field",
+        "datasets.create_dataset_field",
+        "datasets.edit_dataset_field",
+        "datasets.update_dataset_field",
+        "datasets.delete_dataset_field",
     }
     expected = {}
     expected.update(dict.fromkeys(community, "can_access_community"))
-    expected["new_dataset"] = "can_create_dataset"
-    expected["create_dataset"] = "can_create_dataset"
+    expected["datasets.new_dataset"] = "can_create_dataset"
+    expected["datasets.create_dataset"] = "can_create_dataset"
     expected.update(dict.fromkeys(installation_admin, "can_administer_installation"))
     expected.update(dict.fromkeys(access_admin, "can_manage_access"))
     expected.update(dict.fromkeys(dataset_view, "can_view_dataset"))
@@ -385,6 +453,9 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
     exporter = services.users.create_user(
         admin.id, "matrix-exporter@example.com", "Exporter", "valid password"
     )
+    managed_user = services.users.create_user(
+        admin.id, "matrix-managed@example.com", "Managed", "valid password"
+    )
     dataset = create_dataset(services, admin, "matrix-dataset")
     owner_team_id = dataset.owner_team_id
     services.memberships.create_membership(admin.id, maintainer.id, owner_team_id)
@@ -444,15 +515,21 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
                 client = app.test_client()
                 client.set_cookie(SESSION_COOKIE, session_token, domain="localhost")
                 calls.clear()
-                path = _route_probe_path(rule, dataset=dataset, team=owner_team_id, user=viewer)
+                path = _route_probe_path(
+                    rule,
+                    dataset=dataset,
+                    team=owner_team_id,
+                    user=managed_user,
+                )
                 response = getattr(client, method.lower())(
                     path,
                     base_url=HTTPS,
                     data={"csrf_token": login_session.csrf_token},
                 )
-                if not calls:
-                    assert response.status_code in {302, 400, 404, 405}
-                    continue
+                assert calls, (
+                    f"{method} {rule.rule} bypassed the central capability hook "
+                    f"with status {response.status_code}"
+                )
                 assert calls[0][1] == expected, f"{method} {rule.rule}"
                 if actor is lower_user and expected in denied_for_lower:
                     assert response.status_code in {403, 404}, f"{method} {rule.rule}"

@@ -11,7 +11,7 @@
       {{ feedback(error, id='publication-error', focus=true) }}
       {{ publication_notice(mapping_usage) }}
       {% if mapping_source %}<p>{{ transition(mapping_source) }}</p>{{ counts(mapping_source) }}{{ warning(mapping_source) }}{% endif %}
-      {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a></p>{% endif %}
+      {% if review_available %}<p><a class='button button-secondary' href='{{ url_for("versions.dataset_version_review", key=dataset.key, review=review_token) if review_token else url_for("versions.dataset_version_review", key=dataset.key) }}'>Review &amp; publish</a></p>{% endif %}
       {% if review %}{% set revision, number, content, summary = review %}
         {{ readonly_field('Next version', 'Version ' ~ number) }}
         {{ readonly_field('Dataset', content.name) }}
@@ -20,7 +20,7 @@
           <div><dt>Fields</dt><dd>{{ summary.fields_added }} added · {{ summary.fields_changed }} changed · {{ summary.fields_removed }} removed</dd></div>
           <div><dt>Records</dt><dd>{{ summary.records_added }} added · {{ summary.records_changed }} changed · {{ summary.records_removed }} removed</dd></div>
         </dl>
-        <form {{ non_login_form_attrs() }} id='publication-form' class='form' method='post' action='{{ url_for("dataset_version_publish", key=dataset.key, review=review_token) if review_token else url_for("dataset_version_publish", key=dataset.key) }}' data-single-submit data-busy-message='Publishing version…' novalidate>
+        <form {{ non_login_form_attrs() }} id='publication-form' class='form' method='post' action='{{ url_for("versions.dataset_version_publish", key=dataset.key, review=review_token) if review_token else url_for("versions.dataset_version_publish", key=dataset.key) }}' data-single-submit data-busy-message='Publishing version…' novalidate>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <input type='hidden' name='dataset_id' value='{{ dataset.id }}'>
           <input type='hidden' name='expected_revision' value='{{ revision }}'>
@@ -33,7 +33,7 @@
       {% endif %}
     </div>
     {% call panel_form_actions() %}
-      <a class='button button-secondary' href='{{ url_for("dataset_versions_view", key=dataset.key) }}' data-panel-cancel>Cancel</a>
+      <a class='button button-secondary' href='{{ url_for("versions.dataset_versions_view", key=dataset.key) }}' data-panel-cancel>Cancel</a>
       {% if review %}<button class='button button-primary' type='submit' form='publication-form'>Publish version</button>{% endif %}
     {% endcall %}
   </div>

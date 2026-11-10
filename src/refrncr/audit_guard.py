@@ -17,7 +17,17 @@ SUPPORT_CLASSES = frozenset(
         "BrowserCookiePolicy",
     }
 )
-ROUTE_DECORATORS = {"app.get", "app.post", "app.route", "dataset_route", "import_route"}
+ROUTE_DECORATORS = {
+    "app.get",
+    "app.post",
+    "app.route",
+    "blueprint.get",
+    "blueprint.dataset_route",
+    "blueprint.post",
+    "blueprint.route",
+    "dataset_route",
+    "import_route",
+}
 
 
 def discover_service_operations(source, module):
@@ -52,16 +62,19 @@ def discover_routes(source, module):
             name = ast.unparse(decorator.func)
             if name not in ROUTE_DECORATORS:
                 continue
-            if not decorator.args or not isinstance(decorator.args[0], ast.Constant):
+            path_argument = 1 if name == "dataset_route" else 0
+            if len(decorator.args) <= path_argument or not isinstance(
+                decorator.args[path_argument], ast.Constant
+            ):
                 raise AuditContractError("Route needs explicit inventory: " + node.name)
             methods = next(
                 (ast.literal_eval(k.value) for k in decorator.keywords if k.arg == "methods"),
-                ["POST"] if name == "app.post" else ["GET"],
+                ["POST"] if name.endswith(".post") else ["GET"],
             )
             routes.append(
                 {
                     "symbol": f"{module}.{node.name}",
-                    "path": decorator.args[0].value,
+                    "path": decorator.args[path_argument].value,
                     "methods": sorted(methods),
                 }
             )
@@ -76,7 +89,10 @@ def verify_inventory(root):
     for path in (root / "src/refrncr").rglob("*.py"):
         if "migrations" in path.parts:
             continue  # Operator prepare_database owns the complete Alembic revision chain.
-        module = ".".join(path.relative_to(root / "src").with_suffix("").parts)
+        module_parts = path.relative_to(root / "src").with_suffix("").parts
+        if module_parts[-1] == "__init__":
+            module_parts = module_parts[:-1]
+        module = ".".join(module_parts)
         source = path.read_text()
         tree = ast.parse(source)
         if any(
@@ -86,15 +102,19 @@ def verify_inventory(root):
             module_commands.append(module)
         discovered.update(discover_service_operations(source, module))
         routes.extend(discover_routes(source, module))
-        if module in {
-            "refrncr.services",
-            "refrncr.record_import",
-            "refrncr.web",
-            "refrncr.dataset_versions",
-            "refrncr.dataset_diff",
-            "refrncr.api_keys",
-            "refrncr.hierarchy",
-        }:
+        if (
+            module
+            in {
+                "refrncr.services",
+                "refrncr.record_import",
+                "refrncr.dataset_versions",
+                "refrncr.dataset_diff",
+                "refrncr.api_keys",
+                "refrncr.hierarchy",
+            }
+            or module == "refrncr.web"
+            or module.startswith("refrncr.web.")
+        ):
             for node in ast.walk(ast.parse(source)):
                 if isinstance(node, ast.Call) and (
                     ast.unparse(node.func) in {"AuditEvent", "uow.add_audit"}
@@ -142,8 +162,13 @@ def verify_inventory(root):
         parts = symbol.split(".")
         module_length = len(parts) - 1
         while module_length > 1:
-            path = (root / "src").joinpath(*parts[:module_length]).with_suffix(".py")
+            module_path = (root / "src").joinpath(*parts[:module_length])
+            path = module_path.with_suffix(".py")
+            package_path = module_path / "__init__.py"
             if path.is_file():
+                break
+            if package_path.is_file():
+                path = package_path
                 break
             module_length -= 1
         else:

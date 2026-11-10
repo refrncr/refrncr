@@ -4,7 +4,7 @@
 {% block content %}
   {% include "pages/datasets/_breadcrumbs.html" %}<h1>{{ panel_title }}</h1>{% include 'pages/datasets/concepts/_banner.html' %}
   <div class='side-panel-body' data-side-panel-content data-panel-title='{{ panel_title }}' data-panel-eyebrow='Configure · {{ dataset.name }}'>{% if error %}<div class='alert alert-error' role='alert' tabindex='-1' data-error-focus>{{ error }}</div>{% endif %}
-  <form {{ non_login_form_attrs() }} class='form' data-generate-key novalidate method='post' action='{{ url_for("create_dataset_field", key=dataset.key) }}'>
+  <form {{ non_login_form_attrs() }} class='form' data-generate-key novalidate method='post' action='{{ url_for("datasets.create_dataset_field", key=dataset.key) }}'>
     {% if dataset.kind == 'mapping' %}
     <input type='hidden' name='mapping_field_role' value='{{ mapping_field_role }}'>
     {% if mapping_field_role == 'source_context' %}
@@ -14,6 +14,6 @@
       {{ field_form_fields(key, name, data_type, is_required, is_unique, false, type_choices, true, definition, unit, false, true, field_id_prefix='mapping-target') }}
     {% endif %}
     {% else %}{{ field_form_fields(key, name, data_type, is_required, is_unique, is_business_key_component, type_choices, true, definition, unit, hierarchy=dataset.kind == 'hierarchy', hierarchy_scope=hierarchy_scope) }}{% endif %}
-    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
+    <input type='hidden' name='csrf_token' value='{{ current_csrf }}'><div class='form-actions'><a class='button button-secondary' data-panel-cancel href='{{ url_for("datasets.dataset_detail", key=dataset.key, concept=true) }}'>Cancel</a><button class='button button-primary' type='submit'>Add field</button></div></form>
   </div>
 {% endblock %}

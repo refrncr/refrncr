@@ -711,7 +711,7 @@ for _symbol, _classification, _reason in (
         "Operational probes read no business state and never create durable audit history.",
     ),
     (
-        "refrncr.web.index",
+        "refrncr.web.overview.index",
         "intentionally excluded",
         "Authenticated navigation; no data extraction or business mutation.",
     ),
@@ -728,7 +728,7 @@ for _symbol, _classification, _reason in (
         "cookies or request payload.",
     ),
     (
-        "refrncr.web.handle_oversized_request",
+        "refrncr.web.errors.handle_oversized_request",
         "security logging required",
         "Oversized login/import/form requests belong to REF-31; never store upload or "
         "request contents.",

@@ -12,7 +12,7 @@
 {% block auth_content %}
   <h1 id='auth-title'>Sign in to your account</h1>
   {{ feedback(error, id="login-error", focus=true) }}
-  <form class='login-form' method='post' action='{{ url_for("login") }}' autocomplete='on' data-form-type='login' novalidate>
+  <form class='login-form' method='post' action='{{ url_for("auth.login") }}' autocomplete='on' data-form-type='login' novalidate>
     {{ form_field(
       "Email address",
       "email",

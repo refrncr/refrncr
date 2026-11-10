@@ -152,7 +152,7 @@
   ],
   "routes": [
     {
-      "symbol": "refrncr.web.audit_list",
+      "symbol": "refrncr.web.audit.audit_list",
       "path": "/settings/audit-log",
       "methods": [
         "GET"
@@ -165,7 +165,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.audit_detail",
+      "symbol": "refrncr.web.audit.audit_detail",
       "path": "/settings/audit-log/<event_id>",
       "methods": [
         "GET"
@@ -178,7 +178,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.index",
+      "symbol": "refrncr.web.overview.index",
       "path": "/",
       "methods": [
         "GET"
@@ -186,12 +186,12 @@
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.services.SessionService.resolve_with_session",
-        "refrncr.web.index",
+        "refrncr.web.overview.index",
         "refrncr.overview.OverviewService.read"
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_list",
+      "symbol": "refrncr.web.datasets.core.dataset_list",
       "path": "/datasets",
       "methods": [
         "GET"
@@ -207,7 +207,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.new_dataset",
+      "symbol": "refrncr.web.datasets.core.new_dataset",
       "path": "/datasets/new",
       "methods": [
         "GET"
@@ -222,7 +222,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_dataset",
+      "symbol": "refrncr.web.datasets.core.create_dataset",
       "path": "/datasets",
       "methods": [
         "POST"
@@ -239,7 +239,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_detail",
+      "symbol": "refrncr.web.datasets.core.dataset_detail",
       "path": "/datasets/<key>/concept",
       "methods": [
         "GET"
@@ -261,7 +261,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_detail",
+      "symbol": "refrncr.web.datasets.core.dataset_detail",
       "path": "/datasets/<key>",
       "methods": [
         "GET"
@@ -282,7 +282,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_detail",
+      "symbol": "refrncr.web.datasets.core.dataset_detail",
       "path": "/datasets/<key>/versions/<version_id>",
       "methods": [
         "GET"
@@ -303,7 +303,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_field_detail",
+      "symbol": "refrncr.web.versions.dataset_version_field_detail",
       "path": "/datasets/<key>/versions/<version_id>/fields/<field_key>",
       "methods": [
         "GET"
@@ -314,7 +314,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_concept_create",
+      "symbol": "refrncr.web.versions.dataset_concept_create",
       "path": "/datasets/<key>/concept/new",
       "methods": [
         "POST"
@@ -327,7 +327,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_concept_discard",
+      "symbol": "refrncr.web.versions.dataset_concept_discard",
       "path": "/datasets/<key>/concept/discard",
       "methods": [
         "GET",
@@ -341,7 +341,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_versions_view",
+      "symbol": "refrncr.web.versions.dataset_versions_view",
       "path": "/datasets/<key>/versions",
       "methods": [
         "GET"
@@ -355,7 +355,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_review",
+      "symbol": "refrncr.web.versions.dataset_version_review",
       "path": "/datasets/<key>/versions/review",
       "methods": [
         "GET"
@@ -371,7 +371,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_record_diff",
+      "symbol": "refrncr.web.versions.dataset_version_record_diff",
       "path": "/datasets/<key>/versions/review/records/<object_id>",
       "methods": [
         "GET"
@@ -385,7 +385,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_field_diff",
+      "symbol": "refrncr.web.versions.dataset_version_field_diff",
       "path": "/datasets/<key>/versions/review/fields/<object_id>",
       "methods": [
         "GET"
@@ -399,7 +399,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_publish",
+      "symbol": "refrncr.web.versions.dataset_version_publish",
       "path": "/datasets/<key>/versions/publish",
       "methods": [
         "GET",
@@ -419,7 +419,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_version_cancel",
+      "symbol": "refrncr.web.versions.dataset_version_cancel",
       "path": "/datasets/<key>/versions/<version_id>/cancel",
       "methods": [
         "GET",
@@ -434,7 +434,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_export_access",
+      "symbol": "refrncr.web.datasets.access.dataset_export_access",
       "path": "/datasets/<key>/export-access",
       "methods": [
         "POST"
@@ -458,7 +458,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.revoke_dataset_export_access",
+      "symbol": "refrncr.web.datasets.access.revoke_dataset_export_access",
       "path": "/datasets/<key>/export-access/<access_id>/revoke",
       "methods": [
         "POST"
@@ -471,7 +471,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.move_dataset_field",
+      "symbol": "refrncr.web.datasets.access.move_dataset_field",
       "path": "/datasets/<key>/fields/order",
       "methods": [
         "POST"
@@ -915,7 +915,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.edit_dataset",
+      "symbol": "refrncr.web.datasets.maintenance.edit_dataset",
       "path": "/datasets/<key>/edit",
       "methods": [
         "GET"
@@ -935,7 +935,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.update_dataset",
+      "symbol": "refrncr.web.datasets.maintenance.update_dataset",
       "path": "/datasets/<key>",
       "methods": [
         "POST"
@@ -960,7 +960,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_delete",
+      "symbol": "refrncr.web.datasets.maintenance.dataset_delete",
       "path": "/datasets/id/<dataset_id>/delete",
       "methods": [
         "GET",
@@ -975,7 +975,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.new_dataset_field",
+      "symbol": "refrncr.web.datasets.maintenance.new_dataset_field",
       "path": "/datasets/<key>/fields/new",
       "methods": [
         "GET"
@@ -994,7 +994,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_dataset_field",
+      "symbol": "refrncr.web.datasets.maintenance.create_dataset_field",
       "path": "/datasets/<key>/fields",
       "methods": [
         "POST"
@@ -1015,7 +1015,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.edit_dataset_field",
+      "symbol": "refrncr.web.datasets.maintenance.edit_dataset_field",
       "path": "/datasets/<key>/fields/<field_key>/edit",
       "methods": [
         "GET"
@@ -1033,7 +1033,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.update_dataset_field",
+      "symbol": "refrncr.web.datasets.maintenance.update_dataset_field",
       "path": "/datasets/<key>/fields/<field_key>",
       "methods": [
         "POST"
@@ -1052,7 +1052,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_dataset_field",
+      "symbol": "refrncr.web.datasets.maintenance.delete_dataset_field",
       "path": "/datasets/<key>/fields/<field_key>/delete",
       "methods": [
         "POST"
@@ -1072,7 +1072,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.setup",
+      "symbol": "refrncr.web.auth.setup",
       "path": "/setup",
       "methods": [
         "GET",
@@ -1087,7 +1087,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.login",
+      "symbol": "refrncr.web.auth.login",
       "path": "/login",
       "methods": [
         "GET",
@@ -1109,7 +1109,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.logout",
+      "symbol": "refrncr.web.auth.logout",
       "path": "/logout",
       "methods": [
         "POST"
@@ -1148,7 +1148,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.user_list",
+      "symbol": "refrncr.web.users.user_list",
       "path": "/users",
       "methods": [
         "GET"
@@ -1162,7 +1162,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_user",
+      "symbol": "refrncr.web.users.create_user",
       "path": "/users",
       "methods": [
         "POST"
@@ -1178,7 +1178,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.change_user_state",
+      "symbol": "refrncr.web.users.change_user_state",
       "path": "/users/<target_id>/<action>",
       "methods": [
         "POST"
@@ -1194,7 +1194,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.change_user_email",
+      "symbol": "refrncr.web.users.change_user_email",
       "path": "/users/<target_id>/email",
       "methods": [
         "POST"
@@ -1210,7 +1210,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.team_list",
+      "symbol": "refrncr.web.teams.team_list",
       "path": "/teams",
       "methods": [
         "GET"
@@ -1225,7 +1225,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_team",
+      "symbol": "refrncr.web.teams.create_team",
       "path": "/teams",
       "methods": [
         "POST"
@@ -1243,7 +1243,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.rename_team",
+      "symbol": "refrncr.web.teams.rename_team",
       "path": "/teams/<team_id>/rename",
       "methods": [
         "POST"
@@ -1261,7 +1261,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_team",
+      "symbol": "refrncr.web.teams.delete_team",
       "path": "/teams/<team_id>/delete",
       "methods": [
         "POST"
@@ -1275,7 +1275,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.team_members",
+      "symbol": "refrncr.web.teams.team_members",
       "path": "/teams/<team_id>/members",
       "methods": [
         "GET"
@@ -1289,7 +1289,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_membership",
+      "symbol": "refrncr.web.teams.create_membership",
       "path": "/teams/<team_id>/members",
       "methods": [
         "POST"
@@ -1307,7 +1307,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_membership",
+      "symbol": "refrncr.web.teams.delete_membership",
       "path": "/teams/<team_id>/members/<membership_id>/delete",
       "methods": [
         "POST"
@@ -1355,7 +1355,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_configuration",
+      "symbol": "refrncr.web.datasets.core.dataset_configuration",
       "path": "/datasets/<key>/configure",
       "methods": [
         "GET"
@@ -1579,7 +1579,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_mapping_source_update",
+      "symbol": "refrncr.web.datasets.core.dataset_mapping_source_update",
       "path": "/datasets/<key>/source/update",
       "methods": [
         "POST"
@@ -1591,7 +1591,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.attention_overview",
+      "symbol": "refrncr.web.overview.attention_overview",
       "path": "/attention",
       "methods": [
         "GET"
@@ -1734,8 +1734,8 @@
     "refrncr.dataset_upgrade.ownership_preflight",
     "refrncr.dataset_upgrade.read_owner_mapping",
     "refrncr.dataset_upgrade.require_resolved_ownership",
-    "refrncr.web.handle_oversized_request",
-    "refrncr.web.index",
+    "refrncr.web.errors.handle_oversized_request",
+    "refrncr.web.overview.index",
     "refrncr.web.require_cookie_settings",
     "refrncr.web.require_csrf",
     "refrncr.version_upgrade.publication_preflight",
@@ -1755,14 +1755,14 @@
     {
       "symbol": "Flask GET /static/<path:filename>",
       "operations": [
-        "refrncr.web.index"
+        "refrncr.web.overview.index"
       ],
       "reason": "Packaged static assets; no business read or mutation."
     },
     {
       "symbol": "Flask HEAD for GET and OPTIONS",
       "operations": [
-        "refrncr.web.index"
+        "refrncr.web.overview.index"
       ],
       "reason": "HEAD executes the corresponding GET handler (including export request auditing); automatic OPTIONS returns routing metadata only."
     },
@@ -1778,12 +1778,12 @@
       "operations": [
         "refrncr.web.require_cookie_settings",
         "refrncr.web.require_csrf",
-        "refrncr.web.handle_oversized_request"
+        "refrncr.web.errors.handle_oversized_request"
       ],
       "reason": "Apply to all applicable protected forms/import/login requests; failures have REF-31 disposition and no success audit."
     },
     {
-      "symbol": "Successful dataset HTML GET: refrncr.web.record_dataset_visit",
+      "symbol": "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit",
       "operations": [
         "refrncr.overview.OverviewService.record_visit"
       ]

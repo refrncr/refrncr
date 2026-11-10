@@ -29,7 +29,7 @@
             <td><time datetime='{{ version.published_at.isoformat() }}' data-local-time='datetime'>{{ version.published_at|absolute_utc }}</time></td>
             <td><bdi>{{ 'System' if version.system_published else history.publisher_names.get(version.publisher_id, 'Deleted user') }}</bdi></td>
             <td>{{ version.release_note or '—' }}</td>
-            <td>{% if state.status == 'Scheduled' and history.may_maintain %}<a class='button button-danger button-table-action' href='{{ url_for("dataset_version_cancel", key=dataset.key, version_id=version.id) }}' data-panel-url data-dialog-open='version-panel' aria-label='Cancel Version {{ version.number }}'>Cancel version</a>{% else %}—{% endif %}</td>
+            <td>{% if state.status == 'Scheduled' and history.may_maintain %}<a class='button button-danger button-table-action' href='{{ url_for("versions.dataset_version_cancel", key=dataset.key, version_id=version.id) }}' data-panel-url data-dialog-open='version-panel' aria-label='Cancel Version {{ version.number }}'>Cancel version</a>{% else %}—{% endif %}</td>
           </tr>
         {% endfor %}</tbody>
       </table>
