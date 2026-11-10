@@ -56,6 +56,7 @@ def hierarchy_presentation(view: Any) -> tuple[list[dict[str, Any]], dict[Any, l
 
     for node in children.get(None, ()):
         append_subtree(node)
+    # Invalid disconnected structure remains visible while its validation is resolved.
     for node in nodes.values():
         if node.id not in visited:
             append_subtree(node)

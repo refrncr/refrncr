@@ -32,6 +32,13 @@ The service returns coded issues and the fields needed to render the mapping ste
 Flask translates those codes into wizard copy. The route must not open the import unit of work or
 recompute required-field, identifier, target-cardinality, or source-format validation.
 
+The Flask composition root registers focused blueprints for audit, authentication, overview,
+settings, teams, users, versions, Datasets, hierarchy workflows, imports, and Records. Each
+blueprint receives services and app-specific helpers through a typed context stored in
+`app.extensions`; large blueprint packages may expose request-scoped `LocalProxy` names backed by
+that context. Shared conditional routing and error policy are composed separately, while pure
+presentation transformations live in framework-independent view-model modules.
+
 ## Consequences
 
 The product has one deployable application and one composition root. Flask can deliver the first
@@ -72,6 +79,8 @@ edge, not a second business-logic layer: authorization, domain validation rules,
 persistence remain in the shared application services. FastAPI endpoints must continue to call
 those same services and may use their own API-specific mapping.
 
-A future extraction is appropriate only when a separate story defines a reusable API contract or
-another concrete consumer. This ADR does not require a speculative `web.py`/services split as
-cleanup work.
+The browser composition is split by workflow, but this does not make blueprint routes reusable
+application services. A further extraction is appropriate only when a separate story defines a
+reusable API contract or another concrete consumer. App-instance render, session, cookie,
+authorization, CSRF, and security-audit callables remain in the composition root and are injected
+into blueprint contexts; framework-independent shared helpers live in dedicated web modules.
