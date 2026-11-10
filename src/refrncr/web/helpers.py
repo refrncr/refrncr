@@ -7,6 +7,8 @@ from urllib.parse import unquote, urlsplit
 
 from flask import abort, request
 
+from refrncr.services import ValidationError, parse_expected_revision
+
 
 def merge_error_messages(*messages: str | None) -> str:
     """Join distinct non-empty validation messages while preserving order."""
@@ -46,3 +48,11 @@ def parse_page_parameter() -> int:
     if len(values) != 1 or re.fullmatch(r"[1-9][0-9]{0,8}", values[0]) is None:
         abort(400, description="Page must be a canonical positive integer")
     return int(values[0])
+
+
+def exact_expected_revision() -> int:
+    """Read exactly one optimistic-lock revision from the submitted form."""
+    values = request.form.getlist("expected_revision")
+    if len(values) != 1:
+        raise ValidationError("Submit exactly one expected revision")
+    return parse_expected_revision(values[0])

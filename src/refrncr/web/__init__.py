@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import hmac
 import secrets
-from datetime import UTC
 
 from flask import (
     Flask,
@@ -28,26 +27,19 @@ from flask import (
     render_template,
     request,
 )
-from markupsafe import Markup
 
 from refrncr.api_keys import ApiKeyService
 from refrncr.audit import record_security_event
-from refrncr.audit_history import MAX_AUDIT_DATETIME_LENGTH, AuditHistoryService
+from refrncr.audit_history import AuditHistoryService
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
-from refrncr.change_status import ChangeStatus
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
-from refrncr.datatypes import get_datatype
-from refrncr.diff_contracts import MAX_SEARCH
-from refrncr.hierarchy import (
-    MAX_HIERARCHY_NODE_NAME,
-    HierarchyService,
-)
+from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.installation_settings import InstallationSettingsService
 from refrncr.login_security import (
@@ -56,45 +48,27 @@ from refrncr.login_security import (
     SourceIdentityResolver,
 )
 from refrncr.overview import OverviewService
-from refrncr.presentation import (
-    DISPLAY_STATUSES,
-    dataset_kind_label,
-    pluralize,
-    status_badge_variant,
-    status_label,
-)
-from refrncr.presentation_metadata import (
-    MAX_DATASET_ICON_LENGTH,
-    MAX_FIELD_DEFINITION,
-    MAX_FIELD_UNIT,
-    dataset_icon_sprite,
-    default_dataset_icon,
-    rendered_dataset_icon,
-)
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthenticationService,
-    AuthorizationError,
     AuthorizationService,
-    ConflictError,
     DatasetBusinessKeyService,
     DatasetFieldService,
     DatasetRecordService,
     DatasetService,
     MembershipService,
-    NotFoundError,
     SessionService,
     TeamService,
-    UserManagementError,
     UserService,
-    ValidationError,
-    parse_expected_revision,
 )
-from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
 from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.auth import register_auth_blueprint
 from refrncr.web.datasets import register_datasets_blueprint
-from refrncr.web.errors import register_error_handlers
+from refrncr.web.errors import register_error_handlers, register_user_error_handler
+from refrncr.web.filters import register_template_filters
+from refrncr.web.helpers import (
+    exact_expected_revision,
+)
 from refrncr.web.helpers import (
     safe_login_target as safe_login_target,
 )
@@ -108,6 +82,7 @@ from refrncr.web.hooks import (
     register_security_hooks,
 )
 from refrncr.web.imports import register_imports_blueprint
+from refrncr.web.navigation import active_navigation
 from refrncr.web.overview import register_overview_blueprint
 from refrncr.web.records import register_records_blueprint
 from refrncr.web.routing import authenticated_route as authenticated_route
@@ -167,78 +142,7 @@ def create_flask_app(
     )
     audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
 
-    app.jinja_env.globals["rendered_dataset_icon"] = rendered_dataset_icon
-    app.jinja_env.globals["non_login_form_attrs"] = lambda: Markup(
-        "autocomplete='off' data-form-type='other' data-1p-ignore "
-        "data-lpignore='true' data-bwignore='true'"
-    )
-    app.jinja_env.globals["non_login_field_attrs"] = lambda: Markup(
-        "data-form-type='other' data-1p-ignore data-lpignore='true' data-bwignore='true'"
-    )
-    app.jinja_env.globals["dataset_icon_sprite"] = dataset_icon_sprite
-    app.jinja_env.globals["default_dataset_icon"] = default_dataset_icon
-    app.jinja_env.filters["datatype_label"] = lambda value: get_datatype(value).label
-    app.jinja_env.filters["dataset_title"] = lambda value: value.replace("->", "→")
-    app.jinja_env.filters["status_label"] = status_label
-    app.jinja_env.filters["status_badge_variant"] = status_badge_variant
-    app.jinja_env.filters["dataset_kind_label"] = dataset_kind_label
-    app.jinja_env.filters["pluralize"] = pluralize
-    app.jinja_env.globals["dataset_kind_label"] = dataset_kind_label
-    app.jinja_env.globals["ChangeStatus"] = ChangeStatus
-    app.jinja_env.globals["DISPLAY_STATUSES"] = DISPLAY_STATUSES
-    app.jinja_env.globals["status_label"] = status_label
-    app.jinja_env.globals.update(
-        MAX_AUDIT_DATETIME_LENGTH=MAX_AUDIT_DATETIME_LENGTH,
-        MAX_DATASET_ICON_LENGTH=MAX_DATASET_ICON_LENGTH,
-        MAX_HIERARCHY_NODE_NAME=MAX_HIERARCHY_NODE_NAME,
-        MAX_SEARCH=MAX_SEARCH,
-        MAX_SOURCE_TIMEZONE_LENGTH=MAX_SOURCE_TIMEZONE_LENGTH,
-        MAX_FIELD_DEFINITION=MAX_FIELD_DEFINITION,
-        MAX_FIELD_UNIT=MAX_FIELD_UNIT,
-    )
-
-    @app.template_filter("record_value_text")
-    def record_value_text(value, data_type):
-        return "" if value is None else get_datatype(data_type).text(value)
-
-    @app.template_filter("absolute_utc")
-    def absolute_utc(value):
-        if value.utcoffset() is None:
-            raise ValueError("Database timestamps must be timezone-aware")
-        value = value.astimezone(UTC)
-        months = (
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-        )
-        return f"{value.day} {months[value.month - 1]} {value.year}, {value:%H:%M} UTC"
-
-    @app.template_filter("short_date")
-    def short_date(value):
-        months = (
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-        )
-        return f"{value.day} {months[value.month - 1]} {value.year}"
+    register_template_filters(app)
 
     app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
 
@@ -327,24 +231,6 @@ def create_flask_app(
         authorization=authorization,
         datasets=datasets,
     )
-
-    def active_navigation() -> str:
-        endpoint = request.endpoint or ""
-        if endpoint.startswith("settings.api_key_"):
-            return "api_keys"
-        if endpoint in {"settings.appearance_settings", "settings.theme_preference"}:
-            return "appearance"
-        if endpoint == "settings.dataset_access_settings":
-            return "dataset_access"
-        if endpoint.startswith("audit."):
-            return "audit"
-        if endpoint == "overview.index":
-            return "home"
-        if endpoint.startswith("users."):
-            return "users"
-        if endpoint.startswith("teams."):
-            return "teams"
-        return ""
 
     register_concept_hooks(
         app,
@@ -557,12 +443,6 @@ def create_flask_app(
         audit_security=audit_security,
     )
 
-    def exact_expected_revision():
-        values = request.form.getlist("expected_revision")
-        if len(values) != 1:
-            raise ValidationError("Submit exactly one expected revision")
-        return parse_expected_revision(values[0])
-
     register_hierarchies_blueprint(
         app,
         authorization=authorization,
@@ -659,23 +539,7 @@ def create_flask_app(
         dataset_ui_enabled=dataset_ui_enabled,
     )
 
-    @app.errorhandler(UserManagementError)
-    def handle_user_error(error: UserManagementError):
-        view = app.view_functions.get(request.endpoint)
-        if isinstance(error, NotFoundError) and getattr(view, "dataset_not_found_route", False):
-            return "Dataset not found", 404
-        if isinstance(error, NotFoundError):
-            abort(404)
-        if isinstance(error, AuthorizationError):
-            resolved = getattr(g, "authenticated_resolution", None)
-            audit_security(
-                "security.authorization_denied",
-                actor_user_id=resolved[0].id if resolved else None,
-            )
-        if isinstance(error, ConflictError):
-            return str(error), 409
-        status = 403 if isinstance(error, AuthorizationError) else 400
-        return str(error), status
+    register_user_error_handler(app, audit_security)
 
     missing_capabilities = [
         rule.endpoint
