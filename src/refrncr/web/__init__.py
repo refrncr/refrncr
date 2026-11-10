@@ -52,10 +52,7 @@ from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.hierarchy import (
     MAX_HIERARCHY_NODE_NAME,
     HierarchyService,
-    canonical_hierarchy_view,
-    hierarchy_sibling_sort_key,
 )
-from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.installation_policy import EXPORT_POLICIES
 from refrncr.installation_settings import InstallationSettingsService, PolicyConfirmationRequired
@@ -87,7 +84,6 @@ from refrncr.record_import import (
     ImportExpiredError,
     ImportValidationError,
 )
-from refrncr.record_search import matches, search_term
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -99,7 +95,6 @@ from refrncr.services import (
     DatasetService,
     MembershipService,
     NotFoundError,
-    RecordValidationError,
     SessionService,
     StaleRecordError,
     TeamService,
@@ -116,6 +111,8 @@ from refrncr.web.errors import register_error_handlers
 from refrncr.web.helpers import (
     safe_login_target as safe_login_target,
 )
+from refrncr.web.hierarchies import register_hierarchies_blueprint
+from refrncr.web.hierarchies.views import render_hierarchy
 from refrncr.web.hooks import (
     register_concept_hooks,
     register_dataset_visit_hook,
@@ -129,11 +126,9 @@ from refrncr.web.records import register_records_blueprint
 from refrncr.web.routing import (
     authenticated_route,
     capability_route,
-    concept_route,
     dataset_route,
     no_store_route,
     register_web_routing_context,
-    version_errors,
 )
 from refrncr.web.routing import public_route as public_route
 from refrncr.web.teams import register_teams_blueprint
@@ -275,6 +270,7 @@ def create_flask_app(
         dataset_fields,
         dataset_business_keys,
     )
+    hierarchy = None
     if any(dependency is not None for dependency in existing_dataset_dependencies) and not all(
         dependency is not None for dependency in existing_dataset_dependencies
     ):
@@ -357,7 +353,9 @@ def create_flask_app(
             return "audit"
         if endpoint == "overview.index":
             return "home"
-        if endpoint.startswith(("dataset_", "datasets.", "imports.", "records.", "versions.")):
+        if endpoint.startswith(
+            ("dataset_", "datasets.", "hierarchies.", "imports.", "records.", "versions.")
+        ):
             return "datasets"
         if endpoint.startswith("users."):
             return "users"
@@ -689,501 +687,21 @@ def create_flask_app(
         audit_security=audit_security,
     )
 
-    def hierarchy_presentation(view):
-        """Arrange a snapshot for templates without changing its structure or values."""
-        nodes = {node.id: node for node in view.hierarchy_nodes}
-        children = {}
-        for node in nodes.values():
-            children.setdefault(node.parent_id, []).append(node)
-        for siblings in children.values():
-            siblings.sort(key=hierarchy_sibling_sort_key)
-        rows, visited = [], set()
-
-        def append_subtree(start):
-            pending = [(start, ())]
-            while pending:
-                node, ancestors = pending.pop()
-                if node.id in visited:
-                    continue
-                visited.add(node.id)
-                ancestor_names = tuple(row["node"].name for row in ancestors)
-                path = (*ancestor_names, node.name)
-                rows.append(
-                    {
-                        "node": node,
-                        "depth": len(ancestors),
-                        "ancestors": ancestor_names,
-                        "ancestor_rows": ancestors,
-                        "parent_name": nodes[node.parent_id].name
-                        if node.parent_id in nodes
-                        else None,
-                        "path": hierarchy_path_label(path),
-                        "leaf": not children.get(node.id),
-                        "values": {
-                            value.field_key: value.value
-                            for value in node.values
-                            if any(
-                                field.id == value.field_id and field.data_type == value.data_type
-                                for field in view.fields
-                            )
-                        },
-                    }
-                )
-                pending.extend(
-                    (child, (*ancestors, rows[-1])) for child in reversed(children.get(node.id, ()))
-                )
-
-        for node in children.get(None, ()):
-            append_subtree(node)
-        # Invalid disconnected structure remains visible while its validation is resolved.
-        for node in nodes.values():
-            if node.id not in visited:
-                append_subtree(node)
-        return rows, children
-
-    def render_hierarchy(view, actor_id):
-        selected = request.args.getlist("view") or ["tree"]
-        if len(selected) != 1 or selected[0] not in {
-            "tree",
-            "table",
-            "hierarchy",
-            "records",
-            "hybrid",
-        }:
-            abort(400, description="Choose Tree or Table.")
-        legacy_view = selected[0]
-        selected[0] = canonical_hierarchy_view(selected[0])
-        records_view = request.args.getlist("records_view") or ["reference"]
-        if len(records_view) != 1 or records_view[0] not in {"reference", "flattened"}:
-            abort(400, description="Choose a valid hierarchy view.")
-        searches = request.args.getlist("q")
-        sorts = request.args.getlist("sort") or [""]
-        directions = request.args.getlist("direction") or ["asc"]
-        if len(searches) > 1 or len(sorts) != 1 or len(directions) != 1:
-            abort(400, description="Unsupported hierarchy view parameters.")
-        if sorts[0] not in {"", "name", "parent", "key"} or directions[0] not in {"asc", "desc"}:
-            abort(400, description="Unsupported hierarchy sort.")
-        if set(request.args) - {"view", "records_view", "q", "sort", "direction"}:
-            abort(400, description="Unsupported hierarchy view parameters.")
-        if legacy_view != selected[0]:
-            target = url_for(
-                "records.dataset_records_view",
-                key=view.context.dataset.key,
-                version_id=view.state.version.id if view.state else None,
-                concept=True if view.state is None else None,
-                view=selected[0],
-                q=searches[0] if searches else None,
-            )
-            return redirect(target, code=301)
-        hierarchy_search = search_term(searches[0] if searches else "")
-        normalized_search = hierarchy_search.casefold()
-        rows, children = hierarchy_presentation(view)
-        leaf_rows = [row for row in rows if row["leaf"] and row["node"].parent_id is not None]
-        parent_level_count = max((len(row["ancestors"]) for row in leaf_rows), default=0)
-        flat_value_columns = []
-        for field in view.fields:
-            if field.hierarchy_scope == "all_nodes":
-                flat_value_columns.extend(
-                    {"field": field, "label": f"{field.name} Level {level + 1}", "level": level}
-                    for level in range(parent_level_count)
-                )
-            flat_value_columns.append(
-                {"field": field, "label": f"{field.name} Leaf", "level": None}
-            )
-
-        def row_matches(row):
-            return matches(row["node"], view.fields, normalized_search) or (
-                normalized_search in row["node"].name.casefold()
-            )
-
-        if selected[0] == "table":
-            unfiltered_rows = rows
-            display_rows = [
-                row for row in unfiltered_rows if not normalized_search or row_matches(row)
-            ]
-        else:
-            unfiltered_rows = rows
-            if normalized_search:
-                matched_rows = [row for row in rows if row_matches(row)]
-                visible_ids = {
-                    candidate["node"].id
-                    for row in matched_rows
-                    for candidate in (*row["ancestor_rows"], row)
-                }
-                display_rows = [row for row in rows if row["node"].id in visible_ids]
-            else:
-                display_rows = rows
-
-        key_field_key = (getattr(view.identifier, "field_keys", ()) or (None,))[0]
-        key_field = next((field for field in view.fields if field.key == key_field_key), None)
-        sort_key = sorts[0]
-        if selected[0] == "table" and sort_key:
-
-            def row_sort_value(row):
-                if sort_key == "name":
-                    return (1, row["node"].name.casefold())
-                if sort_key == "parent":
-                    return (1, (row["parent_name"] or "").casefold())
-                value = row["values"].get(key_field.key) if key_field else None
-                if value is None:
-                    return (0, "")
-                if key_field and key_field.data_type in {"integer", "number", "float"}:
-                    return (1, value)
-                return (2, str(value).casefold())
-
-            display_rows = sorted(
-                display_rows,
-                key=lambda row: (row_sort_value(row), row["path"].casefold()),
-                reverse=directions[0] == "desc",
-            )
-
-        hierarchy_clear_url = url_for(
-            "records.dataset_records_view",
-            key=view.context.dataset.key,
-            version_id=view.state.version.id if view.state else None,
-            concept=True if view.state is None else None,
-            view=selected[0],
-            sort=sorts[0] or None,
-            direction=directions[0] if sorts[0] else None,
-        )
-        return render_authenticated_template(
-            "pages/datasets/hierarchy.html",
-            dataset=view.context.dataset,
-            context=view.context,
-            fields=view.fields,
-            identifier=view.identifier,
-            hierarchy_rows=rows,
-            hierarchy_errors=view.hierarchy_errors,
-            leaf_rows=leaf_rows,
-            parent_level_count=parent_level_count,
-            flat_value_columns=flat_value_columns,
-            records_view=records_view[0],
-            display_rows=display_rows,
-            hierarchy_result_total=len(unfiltered_rows),
-            leaf_count=len(leaf_rows),
-            hierarchy_search=hierarchy_search,
-            hierarchy_clear_url=hierarchy_clear_url,
-            selected_view=selected[0],
-            sort_key=sort_key,
-            sort_direction=directions[0],
-            key_field_key=key_field_key,
-            default_column_keys=(
-                [key_field_key]
-                + [field.key for field in view.fields if field.key != key_field_key][
-                    : 6 - bool(key_field_key)
-                ]
-                if key_field_key
-                else [field.key for field in view.fields[:6]]
-            ),
-            version_state=view.state,
-            may_cancel_scheduled=view.may_maintain,
-            may_export=view.may_export,
-            may_import=view.may_maintain,
-            may_edit=view.state is None and view.may_maintain,
-            may_view_access=view.may_maintain,
-            may_change_owner=authorization.datasets.can_change_dataset_owner(
-                actor_id, view.context.dataset.id
-            ),
-            draft_in_progress=view.concept is not None,
-            may_start_concept=(
-                view.may_maintain
-                and view.concept is None
-                and view.state is not None
-                and view.state.status == "Current"
-            ),
-        )
-
     def exact_expected_revision():
         values = request.form.getlist("expected_revision")
         if len(values) != 1:
             raise ValidationError("Submit exactly one expected revision")
         return parse_expected_revision(values[0])
 
-    def hierarchy_edit_context(key, node_id=None):
-        actor, _session = require_authenticated()
-        view = dataset_versions.read(actor.id, key, page=None, prefer_concept=True)
-        if view.context.dataset.kind != "hierarchy" or view.state or not view.may_maintain:
-            abort(404)
-        rows, _children = hierarchy_presentation(view)
-        row = next((row for row in rows if row["node"].id == node_id), None)
-        if node_id is not None and row is None:
-            abort(404)
-        return actor, view, rows, row
-
-    def render_hierarchy_node_form(
-        view, rows, row=None, *, mode="structure", error=None, errors=None
-    ):
-        node = row["node"] if row else None
-        node_ids = {entry["node"].id for entry in rows}
-        excluded = {node.id} if node else set()
-        if node:
-            for _ in rows:
-                descendants = {
-                    entry["node"].id for entry in rows if entry["node"].parent_id in excluded
-                }
-                if descendants <= excluded:
-                    break
-                excluded.update(descendants)
-        applicable = tuple(
-            field
-            for field in view.fields
-            if row and (row["leaf"] or field.hierarchy_scope == "all_nodes")
-        )
-        parent_id = (
-            request.form.get(
-                "parent_id", request.args.get("parent_id", node.parent_id if node else "")
-            )
-            or None
-        )
-        if not node and rows and parent_id is None and request.method == "GET":
-            parent_id = rows[0]["node"].id
-        if parent_id is not None and parent_id not in node_ids:
-            abort(404)
-        return_view, return_q, return_sort, return_direction = hierarchy_return_view()
-        return render_authenticated_template(
-            "pages/datasets/hierarchy/node_form.html",
-            dataset=view.context.dataset,
-            node=node,
-            node_row=row,
-            mode=mode,
-            fields=applicable,
-            inactive_fields=tuple(
-                field for field in view.fields if field not in applicable and row
-            ),
-            parent_options=[entry for entry in rows if entry["node"].id not in excluded],
-            parent_id=parent_id,
-            name=request.form.get(
-                "node_label", request.form.get("name", node.name if node else "")
-            ),
-            values=(
-                {
-                    key.removeprefix("field:"): value
-                    for key, value in request.form.items()
-                    if key.startswith("field:")
-                }
-                if request.method == "POST"
-                else (row["values"] if row else {})
-            ),
-            raw_values=request.method == "POST",
-            expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
-            return_view=return_view,
-            return_q=return_q,
-            return_sort=return_sort,
-            return_direction=return_direction,
-            error=error,
-            errors=errors or {},
-        )
-
-    def hierarchy_return_view():
-        values = request.form if request.method == "POST" else request.args
-        selected = values.getlist("return_view") or values.getlist("view") or ["tree"]
-        selected[0] = canonical_hierarchy_view(selected[0])
-        searches = values.getlist("return_q") or values.getlist("q") or [""]
-        sorts = values.getlist("return_sort") or values.getlist("sort") or [""]
-        directions = values.getlist("return_direction") or values.getlist("direction") or ["asc"]
-        legacy_records = (
-            values.getlist("return_records_view") or values.getlist("records_view") or ["reference"]
-        )
-        if (
-            len(selected) != 1
-            or selected[0] not in {"tree", "table"}
-            or len(searches) != 1
-            or len(sorts) != 1
-            or sorts[0] not in {"", "name", "parent", "key"}
-            or len(directions) != 1
-            or directions[0] not in {"asc", "desc"}
-            or len(legacy_records) != 1
-            or legacy_records[0] not in {"reference", "flattened"}
-        ):
-            abort(400, description="Choose a valid return view.")
-        return selected[0], searches[0], sorts[0], directions[0]
-
-    @dataset_route(
+    register_hierarchies_blueprint(
         app,
-        "/datasets/<key>/concept/nodes/new",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
+        authorization=authorization,
+        dataset_versions=dataset_versions,
+        hierarchy=hierarchy,
+        require_authenticated=require_authenticated,
+        render_authenticated_template=render_authenticated_template,
+        exact_expected_revision=exact_expected_revision,
     )
-    @version_errors
-    @concept_route
-    def dataset_hierarchy_node_create(key):
-        actor, view, rows, _row = hierarchy_edit_context(key)
-        if request.method == "POST":
-            try:
-                hierarchy.create_node(
-                    actor.id,
-                    key,
-                    request.form.get("node_label", request.form.get("name", "")),
-                    request.form.get("parent_id") or None,
-                    expected_revision=exact_expected_revision(),
-                )
-            except (ValidationError, ConflictError) as error:
-                return render_hierarchy_node_form(view, rows, error=str(error)), 409 if isinstance(
-                    error, ConflictError
-                ) else 400
-            return redirect(url_for("records.dataset_records_view", key=key, concept=True))
-        return render_hierarchy_node_form(view, rows)
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/concept/nodes/<node_id>/edit",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_hierarchy_node_edit(key, node_id):
-        actor, view, rows, row = hierarchy_edit_context(key, node_id)
-        if request.method == "POST":
-            submitted = {}
-            if any(
-                form_key.startswith("field:") and len(form_values) != 1
-                for form_key, form_values in request.form.lists()
-            ):
-                abort(400, description="Submit exactly one value per field.")
-            for form_key, form_values in request.form.lists():
-                if form_key.startswith("field:"):
-                    submitted[form_key.removeprefix("field:")] = form_values[0]
-            try:
-                hierarchy.update_node_and_values(
-                    actor.id,
-                    key,
-                    node_id,
-                    request.form.get("node_label", request.form.get("name", "")),
-                    request.form.get("parent_id") or None,
-                    submitted,
-                    expected_revision=exact_expected_revision(),
-                )
-            except (ValidationError, ConflictError) as error:
-                return render_hierarchy_node_form(
-                    view, rows, row, error=str(error)
-                ), 409 if isinstance(error, ConflictError) else 400
-            return redirect(
-                url_for(
-                    "records.dataset_records_view",
-                    key=key,
-                    concept=True,
-                    view=hierarchy_return_view()[0],
-                    q=hierarchy_return_view()[1] or None,
-                    sort=hierarchy_return_view()[2] or None,
-                    direction=hierarchy_return_view()[3] if hierarchy_return_view()[2] else None,
-                )
-            )
-        return render_hierarchy_node_form(view, rows, row)
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/concept/nodes/<node_id>/delete",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_hierarchy_node_delete(key, node_id):
-        actor, view, rows, row = hierarchy_edit_context(key, node_id)
-        if row["node"].parent_id is None:
-            abort(400, description="The root node cannot be deleted.")
-        subtree_count = 1 + sum(
-            any(ancestor["node"].id == node_id for ancestor in entry["ancestor_rows"])
-            for entry in rows
-            if entry["node"].id != node_id
-        )
-        error, status = None, 200
-        if request.method == "POST":
-            try:
-                if set(request.form) - {"csrf_token", "confirm", "expected_revision"}:
-                    raise ValidationError("Unknown form field")
-                if request.form.getlist("confirm") != ["yes"]:
-                    raise ValidationError("Explicit confirmation is required")
-                hierarchy.delete_subtree(
-                    actor.id,
-                    key,
-                    node_id,
-                    expected_revision=exact_expected_revision(),
-                )
-            except (ValidationError, ConflictError) as failure:
-                error = str(failure)
-                status = 409 if isinstance(failure, ConflictError) else 400
-            else:
-                return redirect(url_for("records.dataset_records_view", key=key, concept=True))
-        response = render_authenticated_template(
-            "pages/datasets/hierarchy/delete.html",
-            dataset=view.context.dataset,
-            node_row=row,
-            subtree_count=subtree_count,
-            expected_revision=request.form.get("expected_revision", view.context.dataset.revision),
-            error=error,
-        )
-        return (response, status) if status != 200 else response
-
-    @dataset_route(
-        app,
-        "/datasets/<key>/concept/nodes/<node_id>/values",
-        capability="can_view_dataset",
-        methods=["GET", "POST"],
-    )
-    @version_errors
-    @concept_route
-    def dataset_hierarchy_node_values(key, node_id):
-        actor, view, rows, row = hierarchy_edit_context(key, node_id)
-        return_view, return_q, return_sort, return_direction = hierarchy_return_view()
-        if request.method == "POST":
-            applicable = [
-                field
-                for field in view.fields
-                if row["leaf"] or field.hierarchy_scope == "all_nodes"
-            ]
-            submitted, errors = {}, {}
-            expected_fields = {f"field:{field.key}" for field in applicable}
-            for form_key, form_values in request.form.lists():
-                if form_key in {
-                    "csrf_token",
-                    "expected_revision",
-                    "return_view",
-                    "return_q",
-                    "return_sort",
-                    "return_direction",
-                    "return_records_view",
-                }:
-                    continue
-                field_key = form_key.removeprefix("field:")
-                if form_key not in expected_fields:
-                    errors[field_key] = "This field does not apply to the selected node."
-                elif len(form_values) != 1:
-                    errors[field_key] = "Submit exactly one value."
-                else:
-                    submitted[field_key] = form_values[0]
-            try:
-                if errors:
-                    raise RecordValidationError(errors)
-                hierarchy.update_values(
-                    actor.id,
-                    key,
-                    node_id,
-                    submitted,
-                    expected_revision=exact_expected_revision(),
-                )
-            except (ValidationError, ConflictError) as error:
-                return render_hierarchy_node_form(
-                    view,
-                    rows,
-                    row,
-                    mode="values",
-                    error=str(error),
-                    errors=getattr(error, "errors", {}),
-                ), 409 if isinstance(error, ConflictError) else 400
-            return redirect(
-                url_for(
-                    "records.dataset_records_view",
-                    key=key,
-                    concept=True,
-                    view=return_view,
-                    q=return_q or None,
-                    sort=return_sort or None,
-                    direction=return_direction if return_sort else None,
-                )
-            )
-        return render_hierarchy_node_form(view, rows, row, mode="values")
 
     register_records_blueprint(
         app,

@@ -53,7 +53,7 @@
 {% if not hierarchy_rows %}
 <div class='empty-state'>
   <h3>Start with the root</h3><p>Build the hierarchy first. Add optional fields and values when you are ready.</p>
-  {% if may_edit %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
+  {% if may_edit %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("hierarchies.dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
 </div>
 {% else %}
 <div class='record-toolbar record-toolbar-search' role='group' aria-label='Hierarchy results'>

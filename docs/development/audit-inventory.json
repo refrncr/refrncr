@@ -1527,7 +1527,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_hierarchy_node_create",
+      "symbol": "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_create",
       "path": "/datasets/<key>/concept/nodes/new",
       "methods": [
         "GET",
@@ -1540,7 +1540,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_hierarchy_node_edit",
+      "symbol": "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_edit",
       "path": "/datasets/<key>/concept/nodes/<node_id>/edit",
       "methods": [
         "GET",
@@ -1553,7 +1553,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_hierarchy_node_delete",
+      "symbol": "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_delete",
       "path": "/datasets/<key>/concept/nodes/<node_id>/delete",
       "methods": [
         "GET",
@@ -1566,7 +1566,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_hierarchy_node_values",
+      "symbol": "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_values",
       "path": "/datasets/<key>/concept/nodes/<node_id>/values",
       "methods": [
         "GET",

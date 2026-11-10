@@ -2996,10 +2996,10 @@
         "refrncr.web.api_key_list GET /settings/api-keys",
         "refrncr.web.api_key_create GET,POST /settings/api-keys/new",
         "refrncr.web.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke",
-        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
-        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
-        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
-        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values",
         "refrncr.web.datasets.core.dataset_mapping_source_update POST /datasets/<key>/source/update",
         "refrncr.web.overview.attention_overview GET /attention",
         "refrncr.web.dataset_access_settings GET,POST /settings/dataset-access"
@@ -5196,10 +5196,10 @@
         "refrncr.web.datasets.maintenance.edit_dataset GET /datasets/<key>/edit",
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
         "refrncr.web.datasets.core.dataset_configuration GET /datasets/<key>/configure",
-        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
-        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
-        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
-        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit",
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
       "kind": "read",
       "classification": "intentionally excluded",
@@ -6300,7 +6300,7 @@
       "operation": "create_node",
       "service": "refrncr.hierarchy.HierarchyService.create_node",
       "interface_entrypoints": [
-        "refrncr.web.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new"
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6340,7 +6340,7 @@
       "operation": "delete_subtree",
       "service": "refrncr.hierarchy.HierarchyService.delete_subtree",
       "interface_entrypoints": [
-        "refrncr.web.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete"
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6421,7 +6421,7 @@
       "operation": "update_node_and_values",
       "service": "refrncr.hierarchy.HierarchyService.update_node_and_values",
       "interface_entrypoints": [
-        "refrncr.web.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6461,7 +6461,7 @@
       "operation": "update_values",
       "service": "refrncr.hierarchy.HierarchyService.update_values",
       "interface_entrypoints": [
-        "refrncr.web.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
+        "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
