@@ -16,14 +16,37 @@ def assert_viewmodels_are_framework_independent(root: Path) -> None:
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                imported = {alias.name.split(".", 1)[0] for alias in node.names}
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                imported = {node.module.split(".", 1)[0]}
+                names = {alias.name for alias in node.names}
+                imported = {name.split(".", 1)[0] for name in names}
+                forbidden_web = {
+                    name
+                    for name in names
+                    if name.startswith("refrncr.web")
+                    and not name.startswith("refrncr.web.viewmodels")
+                }
+            elif isinstance(node, ast.ImportFrom):
+                imported = {node.module.split(".", 1)[0]} if node.module else set()
+                imported_paths = {
+                    ".".join(part for part in (node.module, alias.name) if part)
+                    for alias in node.names
+                }
+                forbidden_web = {
+                    name
+                    for name in imported_paths
+                    if (name == "refrncr.web" or name.startswith("refrncr.web."))
+                    and name != "refrncr.web.viewmodels"
+                    and not name.startswith("refrncr.web.viewmodels.")
+                }
+                if node.level >= 2:
+                    forbidden_web.add(node.module or next(iter(imported_paths)))
             else:
                 continue
             violations.extend(
                 f"{path.name}:{node.lineno}: {name}"
                 for name in sorted(imported & FORBIDDEN_VIEWMODEL_IMPORTS)
+            )
+            violations.extend(
+                f"{path.name}:{node.lineno}: {name}" for name in sorted(forbidden_web)
             )
     assert not violations, "View-model framework imports:\n" + "\n".join(violations)
 
@@ -43,6 +66,34 @@ def test_viewmodel_import_boundary_rejects_a_forbidden_import(tmp_path):
 
     with pytest.raises(AssertionError, match=r"future_viewmodel\.py:1: flask"):
         assert_viewmodels_are_framework_independent(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("from refrncr.web.routing import version_errors\n", "refrncr.web.routing"),
+        ("from ..routing import version_errors\n", "routing"),
+        ("from refrncr.web import routing\n", "refrncr.web.routing"),
+        ("import refrncr.web.routing\n", "refrncr.web.routing"),
+        ("from .. import routing\n", "routing"),
+        ("from refrncr import web\n", "refrncr.web"),
+    ],
+)
+def test_viewmodel_import_boundary_rejects_web_layer_imports(tmp_path, source, expected):
+    (tmp_path / "future_viewmodel.py").write_text(source)
+
+    with pytest.raises(AssertionError, match=rf"future_viewmodel\.py:1: {expected}"):
+        assert_viewmodels_are_framework_independent(tmp_path)
+
+
+def test_viewmodel_import_boundary_allows_viewmodels_and_domain_modules(tmp_path):
+    (tmp_path / "future_viewmodel.py").write_text(
+        "from . import records\n"
+        "from refrncr.web.viewmodels.records import record_value_formatter\n"
+        "from refrncr.datatypes import get_datatype\n"
+    )
+
+    assert_viewmodels_are_framework_independent(tmp_path)
 
 
 def test_decimal_columns_use_the_largest_visible_scale():

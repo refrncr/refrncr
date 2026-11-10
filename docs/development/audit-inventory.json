@@ -595,7 +595,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.import_dataset_records",
+      "symbol": "refrncr.web.imports.routes.import_dataset_records",
       "path": "/datasets/<key>/concept/records/import-new-version",
       "methods": [
         "GET",
@@ -620,7 +620,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.import_dataset_records",
+      "symbol": "refrncr.web.imports.routes.import_dataset_records",
       "path": "/datasets/<key>/records/import",
       "methods": [
         "GET",
@@ -645,7 +645,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_import_step",
+      "symbol": "refrncr.web.imports.routes.dataset_import_step",
       "path": "/datasets/<key>/records/import/<token>/step/<int:step>",
       "methods": [
         "GET"
@@ -665,7 +665,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.select_import_worksheet",
+      "symbol": "refrncr.web.imports.routes.select_import_worksheet",
       "path": "/datasets/<key>/records/import/<token>/worksheet",
       "methods": [
         "POST"
@@ -687,7 +687,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.review_source_formats",
+      "symbol": "refrncr.web.imports.routes.review_source_formats",
       "path": "/datasets/<key>/records/import/<token>/formats",
       "methods": [
         "POST"
@@ -701,7 +701,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.review_import_mapping",
+      "symbol": "refrncr.web.imports.routes.review_import_mapping",
       "path": "/datasets/<key>/records/import/<token>/mapping",
       "methods": [
         "GET"
@@ -719,7 +719,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.preview_record_import",
+      "symbol": "refrncr.web.imports.routes.preview_record_import",
       "path": "/datasets/<key>/records/import/<token>/preview",
       "methods": [
         "GET",
@@ -740,7 +740,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.confirm_record_import",
+      "symbol": "refrncr.web.imports.routes.confirm_record_import",
       "path": "/datasets/<key>/records/import/<token>/confirm",
       "methods": [
         "POST"
@@ -762,7 +762,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.cancel_record_import",
+      "symbol": "refrncr.web.imports.routes.cancel_record_import",
       "path": "/datasets/<key>/records/import/<token>/cancel",
       "methods": [
         "POST"

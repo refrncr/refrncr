@@ -1,4 +1,4 @@
 <p>File: <strong>{{ state.filename }}</strong></p><p>This workbook contains multiple visible worksheets. Select the one to import.</p>
-<form {{ non_login_form_attrs() }} id='import-step-form' class='form' method='post' action='{{ url_for("select_import_worksheet", key=dataset.key, token=state.token) }}' novalidate>
+<form {{ non_login_form_attrs() }} id='import-step-form' class='form' method='post' action='{{ url_for("imports.select_import_worksheet", key=dataset.key, token=state.token) }}' novalidate>
 <label for='import-worksheet'>Worksheet</label><select id='import-worksheet' name='worksheet' data-select data-noun='worksheets'{% if error %} aria-invalid='true' aria-describedby='import-error'{% endif %}><option value=''>Choose a worksheet</option>{% for sheet in source.worksheets %}<option value='{{ sheet }}'{% if state.worksheet == sheet %} selected{% endif %}>{{ sheet }}</option>{% endfor %}</select><input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
 </form>

@@ -17,7 +17,6 @@ the audit guard relies on this shared name when discovering registered routes.
 from __future__ import annotations
 
 import hmac
-import logging
 import re
 import secrets
 from datetime import UTC, date, datetime
@@ -71,7 +70,6 @@ from refrncr.presentation import (
     DISPLAY_STATUSES,
     dataset_kind_label,
     pluralize,
-    record_label,
     status_badge_variant,
     status_label,
 )
@@ -85,14 +83,9 @@ from refrncr.presentation_metadata import (
 )
 from refrncr.record_import import (
     MAX_UPLOAD_BYTES,
-    PROFILE_SCAN_ROWS,
     DatasetRecordImportService,
     ImportExpiredError,
     ImportValidationError,
-    SourceFormatComponentsError,
-    distinct_samples,
-    mapping_issue_message,
-    parse_source,
 )
 from refrncr.record_search import matches, search_term
 from refrncr.services import (
@@ -106,7 +99,6 @@ from refrncr.services import (
     DatasetService,
     MembershipService,
     NotFoundError,
-    RecordConflictError,
     RecordValidationError,
     SessionService,
     StaleRecordError,
@@ -122,10 +114,6 @@ from refrncr.web.auth import register_auth_blueprint
 from refrncr.web.datasets import register_datasets_blueprint
 from refrncr.web.errors import register_error_handlers
 from refrncr.web.helpers import (
-    merge_error_messages,
-    parse_page_parameter,
-)
-from refrncr.web.helpers import (
     safe_login_target as safe_login_target,
 )
 from refrncr.web.hooks import (
@@ -135,17 +123,16 @@ from refrncr.web.hooks import (
     register_response_hooks,
     register_security_hooks,
 )
+from refrncr.web.imports import register_imports_blueprint
 from refrncr.web.overview import register_overview_blueprint
 from refrncr.web.records import register_records_blueprint
 from refrncr.web.routing import (
     authenticated_route,
-    bounded_import_route,
     capability_route,
     concept_route,
     dataset_route,
     no_store_route,
     register_web_routing_context,
-    upload_limit_route,
     version_errors,
 )
 from refrncr.web.routing import public_route as public_route
@@ -370,15 +357,7 @@ def create_flask_app(
             return "audit"
         if endpoint == "overview.index":
             return "home"
-        if endpoint.startswith(("dataset_", "datasets.", "records.", "versions.")) or endpoint in {
-            "import_dataset_records",
-            "select_import_worksheet",
-            "review_import_mapping",
-            "review_source_formats",
-            "preview_record_import",
-            "confirm_record_import",
-            "cancel_record_import",
-        }:
+        if endpoint.startswith(("dataset_", "datasets.", "imports.", "records.", "versions.")):
             return "datasets"
         if endpoint.startswith("users."):
             return "users"
@@ -1224,6 +1203,17 @@ def create_flask_app(
         exact_expected_revision=exact_expected_revision,
     )
 
+    register_imports_blueprint(
+        app,
+        dataset_records=dataset_records,
+        record_imports=record_imports,
+        require_authenticated=require_authenticated,
+        require_csrf=require_csrf,
+        require_dataset_dependencies=require_dataset_dependencies,
+        render_authenticated_template=render_authenticated_template,
+        audit_security=audit_security,
+    )
+
     def import_route(rule, *, capability: str, **options):
         def decorate(function):
             function.required_capability = capability
@@ -1267,7 +1257,9 @@ def create_flask_app(
                             f"This import expired after {minutes} minutes without activity. "
                             "Upload the file again to continue."
                         ),
-                        return_url=url_for("import_dataset_records", key=kwargs.get("key", "")),
+                        return_url=url_for(
+                            "imports.import_dataset_records", key=kwargs.get("key", "")
+                        ),
                     ), 410
                 except NotFoundError:
                     resolved = getattr(g, "authenticated_resolution", None)
@@ -1290,7 +1282,9 @@ def create_flask_app(
                     return render_authenticated_template(
                         "pages/datasets/import/unavailable.html",
                         error=str(error),
-                        return_url=url_for("import_dataset_records", key=kwargs.get("key", "")),
+                        return_url=url_for(
+                            "imports.import_dataset_records", key=kwargs.get("key", "")
+                        ),
                     ), 409
                 except ImportValidationError as error:
                     return render_authenticated_template(
@@ -1306,598 +1300,6 @@ def create_flask_app(
             )(secured_import)
 
         return decorate
-
-    def render_import_wizard(
-        dataset,
-        login_session,
-        state=None,
-        *,
-        step=1,
-        error=None,
-        status=200,
-        selected_mapping=None,
-        source_format_issues=(),
-    ):
-        actor, _session = require_authenticated()
-        mode = (
-            state.mode
-            if state
-            else "mapping_update"
-            if dataset.kind == "mapping"
-            else "new_version"
-        )
-        fields = ()
-        source = assistance = preview = None
-        required_keys = ()
-        identifier_keys = ()
-        mapping_errors = {}
-        step_mapping_errors = []
-        mapping_samples = []
-        format_columns = []
-        if state and state.imported_count is None:
-            if step >= 3:
-                state, source, assistance = record_imports.mapping_assistance(
-                    actor.id,
-                    login_session.id,
-                    dataset.key,
-                    state.token,
-                    selected_mapping,
-                    include_formats=True,
-                )
-                fields = assistance.fields
-                required_keys = assistance.required_keys
-                identifier_keys = assistance.identifier_keys
-                if error or source_format_issues:
-                    for issue in assistance.errors:
-                        message = mapping_issue_message(issue)
-                        if issue.column_index is None:
-                            if message:
-                                step_mapping_errors.append(message)
-                        elif message:
-                            mapping_errors[issue.column_index] = message
-            else:
-                source = parse_source(state.filename, state.content, state.worksheet)
-            if step >= 4:
-                try:
-                    preview = record_imports.saved_preview(
-                        actor.id,
-                        login_session.id,
-                        dataset.key,
-                        state.token,
-                        page=parse_page_parameter(),
-                        statuses=tuple(value for value in request.args.getlist("status") if value),
-                        search=request.args.get("q", ""),
-                    )
-                except (NotFoundError, ImportValidationError):
-                    raise
-                except Exception:
-                    logging.getLogger(__name__).exception("Import preview validation failed")
-                    return (
-                        "Validation could not be completed. No records have been imported. "
-                        "Try again.",
-                        500,
-                    )
-                state = record_imports.state(actor.id, login_session.id, dataset.key, state.token)
-                if preview.non_row_errors:
-                    step = 3
-                    preview_messages = [
-                        mapping_issue_message(item) or item.message
-                        for item in preview.non_row_errors
-                    ]
-                    error = " ".join(dict.fromkeys(preview_messages))
-                elif step == 4 and not preview.valid:
-                    step = 4
-                if step != state.step:
-                    state = record_imports.navigate(
-                        actor.id, login_session.id, dataset.key, state.token, step
-                    )
-        if assistance:
-            # Full versions of the same bounded display examples, for accessible disclosure.
-            for index in range(len(source.headers)):
-                samples = (
-                    row.values[index]
-                    for row in source.rows[:PROFILE_SCAN_ROWS]
-                    if index not in row.formulas and row.values[index].strip()
-                )
-                mapping_samples.append(distinct_samples(samples))
-        if assistance:
-            format_columns = list(assistance.format_columns)
-        format_columns = show_source_format_issues(format_columns, source_format_issues)
-        for issue in source_format_issues:
-            message = mapping_issue_message(issue)
-            if not message:
-                continue
-            step_mapping_errors.append(message)
-            if issue.column_index is not None:
-                mapping_errors[issue.column_index] = message
-        if step_mapping_errors:
-            error = merge_error_messages(error, *step_mapping_errors)
-        success = state is not None and state.imported_count is not None
-        automatic = source is not None and (source.kind == "csv" or len(source.worksheets) == 1)
-        completed = {
-            1: state is not None,
-            2: bool(source and source.headers),
-            3: bool(state and state.mapping_ready),
-            4: bool(state and state.validation_valid),
-        }
-        labels = ("Upload file", "Select worksheet", "Map columns", "Preview & import")
-        steps = []
-        for number, label in enumerate(labels, 1):
-            done = success or completed[number]
-            reachable = bool(
-                state
-                and not success
-                and number != step
-                and (done or number == 3 and source and source.headers)
-                and not (number == 2 and automatic)
-            )
-            steps.append(dict(number=number, label=label, done=done, reachable=reachable))
-        preview_fields = [field for field in fields if preview and field.key in preview.mapping]
-        preview_rows = preview.sample if preview and preview.valid else []
-        report_rows = []
-        if preview and preview.errors:
-            rows = {row.number: row for row in preview.source.rows}
-            for number, errors in preview.row_error_groups:
-                row = rows[number]
-                identifier_values = [
-                    row.values[preview.mapping.index(key)] if key in preview.mapping else None
-                    for key in required_keys
-                    if key in identifier_keys
-                ]
-                details = []
-                for item in errors:
-                    value = None
-                    if item.header in preview.source.headers:
-                        index = preview.source.headers.index(item.header)
-                        value = "[Formula]" if index in row.formulas else row.values[index]
-                    details.append(dict(field=item.field, value=value, message=item.message))
-                report_rows.append(
-                    dict(number=number, identifier=record_label(identifier_values), errors=details)
-                )
-        back_step = 3 if step == 4 else 1 if automatic else step - 1
-        return render_authenticated_template(
-            "pages/datasets/import/wizard.html",
-            mode=mode,
-            difference_page=parse_page_parameter(),
-            difference_search=request.args.get("q", ""),
-            difference_statuses=request.args.getlist("status"),
-            dataset=dataset,
-            state=state,
-            step=step,
-            steps=steps,
-            source=source,
-            assistance=assistance,
-            preview=preview,
-            fields=fields,
-            mapping_samples=mapping_samples,
-            format_columns=format_columns,
-            mapping_errors=mapping_errors,
-            required_keys=required_keys,
-            identifier_keys=identifier_keys,
-            preview_fields=preview_fields,
-            unmapped_fields=(
-                tuple(field for field in fields if field.key not in preview.mapping)
-                if preview and mode == "new_version"
-                else ()
-            ),
-            preview_rows=preview_rows,
-            report_rows=report_rows,
-            success=success,
-            automatic=automatic,
-            back_step=back_step,
-            error=error,
-            current_csrf=login_session.csrf_token,
-            mapping_reason_text=(
-                "Map the source identifier to match existing rows; target columns are optional."
-                if mode == "mapping_update"
-                else "Map every required and identifier field. "
-                "Optional fields may be left unmapped."
-            ),
-        ), status
-
-    def import_redirect(key, state):
-        return redirect(
-            url_for("dataset_import_step", key=key, token=state.token, step=state.step), code=303
-        )
-
-    @import_route(
-        "/datasets/<key>/concept/records/import-new-version",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @import_route(
-        "/datasets/<key>/records/import", capability="can_maintain_dataset", methods=["GET", "POST"]
-    )
-    @upload_limit_route
-    @concept_route
-    def import_dataset_records(key: str):
-        mode = "new_version"
-        actor, login_session = require_authenticated()
-        require_dataset_dependencies()
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        if dataset.kind == "mapping":
-            mode = "mapping_update"
-        reason = record_imports.eligibility(actor.id, key)
-        if reason:
-            raise ImportValidationError(". ".join(reason))
-        state = record_imports.active(actor.id, login_session.id, key)
-        if state and state.mode != mode:
-            raise ImportValidationError(
-                "Cancel the older staged import, then upload the complete file again."
-            )
-        if request.method == "GET":
-            if state:
-                state = record_imports.navigate(
-                    actor.id,
-                    login_session.id,
-                    key,
-                    state.token,
-                    4 if state.mapping_ready else state.step,
-                )
-                return import_redirect(key, state)
-            return render_import_wizard(dataset, login_session)
-        require_csrf(login_session.csrf_token)
-        if (
-            set(request.form) != {"csrf_token"}
-            or set(request.files) != {"file"}
-            or len(request.files.getlist("file")) != 1
-        ):
-            return render_import_wizard(
-                dataset, login_session, state, error="Submit exactly one import file", status=400
-            )
-        uploaded = request.files["file"]
-        try:
-            state, _source, _assistance = record_imports.begin(
-                actor.id,
-                login_session.id,
-                key,
-                uploaded.filename or "",
-                uploaded.stream.read(MAX_UPLOAD_BYTES + 1),
-                mode=mode,
-            )
-        except ImportValidationError as error:
-            return render_import_wizard(dataset, login_session, state, error=str(error), status=400)
-        return import_redirect(key, state)
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/step/<int:step>",
-        capability="can_maintain_dataset",
-        methods=["GET"],
-    )
-    @bounded_import_route
-    @concept_route
-    def dataset_import_step(key: str, token: str, step: int):
-        actor, login_session = require_authenticated()
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        state = record_imports.navigate(actor.id, login_session.id, key, token, step)
-        return render_import_wizard(dataset, login_session, state, step=step)
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/worksheet",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    @bounded_import_route
-    @concept_route
-    def select_import_worksheet(key: str, token: str):
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        expected = {"csrf_token", "worksheet"}
-        going_back = "go_step" in request.form
-        if going_back:
-            expected.add("go_step")
-        if (
-            set(request.form) != expected
-            or any(len(request.form.getlist(name)) != 1 for name in expected)
-            or going_back
-            and request.form["go_step"] != "1"
-        ):
-            abort(400)
-        if going_back and not request.form["worksheet"]:
-            state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
-            return import_redirect(key, state)
-        try:
-            state, _source, _assistance = record_imports.select_worksheet(
-                actor.id, login_session.id, key, token, request.form["worksheet"]
-            )
-        except ImportValidationError as error:
-            dataset = dataset_records.get_dataset_for_add(actor.id, key)
-            state = record_imports.state(actor.id, login_session.id, key, token)
-            return render_import_wizard(
-                dataset, login_session, state, step=2, error=str(error), status=400
-            )
-        if going_back:
-            state = record_imports.navigate(actor.id, login_session.id, key, token, 1)
-        return import_redirect(key, state)
-
-    def submitted_source_format_components(mapping):
-        return tuple(
-            {
-                "source": request.form.get(f"source_{index}", ""),
-                **{
-                    part: request.form[f"{part}_{index}"]
-                    for part in ("date", "time")
-                    if f"{part}_{index}" in request.form
-                },
-                "timezone": request.form.get(f"timezone_{index}", ""),
-                "fold": request.form.get(f"fold_{index}", ""),
-            }
-            for index, _target in enumerate(mapping)
-        )
-
-    def show_source_format_issues(columns, issues):
-        columns = list(columns)
-        for issue in issues:
-            if issue.column_index is None or issue.column_index >= len(columns):
-                continue
-            column = columns[issue.column_index]
-            if column is not None:
-                message = mapping_issue_message(issue)
-                columns[issue.column_index] = {
-                    **column,
-                    "state": "failing",
-                    "verdict": message,
-                    "error": message,
-                }
-        return columns
-
-    def submitted_component_names(count):
-        # Components are optional only for the unchanged canonical-identifier contract.
-        return {f"{part}_{index}" for part in ("date", "time") for index in range(count)} & set(
-            request.form
-        )
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/formats",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    @bounded_import_route
-    @concept_route
-    def review_source_formats(key: str, token: str):
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        with record_imports.source_format_review(actor.id, login_session.id, key, token) as state:
-            if state.mapping is None:
-                raise NotFoundError("Import not found")
-            column_count = len(state.mapping)
-            expected = {
-                f"{prefix}_{index}"
-                for prefix in ("mapping", "source", "timezone", "fold")
-                for index in range(column_count)
-            } | {"csrf_token"}
-            expected |= submitted_component_names(column_count)
-            if set(request.form) != expected or any(
-                len(request.form.getlist(name)) != 1 for name in expected
-            ):
-                abort(400)
-            mapping = tuple(
-                None
-                if request.form[f"mapping_{index}"] == "__ignored__"
-                else request.form[f"mapping_{index}"]
-                for index in range(column_count)
-            )
-            _state, _source, assistance, issues = record_imports.submitted_source_format_assistance(
-                actor.id,
-                login_session.id,
-                key,
-                token,
-                mapping,
-                submitted_source_format_components(mapping),
-            )
-            columns = show_source_format_issues(assistance.format_columns, issues)
-            return render_template(
-                "pages/datasets/import/source_format_fragments.html", format_columns=columns
-            )
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/mapping",
-        capability="can_maintain_dataset",
-        methods=["GET"],
-    )
-    @bounded_import_route
-    @concept_route
-    def review_import_mapping(key: str, token: str):
-        return dataset_import_step(key, token, 3)
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/preview",
-        capability="can_maintain_dataset",
-        methods=["GET", "POST"],
-    )
-    @bounded_import_route
-    @concept_route
-    def preview_record_import(key: str, token: str):
-        actor, login_session = require_authenticated()
-        state = record_imports.state(actor.id, login_session.id, key, token)
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        if state.mapping is None:
-            raise NotFoundError("Import not found")
-        column_count = len(state.mapping)
-        if request.method == "GET":
-            return dataset_import_step(key, token, 4)
-        require_csrf(login_session.csrf_token)
-        expected = {f"mapping_{index}" for index in range(column_count)} | {"csrf_token"}
-        format_names = {
-            f"{prefix}_{index}"
-            for prefix in ("source", "timezone", "fold")
-            for index in range(column_count)
-        }
-        if set(request.form) & format_names:
-            expected |= format_names
-            expected |= submitted_component_names(column_count)
-        target_step = request.form.get("go_step")
-        if target_step is not None:
-            if len(request.form.getlist("go_step")) != 1 or target_step not in {"1", "2", "4"}:
-                abort(400)
-            # Check the original state before accepting a navigation request.
-            record_imports.navigate(actor.id, login_session.id, key, token, int(target_step))
-            expected.add("go_step")
-        if set(request.form) != expected or any(
-            len(request.form.getlist(name)) != 1 for name in expected
-        ):
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=3,
-                error="Submit exactly one mapping for every source column",
-                status=400,
-            )
-        mapping = tuple(
-            None
-            if request.form[f"mapping_{index}"] == "__ignored__"
-            else request.form[f"mapping_{index}"]
-            for index in range(column_count)
-        )
-        format_components = (
-            submitted_source_format_components(mapping)
-            if set(request.form) & format_names
-            else None
-        )
-        try:
-            preview = record_imports.preview(
-                actor.id,
-                login_session.id,
-                key,
-                token,
-                mapping,
-                format_components=format_components,
-            )
-        except SourceFormatComponentsError as error:
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=3,
-                status=400,
-                selected_mapping=mapping,
-                source_format_issues=error.issues,
-            )
-        except NotFoundError:
-            raise
-        except Exception:
-            logging.getLogger(__name__).exception("Import mapping validation failed")
-            state = record_imports.state(actor.id, login_session.id, key, token)
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=3,
-                error=(
-                    "Validation could not be completed. No records have been imported. Try again."
-                ),
-                status=500,
-            )
-        state = record_imports.state(actor.id, login_session.id, key, token)
-        if target_step in {"1", "2"}:
-            state = record_imports.navigate(
-                actor.id, login_session.id, key, token, int(target_step)
-            )
-            return import_redirect(key, state)
-        if preview.non_row_errors:
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=3,
-                error=merge_error_messages(
-                    *(
-                        mapping_issue_message(item) or item.message
-                        for item in preview.non_row_errors
-                    )
-                ),
-                status=400,
-            )
-        return import_redirect(key, state)
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/confirm",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    @concept_route
-    def confirm_record_import(key: str, token: str):
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        state = record_imports.state(actor.id, login_session.id, key, token)
-        expected = (
-            {"csrf_token", "confirmation"}
-            if state.mode in {"new_version", "mapping_update"}
-            else {"csrf_token"}
-        )
-        if "acknowledge_deletions" in request.form and state.mode == "new_version":
-            expected.add("acknowledge_deletions")
-        if set(request.form) != expected or any(
-            len(request.form.getlist(k)) != 1 for k in expected
-        ):
-            abort(400)
-        dataset = dataset_records.get_dataset_for_add(actor.id, key)
-        try:
-            record_imports.confirm(
-                actor.id,
-                login_session.id,
-                key,
-                token,
-                require_confirmation=True,
-                confirmation=request.form.get("confirmation"),
-                acknowledge_deletions=request.form.get("acknowledge_deletions") == "yes",
-            )
-        except NotFoundError:
-            raise
-        except (ImportValidationError, RecordConflictError):
-            state = record_imports.state(actor.id, login_session.id, key, token)
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=4,
-                error=(
-                    "The import changed since validation. No records have been imported. "
-                    "Review the validation results before continuing."
-                ),
-                status=409,
-            )
-        except Exception:
-            logging.getLogger(__name__).exception("Import preview confirmation failed")
-            state = record_imports.state(actor.id, login_session.id, key, token)
-            return render_import_wizard(
-                dataset,
-                login_session,
-                state,
-                step=4,
-                error=(
-                    "The import could not be completed. No records have been imported. Try again."
-                ),
-                status=500,
-            )
-        if state.mode == "new_version":
-            return redirect(
-                url_for("records.dataset_records_view", key=key, concept=True, import_results=1),
-                code=303,
-            )
-        return import_redirect(key, record_imports.state(actor.id, login_session.id, key, token))
-
-    @import_route(
-        "/datasets/<key>/records/import/<token>/cancel",
-        capability="can_maintain_dataset",
-        methods=["POST"],
-    )
-    @concept_route
-    def cancel_record_import(key: str, token: str):
-        actor, login_session = require_authenticated()
-        require_csrf(login_session.csrf_token)
-        if set(request.form) != {"csrf_token"} or len(request.form.getlist("csrf_token")) != 1:
-            abort(400)
-        try:
-            record_imports.cancel(actor.id, login_session.id, key, token)
-        except ConflictError as error:
-            return render_authenticated_template(
-                "pages/datasets/import/unavailable.html",
-                error=str(error),
-                return_url=url_for("dataset_import_step", key=key, token=token, step=1),
-            ), 409
-        return redirect(url_for("records.dataset_records_view", key=key, concept=True), code=303)
 
     @import_route(
         "/datasets/<key>/concept/hierarchy-import",

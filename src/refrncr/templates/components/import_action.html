@@ -6,6 +6,6 @@
   <div class='mapping-tooltip' role='tooltip' id='record-import-reason'><strong>{{ reason[0] }}</strong><p>{{ reason[1] }}</p></div>
 </details>
 {% else %}
-<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=key) }}'>{{ upload_icon() }}Import</a>
+<a class='button button-secondary' href='{{ url_for("imports.import_dataset_records", key=key) }}'>{{ upload_icon() }}Import</a>
 {% endif %}
 {% endmacro %}
