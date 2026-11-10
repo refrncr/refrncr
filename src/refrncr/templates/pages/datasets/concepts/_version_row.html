@@ -1,7 +1,7 @@
 {% from 'components.html' import status_badge %}
 {% if history.concept %}{% set ui = history.concept_summary %}
 <tr class='concept-version-row'>
-<th scope='row'><a href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Draft</a></th>
+<th scope='row'><a href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Draft</a></th>
 <td>{{ status_badge('Stale' if ui.stale else 'Draft') }}{% if ui.stale %}<br><span class='help-text'>The basis version was cancelled.</span>{% endif %}</td>
 <td>—</td>
 <td>—</td>

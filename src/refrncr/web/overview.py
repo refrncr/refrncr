@@ -69,7 +69,7 @@ def _render_overview(actor, *, full=False):
     def destination(card, selected=None):
         draft = selected.draft if selected else card.version is None and card.has_draft
         return url_for(
-            "dataset_records_view",
+            "records.dataset_records_view",
             key=card.dataset.key,
             concept=True if draft else None,
             version_id=None

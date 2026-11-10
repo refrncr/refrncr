@@ -1,6 +1,6 @@
 {% macro dataset_navigation(dataset, active, concept=false, version_id=none, may_view_access=false, local=false) -%}
 <nav class='section-tabs dataset-tabs' aria-label='Dataset sections' data-section-tabs>
-  {% set records_url = url_for('dataset_records_view', key=dataset.key, version_id=version_id, concept=true if concept else none) %}
+  {% set records_url = url_for('records.dataset_records_view', key=dataset.key, version_id=version_id, concept=true if concept else none) %}
   <a class='section-tab' href='{{ records_url }}'{% if active == 'records' %} aria-current='page'{% endif %}>Records</a>
   {% if local %}
     <a class='section-tab' id='tab-fields' data-tab-target='fields' href='#fields'{% if active == 'fields' %} aria-current='page'{% endif %}>Fields</a>

@@ -31,10 +31,10 @@
   </div>
   <footer class='import-actions'>
     <div class='import-actions-back'>{% if not success and step in (2, 3) %}<button class='button button-secondary' type='submit' form='import-step-form' name='go_step' value='{{ back_step }}'>Back</button>{% elif not success and step > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=back_step) }}'>Back</a>{% endif %}
-      {% if not success and state %}<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-link import-cancel' type='submit'>Cancel import</button></form>{% elif not success %}<a class='button button-link import-cancel' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel import</a>{% endif %}
+      {% if not success and state %}<form {{ non_login_form_attrs() }} method='post' action='{{ url_for("cancel_record_import", key=dataset.key, token=state.token) }}'><input type='hidden' name='csrf_token' value='{{ current_csrf }}'><button class='button button-link import-cancel' type='submit'>Cancel import</button></form>{% elif not success %}<a class='button button-link import-cancel' href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Cancel import</a>{% endif %}
     </div>
     <div class='import-actions-forward{% if step == 3 %} import-mapping-forward{% endif %}'>
-      {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>View records</a>
+      {% if success %}<a class='button button-secondary' href='{{ url_for("import_dataset_records", key=dataset.key) }}'>Import another file</a><a class='button button-primary' href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>View records</a>
       {% else %}
         {% if step == 3 %}
           {% set mapped_keys = assistance.mapping|select|unique|list %}

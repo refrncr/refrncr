@@ -338,9 +338,9 @@ def _route_matrix_expectations():
         "versions.dataset_version_field_diff",
         "versions.dataset_version_field_detail",
         "dataset_hierarchy_node_values",
-        "dataset_records_view",
+        "records.dataset_records_view",
     }
-    dataset_export = {"export_dataset_history", "export_dataset_records"}
+    dataset_export = {"records.export_dataset_history", "records.export_dataset_records"}
     dataset_export_admin = {
         "datasets.dataset_export_access",
         "datasets.revoke_dataset_export_access",
@@ -367,11 +367,11 @@ def _route_matrix_expectations():
         "hierarchy_import_preview",
         "confirm_hierarchy_import",
         "cancel_hierarchy_import",
-        "new_dataset_record",
-        "create_dataset_record",
-        "edit_dataset_record",
-        "restore_dataset_record",
-        "delete_dataset_record",
+        "records.new_dataset_record",
+        "records.create_dataset_record",
+        "records.edit_dataset_record",
+        "records.restore_dataset_record",
+        "records.delete_dataset_record",
         "datasets.edit_dataset",
         "datasets.update_dataset",
         "datasets.dataset_delete",

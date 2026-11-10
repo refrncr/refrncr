@@ -487,7 +487,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_records_view",
+      "symbol": "refrncr.web.records.browse.dataset_records_view",
       "path": "/datasets/<key>/concept/records",
       "methods": [
         "GET"
@@ -506,7 +506,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_records_view",
+      "symbol": "refrncr.web.records.browse.dataset_records_view",
       "path": "/datasets/<key>/records",
       "methods": [
         "GET"
@@ -524,7 +524,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_records_view",
+      "symbol": "refrncr.web.records.browse.dataset_records_view",
       "path": "/datasets/<key>/versions/<version_id>/records",
       "methods": [
         "GET"
@@ -542,7 +542,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.export_dataset_records",
+      "symbol": "refrncr.web.records.browse.export_dataset_records",
       "path": "/datasets/<key>/concept/records/export",
       "methods": [
         "GET"
@@ -555,7 +555,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.export_dataset_history",
+      "symbol": "refrncr.web.records.browse.export_dataset_history",
       "path": "/datasets/<key>/records/export/period",
       "methods": [
         "GET",
@@ -569,7 +569,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.export_dataset_records",
+      "symbol": "refrncr.web.records.browse.export_dataset_records",
       "path": "/datasets/<key>/records/export",
       "methods": [
         "GET"
@@ -582,7 +582,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.export_dataset_records",
+      "symbol": "refrncr.web.records.browse.export_dataset_records",
       "path": "/datasets/<key>/versions/<version_id>/records/export",
       "methods": [
         "GET"
@@ -833,7 +833,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.new_dataset_record",
+      "symbol": "refrncr.web.records.maintenance.new_dataset_record",
       "path": "/datasets/<key>/records/new",
       "methods": [
         "GET"
@@ -848,7 +848,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.create_dataset_record",
+      "symbol": "refrncr.web.records.maintenance.create_dataset_record",
       "path": "/datasets/<key>/records",
       "methods": [
         "POST"
@@ -865,7 +865,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.edit_dataset_record",
+      "symbol": "refrncr.web.records.maintenance.edit_dataset_record",
       "path": "/datasets/<key>/records/<record_id>/edit",
       "methods": [
         "GET",
@@ -884,7 +884,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.restore_dataset_record",
+      "symbol": "refrncr.web.records.maintenance.restore_dataset_record",
       "path": "/datasets/<key>/concept/records/<record_id>/restore",
       "methods": [
         "POST"
@@ -896,7 +896,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.delete_dataset_record",
+      "symbol": "refrncr.web.records.maintenance.delete_dataset_record",
       "path": "/datasets/<key>/records/<record_id>/delete",
       "methods": [
         "GET",

@@ -9,7 +9,7 @@
 {%- endmacro %}
 {% macro current_version_action(key, has_current) -%}
 {% if has_current %}
-<a class='button button-secondary' href='{{ url_for("dataset_records_view", key=key) }}'>View current version</a>
+<a class='button button-secondary' href='{{ url_for("records.dataset_records_view", key=key) }}'>View current version</a>
 {% endif %}
 {%- endmacro %}
 {% macro discard_action(key, ui, panel_id='concept-discard-panel') -%}

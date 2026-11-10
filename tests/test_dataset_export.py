@@ -506,7 +506,7 @@ def test_response_construction_failure_closes_generated_artifact(monkeypatch):
         lambda *_args, **_kwargs: ExportArtifact(spool, "application/json", "json"),
     )
     monkeypatch.setattr(
-        "refrncr.web.send_file",
+        "refrncr.web.records.browse.send_file",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("response failed")),
     )
     response = client.get(f"/datasets/{dataset.key}/records/export?format=json", base_url=HTTPS)

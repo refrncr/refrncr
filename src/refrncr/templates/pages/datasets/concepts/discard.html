@@ -27,7 +27,7 @@
     {% endif %}
   </div>
   {% call panel_form_actions() %}
-  <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>
+  <a class='button button-secondary' data-panel-cancel href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Cancel</a>
   {% if review %}<button class='button button-danger' type='submit' form='discard-concept-form'>Discard draft</button>{% endif %}
   {% endcall %}
 </div>

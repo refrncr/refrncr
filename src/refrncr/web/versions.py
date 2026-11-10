@@ -474,7 +474,7 @@ def dataset_concept_create(key):
             already_active=True,
             has_current=dataset_versions.history(actor.id, key).has_current,
         ), 409
-    return redirect(url_for("dataset_records_view", key=key, concept=True), code=303)
+    return redirect(url_for("records.dataset_records_view", key=key, concept=True), code=303)
 
 
 @blueprint.dataset_route(

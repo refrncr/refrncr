@@ -38,7 +38,7 @@
     </form>
   </div>
   {% call panel_form_actions() %}
-    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view, q=return_q or none, sort=return_sort or none, direction=return_direction if return_sort else none) }}'>Cancel</a>
+    <a class='button button-secondary' data-panel-cancel href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true, view=return_view, q=return_q or none, sort=return_sort or none, direction=return_direction if return_sort else none) }}'>Cancel</a>
     <button class='button button-primary' type='submit' form='hierarchy-node-form'>{{ 'Save node' if node else 'Add child' if parent_id else 'Add root' }}</button>
   {% endcall %}
 </div>

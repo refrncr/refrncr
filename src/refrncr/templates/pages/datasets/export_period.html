@@ -8,7 +8,7 @@
   <div class='side-panel-body'>
     <p>One row per record for each period in which it did not change, across all published versions. Draft changes are not included.</p>
     {{ feedback(error, id='period-export-error', focus=true) }}
-    <form {{ non_login_form_attrs() }} id='period-export-form' method='post' action='{{ url_for("export_dataset_history", key=request.view_args.key) }}' data-native-submit>
+    <form {{ non_login_form_attrs() }} id='period-export-form' method='post' action='{{ url_for("records.export_dataset_history", key=request.view_args.key) }}' data-native-submit>
       <div class='form-grid'>
         <label for='period-from'>From <span class='field-hint'>Optional, inclusive</span></label>
         <input id='period-from' name='valid_from' type='date' value='{{ values.valid_from }}'>

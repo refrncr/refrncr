@@ -536,9 +536,9 @@ def test_post_stream_failure_retains_one_request_event_and_logs_safely(
     client = browser(c)
     token, _ = c.s.sessions.create(c.a)
     client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
-    from refrncr import web
+    from refrncr.web.records import browse
 
-    original = web.send_file
+    original = browse.send_file
 
     def send(*args, **kwargs):
         response = original(*args, **kwargs)
@@ -554,7 +554,7 @@ def test_post_stream_failure_retains_one_request_event_and_logs_safely(
         response.response = broken()
         return response
 
-    monkeypatch.setattr(web, "send_file", send)
+    monkeypatch.setattr(browse, "send_file", send)
     before = {e.id for e in audits(c)}
     response = client.get(
         f"/datasets/{c.d.key}/concept/records/export?format=json",
@@ -887,7 +887,8 @@ def test_browser_route_inventory_matches_real_registration(database_context):
 def test_response_construction_failure_keeps_request_and_closes_artifact(
     database_context, monkeypatch
 ):
-    from refrncr import dataset_export, web
+    from refrncr import dataset_export
+    from refrncr.web.records import browse
 
     c = database_context
     client = browser(c)
@@ -906,7 +907,7 @@ def test_response_construction_failure_keeps_request_and_closes_artifact(
         raise RuntimeError("response construction failed")
 
     monkeypatch.setattr(dataset_export, "generate_export", generate)
-    monkeypatch.setattr(web, "send_file", fail)
+    monkeypatch.setattr(browse, "send_file", fail)
     before = {e.id for e in audits(c)}
     response = client.get(
         f"/datasets/{c.d.key}/concept/records/export?format=json", base_url="https://localhost"
