@@ -50,7 +50,7 @@
       {% endif %}
       <main id="content" class="app-main{{ ' app-main-anonymous' if not current_actor else '' }}" tabindex="-1">
         {% if current_actor %}{{ navigation_button('application-navigation', expand=true) }}{% endif %}
-        {% if current_actor %}<noscript><p><a href="{{ url_for('api_key_list') }}">API keys</a></p></noscript>{% endif %}
+        {% if current_actor %}<noscript><p><a href="{{ url_for('settings.api_key_list') }}">API keys</a></p></noscript>{% endif %}
         {% include "components/flash_messages.html" %}
         {% block content %}{% endblock %}
       </main>

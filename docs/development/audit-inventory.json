@@ -1124,7 +1124,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.theme_preference",
+      "symbol": "refrncr.web.settings.theme_preference",
       "path": "/settings/theme",
       "methods": [
         "POST"
@@ -1137,7 +1137,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.appearance_settings",
+      "symbol": "refrncr.web.settings.appearance_settings",
       "path": "/settings/appearance",
       "methods": [
         "GET"
@@ -1374,7 +1374,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.api_key_list",
+      "symbol": "refrncr.web.settings.api_key_list",
       "path": "/settings/api-keys",
       "methods": [
         "GET"
@@ -1386,7 +1386,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.api_key_create",
+      "symbol": "refrncr.web.settings.api_key_create",
       "path": "/settings/api-keys/new",
       "methods": [
         "GET",
@@ -1399,7 +1399,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.api_key_revoke",
+      "symbol": "refrncr.web.settings.api_key_revoke",
       "path": "/settings/api-keys/<key_id>/revoke",
       "methods": [
         "GET",
@@ -1603,7 +1603,7 @@
       ]
     },
     {
-      "symbol": "refrncr.web.dataset_access_settings",
+      "symbol": "refrncr.web.settings.dataset_access_settings",
       "path": "/settings/dataset-access",
       "methods": [
         "GET",

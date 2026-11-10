@@ -6,11 +6,11 @@
   <h2 tabindex="-1"{% if not error %} data-error-focus{% endif %}>Revoke {{ key.name }}?</h2>
   {{ feedback(error, id="key-error", focus=true) }}
   <p>Revocation is immediate and permanent. Integrations using this key will stop authenticating. This cannot be undone.</p>
-  <form {{ non_login_form_attrs() }} class="api-key-revoke-form" method="post" action="{{ url_for('api_key_revoke', key_id=key.id) }}">
+  <form {{ non_login_form_attrs() }} class="api-key-revoke-form" method="post" action="{{ url_for('settings.api_key_revoke', key_id=key.id) }}">
     <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
     <input type="hidden" name="revision" value="{{ key.revision }}">
     <label><input type="checkbox" name="confirm" value="yes" required> I confirm permanent revocation</label>
-    <div class="form-actions">{{ button("Revoke API key", variant="danger", button_type="submit") }}{{ button("Cancel", url_for("api_key_list"), variant="secondary") }}</div>
+    <div class="form-actions">{{ button("Revoke API key", variant="danger", button_type="submit") }}{{ button("Cancel", url_for("settings.api_key_list"), variant="secondary") }}</div>
   </form>
 </div>
 {% endblock %}

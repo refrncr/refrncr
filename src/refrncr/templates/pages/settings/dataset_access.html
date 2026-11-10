@@ -4,7 +4,7 @@
 {% block settings_content %}
 {{ feedback(error, focus=true) }}
 {% if request.args.get('notice') == 'saved' %}<p class="alert alert-success" role="status">Dataset access policy saved.</p>{% endif %}
-<form {{ non_login_form_attrs() }} class="form" method="post" action="{{ url_for('dataset_access_settings') }}">
+<form {{ non_login_form_attrs() }} class="form" method="post" action="{{ url_for('settings.dataset_access_settings') }}">
   <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
   <input type="hidden" name="expected_policy" value="{{ expected }}">
   {% if confirmation %}
@@ -13,7 +13,7 @@
     <p class="alert alert-warning">{{ confirmation }}</p>
     <input type="hidden" name="policy" value="{{ selected }}">
     <button class="button button-primary" type="submit" name="confirmed" value="yes">Confirm change</button>
-    <a class="button button-secondary" href="{{ url_for('dataset_access_settings') }}">Cancel</a>
+    <a class="button button-secondary" href="{{ url_for('settings.dataset_access_settings') }}">Cancel</a>
   {% else %}
     <div class="form-field">
       <label for="export-access-policy">Who can export and use the API</label>

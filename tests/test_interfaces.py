@@ -303,19 +303,19 @@ def test_renamed_views_keep_csrf_and_capability_checks():
 def _route_matrix_expectations():
     community = {
         "overview.attention_overview",
-        "api_key_list",
-        "api_key_create",
-        "api_key_revoke",
-        "appearance_settings",
+        "settings.api_key_list",
+        "settings.api_key_create",
+        "settings.api_key_revoke",
+        "settings.appearance_settings",
         "datasets.dataset_list",
         "overview.index",
         "teams.team_list",
-        "theme_preference",
+        "settings.theme_preference",
     }
     installation_admin = {
         "audit.audit_list",
         "audit.audit_detail",
-        "dataset_access_settings",
+        "settings.dataset_access_settings",
     }
     access_admin = {
         "users.user_list",
