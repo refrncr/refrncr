@@ -403,6 +403,34 @@ class UserService:
             require_admin(uow, actor_id)
             return uow.users.list_by_email()
 
+    def recover_administrator_password(self, email: str, password: str) -> UserRecord:
+        """Replace an administrator credential for the local CLI or trusted integration.
+
+        Community records a neutral audit event without inventing an actor. The caller
+        must select the installation before constructing this service; this method only
+        accepts an active administrator identity within that installation.
+        """
+        normalized_email = normalize_email(email)
+        replacement_hash = self.hasher.hash(validate_password(password))
+        with self.uow(write=True, serialized=True) as uow:
+            self._lock_organisation(uow)
+            candidate = uow.users.find_by_email(normalized_email)
+            if candidate is None:
+                raise NotFoundError("Administrator not found")
+            target = self._target(uow, candidate.id)
+            if target.role != "admin" or not target.is_active or target.is_deleted:
+                raise NotFoundError("Administrator not found")
+            if not uow.users.replace_password_hash(
+                target.id, target.password_hash, replacement_hash
+            ):
+                raise ConflictError("Administrator credential changed concurrently")
+            uow.users.revoke_active_sessions(target.id, uow.now())
+            self._add_audit(uow, self._audit(None, target, "password_recovered"))
+            updated = uow.users.get(target.id)
+            if updated is None:
+                raise ConflictError("Administrator credential changed concurrently")
+            return updated
+
     def update_theme_preference(self, actor_id: str, theme_preference: str) -> UserRecord:
         if theme_preference not in THEME_PREFERENCES:
             raise ValidationError("Choose System, Light or Dark")
@@ -479,7 +507,7 @@ class UserService:
         return organisation
 
     @staticmethod
-    def _audit(actor_id: str, target: UserRecord, action: str) -> AuditEntry:
+    def _audit(actor_id: str | None, target: UserRecord, action: str) -> AuditEntry:
         return AuditEntry(
             actor_user_id=actor_id,
             object_type="user",

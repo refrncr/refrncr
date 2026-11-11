@@ -144,7 +144,8 @@ class AuditEvent(Base):
         CheckConstraint(
             "actor_user_id IS NOT NULL OR "
             "(object_type = 'api_key' AND action = 'api_key.authentication_failed') OR "
-            "object_type = 'security'",
+            "object_type = 'security' OR "
+            "(object_type = 'user' AND action = 'password_recovered')",
             name="ck_audit_events_actor",
         ),
     )

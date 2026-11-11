@@ -86,7 +86,7 @@ def test_historical_action_names_and_object_types_are_stable():
             "security.login_failed security.session_rejected security.authorization_denied "
             "security.csrf_rejected security.workflow_token_rejected"
         ),
-        "user": "created email_changed disabled enabled deleted",
+        "user": "created email_changed disabled enabled deleted password_recovered",
         "team": "created renamed deleted",
         "membership": "created deleted",
         "grant": "created permission_changed deleted",
@@ -114,6 +114,7 @@ def test_historical_action_names_and_object_types_are_stable():
         "required",
         "unauthenticated",
         "optional",
+        "absent",
     }
     produced = {event for operation in OPERATIONS.values() for event in operation.events}
     assert set(EVENTS) - produced == {("api_key", "api_key.authenticated")}
@@ -264,6 +265,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.api_keys.ApiKeyService.create_key",
             "refrncr.api_keys.ApiKeyService.revoke_key",
             "refrncr.services.UserService.create_initial_admin",
+            "refrncr.services.UserService.recover_administrator_password",
             "refrncr.services.DatasetRecordService.export_dataset",
             "refrncr.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
@@ -295,6 +297,10 @@ def test_cli_inventory_matches_real_parser():
             ["user", "create-admin", "--email", "test@example.com", "--display-name", "Test"]
         ).user_command
         == "create-admin"
+    )
+    assert (
+        parser.parse_args(["user", "recover-admin", "--email", "test@example.com"]).user_command
+        == "recover-admin"
     )
     inventory = json.loads((ROOT / "docs/development/audit-inventory.json").read_text())
     assert all(row["operations"] for row in inventory["cli_commands"])

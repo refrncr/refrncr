@@ -26,7 +26,7 @@ from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.login_security import SourceIdentityResolver
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
-from refrncr.services import ConflictError, ResourceTypeRegistry, ValidationError
+from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
 from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
 from refrncr.xml_security import require_xml_protection
 
@@ -52,6 +52,12 @@ class CreateAdminConfiguration:
     display_name: str
 
 
+@dataclass(frozen=True)
+class RecoverAdminConfiguration:
+    database_url: str | URL
+    email: str
+
+
 class CliError(Exception):
     """A controlled, secret-free command-line failure."""
 
@@ -69,7 +75,10 @@ class RefrncrArgumentParser(argparse.ArgumentParser):
     def parse_args(self, args=None, namespace=None):
         parsed, unrecognized = self.parse_known_args(args, namespace)
         if unrecognized:
-            if parsed.command == "user" and parsed.user_command == "create-admin":
+            if parsed.command == "user" and parsed.user_command in {
+                "create-admin",
+                "recover-admin",
+            }:
                 self.print_usage(sys.stderr)
                 self.exit(2, f"{self.prog}: error: invalid command-line arguments\n")
             self.error(f"unrecognized arguments: {' '.join(unrecognized)}")
@@ -188,6 +197,22 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="SQLite database path (overrides REFRNCR_DATABASE_URL).",
     )
+    recover_admin = user_commands.add_parser(
+        "recover-admin",
+        help="Recover an active Community administrator password.",
+        description="Recover an active administrator password in an existing installation.",
+    )
+    recover_admin.add_argument("--email", required=True, help="Administrator email address.")
+    recovery_database = recover_admin.add_mutually_exclusive_group()
+    recovery_database.add_argument(
+        "--database-url",
+        help="SQLAlchemy database URL (overrides REFRNCR_DATABASE_URL).",
+    )
+    recovery_database.add_argument(
+        "--database-path",
+        type=Path,
+        help="SQLite database path (overrides REFRNCR_DATABASE_URL).",
+    )
     preflight = subparsers.add_parser(
         "dataset-ownership-preflight",
         help="Inspect REF-73 ownership and optionally upgrade with an explicit mapping.",
@@ -266,6 +291,13 @@ def resolve_create_admin_configuration(args: argparse.Namespace) -> CreateAdminC
     )
 
 
+def resolve_recover_admin_configuration(args: argparse.Namespace) -> RecoverAdminConfiguration:
+    return RecoverAdminConfiguration(
+        database_url=resolve_database_url(args),
+        email=args.email,
+    )
+
+
 def prepare_database(database_url: str | URL, *, dataset_owner_mapping=None) -> None:
     url = make_url(database_url)
     if url.get_backend_name() == "sqlite" and url.database not in {None, "", ":memory:"}:
@@ -313,6 +345,7 @@ def _validate_ref_121_schema(connection) -> None:
         "0033_ref_301",
         "0034_ref_238",
         "0035_ref_294",
+        "0036_ref_349",
     }:
         return
     inspector = inspect(connection)
@@ -417,10 +450,15 @@ def read_password_from_tty(prompt: str) -> str:
             raise CliError("administrator password could not be read safely") from None
 
 
-def read_confirmed_password(password_reader: PasswordReader) -> str:
+def read_confirmed_password(
+    password_reader: PasswordReader,
+    *,
+    prompt: str = "Administrator password: ",
+    confirmation_prompt: str = "Confirm administrator password: ",
+) -> str:
     try:
-        password = password_reader("Administrator password: ")
-        confirmation = password_reader("Confirm administrator password: ")
+        password = password_reader(prompt)
+        confirmation = password_reader(confirmation_prompt)
     except (CliError, KeyboardInterrupt):
         raise
     except Exception as exc:  # noqa: BLE001 - the CLI emits a safe final error.
@@ -465,6 +503,39 @@ def create_initial_admin(
             raise CliError(str(exc)) from None
         except Exception as exc:
             raise CliError("administrator could not be created safely") from exc
+    finally:
+        engine.dispose()
+
+
+def recover_admin_password(
+    configuration: RecoverAdminConfiguration,
+    password_reader: PasswordReader = read_password_from_tty,
+) -> None:
+    try:
+        engine = create_database_engine(configuration.database_url)
+    except Exception as exc:
+        raise CliError("administrator password could not be recovered safely") from exc
+
+    try:
+        password = read_confirmed_password(
+            password_reader,
+            prompt="New administrator password: ",
+            confirmation_prompt="Confirm new administrator password: ",
+        )
+        try:
+            services = create_community_services(
+                create_session_factory(engine),
+                ResourceTypeRegistry(),
+            )
+            services.users.recover_administrator_password(configuration.email, password)
+        except NotFoundError as exc:
+            raise CliError("administrator not found or not eligible for recovery") from exc
+        except ConflictError as exc:
+            raise CliError("administrator credential changed concurrently; retry") from exc
+        except ValidationError as exc:
+            raise CliError(str(exc)) from None
+        except Exception as exc:
+            raise CliError("administrator password could not be recovered safely") from exc
     finally:
         engine.dispose()
 
@@ -567,16 +638,27 @@ def main(
                 engine.dispose()
         elif args.command == "start":
             start(resolve_start_configuration(args))
-        else:
+        elif args.command == "user" and args.user_command == "create-admin":
             create_initial_admin(
                 resolve_create_admin_configuration(args),
                 password_reader,
             )
             print("First Community administrator created.")
+        elif args.command == "user" and args.user_command == "recover-admin":
+            recover_admin_password(
+                resolve_recover_admin_configuration(args),
+                password_reader,
+            )
+            print("Administrator password recovered; existing sessions revoked.")
     except KeyboardInterrupt:
         if args.command == "start":
             return 0
-        print("refrncr failed: administrator creation interrupted", file=sys.stderr)
+        message = (
+            "administrator password recovery interrupted"
+            if args.command == "user" and args.user_command == "recover-admin"
+            else "administrator creation interrupted"
+        )
+        print(f"refrncr failed: {message}", file=sys.stderr)
         return 1
     except CliError as exc:
         print(f"refrncr failed: {exc}", file=sys.stderr)

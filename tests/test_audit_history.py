@@ -217,7 +217,8 @@ def test_dataset_and_team_grants_do_not_authorize(database_history, permission):
 def test_all_contracts_have_safe_presentations(database_history):
     h = database_history
     require_complete_presentation()
-    assert len(EVENTS) == len(ACTION_LABELS) == 55
+    assert len(EVENTS) == len(ACTION_LABELS) == 56
+    assert ACTION_LABELS[("user", "password_recovered")] == "Administrator password recovered"
     assert (
         ACTION_LABELS[("dataset", "dataset.mapping_targets_updated")] == "Mapping targets updated"
     )
@@ -228,10 +229,12 @@ def test_all_contracts_have_safe_presentations(database_history):
     assert ACTION_LABELS[("dataset", "hierarchy.subtree_deleted")] == "Hierarchy subtree deleted"
     assert ACTION_LABELS[("dataset", "hierarchy.values_updated")] == "Hierarchy node values updated"
     assert set(OBJECTS) == {kind for kind, _ in EVENTS}
-    assert not SYSTEM_ACTORS and {c.actor for c in EVENTS.values()} == {
+    assert SYSTEM_ACTORS == {("user", "password_recovered"): "No actor"}
+    assert {c.actor for c in EVENTS.values()} == {
         "required",
         "unauthenticated",
         "optional",
+        "absent",
     }
     actions = dict(ACTION_LABELS)
     actions.pop(next(iter(actions)))
@@ -259,12 +262,14 @@ def test_all_contracts_have_safe_presentations(database_history):
         }
         details = {key: values[formatter] for key, formatter in contract.context}
         eid = seed(h, 1, first=i, kind=kind, action=action, details=details)[0]
-        if contract.actor == "unauthenticated":
+        if contract.actor in {"unauthenticated", "absent"}:
             with h.sessions.begin() as session:
                 session.get(AuditEvent, eid).actor_user_id = None
         view = h.service.get_event(h.admin, eid)
         if contract.actor == "unauthenticated":
             assert view.actor_label == "Unauthenticated"
+        elif contract.actor == "absent":
+            assert view.actor_label == "No actor"
         assert (view.object_type, view.action) == (kind, action)
         assert view.action_label == ACTION_LABELS[kind, action]
         assert len(view.context) == len(contract.context)

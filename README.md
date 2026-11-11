@@ -81,6 +81,18 @@ When starting with `--database-path` or `--database-url`, pass the same option t
 Only the first administrator can be bootstrapped this way; create later users
 from **Settings → Users** while signed in as an administrator.
 
+An installation operator can recover the password of an existing active administrator:
+
+```shell
+refrncr user recover-admin --email admin@example.com
+```
+
+The command requires an interactive terminal and reads the new password and confirmation
+without echoing them. It does not migrate the database, revokes all existing sessions after a
+successful reset, and records an actor-free recovery event in the Community audit log. An
+unknown, non-administrator, disabled or deleted account is rejected uniformly; recovery never
+reactivates an account. Pass the same `--database-path` or `--database-url` used by the server.
+
 The default database is stored in the operating system's user application-data directory:
 
 - Linux: `$XDG_DATA_HOME/refrncr/refrncr.db`, or `~/.local/share/refrncr/refrncr.db` when

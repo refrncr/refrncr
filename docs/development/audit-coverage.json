@@ -349,6 +349,50 @@
     },
     {
       "capability": "UserService",
+      "operation": "recover_administrator_password",
+      "service": "refrncr.services.UserService.recover_administrator_password",
+      "interface_entrypoints": [
+        "refrncr user recover-admin",
+        "Trusted programmatic caller using the same Community service boundary"
+      ],
+      "kind": "mutation",
+      "classification": "domain-audited",
+      "domain_audit": true,
+      "security_logging": false,
+      "security_handoff": "Community records the successful target and result without an actor. Integrations may add their own operator audit outside Community; no integration identity, tenant data or secrets enter this event.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure only; no email address, password, password hash, session token, tenant or organisation identifier, request payload or exception details.",
+      "events": [
+        [
+          "user",
+          "password_recovered"
+        ]
+      ],
+      "object_identifier": "The recovered Community user ID.",
+      "actor_source": "No actor: local recovery has no authenticated Community user and integrations are not represented as Community principals.",
+      "allowed_context": {
+        "user:password_recovered": {}
+      },
+      "success": "Exactly one actor-free user/password_recovered event in the same transaction as the credential replacement and session revocation.",
+      "validation_failure": "No state change or domain event; reject an invalid password before opening the write transaction.",
+      "authorization_failure": "No state change or domain event; return the same non-disclosing not-found outcome for missing, non-administrator, inactive or deleted targets.",
+      "stale_input": "A compare-and-swap on the existing password hash rejects a concurrent credential change and rolls back session revocation.",
+      "no_op": "No no-op success is exposed; a valid recovery request replaces the credential even when the submitted password matches the previous plaintext value.",
+      "rollback": "Credential replacement, active-session revocation and the audit event share one serialized Community unit of work; any failure rolls all three back.",
+      "duplicate_retry": "Each successful retry is a separate credential replacement and produces exactly one new recovery event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_user_management.py::test_recover_administrator_password_replaces_credential_and_revokes_sessions",
+        "tests/test_user_management.py::test_recover_administrator_password_uniformly_rejects_ineligible_targets",
+        "tests/test_user_management.py::test_recover_administrator_password_rejects_weak_password_without_changes",
+        "tests/test_user_management.py::test_recover_administrator_password_rolls_back_concurrent_change",
+        "tests/test_cli.py::test_recover_admin_changes_password_revokes_sessions_and_hides_secret"
+      ],
+      "implementation_status": "Implemented for REF-349 Community CLI and shared service boundary.",
+      "exclusion_reason": "",
+      "persistence_scope": "Existing installation database / User.password_hash, Session.revoked_at and AuditEvent."
+    },
+    {
+      "capability": "UserService",
       "operation": "has_users",
       "service": "refrncr.services.UserService.has_users",
       "interface_entrypoints": [
@@ -4330,6 +4374,39 @@
       "implementation_status": "Implemented; REF-149 part-2 review and full local SQLite/PostgreSQL 16 validation passed; GitHub CI pending.",
       "exclusion_reason": "Operator/startup Alembic upgrade, including REF-73 ownership backfill; no authenticated actor. Migration revision and safe outcome are technical diagnostics.",
       "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "cli",
+      "operation": "recover_admin_password",
+      "service": "refrncr.cli.recover_admin_password",
+      "interface_entrypoints": [
+        "refrncr user recover-admin"
+      ],
+      "kind": "mutation",
+      "classification": "intentionally excluded",
+      "domain_audit": false,
+      "security_logging": false,
+      "security_handoff": "The called UserService operation records the successful Community event; the CLI adapter must not duplicate it.",
+      "technical_logging": "Controlled fixed CLI outcomes only; never log the email, password, password hash, session token or exception details.",
+      "events": [],
+      "object_identifier": "No adapter event; UserService uses the recovered Community user ID.",
+      "actor_source": "No CLI actor is invented; UserService records the explicit actor-free recovery event.",
+      "allowed_context": {},
+      "success": "No separate adapter event. UserService atomically records user/password_recovered with the credential replacement and session revocation.",
+      "validation_failure": "No state change or event; the CLI returns a controlled nonzero outcome.",
+      "authorization_failure": "No state change or event; all ineligible targets receive the same non-disclosing outcome.",
+      "stale_input": "The service compare-and-swap rejects concurrent credential changes; the CLI returns a controlled retry message.",
+      "no_op": "No no-op success is exposed.",
+      "rollback": "The adapter owns no transaction; the service rolls back the credential, sessions and event together.",
+      "duplicate_retry": "No adapter event; each successful service retry records exactly one recovery event.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code",
+        "tests/test_cli.py::test_recover_admin_changes_password_revokes_sessions_and_hides_secret",
+        "tests/test_cli.py::test_recover_admin_rejects_unknown_without_disclosure"
+      ],
+      "implementation_status": "Implemented for REF-349.",
+      "exclusion_reason": "CLI adapter only; UserService.recover_administrator_password owns the atomic credential, session and audit-event transaction.",
+      "persistence_scope": "No direct persistence; delegates to UserService."
     },
     {
       "capability": "cli",

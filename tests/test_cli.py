@@ -3,9 +3,12 @@ import os
 import uuid
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Barrier
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, select, text
@@ -40,6 +43,7 @@ def test_help_exposes_first_admin_command_hierarchy_without_password_option(caps
     user_help = capsys.readouterr().out
     assert user_exit.value.code == 0
     assert "create-admin" in user_help
+    assert "recover-admin" in user_help
 
     with pytest.raises(SystemExit) as command_exit:
         cli.main(["user", "create-admin", "--help"])
@@ -49,6 +53,14 @@ def test_help_exposes_first_admin_command_hierarchy_without_password_option(caps
     assert "--email" in command_help
     assert "--display-name" in command_help
     assert "--password" not in command_help
+
+    with pytest.raises(SystemExit) as recovery_exit:
+        cli.main(["user", "recover-admin", "--help"])
+    recovery_help = capsys.readouterr().out
+    assert recovery_exit.value.code == 0
+    assert "active administrator password" in recovery_help
+    assert "--email" in recovery_help
+    assert "--password" not in recovery_help
 
 
 def test_start_defaults_to_loopback_and_persistent_platform_data(monkeypatch, tmp_path):
@@ -126,11 +138,195 @@ def _create_admin(database, email, display_name, passwords):
     )
 
 
+def _recover_admin(database, email, passwords):
+    answers = iter(passwords)
+    return cli.main(
+        [
+            "user",
+            "recover-admin",
+            "--email",
+            email,
+            "--database-path",
+            str(database),
+        ],
+        password_reader=lambda _prompt: next(answers),
+    )
+
+
 def _stored_users(database):
     engine = create_database_engine(cli.sqlite_url(database))
     try:
         with create_session_factory(engine)() as session:
             return list(session.scalars(select(User)))
+    finally:
+        engine.dispose()
+
+
+def test_recover_admin_changes_password_revokes_sessions_and_hides_secret(
+    monkeypatch, tmp_path, capsys, caplog
+):
+    database = tmp_path / "recovery.db"
+    old_password = "correct horse battery staple"
+    new_password = "replacement administrator password"
+    assert (
+        _create_admin(database, "admin@example.com", "Administrator", [old_password, old_password])
+        == 0
+    )
+    engine = create_database_engine(cli.sqlite_url(database))
+    try:
+        services = cli.create_community_services(
+            create_session_factory(engine), cli.ResourceTypeRegistry()
+        )
+        admin = _stored_users(database)[0]
+        token, login = services.sessions.create(admin)
+    finally:
+        engine.dispose()
+    capsys.readouterr()
+    caplog.clear()
+    monkeypatch.setattr(
+        cli,
+        "prepare_database",
+        lambda *_args, **_kwargs: pytest.fail("recovery must not migrate the database"),
+    )
+
+    assert _recover_admin(database, "admin@example.com", [new_password, new_password]) == 0
+
+    captured = capsys.readouterr()
+    assert "Administrator password recovered; existing sessions revoked." in captured.out
+    for secret in (new_password,):
+        assert secret not in captured.out
+        assert secret not in captured.err
+        assert secret not in caplog.text
+    engine = create_database_engine(cli.sqlite_url(database))
+    try:
+        services = cli.create_community_services(
+            create_session_factory(engine), cli.ResourceTypeRegistry()
+        )
+        assert services.authentication.authenticate("admin@example.com", old_password) is None
+        assert services.authentication.authenticate("admin@example.com", new_password) is not None
+        assert services.sessions.resolve(token) is None
+        with create_session_factory(engine)() as session:
+            assert session.get(type(login), login.id).revoked_at is not None
+    finally:
+        engine.dispose()
+
+
+def test_recover_admin_rejects_unknown_without_disclosure(tmp_path, capsys, caplog):
+    database = tmp_path / "unknown-recovery.db"
+    password = "replacement administrator password"
+    assert (
+        _create_admin(
+            database,
+            "admin@example.com",
+            "Administrator",
+            ["correct horse battery staple"] * 2,
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert _recover_admin(database, "missing@example.com", [password, password]) == 1
+
+    captured = capsys.readouterr()
+    assert "administrator not found or not eligible for recovery" in captured.err
+    assert "missing@example.com" not in captured.err
+    assert password not in captured.out + captured.err
+    assert password not in caplog.text
+
+
+def test_recover_admin_confirmation_mismatch_leaves_password_unchanged(tmp_path, capsys):
+    database = tmp_path / "recovery-mismatch.db"
+    old_password = "correct horse battery staple"
+    assert (
+        _create_admin(database, "admin@example.com", "Administrator", [old_password, old_password])
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        _recover_admin(
+            database,
+            "admin@example.com",
+            ["replacement administrator password", "different administrator password"],
+        )
+        == 1
+    )
+
+    engine = create_database_engine(cli.sqlite_url(database))
+    try:
+        services = cli.create_community_services(
+            create_session_factory(engine), cli.ResourceTypeRegistry()
+        )
+        assert services.authentication.authenticate("admin@example.com", old_password) is not None
+    finally:
+        engine.dispose()
+    assert "confirmation does not match" in capsys.readouterr().err
+
+
+def test_recover_admin_requires_tty_and_never_migrates(monkeypatch, tmp_path, capsys):
+    class NonInteractiveInput:
+        @staticmethod
+        def isatty():
+            return False
+
+    database = tmp_path / "non-tty-recovery.db"
+    assert (
+        _create_admin(
+            database,
+            "admin@example.com",
+            "Administrator",
+            ["correct horse battery staple"] * 2,
+        )
+        == 0
+    )
+    capsys.readouterr()
+    monkeypatch.setattr(cli.sys, "stdin", NonInteractiveInput())
+    monkeypatch.setattr(
+        cli,
+        "prepare_database",
+        lambda *_args, **_kwargs: pytest.fail("recovery must not migrate the database"),
+    )
+
+    assert (
+        cli.main(
+            [
+                "user",
+                "recover-admin",
+                "--email",
+                "admin@example.com",
+                "--database-path",
+                str(database),
+            ]
+        )
+        == 1
+    )
+
+    assert "interactive terminal is required" in capsys.readouterr().err
+
+
+def test_recover_admin_fails_safely_when_database_needs_migration(tmp_path, capsys):
+    database = tmp_path / "outdated-recovery.db"
+    old_password = "correct horse battery staple"
+    new_password = "replacement administrator password"
+    assert _create_admin(database, "admin@example.com", "Administrator", [old_password] * 2) == 0
+    config = Config()
+    config.set_main_option("script_location", str(Path(cli.__file__).parent / "migrations"))
+    config.set_main_option("sqlalchemy.url", str(cli.sqlite_url(database)))
+    command.downgrade(config, "0035_ref_294")
+    capsys.readouterr()
+
+    assert _recover_admin(database, "admin@example.com", [new_password] * 2) == 1
+
+    captured = capsys.readouterr()
+    assert "administrator password could not be recovered safely" in captured.err
+    assert new_password not in captured.out + captured.err
+    engine = create_database_engine(cli.sqlite_url(database))
+    try:
+        services = cli.create_community_services(
+            create_session_factory(engine), cli.ResourceTypeRegistry()
+        )
+        assert services.authentication.authenticate("admin@example.com", old_password) is not None
+        assert services.authentication.authenticate("admin@example.com", new_password) is None
     finally:
         engine.dispose()
 
