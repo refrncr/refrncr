@@ -25,7 +25,7 @@ class PasswordHashReplacementError(Exception):
 
 @dataclass(frozen=True)
 class AuditEntry:
-    actor_user_id: str
+    actor_user_id: str | None
     object_type: str
     object_id: str
     action: str

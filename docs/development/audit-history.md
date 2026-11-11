@@ -172,9 +172,10 @@ Record still produces one `dataset_record:created`. No import production code is
 this presentation correction; no Record contents or historical name snapshots are reconstructed.
 
 Actors use current non-deleted `User.display_name`, otherwise **Deleted user**. Active/inactive
-status is not displayed; email is never fetched for label resolution. REF-149 permits no system
-or anonymous actor; bootstrap uses the initial administrator's actual ID. There is intentionally
-no synthetic system actor fallback. Unknown types do not resolve other tables speculatively.
+status is not displayed; email is never fetched for label resolution. Bootstrap uses the initial
+administrator's actual ID. Failed authentication appears as **Unauthenticated**. The explicitly
+actor-free administrator recovery event appears as **No actor**; no synthetic user or integration
+principal is created. Unknown types do not resolve other tables speculatively.
 
 Labels are bounded and controls/bidirectional formatting characters are removed in presentation
 only. Jinja escapes text and `<bdi>` isolates names. Stored names/events are not rewritten.

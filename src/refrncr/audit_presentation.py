@@ -48,6 +48,9 @@ ACTION_PRESENTATIONS = MappingProxyType(
         ("user", "disabled"): ActionPresentation("User disabled", False),
         ("user", "enabled"): ActionPresentation("User enabled", False),
         ("user", "deleted"): ActionPresentation("User deleted", True),
+        ("user", "password_recovered"): ActionPresentation(
+            "Administrator password recovered", False
+        ),
         ("team", "created"): ActionPresentation("Team created", False),
         ("team", "renamed"): ActionPresentation("Team renamed", False),
         ("team", "deleted"): ActionPresentation("Team deleted", True),
@@ -210,8 +213,8 @@ FORMAT_KINDS = frozenset(
         "open_end",
     }
 )
-# REF-149 rejects anonymous/system actors. Bootstrap uses the initial admin's real ID.
-SYSTEM_ACTORS = MappingProxyType({})
+# Operations without an authenticated Community user receive a fixed presentation label.
+SYSTEM_ACTORS = MappingProxyType({("user", "password_recovered"): "No actor"})
 DELETED_ACTOR = "Deleted user"
 UNNAMED_OBJECT = "No name to display"
 DELETED_OBJECT = "Deleted object"
@@ -266,7 +269,7 @@ def require_complete_presentation(
             raise AuditContractError(
                 f"Missing audit context presentation: {sorted(missing_context)}"
             )
-        if contract.actor not in {"required", "unauthenticated", "optional"} or any(
+        if contract.actor not in {"required", "unauthenticated", "optional", "absent"} or any(
             kind not in FORMAT_KINDS for _, kind in contract.context
         ):
             raise AuditContractError("Missing safe audit actor/context formatter")
@@ -409,7 +412,7 @@ def present_event(event, actor_names, objects):
         event.id,
         timestamp.isoformat(timespec="microseconds"),
         event.actor_user_id if valid_id(event.actor_user_id) else "Unavailable",
-        "Unauthenticated"
+        SYSTEM_ACTORS.get(pair, "Unauthenticated")
         if event.actor_user_id is None and known
         else safe_name(actor_names.get(event.actor_user_id), DELETED_ACTOR),
         technical(event.action) if known else "Unavailable",

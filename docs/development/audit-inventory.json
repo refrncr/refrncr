@@ -1637,6 +1637,13 @@
       ]
     },
     {
+      "symbol": "refrncr user recover-admin",
+      "operations": [
+        "refrncr.cli.recover_admin_password",
+        "refrncr.services.UserService.recover_administrator_password"
+      ]
+    },
+    {
       "symbol": "refrncr dataset-ownership-preflight",
       "operations": [
         "refrncr.dataset_upgrade.read_owner_mapping",
@@ -1730,6 +1737,7 @@
     "refrncr.argon2_benchmark.run_benchmark",
     "refrncr.cli.build_parser",
     "refrncr.cli.prepare_database",
+    "refrncr.cli.recover_admin_password",
     "refrncr.cli.start",
     "refrncr.dataset_export.logged_export_stream",
     "refrncr.dataset_upgrade.ownership_preflight",
@@ -1748,6 +1756,7 @@
     "start",
     "user",
     "create-admin",
+    "recover-admin",
     "dataset-ownership-preflight",
     "dataset-publication-preflight",
     "dataset-concept-preflight"

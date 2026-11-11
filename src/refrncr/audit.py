@@ -33,8 +33,16 @@ class EventContract:
             for value in (self.object_type, self.action)
         ):
             raise AuditContractError("Audit names must be stable lower-case identifiers")
-        if self.actor not in {"required", "unauthenticated", "optional"} or (
-            self.actor != "required" and self.object_type not in {"api_key", "security"}
+        if (
+            self.actor not in {"required", "unauthenticated", "optional", "absent"}
+            or (
+                self.actor == "absent"
+                and (self.object_type, self.action) != ("user", "password_recovered")
+            )
+            or (
+                self.actor in {"unauthenticated", "optional"}
+                and self.object_type not in {"api_key", "security"}
+            )
         ):
             raise AuditContractError("This installation has no anonymous/system audit actor")
         if len(dict(self.context)) != len(self.context) or any(
@@ -96,6 +104,7 @@ _EVENTS = (
         EventContract("user", action)
         for action in ("created", "email_changed", "disabled", "enabled", "deleted")
     ),
+    EventContract("user", "password_recovered", actor="absent"),
     *(EventContract("team", action) for action in ("created", "renamed", "deleted")),
     *(EventContract("membership", action) for action in ("created", "deleted")),
     *(EventContract("grant", action) for action in ("created", "permission_changed", "deleted")),
@@ -234,8 +243,9 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
     """Return a fresh, bounded context; reject unknown fields rather than discard them.
 
     Never include a rejected value in the exception. Actor authentication is the
-    caller service's responsibility; the contract rejects absent identities.
-    Bootstrap uses the newly created administrator as its explicitly documented actor.
+    caller service's responsibility. Actor-free events are allowed only for explicit
+    contracts such as local installation recovery. Bootstrap uses the newly created
+    administrator as its explicitly documented actor.
     """
     contract = EVENTS.get((object_type, action))
     if contract is None:
@@ -243,6 +253,9 @@ def validate_event(*, actor_user_id, object_type, object_id, action, details=Non
     if contract.actor == "unauthenticated":
         if actor_user_id is not None:
             raise AuditContractError("Failed authentication has no trusted actor")
+    elif contract.actor == "absent":
+        if actor_user_id is not None:
+            raise AuditContractError("This operation has no Community user actor")
     elif contract.actor == "optional":
         if actor_user_id is not None:
             _identity(actor_user_id)
@@ -459,16 +472,7 @@ for _method, _action in (
 ):
     _audited("UserService", _method, ("user", _action))
 
-_register(
-    "UserService",
-    "recover_administrator_password",
-    "technical logging only",
-    rationale=(
-        "Trusted installation recovery primitive. The cloud control plane owns the durable "
-        "operator, installation, target, reason and result audit without copying secrets into "
-        "Community; Community atomically changes the credential and revokes sessions."
-    ),
-)
+_audited("UserService", "recover_administrator_password", ("user", "password_recovered"))
 _read("UserService", "list_users")
 _read(
     "UserService",
@@ -682,6 +686,12 @@ for _symbol, _classification, _reason in (
         "refrncr.cli.start",
         "technical logging only",
         "Start the installation and run prepare_database; process diagnostics, no business event.",
+    ),
+    (
+        "refrncr.cli.recover_admin_password",
+        "intentionally excluded",
+        "CLI adapter only; UserService.recover_administrator_password owns the atomic "
+        "credential, session and audit-event transaction.",
     ),
     (
         "refrncr.cli.build_parser",

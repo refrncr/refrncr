@@ -47,6 +47,7 @@ def downgrade_historical_fixture(config, revision):
             "0033_ref_301",
             "0034_ref_238",
             "0035_ref_294",
+            "0036_ref_349",
         }:
             command.downgrade(config, "0030_ref_205")
             current = "0030_ref_205"

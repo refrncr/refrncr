@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.models import AuditEvent, LoginSession, Organisation, User
-from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory, SqlAlchemyUserOperations
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -70,6 +70,8 @@ def test_recover_administrator_password_replaces_credential_and_revokes_sessions
     recovered = users.recover_administrator_password(" ADMIN@example.com ", "replacement password")
 
     assert recovered.id == admin.id
+    assert PasswordHasher().verify(recovered.password_hash, "replacement password")
+    assert recovered.password_hash != admin.password_hash
     assert (
         AuthenticationService(users.uow).authenticate(admin.email, "correct horse battery staple")
         is None
@@ -80,22 +82,82 @@ def test_recover_administrator_password_replaces_credential_and_revokes_sessions
     )
     assert sessions.resolve(token) is None
     with factory() as session:
-        events = list(session.scalars(select(AuditEvent)))
-        assert len(events) == 1
+        events = list(session.scalars(select(AuditEvent).order_by(AuditEvent.timestamp)))
+        assert [(event.action, event.actor_user_id, event.object_id) for event in events] == [
+            ("created", admin.id, admin.id),
+            ("password_recovered", None, admin.id),
+        ]
+        assert events[-1].details is None
         assert "replacement password" not in repr(events)
+        assert recovered.password_hash not in repr(events)
 
 
-def test_recover_administrator_password_rejects_non_admin_and_invalid_password(services):
-    _factory, users, _sessions = services
+@pytest.mark.parametrize("case", ["unknown", "non_admin", "inactive", "deleted"])
+def test_recover_administrator_password_uniformly_rejects_ineligible_targets(services, case):
+    factory, users, sessions = services
     _organisation, admin = initial_admin(users)
-    users.create_user(admin.id, "person@example.com", "Person", "correct horse battery staple")
+    target = admin
+    email = admin.email
+    if case == "unknown":
+        email = "missing@example.com"
+    elif case == "non_admin":
+        target = users.create_user(
+            admin.id, "person@example.com", "Person", "correct horse battery staple"
+        )
+        email = target.email
 
-    with pytest.raises(NotFoundError, match="Administrator not found"):
-        users.recover_administrator_password("person@example.com", "replacement password")
-    with pytest.raises(NotFoundError, match="Administrator not found"):
-        users.recover_administrator_password("other@example.com", "replacement password")
+    _token, login = sessions.create(target)
+    with factory.begin() as session:
+        stored = session.get(User, target.id)
+        if case == "inactive":
+            stored.is_active = False
+        elif case == "deleted":
+            stored.is_active = False
+            stored.is_deleted = True
+        old_hash = stored.password_hash
+        events_before = session.scalar(select(func.count(AuditEvent.id)))
+
+    with pytest.raises(NotFoundError, match="^Administrator not found$"):
+        users.recover_administrator_password(email, "replacement password")
+
+    with factory() as session:
+        assert session.get(User, target.id).password_hash == old_hash
+        assert session.get(LoginSession, login.id).revoked_at is None
+        assert session.scalar(select(func.count(AuditEvent.id))) == events_before
+
+
+def test_recover_administrator_password_rejects_weak_password_without_changes(services):
+    factory, users, sessions = services
+    _organisation, admin = initial_admin(users)
+    _token, login = sessions.create(admin)
+    with factory() as session:
+        events_before = session.scalar(select(func.count(AuditEvent.id)))
+
     with pytest.raises(UserManagementError):
-        users.recover_administrator_password("admin@example.com", "too short")
+        users.recover_administrator_password(admin.email, "too short")
+
+    with factory() as session:
+        assert session.get(User, admin.id).password_hash == admin.password_hash
+        assert session.get(LoginSession, login.id).revoked_at is None
+        assert session.scalar(select(func.count(AuditEvent.id))) == events_before
+
+
+def test_recover_administrator_password_rolls_back_concurrent_change(services, monkeypatch):
+    factory, users, sessions = services
+    _organisation, admin = initial_admin(users)
+    _token, login = sessions.create(admin)
+    with factory() as session:
+        events_before = session.scalar(select(func.count(AuditEvent.id)))
+
+    monkeypatch.setattr(SqlAlchemyUserOperations, "replace_password_hash", lambda *_args: False)
+
+    with pytest.raises(ConflictError, match="changed concurrently"):
+        users.recover_administrator_password(admin.email, "replacement password")
+
+    with factory() as session:
+        assert session.get(User, admin.id).password_hash == admin.password_hash
+        assert session.get(LoginSession, login.id).revoked_at is None
+        assert session.scalar(select(func.count(AuditEvent.id))) == events_before
 
 
 def test_database_rejects_a_second_organisation(services):

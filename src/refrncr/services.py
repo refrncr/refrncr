@@ -404,11 +404,11 @@ class UserService:
             return uow.users.list_by_email()
 
     def recover_administrator_password(self, email: str, password: str) -> UserRecord:
-        """Replace an administrator credential at a trusted operational boundary.
+        """Replace an administrator credential for the local CLI or trusted integration.
 
-        Community deliberately has no tenant or cloud-operator concept.  The caller
-        must select the installation before constructing this service; this method
-        only accepts an administrator identity within that installation.
+        Community records a neutral audit event without inventing an actor. The caller
+        must select the installation before constructing this service; this method only
+        accepts an active administrator identity within that installation.
         """
         normalized_email = normalize_email(email)
         replacement_hash = self.hasher.hash(validate_password(password))
@@ -425,7 +425,11 @@ class UserService:
             ):
                 raise ConflictError("Administrator credential changed concurrently")
             uow.users.revoke_active_sessions(target.id, uow.now())
-            return target
+            self._add_audit(uow, self._audit(None, target, "password_recovered"))
+            updated = uow.users.get(target.id)
+            if updated is None:
+                raise ConflictError("Administrator credential changed concurrently")
+            return updated
 
     def update_theme_preference(self, actor_id: str, theme_preference: str) -> UserRecord:
         if theme_preference not in THEME_PREFERENCES:
@@ -503,7 +507,7 @@ class UserService:
         return organisation
 
     @staticmethod
-    def _audit(actor_id: str, target: UserRecord, action: str) -> AuditEntry:
+    def _audit(actor_id: str | None, target: UserRecord, action: str) -> AuditEntry:
         return AuditEntry(
             actor_user_id=actor_id,
             object_type="user",
