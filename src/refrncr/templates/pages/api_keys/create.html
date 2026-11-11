@@ -4,13 +4,13 @@
 {% block settings_content %}
 <div class="card">
   {{ feedback(error, id="key-error", focus=true) }}
-  <form method="post" action="{{ url_for('api_key_create') }}" autocomplete="off" data-form-type="other" data-1p-ignore data-lpignore="true" data-bwignore="true" novalidate>
+  <form method="post" action="{{ url_for('settings.api_key_create') }}" autocomplete="off" data-form-type="other" data-1p-ignore data-lpignore="true" data-bwignore="true" novalidate>
     <input type="hidden" name="csrf_token" value="{{ current_csrf }}">
     <input type="hidden" name="creation_token" value="{{ creation_token }}">
     {{ form_field("Name", "name", "key-name", required=true, max_length=100, help_text="Use a unique name for this integration, up to 100 characters.", error_id="key-error" if error else none) }}
     {{ form_field("Expiry date (UTC)", "expires_at", "key-expiry", type="date", required=true, value=default_expiry, help_text="Default: exactly 90 days. An earlier date expires at 00:00 UTC.", error_id="key-error" if error else none) }}
     <p>The secret will be displayed once. Store it securely before leaving the next page.</p>
-    <div class="form-actions">{{ button("Create API key", button_type="submit") }}{{ button("Cancel", url_for("api_key_list"), variant="secondary") }}</div>
+    <div class="form-actions">{{ button("Create API key", button_type="submit") }}{{ button("Cancel", url_for("settings.api_key_list"), variant="secondary") }}</div>
   </form>
 </div>
 {% endblock %}

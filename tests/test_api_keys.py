@@ -318,7 +318,9 @@ def test_browser_creation_refresh_and_csrf(keys):
     repeated = client.post("/settings/api-keys/new", data=data, base_url="https://localhost")
     assert repeated.status_code == 400 and secret not in repeated.get_data(as_text=True)
     listing = client.get("/settings/api-keys", base_url="https://localhost")
-    assert secret not in listing.get_data(as_text=True)
+    listing_html = listing.get_data(as_text=True)
+    assert secret not in listing_html
+    assert re.search(r'href="/settings/api-keys"[^>]*aria-current="page"', listing_html)
     _, _, _, _, user, service, _ = keys
     assert len(service.list_keys(user.id)) == 1
 

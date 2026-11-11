@@ -70,9 +70,9 @@
     {% endcall %}
   {% endfor %}
   {% if page_count > 1 %}<nav class='pagination' aria-label='Difference pages'>
-    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search, status=difference_statuses) }}'>Previous</a>{% endif %}
+    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("imports.dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search, status=difference_statuses) }}'>Previous</a>{% endif %}
     <span>Page {{ difference_page }} of {{ page_count }} · {{ preview.counts.matching }} {{ 'change' if preview.counts.matching == 1 else 'changes' }}</span>
-    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
+    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("imports.dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search, status=difference_statuses) }}'>Next</a>{% endif %}
   </nav>{% endif %}
 {% else %}
   {% if difference_total > 10 or difference_search %}<form {{ non_login_form_attrs() }} method='get' class='record-toolbar import-difference-filters' aria-label='Search import preview' data-auto-filter>{{ search_field('difference-search', 'Search identifier', 'Search identifiers', name='q', value=difference_search, maxlength=MAX_SEARCH) }}</form>{% endif %}
@@ -88,8 +88,8 @@
     {% call side_panel(panel_id, id_values|join(' · '), title_id, eyebrow='Import preview', title_suffix=status_badge('Added')) %}<div class='side-panel-body import-preview-panel'><p class='help-text'>This record will be added.</p><dl class='record-details'>{% for field in preview_fields %}<div><dt>{{ field.name }}</dt><dd>{{ value(row[loop.index0] if row[loop.index0]|trim else none) }}</dd></div>{% endfor %}</dl></div>{% endcall %}
   {% endfor %}
   {% if page_count > 1 %}<nav class='pagination' aria-label='Import preview pages'>
-    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search) }}'>Previous</a>{% endif %}
+    {% if difference_page > 1 %}<a class='button button-secondary' href='{{ url_for("imports.dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page-1, q=difference_search) }}'>Previous</a>{% endif %}
     <span>Page {{ difference_page }} of {{ page_count }} · {{ preview.counts.matching }} {{ 'change' if preview.counts.matching == 1 else 'changes' }}</span>
-    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search) }}'>Next</a>{% endif %}
+    {% if difference_page < page_count %}<a class='button button-secondary' href='{{ url_for("imports.dataset_import_step", key=dataset.key, token=state.token, step=4, page=difference_page+1, q=difference_search) }}'>Next</a>{% endif %}
   </nav>{% endif %}
 {% endif %}

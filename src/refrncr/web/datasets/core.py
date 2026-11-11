@@ -442,13 +442,13 @@ def dataset_mapping_source_update(key):
         )
     except SourceUpdateBlocked:
         # Re-render the mapping's shared notice, including newly incompatible sources.
-        return redirect(url_for("dataset_records_view", key=key), code=303)
+        return redirect(url_for("records.dataset_records_view", key=key), code=303)
     except (ValidationError, ConflictError) as failure:
         status = 409 if isinstance(failure, ConflictError) else 400
         return render_authenticated_template(
             "pages/error.html", error_code=status, error_message=str(failure)
         ), status
     return redirect(
-        url_for("dataset_records_view", key=key, concept=True, notice="source-updated"),
+        url_for("records.dataset_records_view", key=key, concept=True, notice="source-updated"),
         code=303,
     )

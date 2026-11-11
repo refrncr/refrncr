@@ -1,7 +1,7 @@
 {% extends "pages/api_keys/base.html" %}
 {% from "components.html" import button, feedback %}
 {% set settings_title = "API keys" %}
-{% block settings_actions %}{% if not unavailable %}{{ button("Create API key", url_for("api_key_create")) }}{% endif %}{% endblock %}
+{% block settings_actions %}{% if not unavailable %}{{ button("Create API key", url_for("settings.api_key_create")) }}{% endif %}{% endblock %}
 {% block settings_content %}
   {% if unavailable %}{{ feedback("API keys require server configuration. Contact your administrator.") }}{% else %}
   {% if revoked %}{{ feedback("API key permanently revoked.", "success", id="key-status", focus=true) }}{% endif %}
@@ -15,7 +15,7 @@
         <td><time datetime="{{ key.created_at.isoformat() }}">{{ key.created_at|absolute_utc }}</time></td>
         <td><time datetime="{{ key.expires_at.isoformat() }}">{{ key.expires_at|absolute_utc }}</time></td>
         <td>{% if key.last_used_at %}<time datetime="{{ key.last_used_at.isoformat() }}">{{ key.last_used_at|absolute_utc }}</time>{% else %}Never{% endif %}</td>
-        <td>{{ key.status }}</td><td>{% if key.status != "Revoked" %}<a class="button button-secondary button-table-action" href="{{ url_for('api_key_revoke', key_id=key.id) }}" aria-label="Revoke {{ key.name }}">Revoke</a>{% else %}—{% endif %}</td>
+        <td>{{ key.status }}</td><td>{% if key.status != "Revoked" %}<a class="button button-secondary button-table-action" href="{{ url_for('settings.api_key_revoke', key_id=key.id) }}" aria-label="Revoke {{ key.name }}">Revoke</a>{% else %}—{% endif %}</td>
       </tr>{% endfor %}</tbody>
     </table>
   </div>

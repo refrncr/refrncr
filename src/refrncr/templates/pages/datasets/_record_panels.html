@@ -6,7 +6,7 @@
 {% if may_add_record %}
   {% call side_panel("add-record-panel", "New " ~ record_type ~ " record", "add-record-title", "Add record", "add-record-description") %}
     <div class='side-panel-view' data-panel-host>
-      <form class='side-panel-form' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("create_dataset_record", key=dataset.key) }}'>
+      <form class='side-panel-form' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("records.create_dataset_record", key=dataset.key) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "new-record", initial_focus=true) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <footer class='side-panel-footer'>
@@ -35,7 +35,7 @@
         </dl>
       </div>
       {% if deleted and may_edit and dataset.kind != 'mapping' %}
-        <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("restore_dataset_record", key=dataset.key, record_id=record.id) }}' class='side-panel-footer'>
+        <form {{ non_login_form_attrs() }} method='post' action='{{ url_for("records.restore_dataset_record", key=dataset.key, record_id=record.id) }}' class='side-panel-footer'>
           <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
           <input type='hidden' name='expected_revision' value='{{ record.revision }}'>
           <input type='hidden' name='concept_id' value='{{ concept_ui.concept.id }}'>
@@ -50,7 +50,7 @@
       {% endif %}
     </section>
     {% if record_may_edit %}
-      <form class='side-panel-view side-panel-form' data-panel-view='edit' data-focus-return-record-id='{{ record.id }}' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='edit' data-focus-return-record-id='{{ record.id }}' novalidate {{ non_login_form_attrs() }} method='post' action='{{ url_for("records.edit_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>{{ record_form_fields(fields, "edit-" ~ record.id, values) }}</div>
         <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
         <input type='hidden' name='expected_revision' value='{{ record.revision }}'><input type='hidden' name='return_focus' value='pointer'>
@@ -61,7 +61,7 @@
         </footer>
       </form>
       {% if dataset.kind != 'mapping' %}
-      <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden {{ non_login_form_attrs() }} method='post' action='{{ url_for("delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
+      <form class='side-panel-view side-panel-form' data-panel-view='delete' hidden {{ non_login_form_attrs() }} method='post' action='{{ url_for("records.delete_dataset_record", key=dataset.key, record_id=record.id) }}'>
         <div class='side-panel-body'>
           <h3>Delete record?</h3>
           <p class='delete-confirmation'>You can Undo delete while this Draft remains active.</p>

@@ -11,7 +11,7 @@
     {% endcall %}
     <div class='page-actions'>
       {{ current_version_action(dataset.key, history.has_current) }}
-      {% if history.concept %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% elif history.may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
+      {% if history.concept %}<a class='button button-primary' href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% elif history.may_maintain %}{{ new_concept(dataset.key) }}{% endif %}
     </div>
   </div>
   {{ feedback(notice, kind='success') }}
@@ -22,7 +22,7 @@
         <thead><tr>{% for label in ['Version', 'Status', 'Effective from (UTC)', 'Effective until (UTC)', 'Publication date', 'Published by', 'Release note', 'Actions'] %}<th scope='col' title='{{ "Starts at 00:00 UTC" if label == "Effective from (UTC)" else "Ends at 23:59 UTC" if label == "Effective until (UTC)" else "" }}'>{{ label }}{% if label == 'Publication date' %} <span class='table-zone' data-local-timezone>(UTC)</span>{% endif %}</th>{% endfor %}</tr></thead>
         <tbody>{% if history.concept %}{% include 'pages/datasets/concepts/_version_row.html' %}{% endif %}{% for state in history.entries %}{% set version = state.version %}
           <tr>
-            <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}{% if mapping_history_sources and mapping_history_sources.get(version.id) %}<span class='help-text'>Source: {{ mapping_history_sources[version.id].name }} V{{ mapping_history_sources[version.id].number }}</span>{% endif %}</th>
+            <th scope='row'>{% if state.status != 'Cancelled' %}<a href='{{ url_for("records.dataset_records_view", key=dataset.key, version_id=version.id) }}'>Version {{ version.number }}</a>{% else %}Version {{ version.number }}{% endif %}{% if mapping_history_sources and mapping_history_sources.get(version.id) %}<span class='help-text'>Source: {{ mapping_history_sources[version.id].name }} V{{ mapping_history_sources[version.id].number }}</span>{% endif %}</th>
             <td>{{ status_badge(state.status) }}</td>
             <td><time datetime='{{ version.effective_date.isoformat() }}'>{{ version.effective_date|short_date }}</time></td>
             <td>{% if state.end_date %}<time datetime='{{ state.end_date.isoformat() }}'>{{ state.end_date|short_date }}</time>{% else %}—{% endif %}</td>

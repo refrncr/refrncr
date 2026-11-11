@@ -12,7 +12,7 @@
     <p class='help-text'>{{ status_badge('Draft') }} Saved to the draft. Consumers see it after you publish.</p>
     {% if node_row %}<p class='hierarchy-path'>{{ node_row.path }}</p>{% endif %}
     {% if error %}<p role='alert' tabindex='-1' data-error-focus>{{ error }}</p>{% endif %}
-    <form id='hierarchy-node-form' class='form' {{ non_login_form_attrs() }} method='post' novalidate action='{{ url_for("dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>
+    <form id='hierarchy-node-form' class='form' {{ non_login_form_attrs() }} method='post' novalidate action='{{ url_for("hierarchies.dataset_hierarchy_node_values", key=dataset.key, node_id=node.id) if mode == "values" else url_for("hierarchies.dataset_hierarchy_node_edit", key=dataset.key, node_id=node.id) if node else url_for("hierarchies.dataset_hierarchy_node_create", key=dataset.key) }}'>
       <input type='hidden' name='csrf_token' value='{{ current_csrf }}'>
       <input type='hidden' name='expected_revision' value='{{ expected_revision }}'>
       <input type='hidden' name='return_view' value='{{ return_view }}'>
@@ -38,7 +38,7 @@
     </form>
   </div>
   {% call panel_form_actions() %}
-    <a class='button button-secondary' data-panel-cancel href='{{ url_for("dataset_records_view", key=dataset.key, concept=true, view=return_view, q=return_q or none, sort=return_sort or none, direction=return_direction if return_sort else none) }}'>Cancel</a>
+    <a class='button button-secondary' data-panel-cancel href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true, view=return_view, q=return_q or none, sort=return_sort or none, direction=return_direction if return_sort else none) }}'>Cancel</a>
     <button class='button button-primary' type='submit' form='hierarchy-node-form'>{{ 'Save node' if node else 'Add child' if parent_id else 'Add root' }}</button>
   {% endcall %}
 </div>

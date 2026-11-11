@@ -19,9 +19,9 @@
     {% if not version_state %}{{ current_version_action(dataset.key, concept_ui and concept_ui.has_current) }}{% endif %}
     {{ versions_action(dataset.key) }}
     {{ export_action(dataset=dataset, version_state=version_state, label='Export draft' if not version_state else 'Export', may_export=may_export, may_import=may_import) }}
-    {% if may_edit %}<a class='button button-secondary' href='{{ url_for("import_hierarchy_file", key=dataset.key) }}'>Import</a>{% endif %}
+    {% if may_edit %}<a class='button button-secondary' href='{{ url_for("hierarchies.import_hierarchy_file", key=dataset.key) }}'>Import</a>{% endif %}
     {% if may_start_concept %}{{ new_concept(dataset.key) }}{% endif %}
-    {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
+    {% if draft_in_progress and version_state %}<a class='button button-primary' href='{{ url_for("records.dataset_records_view", key=dataset.key, concept=true) }}'>Open draft</a>{% endif %}
   </div>
 </div>
 {% include 'pages/datasets/_version_status.html' %}
@@ -33,7 +33,7 @@
 
 <nav class='section-tabs' aria-label='Hierarchy views'>
   {% for key, label in [('tree', 'Tree'), ('table', 'Table')] %}
-  <a class='section-tab' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view=key, q=hierarchy_search or none, sort=sort_key or none, direction=sort_direction if sort_key else none) }}'{% if selected_view == key %} aria-current='page'{% endif %}>{{ label }}</a>
+  <a class='section-tab' href='{{ url_for("records.dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view=key, q=hierarchy_search or none, sort=sort_key or none, direction=sort_direction if sort_key else none) }}'{% if selected_view == key %} aria-current='page'{% endif %}>{{ label }}</a>
   {% endfor %}
 </nav>
 
@@ -53,7 +53,7 @@
 {% if not hierarchy_rows %}
 <div class='empty-state'>
   <h3>Start with the root</h3><p>Build the hierarchy first. Add optional fields and values when you are ready.</p>
-  {% if may_edit %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
+  {% if may_edit %}<a class='button button-primary' data-panel-url data-dialog-open='hierarchy-panel' href='{{ url_for("hierarchies.dataset_hierarchy_node_create", key=dataset.key) }}'>Add root</a>{% endif %}
 </div>
 {% else %}
 <div class='record-toolbar record-toolbar-search' role='group' aria-label='Hierarchy results'>
@@ -93,11 +93,11 @@
       {% else %}
         {% for key, label in [('name', 'Name'), ('parent', 'Parent')] %}
         {% set active = sort_key == key %}{% set next = 'desc' if active and sort_direction == 'asc' else 'asc' %}
-        <th scope='col'><a class='hierarchy-sort' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view="table", q=hierarchy_search or none, sort=key, direction=next) }}' aria-label='Sort by {{ label }}'>{{ label }}{% if active %}<span aria-hidden='true'>{{ ' ↑' if sort_direction == 'asc' else ' ↓' }}</span>{% endif %}</a></th>
+        <th scope='col'><a class='hierarchy-sort' href='{{ url_for("records.dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view="table", q=hierarchy_search or none, sort=key, direction=next) }}' aria-label='Sort by {{ label }}'>{{ label }}{% if active %}<span aria-hidden='true'>{{ ' ↑' if sort_direction == 'asc' else ' ↓' }}</span>{% endif %}</a></th>
         {% endfor %}
         <th scope='col'>Level</th>
       {% endif %}
-      {% for field in fields %}<th scope='col' data-column='{{ field.key }}'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>{% if selected_view == 'table' and field.key == key_field_key %}{% set active = sort_key == 'key' %}{% set next = 'desc' if active and sort_direction == 'asc' else 'asc' %}<a class='hierarchy-sort' href='{{ url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view="table", q=hierarchy_search or none, sort="key", direction=next) }}' aria-label='Sort by {{ field.name }}'>{{ field.name }}{% if active %}<span aria-hidden='true'>{{ ' ↑' if sort_direction == 'asc' else ' ↓' }}</span>{% endif %}</a>{% else %}<span>{{ field.name }}</span>{% endif %}{% if field.hierarchy_scope != 'all_nodes' %}<span class='hierarchy-field-scope'>Leaves only</span>{% endif %}</th>{% endfor %}
+      {% for field in fields %}<th scope='col' data-column='{{ field.key }}'{% if field.data_type in ('integer', 'number', 'float') %} class='numeric-column'{% endif %}>{% if selected_view == 'table' and field.key == key_field_key %}{% set active = sort_key == 'key' %}{% set next = 'desc' if active and sort_direction == 'asc' else 'asc' %}<a class='hierarchy-sort' href='{{ url_for("records.dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if not version_state else none, view="table", q=hierarchy_search or none, sort="key", direction=next) }}' aria-label='Sort by {{ field.name }}'>{{ field.name }}{% if active %}<span aria-hidden='true'>{{ ' ↑' if sort_direction == 'asc' else ' ↓' }}</span>{% endif %}</a>{% else %}<span>{{ field.name }}</span>{% endif %}{% if field.hierarchy_scope != 'all_nodes' %}<span class='hierarchy-field-scope'>Leaves only</span>{% endif %}</th>{% endfor %}
       <th scope='col' class='hierarchy-filler-column' aria-hidden='true'></th>{% if may_edit %}<th scope='col' class='hierarchy-actions-column'>Actions</th>{% endif %}
     </tr></thead>
     <tbody>{% for row in display_rows %}

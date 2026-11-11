@@ -196,6 +196,49 @@ Update documentation when behaviour, setup, architecture or developer workflow c
 
 Do not duplicate authoritative product requirements from Jira into GitHub unless needed for implementation context.
 
+## Web application structure
+
+`src/refrncr/web/__init__.py` is the Flask composition root. Browser routes live in focused
+blueprint modules (`audit`, `auth`, `overview`, `settings`, `teams`, `users`, and `versions`) or
+in the `datasets`, `hierarchies`, `imports`, and `records` blueprint packages. Add a route to the
+blueprint that owns its workflow; do not register new routes directly in `create_flask_app`.
+
+Each blueprint exposes a module variable named `blueprint` and a
+`register_<name>_blueprint(app, ...)` function. Registration stores a typed context dataclass in
+`app.extensions["refrncr.<name>"]`, through which route functions obtain their services and
+app-specific helpers. Large blueprint packages may expose `LocalProxy` names backed by that
+context when this keeps moved route code literal; use those proxies only inside an application or
+request context. A blueprint must not import app-specific closures from `refrncr.web` directly.
+
+Declare authorization on every browser route. Use `capability_route` with an ordinary Flask
+blueprint route, or `DatasetBlueprint.dataset_route` for a route that exists only when the Dataset
+UI is configured. Shared routing policy lives in `web/routing.py`: its routing context supplies
+the state used by `dataset_route`, `import_route`, and `version_errors`.
+
+Some helpers intentionally remain closures in `create_flask_app` because they depend on the
+services or settings of that particular app instance:
+
+- authenticated and mapping renderers, anonymous rendering, and the anonymous-CSRF response;
+- cookie settings, required cookie settings, and authenticated-session resolution;
+- capability, authentication, Dataset-dependency, and CSRF checks;
+- security-audit recording.
+
+Blueprints receive these callables through their typed context (or through the shared routing
+context where applicable). Shared helpers without app-specific state belong in their own module:
+Jinja filters and globals in `web/filters.py`, navigation selection in `web/navigation.py`, form
+and presentation helpers in `web/helpers.py`, and shared error policy in `web/errors.py`.
+
+Presentation-only transformations belong in `web/viewmodels/`. View-model modules must remain
+independent of Flask, Werkzeug, SQLAlchemy, and the rest of `refrncr.web`; they may import other
+view-models and framework-independent domain or presentation modules. Keep their unit tests free
+of a Flask app and database.
+
+Route-contract tests compare both supported compositions against
+`tests/fixtures/web_routes.json` (Dataset UI enabled) and
+`tests/fixtures/web_routes_without_datasets.json` (Dataset UI disabled). Update these snapshots
+only for an intentional, reviewed route-contract change; blueprint extraction alone must leave
+their paths, methods, capabilities, public markers, and existing endpoint basename unchanged.
+
 
 ## Jira implementation workflow
 

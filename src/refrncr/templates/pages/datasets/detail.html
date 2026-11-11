@@ -16,7 +16,7 @@
 {% block title %}{{ detail_title }} · {{ dataset.name|dataset_title }} · REFRNCR{% endblock %}
 
 {% block content %}
-  {% set records_url = url_for("dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if concept else none) %}
+  {% set records_url = url_for("records.dataset_records_view", key=dataset.key, version_id=version_state.version.id if version_state else none, concept=true if concept else none) %}
   {% if request.args.get('notice') == 'discarded' %}
   {{ feedback('Draft discarded. Current was not changed.', kind='success') }}
   {% endif %}
@@ -87,7 +87,7 @@
         <section class='dataset-settings-section' id='mapping' aria-labelledby='mapping-heading'>
           <header><h3 id='mapping-heading'>Mapping</h3><p>The source dataset and identifier used by this mapping.</p></header>
           <div class='dataset-settings-card'><dl class='dataset-settings-values'>
-            <div><dt>Source dataset</dt><dd>{% if mapping_source_table %}<a href='{{ url_for("dataset_records_view", key=mapping_source_table.key) }}'>{{ mapping_source_table.name }}</a>{% else %}Unavailable{% endif %}</dd></div>
+            <div><dt>Source dataset</dt><dd>{% if mapping_source_table %}<a href='{{ url_for("records.dataset_records_view", key=mapping_source_table.key) }}'>{{ mapping_source_table.name }}</a>{% else %}Unavailable{% endif %}</dd></div>
             <div><dt>Source identifier</dt><dd>{{ mapping_configuration.source_system or mapping_configuration.source_field_key }}</dd></div>
           </dl></div>
         </section>
