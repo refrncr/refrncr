@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "refrncr"
-version = "0.1.0rc2"
+version = "0.1.0rc3"
 description = "Reference data without the enterprise baggage."
 readme = "README.md"
 license = "Elastic-2.0"

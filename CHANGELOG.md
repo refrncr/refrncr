@@ -4,6 +4,22 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+## [0.1.0rc3] - 2026-11-13
+
+- Add `refrncr user recover-admin` for resetting an active administrator's password from a
+  Community installation, revoking their active sessions and recording an actor-free
+  `user/password_recovered` audit event without secrets (REF-349).
+- Require database migration `0036_ref_349` before using `recover-admin`. The command never runs
+  migrations itself and fails without changing credentials when the schema is outdated. The
+  migration only extends the `audit_events` actor constraint for password-recovery events; a
+  downgrade below `0036` is refused after such an event exists, in which case restore a backup
+  from before the upgrade. Cloud operators must likewise migrate tenant databases to `0036_ref_349`
+  before enabling password recovery (REF-349/RC-29).
+- Split the web layer into domain blueprints and framework-independent presentation view-models
+  without changing the existing browser route contract or behaviour (REF-224).
+- Update the locked release graph to SQLAlchemy 2.1.8, FastAPI 0.162.2, Pydantic 2.14.3 and
+  Psycopg 3.3.8; Pydantic 2.14.3 includes a security fix.
+
 ## [0.1.0rc2] - 2026-11-03
 
 - Correct the controlled-release upload context so validated artifacts can be attached to the
