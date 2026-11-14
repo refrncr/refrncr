@@ -9,6 +9,7 @@ import uuid
 from dataclasses import dataclass
 
 from refrncr.audit import record_audit
+from refrncr.domain import advance_concept, require_concept
 from refrncr.hierarchy import hierarchy_validation_errors
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import RecordValue
@@ -22,8 +23,6 @@ from refrncr.services import (
     NotFoundError,
     StaleRecordError,
     ValidationError,
-    _advance_concept,
-    _require_concept,
     canonicalize_record_value,
 )
 from refrncr.upload_names import safe_upload_filename
@@ -97,7 +96,7 @@ class HierarchyImportService:
                 )
             ):
                 raise NotFoundError("Dataset not found")
-            _require_concept(uow, dataset.id)
+            require_concept(uow, dataset.id)
             return dataset.id, dataset.revision
 
     @staticmethod
@@ -282,7 +281,7 @@ class HierarchyImportService:
 
     def _concept_id(self, dataset_id):
         with self.uow() as uow:
-            return _require_concept(uow, dataset_id).id
+            return require_concept(uow, dataset_id).id
 
     @staticmethod
     def _digest(preview):
@@ -364,7 +363,7 @@ class HierarchyImportService:
                 raise NotFoundError("Dataset not found")
             if dataset.revision != preview.expected_revision:
                 raise StaleRecordError("The hierarchy changed since validation")
-            _require_concept(work, dataset.id)
+            require_concept(work, dataset.id)
             current = {node.id: node for node in work.hierarchy.list_for_dataset(dataset.id)}
             by_row = {row.node_id: row for row in preview.rows if row.node_id is not None}
             changed = 0
@@ -391,7 +390,7 @@ class HierarchyImportService:
                     work.hierarchy.delete(dataset.id, node.id)
                     changed += 1
             if changed:
-                _advance_concept(work, dataset)
+                advance_concept(work, dataset)
                 dataset.content_updated_at = work.now()
                 work.concepts.record_mutation(dataset.id)
                 record_audit(

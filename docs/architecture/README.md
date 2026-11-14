@@ -27,3 +27,4 @@ decision rather than duplicating the backlog.
 - [ADR-023: UTC-aware database time and a shared application clock](adr-023-utc-aware-database-time.md)
 - [ADR-024: Pinned mapping source versions](adr-024-pinned-mapping-sources.md)
 - [ADR-025: Record validity periods for consumers](adr-025-record-validity-periods.md)
+- [ADR-026: Domain packages and one integration boundary](adr-026-domain-packages-and-integration-boundary.md)

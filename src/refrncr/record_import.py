@@ -24,6 +24,8 @@ from openpyxl.utils.exceptions import InvalidFileException
 from refrncr.audit import record_audit
 from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.diff_contracts import MAX_SEARCH
+from refrncr.domain import advance_concept, require_concept
+from refrncr.errors import ImportDomainError
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
@@ -74,7 +76,7 @@ UNREADABLE_XLSX_MESSAGE = (
 )
 
 
-class ImportValidationError(ValidationError):
+class ImportValidationError(ImportDomainError, ValidationError):
     """A safe, user-facing import validation failure."""
 
 
@@ -84,7 +86,7 @@ class SourceFormatComponentsError(ImportValidationError):
         super().__init__("Choose a valid source type and its required format components.")
 
 
-class ImportExpiredError(NotFoundError):
+class ImportExpiredError(ImportDomainError, NotFoundError):
     """A previously valid staged import expired for its bound session and dataset."""
 
 
@@ -1061,10 +1063,8 @@ class DatasetRecordImportService:
         self.store = store or TransientImportStore()
 
     def _concept(self, dataset_id):
-        from refrncr.services import _require_concept
-
         with self.uow() as uow:
-            return _require_concept(uow, dataset_id)
+            return require_concept(uow, dataset_id)
 
     @staticmethod
     def _eligibility(concept, has_non_cancelled_version):
@@ -1097,10 +1097,8 @@ class DatasetRecordImportService:
 
     def eligibility(self, actor_id, dataset_key):
         dataset = self.records.get_dataset_for_add(actor_id, dataset_key)
-        from refrncr.services import _require_concept
-
         with self.uow() as uow:
-            concept = _require_concept(uow, dataset.id)
+            concept = require_concept(uow, dataset.id)
             has_non_cancelled_version = uow.versions.latest_non_cancelled(dataset.id) is not None
         return (
             None
@@ -1758,8 +1756,6 @@ class DatasetRecordImportService:
                     uow.dataset_fields.remember_source_formats(
                         dataset.id, state.source_formats or {}
                     )
-                    from refrncr.services import _advance_concept
-
                     result = (
                         {
                             k: preview.counts[k]
@@ -1771,7 +1767,7 @@ class DatasetRecordImportService:
                     if result is not None:
                         result["records"] = imported_states
                     uow.concepts.record_mutation(dataset.id, import_result=result)
-                    _advance_concept(uow, dataset)
+                    advance_concept(uow, dataset)
                     dataset.content_updated_at = uow.now()
                     if state.mode == "new_version":
                         record_audit(

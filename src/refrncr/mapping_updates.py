@@ -1,11 +1,12 @@
 """Reconcile pinned mapping sources inside the caller's Dataset transaction."""
 
+from refrncr.errors import DatasetError
 from refrncr.ports import RecordValue
 from refrncr.record_identity import encode_record_identifier
 from refrncr.services import ConflictError, ValidationError
 
 
-class SourceUpdateBlocked(ValidationError):
+class SourceUpdateBlocked(DatasetError, ValidationError):
     """The published source cannot be used; explain this in the mapping notice."""
 
 

@@ -1,6 +1,7 @@
 """Installation-wide access policy, changed atomically with its audit event."""
 
 from refrncr.audit import record_audit
+from refrncr.errors import AuthorizationError as AuthorizationDomainError
 from refrncr.installation_policy import (
     EXPORT_POLICIES,
     INSTALLATION_SETTINGS_ID,
@@ -9,7 +10,7 @@ from refrncr.installation_policy import (
 from refrncr.services import AuthorizationError, ConflictError, ValidationError
 
 
-class PolicyConfirmationRequired(ValidationError):
+class PolicyConfirmationRequired(AuthorizationDomainError, ValidationError):
     """The exact transition needs explicit confirmation before it can be applied."""
 
 

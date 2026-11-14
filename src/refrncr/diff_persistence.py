@@ -300,9 +300,9 @@ class SqlAlchemyDiffOperations:
     def validate_snapshot(self, version):
         """Validate stored content and identifiers, including the hierarchy leaf projection."""
         if self._is_hierarchy(version.dataset_id):
+            from refrncr.domain import valid_identity
             from refrncr.hierarchy import hierarchy_leaf_records, hierarchy_validation_errors
             from refrncr.ports import DatasetBusinessKey
-            from refrncr.services import _valid_identity
             from refrncr.version_persistence import SqlAlchemyVersionOperations
 
             versions = SqlAlchemyVersionOperations(self.session)
@@ -310,8 +310,8 @@ class SqlAlchemyDiffOperations:
             nodes = versions.hierarchy_nodes(version)
             if any(
                 node.dataset_id != version.dataset_id
-                or not _valid_identity(node.id)
-                or (node.parent_id is not None and not _valid_identity(node.parent_id))
+                or not valid_identity(node.id)
+                or (node.parent_id is not None and not valid_identity(node.parent_id))
                 for node in nodes
             ):
                 return False

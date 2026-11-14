@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable, Mapping
 
-from refrncr.errors import ValidationError
+from refrncr.errors import DatasetError, ValidationError
 
 MAX_RECORD_IDENTIFIER_BYTES = 2000
 RECORD_IDENTIFIER_MESSAGES = {
@@ -14,7 +14,7 @@ RECORD_IDENTIFIER_MESSAGES = {
 }
 
 
-class RecordIdentifierError(ValidationError):
+class RecordIdentifierError(DatasetError, ValidationError):
     """An identifier is incomplete, malformed, or exceeds its storage limit."""
 
     def __init__(self, reason: str = "incomplete") -> None:

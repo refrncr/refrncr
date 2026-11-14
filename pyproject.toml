@@ -121,7 +121,7 @@ line-length = 100
 select = ["E", "F", "I", "UP", "B", "A", "BLE", "C90", "DTZ"]
 
 [tool.ruff.lint.mccabe]
-max-complexity = 44
+max-complexity = 41
 
 [tool.ruff.format]
 quote-style = "double"
