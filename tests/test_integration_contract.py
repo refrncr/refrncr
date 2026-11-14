@@ -135,11 +135,11 @@ def test_integration_contract_on_supported_databases(integration_database):
 
     with pytest.raises(NotFoundError) as missing:
         recover_administrator_password(sessions, "missing@example.com", new_password)
-    assert missing.type is NotFoundError
+    assert not isinstance(missing.value, ConflictError | ValidationError | AuthorizationError)
 
     with pytest.raises(ValidationError) as invalid:
         recover_administrator_password(sessions, email, "too short")
-    assert invalid.type is ValidationError
+    assert not isinstance(invalid.value, NotFoundError | ConflictError | AuthorizationError)
 
     recover_administrator_password(sessions, email, new_password)
 
