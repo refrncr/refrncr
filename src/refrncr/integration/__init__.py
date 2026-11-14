@@ -4,15 +4,15 @@ from refrncr.app import create_application, create_community_services
 from refrncr.cli import (
     CliError,
     CreateAdminConfiguration,
-    RecoverAdminConfiguration,
     create_initial_admin,
     prepare_database,
-    recover_admin_password,
 )
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.operational import database_is_ready, expected_database_revision
 from refrncr.services import ResourceTypeRegistry
+
+from .administrators import recover_administrator_password
 
 __all__ = (
     "AuthorizationError",
@@ -20,7 +20,6 @@ __all__ = (
     "ConflictError",
     "CreateAdminConfiguration",
     "NotFoundError",
-    "RecoverAdminConfiguration",
     "ResourceTypeRegistry",
     "ValidationError",
     "create_application",
@@ -31,5 +30,5 @@ __all__ = (
     "database_is_ready",
     "expected_database_revision",
     "prepare_database",
-    "recover_admin_password",
+    "recover_administrator_password",
 )

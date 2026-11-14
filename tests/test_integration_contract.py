@@ -1,6 +1,12 @@
 """Public integration contract exercised without importing refrncr internals."""
 
-from pathlib import Path
+import os
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from refrncr.integration import (
     AuthorizationError,
@@ -8,7 +14,6 @@ from refrncr.integration import (
     ConflictError,
     CreateAdminConfiguration,
     NotFoundError,
-    RecoverAdminConfiguration,
     ResourceTypeRegistry,
     ValidationError,
     create_application,
@@ -19,7 +24,7 @@ from refrncr.integration import (
     database_is_ready,
     expected_database_revision,
     prepare_database,
-    recover_admin_password,
+    recover_administrator_password,
 )
 from refrncr.integration import (
     __all__ as public_names,
@@ -33,7 +38,6 @@ def test_integration_exposes_application_and_error_contract():
         "ConflictError",
         "CreateAdminConfiguration",
         "NotFoundError",
-        "RecoverAdminConfiguration",
         "ResourceTypeRegistry",
         "ValidationError",
         "create_application",
@@ -44,7 +48,7 @@ def test_integration_exposes_application_and_error_contract():
         "database_is_ready",
         "expected_database_revision",
         "prepare_database",
-        "recover_admin_password",
+        "recover_administrator_password",
     }
     assert callable(create_application)
     assert callable(create_community_services)
@@ -54,7 +58,7 @@ def test_integration_exposes_application_and_error_contract():
     assert callable(database_is_ready)
     assert callable(expected_database_revision)
     assert callable(create_initial_admin)
-    assert callable(recover_admin_password)
+    assert callable(recover_administrator_password)
     assert issubclass(NotFoundError, Exception)
     assert issubclass(ConflictError, Exception)
     assert issubclass(ValidationError, Exception)
@@ -62,37 +66,82 @@ def test_integration_exposes_application_and_error_contract():
     assert issubclass(CliError, Exception)
 
 
-def test_integration_composes_services_on_supported_databases(database_audit_db):
-    engine, sessions, _existing_services = database_audit_db
-    services = create_community_services(sessions, ResourceTypeRegistry())
+@pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])
+def integration_database(request, tmp_path):
+    administration = None
+    schema = None
+    if request.param == "postgresql":
+        database_url = os.environ["REFRNCR_TEST_POSTGRES_URL"]
+        administration = create_engine(database_url)
+        schema = f"integration_{uuid.uuid4().hex}"
+        with administration.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        url = make_url(database_url).update_query_dict({"options": f"-csearch_path={schema}"})
+    else:
+        url = make_url(f"sqlite:///{tmp_path / 'integration.db'}")
 
-    assert services.users is not None
-    assert services.datasets is not None
-    assert create_session_factory(engine).kw["expire_on_commit"] is False
-
-
-def test_integration_prepares_and_reports_sqlite_readiness(tmp_path: Path):
-    database_url = f"sqlite:///{tmp_path / 'integration.db'}"
-
-    prepare_database(database_url)
-    engine = create_database_engine(database_url)
+    prepare_database(url)
+    engine = create_database_engine(url)
     try:
-        assert database_is_ready(engine)
-        assert expected_database_revision()
+        yield engine, url.render_as_string(hide_password=False)
     finally:
         engine.dispose()
+        if administration is not None:
+            with administration.begin() as connection:
+                connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+            administration.dispose()
 
 
-def test_integration_admin_creation_and_recovery(tmp_path: Path):
-    database_url = f"sqlite:///{tmp_path / 'administrators.db'}"
-    create_passwords = iter(("correct horse battery staple",) * 2)
-    recover_passwords = iter(("another correct horse battery staple",) * 2)
+def test_integration_contract_on_supported_databases(integration_database):
+    engine, database_url = integration_database
+    sessions = create_session_factory(engine)
+    services = create_community_services(sessions, ResourceTypeRegistry())
+    application = create_application(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+        dataset_records=services.dataset_records,
+        record_imports=services.record_imports,
+        hierarchy_imports=services.hierarchy_imports,
+        audit_history=services.audit_history,
+        dataset_versions=services.dataset_versions,
+        api_keys=services.api_keys,
+        readiness_engine=engine,
+    )
 
+    with TestClient(application, base_url="https://testserver") as client:
+        response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+    assert sessions.kw["expire_on_commit"] is False
+    assert database_is_ready(engine)
+    assert expected_database_revision()
+
+    email = "administrator@example.com"
+    old_password = "correct horse battery staple"
+    new_password = "another correct horse battery staple"
+    create_passwords = iter((old_password,) * 2)
     create_initial_admin(
-        CreateAdminConfiguration(database_url, "admin@example.com", "Administrator"),
+        CreateAdminConfiguration(database_url, email, "Administrator"),
         password_reader=lambda _prompt: next(create_passwords),
     )
-    recover_admin_password(
-        RecoverAdminConfiguration(database_url, "admin@example.com"),
-        password_reader=lambda _prompt: next(recover_passwords),
-    )
+
+    with pytest.raises(NotFoundError) as missing:
+        recover_administrator_password(sessions, "missing@example.com", new_password)
+    assert missing.type is NotFoundError
+
+    with pytest.raises(ValidationError) as invalid:
+        recover_administrator_password(sessions, email, "too short")
+    assert invalid.type is ValidationError
+
+    recover_administrator_password(sessions, email, new_password)
+
+    assert services.authentication.authenticate(email, old_password) is None
+    assert services.authentication.authenticate(email, new_password) is not None

@@ -78,10 +78,9 @@ if not database_is_ready(engine):
   administrator creation.
 - `create_initial_admin(configuration, password_reader=...)` migrates an installation and creates
   its first administrator.
-- `RecoverAdminConfiguration` contains the database URL and administrator email address for
-  password recovery.
-- `recover_admin_password(configuration, password_reader=...)` replaces an eligible
-  administrator password without exposing a persistence adapter.
+- `recover_administrator_password(session_factory, email, new_password)` replaces an eligible
+  administrator password through the existing service logic, without exposing a persistence
+  adapter or creating its own engine.
 - `CliError` is the secret-safe failure returned by these controlled operations.
 
 ```python
@@ -93,8 +92,28 @@ create_initial_admin(
 )
 ```
 
-The password reader is called twice and must return matching values. Integrators must collect the
-password from a secret-safe input channel and must never log it.
+For programmatic recovery, pass the session factory for the already selected installation or
+tenant. `NotFoundError`, `ConflictError` and `ValidationError` are returned unchanged so the
+integrator can translate the category without parsing messages.
+
+```python
+from refrncr.integration import (
+    NotFoundError,
+    ValidationError,
+    recover_administrator_password,
+)
+
+try:
+    recover_administrator_password(session_factory, email, new_password)
+except NotFoundError:
+    report_administrator_unavailable()
+except ValidationError:
+    report_password_policy_rejected()
+```
+
+Integrators must collect the password from a secret-safe input channel and must never log it. The
+interactive Community CLI recovery command remains available, but is not part of this public
+integration contract.
 
 ## Error categories
 
