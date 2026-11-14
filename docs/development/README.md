@@ -1,6 +1,7 @@
 # Development documentation
 
 - [Browser acceptance tests](browser-acceptance.md)
+- [Integration contract](integration.md)
 
 This directory contains current development and operations guidance for the Community
 application. Historical implementation reports and notes are maintained in the project archive
