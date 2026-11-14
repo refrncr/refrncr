@@ -10,7 +10,7 @@ from flask import Blueprint, Flask, redirect, request, url_for
 
 from refrncr.browser_security import BrowserCookieSettings
 from refrncr.hierarchy_import import HierarchyImportService
-from refrncr.login_security import (
+from refrncr.identity.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,

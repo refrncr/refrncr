@@ -18,10 +18,10 @@ from sqlalchemy.engine import make_url
 from support import NOW, MutableClock, _dataset_browser, publish, setup
 from werkzeug.datastructures import MultiDict
 
-from refrncr.api_keys import ApiKeyService
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
+from refrncr.identity.api_keys import ApiKeyService
 from refrncr.models import Dataset, DatasetRecord, User
 from refrncr.services import ResourceTypeRegistry
 from refrncr.web import create_flask_app

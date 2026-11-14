@@ -24,7 +24,7 @@ from refrncr.browser_security import is_loopback_host
 from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.dataset_upgrade import DatasetUpgradeError
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.login_security import SourceIdentityResolver
+from refrncr.identity.login_security import SourceIdentityResolver
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
 from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
 from refrncr.version_upgrade import VersionUpgradeError, publication_preflight

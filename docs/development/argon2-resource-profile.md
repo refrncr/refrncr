@@ -34,7 +34,7 @@ must therefore be reviewed and benchmarked rather than inferred from results on 
 From an installed development checkout, run:
 
 ```shell
-python -m refrncr.argon2_benchmark --samples 5
+python -m refrncr.identity.argon2_benchmark --samples 5
 ```
 
 The utility imports the application's configured `PASSWORD_HASHER`, uses generated synthetic

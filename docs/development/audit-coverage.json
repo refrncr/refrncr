@@ -5,7 +5,7 @@
     {
       "capability": "UserService",
       "operation": "update_theme_preference",
-      "service": "refrncr.services.UserService.update_theme_preference",
+      "service": "refrncr.identity.users.UserService.update_theme_preference",
       "interface_entrypoints": [
         "refrncr.web.settings.theme_preference POST /settings/theme"
       ],
@@ -95,7 +95,7 @@
     {
       "capability": "UserService",
       "operation": "create_initial_admin",
-      "service": "refrncr.services.UserService.create_initial_admin",
+      "service": "refrncr.identity.users.UserService.create_initial_admin",
       "interface_entrypoints": [
         "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
@@ -135,7 +135,7 @@
     {
       "capability": "UserService",
       "operation": "create_user",
-      "service": "refrncr.services.UserService.create_user",
+      "service": "refrncr.identity.users.UserService.create_user",
       "interface_entrypoints": [
         "refrncr.web.users.create_user POST /users"
       ],
@@ -178,7 +178,7 @@
     {
       "capability": "UserService",
       "operation": "change_email",
-      "service": "refrncr.services.UserService.change_email",
+      "service": "refrncr.identity.users.UserService.change_email",
       "interface_entrypoints": [
         "refrncr.web.users.change_user_email POST /users/<target_id>/email"
       ],
@@ -221,7 +221,7 @@
     {
       "capability": "UserService",
       "operation": "disable_user",
-      "service": "refrncr.services.UserService.disable_user",
+      "service": "refrncr.identity.users.UserService.disable_user",
       "interface_entrypoints": [
         "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
@@ -264,7 +264,7 @@
     {
       "capability": "UserService",
       "operation": "enable_user",
-      "service": "refrncr.services.UserService.enable_user",
+      "service": "refrncr.identity.users.UserService.enable_user",
       "interface_entrypoints": [
         "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
@@ -307,7 +307,7 @@
     {
       "capability": "UserService",
       "operation": "delete_user",
-      "service": "refrncr.services.UserService.delete_user",
+      "service": "refrncr.identity.users.UserService.delete_user",
       "interface_entrypoints": [
         "refrncr.web.users.change_user_state POST /users/<target_id>/<action>"
       ],
@@ -350,7 +350,7 @@
     {
       "capability": "UserService",
       "operation": "recover_administrator_password",
-      "service": "refrncr.services.UserService.recover_administrator_password",
+      "service": "refrncr.identity.users.UserService.recover_administrator_password",
       "interface_entrypoints": [
         "refrncr user recover-admin",
         "Trusted programmatic caller using the same Community service boundary"
@@ -394,7 +394,7 @@
     {
       "capability": "UserService",
       "operation": "has_users",
-      "service": "refrncr.services.UserService.has_users",
+      "service": "refrncr.identity.users.UserService.has_users",
       "interface_entrypoints": [
         "refrncr.web.auth.setup GET,POST /setup",
         "refrncr user create-admin"
@@ -427,7 +427,7 @@
     {
       "capability": "UserService",
       "operation": "list_users",
-      "service": "refrncr.services.UserService.list_users",
+      "service": "refrncr.identity.users.UserService.list_users",
       "interface_entrypoints": [
         "refrncr.web.users.user_list GET /users",
         "refrncr.web.users.create_user POST /users",
@@ -461,7 +461,7 @@
     {
       "capability": "UserService",
       "operation": "bootstrap_organisation",
-      "service": "refrncr.services.UserService.bootstrap_organisation",
+      "service": "refrncr.identity.users.UserService.bootstrap_organisation",
       "interface_entrypoints": [
         "refrncr start",
         "refrncr user create-admin"
@@ -493,7 +493,7 @@
     {
       "capability": "TeamService",
       "operation": "create_team",
-      "service": "refrncr.services.TeamService.create_team",
+      "service": "refrncr.identity.teams.TeamService.create_team",
       "interface_entrypoints": [
         "refrncr.web.teams.create_team POST /teams"
       ],
@@ -536,7 +536,7 @@
     {
       "capability": "TeamService",
       "operation": "rename_team",
-      "service": "refrncr.services.TeamService.rename_team",
+      "service": "refrncr.identity.teams.TeamService.rename_team",
       "interface_entrypoints": [
         "refrncr.web.teams.rename_team POST /teams/<team_id>/rename"
       ],
@@ -579,7 +579,7 @@
     {
       "capability": "MembershipService",
       "operation": "create_membership",
-      "service": "refrncr.services.MembershipService.create_membership",
+      "service": "refrncr.identity.memberships.MembershipService.create_membership",
       "interface_entrypoints": [
         "refrncr.web.teams.create_membership POST /teams/<team_id>/members"
       ],
@@ -622,7 +622,7 @@
     {
       "capability": "MembershipService",
       "operation": "delete_membership",
-      "service": "refrncr.services.MembershipService.delete_membership",
+      "service": "refrncr.identity.memberships.MembershipService.delete_membership",
       "interface_entrypoints": [
         "refrncr.web.teams.delete_membership POST /teams/<team_id>/members/<membership_id>/delete"
       ],
@@ -794,7 +794,7 @@
     {
       "capability": "TeamService",
       "operation": "delete_team",
-      "service": "refrncr.services.TeamService.delete_team",
+      "service": "refrncr.identity.teams.TeamService.delete_team",
       "interface_entrypoints": [
         "refrncr.web.teams.delete_team POST /teams/<team_id>/delete"
       ],
@@ -843,7 +843,7 @@
     {
       "capability": "TeamService",
       "operation": "list_teams",
-      "service": "refrncr.services.TeamService.list_teams",
+      "service": "refrncr.identity.teams.TeamService.list_teams",
       "interface_entrypoints": [
         "refrncr.web.teams.team_list GET /teams",
         "refrncr.web.teams.create_team POST /teams",
@@ -879,7 +879,7 @@
     {
       "capability": "MembershipService",
       "operation": "list_team_members",
-      "service": "refrncr.services.MembershipService.list_team_members",
+      "service": "refrncr.identity.memberships.MembershipService.list_team_members",
       "interface_entrypoints": [
         "refrncr.web.teams.team_list GET /teams",
         "refrncr.web.teams.team_members GET /teams/<team_id>/members",
@@ -916,7 +916,7 @@
     {
       "capability": "MembershipService",
       "operation": "list_eligible_users",
-      "service": "refrncr.services.MembershipService.list_eligible_users",
+      "service": "refrncr.identity.memberships.MembershipService.list_eligible_users",
       "interface_entrypoints": [
         "refrncr.web.teams.team_list GET /teams",
         "refrncr.web.teams.team_members GET /teams/<team_id>/members",
@@ -2873,7 +2873,7 @@
     {
       "capability": "AuthenticationService",
       "operation": "authenticate",
-      "service": "refrncr.services.AuthenticationService.authenticate",
+      "service": "refrncr.identity.authentication.AuthenticationService.authenticate",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -2904,7 +2904,7 @@
     {
       "capability": "SessionService",
       "operation": "create",
-      "service": "refrncr.services.SessionService.create",
+      "service": "refrncr.identity.sessions.SessionService.create",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -2935,7 +2935,7 @@
     {
       "capability": "SessionService",
       "operation": "resolve",
-      "service": "refrncr.services.SessionService.resolve",
+      "service": "refrncr.identity.sessions.SessionService.resolve",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -2966,7 +2966,7 @@
     {
       "capability": "SessionService",
       "operation": "resolve_with_session",
-      "service": "refrncr.services.SessionService.resolve_with_session",
+      "service": "refrncr.identity.sessions.SessionService.resolve_with_session",
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log",
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
@@ -3075,7 +3075,7 @@
     {
       "capability": "SessionService",
       "operation": "revoke",
-      "service": "refrncr.services.SessionService.revoke",
+      "service": "refrncr.identity.sessions.SessionService.revoke",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login",
         "refrncr.web.auth.logout POST /logout"
@@ -3107,7 +3107,7 @@
     {
       "capability": "SessionService",
       "operation": "cleanup",
-      "service": "refrncr.services.SessionService.cleanup",
+      "service": "refrncr.identity.sessions.SessionService.cleanup",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3881,7 +3881,7 @@
     {
       "capability": "SourceIdentityResolver",
       "operation": "from_config",
-      "service": "refrncr.login_security.SourceIdentityResolver.from_config",
+      "service": "refrncr.identity.login_security.SourceIdentityResolver.from_config",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3912,7 +3912,7 @@
     {
       "capability": "SourceIdentityResolver",
       "operation": "resolve",
-      "service": "refrncr.login_security.SourceIdentityResolver.resolve",
+      "service": "refrncr.identity.login_security.SourceIdentityResolver.resolve",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -3943,7 +3943,7 @@
     {
       "capability": "LoginAttemptReservation",
       "operation": "cancel",
-      "service": "refrncr.login_security.LoginAttemptReservation.cancel",
+      "service": "refrncr.identity.login_security.LoginAttemptReservation.cancel",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -3974,7 +3974,7 @@
     {
       "capability": "LoginAttemptReservation",
       "operation": "failed",
-      "service": "refrncr.login_security.LoginAttemptReservation.failed",
+      "service": "refrncr.identity.login_security.LoginAttemptReservation.failed",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -4005,7 +4005,7 @@
     {
       "capability": "LoginAttemptReservation",
       "operation": "succeeded",
-      "service": "refrncr.login_security.LoginAttemptReservation.succeeded",
+      "service": "refrncr.identity.login_security.LoginAttemptReservation.succeeded",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -4036,7 +4036,7 @@
     {
       "capability": "LoginAttemptLimiter",
       "operation": "allow",
-      "service": "refrncr.login_security.LoginAttemptLimiter.allow",
+      "service": "refrncr.identity.login_security.LoginAttemptLimiter.allow",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -4067,7 +4067,7 @@
     {
       "capability": "LoginAttemptLimiter",
       "operation": "reserve",
-      "service": "refrncr.login_security.LoginAttemptLimiter.reserve",
+      "service": "refrncr.identity.login_security.LoginAttemptLimiter.reserve",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -4098,7 +4098,7 @@
     {
       "capability": "LoginAttemptLimiter",
       "operation": "entry_count",
-      "service": "refrncr.login_security.LoginAttemptLimiter.entry_count",
+      "service": "refrncr.identity.login_security.LoginAttemptLimiter.entry_count",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -4129,7 +4129,7 @@
     {
       "capability": "LoginAttemptLimiter",
       "operation": "tracked_keys",
-      "service": "refrncr.login_security.LoginAttemptLimiter.tracked_keys",
+      "service": "refrncr.identity.login_security.LoginAttemptLimiter.tracked_keys",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -4160,7 +4160,7 @@
     {
       "capability": "BrowserAuthenticationAdmissionGuard",
       "operation": "try_acquire",
-      "service": "refrncr.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
+      "service": "refrncr.identity.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
       "interface_entrypoints": [
         "refrncr.web.auth.login GET,POST /login"
       ],
@@ -4279,9 +4279,9 @@
     {
       "capability": "argon2_benchmark",
       "operation": "run_benchmark",
-      "service": "refrncr.argon2_benchmark.run_benchmark",
+      "service": "refrncr.identity.argon2_benchmark.run_benchmark",
       "interface_entrypoints": [
-        "python -m refrncr.argon2_benchmark [--samples N]"
+        "python -m refrncr.identity.argon2_benchmark [--samples N]"
       ],
       "kind": "read",
       "classification": "technical logging only",
@@ -5847,7 +5847,7 @@
     {
       "capability": "MembershipService",
       "operation": "list_relationships",
-      "service": "refrncr.services.MembershipService.list_relationships",
+      "service": "refrncr.identity.memberships.MembershipService.list_relationships",
       "interface_entrypoints": [
         "refrncr.web.users.user_list GET /users",
         "refrncr.web.teams.team_list GET /teams",
@@ -5929,7 +5929,7 @@
     {
       "capability": "API key lifecycle",
       "operation": "list_keys",
-      "service": "refrncr.api_keys.ApiKeyService.list_keys",
+      "service": "refrncr.identity.api_keys.ApiKeyService.list_keys",
       "interface_entrypoints": [
         "refrncr.web.settings.api_key_list GET /settings/api-keys"
       ],
@@ -5963,7 +5963,7 @@
     {
       "capability": "API key lifecycle",
       "operation": "get_key",
-      "service": "refrncr.api_keys.ApiKeyService.get_key",
+      "service": "refrncr.identity.api_keys.ApiKeyService.get_key",
       "interface_entrypoints": [
         "refrncr.web.settings.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
       ],
@@ -5997,7 +5997,7 @@
     {
       "capability": "API key lifecycle",
       "operation": "create_key",
-      "service": "refrncr.api_keys.ApiKeyService.create_key",
+      "service": "refrncr.identity.api_keys.ApiKeyService.create_key",
       "interface_entrypoints": [
         "refrncr.web.settings.api_key_create GET,POST /settings/api-keys/new"
       ],
@@ -6038,7 +6038,7 @@
     {
       "capability": "API key lifecycle",
       "operation": "revoke_key",
-      "service": "refrncr.api_keys.ApiKeyService.revoke_key",
+      "service": "refrncr.identity.api_keys.ApiKeyService.revoke_key",
       "interface_entrypoints": [
         "refrncr.web.settings.api_key_revoke GET,POST /settings/api-keys/<key_id>/revoke"
       ],
@@ -6079,7 +6079,7 @@
     {
       "capability": "API key lifecycle",
       "operation": "authenticate",
-      "service": "refrncr.api_keys.ApiKeyService.authenticate",
+      "service": "refrncr.identity.api_keys.ApiKeyService.authenticate",
       "interface_entrypoints": [
         "Trusted programmatic caller",
         "refrncr.api.routes.datasets GET /datasets",

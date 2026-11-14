@@ -10,13 +10,13 @@ from uuid import UUID, uuid4
 from refrncr.audit import record_audit
 from refrncr.audit_presentation import valid_id
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.services import (
-    AuthenticatedPrincipal,
-    AuthorizationError,
-    ConflictError,
-    NotFoundError,
-    ValidationError,
+from refrncr.identity.errors import (
+    IdentityAuthorizationError,
+    IdentityConflictError,
+    IdentityNotFoundError,
+    IdentityValidationError,
 )
+from refrncr.identity.shared import AuthenticatedPrincipal
 
 LIFETIME = timedelta(days=90)
 LAST_USED_INTERVAL = timedelta(minutes=15)
@@ -70,7 +70,7 @@ class ApiKeyService:
     def _actor(work, actor_id, *, lock=False):
         actor = work.users.get(actor_id, for_update=lock) if valid_id(actor_id) else None
         if actor is None or not actor.is_active or actor.is_deleted:
-            raise AuthorizationError("Active user access required")
+            raise IdentityAuthorizationError("Active user access required")
         return actor
 
     @staticmethod
@@ -99,7 +99,7 @@ class ApiKeyService:
             self._actor(work, actor_id)
             key = work.api_keys.get_owned(actor_id, key_id) if valid_id(key_id) else None
             if key is None:
-                raise NotFoundError("API key not found")
+                raise IdentityNotFoundError("API key not found")
             return self._view(key, self.clock.now())
 
     def create_key(self, actor_id, name, expires_at=None, *, request_id=None):
@@ -108,13 +108,13 @@ class ApiKeyService:
             now = self.clock.now()
             if request_id is not None:
                 if not valid_id(request_id):
-                    raise ValidationError("Invalid creation request")
+                    raise IdentityValidationError("Invalid creation request")
                 if work.api_keys.get_owned(actor_id, request_id) is not None:
-                    raise ConflictError(
+                    raise IdentityConflictError(
                         "This creation form was already used. The secret cannot be shown again."
                     )
             if not isinstance(name, str) or len(name) > 100 or not name.strip():
-                raise ValidationError("Enter a name of 1 to 100 characters")
+                raise IdentityValidationError("Enter a name of 1 to 100 characters")
             name = name.strip()
             expiry = now + LIFETIME if expires_at is None else expires_at
             if (
@@ -122,12 +122,12 @@ class ApiKeyService:
                 or expiry.utcoffset() is None
                 or not now < expiry <= now + LIFETIME
             ):
-                raise ValidationError("Expiry must be in the future and within 90 days")
+                raise IdentityValidationError("Expiry must be in the future and within 90 days")
             active = work.api_keys.active_owned(actor_id, now)
             if len(active) >= 5:
-                raise ConflictError("You can have at most five active API keys")
+                raise IdentityConflictError("You can have at most five active API keys")
             if any(key.name.casefold() == name.casefold() for key in active):
-                raise ConflictError("An active API key already uses this name")
+                raise IdentityConflictError("An active API key already uses this name")
             key_id = request_id or str(uuid4())
             secret = "rfr_" + key_id.replace("-", "") + "." + secrets.token_urlsafe(32)
             key = work.api_keys.create(
@@ -149,13 +149,13 @@ class ApiKeyService:
             self._actor(work, actor_id, lock=True)
             key = work.api_keys.get_owned(actor_id, key_id) if valid_id(key_id) else None
             if key is None:
-                raise NotFoundError("API key not found")
+                raise IdentityNotFoundError("API key not found")
             if confirmed is not True:
-                raise ValidationError("Confirm permanent revocation")
+                raise IdentityValidationError("Confirm permanent revocation")
             if type(expected_revision) is not int or expected_revision != key.revision:
-                raise ConflictError("API key changed. Reload and try again")
+                raise IdentityConflictError("API key changed. Reload and try again")
             if key.revoked_at is not None:
-                raise ConflictError("API key is already revoked")
+                raise IdentityConflictError("API key is already revoked")
             key.revoked_at = self.clock.now()
             key.revision += 1
             self._audit(work, actor_id, key.id, "api_key.revoked")

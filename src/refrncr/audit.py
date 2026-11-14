@@ -433,8 +433,14 @@ def _audited(service, name, *events, module="services"):
     _register(service, name, "domain-audited", events=events, module=module)
 
 
-def _read(service, names, rationale="Ordinary authorized read; no business state change."):
-    _register(service, names, "intentionally excluded", rationale=rationale)
+def _read(
+    service,
+    names,
+    rationale="Ordinary authorized read; no business state change.",
+    *,
+    module="services",
+):
+    _register(service, names, "intentionally excluded", rationale=rationale, module=module)
 
 
 for _method, _action in (
@@ -470,28 +476,46 @@ for _method, _action in (
     ("enable_user", "enabled"),
     ("delete_user", "deleted"),
 ):
-    _audited("UserService", _method, ("user", _action))
+    _audited("UserService", _method, ("user", _action), module="identity.users")
 
-_audited("UserService", "recover_administrator_password", ("user", "password_recovered"))
-_read("UserService", "list_users")
+_audited(
+    "UserService",
+    "recover_administrator_password",
+    ("user", "password_recovered"),
+    module="identity.users",
+)
+_read("UserService", "list_users", module="identity.users")
 _read(
     "UserService",
     "update_theme_preference",
     "Presentation preference persistence; no domain event or protected content change.",
+    module="identity.users",
 )
-_read("UserService", "has_users", "Boolean first-setup availability check; no protected content.")
+_read(
+    "UserService",
+    "has_users",
+    "Boolean first-setup availability check; no protected content.",
+    module="identity.users",
+)
 _register(
     "UserService",
     "bootstrap_organisation",
     "technical logging only",
     rationale="Idempotent installation singleton setup before an authenticated actor exists.",
+    module="identity.users",
 )
-for _service, _object, _methods in (
-    ("TeamService", "team", (("create_team", "created"), ("rename_team", "renamed"))),
+for _service, _object, _methods, _module in (
+    (
+        "TeamService",
+        "team",
+        (("create_team", "created"), ("rename_team", "renamed")),
+        "identity.teams",
+    ),
     (
         "MembershipService",
         "membership",
         (("create_membership", "created"), ("delete_membership", "deleted")),
+        "identity.memberships",
     ),
     (
         "GrantService",
@@ -501,13 +525,24 @@ for _service, _object, _methods in (
             ("change_permission", "permission_changed"),
             ("delete_grant", "deleted"),
         ),
+        "services",
     ),
 ):
     for _method, _action in _methods:
-        _audited(_service, _method, (_object, _action))
-_audited("TeamService", "delete_team", ("team", "deleted"), ("grant", "deleted"))
-_read("TeamService", "list_teams")
-_read("MembershipService", "list_team_members list_eligible_users list_relationships")
+        _audited(_service, _method, (_object, _action), module=_module)
+_audited(
+    "TeamService",
+    "delete_team",
+    ("team", "deleted"),
+    ("grant", "deleted"),
+    module="identity.teams",
+)
+_read("TeamService", "list_teams", module="identity.teams")
+_read(
+    "MembershipService",
+    "list_team_members list_eligible_users list_relationships",
+    module="identity.memberships",
+)
 _audited(
     "DatasetService",
     "create_dataset",
@@ -576,6 +611,7 @@ _register(
     "AuthenticationService",
     "authenticate",
     "security logging required",
+    module="identity.authentication",
     rationale="Credential verification and optional hash maintenance are authentication "
     "security events (REF-31), not successful business changes.",
 )
@@ -583,12 +619,14 @@ _register(
     "SessionService",
     "create resolve resolve_with_session revoke",
     "security logging required",
+    module="identity.sessions",
     rationale="Session lifecycle and invalid credentials belong to REF-31; never log tokens.",
 )
 _register(
     "SessionService",
     "cleanup",
     "technical logging only",
+    module="identity.sessions",
     rationale="Bounded retention cleanup of expired/revoked authentication sessions.",
 )
 _read(
@@ -623,7 +661,7 @@ for _module, _service, _methods, _classification, _reason in (
         "Composition-time resource registration/existence checks; no user business operation.",
     ),
     (
-        "login_security",
+        "identity.login_security",
         "SourceIdentityResolver",
         "from_config resolve",
         "security logging required",
@@ -631,7 +669,7 @@ for _module, _service, _methods, _classification, _reason in (
         "request data.",
     ),
     (
-        "login_security",
+        "identity.login_security",
         "LoginAttemptReservation",
         "cancel failed succeeded",
         "security logging required",
@@ -639,7 +677,7 @@ for _module, _service, _methods, _classification, _reason in (
         "is not domain history.",
     ),
     (
-        "login_security",
+        "identity.login_security",
         "LoginAttemptLimiter",
         "allow reserve entry_count tracked_keys",
         "security logging required",
@@ -647,7 +685,7 @@ for _module, _service, _methods, _classification, _reason in (
         "tracked identifiers in domain audit.",
     ),
     (
-        "login_security",
+        "identity.login_security",
         "BrowserAuthenticationAdmissionGuard",
         "try_acquire",
         "security logging required",
@@ -667,7 +705,7 @@ for _module, _service, _methods, _classification, _reason in (
 
 for _symbol, _classification, _reason in (
     (
-        "refrncr.argon2_benchmark.run_benchmark",
+        "refrncr.identity.argon2_benchmark.run_benchmark",
         "technical logging only",
         "Opt-in synthetic password benchmark; no application credentials or business state.",
     ),
@@ -855,16 +893,26 @@ _register(
     "ApiKeyService",
     "list_keys get_key",
     "intentionally excluded",
-    module="api_keys",
+    module="identity.api_keys",
     rationale="Owner-only metadata read; no credential is returned.",
 )
-_audited("ApiKeyService", "create_key", ("api_key", "api_key.created"), module="api_keys")
-_audited("ApiKeyService", "revoke_key", ("api_key", "api_key.revoked"), module="api_keys")
+_audited(
+    "ApiKeyService",
+    "create_key",
+    ("api_key", "api_key.created"),
+    module="identity.api_keys",
+)
+_audited(
+    "ApiKeyService",
+    "revoke_key",
+    ("api_key", "api_key.revoked"),
+    module="identity.api_keys",
+)
 _register(
     "ApiKeyService",
     "authenticate",
     "security-audited",
-    module="api_keys",
+    module="identity.api_keys",
     events=(("api_key", "api_key.authentication_failed"),),
     rationale=(
         "REF-169 keeps durable failed-authentication coverage; successful requests use only "

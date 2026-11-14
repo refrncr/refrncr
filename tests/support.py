@@ -17,7 +17,6 @@ from sqlalchemy import func, select
 from sqlalchemy.pool import StaticPool
 from werkzeug.datastructures import MultiDict
 
-from refrncr import login_security
 from refrncr.app import create_community_services
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.dataset_diff import DatasetDiffService
@@ -26,6 +25,7 @@ from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.hierarchy import HierarchyService
+from refrncr.identity import login_security
 from refrncr.models import AuditEvent, Dataset, User
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.services import ResourceTypeRegistry

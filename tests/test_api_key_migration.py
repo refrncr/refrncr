@@ -6,7 +6,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from support import config_for
 
-from refrncr.api_keys import ApiKeyService
+from refrncr.identity.api_keys import ApiKeyService
 
 
 def test_upgrade_preserves_existing_database_and_empty_downgrade(database_audit_db):
@@ -41,7 +41,7 @@ def test_populated_downgrade_preserves_history(database_audit_db, history):
     if history == "key":
         service.create_key(admin.id, "Keep history")
     else:
-        from refrncr.api_keys import ApiKeyAuthenticationError
+        from refrncr.identity.api_keys import ApiKeyAuthenticationError
 
         with pytest.raises(ApiKeyAuthenticationError):
             service.authenticate(None)

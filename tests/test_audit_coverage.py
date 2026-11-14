@@ -231,13 +231,14 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
     actual = {(e.object_type, e.action, e.object_id) for e in events}
     expected = {(kind, action, target or result.id) for kind, action, target in expected}
     assert actual == expected and len(events) == len(expected)
-    module = (
-        "record_import"
-        if operation.startswith("DatasetRecordImportService")
-        else "dataset_versions"
-        if operation.startswith("DatasetVersionService")
-        else "services"
-    )
+    service = operation.split(".", 1)[0]
+    module = {
+        "DatasetRecordImportService": "record_import",
+        "DatasetVersionService": "dataset_versions",
+        "MembershipService": "identity.memberships",
+        "TeamService": "identity.teams",
+        "UserService": "identity.users",
+    }.get(service, "services")
     declared = OPERATIONS[f"refrncr.{module}.{operation}"].events
     for e in events:
         assert e.actor_user_id == c.a.id and e.timestamp is not None
