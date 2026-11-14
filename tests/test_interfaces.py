@@ -1704,6 +1704,28 @@ def test_membership_interface_controls_invalid_targets_duplicates_and_lifecycle(
         assert response.status_code == 302
 
 
+def test_membership_interface_renders_inactive_user_error_on_team_page(interface):
+    _, users, authentication, _, teams, _, client = interface
+    setup_admin(client)
+    assert login(client).status_code == 302
+    admin = authentication.authenticate("admin@example.com", ADMIN_PASSWORD)
+    disabled = users.create_user(admin.id, "disabled@example.com", "Disabled", "valid password")
+    team = teams.create_team(admin.id, "Platform")
+    users.disable_user(admin.id, disabled.id)
+
+    response = request(
+        client,
+        "post",
+        f"/teams/{team.id}/members",
+        data={"user_id": disabled.id, "csrf_token": authenticated_csrf(client)},
+    )
+
+    assert response.status_code == 400
+    body = response_text(response)
+    assert "Only active users can be added to teams" in body
+    assert "Platform" in body
+
+
 def test_membership_interface_escapes_user_values(interface):
     _, users, authentication, _, teams, memberships, client = interface
     setup_admin(client)

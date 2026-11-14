@@ -9,7 +9,6 @@ from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from uuid import UUID
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -17,12 +16,25 @@ from argon2.low_level import Type
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from refrncr import errors as _errors
 from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
-from refrncr.errors import UserManagementError, ValidationError
+from refrncr.domain import advance_concept, require_concept, valid_identity
+from refrncr.errors import (
+    AuthorizationError,
+    ConflictError,
+    InvalidLifecycleError,
+    NotFoundError,
+    RecordConflictError,
+    RecordValidationError,
+    StaleDatasetOwnerError,
+    StaleFieldOrderError,
+    StaleRecordError,
+    ValidationError,
+)
 from refrncr.field_contracts import FIELD_KEY_PATTERN
 from refrncr.models import LoginSession, User
 from refrncr.ports import (
@@ -57,6 +69,18 @@ from refrncr.version_contracts import mapping_incomplete_message
 SUBJECT_TYPES = {"user", "team"}
 THEME_PREFERENCES = frozenset(("system", "light", "dark"))
 
+# Compatibility facade while services move to domain packages. These assignments keep
+# existing imports working without making ``errors.py`` depend on the facade.
+DatasetError = _errors.DatasetError
+DomainError = _errors.DomainError
+HierarchyError = _errors.HierarchyError
+IdentityError = _errors.IdentityError
+ImportDomainError = _errors.ImportDomainError
+PersistenceError = _errors.PersistenceError
+AccessManagementError = _errors.AccessManagementError
+UserManagementError = _errors.UserManagementError
+VersionError = _errors.VersionError
+
 # Keep this security posture explicit so dependency default changes cannot weaken it:
 # Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
 PASSWORD_HASHER = PasswordHasher(
@@ -75,44 +99,6 @@ _DUMMY_PASSWORD_HASH = (
     "U29tZVN0YXRpY1NhbHQxNg$"
     "JvPgxylqfMveFSbsSWHHBEKbGOlnkLIjFBG0s33wtgE"
 )
-
-
-class AuthorizationError(UserManagementError):
-    pass
-
-
-class ConflictError(UserManagementError):
-    def __init__(self, message, *, field=None):
-        self.field = field
-        super().__init__(message)
-
-
-class InvalidLifecycleError(UserManagementError):
-    pass
-
-
-class NotFoundError(UserManagementError):
-    pass
-
-
-class RecordValidationError(ValidationError):
-    def __init__(self, errors: dict[str, str]) -> None:
-        super().__init__("Record contains invalid values")
-        self.errors = errors
-
-
-class RecordConflictError(ConflictError):
-    def __init__(self, message: str, field_key: str | None = None) -> None:
-        super().__init__(message)
-        self.field_key = field_key
-
-
-class StaleRecordError(ConflictError):
-    """The submitted Record revision no longer matches persisted state."""
-
-
-class StaleFieldOrderError(ConflictError):
-    """The submitted field order no longer matches persisted state."""
 
 
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
@@ -672,15 +658,6 @@ class DatasetResourceResolver:
             return uow.datasets.exists(dataset_id)
 
 
-def _valid_identity(value: str) -> bool:
-    if not isinstance(value, str):
-        return False
-    try:
-        return str(UUID(value)) == value
-    except ValueError:
-        return False
-
-
 class DatasetAuthorizationService:
     """Dataset capabilities, independent of frameworks and legacy resource roles.
 
@@ -712,7 +689,7 @@ class DatasetAuthorizationService:
             # Starting the creation flow is open to every active user.
             if team_id is None:
                 return self.active(work.users.get(actor_id))
-            if not _valid_identity(team_id):
+            if not valid_identity(team_id):
                 return False
             team = work.teams.get(team_id, for_update=uow is not None)
             actor = work.users.get(actor_id, for_update=uow is not None)
@@ -812,10 +789,6 @@ class DatasetAuthorizationService:
             return self.active(work.users.get(actor_id))
 
 
-class StaleDatasetOwnerError(ConflictError):
-    """Persisted ownership no longer matches the form's expected owner."""
-
-
 @dataclass(frozen=True, slots=True)
 class DatasetDeletion:
     id: str
@@ -826,19 +799,6 @@ class DatasetDeletion:
     version_count: int
     export_access_count: int
     expected_updated_at: str
-
-
-def _require_concept(uow, dataset_id):
-    concept = uow.concepts.get(dataset_id)
-    if concept is None:
-        raise ConflictError("Start a New concept before editing this Dataset.")
-    return concept
-
-
-def _advance_concept(uow, dataset):
-    _require_concept(uow, dataset.id)
-    dataset.revision += 1
-    uow.concepts.touch(dataset.id, uow.now())
 
 
 def _version_reads(service):
@@ -894,7 +854,7 @@ class DatasetService:
             return result
 
     def _deletion_target(self, uow, actor_id, dataset_id, *, for_update=False):
-        if not _valid_identity(actor_id) or not _valid_identity(dataset_id):
+        if not valid_identity(actor_id) or not valid_identity(dataset_id):
             raise NotFoundError("Dataset not found")
         dataset = uow.datasets.get(dataset_id, for_update=for_update)
         if dataset is None or not self.authorization.datasets.can_maintain_dataset(
@@ -1365,16 +1325,14 @@ class DatasetService:
 
     def _change_owner(self, uow, actor_id, dataset, expected_owner_team_id, owner_team_id):
         target_team = (
-            uow.teams.get(owner_team_id, for_update=True)
-            if _valid_identity(owner_team_id)
-            else None
+            uow.teams.get(owner_team_id, for_update=True) if valid_identity(owner_team_id) else None
         )
         # Validate authority before revealing owner or target information.
         if dataset is None or not self.authorization.datasets.can_change_dataset_owner(
             actor_id, dataset.id, uow=uow
         ):
             raise NotFoundError("Dataset not found")
-        if not _valid_identity(expected_owner_team_id):
+        if not valid_identity(expected_owner_team_id):
             raise ValidationError("Expected owning team is required. Reopen the form.")
         if dataset.owner_team_id != expected_owner_team_id:
             raise StaleDatasetOwnerError("Owning team changed. Reopen the form and try again.")
@@ -1433,16 +1391,16 @@ class DatasetService:
 
     def grant_export_access(self, actor_id, key, subject_type, subject_id):
         key = self._validated_lookup_key(key)
-        if not _valid_identity(actor_id):
+        if not valid_identity(actor_id):
             raise NotFoundError("Dataset not found")
         with self.uow(write=True, serialized=True) as uow:
             # Serialize grant changes with policy changes before any Dataset/user locks.
             uow.installation_settings.get_policy(for_update=True)
             dataset = uow.datasets.find_by_key(key, for_update=True)
             valid = False
-            if subject_type == "team" and _valid_identity(subject_id):
+            if subject_type == "team" and valid_identity(subject_id):
                 valid = uow.teams.get(subject_id, for_update=True) is not None
-            elif subject_type == "user" and _valid_identity(subject_id):
+            elif subject_type == "user" and valid_identity(subject_id):
                 locked_users = {
                     user_id: uow.users.get(user_id, for_update=True)
                     for user_id in sorted({subject_id, actor_id})
@@ -1452,7 +1410,7 @@ class DatasetService:
                 actor_id, dataset.id, uow=uow
             ):
                 raise NotFoundError("Dataset not found")
-            if subject_type not in SUBJECT_TYPES or not _valid_identity(subject_id):
+            if subject_type not in SUBJECT_TYPES or not valid_identity(subject_id):
                 raise ValidationError("Choose an available user or team.")
             if not valid:
                 raise ValidationError("Choose an available user or team.")
@@ -1490,9 +1448,7 @@ class DatasetService:
                 actor_id, dataset.id, uow=uow
             ):
                 raise NotFoundError("Dataset not found")
-            access = (
-                uow.dataset_export_access.get(access_id) if _valid_identity(access_id) else None
-            )
+            access = uow.dataset_export_access.get(access_id) if valid_identity(access_id) else None
             if access is None or access.dataset_id != dataset.id:
                 raise NotFoundError("Export access not found")
             record_audit(
@@ -1802,7 +1758,7 @@ class DatasetFieldService:
                 if exc.constraint == "uq_dataset_fields_dataset_key":
                     raise ConflictError("Field key already exists in this Dataset") from exc
                 raise
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field.id, "created")
             if validated_component:
@@ -2014,7 +1970,7 @@ class DatasetFieldService:
             field.is_unique = validated_unique
             field.hierarchy_scope = hierarchy_scope
             field.updated_at = uow.now()
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field.id, "definition_updated")
             return field
@@ -2163,7 +2119,7 @@ class DatasetFieldService:
                     ),
                 )
 
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             if definition_changed or key_changed:
                 field.definition, field.unit = definition, unit
@@ -2200,7 +2156,7 @@ class DatasetFieldService:
             uow.flush()
             remaining = uow.dataset_fields.list_for_dataset(dataset.id)
             uow.dataset_fields.replace_order(dataset.id, tuple(item.id for item in remaining))
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             self._add_audit(uow, actor_id, field_id, "deleted")
 
@@ -2240,7 +2196,7 @@ class DatasetFieldService:
                     raise ValidationError("Move fields within their Source or Target block.")
             if proposed_order == current:
                 return tuple(fields)
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             uow.dataset_fields.replace_order(dataset.id, proposed_order)
             record_audit(
@@ -2284,10 +2240,10 @@ class DatasetFieldService:
             raise NotFoundError("Dataset not found")
         if required_permission == "can_maintain_dataset":
             if uow is not None:
-                _require_concept(uow, dataset.id)
+                require_concept(uow, dataset.id)
             else:
                 with self.uow() as work:
-                    _require_concept(work, dataset.id)
+                    require_concept(work, dataset.id)
 
     @staticmethod
     def _validated_dataset_lookup_key(key: str) -> str:
@@ -2402,7 +2358,7 @@ class DatasetBusinessKeyService:
             if uow.dataset_records.count(dataset.id):
                 raise ValidationError("Record identifier cannot change after records exist")
 
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             uow.dataset_business_keys.replace(dataset.id, canonical)
             record_audit(
@@ -2425,10 +2381,10 @@ class DatasetBusinessKeyService:
             raise NotFoundError("Dataset not found")
         if required_permission == "can_maintain_dataset":
             if uow is not None:
-                _require_concept(uow, dataset.id)
+                require_concept(uow, dataset.id)
             else:
                 with self.uow() as work:
-                    _require_concept(work, dataset.id)
+                    require_concept(work, dataset.id)
 
 
 class DatasetRecordService:
@@ -2487,7 +2443,7 @@ class DatasetRecordService:
                     raise RecordConflictError("A unique field value already exists") from error
                 raise
             uow.concepts.record_mutation(dataset.id)
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
@@ -2556,7 +2512,7 @@ class DatasetRecordService:
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
             uow.concepts.record_mutation(dataset.id)
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
@@ -2585,7 +2541,7 @@ class DatasetRecordService:
             if not uow.dataset_records.delete_if_revision(dataset.id, record_id, expected_revision):
                 self._raise_missing_or_stale(uow, dataset.id, record_id)
             uow.concepts.record_mutation(dataset.id)
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
@@ -2606,7 +2562,7 @@ class DatasetRecordService:
                 raise ValidationError(
                     "Source records can only be restored by updating the source version."
                 )
-            if _require_concept(uow, dataset.id).id != concept_id:
+            if require_concept(uow, dataset.id).id != concept_id:
                 raise NotFoundError("Record not found")
             deleted = next(
                 (
@@ -2647,7 +2603,7 @@ class DatasetRecordService:
             except PersistenceConflictError as error:
                 self._raise_record_conflict(error)
             uow.concepts.record_mutation(dataset.id)
-            _advance_concept(uow, dataset)
+            advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
             record_audit(
                 uow,
@@ -2891,10 +2847,10 @@ class DatasetRecordService:
             )
         if permission == "can_maintain_dataset":
             if uow is not None:
-                _require_concept(uow, dataset.id)
+                require_concept(uow, dataset.id)
             else:
                 with self.uow() as work:
-                    _require_concept(work, dataset.id)
+                    require_concept(work, dataset.id)
 
 
 class GrantService:
@@ -2923,7 +2879,7 @@ class GrantService:
             # Match the Dataset → actor lock order before checking existence.
             dataset = (
                 uow.datasets.get(resource_id, for_update=True)
-                if resource_type == "dataset" and _valid_identity(resource_id)
+                if resource_type == "dataset" and valid_identity(resource_id)
                 else None
             )
             actor = require_admin(uow, actor_id)

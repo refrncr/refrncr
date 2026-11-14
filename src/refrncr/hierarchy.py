@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from refrncr.audit import record_audit
 from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
@@ -14,9 +15,6 @@ from refrncr.services import (
     RecordValidationError,
     StaleRecordError,
     ValidationError,
-    _advance_concept,
-    _require_concept,
-    _valid_identity,
     canonicalize_record_value,
     normalize_dataset_field_name,
     normalize_dataset_name,
@@ -243,7 +241,7 @@ def hierarchy_snapshot(uow, dataset, *, validate=True):
     ):
         raise ValidationError("Invalid Field configuration")
     for field in fields:
-        if field.dataset_id != dataset.id or not _valid_identity(field.id):
+        if field.dataset_id != dataset.id or not valid_identity(field.id):
             raise ValidationError("Invalid Field identity")
         validate_dataset_field_key(field.key)
         normalize_dataset_field_name(field.name)
@@ -254,8 +252,8 @@ def hierarchy_snapshot(uow, dataset, *, validate=True):
         validate_hierarchy_scope(field.hierarchy_scope, "hierarchy")
     if any(
         node.dataset_id != dataset.id
-        or not _valid_identity(node.id)
-        or (node.parent_id is not None and not _valid_identity(node.parent_id))
+        or not valid_identity(node.id)
+        or (node.parent_id is not None and not valid_identity(node.parent_id))
         for node in nodes
     ):
         raise ValidationError("Invalid hierarchy node identity")
@@ -306,7 +304,7 @@ class HierarchyService:
             or not self.authorization.datasets.can_maintain_dataset(actor_id, dataset.id, uow=work)
         ):
             raise NotFoundError("Dataset not found")
-        _require_concept(work, dataset.id)
+        require_concept(work, dataset.id)
         if type(expected_revision) is not int or expected_revision < 1:
             raise ValidationError("Expected revision must be a positive integer")
         if expected_revision != dataset.revision:
@@ -315,7 +313,7 @@ class HierarchyService:
 
     @staticmethod
     def _changed(work, dataset, actor_id, action):
-        _advance_concept(work, dataset)
+        advance_concept(work, dataset)
         dataset.content_updated_at = work.now()
         work.concepts.record_mutation(dataset.id)
         record_audit(

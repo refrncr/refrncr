@@ -15,6 +15,7 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
+from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import (
     DatasetBusinessKey,
@@ -37,7 +38,6 @@ from refrncr.services import (
     NotFoundError,
     RecordPage,
     ValidationError,
-    _valid_identity,
     normalize_dataset_field_name,
     normalize_dataset_name,
     validate_dataset_description,
@@ -564,9 +564,7 @@ class DatasetVersionService:
         return artifact
 
     def _discard_review(self, uow, actor_id, dataset):
-        from refrncr.services import _require_concept
-
-        concept = _require_concept(uow, dataset.id)
+        concept = require_concept(uow, dataset.id)
         current = uow.versions.current_for_datasets((dataset.id,), self.clock.today()).get(
             dataset.id
         )
@@ -705,7 +703,6 @@ class DatasetVersionService:
     def update_mapping_source(self, actor_id, dataset_id, expected_revision):
         """Explicitly upgrade to the latest non-cancelled publication, atomically."""
         from refrncr.mapping_updates import reconcile_source
-        from refrncr.services import _advance_concept
 
         try:
             with self.uow(write=True, serialized=True, translate_errors=True) as uow:
@@ -733,7 +730,7 @@ class DatasetVersionService:
                     import_result={},
                     source_update_notes=[*(concept.source_update_notes or []), *notes],
                 )
-                _advance_concept(uow, dataset)
+                advance_concept(uow, dataset)
                 record_audit(
                     uow,
                     actor_user_id=actor_id,
@@ -750,7 +747,7 @@ class DatasetVersionService:
 
     def _target(self, uow, actor_id, dataset_id, *, write=False):
         dataset = (
-            uow.datasets.get(dataset_id, for_update=write) if _valid_identity(dataset_id) else None
+            uow.datasets.get(dataset_id, for_update=write) if valid_identity(dataset_id) else None
         )
         if dataset is None or not self.authorization.can_maintain_dataset(
             actor_id, dataset.id, uow=uow
@@ -1186,9 +1183,7 @@ class DatasetVersionService:
             return dataset.revision, number, content, summary
 
     def _prepare(self, uow, dataset, today):
-        from refrncr.services import _require_concept
-
-        concept = _require_concept(uow, dataset.id)
+        concept = require_concept(uow, dataset.id)
         versions = uow.versions.list_for_dataset(dataset.id)
         baseline = next((v for v in versions if v.id == concept.base_version_id), None)
         if concept.base_version_id is not None and (

@@ -20,10 +20,11 @@ from refrncr.diff_contracts import (
     RecordDetail,
     ReviewIdentity,
 )
+from refrncr.domain import require_concept, valid_identity
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, decode_record_identifier
-from refrncr.services import ConflictError, NotFoundError, ValidationError, _valid_identity
+from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.version_contracts import SnapshotField, version_states
 
 STALE_MESSAGE = "This Dataset changed. Reload the review to see its current changes."
@@ -36,9 +37,7 @@ class DatasetDiffService:
 
     def _load(self, uow, actor_id, dataset_id, expected=None, *, write=False, allow_stale=False):
         dataset = self.versions._target(uow, actor_id, dataset_id, write=write)
-        from refrncr.services import _require_concept
-
-        concept = _require_concept(uow, dataset_id)
+        concept = require_concept(uow, dataset_id)
         latest = (
             uow.versions.get(dataset_id, concept.base_version_id)
             if concept.base_version_id
@@ -255,7 +254,7 @@ class DatasetDiffService:
                 _dataset, _actual, state, current, previous, _changes = self._load(
                     uow, actor_id, identity.dataset_id, identity
                 )
-                if not _valid_identity(record_id):
+                if not valid_identity(record_id):
                     raise NotFoundError("Record not found")
                 if type(page) is not int or not 1 <= page <= 2_147_483_647:
                     raise ValidationError("Choose a valid detail page.")
@@ -288,7 +287,7 @@ class DatasetDiffService:
             or any(status not in STATUSES for status in criteria.statuses)
             or not isinstance(criteria.search, str)
             or len(criteria.search) > MAX_SEARCH
-            or (criteria.anchor and not _valid_identity(criteria.anchor))
+            or (criteria.anchor and not valid_identity(criteria.anchor))
             or type(criteria.backwards) is not bool
         ):
             raise ValidationError("Choose valid review filters.")
@@ -336,7 +335,7 @@ class DatasetDiffService:
 
     @classmethod
     def _record(cls, row, current, previous):
-        if not _valid_identity(row.id):
+        if not valid_identity(row.id):
             raise ValidationError("Invalid stored Record identity")
         if row.hierarchy:
             old, new = row.before_label, row.after_label
