@@ -500,9 +500,9 @@ cryptography==50.0.2 \
     --hash=sha256:fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb \
     --hash=sha256:fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b
     # via secretstorage
-cyclonedx-bom==7.5.0 \
-    --hash=sha256:396cc8c9cb7533d25a21f930b45d2699a1839e3ba2be9ba88f8bd61c566b51dc \
-    --hash=sha256:a3020e225107214a66cb9c79ae83e3a71640a06d4ff3a0e2f9cb0d238f7061fd
+cyclonedx-bom==8.0.1 \
+    --hash=sha256:a32c8bb2c4b436e0d6b7ee3b9f0899efdfc91e8f5d9652975467d31e4c20b900 \
+    --hash=sha256:b91ac00e0d031aaee0bc69fd3851384b2c36e569859df13b2a564b5d2d67aab3
     # via -r requirements/dev.in
 cyclonedx-python-lib==11.12.0 \
     --hash=sha256:0e807521a921a5c3cb8ce1153f8a61d29eedfe76a46aac2796b7c6b573391a54 \
