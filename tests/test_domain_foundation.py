@@ -5,6 +5,8 @@ import pytest
 from refrncr import services
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.errors import (
+    AccessManagementError,
+    AuthorizationError,
     ConflictError,
     DatasetError,
     DomainError,
@@ -22,6 +24,22 @@ def test_compatibility_error_is_an_alias_and_services_reexports_categories():
     assert services.NotFoundError is NotFoundError
     assert services.ConflictError is ConflictError
     assert services.ValidationError is ValidationError
+    assert services.AuthorizationError is AuthorizationError
+    assert services.AccessManagementError is AccessManagementError
+
+
+def test_authorization_is_a_category_and_access_management_is_a_domain():
+    class DuplicateGrantError(AccessManagementError, ConflictError):
+        pass
+
+    assert issubclass(AuthorizationError, DomainError)
+    assert not issubclass(AuthorizationError, AccessManagementError)
+    assert issubclass(AccessManagementError, DomainError)
+    assert not issubclass(AccessManagementError, AuthorizationError)
+    assert not issubclass(AccessManagementError, NotFoundError | ConflictError | ValidationError)
+    assert issubclass(DuplicateGrantError, AccessManagementError)
+    assert issubclass(DuplicateGrantError, ConflictError)
+    assert not issubclass(DuplicateGrantError, AuthorizationError)
 
 
 def test_record_errors_have_a_domain_and_exact_category():

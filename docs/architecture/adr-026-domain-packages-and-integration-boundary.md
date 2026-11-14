@@ -100,7 +100,7 @@ will expose exactly the production needs recorded by REF-356:
 - the supported administrator-password recovery operation, without exposing
   `SqlAlchemyUnitOfWorkFactory`;
 - `ResourceTypeRegistry`;
-- `NotFoundError`, `ConflictError` and `ValidationError`.
+- `NotFoundError`, `ConflictError`, `ValidationError` and `AuthorizationError`.
 
 REF-356 creates this package, contract tests and `docs/development/integration.md`. The integrator
 wrapper hook is added to the same contract by REF-362. The Cloud beta-seed replacement is separate
@@ -109,9 +109,10 @@ work in REF-354 and is not part of this package's initial implementation.
 ### Domain error hierarchy
 
 `DomainError` is the safe application-boundary base. Each domain has a marker:
-`IdentityError`, `AuthorizationError`, `DatasetError`, `VersionError`, `ImportDomainError` and
+`IdentityError`, `AccessManagementError`, `DatasetError`, `VersionError`, `ImportDomainError` and
 `HierarchyError`; persistence-neutral failures that are safe to expose may use `PersistenceError`.
-The import marker is deliberately called `ImportDomainError` to avoid shadowing Python's built-in
+The access-management name keeps the domain distinct from the `AuthorizationError` category. The
+import marker is deliberately called `ImportDomainError` to avoid shadowing Python's built-in
 `ImportError`.
 
 Every specific domain failure ultimately combines one domain marker with exactly one semantic
@@ -119,7 +120,9 @@ category:
 
 - `NotFoundError` for absent or deliberately concealed resources;
 - `ConflictError` for a request that conflicts with current state;
-- `ValidationError` for invalid input.
+- `ValidationError` for invalid input;
+- `AuthorizationError` for denied access, mapped to HTTP 403 and
+  `security.authorization_denied` at the browser boundary.
 
 For example, a Dataset-specific missing-resource error inherits from both `DatasetError` and
 `NotFoundError`. Boundary code maps categories and does not need to know every domain-specific

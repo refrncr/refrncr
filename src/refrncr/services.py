@@ -77,6 +77,7 @@ HierarchyError = _errors.HierarchyError
 IdentityError = _errors.IdentityError
 ImportDomainError = _errors.ImportDomainError
 PersistenceError = _errors.PersistenceError
+AccessManagementError = _errors.AccessManagementError
 UserManagementError = _errors.UserManagementError
 VersionError = _errors.VersionError
 
