@@ -10,7 +10,7 @@ from sqlalchemy import select
 from support import NOW, audits, publish, request, setup, snapshot
 from support import dataset_version_client as client
 
-from refrncr.dataset_diff import DatasetDiffService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.models import DatasetConcept, DatasetVersion
 from refrncr.services import ConflictError, NotFoundError
 

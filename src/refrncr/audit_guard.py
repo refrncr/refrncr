@@ -106,9 +106,11 @@ def verify_inventory(root):
             module
             in {
                 "refrncr.services",
+                "refrncr.datasets.deletion",
+                "refrncr.datasets.service",
                 "refrncr.record_import",
                 "refrncr.dataset_versions",
-                "refrncr.dataset_diff",
+                "refrncr.datasets.dataset_diff",
                 "refrncr.identity.api_keys",
                 "refrncr.hierarchy",
             }

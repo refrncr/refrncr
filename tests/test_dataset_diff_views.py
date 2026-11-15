@@ -461,7 +461,7 @@ def test_review_websecurity_methods_parameters_and_escaping(context):
 
 
 def test_review_failure_hides_internal_details(context, monkeypatch):
-    from refrncr.dataset_diff import DatasetDiffService
+    from refrncr.datasets.dataset_diff import DatasetDiffService
 
     c = context
     browser, _csrf, base, token = prepared(c)

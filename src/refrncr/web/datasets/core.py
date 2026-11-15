@@ -428,7 +428,7 @@ def render_dataset_configuration(
 )
 @version_errors
 def dataset_mapping_source_update(key):
-    from refrncr.mapping_updates import SourceUpdateBlocked
+    from refrncr.datasets.mapping_updates import SourceUpdateBlocked
 
     actor, session = require_authenticated()
     require_csrf(session.csrf_token)

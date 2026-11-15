@@ -548,23 +548,45 @@ _audited(
     "create_dataset",
     ("dataset", "created"),
     ("dataset", "dataset.concept_created"),
+    module="datasets.service",
 )
-_audited("DatasetService", "delete_dataset", ("dataset", "dataset.deleted"))
-_read("DatasetService", "get_dataset_for_deletion get_dataset_configuration")
-_audited("DatasetService", "change_owner", ("dataset", "owner_changed"))
+_audited(
+    "DatasetService",
+    "delete_dataset",
+    ("dataset", "dataset.deleted"),
+    module="datasets.service",
+)
+_read(
+    "DatasetService",
+    "get_dataset_for_deletion get_dataset_configuration",
+    module="datasets.service",
+)
+_audited("DatasetService", "change_owner", ("dataset", "owner_changed"), module="datasets.service")
 _audited(
     "DatasetService",
     "update_dataset",
     ("dataset", "metadata_updated"),
     ("dataset", "owner_changed"),
+    module="datasets.service",
 )
-_audited("DatasetService", "grant_export_access", ("dataset_export_access", "granted"))
-_audited("DatasetService", "revoke_export_access", ("dataset_export_access", "revoked"))
+_audited(
+    "DatasetService",
+    "grant_export_access",
+    ("dataset_export_access", "granted"),
+    module="datasets.service",
+)
+_audited(
+    "DatasetService",
+    "revoke_export_access",
+    ("dataset_export_access", "revoked"),
+    module="datasets.service",
+)
 _read(
     "DatasetService",
     "export_access_context list_datasets list_dataset_overview "
     "get_dataset_context get_dataset get_dataset_details get_dataset_for_edit "
     "get_visible_dataset_by_id mapping_source mapping_source_choices mapping_usage",
+    module="datasets.service",
 )
 _identifier_events = (("dataset", "business_key_defined"), ("dataset", "business_key_updated"))
 _audited("DatasetFieldService", "create_field", ("dataset_field", "created"), *_identifier_events)
@@ -739,19 +761,19 @@ for _symbol, _classification, _reason in (
         "Help/version and argument parsing disclose no protected application state.",
     ),
     (
-        "refrncr.dataset_upgrade.ownership_preflight",
+        "refrncr.datasets.dataset_upgrade.ownership_preflight",
         "technical logging only",
         "Operator-only read/validation of the stopped installation; output is an "
         "upgrade report, not a Dataset export.",
     ),
     (
-        "refrncr.dataset_upgrade.read_owner_mapping",
+        "refrncr.datasets.dataset_upgrade.read_owner_mapping",
         "technical logging only",
         "Read and validate operator mapping; no persistence or authenticated actor, "
         "never log local paths or content.",
     ),
     (
-        "refrncr.dataset_upgrade.require_resolved_ownership",
+        "refrncr.datasets.dataset_upgrade.require_resolved_ownership",
         "technical logging only",
         "Pre-DDL validation used by Alembic; migration failure is technical, never "
         "successful domain history.",
@@ -861,13 +883,13 @@ _audited(
     "DatasetDiffService",
     "open_review",
     ("dataset", "dataset.version_diff_viewed"),
-    module="dataset_diff",
+    module="datasets.dataset_diff",
 )
 _register(
     "DatasetDiffService",
     "review field_detail record_detail",
     "intentionally excluded",
-    module="dataset_diff",
+    module="datasets.dataset_diff",
     rationale="Child read in one authorized revision-bound review; opening owns the event.",
 )
 

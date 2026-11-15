@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from refrncr.mapping_updates import source_update_blocker
+from refrncr.datasets.mapping_updates import source_update_blocker
 from refrncr.services import AuthorizationError
 from refrncr.version_contracts import version_states
 

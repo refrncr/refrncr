@@ -21,10 +21,10 @@ from refrncr.diff_contracts import (
     ReviewIdentity,
 )
 from refrncr.domain import require_concept, valid_identity
+from refrncr.errors import DatasetConflictError, DatasetNotFoundError, DatasetValidationError
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
 from refrncr.record_identity import RecordIdentifierError, decode_record_identifier
-from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.version_contracts import SnapshotField, version_states
 
 STALE_MESSAGE = "This Dataset changed. Reload the review to see its current changes."
@@ -44,10 +44,12 @@ class DatasetDiffService:
             else None
         )
         if concept.base_version_id is not None and latest is None:
-            raise ConflictError("The concept basis is unavailable. Your changes are preserved.")
+            raise DatasetConflictError(
+                "The concept basis is unavailable. Your changes are preserved."
+            )
         state = version_states((latest,), self.versions.clock.today())[0] if latest else None
         if state and state.status == "Cancelled" and not allow_stale:
-            raise ConflictError(
+            raise DatasetConflictError(
                 "The concept basis was cancelled. Your changes are preserved; "
                 "publication is blocked."
             )
@@ -61,7 +63,7 @@ class DatasetDiffService:
             concept.id,
         )
         if expected is not None and expected != identity:
-            raise ConflictError(STALE_MESSAGE)
+            raise DatasetConflictError(STALE_MESSAGE)
         identifier = uow.dataset_business_keys.get(dataset_id)
         current = tuple(
             SnapshotField(
@@ -84,7 +86,7 @@ class DatasetDiffService:
         )
         previous = uow.versions.fields(latest) if latest else ()
         if latest and len(previous) != latest.field_count:
-            raise ValidationError("Invalid published snapshot")
+            raise DatasetValidationError("Invalid published snapshot")
         changes = classify_fields(current, previous)
         return dataset, identity, state, current, previous, changes
 
@@ -94,7 +96,7 @@ class DatasetDiffService:
             return
         current = version_states((state.version,), self.versions.clock.today())[0]
         if current.status != state.status:
-            raise ConflictError(STALE_MESSAGE)
+            raise DatasetConflictError(STALE_MESSAGE)
 
     @staticmethod
     def _summary(uow, dataset, identity, state, changes):
@@ -141,12 +143,12 @@ class DatasetDiffService:
                     uow, actor_id, dataset_id, expected, write=True
                 )
                 if state is not None and not uow.version_diff.validate_snapshot(state.version):
-                    raise ValidationError("Invalid published snapshot")
+                    raise DatasetValidationError("Invalid published snapshot")
                 if not uow.version_diff.validate_concept(dataset_id, current):
-                    raise ValidationError("Invalid concept Record content")
+                    raise DatasetValidationError("Invalid concept Record content")
                 result = self._summary(uow, dataset, identity, state, changes)
                 if not result.has_changes:
-                    raise ConflictError(
+                    raise DatasetConflictError(
                         "No changes yet. Edit the concept before reviewing changes."
                     )
                 self._calendar_check(state)
@@ -164,7 +166,9 @@ class DatasetDiffService:
                 )
             return result
         except (PersistenceConflictError, DatatypeError):
-            raise ConflictError("Review could not be opened. Reload and try again.") from None
+            raise DatasetConflictError(
+                "Review could not be opened. Reload and try again."
+            ) from None
 
     def review(self, actor_id, identity, section="Summary", criteria=None):
         try:
@@ -229,11 +233,11 @@ class DatasetDiffService:
                             result, mapping_fields=ordered, mapping_values=tuple(values)
                         )
                 else:
-                    raise ValidationError("Choose Summary, Fields or Records.")
+                    raise DatasetValidationError("Choose Summary, Fields or Records.")
                 self._calendar_check(state)
                 return result
         except (PersistenceConflictError, DatatypeError):
-            raise ConflictError("Review is unavailable. Reload and try again.") from None
+            raise DatasetConflictError("Review is unavailable. Reload and try again.") from None
 
     def field_detail(self, actor_id, identity, field_id):
         with self.uow(translate_errors=True) as uow:
@@ -243,7 +247,7 @@ class DatasetDiffService:
             )
             result = next((item for item in changes if item.id == field_id), None)
             if result is None:
-                raise NotFoundError("Field not found")
+                raise DatasetNotFoundError("Field not found")
             self._calendar_check(state)
             return result
 
@@ -255,9 +259,9 @@ class DatasetDiffService:
                     uow, actor_id, identity.dataset_id, identity
                 )
                 if not valid_identity(record_id):
-                    raise NotFoundError("Record not found")
+                    raise DatasetNotFoundError("Record not found")
                 if type(page) is not int or not 1 <= page <= 2_147_483_647:
-                    raise ValidationError("Choose a valid detail page.")
+                    raise DatasetValidationError("Choose a valid detail page.")
                 row = next(
                     iter(
                         uow.version_diff.records(
@@ -267,7 +271,7 @@ class DatasetDiffService:
                     None,
                 )
                 if row is None:
-                    raise NotFoundError("Record not found")
+                    raise DatasetNotFoundError("Record not found")
                 record = self._record(row, current, previous)
                 values, total = uow.version_diff.values(
                     identity.dataset_id, identity.baseline_id, record_id, record.status, page
@@ -275,7 +279,9 @@ class DatasetDiffService:
                 self._calendar_check(state)
                 return RecordDetail(record, values, page, total)
         except (PersistenceConflictError, DatatypeError):
-            raise ConflictError("Record review is unavailable. Reload and try again.") from None
+            raise DatasetConflictError(
+                "Record review is unavailable. Reload and try again."
+            ) from None
 
     @staticmethod
     def _criteria(criteria):
@@ -290,7 +296,7 @@ class DatasetDiffService:
             or (criteria.anchor and not valid_identity(criteria.anchor))
             or type(criteria.backwards) is not bool
         ):
-            raise ValidationError("Choose valid review filters.")
+            raise DatasetValidationError("Choose valid review filters.")
 
     @staticmethod
     def _field_page(changes, criteria):
@@ -298,7 +304,7 @@ class DatasetDiffService:
         if criteria.anchor:
             index = next((i for i, item in enumerate(changes) if item.id == criteria.anchor), None)
             if index is None:
-                raise NotFoundError("Field not found")
+                raise DatasetNotFoundError("Field not found")
             start = max(0, index - PAGE_SIZE) if criteria.backwards else index + 1
         items = changes[start : start + PAGE_SIZE]
         return DiffPage(
@@ -316,27 +322,27 @@ class DatasetDiffService:
         try:
             components = decode_record_identifier(encoded)
         except RecordIdentifierError:
-            raise ValidationError("Invalid stored Record identifier") from None
+            raise DatasetValidationError("Invalid stored Record identifier") from None
         identifier_fields = sorted((f for f in fields if f.is_identifier), key=lambda f: f.key)
         if len(components) != len(identifier_fields):
-            raise ValidationError("Invalid stored Record identifier")
+            raise DatasetValidationError("Invalid stored Record identifier")
         labels, ordering = [], []
         for field, key in zip(identifier_fields, components, strict=True):
             datatype = get_datatype(field.data_type)
             if not datatype.identifier_eligible:
-                raise ValidationError("Invalid stored Record identifier")
+                raise DatasetValidationError("Invalid stored Record identifier")
             value = datatype.from_key(key)
             labels.append(datatype.text(value))
             # Status groups have one schema each: Changed uses the new identifier.
             ordering.append(datatype.ordering_key(value))
         if not labels:
-            raise ValidationError("Invalid stored Record identifier")
+            raise DatasetValidationError("Invalid stored Record identifier")
         return record_label(labels), tuple(ordering)
 
     @classmethod
     def _record(cls, row, current, previous):
         if not valid_identity(row.id):
-            raise ValidationError("Invalid stored Record identity")
+            raise DatasetValidationError("Invalid stored Record identity")
         if row.hierarchy:
             old, new = row.before_label, row.after_label
             old_sort, new_sort = ((label.casefold(),) if label else () for label in (old, new))
@@ -367,7 +373,7 @@ class DatasetDiffService:
                 None,
             )
             if row is None:
-                raise NotFoundError("Record not found")
+                raise DatasetNotFoundError("Record not found")
             anchor = self._record(row, current, previous).sort_key
         total = 0
         status_counts = [0, 0, 0]

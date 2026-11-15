@@ -58,6 +58,18 @@ class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
 
 
+class DatasetNotFoundError(DatasetError, NotFoundError):
+    """A Dataset object does not exist or is deliberately concealed."""
+
+
+class DatasetConflictError(DatasetError, ConflictError):
+    """Requested Dataset work conflicts with current domain state."""
+
+
+class DatasetValidationError(DatasetError, ValidationError):
+    """A Dataset request violates a domain constraint."""
+
+
 class RecordValidationError(DatasetError, ValidationError):
     """Record values violate one or more Dataset field constraints."""
 

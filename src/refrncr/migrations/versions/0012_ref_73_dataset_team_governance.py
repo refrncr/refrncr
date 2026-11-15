@@ -3,7 +3,7 @@
 import sqlalchemy as sa
 from alembic import op
 
-from refrncr.dataset_upgrade import require_resolved_ownership
+from refrncr.datasets.dataset_upgrade import require_resolved_ownership
 
 revision = "0012_ref_73"
 down_revision = "0011_ref_130"

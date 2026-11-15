@@ -14,7 +14,10 @@ from refrncr.errors import (
     AccessManagementError,
     AuthorizationError,
     ConflictError,
+    DatasetConflictError,
     DatasetError,
+    DatasetNotFoundError,
+    DatasetValidationError,
     DomainError,
     NotFoundError,
     RecordConflictError,
@@ -62,6 +65,20 @@ def test_record_errors_have_a_domain_and_exact_category():
     assert issubclass(RecordConflictError, DatasetError)
     assert issubclass(RecordConflictError, ConflictError)
     assert not issubclass(RecordConflictError, ValidationError | NotFoundError)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "category", "other_categories"),
+    [
+        (DatasetNotFoundError, NotFoundError, ConflictError | ValidationError),
+        (DatasetConflictError, ConflictError, NotFoundError | ValidationError),
+        (DatasetValidationError, ValidationError, NotFoundError | ConflictError),
+    ],
+)
+def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, other_categories):
+    assert issubclass(error_type, DatasetError)
+    assert issubclass(error_type, category)
+    assert not issubclass(error_type, other_categories)
 
 
 @pytest.mark.parametrize(

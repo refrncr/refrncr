@@ -37,8 +37,8 @@ from refrncr.browser_security import (
     BrowserCookiePolicy,
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.identity.api_keys import ApiKeyService
