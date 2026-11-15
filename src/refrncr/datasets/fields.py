@@ -3,7 +3,13 @@ from __future__ import annotations
 from refrncr.audit import record_audit
 from refrncr.authorization import AuthorizationService
 from refrncr.datasets.deletion import version_reads as _version_reads
-from refrncr.datasets.errors import StaleFieldOrderError
+from refrncr.datasets.errors import (
+    DatasetAuthorizationError,
+    DatasetConflictError,
+    DatasetNotFoundError,
+    DatasetValidationError,
+    StaleFieldOrderError,
+)
 from refrncr.datasets.shared import (
     normalize_dataset_field_name,
     validate_dataset_field_flag,
@@ -16,7 +22,7 @@ from refrncr.datasets.shared import (
     require_identifier_type as _require_identifier_type,
 )
 from refrncr.domain import advance_concept, require_concept
-from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from refrncr.errors import ValidationError
 from refrncr.ports import (
     DatasetFieldRecord,
     DatasetRecord,
@@ -72,16 +78,16 @@ class DatasetFieldService:
                     else {"mapping_target", "source_identifier", "source_context"}
                 )
                 if mapping_role not in allowed_roles:
-                    raise ValidationError("Choose a valid mapping field role")
+                    raise DatasetValidationError("Choose a valid mapping field role")
                 if mapping_role == "source_context":
                     if dataset.mapping_mode == "linked":
                         if not dataset.source_dataset_id:
-                            raise ValidationError(
+                            raise DatasetValidationError(
                                 "Source context requires a linked mapping dataset"
                             )
                         source_dataset = uow.datasets.get(dataset.source_dataset_id)
                         if not source_field_key:
-                            raise ValidationError("Choose an available source field")
+                            raise DatasetValidationError("Choose an available source field")
                         source_version = uow.versions.get(
                             dataset.source_dataset_id, dataset.source_version_id
                         )
@@ -94,12 +100,14 @@ class DatasetFieldService:
                             None,
                         )
                         if source_dataset is None or source_field is None:
-                            raise ValidationError("Choose an available source field")
+                            raise DatasetValidationError("Choose an available source field")
                         if any(
                             field.source_field_id == source_field.id
                             for field in uow.dataset_fields.list_for_dataset(dataset.id)
                         ):
-                            raise ConflictError("Source field is already included in this mapping")
+                            raise DatasetConflictError(
+                                "Source field is already included in this mapping"
+                            )
                         key, name, data_type = (
                             source_field.key,
                             source_field.name,
@@ -116,7 +124,7 @@ class DatasetFieldService:
                         if any(
                             field.mapping_role == "source_identifier" for field in existing_fields
                         ):
-                            raise ConflictError(
+                            raise DatasetConflictError(
                                 "A standalone mapping can have only one source identifier"
                             )
                         is_required = is_unique = is_business_key_component = True
@@ -131,11 +139,11 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required.")
+                raise DatasetValidationError("A Record identifier field must be required.")
             if uow.dataset_records.count(dataset.id) and (
                 validated_required or validated_component
             ):
-                raise ValidationError("Required fields cannot be added after records exist")
+                raise DatasetValidationError("Required fields cannot be added after records exist")
             definition, unit = validate_field_metadata(definition, unit)
             field = uow.dataset_fields.create(
                 dataset_id=dataset.id,
@@ -156,7 +164,7 @@ class DatasetFieldService:
                 uow.flush()
             except PersistenceConflictError as exc:
                 if exc.constraint == "uq_dataset_fields_dataset_key":
-                    raise ConflictError("Field key already exists in this Dataset") from exc
+                    raise DatasetConflictError("Field key already exists in this Dataset") from exc
                 raise
             advance_concept(uow, dataset)
             dataset.content_updated_at = uow.now()
@@ -197,7 +205,7 @@ class DatasetFieldService:
             uow.begin_export_snapshot()
             datasets = {dataset.id: dataset for dataset in uow.datasets.list_by_ids(dataset_ids)}
             if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
-                raise AuthorizationError("Active user access required")
+                raise DatasetAuthorizationError("Active user access required")
             maintenance = self.authorization.datasets.maintainable_resources(actor_id, uow=uow)
             allowed = set(maintenance.resource_ids)
             concepts = uow.concepts.list_for_datasets(tuple(datasets))
@@ -228,7 +236,7 @@ class DatasetFieldService:
             (field for field in self.list_fields(actor_id, dataset_key) if field.key == key), None
         )
         if field is None:
-            raise NotFoundError("Dataset field not found")
+            raise DatasetNotFoundError("Dataset field not found")
         return field
 
     def update_field(
@@ -252,9 +260,9 @@ class DatasetFieldService:
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
-                raise NotFoundError("Dataset field not found")
+                raise DatasetNotFoundError("Dataset field not found")
             if field.source_field_key:
-                raise ValidationError("Source mapping fields are read-only")
+                raise DatasetValidationError("Source mapping fields are read-only")
 
             from refrncr.hierarchy import validate_hierarchy_scope
 
@@ -275,7 +283,7 @@ class DatasetFieldService:
                 and not validated_required
                 and uow.dataset_business_keys.contains(dataset.id, field.key)
             ):
-                raise ValidationError("A Record identifier field must be required.")
+                raise DatasetValidationError("A Record identifier field must be required.")
             replacement = (
                 normalized_name,
                 validated_type,
@@ -343,7 +351,7 @@ class DatasetFieldService:
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
-                raise NotFoundError("Dataset field not found")
+                raise DatasetNotFoundError("Dataset field not found")
             validated_new_key = (
                 field.key if new_key is None else validate_dataset_field_key(new_key)
             )
@@ -374,7 +382,7 @@ class DatasetFieldService:
             if validated_component:
                 _require_identifier_type(data_type)
             if validated_component and not validated_required:
-                raise ValidationError("A Record identifier field must be required.")
+                raise DatasetValidationError("A Record identifier field must be required.")
 
             current_key = uow.dataset_business_keys.get(dataset.id)
             currently_component = field.key in current_key.field_keys
@@ -402,7 +410,7 @@ class DatasetFieldService:
                 return field
 
             if membership_changed and uow.dataset_records.count(dataset.id):
-                raise ValidationError("Record identifier cannot change after records exist")
+                raise DatasetValidationError("Record identifier cannot change after records exist")
             if definition_changed:
                 if dataset.kind == "hierarchy":
                     self._validate_hierarchy_definition_change(uow, dataset, field, validated_type)
@@ -425,7 +433,9 @@ class DatasetFieldService:
                     field = uow.dataset_fields.rename_key(dataset.id, field.id, validated_new_key)
                 except PersistenceConflictError as exc:
                     if exc.constraint == "uq_dataset_fields_dataset_key":
-                        raise ConflictError("Field key already exists in this Dataset") from exc
+                        raise DatasetConflictError(
+                            "Field key already exists in this Dataset"
+                        ) from exc
                     raise
                 uow.dataset_records.rename_deleted_field_key(
                     dataset.id, field.id, validated_new_key
@@ -470,17 +480,19 @@ class DatasetFieldService:
             validated_field_key = self._validated_field_lookup_key(field_key)
             field = uow.dataset_fields.find_by_key(dataset.id, validated_field_key, for_update=True)
             if field is None:
-                raise NotFoundError("Dataset field not found")
+                raise DatasetNotFoundError("Dataset field not found")
             if uow.dataset_business_keys.contains(dataset.id, field.key):
-                raise ValidationError(
+                raise DatasetValidationError(
                     "Remove this field from the Record identifier before deleting it"
                 )
             if uow.datasets.uses_linked_field(dataset.id, field.key):
-                raise ValidationError("A field used by a linked mapping dataset cannot be deleted")
+                raise DatasetValidationError(
+                    "A field used by a linked mapping dataset cannot be deleted"
+                )
             if uow.dataset_records.field_has_values(dataset.id, field.id) or (
                 dataset.kind == "hierarchy" and uow.hierarchy.field_has_values(dataset.id, field.id)
             ):
-                raise ValidationError("A field with stored values cannot be deleted")
+                raise DatasetValidationError("A field with stored values cannot be deleted")
             field_id = field.id
             uow.dataset_fields.delete(field)
             uow.flush()
@@ -499,15 +511,15 @@ class DatasetFieldService:
     ) -> tuple[DatasetFieldRecord, ...]:
         validated_dataset_key = self._validated_dataset_lookup_key(dataset_key)
         if not isinstance(expected_order, tuple) or not isinstance(proposed_order, tuple):
-            raise ValidationError("Field order must be a complete sequence")
+            raise DatasetValidationError("Field order must be a complete sequence")
         if any(
             not isinstance(value, str) or not value for value in (*expected_order, *proposed_order)
         ):
-            raise ValidationError("Field order contains a malformed field identity")
+            raise DatasetValidationError("Field order contains a malformed field identity")
         if len(set(expected_order)) != len(expected_order) or len(set(proposed_order)) != len(
             proposed_order
         ):
-            raise ValidationError("Field order contains duplicate fields")
+            raise DatasetValidationError("Field order contains duplicate fields")
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
@@ -516,14 +528,16 @@ class DatasetFieldService:
             if expected_order != current:
                 raise StaleFieldOrderError("Field order changed since this page was opened")
             if len(proposed_order) != len(current) or set(proposed_order) != set(current):
-                raise ValidationError("Field order must contain every current field exactly once")
+                raise DatasetValidationError(
+                    "Field order must contain every current field exactly once"
+                )
             if dataset.kind == "mapping":
                 by_id = {field.id: field for field in fields}
                 roles = [
                     by_id[field_id].mapping_role == "mapping_target" for field_id in proposed_order
                 ]
                 if roles != sorted(roles):
-                    raise ValidationError("Move fields within their Source or Target block.")
+                    raise DatasetValidationError("Move fields within their Source or Target block.")
             if proposed_order == current:
                 return tuple(fields)
             advance_concept(uow, dataset)
@@ -548,11 +562,11 @@ class DatasetFieldService:
         expected_order: tuple[str, ...],
     ) -> tuple[DatasetFieldRecord, ...]:
         if direction not in {"up", "down"}:
-            raise ValidationError("Field direction is invalid")
+            raise DatasetValidationError("Field direction is invalid")
         if not isinstance(field_id, str) or not field_id:
-            raise NotFoundError("Dataset field not found")
+            raise DatasetNotFoundError("Dataset field not found")
         if field_id not in expected_order:
-            raise NotFoundError("Dataset field not found")
+            raise DatasetNotFoundError("Dataset field not found")
         proposed = list(expected_order)
         index = proposed.index(field_id)
         target = index - 1 if direction == "up" else index + 1
@@ -567,7 +581,7 @@ class DatasetFieldService:
         if dataset is None or not self.authorization.has_capability(
             actor_id, required_permission, dataset.id, uow=uow
         ):
-            raise NotFoundError("Dataset not found")
+            raise DatasetNotFoundError("Dataset not found")
         if required_permission == "can_maintain_dataset":
             if uow is not None:
                 require_concept(uow, dataset.id)
@@ -580,14 +594,14 @@ class DatasetFieldService:
         try:
             return validate_dataset_key(key)
         except ValidationError as exc:
-            raise NotFoundError("Dataset not found") from exc
+            raise DatasetNotFoundError("Dataset not found") from exc
 
     @staticmethod
     def _validated_field_lookup_key(key: str) -> str:
         try:
             return validate_dataset_field_key(key)
         except ValidationError as exc:
-            raise NotFoundError("Dataset field not found") from exc
+            raise DatasetNotFoundError("Dataset field not found") from exc
 
     @staticmethod
     def _add_audit(uow: UnitOfWork, actor_id: str, field_id: str, action: str) -> None:
@@ -604,7 +618,7 @@ class DatasetFieldService:
         # Inactive values still belong to this field. Changing their datatype would
         # destroy their lossless recovery contract. Applicability changes never delete.
         if data_type != field.data_type and uow.hierarchy.field_has_values(dataset.id, field.id):
-            raise ValidationError("Field type cannot change while stored values exist")
+            raise DatasetValidationError("Field type cannot change while stored values exist")
 
     @staticmethod
     def _validate_record_aware_definition_change(
@@ -618,19 +632,19 @@ class DatasetFieldService:
         if data_type != field.data_type and uow.dataset_records.field_has_values(
             dataset_id, field.id
         ):
-            raise ValidationError("Field type cannot change while stored values exist")
+            raise DatasetValidationError("Field type cannot change while stored values exist")
         if (
             not field.is_required
             and is_required
             and uow.dataset_records.field_has_missing_values(dataset_id, field.id)
         ):
-            raise ValidationError("Required cannot be enabled while records have no value")
+            raise DatasetValidationError("Required cannot be enabled while records have no value")
         if (
             not field.is_unique
             and is_unique
             and uow.dataset_records.field_has_duplicate_values(dataset_id, field.id)
         ):
-            raise ValidationError("Unique cannot be enabled while duplicate values exist")
+            raise DatasetValidationError("Unique cannot be enabled while duplicate values exist")
 
     @staticmethod
     def _populate_source_context(uow, dataset, field, source_field, source_version) -> None:
@@ -687,16 +701,18 @@ class DatasetFieldService:
     def _validate_field_key_change(uow, dataset, field, validated_new_key: str) -> bool:
         key_changed = validated_new_key != field.key
         if key_changed and field.source_field_key:
-            raise ValidationError("Source mapping field keys are read-only")
+            raise DatasetValidationError("Source mapping field keys are read-only")
         if key_changed and (
             uow.concepts.get(dataset.id) is None or uow.versions.list_for_dataset(dataset.id)
         ):
-            raise ValidationError(
+            raise DatasetValidationError(
                 "Field key can only be changed before the first version is published."
             )
         if key_changed and uow.datasets.uses_linked_field(dataset.id, field.key):
-            raise ValidationError("Field key cannot change while used by a linked mapping dataset.")
+            raise DatasetValidationError(
+                "Field key cannot change while used by a linked mapping dataset."
+            )
         existing_key = uow.dataset_fields.find_by_key(dataset.id, validated_new_key)
         if key_changed and existing_key is not None:
-            raise ConflictError("Field key already exists in this Dataset")
+            raise DatasetConflictError("Field key already exists in this Dataset")
         return key_changed

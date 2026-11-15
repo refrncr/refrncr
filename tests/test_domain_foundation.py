@@ -75,6 +75,11 @@ def test_record_errors_have_a_domain_and_exact_category():
         (DatasetNotFoundError, NotFoundError, ConflictError | ValidationError),
         (DatasetConflictError, ConflictError, NotFoundError | ValidationError),
         (DatasetValidationError, ValidationError, NotFoundError | ConflictError),
+        (
+            dataset_domain.DatasetAuthorizationError,
+            AuthorizationError,
+            NotFoundError | ConflictError | ValidationError,
+        ),
     ],
 )
 def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, other_categories):
@@ -86,6 +91,7 @@ def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, o
 def test_dataset_error_exports_are_identical_and_have_one_category():
     names = (
         "DatasetError",
+        "DatasetAuthorizationError",
         "DatasetNotFoundError",
         "DatasetConflictError",
         "DatasetValidationError",

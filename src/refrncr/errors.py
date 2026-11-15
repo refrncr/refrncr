@@ -59,6 +59,7 @@ class AuthorizationError(DomainError):
 _DATASET_ERROR_NAMES = frozenset(
     {
         "DatasetError",
+        "DatasetAuthorizationError",
         "DatasetNotFoundError",
         "DatasetConflictError",
         "DatasetValidationError",

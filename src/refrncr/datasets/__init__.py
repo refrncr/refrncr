@@ -1,5 +1,6 @@
 from importlib import import_module
 
+from .errors import DatasetAuthorizationError as DatasetAuthorizationError
 from .errors import DatasetConflictError as DatasetConflictError
 from .errors import DatasetError as DatasetError
 from .errors import DatasetNotFoundError as DatasetNotFoundError

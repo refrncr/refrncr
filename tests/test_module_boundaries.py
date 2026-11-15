@@ -4,6 +4,13 @@ import ast
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "refrncr"
+DOMAIN_PACKAGES_WITH_TYPED_ERRORS = ("identity", "authorization", "datasets")
+GENERAL_ERROR_TYPES = {
+    "AuthorizationError",
+    "ConflictError",
+    "NotFoundError",
+    "ValidationError",
+}
 
 
 def _module_name(path: Path) -> str:
@@ -81,5 +88,39 @@ def test_production_modules_do_not_use_private_functions_from_other_modules():
                 )
 
     assert violations == [], "Private functions crossed module boundaries:\n" + "\n".join(
+        violations
+    )
+
+
+def test_split_domain_packages_do_not_raise_general_error_categories():
+    violations = []
+    for package in DOMAIN_PACKAGES_WITH_TYPED_ERRORS:
+        for path in (SOURCE_ROOT / package).rglob("*.py"):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            imported_names = {
+                imported.asname or imported.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom)
+                for imported in node.names
+                if imported.name in GENERAL_ERROR_TYPES
+            }
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Raise) or not isinstance(node.exc, ast.Call):
+                    continue
+                raised = node.exc.func
+                if isinstance(raised, ast.Name) and (
+                    raised.id in GENERAL_ERROR_TYPES or raised.id in imported_names
+                ):
+                    violations.append(
+                        f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} raises "
+                        f"general category {raised.id}"
+                    )
+                elif isinstance(raised, ast.Attribute) and raised.attr in GENERAL_ERROR_TYPES:
+                    violations.append(
+                        f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} raises "
+                        f"general category {raised.attr}"
+                    )
+
+    assert violations == [], "Domain packages raised general error categories:\n" + "\n".join(
         violations
     )
