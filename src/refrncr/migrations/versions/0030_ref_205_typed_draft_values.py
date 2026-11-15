@@ -3,7 +3,7 @@
 import sqlalchemy as sa
 from alembic import op
 
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 
 revision = "0030_ref_205"
 down_revision = "0029_ref_195"

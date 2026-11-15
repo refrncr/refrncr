@@ -23,7 +23,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 
 from refrncr.audit import record_audit
 from refrncr.datasets import RecordConflictError, RecordValidationError
-from refrncr.datatypes import DATASET_FIELD_TYPES, get_datatype
+from refrncr.datasets.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ImportDomainError

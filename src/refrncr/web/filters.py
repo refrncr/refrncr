@@ -7,7 +7,7 @@ from markupsafe import Markup
 
 from refrncr.audit_history import MAX_AUDIT_DATETIME_LENGTH
 from refrncr.change_status import ChangeStatus
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.hierarchy import MAX_HIERARCHY_NODE_NAME
 from refrncr.presentation import (

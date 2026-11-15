@@ -3,7 +3,7 @@
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
 from refrncr.change_status import STATUSES, ChangeStatus
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.diff_contracts import PAGE_SIZE, RecordProjection, ValueChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.models import (
@@ -442,7 +442,7 @@ class SqlAlchemyDiffOperations:
     def _validate_rows(self, statement, identifier_fields, expected_count=None):
         from uuid import UUID
 
-        from refrncr.datatypes import DatatypeError
+        from refrncr.datasets.datatypes import DatatypeError
 
         record_id, encoded, components, count = None, None, [], 0
 

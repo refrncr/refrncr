@@ -28,7 +28,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, Session, column_property, mapped_column
 
 from refrncr.clock import SYSTEM_CLOCK
-from refrncr.datatypes import DATASET_FIELD_TYPES
+from refrncr.datasets.datatypes import DATASET_FIELD_TYPES
 from refrncr.db.base import Base
 from refrncr.db.types import UTCDateTime
 from refrncr.record_identity import MAX_RECORD_IDENTIFIER_BYTES

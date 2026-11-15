@@ -1,6 +1,6 @@
 from refrncr.audit import record_audit
 from refrncr.authorization import AuthorizationService
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.domain import valid_identity
 from refrncr.errors import (
     AuthorizationError,

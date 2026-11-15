@@ -20,7 +20,7 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.hierarchy import applicable, hierarchy_order, hierarchy_paths
 from refrncr.hierarchy_contracts import hierarchy_path_label
 from refrncr.ports import DatasetFieldRecord, StoredRecord

@@ -4,7 +4,7 @@ from bisect import bisect_left
 from dataclasses import fields as dataclass_fields
 
 from refrncr.change_status import ChangeStatus
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.diff_contracts import STATUSES, FieldChange, PropertyChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.services import ValidationError

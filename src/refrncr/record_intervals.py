@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.published_contracts import record_identifier
 
 

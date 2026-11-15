@@ -210,3 +210,14 @@ def test_require_concept_preserves_conflict_contract():
 
     with pytest.raises(ConflictError, match="Start a New concept"):
         require_concept(uow, "dataset-id")
+
+
+def test_dataset_service_compatibility_exports_are_the_domain_classes():
+    from refrncr.datasets import DatasetBusinessKeyService, DatasetFieldService
+    from refrncr.datasets.business_key import DatasetBusinessKeyService as DomainBusinessKeys
+    from refrncr.datasets.fields import DatasetFieldService as DomainFields
+    from refrncr.services import DatasetBusinessKeyService as CompatibilityBusinessKeys
+    from refrncr.services import DatasetFieldService as CompatibilityFields
+
+    assert DatasetFieldService is DomainFields is CompatibilityFields
+    assert DatasetBusinessKeyService is DomainBusinessKeys is CompatibilityBusinessKeys

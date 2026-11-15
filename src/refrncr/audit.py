@@ -11,7 +11,7 @@ from types import MappingProxyType
 from unicodedata import category, normalize
 from uuid import UUID, uuid4
 
-from refrncr.field_contracts import FIELD_KEY_PATTERN
+from refrncr.datasets.field_contracts import FIELD_KEY_PATTERN
 
 
 class AuditContractError(ValueError):
@@ -589,19 +589,50 @@ _read(
     module="datasets.service",
 )
 _identifier_events = (("dataset", "business_key_defined"), ("dataset", "business_key_updated"))
-_audited("DatasetFieldService", "create_field", ("dataset_field", "created"), *_identifier_events)
-_audited("DatasetFieldService", "update_field", ("dataset_field", "definition_updated"))
+_audited(
+    "DatasetFieldService",
+    "create_field",
+    ("dataset_field", "created"),
+    *_identifier_events,
+    module="datasets.fields",
+)
+_audited(
+    "DatasetFieldService",
+    "update_field",
+    ("dataset_field", "definition_updated"),
+    module="datasets.fields",
+)
 _audited(
     "DatasetFieldService",
     "update_field_and_business_key_membership",
     ("dataset_field", "definition_updated"),
     *_identifier_events,
+    module="datasets.fields",
 )
-_audited("DatasetFieldService", "delete_field", ("dataset_field", "deleted"))
-_audited("DatasetFieldService", "replace_order move_field", ("dataset", "field_order_updated"))
-_read("DatasetFieldService", "list_fields get_field list_fields_for_datasets")
-_audited("DatasetBusinessKeyService", "set_business_key", *_identifier_events)
-_read("DatasetBusinessKeyService", "get_business_key")
+_audited(
+    "DatasetFieldService",
+    "delete_field",
+    ("dataset_field", "deleted"),
+    module="datasets.fields",
+)
+_audited(
+    "DatasetFieldService",
+    "replace_order move_field",
+    ("dataset", "field_order_updated"),
+    module="datasets.fields",
+)
+_read(
+    "DatasetFieldService",
+    "list_fields get_field list_fields_for_datasets",
+    module="datasets.fields",
+)
+_audited(
+    "DatasetBusinessKeyService",
+    "set_business_key",
+    *_identifier_events,
+    module="datasets.business_key",
+)
+_read("DatasetBusinessKeyService", "get_business_key", module="datasets.business_key")
 for _method, _action in (
     ("create_record", "created"),
     ("update_record", "updated"),

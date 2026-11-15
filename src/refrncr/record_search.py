@@ -4,7 +4,7 @@ from logging import Filter
 from unicodedata import normalize
 
 from refrncr.change_status import LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
-from refrncr.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
+from refrncr.datasets.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
 from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.presentation import DISPLAY_STATUSES
 

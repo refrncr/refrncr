@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields
 from refrncr.diff_persistence import SqlAlchemyDiffOperations
 from refrncr.models import Dataset

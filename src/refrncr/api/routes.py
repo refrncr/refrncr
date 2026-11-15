@@ -46,7 +46,7 @@ from refrncr.api.documentation import (
 )
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.hierarchy import hierarchy_order, hierarchy_paths
 from refrncr.identity.api_keys import ApiKeyAuthenticationError
 from refrncr.published_contracts import encode_identifier, record_identifier
