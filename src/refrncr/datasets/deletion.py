@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 from refrncr.audit import record_audit
 from refrncr.domain import valid_identity
-from refrncr.errors import DatasetConflictError, DatasetNotFoundError, DatasetValidationError
+
+from .errors import DatasetConflictError, DatasetNotFoundError, DatasetValidationError
 
 
 @dataclass(frozen=True, slots=True)

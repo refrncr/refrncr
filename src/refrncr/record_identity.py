@@ -2,7 +2,8 @@
 
 from collections.abc import Iterable, Mapping
 
-from refrncr.errors import DatasetError, ValidationError
+from refrncr.datasets import DatasetError
+from refrncr.errors import ValidationError
 
 MAX_RECORD_IDENTIFIER_BYTES = 2000
 RECORD_IDENTIFIER_MESSAGES = {

@@ -14,10 +14,6 @@ class AccessManagementError(DomainError):
     """Access-management-domain failure."""
 
 
-class DatasetError(DomainError):
-    """Dataset-domain failure."""
-
-
 class VersionError(DomainError):
     """Dataset-version-domain failure."""
 
@@ -58,41 +54,25 @@ class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
 
 
-class DatasetNotFoundError(DatasetError, NotFoundError):
-    """A Dataset object does not exist or is deliberately concealed."""
+_DATASET_ERROR_NAMES = frozenset(
+    {
+        "DatasetError",
+        "DatasetNotFoundError",
+        "DatasetConflictError",
+        "DatasetValidationError",
+        "RecordValidationError",
+        "RecordConflictError",
+        "StaleRecordError",
+        "StaleFieldOrderError",
+        "StaleDatasetOwnerError",
+    }
+)
 
 
-class DatasetConflictError(DatasetError, ConflictError):
-    """Requested Dataset work conflicts with current domain state."""
+def __getattr__(name: str):
+    """Temporarily preserve dataset-error imports until REF-370."""
+    if name in _DATASET_ERROR_NAMES:
+        from refrncr.datasets import errors as dataset_errors
 
-
-class DatasetValidationError(DatasetError, ValidationError):
-    """A Dataset request violates a domain constraint."""
-
-
-class RecordValidationError(DatasetError, ValidationError):
-    """Record values violate one or more Dataset field constraints."""
-
-    def __init__(self, errors: dict[str, str]) -> None:
-        super().__init__("Record contains invalid values")
-        self.errors = errors
-
-
-class RecordConflictError(DatasetError, ConflictError):
-    """Record work conflicts with current Dataset state."""
-
-    def __init__(self, message: str, field_key: str | None = None) -> None:
-        super().__init__(message)
-        self.field_key = field_key
-
-
-class StaleRecordError(DatasetError, ConflictError):
-    """The submitted Record revision no longer matches persisted state."""
-
-
-class StaleFieldOrderError(DatasetError, ConflictError):
-    """The submitted field order no longer matches persisted state."""
-
-
-class StaleDatasetOwnerError(DatasetError, ConflictError):
-    """Persisted ownership no longer matches the form's expected owner."""
+        return getattr(dataset_errors, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -9,6 +9,7 @@ import uuid
 from dataclasses import dataclass
 
 from refrncr.audit import record_audit
+from refrncr.datasets import StaleRecordError
 from refrncr.domain import advance_concept, require_concept
 from refrncr.hierarchy import hierarchy_validation_errors
 from refrncr.hierarchy_contracts import HierarchyNode
@@ -21,7 +22,6 @@ from refrncr.record_import import (
 from refrncr.services import (
     DatasetFieldService,
     NotFoundError,
-    StaleRecordError,
     ValidationError,
     canonicalize_record_value,
 )

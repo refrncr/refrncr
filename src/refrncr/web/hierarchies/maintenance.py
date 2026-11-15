@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from flask import abort, redirect, request, url_for
 
+from refrncr.datasets import RecordValidationError
 from refrncr.hierarchy import canonical_hierarchy_view
-from refrncr.services import ConflictError, RecordValidationError, ValidationError
+from refrncr.services import ConflictError, ValidationError
 from refrncr.web.hierarchies import (
     blueprint,
     dataset_versions,

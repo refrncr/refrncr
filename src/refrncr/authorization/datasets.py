@@ -2,8 +2,8 @@
 
 from contextlib import nullcontext
 
+from refrncr.datasets import DatasetNotFoundError
 from refrncr.domain import valid_identity
-from refrncr.errors import DatasetNotFoundError
 from refrncr.ports import TeamRecord, UnitOfWorkFactory
 
 from .errors import AccessManagementAuthorizationError

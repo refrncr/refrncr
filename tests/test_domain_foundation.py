@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from refrncr import datasets as dataset_domain
+from refrncr import errors as shared_errors
 from refrncr import services
 from refrncr.authorization import (
     AccessManagementAuthorizationError,
@@ -79,6 +81,28 @@ def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, o
     assert issubclass(error_type, DatasetError)
     assert issubclass(error_type, category)
     assert not issubclass(error_type, other_categories)
+
+
+def test_dataset_error_exports_are_identical_and_have_one_category():
+    names = (
+        "DatasetError",
+        "DatasetNotFoundError",
+        "DatasetConflictError",
+        "DatasetValidationError",
+        "RecordValidationError",
+        "RecordConflictError",
+        "StaleRecordError",
+        "StaleFieldOrderError",
+        "StaleDatasetOwnerError",
+    )
+    for name in names:
+        assert getattr(dataset_domain, name) is getattr(shared_errors, name)
+
+    categories = (NotFoundError, ConflictError, ValidationError, AuthorizationError)
+    assert not any(issubclass(dataset_domain.DatasetError, category) for category in categories)
+    for name in names[1:]:
+        error_type = getattr(dataset_domain, name)
+        assert sum(issubclass(error_type, category) for category in categories) == 1
 
 
 @pytest.mark.parametrize(

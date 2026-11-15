@@ -6,13 +6,14 @@ import logging
 
 from flask import abort, redirect, render_template, request, url_for
 
+from refrncr.datasets import RecordConflictError
 from refrncr.record_import import (
     MAX_UPLOAD_BYTES,
     ImportValidationError,
     SourceFormatComponentsError,
     mapping_issue_message,
 )
-from refrncr.services import ConflictError, NotFoundError, RecordConflictError
+from refrncr.services import ConflictError, NotFoundError
 from refrncr.web.helpers import merge_error_messages
 from refrncr.web.imports import (
     blueprint,

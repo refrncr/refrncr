@@ -1,7 +1,7 @@
 from refrncr.datatypes import get_datatype
-from refrncr.errors import DatasetNotFoundError
 
 from .deletion import mapping_deletion_error, version_reads
+from .errors import DatasetNotFoundError
 
 
 class DatasetMappingMixin:

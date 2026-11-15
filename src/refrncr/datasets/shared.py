@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
-from refrncr.errors import DatasetValidationError
 from refrncr.field_contracts import FIELD_KEY_PATTERN
 from refrncr.presentation_metadata import (
     MAX_FIELD_DEFINITION,
@@ -12,6 +11,8 @@ from refrncr.presentation_metadata import (
     dataset_icon,
     optional_plain_text,
 )
+
+from .errors import DatasetValidationError
 
 
 @dataclass(frozen=True, slots=True)

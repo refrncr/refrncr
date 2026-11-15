@@ -22,9 +22,18 @@ from refrncr.authorization import ResourceTypeRegistry as ResourceTypeRegistry
 from refrncr.authorization import (
     create_deprecated_grant_service as create_deprecated_grant_service,
 )
+from refrncr.datasets import DatasetConflictError as DatasetConflictError
 from refrncr.datasets import DatasetDeletion as DatasetDeletion
 from refrncr.datasets import DatasetDetails as DatasetDetails
+from refrncr.datasets import DatasetError as DatasetError
+from refrncr.datasets import DatasetNotFoundError as DatasetNotFoundError
 from refrncr.datasets import DatasetService as DatasetService
+from refrncr.datasets import DatasetValidationError as DatasetValidationError
+from refrncr.datasets import RecordConflictError as RecordConflictError
+from refrncr.datasets import RecordValidationError as RecordValidationError
+from refrncr.datasets import StaleDatasetOwnerError as StaleDatasetOwnerError
+from refrncr.datasets import StaleFieldOrderError as StaleFieldOrderError
+from refrncr.datasets import StaleRecordError as StaleRecordError
 from refrncr.datasets import canonicalize_record_value as canonicalize_record_value
 from refrncr.datasets import normalize_dataset_field_name as normalize_dataset_field_name
 from refrncr.datasets import normalize_dataset_name as normalize_dataset_name
@@ -44,14 +53,7 @@ from refrncr.errors import (
     AuthorizationError,
     ConflictError,
     NotFoundError,
-    RecordConflictError,
-    RecordValidationError,
-    StaleFieldOrderError,
-    StaleRecordError,
     ValidationError,
-)
-from refrncr.errors import (
-    StaleDatasetOwnerError as StaleDatasetOwnerError,
 )
 from refrncr.identity import (
     AuthenticatedPrincipal as AuthenticatedPrincipal,
@@ -119,10 +121,6 @@ SUBJECT_TYPES = {"user", "team"}
 
 # Compatibility facade while services move to domain packages. These assignments keep
 # existing imports working without making ``errors.py`` depend on the facade.
-DatasetError = _errors.DatasetError
-DatasetConflictError = _errors.DatasetConflictError
-DatasetNotFoundError = _errors.DatasetNotFoundError
-DatasetValidationError = _errors.DatasetValidationError
 DomainError = _errors.DomainError
 HierarchyError = _errors.HierarchyError
 ImportDomainError = _errors.ImportDomainError
