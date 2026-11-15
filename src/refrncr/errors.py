@@ -1,5 +1,7 @@
 """Shared, persistence-neutral domain error hierarchy."""
 
+from importlib import import_module
+
 
 class DomainError(Exception):
     """Base class for safe domain errors exposed at an application boundary."""
@@ -72,7 +74,7 @@ _DATASET_ERROR_NAMES = frozenset(
 def __getattr__(name: str):
     """Temporarily preserve dataset-error imports until REF-370."""
     if name in _DATASET_ERROR_NAMES:
-        from refrncr.datasets import errors as dataset_errors
-
-        return getattr(dataset_errors, name)
+        value = getattr(import_module("refrncr.datasets.errors"), name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
