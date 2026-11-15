@@ -7,8 +7,7 @@ import pytest
 from sqlalchemy import select
 from support import dataset_version_client, html_tag_texts, publish, request, setup
 
-from refrncr.installation_policy import EXPORT_POLICIES
-from refrncr.installation_settings import PolicyConfirmationRequired
+from refrncr.authorization import EXPORT_POLICIES, PolicyConfirmationRequired
 from refrncr.models import AuditEvent
 from refrncr.persistence import SqlAlchemyInstallationSettingsOperations, SqlAlchemyUnitOfWork
 from refrncr.services import AuthorizationError, ConflictError, NotFoundError, ValidationError

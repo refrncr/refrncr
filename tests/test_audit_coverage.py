@@ -235,6 +235,7 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
     module = {
         "DatasetRecordImportService": "record_import",
         "DatasetVersionService": "dataset_versions",
+        "GrantService": "authorization.grants",
         "MembershipService": "identity.memberships",
         "TeamService": "identity.teams",
         "UserService": "identity.users",

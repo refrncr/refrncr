@@ -3,6 +3,12 @@ from types import SimpleNamespace
 import pytest
 
 from refrncr import services
+from refrncr.authorization import (
+    AccessManagementAuthorizationError,
+    AccessManagementConflictError,
+    AccessManagementNotFoundError,
+    AccessManagementValidationError,
+)
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.errors import (
     AccessManagementError,
@@ -87,6 +93,46 @@ def test_identity_errors_have_a_domain_and_exact_category(error_type, category, 
     assert issubclass(error_type, IdentityError)
     assert issubclass(error_type, category)
     assert not issubclass(error_type, other_categories)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "category", "other_categories"),
+    [
+        (
+            AccessManagementNotFoundError,
+            NotFoundError,
+            ConflictError | ValidationError | AuthorizationError,
+        ),
+        (
+            AccessManagementConflictError,
+            ConflictError,
+            NotFoundError | ValidationError | AuthorizationError,
+        ),
+        (
+            AccessManagementValidationError,
+            ValidationError,
+            NotFoundError | ConflictError | AuthorizationError,
+        ),
+        (
+            AccessManagementAuthorizationError,
+            AuthorizationError,
+            NotFoundError | ConflictError | ValidationError,
+        ),
+    ],
+)
+def test_access_management_errors_have_a_domain_and_exact_category(
+    error_type, category, other_categories
+):
+    assert issubclass(error_type, AccessManagementError)
+    assert issubclass(error_type, category)
+    assert not issubclass(error_type, other_categories)
+
+
+def test_access_management_conflicts_are_not_authorization_denials():
+    error = AccessManagementConflictError("Grant already exists")
+
+    assert isinstance(error, AccessManagementError | ConflictError)
+    assert not isinstance(error, AuthorizationError)
 
 
 @pytest.mark.parametrize(

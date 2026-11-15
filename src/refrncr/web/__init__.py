@@ -30,6 +30,7 @@ from flask import (
 
 from refrncr.audit import record_security_event
 from refrncr.audit_history import AuditHistoryService
+from refrncr.authorization import InstallationSettingsService
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
@@ -46,7 +47,6 @@ from refrncr.identity.login_security import (
     LoginAttemptLimiter,
     SourceIdentityResolver,
 )
-from refrncr.installation_settings import InstallationSettingsService
 from refrncr.overview import OverviewService
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (

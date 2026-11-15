@@ -251,6 +251,7 @@ def test_every_audited_operation_has_behavior_cases():
     from support import MUTATIONS
 
     service_modules = {
+        "GrantService": "authorization.grants",
         "MembershipService": "identity.memberships",
         "TeamService": "identity.teams",
         "UserService": "identity.users",
@@ -281,7 +282,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.hierarchy.HierarchyService.update_node_and_values",
             "refrncr.hierarchy.HierarchyService.update_values",
             "refrncr.hierarchy_import.HierarchyImportService.confirm",
-            "refrncr.installation_settings.InstallationSettingsService.change_policy",
+            "refrncr.authorization.installation_settings.InstallationSettingsService.change_policy",
         }
     )
     assert behaviors == {
@@ -444,7 +445,9 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
             if isinstance(function, ast.Attribute):
                 receiver = function.value
                 if isinstance(receiver, ast.Attribute) and receiver.attr == "datasets":
-                    found.add(f"refrncr.services.DatasetAuthorizationService.{function.attr}")
+                    found.add(
+                        f"refrncr.authorization.datasets.DatasetAuthorizationService.{function.attr}"
+                    )
                 elif (
                     isinstance(receiver, ast.Name)
                     and receiver.id in receivers
@@ -455,6 +458,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "api_keys": "identity.api_keys",
                         "api_key_service": "identity.api_keys",
                         "authentication": "identity.authentication",
+                        "authorization": "authorization.service",
+                        "authorization_service": "authorization.service",
                         "memberships": "identity.memberships",
                         "sessions": "identity.sessions",
                         "teams": "identity.teams",

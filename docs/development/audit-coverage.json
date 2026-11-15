@@ -665,7 +665,7 @@
     {
       "capability": "GrantService",
       "operation": "create_grant",
-      "service": "refrncr.services.GrantService.create_grant",
+      "service": "refrncr.authorization.grants.GrantService.create_grant",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -708,7 +708,7 @@
     {
       "capability": "GrantService",
       "operation": "change_permission",
-      "service": "refrncr.services.GrantService.change_permission",
+      "service": "refrncr.authorization.grants.GrantService.change_permission",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -751,7 +751,7 @@
     {
       "capability": "GrantService",
       "operation": "delete_grant",
-      "service": "refrncr.services.GrantService.delete_grant",
+      "service": "refrncr.authorization.grants.GrantService.delete_grant",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3138,7 +3138,7 @@
     {
       "capability": "AuthorizationService",
       "operation": "effective_permission",
-      "service": "refrncr.services.AuthorizationService.effective_permission",
+      "service": "refrncr.authorization.service.AuthorizationService.effective_permission",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3170,7 +3170,7 @@
     {
       "capability": "AuthorizationService",
       "operation": "check_access",
-      "service": "refrncr.services.AuthorizationService.check_access",
+      "service": "refrncr.authorization.service.AuthorizationService.check_access",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3202,7 +3202,7 @@
     {
       "capability": "AuthorizationService",
       "operation": "authorized_resources",
-      "service": "refrncr.services.AuthorizationService.authorized_resources",
+      "service": "refrncr.authorization.service.AuthorizationService.authorized_resources",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3234,7 +3234,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "active",
-      "service": "refrncr.services.DatasetAuthorizationService.active",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.active",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3266,7 +3266,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "creation_teams",
-      "service": "refrncr.services.DatasetAuthorizationService.creation_teams",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.creation_teams",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.new_dataset GET /datasets/new",
         "refrncr.web.datasets.core.create_dataset POST /datasets"
@@ -3300,7 +3300,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_create_dataset",
-      "service": "refrncr.services.DatasetAuthorizationService.can_create_dataset",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_create_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_list GET /datasets"
       ],
@@ -3332,7 +3332,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_view_dataset",
-      "service": "refrncr.services.DatasetAuthorizationService.can_view_dataset",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_view_dataset",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3364,7 +3364,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "maintainable_resources",
-      "service": "refrncr.services.DatasetAuthorizationService.maintainable_resources",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.maintainable_resources",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3396,7 +3396,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_maintain_dataset",
-      "service": "refrncr.services.DatasetAuthorizationService.can_maintain_dataset",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_maintain_dataset",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3428,7 +3428,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_export_dataset",
-      "service": "refrncr.services.DatasetAuthorizationService.can_export_dataset",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_export_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -3467,7 +3467,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_change_dataset_owner",
-      "service": "refrncr.services.DatasetAuthorizationService.can_change_dataset_owner",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_change_dataset_owner",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -3508,7 +3508,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_manage_export_access",
-      "service": "refrncr.services.DatasetAuthorizationService.can_manage_export_access",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_manage_export_access",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -3819,7 +3819,7 @@
     {
       "capability": "ResourceTypeRegistry",
       "operation": "register",
-      "service": "refrncr.services.ResourceTypeRegistry.register",
+      "service": "refrncr.authorization.resource_types.ResourceTypeRegistry.register",
       "interface_entrypoints": [
         "Composition and GrantService / AuthorizationService"
       ],
@@ -3850,7 +3850,7 @@
     {
       "capability": "ResourceTypeRegistry",
       "operation": "require_existing",
-      "service": "refrncr.services.ResourceTypeRegistry.require_existing",
+      "service": "refrncr.authorization.resource_types.ResourceTypeRegistry.require_existing",
       "interface_entrypoints": [
         "Composition and GrantService / AuthorizationService"
       ],
@@ -4311,7 +4311,7 @@
     {
       "capability": "DatasetResourceResolver",
       "operation": "__call__",
-      "service": "refrncr.services.DatasetResourceResolver.__call__",
+      "service": "refrncr.authorization.dataset_resources.DatasetResourceResolver.__call__",
       "interface_entrypoints": [
         "ResourceTypeRegistry dataset resolver"
       ],
@@ -6280,7 +6280,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "viewable_resources",
-      "service": "refrncr.services.DatasetAuthorizationService.viewable_resources",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.viewable_resources",
       "interface_entrypoints": [
         "Internal Community dataset view decision (no HTTP entrypoint)."
       ],
@@ -6638,7 +6638,7 @@
     {
       "capability": "AuthorizationService",
       "operation": "has_capability",
-      "service": "refrncr.services.AuthorizationService.has_capability",
+      "service": "refrncr.authorization.service.AuthorizationService.has_capability",
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log",
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",
@@ -6687,7 +6687,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_access_community",
-      "service": "refrncr.services.DatasetAuthorizationService.can_access_community",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_access_community",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -6719,7 +6719,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "can_administer_installation",
-      "service": "refrncr.services.DatasetAuthorizationService.can_administer_installation",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.can_administer_installation",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -7048,7 +7048,7 @@
     {
       "capability": "InstallationSettingsService",
       "operation": "get_policy",
-      "service": "refrncr.installation_settings.InstallationSettingsService.get_policy",
+      "service": "refrncr.authorization.installation_settings.InstallationSettingsService.get_policy",
       "interface_entrypoints": [
         "refrncr.web.settings.dataset_access_settings GET,POST /settings/dataset-access"
       ],
@@ -7079,7 +7079,7 @@
     {
       "capability": "InstallationSettingsService",
       "operation": "change_policy",
-      "service": "refrncr.installation_settings.InstallationSettingsService.change_policy",
+      "service": "refrncr.authorization.installation_settings.InstallationSettingsService.change_policy",
       "interface_entrypoints": [
         "refrncr.web.settings.dataset_access_settings GET,POST /settings/dataset-access"
       ],
@@ -7120,7 +7120,7 @@
     {
       "capability": "DatasetAuthorizationService",
       "operation": "exportable_resources",
-      "service": "refrncr.services.DatasetAuthorizationService.exportable_resources",
+      "service": "refrncr.authorization.datasets.DatasetAuthorizationService.exportable_resources",
       "interface_entrypoints": [
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
@@ -7160,7 +7160,7 @@
     {
       "capability": "InstallationSettingsService",
       "operation": "requires_export_access",
-      "service": "refrncr.installation_settings.InstallationSettingsService.requires_export_access",
+      "service": "refrncr.authorization.installation_settings.InstallationSettingsService.requires_export_access",
       "interface_entrypoints": [
         "refrncr.web.settings.api_key_list GET /settings/api-keys"
       ],

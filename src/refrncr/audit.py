@@ -525,7 +525,7 @@ for _service, _object, _methods, _module in (
             ("change_permission", "permission_changed"),
             ("delete_grant", "deleted"),
         ),
-        "services",
+        "authorization.grants",
     ),
 ):
     for _method, _action in _methods:
@@ -633,6 +633,7 @@ _read(
     "AuthorizationService",
     "effective_permission check_access authorized_resources has_capability",
     "Pure policy/read decision; denied or suspicious requests are REF-31 security logging.",
+    module="authorization.service",
 )
 _read(
     "DatasetAuthorizationService",
@@ -641,6 +642,7 @@ _read(
     "can_manage_export_access can_administer_installation",
     "Capability calculation only; the authoritative caller owns "
     "the mutation/extraction event and REF-31 owns denied/suspicious attempts.",
+    module="authorization.datasets",
 )
 # Supporting security/administrative entrypoints are inventoried separately from
 # business services. None invents a successful domain event for a denied request.
@@ -654,7 +656,7 @@ for _module, _service, _methods, _classification, _reason in (
         "Confirmation owns the summary.",
     ),
     (
-        "services",
+        "authorization.resource_types",
         "ResourceTypeRegistry",
         "register require_existing",
         "technical logging only",
@@ -710,7 +712,7 @@ for _symbol, _classification, _reason in (
         "Opt-in synthetic password benchmark; no application credentials or business state.",
     ),
     (
-        "refrncr.services.DatasetResourceResolver.__call__",
+        "refrncr.authorization.dataset_resources.DatasetResourceResolver.__call__",
         "intentionally excluded",
         "Internal resource existence read; caller owns authorization and auditing.",
     ),
@@ -952,12 +954,14 @@ _register(
     "DatasetAuthorizationService",
     "viewable_resources",
     "intentionally excluded",
+    module="authorization.datasets",
     rationale="Bulk current Community Dataset view decision; no mutation or domain event.",
 )
 _register(
     "DatasetAuthorizationService",
     "exportable_resources",
     "intentionally excluded",
+    module="authorization.datasets",
     rationale="Bulk current export authority for published API reads; no mutation or domain event.",
 )
 
@@ -980,21 +984,21 @@ _register(
     "InstallationSettingsService",
     "get_policy",
     "intentionally excluded",
-    module="installation_settings",
+    module="authorization.installation_settings",
     rationale="Administrator-only installation policy read; no mutation or domain event.",
 )
 _register(
     "InstallationSettingsService",
     "requires_export_access",
     "intentionally excluded",
-    module="installation_settings",
+    module="authorization.installation_settings",
     rationale="Active-user policy explanation flag; no settings mutation or domain event.",
 )
 _audited(
     "InstallationSettingsService",
     "change_policy",
     ("installation_settings", "export_access_policy_changed"),
-    module="installation_settings",
+    module="authorization.installation_settings",
 )
 
 OPERATIONS = MappingProxyType(OPERATIONS)

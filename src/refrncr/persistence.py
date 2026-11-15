@@ -1353,7 +1353,7 @@ class SqlAlchemyInstallationSettingsOperations:
         self.session = session
 
     def get_policy(self, *, for_update=False):
-        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+        from refrncr.authorization import INSTALLATION_SETTINGS_ID
 
         row = self.session.scalar(
             _locked(
@@ -1369,7 +1369,7 @@ class SqlAlchemyInstallationSettingsOperations:
         return row.export_access_policy
 
     def change_policy(self, expected, policy):
-        from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+        from refrncr.authorization import INSTALLATION_SETTINGS_ID
 
         result = self.session.execute(
             update(InstallationSettings)
