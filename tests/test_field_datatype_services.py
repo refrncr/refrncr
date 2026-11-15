@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from support import CASES, PASSWORD
 
-from refrncr.datatypes import DATATYPES, canonicalize, get_datatype
+from refrncr.datasets.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.models import AuditEvent, Dataset, DatasetField, DatasetRecord
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import (

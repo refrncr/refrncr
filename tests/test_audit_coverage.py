@@ -236,6 +236,8 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
         "DatasetRecordImportService": "record_import",
         "DatasetVersionService": "dataset_versions",
         "DatasetService": "datasets.service",
+        "DatasetFieldService": "datasets.fields",
+        "DatasetBusinessKeyService": "datasets.business_key",
         "GrantService": "authorization.grants",
         "MembershipService": "identity.memberships",
         "TeamService": "identity.teams",

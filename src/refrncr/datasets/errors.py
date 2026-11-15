@@ -1,4 +1,10 @@
-from refrncr.errors import ConflictError, DomainError, NotFoundError, ValidationError
+from refrncr.errors import (
+    AuthorizationError,
+    ConflictError,
+    DomainError,
+    NotFoundError,
+    ValidationError,
+)
 
 
 class DatasetError(DomainError):
@@ -15,6 +21,10 @@ class DatasetConflictError(DatasetError, ConflictError):
 
 class DatasetValidationError(DatasetError, ValidationError):
     """A Dataset request violates a domain constraint."""
+
+
+class DatasetAuthorizationError(DatasetError, AuthorizationError):
+    """An authenticated actor cannot perform the requested Dataset operation."""
 
 
 class RecordValidationError(DatasetError, ValidationError):

@@ -250,7 +250,7 @@ def test_persisted_snapshot_cannot_be_edited(database_context):
     ],
 )
 def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):
-    from refrncr.datatypes import get_datatype
+    from refrncr.datasets.datatypes import get_datatype
 
     c = context
     setup(c, populated=False)

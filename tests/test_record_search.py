@@ -10,7 +10,7 @@ from sqlalchemy import event
 from support import NOW, html_elements, publish, request, setup, snapshot
 from support import dataset_version_client as client
 
-from refrncr.datatypes import DATATYPES
+from refrncr.datasets.datatypes import DATATYPES
 from refrncr.record_search import RecordQueryLogFilter
 from refrncr.services import NotFoundError
 

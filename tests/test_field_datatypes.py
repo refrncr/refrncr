@@ -8,7 +8,7 @@ from decimal import Decimal, localcontext
 
 import pytest
 
-from refrncr.datatypes import DATATYPES, DatatypeError, canonicalize, get_datatype
+from refrncr.datasets.datatypes import DATATYPES, DatatypeError, canonicalize, get_datatype
 from refrncr.services import ValidationError, canonicalize_record_value
 
 CASES = [

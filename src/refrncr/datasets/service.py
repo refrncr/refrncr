@@ -1,10 +1,7 @@
 from refrncr.audit import record_audit
 from refrncr.authorization import AuthorizationService
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 from refrncr.domain import valid_identity
-from refrncr.errors import (
-    AuthorizationError,
-)
 from refrncr.identity import UserService
 from refrncr.ports import (
     AuditEntry,
@@ -19,6 +16,7 @@ from refrncr.record_identity import encode_record_identifier
 
 from .deletion import DatasetDeletionMixin, version_reads
 from .errors import (
+    DatasetAuthorizationError,
     DatasetConflictError,
     DatasetNotFoundError,
     DatasetValidationError,
@@ -85,7 +83,7 @@ class DatasetService(DatasetDeletionMixin, DatasetMappingMixin):
     ) -> DatasetRecord:
         with self.uow(write=True, serialized=True) as uow:
             if not self.authorization.datasets.can_create_dataset(actor_id, uow=uow):
-                raise AuthorizationError("Active user access required")
+                raise DatasetAuthorizationError("Active user access required")
             if owner_team_id is None:
                 eligible = self.authorization.datasets.creation_teams(actor_id, uow=uow)
                 if len(eligible) != 1:
@@ -95,7 +93,7 @@ class DatasetService(DatasetDeletionMixin, DatasetMappingMixin):
                 owner_team_id = eligible[0].id
             if not self.authorization.datasets.can_create_dataset(actor_id, owner_team_id, uow=uow):
                 if not self.authorization.datasets.active(uow.users.get(actor_id)):
-                    raise AuthorizationError("Active user access required")
+                    raise DatasetAuthorizationError("Active user access required")
                 raise DatasetValidationError(
                     "Choose an available owning team you may create datasets for."
                 )

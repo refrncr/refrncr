@@ -13,7 +13,7 @@ from refrncr.change_status import (
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths

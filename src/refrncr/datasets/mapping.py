@@ -1,4 +1,4 @@
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 
 from .deletion import mapping_deletion_error, version_reads
 from .errors import DatasetNotFoundError

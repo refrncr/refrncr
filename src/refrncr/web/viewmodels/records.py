@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any, Protocol
 
-from refrncr.datatypes import get_datatype
+from refrncr.datasets.datatypes import get_datatype
 
 
 class RecordField(Protocol):

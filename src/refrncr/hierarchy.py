@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from refrncr.audit import record_audit
 from refrncr.datasets import RecordConflictError, RecordValidationError, StaleRecordError
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import RecordValue, StoredRecord

@@ -368,7 +368,7 @@ def test_bounded_query_count_and_no_object_graph(database_context, monkeypatch):
     ],
 )
 def test_canonical_changed_values(context, data_type, before, after):
-    from refrncr.datatypes import get_datatype
+    from refrncr.datasets.datatypes import get_datatype
 
     c = context
     setup(c, populated=False)

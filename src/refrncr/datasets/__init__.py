@@ -1,5 +1,6 @@
 from importlib import import_module
 
+from .errors import DatasetAuthorizationError as DatasetAuthorizationError
 from .errors import DatasetConflictError as DatasetConflictError
 from .errors import DatasetError as DatasetError
 from .errors import DatasetNotFoundError as DatasetNotFoundError
@@ -11,7 +12,9 @@ from .errors import StaleFieldOrderError as StaleFieldOrderError
 from .errors import StaleRecordError as StaleRecordError
 
 _LAZY_EXPORTS = {
+    "DatasetBusinessKeyService": ("business_key", "DatasetBusinessKeyService"),
     "DatasetDeletion": ("deletion", "DatasetDeletion"),
+    "DatasetFieldService": ("fields", "DatasetFieldService"),
     "version_reads": ("deletion", "version_reads"),
     "DatasetService": ("service", "DatasetService"),
     "DatasetDetails": ("shared", "DatasetDetails"),

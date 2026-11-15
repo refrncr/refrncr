@@ -796,7 +796,7 @@ def test_database_order_matches_existing_browser_order(api, kind, values):
     c.service.publish(
         c.a.id, d.id, NOW.date(), "", c.s.datasets.get_dataset_for_edit(c.a.id, d.key).revision
     )
-    from refrncr.datatypes import get_datatype
+    from refrncr.datasets.datatypes import get_datatype
 
     expected = [
         get_datatype(kind).text(r.values[0].value)

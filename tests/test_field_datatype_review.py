@@ -14,7 +14,7 @@ from support import FIELDS, PASSWORD, setup_dataset, stored
 
 from refrncr import dataset_export
 from refrncr.dataset_export import ExportGenerationError, generate_export
-from refrncr.datatypes import DATATYPES, canonicalize, get_datatype
+from refrncr.datasets.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.db.base import Base
 from refrncr.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
 from refrncr.persistence import SqlAlchemyUnitOfWork

@@ -90,7 +90,7 @@ def test_viewmodel_import_boundary_allows_viewmodels_and_domain_modules(tmp_path
     (tmp_path / "future_viewmodel.py").write_text(
         "from . import records\n"
         "from refrncr.web.viewmodels.records import record_value_formatter\n"
-        "from refrncr.datatypes import get_datatype\n"
+        "from refrncr.datasets.datatypes import get_datatype\n"
     )
 
     assert_viewmodels_are_framework_independent(tmp_path)

@@ -2,7 +2,7 @@
 
 from flask import abort, g, redirect, request, url_for
 
-from refrncr.datatypes import DATATYPES
+from refrncr.datasets.datatypes import DATATYPES
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.web.datasets import (

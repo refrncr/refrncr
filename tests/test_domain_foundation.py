@@ -75,6 +75,11 @@ def test_record_errors_have_a_domain_and_exact_category():
         (DatasetNotFoundError, NotFoundError, ConflictError | ValidationError),
         (DatasetConflictError, ConflictError, NotFoundError | ValidationError),
         (DatasetValidationError, ValidationError, NotFoundError | ConflictError),
+        (
+            dataset_domain.DatasetAuthorizationError,
+            AuthorizationError,
+            NotFoundError | ConflictError | ValidationError,
+        ),
     ],
 )
 def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, other_categories):
@@ -86,6 +91,7 @@ def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, o
 def test_dataset_error_exports_are_identical_and_have_one_category():
     names = (
         "DatasetError",
+        "DatasetAuthorizationError",
         "DatasetNotFoundError",
         "DatasetConflictError",
         "DatasetValidationError",
@@ -210,3 +216,14 @@ def test_require_concept_preserves_conflict_contract():
 
     with pytest.raises(ConflictError, match="Start a New concept"):
         require_concept(uow, "dataset-id")
+
+
+def test_dataset_service_compatibility_exports_are_the_domain_classes():
+    from refrncr.datasets import DatasetBusinessKeyService, DatasetFieldService
+    from refrncr.datasets.business_key import DatasetBusinessKeyService as DomainBusinessKeys
+    from refrncr.datasets.fields import DatasetFieldService as DomainFields
+    from refrncr.services import DatasetBusinessKeyService as CompatibilityBusinessKeys
+    from refrncr.services import DatasetFieldService as CompatibilityFields
+
+    assert DatasetFieldService is DomainFields is CompatibilityFields
+    assert DatasetBusinessKeyService is DomainBusinessKeys is CompatibilityBusinessKeys

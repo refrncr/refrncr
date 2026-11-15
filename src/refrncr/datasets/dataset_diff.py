@@ -6,7 +6,7 @@ from unicodedata import normalize
 
 from refrncr.audit import record_audit
 from refrncr.change_status import ChangeStatus
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.diff_contracts import (
     MAX_SEARCH,

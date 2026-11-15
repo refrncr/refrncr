@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.models import (
     AuditEvent,
     Dataset,

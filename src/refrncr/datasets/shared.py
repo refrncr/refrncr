@@ -3,8 +3,8 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 
-from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
-from refrncr.field_contracts import FIELD_KEY_PATTERN
+from refrncr.datasets.datatypes import DatatypeError, canonicalize, get_datatype
+from refrncr.datasets.field_contracts import FIELD_KEY_PATTERN
 from refrncr.presentation_metadata import (
     MAX_FIELD_DEFINITION,
     MAX_FIELD_UNIT,

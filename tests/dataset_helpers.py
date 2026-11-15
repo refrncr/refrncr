@@ -167,7 +167,7 @@ def downgrade_historical_fixture(config, revision):
 def publish_dataset(services, actor_id, dataset):
     """Explicitly prepare and publish a readable fixture under REF-83's rules."""
     from refrncr.clock import SYSTEM_CLOCK
-    from refrncr.datatypes import get_datatype
+    from refrncr.datasets.datatypes import get_datatype
 
     fields = services.dataset_fields.list_fields(actor_id, dataset.key)
     identifier = services.dataset_business_keys.get_business_key(actor_id, dataset.key)

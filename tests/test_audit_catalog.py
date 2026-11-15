@@ -256,6 +256,8 @@ def test_every_audited_operation_has_behavior_cases():
         "TeamService": "identity.teams",
         "UserService": "identity.users",
         "DatasetService": "datasets.service",
+        "DatasetFieldService": "datasets.fields",
+        "DatasetBusinessKeyService": "datasets.business_key",
     }
     behaviors = {
         f"refrncr.{service_modules.get(name.split('.')[0], 'services')}.{name}"
@@ -469,6 +471,10 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "audit_history": "audit_history",
                         "dataset_versions": "dataset_versions",
                         "dataset_diff": "datasets.dataset_diff",
+                        "dataset_fields": "datasets.fields",
+                        "field_service": "datasets.fields",
+                        "dataset_business_keys": "datasets.business_key",
+                        "business_key_service": "datasets.business_key",
                         "datasets": "datasets.service",
                         "dataset_service": "datasets.service",
                         "service": "datasets.service",

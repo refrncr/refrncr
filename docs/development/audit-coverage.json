@@ -1474,7 +1474,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "create_field",
-      "service": "refrncr.services.DatasetFieldService.create_field",
+      "service": "refrncr.datasets.fields.DatasetFieldService.create_field",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields"
       ],
@@ -1528,7 +1528,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "update_field",
-      "service": "refrncr.services.DatasetFieldService.update_field",
+      "service": "refrncr.datasets.fields.DatasetFieldService.update_field",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -1571,7 +1571,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "update_field_and_business_key_membership",
-      "service": "refrncr.services.DatasetFieldService.update_field_and_business_key_membership",
+      "service": "refrncr.datasets.fields.DatasetFieldService.update_field_and_business_key_membership",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>"
       ],
@@ -1625,7 +1625,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "delete_field",
-      "service": "refrncr.services.DatasetFieldService.delete_field",
+      "service": "refrncr.datasets.fields.DatasetFieldService.delete_field",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.delete_dataset_field POST /datasets/<key>/fields/<field_key>/delete"
       ],
@@ -1668,7 +1668,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "replace_order",
-      "service": "refrncr.services.DatasetFieldService.replace_order",
+      "service": "refrncr.datasets.fields.DatasetFieldService.replace_order",
       "interface_entrypoints": [
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order"
       ],
@@ -1711,7 +1711,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "move_field",
-      "service": "refrncr.services.DatasetFieldService.move_field",
+      "service": "refrncr.datasets.fields.DatasetFieldService.move_field",
       "interface_entrypoints": [
         "refrncr.web.datasets.access.move_dataset_field POST /datasets/<key>/fields/order"
       ],
@@ -1754,7 +1754,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "list_fields",
-      "service": "refrncr.services.DatasetFieldService.list_fields",
+      "service": "refrncr.datasets.fields.DatasetFieldService.list_fields",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.new_dataset GET /datasets/new",
         "refrncr.web.datasets.core.create_dataset POST /datasets",
@@ -1797,7 +1797,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "get_field",
-      "service": "refrncr.services.DatasetFieldService.get_field",
+      "service": "refrncr.datasets.fields.DatasetFieldService.get_field",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
         "refrncr.web.datasets.maintenance.update_dataset_field POST /datasets/<key>/fields/<field_key>",
@@ -1831,7 +1831,7 @@
     {
       "capability": "DatasetBusinessKeyService",
       "operation": "set_business_key",
-      "service": "refrncr.services.DatasetBusinessKeyService.set_business_key",
+      "service": "refrncr.datasets.business_key.DatasetBusinessKeyService.set_business_key",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -1879,7 +1879,7 @@
     {
       "capability": "DatasetBusinessKeyService",
       "operation": "get_business_key",
-      "service": "refrncr.services.DatasetBusinessKeyService.get_business_key",
+      "service": "refrncr.datasets.business_key.DatasetBusinessKeyService.get_business_key",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete",
         "refrncr.web.datasets.maintenance.edit_dataset_field GET /datasets/<key>/fields/<field_key>/edit",
@@ -6607,7 +6607,7 @@
     {
       "capability": "DatasetFieldService",
       "operation": "list_fields_for_datasets",
-      "service": "refrncr.services.DatasetFieldService.list_fields_for_datasets",
+      "service": "refrncr.datasets.fields.DatasetFieldService.list_fields_for_datasets",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
