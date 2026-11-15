@@ -9,7 +9,7 @@ from support import NOW
 from test_api_export_access import grant_role, policy, special_dataset
 from test_mapping_source_versions import publish_table
 
-from refrncr.installation_policy import EXPORT_POLICIES
+from refrncr.authorization import EXPORT_POLICIES
 
 
 @pytest.fixture(params=["integer", "string"])

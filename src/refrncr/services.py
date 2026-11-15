@@ -2,14 +2,28 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Callable
-from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime
 
 from refrncr import errors as _errors
 from refrncr.audit import record_audit
-from refrncr.authorization import highest_permission, permits, validate_permission
+from refrncr.authorization import (
+    AuthorizationService as AuthorizationService,
+)
+from refrncr.authorization import (
+    AuthorizedResourceSet as AuthorizedResourceSet,
+)
+from refrncr.authorization import (
+    DatasetAuthorizationService as DatasetAuthorizationService,
+)
+from refrncr.authorization import (
+    DatasetResourceResolver as DatasetResourceResolver,
+)
+from refrncr.authorization import GrantService as GrantService
+from refrncr.authorization import ResourceTypeRegistry as ResourceTypeRegistry
+from refrncr.authorization import (
+    create_deprecated_grant_service as create_deprecated_grant_service,
+)
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.domain import advance_concept, require_concept, valid_identity
@@ -68,7 +82,7 @@ from refrncr.identity import (
     normalize_team_name as normalize_team_name,
 )
 from refrncr.identity import (
-    require_admin,
+    require_admin as require_admin,
 )
 from refrncr.identity import (
     validate_password as validate_password,
@@ -81,12 +95,9 @@ from refrncr.ports import (
     DatasetFieldRecord,
     DatasetOverview,
     DatasetRecord,
-    GrantRecord,
-    PermissionDataSource,
     PersistenceConflictError,
     RecordValue,
     StoredRecord,
-    TeamRecord,
     UnitOfWork,
     UnitOfWorkFactory,
 )
@@ -126,12 +137,6 @@ def parse_expected_revision(raw: str) -> int:
 
 
 @dataclass(frozen=True, slots=True)
-class AuthorizedResourceSet:
-    all_resources: bool
-    resource_ids: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class DatasetDetails:
     id: str
     key: str
@@ -149,31 +154,6 @@ class RecordPage:
     page: int
     page_size: int
     total: int
-
-
-class ResourceTypeRegistry:
-    """Maps canonical resource types to framework-independent existence resolvers."""
-
-    def __init__(self) -> None:
-        self._resolvers: dict[str, Callable[[str], bool]] = {}
-
-    def register(self, resource_type: str, resolver: Callable[[str], bool]) -> None:
-        if (
-            not resource_type
-            or resource_type != resource_type.strip().casefold()
-            or len(resource_type) > 100
-        ):
-            raise ValidationError("Resource type must be a canonical lower-case value")
-        if resource_type in self._resolvers:
-            raise ConflictError("Resource type is already registered")
-        self._resolvers[resource_type] = resolver
-
-    def require_existing(self, resource_type: str, resource_id: str) -> None:
-        resolver = self._resolvers.get(resource_type)
-        if resolver is None:
-            raise ValidationError("Resource type is not registered")
-        if not resource_id or len(resource_id) > 100 or not resolver(resource_id):
-            raise NotFoundError("Grantable resource not found")
 
 
 def validate_dataset_key(key: str) -> str:
@@ -265,148 +245,6 @@ def canonicalize_record_value(data_type: str, raw: str | None) -> tuple[object, 
         return canonicalize(data_type, raw)
     except DatatypeError as error:
         raise ValidationError(str(error)) from None
-
-
-class DatasetResourceResolver:
-    """Persistence-neutral Dataset existence resolver for resource Grants."""
-
-    def __init__(self, uow: UnitOfWorkFactory) -> None:
-        self.uow = uow
-
-    def __call__(self, dataset_id: str) -> bool:
-        with self.uow() as uow:
-            return uow.datasets.exists(dataset_id)
-
-
-class DatasetAuthorizationService:
-    """Dataset capabilities, independent of frameworks and legacy resource roles.
-
-    Mutations supply their own unit of work after locking the Dataset. Team then
-    user locks keep authority stable through commit, matching membership lifecycle.
-    Read decisions use fresh persistence and never cache membership or capability.
-    """
-
-    def __init__(self, uow: UnitOfWorkFactory):
-        self.uow = uow
-
-    @staticmethod
-    def active(actor):
-        return actor is not None and actor.is_active and not actor.is_deleted
-
-    def creation_teams(self, actor_id: str, *, uow=None) -> list[TeamRecord]:
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            actor = work.users.get(actor_id)
-            if not self.active(actor):
-                raise AuthorizationError("Active user access required")
-            teams = work.teams.list_by_name()
-            if actor.role == "admin":
-                return teams
-            memberships = set(work.memberships.team_ids_for_user(actor_id))
-            return [team for team in teams if team.id in memberships]
-
-    def can_create_dataset(self, actor_id, team_id=None, *, uow=None):
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            # Starting the creation flow is open to every active user.
-            if team_id is None:
-                return self.active(work.users.get(actor_id))
-            if not valid_identity(team_id):
-                return False
-            team = work.teams.get(team_id, for_update=uow is not None)
-            actor = work.users.get(actor_id, for_update=uow is not None)
-            return bool(
-                team
-                and self.active(actor)
-                and (
-                    actor.role == "admin" or team_id in work.memberships.team_ids_for_user(actor_id)
-                )
-            )
-
-    def _decision(self, actor_id, dataset_id, capability, *, uow=None):
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            dataset = work.datasets.get(dataset_id)
-            if dataset is None:
-                return False
-            mutation = uow is not None and work.write and capability not in {"view", "export"}
-            if mutation and capability == "maintain":
-                if work.teams.get(dataset.owner_team_id, for_update=True) is None:
-                    return False
-            actor = work.users.get(actor_id, for_update=mutation)
-            if not self.active(actor):
-                return False
-            if capability in {"export", "manage_export"}:
-                policy = work.installation_settings.get_policy()
-                if policy == "everyone":
-                    return capability == "export"
-                if capability == "manage_export" and policy == "admin_grants":
-                    return actor.role == "admin"
-            if capability == "view" or actor.role == "admin":
-                return True
-            if capability == "change_owner":
-                return False
-            teams = work.memberships.team_ids_for_user(actor_id)
-            if dataset.owner_team_id in teams:
-                return True
-            return capability == "export" and work.dataset_export_access.applies(
-                dataset.id, actor_id, teams
-            )
-
-    def can_view_dataset(self, actor_id, dataset_id, *, uow=None):
-        return self._decision(actor_id, dataset_id, "view", uow=uow)
-
-    def viewable_resources(self, actor_id, *, uow=None):
-        """Bulk form of the existing Community view decision, in the caller's snapshot."""
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            if not self.active(work.users.get(actor_id)):
-                raise NotFoundError("Dataset not found")
-            return AuthorizedResourceSet(True, ())
-
-    def exportable_resources(self, actor_id, *, uow=None):
-        """Bulk export authority in the same snapshot as the published API read."""
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            actor = work.users.get(actor_id)
-            if not self.active(actor):
-                raise NotFoundError("Dataset not found")
-            policy = work.installation_settings.get_policy()
-            if policy == "everyone" or actor.role == "admin":
-                return AuthorizedResourceSet(True, ())
-            teams = work.memberships.team_ids_for_user(actor_id)
-            return AuthorizedResourceSet(
-                False, work.dataset_export_access.exportable_dataset_ids(actor_id, teams)
-            )
-
-    def maintainable_resources(self, actor_id, *, uow=None):
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            actor = work.users.get(actor_id)
-            if not self.active(actor):
-                raise AuthorizationError("Active user access required")
-            if actor.role == "admin":
-                return AuthorizedResourceSet(True, ())
-            teams = set(work.memberships.team_ids_for_user(actor_id))
-            return AuthorizedResourceSet(
-                False,
-                tuple(item.id for item in work.datasets.list_all() if item.owner_team_id in teams),
-            )
-
-    def can_maintain_dataset(self, actor_id, dataset_id, *, uow=None):
-        return self._decision(actor_id, dataset_id, "maintain", uow=uow)
-
-    def can_export_dataset(self, actor_id, dataset_id, *, uow=None):
-        return self._decision(actor_id, dataset_id, "export", uow=uow)
-
-    def can_change_dataset_owner(self, actor_id, dataset_id, *, uow=None):
-        return self._decision(actor_id, dataset_id, "change_owner", uow=uow)
-
-    def can_manage_export_access(self, actor_id, dataset_id, *, uow=None):
-        return self._decision(actor_id, dataset_id, "manage_export", uow=uow)
-
-    def can_administer_installation(self, actor_id, *, uow=None):
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            actor = work.users.get(actor_id)
-            return self.active(actor) and actor.role == "admin"
-
-    def can_access_community(self, actor_id, *, uow=None):
-        with nullcontext(uow) if uow is not None else self.uow() as work:
-            return self.active(work.users.get(actor_id))
 
 
 @dataclass(frozen=True, slots=True)
@@ -2471,232 +2309,3 @@ class DatasetRecordService:
             else:
                 with self.uow() as work:
                     require_concept(work, dataset.id)
-
-
-class GrantService:
-    """Deprecated compatibility service for historical resource Grants.
-
-    Browser and current Community APIs must use ``AuthorizationService`` named
-    capabilities. The grants table and this programmatic compatibility service
-    remain available until a separate deprecation decision authorizes removal.
-    """
-
-    def __init__(self, uow: UnitOfWorkFactory, resources: ResourceTypeRegistry) -> None:
-        self.uow = uow
-        self.resources = resources
-
-    def create_grant(
-        self,
-        actor_id: str,
-        subject_type: str,
-        subject_id: str,
-        resource_type: str,
-        resource_id: str,
-        permission: str,
-    ) -> GrantRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            # Legacy Dataset Grants remain inert but must not outlive deletion.
-            # Match the Dataset → actor lock order before checking existence.
-            dataset = (
-                uow.datasets.get(resource_id, for_update=True)
-                if resource_type == "dataset" and valid_identity(resource_id)
-                else None
-            )
-            actor = require_admin(uow, actor_id)
-            if resource_type == "dataset" and dataset is None:
-                raise NotFoundError("Resource not found")
-            self._validate_permission(permission)
-            if subject_type not in SUBJECT_TYPES:
-                raise ValidationError("Subject type must be user or team")
-            self.resources.require_existing(resource_type, resource_id)
-            self._require_subject(uow, subject_type, subject_id)
-            grant = uow.grants.create(
-                subject_type=subject_type,
-                subject_id=subject_id,
-                resource_type=resource_type,
-                resource_id=resource_id,
-                permission=permission,
-            )
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("Subject already has a Grant for this resource") from exc
-            self._add_audit(uow, self._audit(actor.id, grant.id, "created"))
-            return grant
-
-    def change_permission(self, actor_id: str, grant_id: str, permission: str) -> GrantRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            self._validate_permission(permission)
-            grant = self._target(uow, grant_id, for_update=True)
-            if grant.permission == permission:
-                return grant
-            grant.permission = permission
-            grant.updated_at = uow.now()
-            self._add_audit(uow, self._audit(actor.id, grant.id, "permission_changed"))
-            return grant
-
-    def delete_grant(self, actor_id: str, grant_id: str) -> None:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            grant = self._target(uow, grant_id, for_update=True)
-            self._add_audit(uow, self._audit(actor.id, grant.id, "deleted"))
-            uow.grants.delete(grant)
-
-    @staticmethod
-    def _validate_permission(permission: str) -> None:
-        try:
-            validate_permission(permission)
-        except ValueError as exc:
-            raise ValidationError("Permission must be viewer, editor or admin") from exc
-
-    @staticmethod
-    def _require_subject(uow: UnitOfWork, subject_type: str, subject_id: str) -> None:
-        if subject_type == "user":
-            subject = uow.users.get(subject_id, for_update=True)
-            if subject is None:
-                raise NotFoundError("User not found")
-            if not subject.is_active or subject.is_deleted:
-                raise InvalidLifecycleError("Only active users can receive direct Grants")
-            return
-        if uow.teams.get(subject_id, for_update=True) is None:
-            raise NotFoundError("Team not found")
-
-    @staticmethod
-    def _target(uow: UnitOfWork, grant_id: str, *, for_update: bool = False) -> GrantRecord:
-        grant = uow.grants.get(grant_id, for_update=for_update)
-        if grant is None:
-            raise NotFoundError("Grant not found")
-        return grant
-
-    @staticmethod
-    def _audit(actor_id: str, grant_id: str, action: str) -> AuditEntry:
-        return AuditEntry(
-            actor_user_id=actor_id,
-            object_type="grant",
-            object_id=grant_id,
-            action=action,
-        )
-
-    _add_audit = staticmethod(UserService._add_audit)
-
-
-def create_deprecated_grant_service(
-    uow: UnitOfWorkFactory, resources: ResourceTypeRegistry
-) -> GrantService:
-    """Create the isolated Grant compatibility service for non-web callers."""
-    return GrantService(uow, resources)
-
-
-class AuthorizationService:
-    """Single resource-permission engine plus the separate Community admin rule."""
-
-    def __init__(
-        self, data: PermissionDataSource, resources: ResourceTypeRegistry, datasets=None
-    ) -> None:
-        self.datasets = datasets
-        self.data = data
-        self.resources = resources
-
-    def effective_permission(
-        self, user_id: str, resource_type: str, resource_id: str
-    ) -> str | None:
-        if resource_type == "dataset":
-            return None  # Legacy Dataset roles are inert. Use named capabilities.
-        context = self.data.load_context(user_id, resource_type, resource_id)
-        if not context.subject.exists or not context.subject.active or context.subject.deleted:
-            return None
-        self.resources.require_existing(resource_type, resource_id)
-        return highest_permission(context.permissions)
-
-    def check_access(
-        self, user_id: str, resource_type: str, resource_id: str, required: str, *, uow=None
-    ) -> bool:
-        """Deprecated GrantService compatibility API; use has_capability instead."""
-        if resource_type == "dataset":
-            if self.datasets is None:
-                return False
-            decisions = {
-                "viewer": self.datasets.can_view_dataset,
-                "editor": self.datasets.can_maintain_dataset,
-                "admin": self.datasets.can_maintain_dataset,
-                "export": self.datasets.can_export_dataset,
-            }
-            if required not in decisions:
-                raise ValidationError("Unknown Dataset capability")
-            return decisions[required](user_id, resource_id, uow=uow)
-        GrantService._validate_permission(required)
-        context = self.data.load_context(user_id, resource_type, resource_id)
-        if context.subject.exists and context.subject.active and not context.subject.deleted:
-            self.resources.require_existing(resource_type, resource_id)
-        return permits(context.subject, context.permissions, required)
-
-    def has_capability(self, user_id: str, capability: str, resource_id=None, *, uow=None) -> bool:
-        """Evaluate a named Community capability at one authorization boundary."""
-        installation_capabilities = {
-            "can_access_community": (
-                getattr(self.datasets, "can_access_community", None) if self.datasets else None
-            ),
-            "can_administer_installation": (
-                getattr(self.datasets, "can_administer_installation", None)
-                if self.datasets
-                else None
-            ),
-            "can_manage_access": (
-                getattr(self.datasets, "can_administer_installation", None)
-                if self.datasets
-                else None
-            ),
-            "can_create_dataset": (
-                getattr(self.datasets, "can_create_dataset", None) if self.datasets else None
-            ),
-        }
-        if capability in installation_capabilities:
-            decision = installation_capabilities[capability]
-            if resource_id is not None or decision is None:
-                raise ValidationError(f"Unknown or incomplete capability: {capability}")
-            return decision(user_id, uow=uow)
-        dataset_capabilities = {
-            "can_view_dataset": self.datasets.can_view_dataset if self.datasets else None,
-            "can_maintain_dataset": self.datasets.can_maintain_dataset if self.datasets else None,
-            "can_export_dataset": self.datasets.can_export_dataset if self.datasets else None,
-            "can_change_dataset_owner": (
-                self.datasets.can_change_dataset_owner if self.datasets else None
-            ),
-            "can_manage_export_access": (
-                self.datasets.can_manage_export_access if self.datasets else None
-            ),
-        }
-        decision = dataset_capabilities.get(capability)
-        if decision is None or resource_id is None:
-            raise ValidationError(f"Unknown or incomplete capability: {capability}")
-        return decision(user_id, resource_id, uow=uow)
-
-    def authorized_resources(
-        self, user_id: str, resource_type: str, required: str
-    ) -> AuthorizedResourceSet:
-        GrantService._validate_permission(required)
-        if resource_type == "dataset":
-            if self.datasets is None or not self.datasets.can_create_dataset(user_id):
-                raise AuthorizationError("Active user access required")
-            if required == "viewer":
-                return AuthorizedResourceSet(True, ())
-            return self.datasets.maintainable_resources(user_id)
-        context = self.data.load_resource_permissions(user_id, resource_type)
-        subject = context.subject
-        if not subject.exists or not subject.active or subject.deleted:
-            raise AuthorizationError("Active user access required")
-        if subject.community_admin:
-            return AuthorizedResourceSet(all_resources=True, resource_ids=())
-
-        permissions_by_resource: dict[str, list[str]] = {}
-        for resource_id, permission in context.permissions:
-            permissions_by_resource.setdefault(resource_id, []).append(permission)
-        resource_ids = tuple(
-            sorted(
-                resource_id
-                for resource_id, permissions in permissions_by_resource.items()
-                if permits(subject, permissions, required)
-            )
-        )
-        return AuthorizedResourceSet(all_resources=False, resource_ids=resource_ids)

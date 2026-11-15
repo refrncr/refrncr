@@ -84,7 +84,7 @@ class InstallationSettings(Base):
 
 @event.listens_for(InstallationSettings.__table__, "after_create")
 def _seed_installation_settings(table, connection, **_kw):
-    from refrncr.installation_policy import INSTALLATION_SETTINGS_ID
+    from refrncr.authorization import INSTALLATION_SETTINGS_ID
 
     connection.execute(
         table.insert().values(id=INSTALLATION_SETTINGS_ID, export_access_policy="everyone")

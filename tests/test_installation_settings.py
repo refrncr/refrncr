@@ -7,8 +7,7 @@ import pytest
 from sqlalchemy import select
 from support import dataset_version_client, html_tag_texts, publish, request, setup
 
-from refrncr.installation_policy import EXPORT_POLICIES
-from refrncr.installation_settings import PolicyConfirmationRequired
+from refrncr.authorization import EXPORT_POLICIES, PolicyConfirmationRequired
 from refrncr.models import AuditEvent
 from refrncr.persistence import SqlAlchemyInstallationSettingsOperations, SqlAlchemyUnitOfWork
 from refrncr.services import AuthorizationError, ConflictError, NotFoundError, ValidationError
@@ -25,6 +24,18 @@ def events(c):
         return list(
             session.scalars(
                 select(AuditEvent).where(AuditEvent.object_type == "installation_settings")
+            )
+        )
+
+
+def authorization_denials(c):
+    with c.sessions() as session:
+        return list(
+            session.scalars(
+                select(AuditEvent).where(
+                    AuditEvent.object_type == "security",
+                    AuditEvent.action == "security.authorization_denied",
+                )
             )
         )
 
@@ -121,6 +132,64 @@ def test_policy_transition_confirmation_and_audit(installation_context, previous
     assert request(browser, "post", path, data=data | {"confirmed": "yes"}).status_code == 409
     c.s.installation_settings.change_policy(c.a.id, policy, policy)
     assert len(events(c)) == before + 1
+
+
+def test_policy_conflict_and_denial_have_distinct_web_audit_behavior(installation_context):
+    c = installation_context
+    set_policy(c, "admin_grants")
+    path = "/settings/dataset-access"
+
+    admin_browser, admin_csrf = dataset_version_client(c, c.a)
+    before = len(authorization_denials(c))
+    stale = request(
+        admin_browser,
+        "post",
+        path,
+        data={
+            "csrf_token": admin_csrf,
+            "expected_policy": "everyone",
+            "policy": "team_grants",
+            "confirmed": "yes",
+        },
+    )
+    assert stale.status_code == 409
+    assert len(authorization_denials(c)) == before
+
+    user_browser, user_csrf = dataset_version_client(c, c.u)
+    denied = request(
+        user_browser,
+        "post",
+        path,
+        data={
+            "csrf_token": user_csrf,
+            "expected_policy": "everyone",
+            "policy": "team_grants",
+            "confirmed": "yes",
+        },
+    )
+    assert denied.status_code == 403
+    security_events = authorization_denials(c)
+    assert len(security_events) == before + 1
+    assert security_events[-1].actor_user_id == c.u.id
+
+
+def test_export_access_denial_stays_masked_without_security_audit(installation_ui_context):
+    c = installation_ui_context
+    setup(c)
+    publish(c)
+    set_policy(c, "admin_grants")
+    browser, csrf = dataset_version_client(c, c.u)
+    before = len(authorization_denials(c))
+
+    response = request(
+        browser,
+        "post",
+        f"/datasets/{c.d.key}/export-access",
+        data={"csrf_token": csrf, "subject": f"team:{c.other.id}"},
+    )
+
+    assert response.status_code == 404
+    assert len(authorization_denials(c)) == before
 
 
 @pytest.mark.parametrize("policy", EXPORT_POLICIES)
