@@ -255,6 +255,7 @@ def test_every_audited_operation_has_behavior_cases():
         "MembershipService": "identity.memberships",
         "TeamService": "identity.teams",
         "UserService": "identity.users",
+        "DatasetService": "datasets.service",
     }
     behaviors = {
         f"refrncr.{service_modules.get(name.split('.')[0], 'services')}.{name}"
@@ -273,7 +274,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.identity.users.UserService.create_initial_admin",
             "refrncr.identity.users.UserService.recover_administrator_password",
             "refrncr.services.DatasetRecordService.export_dataset",
-            "refrncr.dataset_diff.DatasetDiffService.open_review",
+            "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
             "refrncr.dataset_versions.DatasetVersionService.discard_concept",
             "refrncr.hierarchy.HierarchyService.create_node",
@@ -467,7 +468,10 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "record_imports": "record_import",
                         "audit_history": "audit_history",
                         "dataset_versions": "dataset_versions",
-                        "dataset_diff": "dataset_diff",
+                        "dataset_diff": "datasets.dataset_diff",
+                        "datasets": "datasets.service",
+                        "dataset_service": "datasets.service",
+                        "service": "datasets.service",
                     }.get(receiver.id, "services")
                     found.add(f"refrncr.{module}.{receivers[receiver.id]}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:

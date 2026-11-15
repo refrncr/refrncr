@@ -2,8 +2,8 @@
 
 from contextlib import nullcontext
 
+from refrncr.datasets import DatasetNotFoundError
 from refrncr.domain import valid_identity
-from refrncr.errors import NotFoundError
 from refrncr.ports import TeamRecord, UnitOfWorkFactory
 
 from .errors import AccessManagementAuthorizationError
@@ -82,14 +82,14 @@ class DatasetAuthorizationService:
     def viewable_resources(self, actor_id, *, uow=None):
         with nullcontext(uow) if uow is not None else self.uow() as work:
             if not self.active(work.users.get(actor_id)):
-                raise NotFoundError("Dataset not found")
+                raise DatasetNotFoundError("Dataset not found")
             return AuthorizedResourceSet(True, ())
 
     def exportable_resources(self, actor_id, *, uow=None):
         with nullcontext(uow) if uow is not None else self.uow() as work:
             actor = work.users.get(actor_id)
             if not self.active(actor):
-                raise NotFoundError("Dataset not found")
+                raise DatasetNotFoundError("Dataset not found")
             policy = work.installation_settings.get_policy()
             if policy == "everyone" or actor.role == "admin":
                 return AuthorizedResourceSet(True, ())

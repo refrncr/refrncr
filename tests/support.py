@@ -19,8 +19,8 @@ from werkzeug.datastructures import MultiDict
 
 from refrncr.app import create_community_services
 from refrncr.clock import SYSTEM_CLOCK
-from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.datatypes import DATATYPES, get_datatype
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory

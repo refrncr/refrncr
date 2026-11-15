@@ -1412,7 +1412,7 @@ def test_create_validation_field_comes_from_domain_error_not_its_message(
     def renamed_key_error(_key):
         raise ValidationError("A differently worded key error", field="key")
 
-    monkeypatch.setattr("refrncr.services.validate_dataset_key", renamed_key_error)
+    monkeypatch.setattr("refrncr.datasets.service.validate_dataset_key", renamed_key_error)
     response = request(
         client,
         "post",

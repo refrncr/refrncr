@@ -10,7 +10,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from support import NOW, MutableClock, audits, publish, setup, snapshot
 
-from refrncr.dataset_diff import DatasetDiffService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.diff_classification import classify_fields, relative_moves
 from refrncr.diff_contracts import DiffCriteria
 from refrncr.persistence import SqlAlchemyUnitOfWork

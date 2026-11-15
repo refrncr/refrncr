@@ -1,5 +1,7 @@
 """Shared, persistence-neutral domain error hierarchy."""
 
+from importlib import import_module
+
 
 class DomainError(Exception):
     """Base class for safe domain errors exposed at an application boundary."""
@@ -12,10 +14,6 @@ UserManagementError = DomainError
 
 class AccessManagementError(DomainError):
     """Access-management-domain failure."""
-
-
-class DatasetError(DomainError):
-    """Dataset-domain failure."""
 
 
 class VersionError(DomainError):
@@ -58,29 +56,25 @@ class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
 
 
-class RecordValidationError(DatasetError, ValidationError):
-    """Record values violate one or more Dataset field constraints."""
-
-    def __init__(self, errors: dict[str, str]) -> None:
-        super().__init__("Record contains invalid values")
-        self.errors = errors
-
-
-class RecordConflictError(DatasetError, ConflictError):
-    """Record work conflicts with current Dataset state."""
-
-    def __init__(self, message: str, field_key: str | None = None) -> None:
-        super().__init__(message)
-        self.field_key = field_key
-
-
-class StaleRecordError(DatasetError, ConflictError):
-    """The submitted Record revision no longer matches persisted state."""
+_DATASET_ERROR_NAMES = frozenset(
+    {
+        "DatasetError",
+        "DatasetNotFoundError",
+        "DatasetConflictError",
+        "DatasetValidationError",
+        "RecordValidationError",
+        "RecordConflictError",
+        "StaleRecordError",
+        "StaleFieldOrderError",
+        "StaleDatasetOwnerError",
+    }
+)
 
 
-class StaleFieldOrderError(DatasetError, ConflictError):
-    """The submitted field order no longer matches persisted state."""
-
-
-class StaleDatasetOwnerError(DatasetError, ConflictError):
-    """Persisted ownership no longer matches the form's expected owner."""
+def __getattr__(name: str):
+    """Temporarily preserve dataset-error imports until REF-370."""
+    if name in _DATASET_ERROR_NAMES:
+        value = getattr(import_module("refrncr.datasets.errors"), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

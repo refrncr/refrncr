@@ -46,7 +46,7 @@ migration it re-exports every name moved out of it. Internal imports are changed
 package by REF-370; that subtask also adds the facade's `DeprecationWarning`. REF-353 removes the
 facade and the `UserManagementError` compatibility alias only after Cloud has migrated.
 Domain markers and specific errors move from the transitional shared `errors.py` into each
-domain's `errors.py`; only `DomainError` and the three category bases remain shared.
+domain's `errors.py`; only `DomainError` and the four category bases remain shared.
 
 ### Dependency rules
 

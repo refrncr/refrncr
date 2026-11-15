@@ -953,7 +953,7 @@
     {
       "capability": "DatasetService",
       "operation": "create_dataset",
-      "service": "refrncr.services.DatasetService.create_dataset",
+      "service": "refrncr.datasets.service.DatasetService.create_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.create_dataset POST /datasets"
       ],
@@ -1007,7 +1007,7 @@
     {
       "capability": "DatasetService",
       "operation": "change_owner",
-      "service": "refrncr.services.DatasetService.change_owner",
+      "service": "refrncr.datasets.service.DatasetService.change_owner",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -1053,7 +1053,7 @@
     {
       "capability": "DatasetService",
       "operation": "update_dataset",
-      "service": "refrncr.services.DatasetService.update_dataset",
+      "service": "refrncr.datasets.service.DatasetService.update_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>"
       ],
@@ -1105,7 +1105,7 @@
     {
       "capability": "DatasetService",
       "operation": "grant_export_access",
-      "service": "refrncr.services.DatasetService.grant_export_access",
+      "service": "refrncr.datasets.service.DatasetService.grant_export_access",
       "interface_entrypoints": [
         "refrncr.web.datasets.access.dataset_export_access POST /datasets/<key>/export-access"
       ],
@@ -1152,7 +1152,7 @@
     {
       "capability": "DatasetService",
       "operation": "revoke_export_access",
-      "service": "refrncr.services.DatasetService.revoke_export_access",
+      "service": "refrncr.datasets.service.DatasetService.revoke_export_access",
       "interface_entrypoints": [
         "refrncr.web.datasets.access.revoke_dataset_export_access POST /datasets/<key>/export-access/<access_id>/revoke"
       ],
@@ -1199,7 +1199,7 @@
     {
       "capability": "DatasetService",
       "operation": "export_access_context",
-      "service": "refrncr.services.DatasetService.export_access_context",
+      "service": "refrncr.datasets.service.DatasetService.export_access_context",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -1237,7 +1237,7 @@
     {
       "capability": "DatasetService",
       "operation": "list_datasets",
-      "service": "refrncr.services.DatasetService.list_datasets",
+      "service": "refrncr.datasets.service.DatasetService.list_datasets",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -1269,7 +1269,7 @@
     {
       "capability": "DatasetService",
       "operation": "list_dataset_overview",
-      "service": "refrncr.services.DatasetService.list_dataset_overview",
+      "service": "refrncr.datasets.service.DatasetService.list_dataset_overview",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_list GET /datasets",
         "refrncr.web.datasets.core.new_dataset GET /datasets/new",
@@ -1312,7 +1312,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset_context",
-      "service": "refrncr.services.DatasetService.get_dataset_context",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset_context",
       "interface_entrypoints": [
         "Internal service caller or direct authorized service use"
       ],
@@ -1344,7 +1344,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset",
-      "service": "refrncr.services.DatasetService.get_dataset",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.new_dataset_field GET /datasets/<key>/fields/new",
         "refrncr.web.datasets.maintenance.create_dataset_field POST /datasets/<key>/fields",
@@ -1380,7 +1380,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset_details",
-      "service": "refrncr.services.DatasetService.get_dataset_details",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset_details",
       "interface_entrypoints": [
         "Internal service caller or direct authorized service use"
       ],
@@ -1412,7 +1412,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset_for_edit",
-      "service": "refrncr.services.DatasetService.get_dataset_for_edit",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new",
@@ -4473,7 +4473,7 @@
     {
       "capability": "dataset_upgrade",
       "operation": "ownership_preflight",
-      "service": "refrncr.dataset_upgrade.ownership_preflight",
+      "service": "refrncr.datasets.dataset_upgrade.ownership_preflight",
       "interface_entrypoints": [
         "refrncr dataset-ownership-preflight",
         "refrncr dataset-ownership-preflight --upgrade"
@@ -4505,7 +4505,7 @@
     {
       "capability": "dataset_upgrade",
       "operation": "read_owner_mapping",
-      "service": "refrncr.dataset_upgrade.read_owner_mapping",
+      "service": "refrncr.datasets.dataset_upgrade.read_owner_mapping",
       "interface_entrypoints": [
         "refrncr dataset-ownership-preflight",
         "refrncr dataset-ownership-preflight --upgrade"
@@ -4537,7 +4537,7 @@
     {
       "capability": "dataset_upgrade",
       "operation": "require_resolved_ownership",
-      "service": "refrncr.dataset_upgrade.require_resolved_ownership",
+      "service": "refrncr.datasets.dataset_upgrade.require_resolved_ownership",
       "interface_entrypoints": [
         "refrncr dataset-ownership-preflight --upgrade"
       ],
@@ -4869,7 +4869,7 @@
     {
       "capability": "DatasetService",
       "operation": "delete_dataset",
-      "service": "refrncr.services.DatasetService.delete_dataset",
+      "service": "refrncr.datasets.service.DatasetService.delete_dataset",
       "interface_entrypoints": [
         "refrncr.web.datasets.maintenance.dataset_delete GET,POST /datasets/id/<dataset_id>/delete"
       ],
@@ -4918,7 +4918,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset_for_deletion",
-      "service": "refrncr.services.DatasetService.get_dataset_for_deletion",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset_for_deletion",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -5307,7 +5307,7 @@
     {
       "capability": "Dataset concept review",
       "operation": "open_review",
-      "service": "refrncr.dataset_diff.DatasetDiffService.open_review",
+      "service": "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review"
       ],
@@ -5358,7 +5358,7 @@
     {
       "capability": "Dataset concept review",
       "operation": "review",
-      "service": "refrncr.dataset_diff.DatasetDiffService.review",
+      "service": "refrncr.datasets.dataset_diff.DatasetDiffService.review",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_review GET /datasets/<key>/versions/review",
         "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
@@ -5394,7 +5394,7 @@
     {
       "capability": "Dataset concept review",
       "operation": "field_detail",
-      "service": "refrncr.dataset_diff.DatasetDiffService.field_detail",
+      "service": "refrncr.datasets.dataset_diff.DatasetDiffService.field_detail",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
@@ -5430,7 +5430,7 @@
     {
       "capability": "Dataset concept review",
       "operation": "record_detail",
-      "service": "refrncr.dataset_diff.DatasetDiffService.record_detail",
+      "service": "refrncr.datasets.dataset_diff.DatasetDiffService.record_detail",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_record_diff GET /datasets/<key>/versions/review/records/<object_id>",
         "refrncr.web.versions.dataset_version_field_diff GET /datasets/<key>/versions/review/fields/<object_id>"
@@ -5886,7 +5886,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_dataset_configuration",
-      "service": "refrncr.services.DatasetService.get_dataset_configuration",
+      "service": "refrncr.datasets.service.DatasetService.get_dataset_configuration",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -6576,7 +6576,7 @@
     {
       "capability": "DatasetService",
       "operation": "get_visible_dataset_by_id",
-      "service": "refrncr.services.DatasetService.get_visible_dataset_by_id",
+      "service": "refrncr.datasets.service.DatasetService.get_visible_dataset_by_id",
       "interface_entrypoints": [
         "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
       ],
@@ -6816,7 +6816,7 @@
     {
       "capability": "DatasetService",
       "operation": "mapping_source",
-      "service": "refrncr.services.DatasetService.mapping_source",
+      "service": "refrncr.datasets.service.DatasetService.mapping_source",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_list GET /datasets",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
@@ -6861,7 +6861,7 @@
     {
       "capability": "DatasetService",
       "operation": "mapping_source_choices",
-      "service": "refrncr.services.DatasetService.mapping_source_choices",
+      "service": "refrncr.datasets.service.DatasetService.mapping_source_choices",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.new_dataset GET /datasets/new",
         "refrncr.web.datasets.core.create_dataset POST /datasets"
@@ -6937,7 +6937,7 @@
     {
       "capability": "DatasetService",
       "operation": "mapping_usage",
-      "service": "refrncr.services.DatasetService.mapping_usage",
+      "service": "refrncr.datasets.service.DatasetService.mapping_usage",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_list GET /datasets",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",

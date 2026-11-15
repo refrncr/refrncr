@@ -9,7 +9,11 @@ from alembic.config import Config
 from sqlalchemy import inspect, text
 
 from refrncr import cli
-from refrncr.dataset_upgrade import DatasetUpgradeError, ownership_preflight, read_owner_mapping
+from refrncr.datasets.dataset_upgrade import (
+    DatasetUpgradeError,
+    ownership_preflight,
+    read_owner_mapping,
+)
 
 
 def migrate(engine, revision, mapping=None, downgrade=False):

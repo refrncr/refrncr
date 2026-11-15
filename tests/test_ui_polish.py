@@ -25,7 +25,7 @@ from support import (
     snapshot,
 )
 
-from refrncr.dataset_diff import DatasetDiffService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.presentation_metadata import DATASET_ICONS, key_from_name
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 

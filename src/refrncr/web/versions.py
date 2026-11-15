@@ -12,8 +12,8 @@ from flask import Flask, abort, current_app, redirect, request, url_for
 from werkzeug.local import LocalProxy
 
 from refrncr.change_status import ChangeStatus, change_status
-from refrncr.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
+from refrncr.datasets.dataset_diff import STALE_MESSAGE, DatasetDiffService
 from refrncr.diff_contracts import STATUSES, DiffCriteria
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.review_tokens import decode_discard, decode_review, encode_discard, encode_review

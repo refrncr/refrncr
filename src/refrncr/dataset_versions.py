@@ -702,7 +702,7 @@ class DatasetVersionService:
 
     def update_mapping_source(self, actor_id, dataset_id, expected_revision):
         """Explicitly upgrade to the latest non-cancelled publication, atomically."""
-        from refrncr.mapping_updates import reconcile_source
+        from refrncr.datasets.mapping_updates import reconcile_source
 
         try:
             with self.uow(write=True, serialized=True, translate_errors=True) as uow:
@@ -933,7 +933,7 @@ class DatasetVersionService:
 
     def _concept_context(self, uow, actor_id, dataset):
         from refrncr.concept_contracts import ConceptContext
-        from refrncr.dataset_diff import DatasetDiffService
+        from refrncr.datasets.dataset_diff import DatasetDiffService
 
         diff = DatasetDiffService(self)
         target, identity, state, _current, _previous, changes = diff._load(
@@ -1112,7 +1112,7 @@ class DatasetVersionService:
             )
             mapping_record_states = {}
             if state is None and dataset.kind == "mapping":
-                from refrncr.mapping_updates import mapping_states
+                from refrncr.datasets.mapping_updates import mapping_states
 
                 mapping_record_states = mapping_states(fields, ordered, removed)
             ordered = matching
@@ -1237,7 +1237,7 @@ class DatasetVersionService:
                 if expected_review is not None:
                     # Optional REF-84 context, checked under this same publication lock.
                     # Ordinary REF-83 publication remains independent of detailed review.
-                    from refrncr.dataset_diff import DatasetDiffService
+                    from refrncr.datasets.dataset_diff import DatasetDiffService
 
                     diff = DatasetDiffService(self)
                     review_state = diff._load(uow, actor_id, dataset_id, expected_review)[2]

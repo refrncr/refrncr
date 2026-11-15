@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from refrncr.audit import record_audit
+from refrncr.datasets import RecordConflictError, RecordValidationError, StaleRecordError
 from refrncr.datatypes import DatatypeError, get_datatype
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
@@ -11,9 +12,6 @@ from refrncr.record_identity import RecordIdentifierError, encode_record_identif
 from refrncr.services import (
     DatasetFieldService,
     NotFoundError,
-    RecordConflictError,
-    RecordValidationError,
-    StaleRecordError,
     ValidationError,
     canonicalize_record_value,
     normalize_dataset_field_name,

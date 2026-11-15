@@ -1,12 +1,12 @@
 """Reconcile pinned mapping sources inside the caller's Dataset transaction."""
 
-from refrncr.errors import DatasetError
 from refrncr.ports import RecordValue
 from refrncr.record_identity import encode_record_identifier
-from refrncr.services import ConflictError, ValidationError
+
+from .errors import DatasetConflictError, DatasetValidationError
 
 
-class SourceUpdateBlocked(DatasetError, ValidationError):
+class SourceUpdateBlocked(DatasetValidationError):
     """The published source cannot be used; explain this in the mapping notice."""
 
 
@@ -71,7 +71,7 @@ def reconcile_source(uow, dataset, source):
     fields = [field for field in fields if field not in removed_fields]
     identifier = source_fields[dataset.source_field_key]
     if not uow.version_diff.validate_snapshot(source):
-        raise ValidationError("Invalid published source snapshot")
+        raise DatasetValidationError("Invalid published source snapshot")
 
     def key(record):
         return next(v.canonical_key for v in record.values if v.field_key == identifier.key)
@@ -99,7 +99,7 @@ def reconcile_source(uow, dataset, source):
     for source_key, record in active.items():
         if source_key not in incoming:
             if not uow.dataset_records.delete_if_revision(dataset.id, record.id, record.revision):
-                raise ConflictError("Mapping changed. Reload and try again.")
+                raise DatasetConflictError("Mapping changed. Reload and try again.")
         else:
             # Release source unique values before copying the entire new snapshot, so
             # swaps of unique context values do not create transient collisions.
@@ -121,7 +121,7 @@ def reconcile_source(uow, dataset, source):
                 else uow.dataset_records.restore_if_revision
             )
             if not operation(dataset.id, record.id, record.revision, encoded):
-                raise ConflictError("Mapping changed. Reload and try again.")
+                raise DatasetConflictError("Mapping changed. Reload and try again.")
         source_values = {value.field_key: value for value in source_record.values}
         values = tuple(
             RecordValue(

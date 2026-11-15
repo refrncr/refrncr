@@ -2,10 +2,10 @@
 
 from flask import abort, g, redirect, request, url_for
 
+from refrncr.datasets import StaleFieldOrderError
 from refrncr.services import (
     ConflictError,
     NotFoundError,
-    StaleFieldOrderError,
     ValidationError,
 )
 from refrncr.web.datasets import (
