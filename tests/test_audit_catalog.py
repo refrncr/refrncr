@@ -258,6 +258,7 @@ def test_every_audited_operation_has_behavior_cases():
         "DatasetService": "datasets.service",
         "DatasetFieldService": "datasets.fields",
         "DatasetBusinessKeyService": "datasets.business_key",
+        "DatasetRecordService": "datasets.records",
     }
     behaviors = {
         f"refrncr.{service_modules.get(name.split('.')[0], 'services')}.{name}"
@@ -275,7 +276,7 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.identity.api_keys.ApiKeyService.revoke_key",
             "refrncr.identity.users.UserService.create_initial_admin",
             "refrncr.identity.users.UserService.recover_administrator_password",
-            "refrncr.services.DatasetRecordService.export_dataset",
+            "refrncr.datasets.records.DatasetRecordService.export_dataset",
             "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
             "refrncr.dataset_versions.DatasetVersionService.discard_concept",
@@ -475,6 +476,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "field_service": "datasets.fields",
                         "dataset_business_keys": "datasets.business_key",
                         "business_key_service": "datasets.business_key",
+                        "dataset_records": "datasets.records",
+                        "record_service": "datasets.records",
                         "datasets": "datasets.service",
                         "dataset_service": "datasets.service",
                         "service": "datasets.service",

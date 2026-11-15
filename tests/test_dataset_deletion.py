@@ -633,7 +633,7 @@ def test_committed_mutation_makes_waiting_delete_stale(context, monkeypatch):
 
 
 def test_current_export_in_progress_retains_coherent_snapshot_during_delete(context, monkeypatch):
-    from refrncr import dataset_export
+    from refrncr.datasets import export as dataset_export
 
     c = context
     populate(c)

@@ -19,7 +19,7 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.pool import StaticPool
 
 from refrncr.app import create_community_services
-from refrncr.dataset_export import (
+from refrncr.datasets.export import (
     ExportArtifact,
     ExportGenerationError,
     externally_ordered_records,
@@ -264,7 +264,7 @@ class FailingReadBuffer(TrackedBuffer):
 def test_serializer_failure_closes_output_spool_and_is_not_masked(monkeypatch):
     spool = TrackedBuffer()
     monkeypatch.setattr(
-        "refrncr.dataset_export.tempfile.SpooledTemporaryFile", lambda **_kwargs: spool
+        "refrncr.datasets.export.tempfile.SpooledTemporaryFile", lambda **_kwargs: spool
     )
 
     def failing_records():
@@ -279,10 +279,10 @@ def test_serializer_failure_closes_output_spool_and_is_not_masked(monkeypatch):
 def test_workbook_finalization_failure_closes_output_spool(monkeypatch):
     spool = TrackedBuffer()
     monkeypatch.setattr(
-        "refrncr.dataset_export.tempfile.SpooledTemporaryFile", lambda **_kwargs: spool
+        "refrncr.datasets.export.tempfile.SpooledTemporaryFile", lambda **_kwargs: spool
     )
     monkeypatch.setattr(
-        "refrncr.dataset_export.Workbook.save",
+        "refrncr.datasets.export.Workbook.save",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("xlsx save failed")),
     )
     with pytest.raises(RuntimeError, match="xlsx save failed"):
@@ -306,8 +306,8 @@ def test_early_sort_disconnect_closes_every_temporary_run(monkeypatch):
         runs.append(run)
         return run
 
-    monkeypatch.setattr("refrncr.dataset_export.SORT_CHUNK_RECORDS", 2)
-    monkeypatch.setattr("refrncr.dataset_export.tempfile.TemporaryFile", tracked_run)
+    monkeypatch.setattr("refrncr.datasets.export.SORT_CHUNK_RECORDS", 2)
+    monkeypatch.setattr("refrncr.datasets.export.tempfile.TemporaryFile", tracked_run)
     records = [stored(str(index), str(9 - index)) for index in range(10)]
     ordered = externally_ordered_records(records, lambda record: record.values[0].value)
     next(ordered)

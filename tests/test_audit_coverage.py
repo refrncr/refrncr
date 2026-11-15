@@ -238,6 +238,7 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
         "DatasetService": "datasets.service",
         "DatasetFieldService": "datasets.fields",
         "DatasetBusinessKeyService": "datasets.business_key",
+        "DatasetRecordService": "datasets.records",
         "GrantService": "authorization.grants",
         "MembershipService": "identity.memberships",
         "TeamService": "identity.teams",
@@ -454,7 +455,7 @@ def test_export_preparation_or_audit_failure_closes_artifact_without_event(
     database_context, monkeypatch, failure
 ):
     c = database_context
-    from refrncr import dataset_export
+    from refrncr.datasets import export as dataset_export
 
     before = snapshot(c)
     artifacts = []
@@ -892,7 +893,7 @@ def test_browser_route_inventory_matches_real_registration(database_context):
 def test_response_construction_failure_keeps_request_and_closes_artifact(
     database_context, monkeypatch
 ):
-    from refrncr import dataset_export
+    from refrncr.datasets import export as dataset_export
     from refrncr.web.records import browse
 
     c = database_context
@@ -948,7 +949,7 @@ def test_export_head_and_options_have_explicit_audit_semantics(database_context,
 
 @pytest.mark.parametrize("failure", ["read", "close", "read_and_close"])
 def test_stream_read_and_cleanup_failures_log_once_without_payload(caplog, failure):
-    from refrncr.dataset_export import logged_export_stream
+    from refrncr.datasets.export import logged_export_stream
 
     class BrokenStream:
         closed = False
@@ -969,7 +970,7 @@ def test_stream_read_and_cleanup_failures_log_once_without_payload(caplog, failu
     with pytest.raises(OSError):
         next(stream)
     assert underlying.closed
-    records = [r for r in caplog.records if r.name == "refrncr.dataset_export"]
+    records = [r for r in caplog.records if r.name == "refrncr.datasets.export"]
     assert len(records) == 1
     assert records[0].getMessage() == "Dataset export stream failed"
     assert records[0].exc_info is None and "private-" not in caplog.text

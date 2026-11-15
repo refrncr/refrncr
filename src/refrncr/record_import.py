@@ -24,12 +24,12 @@ from openpyxl.utils.exceptions import InvalidFileException
 from refrncr.audit import record_audit
 from refrncr.datasets import RecordConflictError, RecordValidationError
 from refrncr.datasets.datatypes import DATASET_FIELD_TYPES, get_datatype
+from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ImportDomainError
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
-from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     MAX_RECORD_REVISION,
     ConflictError,

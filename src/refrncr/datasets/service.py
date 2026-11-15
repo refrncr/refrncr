@@ -1,6 +1,7 @@
 from refrncr.audit import record_audit
 from refrncr.authorization import AuthorizationService
 from refrncr.datasets.datatypes import get_datatype
+from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.domain import valid_identity
 from refrncr.identity import UserService
 from refrncr.ports import (
@@ -12,7 +13,6 @@ from refrncr.ports import (
     RecordValue,
     UnitOfWorkFactory,
 )
-from refrncr.record_identity import encode_record_identifier
 
 from .deletion import DatasetDeletionMixin, version_reads
 from .errors import (

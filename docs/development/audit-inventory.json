@@ -95,14 +95,14 @@
     "refrncr.datasets.fields.DatasetFieldService.replace_order",
     "refrncr.datasets.fields.DatasetFieldService.update_field",
     "refrncr.datasets.fields.DatasetFieldService.update_field_and_business_key_membership",
-    "refrncr.services.DatasetRecordService.create_record",
-    "refrncr.services.DatasetRecordService.delete_record",
-    "refrncr.services.DatasetRecordService.export_dataset",
-    "refrncr.services.DatasetRecordService.get_dataset_for_add",
-    "refrncr.services.DatasetRecordService.get_record_for_edit",
-    "refrncr.services.DatasetRecordService.list_records",
-    "refrncr.services.DatasetRecordService.restore_record",
-    "refrncr.services.DatasetRecordService.update_record",
+    "refrncr.datasets.records.DatasetRecordService.create_record",
+    "refrncr.datasets.records.DatasetRecordService.delete_record",
+    "refrncr.datasets.records.DatasetRecordService.export_dataset",
+    "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
+    "refrncr.datasets.records.DatasetRecordService.get_record_for_edit",
+    "refrncr.datasets.records.DatasetRecordService.list_records",
+    "refrncr.datasets.records.DatasetRecordService.restore_record",
+    "refrncr.datasets.records.DatasetRecordService.update_record",
     "refrncr.datasets.service.DatasetService.change_owner",
     "refrncr.datasets.service.DatasetService.create_dataset",
     "refrncr.datasets.service.DatasetService.delete_dataset",
@@ -550,7 +550,7 @@
       ],
       "operations": [
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
-        "refrncr.services.DatasetRecordService.export_dataset",
+        "refrncr.datasets.records.DatasetRecordService.export_dataset",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -577,8 +577,8 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.dataset_export.logged_export_stream",
-        "refrncr.services.DatasetRecordService.export_dataset",
+        "refrncr.datasets.export.logged_export_stream",
+        "refrncr.datasets.records.DatasetRecordService.export_dataset",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -590,8 +590,8 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.dataset_export.logged_export_stream",
-        "refrncr.services.DatasetRecordService.export_dataset",
+        "refrncr.datasets.export.logged_export_stream",
+        "refrncr.datasets.records.DatasetRecordService.export_dataset",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -614,7 +614,7 @@
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -639,7 +639,7 @@
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -660,7 +660,7 @@
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -681,7 +681,7 @@
         "refrncr.record_import.DatasetRecordImportService.select_worksheet",
         "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -714,7 +714,7 @@
         "refrncr.record_import.DatasetRecordImportService.navigate",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -734,7 +734,7 @@
         "refrncr.record_import.DatasetRecordImportService.preview",
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -756,7 +756,7 @@
         "refrncr.record_import.DatasetRecordImportService.saved_preview",
         "refrncr.record_import.DatasetRecordImportService.state",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -787,7 +787,7 @@
       "operations": [
         "refrncr.hierarchy_import.HierarchyImportService.active",
         "refrncr.hierarchy_import.HierarchyImportService.begin",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -801,7 +801,7 @@
       "operations": [
         "refrncr.hierarchy_import.HierarchyImportService.preview",
         "refrncr.hierarchy_import.HierarchyImportService.state",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -815,7 +815,7 @@
         "refrncr.hierarchy_import.HierarchyImportService.confirm",
         "refrncr.hierarchy_import.HierarchyImportService.preview",
         "refrncr.hierarchy_import.HierarchyImportService.state",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -828,7 +828,7 @@
       ],
       "operations": [
         "refrncr.hierarchy_import.HierarchyImportService.cancel",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -843,7 +843,7 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -858,8 +858,8 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.create_record",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.create_record",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -876,9 +876,9 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
-        "refrncr.services.DatasetRecordService.get_record_for_edit",
-        "refrncr.services.DatasetRecordService.update_record",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_record_for_edit",
+        "refrncr.datasets.records.DatasetRecordService.update_record",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -891,7 +891,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.services.DatasetRecordService.restore_record",
+        "refrncr.datasets.records.DatasetRecordService.restore_record",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
       ]
@@ -907,9 +907,9 @@
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
         "refrncr.dataset_versions.DatasetVersionService.concept_context",
         "refrncr.datasets.business_key.DatasetBusinessKeyService.get_business_key",
-        "refrncr.services.DatasetRecordService.delete_record",
-        "refrncr.services.DatasetRecordService.get_dataset_for_add",
-        "refrncr.services.DatasetRecordService.get_record_for_edit",
+        "refrncr.datasets.records.DatasetRecordService.delete_record",
+        "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
+        "refrncr.datasets.records.DatasetRecordService.get_record_for_edit",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -1739,7 +1739,7 @@
     "refrncr.cli.prepare_database",
     "refrncr.cli.recover_admin_password",
     "refrncr.cli.start",
-    "refrncr.dataset_export.logged_export_stream",
+    "refrncr.datasets.export.logged_export_stream",
     "refrncr.datasets.dataset_upgrade.ownership_preflight",
     "refrncr.datasets.dataset_upgrade.read_owner_mapping",
     "refrncr.datasets.dataset_upgrade.require_resolved_ownership",

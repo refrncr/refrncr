@@ -13,7 +13,10 @@ from refrncr.change_status import (
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
+from refrncr.datasets import export as dataset_export
+from refrncr.datasets import history_export
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.record_search import RecordSearchError, matches, search_term
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
@@ -31,7 +34,6 @@ from refrncr.published_contracts import (
     mapping_identifier,
 )
 from refrncr.record_intervals import HistoryRead, derive_intervals
-from refrncr.record_search import RecordSearchError, matches, search_term
 from refrncr.services import (
     ConflictError,
     DatasetRecordService,
@@ -492,8 +494,6 @@ class DatasetVersionService:
         open_end=False,
     ):
         """Export the same derived interval rows as the history API."""
-        from refrncr.dataset_export import generate_history_export, verify_artifact_readable
-
         if format_name not in {"csv", "xlsx"} or type(open_end) is not bool:
             raise ValidationError("Invalid period export")
         if (valid_from is not None and not isinstance(valid_from, date)) or (
@@ -541,8 +541,10 @@ class DatasetVersionService:
             )
             rows, field_keys = intervals.rows, intervals.field_keys
             dataset_id = dataset.id
-        artifact = generate_history_export(format_name, field_keys, rows, key, open_end=open_end)
-        verify_artifact_readable(artifact)
+        artifact = history_export.generate_history_export(
+            format_name, field_keys, rows, key, open_end=open_end
+        )
+        dataset_export.verify_artifact_readable(artifact)
         try:
             with self.uow(write=True, translate_errors=True) as uow:
                 record_audit(

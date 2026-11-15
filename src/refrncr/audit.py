@@ -639,9 +639,23 @@ for _method, _action in (
     ("delete_record", "deleted"),
     ("restore_record", "restored"),
 ):
-    _audited("DatasetRecordService", _method, ("dataset_record", _action))
-_audited("DatasetRecordService", "export_dataset", ("dataset", "dataset.export_requested"))
-_read("DatasetRecordService", "get_record_for_edit list_records get_dataset_for_add")
+    _audited(
+        "DatasetRecordService",
+        _method,
+        ("dataset_record", _action),
+        module="datasets.records",
+    )
+_audited(
+    "DatasetRecordService",
+    "export_dataset",
+    ("dataset", "dataset.export_requested"),
+    module="datasets.records",
+)
+_read(
+    "DatasetRecordService",
+    "get_record_for_edit list_records get_dataset_for_add",
+    module="datasets.records",
+)
 _audited(
     "DatasetRecordImportService",
     "confirm",
@@ -848,7 +862,7 @@ for _symbol, _classification, _reason in (
         "request contents.",
     ),
     (
-        "refrncr.dataset_export.logged_export_stream",
+        "refrncr.datasets.export.logged_export_stream",
         "technical logging only",
         "Post-preparation transport failure retains the accurate request event; one "
         "fixed diagnostic without exception payload.",

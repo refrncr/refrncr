@@ -107,6 +107,7 @@ def verify_inventory(root):
             in {
                 "refrncr.services",
                 "refrncr.datasets.deletion",
+                "refrncr.datasets.records",
                 "refrncr.datasets.service",
                 "refrncr.record_import",
                 "refrncr.dataset_versions",

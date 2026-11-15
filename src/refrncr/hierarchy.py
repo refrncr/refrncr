@@ -5,10 +5,10 @@ from dataclasses import replace
 from refrncr.audit import record_audit
 from refrncr.datasets import RecordConflictError, RecordValidationError, StaleRecordError
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import RecordValue, StoredRecord
-from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.services import (
     DatasetFieldService,
     NotFoundError,

@@ -219,11 +219,18 @@ def test_require_concept_preserves_conflict_contract():
 
 
 def test_dataset_service_compatibility_exports_are_the_domain_classes():
-    from refrncr.datasets import DatasetBusinessKeyService, DatasetFieldService
+    from refrncr.datasets import (
+        DatasetBusinessKeyService,
+        DatasetFieldService,
+        DatasetRecordService,
+    )
     from refrncr.datasets.business_key import DatasetBusinessKeyService as DomainBusinessKeys
     from refrncr.datasets.fields import DatasetFieldService as DomainFields
+    from refrncr.datasets.records import DatasetRecordService as DomainRecords
     from refrncr.services import DatasetBusinessKeyService as CompatibilityBusinessKeys
     from refrncr.services import DatasetFieldService as CompatibilityFields
+    from refrncr.services import DatasetRecordService as CompatibilityRecords
 
     assert DatasetFieldService is DomainFields is CompatibilityFields
     assert DatasetBusinessKeyService is DomainBusinessKeys is CompatibilityBusinessKeys
+    assert DatasetRecordService is DomainRecords is CompatibilityRecords

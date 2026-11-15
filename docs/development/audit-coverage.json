@@ -1913,7 +1913,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "create_record",
-      "service": "refrncr.services.DatasetRecordService.create_record",
+      "service": "refrncr.datasets.records.DatasetRecordService.create_record",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.create_dataset_record POST /datasets/<key>/records"
       ],
@@ -1956,7 +1956,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "update_record",
-      "service": "refrncr.services.DatasetRecordService.update_record",
+      "service": "refrncr.datasets.records.DatasetRecordService.update_record",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit"
       ],
@@ -1999,7 +1999,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "delete_record",
-      "service": "refrncr.services.DatasetRecordService.delete_record",
+      "service": "refrncr.datasets.records.DatasetRecordService.delete_record",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete"
       ],
@@ -2042,7 +2042,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "export_dataset",
-      "service": "refrncr.services.DatasetRecordService.export_dataset",
+      "service": "refrncr.datasets.records.DatasetRecordService.export_dataset",
       "interface_entrypoints": [
         "refrncr.web.records.browse.export_dataset_records GET /datasets/<key>/concept/records/export",
         "refrncr.web.records.browse.export_dataset_records GET /datasets/<key>/records/export",
@@ -2090,7 +2090,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "get_record_for_edit",
-      "service": "refrncr.services.DatasetRecordService.get_record_for_edit",
+      "service": "refrncr.datasets.records.DatasetRecordService.get_record_for_edit",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.edit_dataset_record GET,POST /datasets/<key>/records/<record_id>/edit",
         "refrncr.web.records.maintenance.delete_dataset_record GET,POST /datasets/<key>/records/<record_id>/delete"
@@ -2123,7 +2123,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "list_records",
-      "service": "refrncr.services.DatasetRecordService.list_records",
+      "service": "refrncr.datasets.records.DatasetRecordService.list_records",
       "interface_entrypoints": [
         "Internal service caller or direct authorized service use"
       ],
@@ -2155,7 +2155,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "get_dataset_for_add",
-      "service": "refrncr.services.DatasetRecordService.get_dataset_for_add",
+      "service": "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -4768,7 +4768,7 @@
     {
       "capability": "dataset_export",
       "operation": "logged_export_stream",
-      "service": "refrncr.dataset_export.logged_export_stream",
+      "service": "refrncr.datasets.export.logged_export_stream",
       "interface_entrypoints": [
         "refrncr.web.records.browse.export_dataset_records GET /datasets/<key>/records/export",
         "refrncr.web.records.browse.export_dataset_records GET /datasets/<key>/versions/<version_id>/records/export"
@@ -5809,7 +5809,7 @@
     {
       "capability": "DatasetRecordService",
       "operation": "restore_record",
-      "service": "refrncr.services.DatasetRecordService.restore_record",
+      "service": "refrncr.datasets.records.DatasetRecordService.restore_record",
       "interface_entrypoints": [
         "refrncr.web.records.maintenance.restore_dataset_record POST /datasets/<key>/concept/records/<record_id>/restore"
       ],

@@ -11,7 +11,7 @@ from support import NOW, html_elements, publish, request, setup, snapshot
 from support import dataset_version_client as client
 
 from refrncr.datasets.datatypes import DATATYPES
-from refrncr.record_search import RecordQueryLogFilter
+from refrncr.datasets.record_search import RecordQueryLogFilter
 from refrncr.services import NotFoundError
 
 SAMPLES = {
