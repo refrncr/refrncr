@@ -13,7 +13,7 @@ from support import html_text
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.login_security import (
+from refrncr.identity.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     OVERSIZED_ACCOUNT_KEY,
     BrowserAuthenticationAdmissionGuard,

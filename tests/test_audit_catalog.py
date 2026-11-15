@@ -250,8 +250,13 @@ def test_application_template_boundary_has_no_inline_markup_or_unsafe_shared_pan
 def test_every_audited_operation_has_behavior_cases():
     from support import MUTATIONS
 
+    service_modules = {
+        "MembershipService": "identity.memberships",
+        "TeamService": "identity.teams",
+        "UserService": "identity.users",
+    }
     behaviors = {
-        f"refrncr.services.{name}"
+        f"refrncr.{service_modules.get(name.split('.')[0], 'services')}.{name}"
         for name in MUTATIONS
         if not name.startswith(("DatasetRecordImportService", "DatasetVersionService"))
     }
@@ -262,10 +267,10 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.dataset_versions.DatasetVersionService.cancel",
             "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
             "refrncr.dataset_versions.DatasetVersionService.export_history",
-            "refrncr.api_keys.ApiKeyService.create_key",
-            "refrncr.api_keys.ApiKeyService.revoke_key",
-            "refrncr.services.UserService.create_initial_admin",
-            "refrncr.services.UserService.recover_administrator_password",
+            "refrncr.identity.api_keys.ApiKeyService.create_key",
+            "refrncr.identity.api_keys.ApiKeyService.revoke_key",
+            "refrncr.identity.users.UserService.create_initial_admin",
+            "refrncr.identity.users.UserService.recover_administrator_password",
             "refrncr.services.DatasetRecordService.export_dataset",
             "refrncr.dataset_diff.DatasetDiffService.open_review",
             "refrncr.dataset_versions.DatasetVersionService.create_concept",
@@ -357,7 +362,7 @@ def test_guard_rejects_inconsistent_or_missing_matrix_decisions(monkeypatch, fie
             row = next(
                 item
                 for item in matrix["operations"]
-                if item["service"] == "refrncr.services.UserService.create_initial_admin"
+                if item["service"] == "refrncr.identity.users.UserService.create_initial_admin"
             )
             row[field] = value
             return json.dumps(matrix)
@@ -447,8 +452,13 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     and not function.attr.startswith("_")
                 ):
                     module = {
-                        "api_keys": "api_keys",
-                        "api_key_service": "api_keys",
+                        "api_keys": "identity.api_keys",
+                        "api_key_service": "identity.api_keys",
+                        "authentication": "identity.authentication",
+                        "memberships": "identity.memberships",
+                        "sessions": "identity.sessions",
+                        "teams": "identity.teams",
+                        "users": "identity.users",
                         "record_imports": "record_import",
                         "audit_history": "audit_history",
                         "dataset_versions": "dataset_versions",

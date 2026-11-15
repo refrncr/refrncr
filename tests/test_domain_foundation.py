@@ -16,6 +16,13 @@ from refrncr.errors import (
     UserManagementError,
     ValidationError,
 )
+from refrncr.identity import (
+    IdentityAuthorizationError,
+    IdentityConflictError,
+    IdentityError,
+    IdentityNotFoundError,
+    IdentityValidationError,
+)
 
 
 def test_compatibility_error_is_an_alias_and_services_reexports_categories():
@@ -49,6 +56,37 @@ def test_record_errors_have_a_domain_and_exact_category():
     assert issubclass(RecordConflictError, DatasetError)
     assert issubclass(RecordConflictError, ConflictError)
     assert not issubclass(RecordConflictError, ValidationError | NotFoundError)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "category", "other_categories"),
+    [
+        (
+            IdentityNotFoundError,
+            NotFoundError,
+            ConflictError | ValidationError | AuthorizationError,
+        ),
+        (
+            IdentityConflictError,
+            ConflictError,
+            NotFoundError | ValidationError | AuthorizationError,
+        ),
+        (
+            IdentityValidationError,
+            ValidationError,
+            NotFoundError | ConflictError | AuthorizationError,
+        ),
+        (
+            IdentityAuthorizationError,
+            AuthorizationError,
+            NotFoundError | ConflictError | ValidationError,
+        ),
+    ],
+)
+def test_identity_errors_have_a_domain_and_exact_category(error_type, category, other_categories):
+    assert issubclass(error_type, IdentityError)
+    assert issubclass(error_type, category)
+    assert not issubclass(error_type, other_categories)
 
 
 @pytest.mark.parametrize(

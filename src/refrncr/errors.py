@@ -10,10 +10,6 @@ class DomainError(Exception):
 UserManagementError = DomainError
 
 
-class IdentityError(DomainError):
-    """Identity-domain failure."""
-
-
 class AccessManagementError(DomainError):
     """Access-management-domain failure."""
 
@@ -60,10 +56,6 @@ class ValidationError(DomainError, ValueError):
 
 class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
-
-
-class InvalidLifecycleError(IdentityError, ValidationError):
-    """An identity lifecycle transition is invalid for the requested operation."""
 
 
 class RecordValidationError(DatasetError, ValidationError):

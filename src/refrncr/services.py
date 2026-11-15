@@ -1,32 +1,21 @@
 from __future__ import annotations
 
-import hashlib
 import re
-import secrets
-import threading
 import unicodedata
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-
-from argon2 import PasswordHasher
-from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from argon2.low_level import Type
-from sqlalchemy import delete, or_, select, update
-from sqlalchemy.orm import Session, sessionmaker
+from datetime import datetime
 
 from refrncr import errors as _errors
 from refrncr.audit import record_audit
 from refrncr.authorization import highest_permission, permits, validate_permission
-from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datatypes import DATASET_FIELD_TYPES as DATASET_FIELD_TYPES
 from refrncr.datatypes import DatatypeError, canonicalize, get_datatype
 from refrncr.domain import advance_concept, require_concept, valid_identity
 from refrncr.errors import (
     AuthorizationError,
     ConflictError,
-    InvalidLifecycleError,
     NotFoundError,
     RecordConflictError,
     RecordValidationError,
@@ -36,7 +25,55 @@ from refrncr.errors import (
     ValidationError,
 )
 from refrncr.field_contracts import FIELD_KEY_PATTERN
-from refrncr.models import LoginSession, User
+from refrncr.identity import (
+    AuthenticatedPrincipal as AuthenticatedPrincipal,
+)
+from refrncr.identity import (
+    AuthenticationService as AuthenticationService,
+)
+from refrncr.identity import (
+    IdentityAuthorizationError as IdentityAuthorizationError,
+)
+from refrncr.identity import (
+    IdentityConflictError as IdentityConflictError,
+)
+from refrncr.identity import (
+    IdentityError as IdentityError,
+)
+from refrncr.identity import (
+    IdentityNotFoundError as IdentityNotFoundError,
+)
+from refrncr.identity import (
+    IdentityValidationError as IdentityValidationError,
+)
+from refrncr.identity import (
+    InvalidLifecycleError as InvalidLifecycleError,
+)
+from refrncr.identity import (
+    MembershipService as MembershipService,
+)
+from refrncr.identity import (
+    SessionService as SessionService,
+)
+from refrncr.identity import (
+    TeamService as TeamService,
+)
+from refrncr.identity import (
+    UserService as UserService,
+)
+from refrncr.identity import (
+    normalize_email as normalize_email,
+)
+from refrncr.identity import (
+    normalize_team_name as normalize_team_name,
+)
+from refrncr.identity import (
+    require_admin,
+)
+from refrncr.identity import (
+    validate_password as validate_password,
+)
+from refrncr.identity.shared import PASSWORD_HASHER as PASSWORD_HASHER
 from refrncr.ports import (
     AuditEntry,
     DatasetBusinessKey,
@@ -45,9 +82,6 @@ from refrncr.ports import (
     DatasetOverview,
     DatasetRecord,
     GrantRecord,
-    MembershipRecord,
-    OrganisationRecord,
-    PasswordHashReplacementError,
     PermissionDataSource,
     PersistenceConflictError,
     RecordValue,
@@ -55,7 +89,6 @@ from refrncr.ports import (
     TeamRecord,
     UnitOfWork,
     UnitOfWorkFactory,
-    UserRecord,
 )
 from refrncr.presentation_metadata import (
     MAX_FIELD_DEFINITION,
@@ -67,39 +100,17 @@ from refrncr.record_identity import encode_record_identifier
 from refrncr.version_contracts import mapping_incomplete_message
 
 SUBJECT_TYPES = {"user", "team"}
-THEME_PREFERENCES = frozenset(("system", "light", "dark"))
 
 # Compatibility facade while services move to domain packages. These assignments keep
 # existing imports working without making ``errors.py`` depend on the facade.
 DatasetError = _errors.DatasetError
 DomainError = _errors.DomainError
 HierarchyError = _errors.HierarchyError
-IdentityError = _errors.IdentityError
 ImportDomainError = _errors.ImportDomainError
 PersistenceError = _errors.PersistenceError
 AccessManagementError = _errors.AccessManagementError
 UserManagementError = _errors.UserManagementError
 VersionError = _errors.VersionError
-
-# Keep this security posture explicit so dependency default changes cannot weaken it:
-# Argon2id with 64 MiB memory, three iterations, and four-way parallelism.
-PASSWORD_HASHER = PasswordHasher(
-    time_cost=3,
-    memory_cost=64 * 1024,
-    parallelism=4,
-    hash_len=32,
-    salt_len=16,
-    type=Type.ID,
-)
-
-# A valid current-profile hash used only to equalize work for attempts that cannot
-# safely verify a stored credential. Its plaintext is intentionally not a credential.
-_DUMMY_PASSWORD_HASH = (
-    "$argon2id$v=19$m=65536,t=3,p=4$"
-    "U29tZVN0YXRpY1NhbHQxNg$"
-    "JvPgxylqfMveFSbsSWHHBEKbGOlnkLIjFBG0s33wtgE"
-)
-
 
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
 MAX_RECORD_REVISION = 2_147_483_647
@@ -112,11 +123,6 @@ def parse_expected_revision(raw: str) -> int:
     if revision > MAX_RECORD_REVISION:
         raise ValidationError("Expected revision is out of range")
     return revision
-
-
-@dataclass(frozen=True, slots=True)
-class AuthenticatedPrincipal:
-    id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,21 +151,6 @@ class RecordPage:
     total: int
 
 
-def validate_password(password: str) -> str:
-    """Validate without trimming, normalizing, or otherwise rewriting a password."""
-    if not isinstance(password, str):
-        raise ValidationError("Password must be text", field="password")
-    if len(password) < 12:
-        raise ValidationError("Password must contain at least 12 characters", field="password")
-    try:
-        encoded_size = len(password.encode("utf-8"))
-    except UnicodeEncodeError as exc:
-        raise ValidationError("Password must be valid Unicode text", field="password") from exc
-    if encoded_size > 1024:
-        raise ValidationError("Password must not exceed 1024 UTF-8 bytes", field="password")
-    return password
-
-
 class ResourceTypeRegistry:
     """Maps canonical resource types to framework-independent existence resolvers."""
 
@@ -183,27 +174,6 @@ class ResourceTypeRegistry:
             raise ValidationError("Resource type is not registered")
         if not resource_id or len(resource_id) > 100 or not resolver(resource_id):
             raise NotFoundError("Grantable resource not found")
-
-
-def normalize_email(email: str) -> str:
-    normalized = email.strip().casefold()
-    if (
-        len(normalized) > 320
-        or normalized.count("@") != 1
-        or any(character.isspace() or ord(character) < 32 for character in normalized)
-    ):
-        raise ValidationError("A valid email address is required", field="email")
-    local_part, domain = normalized.split("@")
-    if not local_part or not domain:
-        raise ValidationError("A valid email address is required", field="email")
-    return normalized
-
-
-def normalize_team_name(name: str) -> str:
-    normalized_name = unicodedata.normalize("NFC", name.strip())
-    if not 1 <= len(normalized_name) <= 100:
-        raise ValidationError("Team name must contain between 1 and 100 characters")
-    return normalized_name
 
 
 def validate_dataset_key(key: str) -> str:
@@ -295,356 +265,6 @@ def canonicalize_record_value(data_type: str, raw: str | None) -> tuple[object, 
         return canonicalize(data_type, raw)
     except DatatypeError as error:
         raise ValidationError(str(error)) from None
-
-
-def require_admin(uow: UnitOfWork, actor_id: str, *, for_update: bool = False) -> UserRecord:
-    actor = uow.users.get(actor_id, for_update=for_update)
-    if actor is None or actor.role != "admin" or not actor.is_active or actor.is_deleted:
-        raise AuthorizationError("Administrator access required")
-    return actor
-
-
-class UserService:
-    """User operations within the one Community installation context."""
-
-    def __init__(self, uow: UnitOfWorkFactory, hasher: PasswordHasher | None = None):
-        self.uow = uow
-        self.hasher = hasher or PASSWORD_HASHER
-
-    def bootstrap_organisation(self) -> OrganisationRecord:
-        try:
-            with self.uow(write=True, serialized=True) as uow:
-                organisation = uow.users.get_community_organisation()
-                if organisation is None:
-                    organisation = uow.users.create_community_organisation()
-                    uow.flush()
-                return organisation
-        except PersistenceConflictError:
-            # Another process may have inserted the singleton between our read and write.
-            with self.uow() as uow:
-                organisation = uow.users.get_community_organisation()
-                if organisation is None:
-                    raise
-                return organisation
-
-    def create_initial_admin(self, email: str, display_name: str, password: str) -> UserRecord:
-        self.bootstrap_organisation()
-        with self.uow(write=True, serialized=True) as uow:
-            self._lock_organisation(uow)
-            if uow.users.count() != 0:
-                raise ConflictError("Initial setup has already been completed")
-            user = self._new_user(uow, email, display_name, password, "admin")
-            uow.flush()
-            self._add_audit(uow, self._audit(user.id, user, "created"))
-            return user
-
-    def has_users(self) -> bool:
-        with self.uow() as uow:
-            return uow.users.count() != 0
-
-    def create_user(
-        self,
-        actor_id: str,
-        email: str,
-        display_name: str,
-        password: str,
-        role: str = "user",
-    ) -> UserRecord:
-        with self.uow(write=True) as uow:
-            actor = require_admin(uow, actor_id)
-            user = self._new_user(uow, email, display_name, password, role)
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("Email already exists in this installation") from exc
-            self._add_audit(uow, self._audit(actor.id, user, "created"))
-            return user
-
-    def change_email(self, actor_id: str, target_id: str, email: str) -> UserRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            target = self._target(uow, target_id)
-            normalized = normalize_email(email)
-            if target.email == normalized:
-                return target
-            target.email = normalized
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("Email already exists in this installation") from exc
-            self._add_audit(uow, self._audit(actor.id, target, "email_changed"))
-            return target
-
-    def disable_user(self, actor_id: str, target_id: str) -> UserRecord:
-        return self._set_state(actor_id, target_id, "disabled")
-
-    def enable_user(self, actor_id: str, target_id: str) -> UserRecord:
-        return self._set_state(actor_id, target_id, "enabled")
-
-    def delete_user(self, actor_id: str, target_id: str) -> UserRecord:
-        return self._set_state(actor_id, target_id, "deleted")
-
-    def list_users(self, actor_id: str) -> list[UserRecord]:
-        with self.uow() as uow:
-            require_admin(uow, actor_id)
-            return uow.users.list_by_email()
-
-    def recover_administrator_password(self, email: str, password: str) -> UserRecord:
-        """Replace an administrator credential for the local CLI or trusted integration.
-
-        Community records a neutral audit event without inventing an actor. The caller
-        must select the installation before constructing this service; this method only
-        accepts an active administrator identity within that installation.
-        """
-        normalized_email = normalize_email(email)
-        replacement_hash = self.hasher.hash(validate_password(password))
-        with self.uow(write=True, serialized=True) as uow:
-            self._lock_organisation(uow)
-            candidate = uow.users.find_by_email(normalized_email)
-            if candidate is None:
-                raise NotFoundError("Administrator not found")
-            target = self._target(uow, candidate.id)
-            if target.role != "admin" or not target.is_active or target.is_deleted:
-                raise NotFoundError("Administrator not found")
-            if not uow.users.replace_password_hash(
-                target.id, target.password_hash, replacement_hash
-            ):
-                raise ConflictError("Administrator credential changed concurrently")
-            uow.users.revoke_active_sessions(target.id, uow.now())
-            self._add_audit(uow, self._audit(None, target, "password_recovered"))
-            updated = uow.users.get(target.id)
-            if updated is None:
-                raise ConflictError("Administrator credential changed concurrently")
-            return updated
-
-    def update_theme_preference(self, actor_id: str, theme_preference: str) -> UserRecord:
-        if theme_preference not in THEME_PREFERENCES:
-            raise ValidationError("Choose System, Light or Dark")
-        with self.uow(write=True) as uow:
-            actor = uow.users.get(actor_id, for_update=True)
-            if actor is None or not actor.is_active or actor.is_deleted:
-                raise AuthorizationError("Active user access required")
-            return uow.users.update_theme_preference(actor.id, theme_preference)
-
-    def _set_state(self, actor_id: str, target_id: str, action: str) -> UserRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            self._lock_organisation(uow)
-            actor = require_admin(uow, actor_id)
-            target = self._target(uow, target_id)
-            if action == "enabled":
-                if target.is_deleted:
-                    raise InvalidLifecycleError("Deleted users cannot be enabled")
-                if target.is_active:
-                    return target
-                target.is_active = True
-            else:
-                if (action == "disabled" and not target.is_active) or (
-                    action == "deleted" and target.is_deleted
-                ):
-                    return target
-                if target.role == "admin" and target.is_active and not target.is_deleted:
-                    active_admins = uow.users.count_active_admins()
-                    if active_admins == 1:
-                        raise InvalidLifecycleError(
-                            "The last active administrator cannot be removed"
-                        )
-                target.is_active = False
-                if action == "deleted":
-                    target.is_deleted = True
-                uow.users.revoke_active_sessions(target.id, uow.now())
-            target.updated_at = uow.now()
-            self._add_audit(uow, self._audit(actor.id, target, action))
-            return target
-
-    def _new_user(
-        self,
-        uow: UnitOfWork,
-        email: str,
-        display_name: str,
-        password: str,
-        role: str,
-    ) -> UserRecord:
-        if role not in {"admin", "user"}:
-            raise ValidationError("Unknown role")
-        if not display_name.strip():
-            raise ValidationError("Display name is required", field="display_name")
-        return uow.users.create(
-            email=normalize_email(email),
-            display_name=display_name.strip(),
-            password_hash=self.hasher.hash(validate_password(password)),
-            role=role,
-            theme_preference="system",
-            is_active=True,
-            is_deleted=False,
-        )
-
-    @staticmethod
-    def _target(uow: UnitOfWork, target_id: str) -> UserRecord:
-        target = uow.users.get(target_id, for_update=True)
-        if target is None:
-            raise NotFoundError("User not found")
-        return target
-
-    @staticmethod
-    def _lock_organisation(uow: UnitOfWork) -> OrganisationRecord:
-        organisation = uow.users.lock_community_setup()
-        if organisation is None:
-            raise ConflictError("Community Organisation has not been bootstrapped")
-        return organisation
-
-    @staticmethod
-    def _audit(actor_id: str | None, target: UserRecord, action: str) -> AuditEntry:
-        return AuditEntry(
-            actor_user_id=actor_id,
-            object_type="user",
-            object_id=target.id,
-            action=action,
-        )
-
-    @staticmethod
-    def _add_audit(uow: UnitOfWork, audit: AuditEntry) -> None:
-        record_audit(
-            uow,
-            actor_user_id=audit.actor_user_id,
-            object_type=audit.object_type,
-            object_id=audit.object_id,
-            action=audit.action,
-        )
-
-
-class AuthenticationService:
-    """Persistence-neutral credential verification and account eligibility boundary."""
-
-    def __init__(self, uow: UnitOfWorkFactory, hasher: PasswordHasher | None = None):
-        self.uow = uow
-        self.hasher = hasher or PASSWORD_HASHER
-
-    def authenticate(self, email: str, password: str) -> AuthenticatedPrincipal | None:
-        try:
-            normalized_email = normalize_email(email)
-        except (TypeError, ValidationError):
-            self._dummy_verify(password)
-            return None
-
-        with self.uow() as uow:
-            user = uow.users.find_by_email(normalized_email)
-            if user is None or not user.is_active or user.is_deleted:
-                self._dummy_verify(password)
-                return None
-            user_id = user.id
-            stored_hash = user.password_hash
-            try:
-                self.hasher.verify(stored_hash, password)
-            except VerifyMismatchError:
-                return None
-            except (InvalidHashError, VerificationError):
-                self._dummy_verify(password)
-                return None
-
-            try:
-                needs_rehash = self.hasher.check_needs_rehash(stored_hash)
-            except InvalidHashError:
-                return None
-        if needs_rehash:
-            replacement_hash = self.hasher.hash(password)
-            try:
-                with self.uow(write=True) as uow:
-                    uow.users.replace_password_hash(user_id, stored_hash, replacement_hash)
-            except PasswordHashReplacementError:
-                return None
-        return AuthenticatedPrincipal(id=user_id)
-
-    def _dummy_verify(self, password: str) -> None:
-        try:
-            self.hasher.verify(_DUMMY_PASSWORD_HASH, password)
-        except (InvalidHashError, VerificationError, TypeError):
-            pass
-
-
-class TeamService:
-    """Team operations within the one Community installation context."""
-
-    def __init__(self, uow: UnitOfWorkFactory):
-        self.uow = uow
-
-    def create_team(self, actor_id: str, name: str) -> TeamRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            team = uow.teams.create(name=normalize_team_name(name))
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("Team name already exists in this installation") from exc
-            self._add_audit(uow, self._audit(actor.id, team.id, "created"))
-            return team
-
-    def rename_team(self, actor_id: str, team_id: str, name: str) -> TeamRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            team = self._target(uow, team_id, for_update=True)
-            normalized = normalize_team_name(name)
-            if team.name == normalized:
-                return team
-            team.name = normalized
-            team.updated_at = uow.now()
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("Team name already exists in this installation") from exc
-            self._add_audit(uow, self._audit(actor.id, team.id, "renamed"))
-            return team
-
-    def delete_team(self, actor_id: str, team_id: str) -> None:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            team = self._target(uow, team_id, for_update=True)
-            if uow.datasets.owns_datasets(team.id):
-                raise InvalidLifecycleError(
-                    "Reassign this team’s datasets before deleting the team."
-                )
-            for grant in uow.grants.list_for_team(team.id, for_update=True):
-                self._add_audit(uow, self._grant_audit(actor.id, grant.id))
-                uow.grants.delete(grant)
-            self._add_audit(uow, self._audit(actor.id, team.id, "deleted"))
-            uow.teams.delete(team)
-
-    def list_teams(self, actor_id: str) -> list[TeamRecord]:
-        with self.uow() as uow:
-            actor = uow.users.get(actor_id)
-            if not DatasetAuthorizationService.active(actor):
-                raise AuthorizationError("Active user access required")
-            teams = uow.teams.list_by_name()
-            if actor.role == "admin":
-                return teams
-            ids = uow.memberships.team_ids_for_user(actor_id)
-            return [team for team in teams if team.id in ids]
-
-    @staticmethod
-    def _target(uow: UnitOfWork, team_id: str, *, for_update: bool = False) -> TeamRecord:
-        team = uow.teams.get(team_id, for_update=for_update)
-        if team is None:
-            raise NotFoundError("Team not found")
-        return team
-
-    @staticmethod
-    def _audit(actor_id: str, team_id: str, action: str) -> AuditEntry:
-        return AuditEntry(
-            actor_user_id=actor_id,
-            object_type="team",
-            object_id=team_id,
-            action=action,
-        )
-
-    @staticmethod
-    def _grant_audit(actor_id: str, grant_id: str) -> AuditEntry:
-        return AuditEntry(
-            actor_user_id=actor_id,
-            object_type="grant",
-            object_id=grant_id,
-            action="deleted",
-        )
-
-    _add_audit = staticmethod(UserService._add_audit)
 
 
 class DatasetResourceResolver:
@@ -3080,195 +2700,3 @@ class AuthorizationService:
             )
         )
         return AuthorizedResourceSet(all_resources=False, resource_ids=resource_ids)
-
-
-class MembershipService:
-    """Team membership operations within the one Community installation context."""
-
-    def list_relationships(self, actor_id):
-        """Administrator-only roster projection, loaded in one query."""
-        with self.uow() as uow:
-            require_admin(uow, actor_id)
-            return tuple(
-                sorted(
-                    uow.memberships.list_relationships(),
-                    key=lambda r: (
-                        r.team_name.casefold(),
-                        r.team_id,
-                        r.user_name.casefold(),
-                        r.user_id,
-                    ),
-                )
-            )
-
-    def __init__(self, uow: UnitOfWorkFactory):
-        self.uow = uow
-
-    def create_membership(self, actor_id: str, user_id: str, team_id: str) -> MembershipRecord:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            self._lock_team(uow, team_id)
-            target = self._lock_user(uow, user_id)
-            if not target.is_active or target.is_deleted:
-                raise InvalidLifecycleError("Only active users can be added to teams")
-            membership = uow.memberships.create(user_id=target.id, team_id=team_id)
-            try:
-                uow.flush()
-            except PersistenceConflictError as exc:
-                raise ConflictError("User is already a member of this team") from exc
-            self._add_audit(uow, self._audit(actor.id, membership.id, "created"))
-            return membership
-
-    def delete_membership(self, actor_id: str, team_id: str, membership_id: str) -> None:
-        with self.uow(write=True, serialized=True) as uow:
-            actor = require_admin(uow, actor_id)
-            membership = uow.memberships.get(membership_id)
-            if membership is None or membership.team_id != team_id:
-                raise NotFoundError("Membership not found")
-            self._lock_team(uow, team_id)
-            membership = uow.memberships.get(membership_id, for_update=True)
-            if membership is None or membership.team_id != team_id:
-                raise NotFoundError("Membership not found")
-            self._add_audit(uow, self._audit(actor.id, membership.id, "deleted"))
-            uow.memberships.delete(membership)
-
-    def list_team_members(
-        self, actor_id: str, team_id: str
-    ) -> list[tuple[MembershipRecord, UserRecord]]:
-        with self.uow() as uow:
-            require_admin(uow, actor_id)
-            self._team(uow, team_id)
-            return uow.memberships.list_team_members(team_id)
-
-    def list_eligible_users(self, actor_id: str, team_id: str) -> list[UserRecord]:
-        with self.uow() as uow:
-            require_admin(uow, actor_id)
-            self._team(uow, team_id)
-            return uow.memberships.list_eligible_users(team_id)
-
-    @staticmethod
-    def _team(uow: UnitOfWork, team_id: str) -> TeamRecord:
-        team = uow.teams.get(team_id)
-        if team is None:
-            raise NotFoundError("Team not found")
-        return team
-
-    @staticmethod
-    def _lock_team(uow: UnitOfWork, team_id: str) -> TeamRecord:
-        team = uow.teams.get(team_id, for_update=True)
-        if team is None:
-            raise NotFoundError("Team not found")
-        return team
-
-    @staticmethod
-    def _lock_user(uow: UnitOfWork, user_id: str) -> UserRecord:
-        user = uow.users.get(user_id, for_update=True)
-        if user is None:
-            raise NotFoundError("User not found")
-        return user
-
-    @staticmethod
-    def _audit(actor_id: str, membership_id: str, action: str) -> AuditEntry:
-        return AuditEntry(
-            actor_user_id=actor_id,
-            object_type="membership",
-            object_id=membership_id,
-            action=action,
-        )
-
-    _add_audit = staticmethod(UserService._add_audit)
-
-
-class SessionService:
-    def __init__(
-        self,
-        sessions: sessionmaker[Session],
-        lifetime: timedelta = timedelta(hours=12),
-        *,
-        clock: Clock = SYSTEM_CLOCK,
-        retention: timedelta = timedelta(days=7),
-        cleanup_batch_size: int = 100,
-    ):
-        self.sessions = sessions
-        self.lifetime = lifetime
-        self.clock = clock
-        self.retention = retention
-        self.cleanup_batch_size = cleanup_batch_size
-        self._cleanup_cursor: str | None = None
-        self._cleanup_lock = threading.Lock()
-
-    def create(self, user: User | AuthenticatedPrincipal) -> tuple[str, LoginSession]:
-        self.cleanup()
-        token = secrets.token_urlsafe(48)
-        now = self.clock.now()
-        login = LoginSession(
-            user_id=user.id,
-            token_hash=self._digest(token),
-            csrf_token=secrets.token_urlsafe(32),
-            created_at=now,
-            expires_at=now + self.lifetime,
-        )
-        with self.sessions.begin() as session:
-            session.info["clock"] = self.clock
-            session.add(login)
-            session.flush()
-            session.expunge(login)
-        return token, login
-
-    def resolve(self, token: str) -> User | None:
-        resolved = self.resolve_with_session(token)
-        return resolved[0] if resolved else None
-
-    def resolve_with_session(self, token: str) -> tuple[User, LoginSession] | None:
-        with self.sessions() as session:
-            login = session.scalar(
-                select(LoginSession).where(LoginSession.token_hash == self._digest(token))
-            )
-            if login is None or login.revoked_at is not None:
-                return None
-            if login.expires_at <= self.clock.now():
-                return None
-            user = session.get(User, login.user_id)
-            if user is None or not user.is_active or user.is_deleted:
-                return None
-            return user, login
-
-    def revoke(self, token: str) -> None:
-        with self.sessions.begin() as session:
-            session.execute(
-                update(LoginSession)
-                .where(LoginSession.token_hash == self._digest(token))
-                .values(revoked_at=self.clock.now())
-            )
-        self.cleanup()
-
-    def cleanup(self) -> int:
-        """Inspect and delete at most one primary-key page of retained sessions."""
-        with self._cleanup_lock:
-            now = self.clock.now()
-            cutoff = now - self.retention
-            with self.sessions.begin() as session:
-                statement = (
-                    select(LoginSession.id).order_by(LoginSession.id).limit(self.cleanup_batch_size)
-                )
-                if self._cleanup_cursor is not None:
-                    statement = statement.where(LoginSession.id > self._cleanup_cursor)
-                ids = list(session.scalars(statement))
-                if not ids:
-                    self._cleanup_cursor = None
-                    return 0
-                self._cleanup_cursor = ids[-1] if len(ids) == self.cleanup_batch_size else None
-                result = session.execute(
-                    delete(LoginSession).where(
-                        LoginSession.id.in_(ids),
-                        or_(
-                            LoginSession.expires_at <= cutoff,
-                            LoginSession.revoked_at <= cutoff,
-                        ),
-                    )
-                )
-                return result.rowcount or 0
-
-    @staticmethod
-    def _digest(token: str) -> str:
-        return hashlib.sha256(token.encode()).hexdigest()

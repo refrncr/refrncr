@@ -109,7 +109,7 @@ def verify_inventory(root):
                 "refrncr.record_import",
                 "refrncr.dataset_versions",
                 "refrncr.dataset_diff",
-                "refrncr.api_keys",
+                "refrncr.identity.api_keys",
                 "refrncr.hierarchy",
             }
             or module == "refrncr.web"

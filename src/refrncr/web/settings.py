@@ -12,8 +12,8 @@ from uuid import uuid4
 
 from flask import Blueprint, Flask, abort, current_app, redirect, request, url_for
 
-from refrncr.api_keys import LIFETIME, ApiKeyService
 from refrncr.clock import Clock
+from refrncr.identity.api_keys import LIFETIME, ApiKeyService
 from refrncr.installation_policy import EXPORT_POLICIES
 from refrncr.installation_settings import InstallationSettingsService, PolicyConfirmationRequired
 from refrncr.ports import PersistenceConflictError

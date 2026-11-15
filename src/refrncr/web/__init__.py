@@ -28,7 +28,6 @@ from flask import (
     request,
 )
 
-from refrncr.api_keys import ApiKeyService
 from refrncr.audit import record_security_event
 from refrncr.audit_history import AuditHistoryService
 from refrncr.browser_security import (
@@ -41,12 +40,13 @@ from refrncr.dataset_diff import DatasetDiffService
 from refrncr.dataset_versions import DatasetVersionService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
-from refrncr.installation_settings import InstallationSettingsService
-from refrncr.login_security import (
+from refrncr.identity.api_keys import ApiKeyService
+from refrncr.identity.login_security import (
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,
     SourceIdentityResolver,
 )
+from refrncr.installation_settings import InstallationSettingsService
 from refrncr.overview import OverviewService
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (

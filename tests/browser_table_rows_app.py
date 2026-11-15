@@ -4,8 +4,8 @@ from dataset_helpers import create_mapping_dataset, create_owned_dataset, publis
 from support import _dataset_browser as dataset_browser
 from support import create_dataset, create_field
 
-from refrncr.api_keys import ApiKeyService
 from refrncr.clock import SYSTEM_CLOCK
+from refrncr.identity.api_keys import ApiKeyService
 from refrncr.web import create_flask_app
 
 _factory, s, admin, _ = dataset_browser()

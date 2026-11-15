@@ -13,7 +13,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from argon2.low_level import ARGON2_VERSION
 
-from refrncr.services import PASSWORD_HASHER
+from refrncr.identity.shared import PASSWORD_HASHER
 
 Timer = Callable[[], int]
 PasswordFactory = Callable[[], str]

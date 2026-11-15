@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import pytest
 
-from refrncr.login_security import (
+from refrncr.identity.login_security import (
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,
     canonical_account_key,

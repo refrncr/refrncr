@@ -11,9 +11,14 @@ from sqlalchemy import select
 from support import MutableClock
 
 from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
-from refrncr.api_keys import LAST_USED_INTERVAL, LIFETIME, ApiKeyAuthenticationError, ApiKeyService
 from refrncr.audit import AuditContractError, validate_event
 from refrncr.audit_presentation import present_event
+from refrncr.identity.api_keys import (
+    LAST_USED_INTERVAL,
+    LIFETIME,
+    ApiKeyAuthenticationError,
+    ApiKeyService,
+)
 from refrncr.models import ApiKey, AuditEvent
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import AuthorizationError, ConflictError, NotFoundError, ValidationError
@@ -354,7 +359,7 @@ def test_corrupt_verifier_and_pepper_rotation_fail_closed(keys):
 
 
 def test_required_pepper_configuration(keys, monkeypatch):
-    from refrncr.api_keys import configured_api_keys
+    from refrncr.identity.api_keys import configured_api_keys
 
     _, _, s, _, _, _, _ = keys
     monkeypatch.delenv("REFRNCR_API_KEY_PEPPER", raising=False)
