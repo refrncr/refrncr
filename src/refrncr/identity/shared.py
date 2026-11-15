@@ -22,7 +22,7 @@ PASSWORD_HASHER = PasswordHasher(
     type=Type.ID,
 )
 
-_DUMMY_PASSWORD_HASH = (
+DUMMY_PASSWORD_HASH = (
     "$argon2id$v=19$m=65536,t=3,p=4$"
     "U29tZVN0YXRpY1NhbHQxNg$"
     "JvPgxylqfMveFSbsSWHHBEKbGOlnkLIjFBG0s33wtgE"

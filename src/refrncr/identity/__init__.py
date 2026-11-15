@@ -12,6 +12,7 @@ from refrncr.identity.errors import (
 from refrncr.identity.memberships import MembershipService
 from refrncr.identity.sessions import SessionService
 from refrncr.identity.shared import (
+    DUMMY_PASSWORD_HASH,
     AuthenticatedPrincipal,
     normalize_email,
     normalize_team_name,
@@ -24,6 +25,7 @@ from refrncr.identity.users import UserService
 __all__ = [
     "AuthenticatedPrincipal",
     "AuthenticationService",
+    "DUMMY_PASSWORD_HASH",
     "IdentityAuthorizationError",
     "IdentityConflictError",
     "IdentityError",

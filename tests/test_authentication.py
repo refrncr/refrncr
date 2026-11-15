@@ -111,11 +111,11 @@ def test_all_failures_are_generic_and_invoke_verifier(
 
 
 def test_dummy_hash_is_valid_current_profile_and_performs_full_verification():
-    from refrncr.services import _DUMMY_PASSWORD_HASH
+    from refrncr.identity import DUMMY_PASSWORD_HASH
 
     with pytest.raises(VerifyMismatchError):
-        PASSWORD_HASHER.verify(_DUMMY_PASSWORD_HASH, "not the dummy password")
-    assert not PASSWORD_HASHER.check_needs_rehash(_DUMMY_PASSWORD_HASH)
+        PASSWORD_HASHER.verify(DUMMY_PASSWORD_HASH, "not the dummy password")
+    assert not PASSWORD_HASHER.check_needs_rehash(DUMMY_PASSWORD_HASH)
 
 
 def test_authentication_does_not_expose_or_log_credentials(authentication_services, caplog):

@@ -73,7 +73,6 @@ from refrncr.identity import (
 from refrncr.identity import (
     validate_password as validate_password,
 )
-from refrncr.identity.shared import _DUMMY_PASSWORD_HASH as _DUMMY_PASSWORD_HASH
 from refrncr.identity.shared import PASSWORD_HASHER as PASSWORD_HASHER
 from refrncr.ports import (
     AuditEntry,

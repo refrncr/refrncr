@@ -5,7 +5,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 
 from refrncr.errors import ValidationError
 from refrncr.identity.shared import (
-    _DUMMY_PASSWORD_HASH,
+    DUMMY_PASSWORD_HASH,
     PASSWORD_HASHER,
     AuthenticatedPrincipal,
     normalize_email,
@@ -57,6 +57,6 @@ class AuthenticationService:
 
     def _dummy_verify(self, password: str) -> None:
         try:
-            self.hasher.verify(_DUMMY_PASSWORD_HASH, password)
+            self.hasher.verify(DUMMY_PASSWORD_HASH, password)
         except (InvalidHashError, VerificationError, TypeError):
             pass
