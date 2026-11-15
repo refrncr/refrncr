@@ -1,6 +1,6 @@
 import pytest
 
-from refrncr.record_identity import (
+from refrncr.datasets.record_identity import (
     MAX_RECORD_IDENTIFIER_BYTES,
     RECORD_IDENTIFIER_MESSAGES,
     RecordIdentifierError,

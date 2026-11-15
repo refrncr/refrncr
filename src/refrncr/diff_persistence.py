@@ -4,6 +4,7 @@ from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
 from refrncr.change_status import STATUSES, ChangeStatus
 from refrncr.datasets.datatypes import get_datatype
+from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.diff_contracts import PAGE_SIZE, RecordProjection, ValueChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.models import (
@@ -15,7 +16,6 @@ from refrncr.models import (
     DatasetVersionRecord,
     DatasetVersionValue,
 )
-from refrncr.record_identity import RecordIdentifierError, encode_record_identifier
 
 
 class SqlAlchemyDiffOperations:

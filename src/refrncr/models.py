@@ -29,9 +29,9 @@ from sqlalchemy.orm import Mapped, Session, column_property, mapped_column
 
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.datasets.datatypes import DATASET_FIELD_TYPES
+from refrncr.datasets.record_identity import MAX_RECORD_IDENTIFIER_BYTES
 from refrncr.db.base import Base
 from refrncr.db.types import UTCDateTime
-from refrncr.record_identity import MAX_RECORD_IDENTIFIER_BYTES
 
 
 def new_id() -> str:

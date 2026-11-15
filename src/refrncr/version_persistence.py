@@ -7,6 +7,7 @@ from sqlalchemy import Numeric, cast, func, select, update
 from sqlalchemy.orm import aliased, undefer
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.hierarchy_persistence import hierarchy_value
 from refrncr.models import (
@@ -20,7 +21,6 @@ from refrncr.models import (
     new_id,
 )
 from refrncr.ports import PersistenceConflictError, RecordValue, StoredRecord
-from refrncr.record_identity import encode_record_identifier
 from refrncr.version_contracts import (
     PublishedVersion,
     SnapshotContent,

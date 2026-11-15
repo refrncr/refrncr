@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from refrncr.datasets.datatypes import DATATYPES, DatatypeError, get_datatype
-from refrncr.hierarchy_contracts import HierarchyNode
-from refrncr.ports import StoredRecord
-from refrncr.record_identity import (
+from refrncr.datasets.record_identity import (
     MAX_RECORD_IDENTIFIER_BYTES,
     decode_record_identifier,
     encode_record_identifier,
 )
+from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.ports import StoredRecord
 from refrncr.version_contracts import PublishedVersion, SnapshotField, SourceVersion
 
 

@@ -472,7 +472,7 @@ def test_concurrent_operation_and_discard_are_atomic(database_context, operation
 
 @pytest.mark.parametrize("removal", ["discard", "dataset_delete"])
 def test_discard_during_export_preparation_returns_no_artifact(context, monkeypatch, removal):
-    from refrncr import dataset_export
+    from refrncr.datasets import export as dataset_export
 
     c = context
     prepared(c)

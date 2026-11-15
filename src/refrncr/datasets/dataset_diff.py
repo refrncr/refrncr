@@ -7,6 +7,7 @@ from unicodedata import normalize
 from refrncr.audit import record_audit
 from refrncr.change_status import ChangeStatus
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.record_identity import RecordIdentifierError, decode_record_identifier
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.diff_contracts import (
     MAX_SEARCH,
@@ -23,7 +24,6 @@ from refrncr.diff_contracts import (
 from refrncr.domain import require_concept, valid_identity
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
-from refrncr.record_identity import RecordIdentifierError, decode_record_identifier
 from refrncr.version_contracts import SnapshotField, version_states
 
 from .errors import DatasetConflictError, DatasetNotFoundError, DatasetValidationError

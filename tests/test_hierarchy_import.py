@@ -9,7 +9,7 @@ import pytest
 from openpyxl import load_workbook
 from support import revision
 
-from refrncr.dataset_export import generate_export
+from refrncr.datasets.export import generate_export
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.record_import import ImportValidationError, TransientImportStore
 from refrncr.services import NotFoundError, StaleRecordError

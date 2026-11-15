@@ -1,7 +1,7 @@
 """Reconcile pinned mapping sources inside the caller's Dataset transaction."""
 
+from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.ports import RecordValue
-from refrncr.record_identity import encode_record_identifier
 
 from .errors import DatasetConflictError, DatasetValidationError
 

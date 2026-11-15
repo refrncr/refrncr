@@ -10,6 +10,7 @@ from refrncr.datasets.errors import (
     DatasetValidationError,
     StaleFieldOrderError,
 )
+from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.datasets.shared import (
     normalize_dataset_field_name,
     validate_dataset_field_flag,
@@ -31,7 +32,6 @@ from refrncr.ports import (
     UnitOfWork,
     UnitOfWorkFactory,
 )
-from refrncr.record_identity import encode_record_identifier
 
 
 class DatasetFieldService:
