@@ -267,7 +267,7 @@ def test_every_audited_operation_has_behavior_cases():
     }
     behaviors.update(
         {
-            "refrncr.record_import.DatasetRecordImportService.confirm",
+            "refrncr.imports.workflows.ImportWorkflowMixin.confirm",
             "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.publish",
             "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.cancel",
             "refrncr.versions.concepts.DatasetVersionConceptMixin.update_mapping_source",
@@ -486,7 +486,10 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "sessions": "identity.sessions",
                         "teams": "identity.teams",
                         "users": "identity.users",
-                        "record_imports": "record_import",
+                        "record_imports": "imports.workflows"
+                        if function.attr
+                        in {"preview", "saved_preview", "confirm", "cancel", "revoke_session"}
+                        else "imports.service",
                         "audit_history": "audit_history",
                         "dataset_versions": version_modules.get(function.attr),
                         "dataset_diff": "datasets.dataset_diff",
@@ -505,6 +508,8 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         service_name = "DatasetVersionConceptMixin"
                     elif module == "versions.lifecycle":
                         service_name = "DatasetVersionLifecycleMixin"
+                    elif module == "imports.workflows":
+                        service_name = "ImportWorkflowMixin"
                     found.add(f"refrncr.{module}.{service_name}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:
                 found.update(service_calls(function.id, seen))

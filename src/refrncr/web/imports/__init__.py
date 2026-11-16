@@ -9,7 +9,7 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.record_import import DatasetRecordImportService
+from refrncr.imports import DatasetRecordImportService
 from refrncr.services import DatasetRecordService
 from refrncr.web.routing import DatasetBlueprint
 

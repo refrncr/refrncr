@@ -8,9 +8,9 @@ from openpyxl import Workbook
 from sqlalchemy import func, select
 from support import html_elements
 
-import refrncr.record_import as record_import_module
+from refrncr.imports import ImportValidationError, TransientImportStore, parse_source
+from refrncr.imports import service as record_import_module
 from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
-from refrncr.record_import import ImportValidationError, TransientImportStore, parse_source
 from refrncr.services import NotFoundError
 
 
@@ -125,7 +125,7 @@ def test_unsuccessful_paths_do_not_remember(database_context, monkeypatch, end):
         with pytest.raises(Exception, match="changed"):
             confirm(database_context, state)
     else:
-        import refrncr.record_import as module
+        from refrncr.imports import workflows as module
 
         def fail(*args, **kwargs):
             raise RuntimeError("injected audit failure")

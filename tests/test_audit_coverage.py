@@ -235,9 +235,11 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
     if service == "DatasetVersionService":
         method = operation.split(".", 1)[1]
         symbol = f"refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.{method}"
+    elif service == "DatasetRecordImportService":
+        method = operation.split(".", 1)[1]
+        symbol = f"refrncr.imports.workflows.ImportWorkflowMixin.{method}"
     else:
         module = {
-            "DatasetRecordImportService": "record_import",
             "DatasetService": "datasets.service",
             "DatasetFieldService": "datasets.fields",
             "DatasetBusinessKeyService": "datasets.business_key",

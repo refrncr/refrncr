@@ -17,7 +17,7 @@ from refrncr.identity.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
-from refrncr.record_import import DatasetRecordImportService
+from refrncr.imports import DatasetRecordImportService
 from refrncr.services import AuthenticationService, SessionService, UserManagementError, UserService
 from refrncr.web.helpers import is_safe_login_target
 from refrncr.web.routing import anonymous_csrf_route, public_route

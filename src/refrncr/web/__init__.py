@@ -41,6 +41,7 @@ from refrncr.identity.login_security import (
     LoginAttemptLimiter,
     SourceIdentityResolver,
 )
+from refrncr.imports.xml_security import require_xml_protection
 from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.auth import register_auth_blueprint
 from refrncr.web.datasets import register_datasets_blueprint
@@ -72,7 +73,6 @@ from refrncr.web.settings import register_settings_blueprint
 from refrncr.web.teams import register_teams_blueprint
 from refrncr.web.users import register_users_blueprint
 from refrncr.web.versions import register_versions_blueprint
-from refrncr.xml_security import require_xml_protection
 
 if TYPE_CHECKING:
     from refrncr.app import CommunityServices

@@ -28,11 +28,11 @@ from refrncr.datasets.dataset_upgrade import (
 )
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity.login_security import SourceIdentityResolver
+from refrncr.imports.xml_security import require_xml_protection
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
 from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
 from refrncr.versions.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.versions.version_upgrade import VersionUpgradeError, publication_preflight
-from refrncr.xml_security import require_xml_protection
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000

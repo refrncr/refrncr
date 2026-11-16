@@ -2433,7 +2433,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "confirm",
-      "service": "refrncr.record_import.DatasetRecordImportService.confirm",
+      "service": "refrncr.imports.workflows.ImportWorkflowMixin.confirm",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.confirm_record_import POST /datasets/<key>/records/import/<token>/confirm"
       ],
@@ -2506,7 +2506,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "active",
-      "service": "refrncr.record_import.DatasetRecordImportService.active",
+      "service": "refrncr.imports.service.DatasetRecordImportService.active",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import"
@@ -2538,7 +2538,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "state",
-      "service": "refrncr.record_import.DatasetRecordImportService.state",
+      "service": "refrncr.imports.service.DatasetRecordImportService.state",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -2575,7 +2575,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "source_format_review",
-      "service": "refrncr.record_import.DatasetRecordImportService.source_format_review",
+      "service": "refrncr.imports.service.DatasetRecordImportService.source_format_review",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
@@ -2606,7 +2606,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "begin",
-      "service": "refrncr.record_import.DatasetRecordImportService.begin",
+      "service": "refrncr.imports.service.DatasetRecordImportService.begin",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import"
@@ -2638,7 +2638,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "navigate",
-      "service": "refrncr.record_import.DatasetRecordImportService.navigate",
+      "service": "refrncr.imports.service.DatasetRecordImportService.navigate",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -2675,7 +2675,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "select_worksheet",
-      "service": "refrncr.record_import.DatasetRecordImportService.select_worksheet",
+      "service": "refrncr.imports.service.DatasetRecordImportService.select_worksheet",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.select_import_worksheet POST /datasets/<key>/records/import/<token>/worksheet"
       ],
@@ -2706,7 +2706,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "mapping_assistance",
-      "service": "refrncr.record_import.DatasetRecordImportService.mapping_assistance",
+      "service": "refrncr.imports.service.DatasetRecordImportService.mapping_assistance",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -2743,7 +2743,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "preview",
-      "service": "refrncr.record_import.DatasetRecordImportService.preview",
+      "service": "refrncr.imports.workflows.ImportWorkflowMixin.preview",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.preview_record_import GET,POST /datasets/<key>/records/import/<token>/preview"
       ],
@@ -2774,7 +2774,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "saved_preview",
-      "service": "refrncr.record_import.DatasetRecordImportService.saved_preview",
+      "service": "refrncr.imports.workflows.ImportWorkflowMixin.saved_preview",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -2811,7 +2811,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "cancel",
-      "service": "refrncr.record_import.DatasetRecordImportService.cancel",
+      "service": "refrncr.imports.workflows.ImportWorkflowMixin.cancel",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.cancel_record_import POST /datasets/<key>/records/import/<token>/cancel"
       ],
@@ -2842,7 +2842,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "revoke_session",
-      "service": "refrncr.record_import.DatasetRecordImportService.revoke_session",
+      "service": "refrncr.imports.workflows.ImportWorkflowMixin.revoke_session",
       "interface_entrypoints": [
         "refrncr.web.auth.logout POST /logout"
       ],
@@ -3540,7 +3540,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "create",
-      "service": "refrncr.record_import.TransientImportStore.create",
+      "service": "refrncr.imports.store.TransientImportStore.create",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3571,7 +3571,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "get",
-      "service": "refrncr.record_import.TransientImportStore.get",
+      "service": "refrncr.imports.store.TransientImportStore.get",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3602,7 +3602,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "update",
-      "service": "refrncr.record_import.TransientImportStore.update",
+      "service": "refrncr.imports.store.TransientImportStore.update",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3633,7 +3633,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "active",
-      "service": "refrncr.record_import.TransientImportStore.active",
+      "service": "refrncr.imports.store.TransientImportStore.active",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3664,7 +3664,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "claim",
-      "service": "refrncr.record_import.TransientImportStore.claim",
+      "service": "refrncr.imports.store.TransientImportStore.claim",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3695,7 +3695,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "finish",
-      "service": "refrncr.record_import.TransientImportStore.finish",
+      "service": "refrncr.imports.store.TransientImportStore.finish",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3726,7 +3726,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "consume",
-      "service": "refrncr.record_import.TransientImportStore.consume",
+      "service": "refrncr.imports.store.TransientImportStore.consume",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3757,7 +3757,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "cancel",
-      "service": "refrncr.record_import.TransientImportStore.cancel",
+      "service": "refrncr.imports.store.TransientImportStore.cancel",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -3788,7 +3788,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "revoke_session",
-      "service": "refrncr.record_import.TransientImportStore.revoke_session",
+      "service": "refrncr.imports.store.TransientImportStore.revoke_session",
       "interface_entrypoints": [
         "Internal: DatasetRecordImportService / Session logout"
       ],
@@ -5628,7 +5628,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "format_assistance",
-      "service": "refrncr.record_import.DatasetRecordImportService.format_assistance",
+      "service": "refrncr.imports.service.DatasetRecordImportService.format_assistance",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/concept/records/import-new-version",
         "refrncr.web.imports.routes.import_dataset_records GET,POST /datasets/<key>/records/import",
@@ -5743,7 +5743,7 @@
     {
       "capability": "TransientImportStore",
       "operation": "revoke_concept",
-      "service": "refrncr.record_import.TransientImportStore.revoke_concept",
+      "service": "refrncr.imports.store.TransientImportStore.revoke_concept",
       "interface_entrypoints": [
         "Internal transient cleanup after discard or obsolete Concept lookup"
       ],
@@ -5774,7 +5774,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "eligibility",
-      "service": "refrncr.record_import.DatasetRecordImportService.eligibility",
+      "service": "refrncr.imports.service.DatasetRecordImportService.eligibility",
       "interface_entrypoints": [
         "refrncr.web.records.browse.dataset_records_view GET /datasets/<key>/concept/records",
         "refrncr.web.records.browse.dataset_records_view GET /datasets/<key>/records",
@@ -6751,7 +6751,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "submitted_source_format_assistance",
-      "service": "refrncr.record_import.DatasetRecordImportService.submitted_source_format_assistance",
+      "service": "refrncr.imports.service.DatasetRecordImportService.submitted_source_format_assistance",
       "interface_entrypoints": [
         "refrncr.web.imports.routes.review_source_formats POST /datasets/<key>/records/import/<token>/formats"
       ],
@@ -6783,7 +6783,7 @@
     {
       "capability": "DatasetRecordImportService",
       "operation": "submitted_source_formats",
-      "service": "refrncr.record_import.DatasetRecordImportService.submitted_source_formats",
+      "service": "refrncr.imports.service.DatasetRecordImportService.submitted_source_formats",
       "interface_entrypoints": [
         "Trusted programmatic caller"
       ],

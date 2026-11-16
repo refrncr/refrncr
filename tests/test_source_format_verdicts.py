@@ -6,9 +6,13 @@ from types import SimpleNamespace
 import pytest
 from support import Controls, html_text, optional_field
 
-from refrncr import source_formats
-from refrncr.record_import import DatasetRecordImportService, ParsedSource, SourceRow
-from refrncr.source_formats import canonical_source, formats_for, propose_format, temporal_controls
+from refrncr.imports import DatasetRecordImportService, ParsedSource, SourceRow, source_formats
+from refrncr.imports.source_formats import (
+    canonical_source,
+    formats_for,
+    propose_format,
+    temporal_controls,
+)
 
 
 def column(datatype, values, profile=None):
@@ -259,7 +263,7 @@ def test_undecided_guidance_has_one_message_and_retains_description_targets(
 def native_date_source():
     from pathlib import Path
 
-    from refrncr.record_import import parse_source
+    from refrncr.imports import parse_source
 
     path = Path(__file__).parent / "fixtures" / "native_excel_dates.xlsx"
     return parse_source(path.name, path.read_bytes(), "Business objects")

@@ -6,7 +6,7 @@ import pytest
 from support import dataset_version_client, html_text, publish, request, setup
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.record_import import ImportValidationError
+from refrncr.imports import ImportValidationError
 
 
 @pytest.mark.parametrize("published", [False, True])

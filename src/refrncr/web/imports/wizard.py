@@ -6,14 +6,14 @@ import logging
 
 from flask import request
 
-from refrncr.presentation import record_label
-from refrncr.record_import import (
+from refrncr.imports import (
     PROFILE_SCAN_ROWS,
     ImportValidationError,
     distinct_samples,
     mapping_issue_message,
     parse_source,
 )
+from refrncr.presentation import record_label
 from refrncr.services import NotFoundError
 from refrncr.web.helpers import merge_error_messages, parse_page_parameter
 from refrncr.web.imports import (

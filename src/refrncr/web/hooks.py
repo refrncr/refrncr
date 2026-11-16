@@ -9,8 +9,8 @@ from typing import Any
 from flask import Flask, abort, g, redirect, request, url_for
 
 from refrncr.browser_security import WEB_HTML_HEADERS
+from refrncr.imports import MAX_COLUMNS, MAX_UPLOAD_BYTES
 from refrncr.ports import PersistenceConflictError
-from refrncr.record_import import MAX_COLUMNS, MAX_UPLOAD_BYTES
 from refrncr.services import AuthorizationError, ConflictError, NotFoundError
 from refrncr.web.helpers import safe_login_target
 

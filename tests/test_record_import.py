@@ -15,12 +15,10 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
-import refrncr.record_import as record_import_module
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
-from refrncr.record_import import (
+from refrncr.imports import (
     MAX_COMPRESSION_RATIO,
     DatasetRecordImportService,
     ImportValidationError,
@@ -34,6 +32,8 @@ from refrncr.record_import import (
     rank_mapping_candidates,
     validate_source_format_components,
 )
+from refrncr.imports import parsing as record_import_module
+from refrncr.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
 from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
 

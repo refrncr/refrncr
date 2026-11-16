@@ -12,7 +12,7 @@ from flask import Flask, abort, current_app, redirect, request, url_for
 from werkzeug.local import LocalProxy
 
 from refrncr.datasets.dataset_diff import STALE_MESSAGE, DatasetDiffService
-from refrncr.record_import import DatasetRecordImportService
+from refrncr.imports import DatasetRecordImportService
 from refrncr.services import (
     ConflictError,
     DatasetService,

@@ -91,7 +91,7 @@ def test_failed_confirmation_preserves_previous_proposal_and_all_tables(
     s.record_imports.confirm(a.id, "one", d.key, first.token)
     second = stage(s, a, d, "two", "second", "1,234.56", "v1-us")
     before = snapshot(engine)
-    import refrncr.record_import as module
+    from refrncr.imports import workflows as module
 
     def fail(*args, **kwargs):
         raise RuntimeError("injected")
@@ -259,7 +259,7 @@ def test_migrated_proposal_constraints_and_field_deletion(database_audit_db):
 
 @pytest.mark.parametrize("ending", ["cancel", "expiry", "validation"])
 def test_unsuccessful_attempt_retains_previous_confirmed_proposal(database_audit_db, ending):
-    from refrncr.record_import import TransientImportStore
+    from refrncr.imports import TransientImportStore
 
     engine, factory, s, a, d = setup(database_audit_db)
     clock = [0.0]

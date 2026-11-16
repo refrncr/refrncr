@@ -13,7 +13,7 @@ from defusedxml.common import DefusedXmlException
 from openpyxl import Workbook
 
 import refrncr
-from refrncr.record_import import UNREADABLE_XLSX_MESSAGE, ImportValidationError, parse_source
+from refrncr.imports import UNREADABLE_XLSX_MESSAGE, ImportValidationError, parse_source
 
 
 class InstalledXmlSmoke(unittest.TestCase):

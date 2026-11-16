@@ -3,7 +3,7 @@
 from flask import abort, redirect, request, url_for
 
 from refrncr.datasets import StaleRecordError
-from refrncr.record_import import MAX_UPLOAD_BYTES, ImportValidationError
+from refrncr.imports import MAX_UPLOAD_BYTES, ImportValidationError
 from refrncr.services import ConflictError
 from refrncr.web.hierarchies import (
     blueprint,

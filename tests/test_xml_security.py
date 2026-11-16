@@ -14,7 +14,7 @@ from support import _dataset_browser, create_dataset, create_field, csrf_token, 
 
 from refrncr import cli
 from refrncr.app import create_application
-from refrncr.record_import import UNREADABLE_XLSX_MESSAGE, ImportValidationError, parse_source
+from refrncr.imports import UNREADABLE_XLSX_MESSAGE, ImportValidationError, parse_source
 from refrncr.web import create_flask_app
 
 
