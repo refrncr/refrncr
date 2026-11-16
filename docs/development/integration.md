@@ -12,8 +12,9 @@ migration proceeds.
   receives one fully composed Community service and returns the service contract exposed to the
   application. Wrappers are applied exactly once; close over integrator policy state instead of
   expecting Community sessions or repositories.
-- `create_application(...)` constructs the combined FastAPI and Flask application from composed
-  services.
+- `create_application(services, ...)` constructs the combined FastAPI and Flask application from
+  the complete bundle returned by `create_community_services`. Adapters never construct missing
+  services or recover them through private attributes.
 - `ResourceTypeRegistry` registers existence checks for authorization resource types.
 
 ```python
@@ -30,24 +31,7 @@ services = create_community_services(
     create_session_factory(engine),
     ResourceTypeRegistry(),
 )
-application = create_application(
-    services.users,
-    services.authentication,
-    services.sessions,
-    services.teams,
-    services.memberships,
-    authorization=services.authorization,
-    datasets=services.datasets,
-    dataset_fields=services.dataset_fields,
-    dataset_business_keys=services.dataset_business_keys,
-    dataset_records=services.dataset_records,
-    record_imports=services.record_imports,
-    hierarchy_imports=services.hierarchy_imports,
-    audit_history=services.audit_history,
-    dataset_versions=services.dataset_versions,
-    api_keys=services.api_keys,
-    readiness_engine=engine,
-)
+application = create_application(services, readiness_engine=engine)
 ```
 
 For example, an integrator can apply product policy without subclassing Community services:

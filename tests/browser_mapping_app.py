@@ -29,18 +29,7 @@ for record in services.dataset_records.list_records(admin.id, mapping.key).recor
         },
     )
 app = create_flask_app(
-    services.users,
-    services.authentication,
-    services.sessions,
-    services.teams,
-    services.memberships,
-    authorization=services.authorization,
-    datasets=services.datasets,
-    dataset_fields=services.dataset_fields,
-    dataset_business_keys=services.dataset_business_keys,
-    dataset_records=services.dataset_records,
-    record_imports=services.record_imports,
-    dataset_versions=services.dataset_versions,
+    services,
     allow_loopback_http=True,
 )
 if __name__ == "__main__":

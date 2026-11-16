@@ -48,18 +48,7 @@ for width in (320, 375, 767, 768, 1440):
             },
         )
 app = create_flask_app(
-    s.users,
-    s.authentication,
-    s.sessions,
-    s.teams,
-    s.memberships,
-    authorization=s.authorization,
-    datasets=s.datasets,
-    dataset_fields=s.dataset_fields,
-    dataset_business_keys=s.dataset_business_keys,
-    dataset_records=s.dataset_records,
-    record_imports=s.record_imports,
-    dataset_versions=s.dataset_versions,
+    s,
     allow_loopback_http=True,
 )
 app.jinja_env.auto_reload = True

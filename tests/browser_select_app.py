@@ -11,12 +11,7 @@ factory, s, admin, _ = dataset_browser.__wrapped__()
 for i in range(3):
     s.teams.create_team(admin.id, f"Domain {i}")
 app = create_flask_app(
-    s.users,
-    s.authentication,
-    s.sessions,
-    s.teams,
-    s.memberships,
-    audit_history=s.audit_history,
+    s,
     allow_loopback_http=True,
 )
 app.jinja_env.auto_reload = True

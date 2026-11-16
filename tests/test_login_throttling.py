@@ -62,11 +62,7 @@ def configured_web(limiter: LoginAttemptLimiter, admission=None):
     services = create_community_services(create_session_factory(engine), ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
+        services,
         login_limiter=limiter,
         authentication_admission=admission,
     ).test_client()

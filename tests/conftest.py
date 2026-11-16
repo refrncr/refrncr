@@ -3,6 +3,7 @@
 import os
 import re
 import uuid
+from dataclasses import replace
 from datetime import timedelta
 from io import BytesIO
 from types import SimpleNamespace
@@ -19,6 +20,7 @@ from support import NOW, MutableClock, _dataset_browser, publish, setup
 from werkzeug.datastructures import MultiDict
 
 from refrncr.app import create_application, create_community_services
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity.api_keys import ApiKeyService
@@ -104,20 +106,13 @@ def _build_api(c):
     c.keys = ApiKeyService(c.s.users.uow, pepper=b"disposable-ref107-test-pepper!!!!!", clock=c.now)
     c.key = c.keys.create_key(c.u.id, "Read integration")
     c.headers = {"Authorization": "Bearer " + c.key.secret}
-    c.app = create_application(
-        c.s.users,
-        c.s.authentication,
-        c.s.sessions,
-        c.s.teams,
-        c.s.memberships,
-        authorization=c.s.authorization,
-        datasets=c.s.datasets,
-        dataset_fields=c.s.dataset_fields,
-        dataset_business_keys=c.s.dataset_business_keys,
-        dataset_records=c.s.dataset_records,
+    services = replace(
+        c.s,
         dataset_versions=c.service,
+        dataset_diff=DatasetDiffService(c.service),
         api_keys=c.keys,
     )
+    c.app = create_application(services)
     with TestClient(c.app, base_url="https://localhost", raise_server_exceptions=False) as client:
         c.client = client
         yield c
@@ -198,19 +193,7 @@ def wizard(import_context):
     factory, services, admin, dataset = import_context
     for key in ("active", "day"):
         services.dataset_fields.delete_field(admin.id, dataset.key, key)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-    )
+    app = create_flask_app(services)
     app.testing = True
     client = app.test_client()
     login = client.get("/login", base_url="https://localhost")

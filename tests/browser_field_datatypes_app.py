@@ -7,16 +7,7 @@ from refrncr.web import create_flask_app
 factory, services, admin, _client = dataset_browser.__wrapped__()
 setup_dataset(services, admin, ())
 app = create_flask_app(
-    services.users,
-    services.authentication,
-    services.sessions,
-    services.teams,
-    services.memberships,
-    authorization=services.authorization,
-    datasets=services.datasets,
-    dataset_fields=services.dataset_fields,
-    dataset_business_keys=services.dataset_business_keys,
-    dataset_records=services.dataset_records,
+    services,
     allow_loopback_http=True,
 )
 

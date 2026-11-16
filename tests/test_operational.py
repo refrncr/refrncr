@@ -121,19 +121,7 @@ def _build_operational_database(database, tmp_path):
     engine = create_database_engine(database_url)
     services = cli.create_community_services(create_session_factory(engine), ResourceTypeRegistry())
     app = create_application(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        dataset_versions=services.dataset_versions,
-        audit_history=services.audit_history,
-        api_keys=services.api_keys,
+        services,
         readiness_engine=engine,
     )
     with TestClient(app, base_url="https://testserver", raise_server_exceptions=False) as client:

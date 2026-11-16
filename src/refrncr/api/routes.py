@@ -2,6 +2,7 @@
 
 import re
 from datetime import date
+from functools import partial
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Query, Request, Security
@@ -239,6 +240,216 @@ def _pagination(page, total, path, effective_date=None, version_number=None):
     )
 
 
+def _read(versions, clock, request, actor, kind, key=None, identifier=None, source=None):
+    page, effective_date, version_number = _query(
+        request,
+        kind in {"datasets", "records", "versions"},
+        lookup=kind == "lookup",
+        selectors=kind != "versions",
+    )
+    condition = ConditionalRead(
+        request,
+        actor_id=actor.id,
+        kind=kind,
+        key=key,
+        identifier=source if kind == "lookup" else identifier,
+        page=page,
+        effective_date=effective_date,
+        version_number=version_number,
+        clock=clock,
+    )
+    if kind == "versions":
+        result = versions.read_versions(
+            actor.id,
+            key,
+            offset=page.offset,
+            limit=page.limit,
+            unchanged=condition,
+        )
+    else:
+        result = versions.read_current(
+            actor.id,
+            key,
+            offset=page.offset,
+            limit=page.limit,
+            records=kind == "records",
+            identifier=identifier,
+            source=source,
+            unchanged=condition,
+            effective_date=effective_date,
+            version_number=version_number,
+            hierarchy=kind == "hierarchy",
+            allow_hierarchy=True,
+        )
+    if result.not_modified:
+        return Response(status_code=304, headers=condition.headers)
+    if kind == "versions":
+        payload = Collection[VersionListItem](
+            data=tuple(_listed_version(p) for p in result.publications),
+            **_pagination(page, result.total, f"/api/v1/datasets/{key}/versions"),
+        )
+    elif kind == "datasets":
+        payload = Collection[Dataset](
+            data=tuple(_dataset(p) for p in result.publications),
+            **_pagination(page, result.total, "/api/v1/datasets", effective_date, version_number),
+        )
+    elif kind == "dataset":
+        fields = tuple(
+            FieldMetadata(
+                key=f.key,
+                name=f.name,
+                datatype=f.data_type,
+                is_identifier=f.is_identifier,
+                is_required=f.is_required,
+                is_unique=f.is_unique,
+                display_position=f.display_position,
+                definition=f.definition,
+                unit=f.unit,
+                mapping_role=f.mapping_role,
+            )
+            for f in result.fields
+        )
+        publication = result.publications[0]
+        hierarchy = None
+        if publication.kind == "hierarchy":
+            hierarchy = HierarchyMetadata(
+                depth=max(
+                    (
+                        max(len(path) - 1, 0)
+                        for path in hierarchy_paths(result.hierarchy_nodes).values()
+                    ),
+                    default=0,
+                )
+            )
+        payload = Detail[DatasetDetail](
+            data=DatasetDetail(
+                **_dataset(publication).model_dump(), fields=fields, hierarchy=hierarchy
+            )
+        )
+    elif kind == "records":
+        pagination = _pagination(
+            page,
+            result.total,
+            f"/api/v1/datasets/{key}/records",
+            effective_date,
+            version_number,
+        )
+        if result.publications[0].kind == "hierarchy":
+            nodes_by_id = {node.id: node for node in result.hierarchy_nodes}
+            paths = hierarchy_paths(result.hierarchy_nodes)
+            payload = HierarchyRecordCollection(
+                data=tuple(
+                    _hierarchy_record(r, result.fields, nodes_by_id, paths) for r in result.records
+                ),
+                version=_version(result.publications[0]),
+                **pagination,
+            )
+        else:
+            payload = RecordCollection(
+                data=tuple(_record(r, result.fields) for r in result.records),
+                version=_version(result.publications[0]),
+                **pagination,
+            )
+    elif kind == "hierarchy":
+        record_pairs = sorted(
+            ((raw, _record(raw, result.fields)) for raw in result.records),
+            key=lambda pair: pair[1].identifier,
+        )
+        records = tuple(record for _raw, record in record_pairs)
+        record_identifiers = {raw.id: record.identifier for raw, record in record_pairs}
+        payload = HierarchyResponse(
+            data=HierarchyData(
+                fields=tuple(
+                    FieldMetadata(
+                        key=f.key,
+                        name=f.name,
+                        datatype=f.data_type,
+                        is_identifier=f.is_identifier,
+                        is_required=f.is_required,
+                        is_unique=f.is_unique,
+                        display_position=f.display_position,
+                        definition=f.definition,
+                        unit=f.unit,
+                        mapping_role=f.mapping_role,
+                    )
+                    for f in result.fields
+                ),
+                nodes=tuple(
+                    _hierarchy_node(node, result.fields, record_identifiers)
+                    for node in hierarchy_order(result.hierarchy_nodes)
+                ),
+                records=records,
+            ),
+            version=_version(result.publications[0]),
+        )
+    else:
+        payload = RecordDetail(
+            data=_record(result.records[0], result.fields),
+            version=_version(result.publications[0]),
+        )
+    return CanonicalJSONResponse(payload, headers=condition.headers)
+
+
+def _principal_dependency(api_keys, bearer):
+    def principal(
+        request: Request,
+        _credential: Annotated[HTTPAuthorizationCredentials | None, Security(bearer)],
+    ):
+        values = request.headers.getlist("authorization")
+        if api_keys is None:
+            raise ApiKeyAuthenticationError()
+        # Malformed/duplicate headers use the same service failure audit as absent keys.
+        authenticated = api_keys.authenticate(values[0] if len(values) == 1 else None)
+        request.scope["refrncr.authentication"] = "api_key"
+        return authenticated
+
+    return principal
+
+
+async def _api_safety(request, call_next):
+    try:
+        response = await call_next(request)
+    except Exception:  # noqa: BLE001 - the API boundary returns a generic safe response.
+        # Never forward exception text/SQL/request state to ASGI exception logging.
+        response = CanonicalJSONResponse(Error(error="service_unavailable"), status_code=503)
+    for name, value in SAFE_HEADERS.items():
+        if name.lower() not in response.headers:
+            response.headers[name] = value
+    return response
+
+
+def _documented_openapi(generated_openapi):
+    schema = generated_openapi()
+    # The existing boundary translates all FastAPI validation errors to safe 400s.
+    # Remove FastAPI's implicit 422, which is not part of the implemented contract.
+    for path in schema["paths"].values():
+        operation = path["get"]
+        operation["responses"].pop("422", None)
+        for parameter in operation.get("parameters", []):
+            if parameter["name"] in CollectionQuery.model_fields:
+                parameter["description"] = CollectionQuery.model_fields[
+                    parameter["name"]
+                ].description
+                if parameter["name"] == "effective_date":
+                    parameter["example"] = "2026-09-30"
+            elif parameter["name"] == "dataset_key":
+                parameter["description"] = (
+                    "Permanent Dataset key from the Dataset list: 1–100 lowercase ASCII "
+                    "letters/digits, underscore or hyphen; starts with a letter/digit. "
+                    "Invalid, missing and inaccessible keys return 404."
+                )
+            elif parameter["name"] == "identifier":
+                parameter["schema"] = Record.model_json_schema()["properties"]["identifier"]
+                parameter["description"] = (
+                    "Entire opaque business identifier from a Record response, URL encoded. "
+                    "Single and composite identifiers use the same contract; invalid or "
+                    "missing identifiers return 404."
+                )
+    for name in ("HTTPValidationError", "ValidationError"):
+        schema["components"]["schemas"].pop(name, None)
+    return schema
+
+
 def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
     """Build the published API through its focused registration helper."""
     return _configure_api(versions, api_keys, clock)
@@ -262,29 +473,9 @@ def _configure_api(versions, api_keys, clock: Clock):
         "Cookies and browser sessions are not accepted.",
     )
 
-    def principal(
-        request: Request,
-        _credential: Annotated[HTTPAuthorizationCredentials | None, Security(bearer)],
-    ):
-        values = request.headers.getlist("authorization")
-        if api_keys is None:
-            raise ApiKeyAuthenticationError()
-        # Malformed/duplicate headers use the same service failure audit as absent keys.
-        authenticated = api_keys.authenticate(values[0] if len(values) == 1 else None)
-        request.scope["refrncr.authentication"] = "api_key"
-        return authenticated
+    principal = _principal_dependency(api_keys, bearer)
 
-    @app.middleware("http")
-    async def safety(request, call_next):
-        try:
-            response = await call_next(request)
-        except Exception:  # noqa: BLE001 - the API boundary returns a generic safe response.
-            # Never forward exception text/SQL/request state to ASGI exception logging.
-            response = CanonicalJSONResponse(Error(error="service_unavailable"), status_code=503)
-        for name, value in SAFE_HEADERS.items():
-            if name.lower() not in response.headers:
-                response.headers[name] = value
-        return response
+    app.middleware("http")(_api_safety)
 
     @app.exception_handler(ApiKeyAuthenticationError)
     async def credentials_error(request, error):
@@ -313,157 +504,7 @@ def _configure_api(versions, api_keys, clock: Clock):
         code = "method_not_allowed" if error.status_code == 405 else "not_found"
         return CanonicalJSONResponse(Error(error=code), status_code=error.status_code)
 
-    def read(request, actor, kind, key=None, identifier=None, source=None):
-        page, effective_date, version_number = _query(
-            request,
-            kind in {"datasets", "records", "versions"},
-            lookup=kind == "lookup",
-            selectors=kind != "versions",
-        )
-        condition = ConditionalRead(
-            request,
-            actor_id=actor.id,
-            kind=kind,
-            key=key,
-            identifier=source if kind == "lookup" else identifier,
-            page=page,
-            effective_date=effective_date,
-            version_number=version_number,
-            clock=clock,
-        )
-        if kind == "versions":
-            result = versions.read_versions(
-                actor.id,
-                key,
-                offset=page.offset,
-                limit=page.limit,
-                unchanged=condition,
-            )
-        else:
-            result = versions.read_current(
-                actor.id,
-                key,
-                offset=page.offset,
-                limit=page.limit,
-                records=kind == "records",
-                identifier=identifier,
-                source=source,
-                unchanged=condition,
-                effective_date=effective_date,
-                version_number=version_number,
-                hierarchy=kind == "hierarchy",
-                allow_hierarchy=True,
-            )
-        if result.not_modified:
-            return Response(status_code=304, headers=condition.headers)
-        if kind == "versions":
-            payload = Collection[VersionListItem](
-                data=tuple(_listed_version(p) for p in result.publications),
-                **_pagination(page, result.total, f"/api/v1/datasets/{key}/versions"),
-            )
-        elif kind == "datasets":
-            payload = Collection[Dataset](
-                data=tuple(_dataset(p) for p in result.publications),
-                **_pagination(
-                    page, result.total, "/api/v1/datasets", effective_date, version_number
-                ),
-            )
-        elif kind == "dataset":
-            fields = tuple(
-                FieldMetadata(
-                    key=f.key,
-                    name=f.name,
-                    datatype=f.data_type,
-                    is_identifier=f.is_identifier,
-                    is_required=f.is_required,
-                    is_unique=f.is_unique,
-                    display_position=f.display_position,
-                    definition=f.definition,
-                    unit=f.unit,
-                    mapping_role=f.mapping_role,
-                )
-                for f in result.fields
-            )
-            publication = result.publications[0]
-            hierarchy = None
-            if publication.kind == "hierarchy":
-                hierarchy = HierarchyMetadata(
-                    depth=max(
-                        (
-                            max(len(path) - 1, 0)
-                            for path in hierarchy_paths(result.hierarchy_nodes).values()
-                        ),
-                        default=0,
-                    )
-                )
-            payload = Detail[DatasetDetail](
-                data=DatasetDetail(
-                    **_dataset(publication).model_dump(), fields=fields, hierarchy=hierarchy
-                )
-            )
-        elif kind == "records":
-            pagination = _pagination(
-                page,
-                result.total,
-                f"/api/v1/datasets/{key}/records",
-                effective_date,
-                version_number,
-            )
-            if result.publications[0].kind == "hierarchy":
-                nodes_by_id = {node.id: node for node in result.hierarchy_nodes}
-                paths = hierarchy_paths(result.hierarchy_nodes)
-                payload = HierarchyRecordCollection(
-                    data=tuple(
-                        _hierarchy_record(r, result.fields, nodes_by_id, paths)
-                        for r in result.records
-                    ),
-                    version=_version(result.publications[0]),
-                    **pagination,
-                )
-            else:
-                payload = RecordCollection(
-                    data=tuple(_record(r, result.fields) for r in result.records),
-                    version=_version(result.publications[0]),
-                    **pagination,
-                )
-        elif kind == "hierarchy":
-            record_pairs = sorted(
-                ((raw, _record(raw, result.fields)) for raw in result.records),
-                key=lambda pair: pair[1].identifier,
-            )
-            records = tuple(record for _raw, record in record_pairs)
-            record_identifiers = {raw.id: record.identifier for raw, record in record_pairs}
-            payload = HierarchyResponse(
-                data=HierarchyData(
-                    fields=tuple(
-                        FieldMetadata(
-                            key=f.key,
-                            name=f.name,
-                            datatype=f.data_type,
-                            is_identifier=f.is_identifier,
-                            is_required=f.is_required,
-                            is_unique=f.is_unique,
-                            display_position=f.display_position,
-                            definition=f.definition,
-                            unit=f.unit,
-                            mapping_role=f.mapping_role,
-                        )
-                        for f in result.fields
-                    ),
-                    nodes=tuple(
-                        _hierarchy_node(node, result.fields, record_identifiers)
-                        for node in hierarchy_order(result.hierarchy_nodes)
-                    ),
-                    records=records,
-                ),
-                version=_version(result.publications[0]),
-            )
-        else:
-            payload = RecordDetail(
-                data=_record(result.records[0], result.fields),
-                version=_version(result.publications[0]),
-            )
-        return CanonicalJSONResponse(payload, headers=condition.headers)
+    read = partial(_read, versions, clock)
 
     errors = {
         status: {"model": Error, "description": description}
@@ -711,37 +752,5 @@ def _configure_api(versions, api_keys, clock: Clock):
 
     generated_openapi = app.openapi
 
-    def documented_openapi():
-        schema = generated_openapi()
-        # The existing boundary translates all FastAPI validation errors to safe 400s.
-        # Remove FastAPI's implicit 422, which is not part of the implemented contract.
-        for path in schema["paths"].values():
-            operation = path["get"]
-            operation["responses"].pop("422", None)
-            for parameter in operation.get("parameters", []):
-                if parameter["name"] in CollectionQuery.model_fields:
-                    parameter["description"] = CollectionQuery.model_fields[
-                        parameter["name"]
-                    ].description
-                    if parameter["name"] == "effective_date":
-                        parameter["example"] = "2026-09-30"
-                elif parameter["name"] == "dataset_key":
-                    parameter["description"] = (
-                        "Permanent Dataset key from the Dataset list: 1–100 lowercase ASCII "
-                        "letters/digits, underscore or hyphen; starts with a letter/digit. "
-                        "Invalid, missing and "
-                        "inaccessible keys return 404."
-                    )
-                elif parameter["name"] == "identifier":
-                    parameter["schema"] = Record.model_json_schema()["properties"]["identifier"]
-                    parameter["description"] = (
-                        "Entire opaque business identifier from a Record response, URL encoded. "
-                        "Single and composite identifiers use the same contract; invalid or "
-                        "missing identifiers return 404."
-                    )
-        for name in ("HTTPValidationError", "ValidationError"):
-            schema["components"]["schemas"].pop(name, None)
-        return schema
-
-    app.openapi = documented_openapi
+    app.openapi = partial(_documented_openapi, generated_openapi)
     return app

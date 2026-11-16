@@ -338,18 +338,7 @@ def test_existing_import_adapters_share_all_nine_canonical_contracts(
 
 
 def browser_client(services, admin):
-    client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-    ).test_client()
+    client = create_flask_app(services).test_client()
     response = client.get("/login", base_url="https://localhost")
     csrf = response.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
     assert (

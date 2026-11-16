@@ -512,18 +512,7 @@ def test_sqlite_concurrent_duplicate_identifier_creates_one(tmp_path):
 def test_browser_add_list_validation_security_and_escaping(record_services):
     _, _, services, admin = record_services
     dataset, _ = configured_dataset(services, admin)
-    client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-    ).test_client()
+    client = create_flask_app(services).test_client()
     login_form = client.get("/login", base_url="https://localhost")
     csrf = login_form.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
     response = client.post(
@@ -630,18 +619,7 @@ def test_browser_edit_delete_prepopulation_validation_and_escaping(record_servic
                 DatasetRecordValue.field_id == fields["code"].id,
             )
         )
-    client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-    ).test_client()
+    client = create_flask_app(services).test_client()
     login = client.get("/login", base_url="https://localhost")
     csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]
     client.post(

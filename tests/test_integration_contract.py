@@ -3,6 +3,7 @@
 import os
 import re
 import uuid
+from inspect import signature
 
 import pytest
 from fastapi.testclient import TestClient
@@ -67,6 +68,12 @@ def test_integration_exposes_application_and_error_contract():
     assert issubclass(ValidationError, Exception)
     assert issubclass(AuthorizationError, Exception)
     assert issubclass(CliError, Exception)
+    assert tuple(signature(create_application).parameters) == (
+        "services",
+        "allow_loopback_http",
+        "trusted_proxies",
+        "readiness_engine",
+    )
 
 
 def test_integration_applies_service_wrappers_once(tmp_path):
@@ -131,21 +138,7 @@ def test_wrapper_conflicts_reach_web_and_api_boundaries(tmp_path, monkeypatch):
     )
     key = services.api_keys.create_key(administrator.id, "Integration contract")
     application = create_application(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-        hierarchy_imports=services.hierarchy_imports,
-        audit_history=services.audit_history,
-        dataset_versions=services.dataset_versions,
-        api_keys=services.api_keys,
+        services,
         readiness_engine=engine,
     )
 
@@ -205,21 +198,7 @@ def test_integration_contract_on_supported_databases(integration_database):
     sessions = create_session_factory(engine)
     services = create_community_services(sessions, ResourceTypeRegistry())
     application = create_application(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-        hierarchy_imports=services.hierarchy_imports,
-        audit_history=services.audit_history,
-        dataset_versions=services.dataset_versions,
-        api_keys=services.api_keys,
+        services,
         readiness_engine=engine,
     )
 

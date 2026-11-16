@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from html.parser import HTMLParser
@@ -107,26 +108,7 @@ def _dataset_browser():
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Administrator", PASSWORD)
     services.teams.create_team(admin.id, "Test data domain")
-    client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-        hierarchy_imports=services.hierarchy_imports,
-        audit_history=services.audit_history,
-        dataset_versions=services.dataset_versions,
-        hierarchy=services.hierarchy,
-        overview_service=services.overview,
-        dataset_diff=services.dataset_diff,
-        installation_settings=services.installation_settings,
-    ).test_client()
+    client = create_flask_app(services).test_client()
     return factory, services, admin, client
 
 
@@ -220,11 +202,7 @@ def configured_web(limiter, admission=None):
     services = create_community_services(create_session_factory(engine), ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     client = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
+        services,
         login_limiter=limiter,
         authentication_admission=admission,
     ).test_client()
@@ -406,14 +384,7 @@ def audit_history_state(history):
 
 
 def audit_history_client(history, uid):
-    app = create_flask_app(
-        history.s.users,
-        history.s.authentication,
-        history.s.sessions,
-        history.s.teams,
-        history.s.memberships,
-        audit_history=history.service,
-    )
+    app = create_flask_app(replace(history.s, audit_history=history.service))
     app.testing = True
     result = app.test_client()
     if uid:
@@ -485,26 +456,7 @@ def configured(c):
 
 def dataset_version_client(c, actor=None):
     actor = actor or c.a
-    browser = create_flask_app(
-        c.s.users,
-        c.s.authentication,
-        c.s.sessions,
-        c.s.teams,
-        c.s.memberships,
-        authorization=c.s.authorization,
-        datasets=c.s.datasets,
-        dataset_fields=c.s.dataset_fields,
-        dataset_business_keys=c.s.dataset_business_keys,
-        dataset_records=c.s.dataset_records,
-        record_imports=c.s.record_imports,
-        hierarchy_imports=c.s.hierarchy_imports,
-        audit_history=c.s.audit_history,
-        dataset_versions=c.service,
-        hierarchy=c.s.hierarchy,
-        overview_service=c.s.overview,
-        dataset_diff=c.s.dataset_diff,
-        installation_settings=c.s.installation_settings,
-    ).test_client()
+    browser = create_flask_app(replace(c.s, dataset_versions=c.service)).test_client()
     token, session = c.s.sessions.create(actor)
     browser.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)
     return browser, session.csrf_token

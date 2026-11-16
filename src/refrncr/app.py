@@ -132,43 +132,18 @@ def create_community_services(
         overview=OverviewService(uow, authorization.datasets),
         dataset_diff=DatasetDiffService(final_versions),
     )
-    # Low-level adapter tests and embedders may still pass the individual
-    # services to ``create_flask_app``.  Keep a reference to the already
-    # composed bundle so the Flask adapter can recover siblings without
-    # constructing domain services itself.
-    for service in (users, datasets):
-        try:
-            service._community_services = services
-        except AttributeError:
-            # Wrappers may use slots or otherwise reject implementation-only
-            # attributes; the public application path supplies siblings directly.
-            pass
     return services
 
 
 def create_application(
-    users: UserService,
-    authentication: AuthenticationService,
-    sessions: SessionService,
-    teams: TeamService,
-    memberships: MembershipService,
+    services: CommunityServices,
     *,
-    authorization: AuthorizationService,
-    datasets: DatasetService,
-    dataset_fields: DatasetFieldService,
-    dataset_business_keys: DatasetBusinessKeyService,
-    dataset_records: DatasetRecordService | None = None,
-    record_imports: DatasetRecordImportService | None = None,
-    hierarchy_imports: HierarchyImportService | None = None,
     allow_loopback_http: bool = False,
     trusted_proxies: tuple[str, ...] = (),
-    audit_history: AuditHistoryService | None = None,
-    dataset_versions: DatasetVersionService | None = None,
-    api_keys: ApiKeyService | None = None,
     readiness_engine: Engine | None = None,
 ) -> FastAPI:
     require_xml_protection()
-    users.bootstrap_organisation()
+    services.users.bootstrap_organisation()
 
     @asynccontextmanager
     async def lifespan(_app):
@@ -188,21 +163,8 @@ def create_application(
         lifespan=lifespan,
     )
     app.add_middleware(OperationalMiddleware)
-    clock = getattr(api_keys, "clock", getattr(users.uow, "clock", SYSTEM_CLOCK))
-    versions = dataset_versions or datasets.versions
-    if versions is None:
-        raise ValueError("DatasetVersionService must be supplied by the composition root")
-    dataset_records = dataset_records or DatasetRecordService(
-        datasets.uow, authorization, versions=versions
-    )
-    record_imports = record_imports or DatasetRecordImportService(dataset_records)
-    hierarchy_imports = hierarchy_imports or HierarchyImportService(datasets.uow, authorization)
-    audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
-    hierarchy = HierarchyService(datasets.uow, authorization, versions=versions)
-    overview = OverviewService(datasets.uow, authorization.datasets)
-    dataset_diff = DatasetDiffService(versions)
-    installation_settings = InstallationSettingsService(users.uow, authorization.datasets)
-    api = create_api(versions, api_keys, clock=clock)
+    clock = getattr(services.api_keys, "clock", getattr(services.users.uow, "clock", SYSTEM_CLOCK))
+    api = create_api(services.dataset_versions, services.api_keys, clock=clock)
     app.mount("/api/v1", api)
     publish_documentation(app, api)
 
@@ -238,27 +200,9 @@ def create_application(
         )
 
     flask_app = create_flask_app(
-        users,
-        authentication,
-        sessions,
-        teams,
-        memberships,
-        authorization=authorization,
-        datasets=datasets,
-        dataset_fields=dataset_fields,
-        dataset_business_keys=dataset_business_keys,
-        dataset_records=dataset_records,
-        record_imports=record_imports,
-        hierarchy_imports=hierarchy_imports,
+        services,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
-        audit_history=audit_history,
-        api_keys=api_keys,
-        dataset_versions=versions,
-        hierarchy=hierarchy,
-        overview_service=overview,
-        dataset_diff=dataset_diff,
-        installation_settings=installation_settings,
         clock=clock,
     )
     app.mount("/", WSGIMiddleware(flask_app))

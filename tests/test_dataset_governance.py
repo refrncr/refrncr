@@ -378,18 +378,7 @@ def test_export_duplicates_constraints_and_cross_dataset_revoke(database_governa
 def test_browser_creation_read_export_owner_csrf_and_escaping(governance):
     _, factory, s, a, u, owner, other, d = governance
     publish_dataset(s, a.id, d)
-    app = create_flask_app(
-        s.users,
-        s.authentication,
-        s.sessions,
-        s.teams,
-        s.memberships,
-        authorization=s.authorization,
-        datasets=s.datasets,
-        dataset_fields=s.dataset_fields,
-        dataset_business_keys=s.dataset_business_keys,
-        dataset_records=s.dataset_records,
-    )
+    app = create_flask_app(s)
     client = app.test_client()
     from refrncr.web import SESSION_COOKIE
 

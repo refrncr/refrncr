@@ -392,17 +392,7 @@ def build_application(
         ResourceTypeRegistry(),
     )
     return create_application(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        audit_history=services.audit_history,
-        api_keys=services.api_keys,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
+        services,
         allow_loopback_http=allow_loopback_http,
         trusted_proxies=trusted_proxies,
         readiness_engine=engine,

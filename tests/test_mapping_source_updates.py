@@ -256,19 +256,7 @@ def browser(c):
 
     from refrncr.web import create_flask_app
 
-    client = create_flask_app(
-        c.s.users,
-        c.s.authentication,
-        c.s.sessions,
-        c.s.teams,
-        c.s.memberships,
-        authorization=c.s.authorization,
-        datasets=c.s.datasets,
-        dataset_fields=c.s.dataset_fields,
-        dataset_business_keys=c.s.dataset_business_keys,
-        dataset_records=c.s.dataset_records,
-        dataset_versions=c.s.dataset_versions,
-    ).test_client()
+    client = create_flask_app(c.s).test_client()
     login(client, password="valid password")
     return client
 

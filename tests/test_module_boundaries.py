@@ -119,6 +119,19 @@ def test_layers_above_persistence_do_not_hide_dependencies_in_functions():
     assert violations == [], "Function-local imports hide dependencies:\n" + "\n".join(violations)
 
 
+def test_services_do_not_hold_a_private_composition_backdoor():
+    violations = []
+    for path in SOURCE_ROOT.rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == "_community_services":
+                violations.append(f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno}")
+            elif isinstance(node, ast.Constant) and node.value == "_community_services":
+                violations.append(f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno}")
+
+    assert violations == [], "Private composition backdoor found:\n" + "\n".join(violations)
+
+
 def test_split_domain_packages_do_not_raise_general_error_categories():
     violations = []
     for package in DOMAIN_PACKAGES_WITH_TYPED_ERRORS:

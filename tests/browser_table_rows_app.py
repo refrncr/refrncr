@@ -1,5 +1,7 @@
 """Disposable in-memory app for the optional REF-144 browser regression script."""
 
+from dataclasses import replace
+
 from dataset_helpers import create_mapping_dataset, create_owned_dataset, publish_dataset
 from support import _dataset_browser as dataset_browser
 from support import create_dataset, create_field
@@ -97,18 +99,7 @@ for index in range(1, 5):
         "correct horse battery staple",
     )
 app = create_flask_app(
-    s.users,
-    s.authentication,
-    s.sessions,
-    s.teams,
-    s.memberships,
-    authorization=s.authorization,
-    api_keys=ApiKeyService(s.users.uow, pepper=b"disposable-browser-fixture-pepper"),
-    datasets=s.datasets,
-    dataset_fields=s.dataset_fields,
-    dataset_business_keys=s.dataset_business_keys,
-    dataset_records=s.dataset_records,
-    record_imports=s.record_imports,
+    replace(s, api_keys=ApiKeyService(s.users.uow, pepper=b"disposable-browser-fixture-pepper")),
     allow_loopback_http=True,
 )
 app.jinja_env.auto_reload = True

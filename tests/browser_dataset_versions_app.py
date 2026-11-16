@@ -58,18 +58,7 @@ s.datasets.grant_export_access(admin.id, history.key, "user", exporter.id)
 future, _ = source("future-only", "Private future")
 publish(future, now.date() + timedelta(days=1), "Private Scheduled release")
 app = create_flask_app(
-    s.users,
-    s.authentication,
-    s.sessions,
-    s.teams,
-    s.memberships,
-    authorization=s.authorization,
-    datasets=s.datasets,
-    dataset_fields=s.dataset_fields,
-    dataset_business_keys=s.dataset_business_keys,
-    dataset_records=s.dataset_records,
-    record_imports=s.record_imports,
-    dataset_versions=s.dataset_versions,
+    s,
     allow_loopback_http=True,
 )
 app.jinja_env.auto_reload = True
