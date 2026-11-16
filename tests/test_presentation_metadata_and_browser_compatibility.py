@@ -14,7 +14,7 @@ from support import (
     session_csrf,
 )
 
-from refrncr.models import Dataset
+from refrncr.persistence.models import Dataset
 from refrncr.presentation_metadata import (
     ICON_SPRITES,
     LEGACY_ICON_SPRITE,

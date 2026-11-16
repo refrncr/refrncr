@@ -9,9 +9,9 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Membership, Team, User
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, Membership, Team, User
 from refrncr.services import (
     AuthorizationError,
     ConflictError,

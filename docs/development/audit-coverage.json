@@ -5087,7 +5087,7 @@
     {
       "capability": "Version upgrade",
       "operation": "publication_preflight",
-      "service": "refrncr.versions.version_upgrade.publication_preflight",
+      "service": "refrncr.persistence.version_upgrade.publication_preflight",
       "interface_entrypoints": [
         "refrncr dataset-publication-preflight"
       ],
@@ -5119,7 +5119,7 @@
     {
       "capability": "Version upgrade",
       "operation": "create_initial_versions",
-      "service": "refrncr.versions.version_upgrade.create_initial_versions",
+      "service": "refrncr.persistence.version_upgrade.create_initial_versions",
       "interface_entrypoints": [
         "Alembic 0015_ref_83 within prepare_database"
       ],
@@ -5566,7 +5566,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "concept_preflight",
-      "service": "refrncr.versions.concept_upgrade.concept_preflight",
+      "service": "refrncr.persistence.concept_upgrade.concept_preflight",
       "interface_entrypoints": [
         "refrncr dataset-concept-preflight"
       ],
@@ -5597,7 +5597,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "migrate_concepts",
-      "service": "refrncr.versions.concept_upgrade.migrate_concepts",
+      "service": "refrncr.persistence.concept_upgrade.migrate_concepts",
       "interface_entrypoints": [
         "Trusted programmatic caller"
       ],

@@ -15,9 +15,9 @@ from refrncr.app import create_community_services
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.datasets.record_identity import decode_record_identifier
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetRecord, DatasetRecordValue
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, DatasetRecord, DatasetRecordValue
 from refrncr.services import (
     NotFoundError,
     RecordConflictError,

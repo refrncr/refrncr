@@ -11,7 +11,7 @@ from support import NOW, audits, publish, request, setup, snapshot
 from support import dataset_version_client as client
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.models import DatasetConcept, DatasetVersion
+from refrncr.persistence.models import DatasetConcept, DatasetVersion
 from refrncr.services import ConflictError, NotFoundError
 
 

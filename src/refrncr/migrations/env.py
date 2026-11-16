@@ -1,8 +1,8 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from refrncr import models  # noqa: F401
 from refrncr.db.base import Base
+from refrncr.persistence import models  # noqa: F401
 
 config = context.config
 target_metadata = Base.metadata

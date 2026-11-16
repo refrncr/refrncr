@@ -4,8 +4,8 @@ from alembic import command
 from sqlalchemy import inspect, select, text
 from support import config_for
 
-from refrncr.models import DatasetVisit
 from refrncr.overview import OverviewService
+from refrncr.persistence.models import DatasetVisit
 
 
 def test_visits_upgrade_and_cascades(database_context):

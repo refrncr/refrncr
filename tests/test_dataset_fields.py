@@ -11,15 +11,15 @@ from sqlalchemy.engine import make_url
 from refrncr.app import create_community_services
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import (
+from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import (
     AuditEvent,
     Dataset,
     DatasetField,
     Grant,
     ImmutableDatasetFieldKeyError,
 )
-from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import (
     ConflictError,
     NotFoundError,

@@ -17,8 +17,8 @@ from sqlalchemy.engine import URL, make_url
 from refrncr import cli
 from refrncr.app import create_community_services
 from refrncr.cli import prepare_database
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, DatasetConcept
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, DatasetConcept
 from refrncr.services import NotFoundError, ResourceTypeRegistry
 
 

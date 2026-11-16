@@ -11,7 +11,6 @@ import pytest
 from sqlalchemy import select
 from support import MutableClock
 
-from refrncr.api_key_persistence import SqlAlchemyApiKeyOperations
 from refrncr.audit import AuditContractError, validate_event
 from refrncr.audit_presentation import present_event
 from refrncr.identity.api_keys import (
@@ -20,8 +19,9 @@ from refrncr.identity.api_keys import (
     ApiKeyAuthenticationError,
     ApiKeyService,
 )
-from refrncr.models import ApiKey, AuditEvent
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.api_keys import SqlAlchemyApiKeyOperations
+from refrncr.persistence.models import ApiKey, AuditEvent
 from refrncr.services import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.web import SESSION_COOKIE, create_flask_app
 

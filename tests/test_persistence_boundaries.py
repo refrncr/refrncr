@@ -5,9 +5,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Grant, Membership, Team, User
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, Grant, Membership, Team, User
 from refrncr.services import (
     GrantService,
     MembershipService,

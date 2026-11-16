@@ -11,8 +11,14 @@ from sqlalchemy.exc import IntegrityError
 from support import governance_state as state
 from support import html_elements
 
-from refrncr.models import AuditEvent, Dataset, DatasetExportAccess, DatasetRecord, Grant
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
+from refrncr.persistence.models import (
+    AuditEvent,
+    Dataset,
+    DatasetExportAccess,
+    DatasetRecord,
+    Grant,
+)
 from refrncr.services import (
     AuthorizationError,
     ConflictError,

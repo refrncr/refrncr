@@ -9,7 +9,7 @@ from support import MutableClock
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.db.base import Base
 from refrncr.db.types import UTCDateTime
-from refrncr.models import AuditEvent, User
+from refrncr.persistence.models import AuditEvent, User
 
 
 def test_every_orm_datetime_column_uses_utc_datetime_type():

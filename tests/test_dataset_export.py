@@ -27,9 +27,9 @@ from refrncr.datasets.export import (
     verify_artifact_readable,
 )
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, Dataset
 from refrncr.persistence import SqlAlchemyDatasetRecordOperations
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, Dataset
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.services import DatasetRecordService, NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app

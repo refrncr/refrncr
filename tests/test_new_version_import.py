@@ -5,7 +5,7 @@ from sqlalchemy import select
 from support import content, dataset_version_client, publish, request, setup, snapshot
 
 from refrncr.imports import ImportValidationError
-from refrncr.models import AuditEvent, DatasetConcept, DatasetRecord
+from refrncr.persistence.models import AuditEvent, DatasetConcept, DatasetRecord
 from refrncr.services import ConflictError, NotFoundError
 
 

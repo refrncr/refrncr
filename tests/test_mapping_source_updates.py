@@ -8,7 +8,7 @@ from support import NOW, snapshot
 from test_mapping_source_versions import create_mapping, prepare, publish_table
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.models import AuditEvent
+from refrncr.persistence.models import AuditEvent
 from refrncr.services import ConflictError, NotFoundError, ValidationError
 
 

@@ -10,7 +10,12 @@ from sqlalchemy.exc import IntegrityError
 from support import migrate
 
 from refrncr.db.base import Base
-from refrncr.models import AuditEvent, DatasetField, DatasetFieldSourceFormat, DatasetRecord
+from refrncr.persistence.models import (
+    AuditEvent,
+    DatasetField,
+    DatasetFieldSourceFormat,
+    DatasetRecord,
+)
 from refrncr.services import NotFoundError, ValidationError
 
 
@@ -187,7 +192,7 @@ def test_additive_migration_preserves_business_rows_and_downgrade(database_audit
 def test_new_concept_preserves_proposal_for_same_field_identity(database_audit_db):
     from datetime import UTC, datetime
 
-    from refrncr.models import Dataset
+    from refrncr.persistence.models import Dataset
 
     engine, factory, s, a, d = setup(database_audit_db)
     state = stage(s, a, d, "first", "A", "1.234,56", "v1-eu")

@@ -26,7 +26,7 @@ HTTPS = "https://localhost"
 
 @pytest.mark.parametrize("baseline_index", [0, 1])
 def test_history_places_concept_before_scheduled_and_current_versions(context, baseline_index):
-    from refrncr.models import DatasetConcept
+    from refrncr.persistence.models import DatasetConcept
 
     c = context
     configured(c)
@@ -464,8 +464,8 @@ def test_cross_dataset_and_unknown_version_are_non_disclosing(context):
 def test_database_read_failure_is_bounded_and_has_no_success_event(context, monkeypatch, operation):
     from sqlalchemy.exc import OperationalError
 
+    from refrncr.persistence.versions import SqlAlchemyVersionOperations
     from refrncr.ports import PersistenceConflictError
-    from refrncr.version_persistence import SqlAlchemyVersionOperations
 
     c = context
     configured(c)

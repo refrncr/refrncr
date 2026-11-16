@@ -12,7 +12,7 @@ from support import NOW, MutableClock, audits, content, publish, revision, snaps
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.hierarchies import hierarchy_snapshot
-from refrncr.models import DatasetRecord, DatasetVersionRecord
+from refrncr.persistence.models import DatasetRecord, DatasetVersionRecord
 from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.versions import DatasetVersionService
 from refrncr.versions.version_contracts import SummaryCounts

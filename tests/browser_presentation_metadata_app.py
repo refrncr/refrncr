@@ -5,7 +5,7 @@ import logging
 from browser_table_rows_app import _factory, admin, app, create_dataset, create_field, s
 from dataset_helpers import publish_dataset
 
-from refrncr.models import Dataset
+from refrncr.persistence.models import Dataset
 
 for width in (320, 768, 1440):
     dataset = create_dataset(s, admin, f"ref165-{width}", f"Review {width}")

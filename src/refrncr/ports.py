@@ -106,6 +106,39 @@ class UserRecord(Protocol):
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class LoginSessionRecord:
+    id: str
+    user_id: str
+    token_hash: str
+    csrf_token: str
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None = None
+
+
+class LoginSessionStore(Protocol):
+    def create(
+        self,
+        *,
+        user_id: str,
+        token_hash: str,
+        csrf_token: str,
+        created_at: datetime,
+        expires_at: datetime,
+    ) -> LoginSessionRecord: ...
+
+    def resolve(
+        self, token_hash: str, now: datetime
+    ) -> tuple[UserRecord, LoginSessionRecord] | None: ...
+
+    def revoke(self, token_hash: str, revoked_at: datetime) -> None: ...
+
+    def cleanup(
+        self, cutoff: datetime, cursor: str | None, batch_size: int
+    ) -> tuple[int, str | None]: ...
+
+
 class TeamRecord(Protocol):
     id: str
     name: str

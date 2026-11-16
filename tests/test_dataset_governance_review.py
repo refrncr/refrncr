@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from support import governance_state as state
 
 from refrncr import cli
-from refrncr.models import Dataset, DatasetExportAccess
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
+from refrncr.persistence.models import Dataset, DatasetExportAccess
 from refrncr.services import AuthorizationError, NotFoundError
 
 
@@ -322,7 +322,7 @@ def test_export_team_deletion_cascades_without_removing_other_access(governance)
 def test_concurrent_revoke_has_one_audit_and_safe_missing_result(database_governance):
     from threading import Barrier
 
-    from refrncr.models import AuditEvent
+    from refrncr.persistence.models import AuditEvent
 
     _, factory, s, a, u, _, _, d = database_governance
     access = s.datasets.grant_export_access(a.id, d.key, "user", u.id)

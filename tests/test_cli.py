@@ -15,8 +15,8 @@ from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.engine import URL, make_url
 
 from refrncr import cli
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import Organisation, User
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import LoginSession, Organisation, User
 
 
 def parse_start(*arguments):
@@ -206,7 +206,7 @@ def test_recover_admin_changes_password_revokes_sessions_and_hides_secret(
         assert services.authentication.authenticate("admin@example.com", new_password) is not None
         assert services.sessions.resolve(token) is None
         with create_session_factory(engine)() as session:
-            assert session.get(type(login), login.id).revoked_at is not None
+            assert session.get(LoginSession, login.id).revoked_at is not None
     finally:
         engine.dispose()
 

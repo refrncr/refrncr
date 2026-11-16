@@ -10,7 +10,7 @@ from support import html_elements
 
 from refrncr.imports import ImportValidationError, TransientImportStore, parse_source
 from refrncr.imports import service as record_import_module
-from refrncr.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
+from refrncr.persistence.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
 from refrncr.services import NotFoundError
 
 

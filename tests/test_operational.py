@@ -14,8 +14,6 @@ from sqlalchemy.engine import make_url
 
 from refrncr import cli
 from refrncr.app import create_application
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent
 from refrncr.operational import (
     LOGGER_NAME,
     InteractiveTerminalHandler,
@@ -24,6 +22,8 @@ from refrncr.operational import (
     configure_operational_logging,
     resolve_log_level,
 )
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent
 from refrncr.services import ResourceTypeRegistry
 
 

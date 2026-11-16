@@ -23,7 +23,7 @@ from refrncr.api.contracts import (
 )
 from refrncr.api.http import SAFE_HEADERS
 from refrncr.api.routes import create_api
-from refrncr.models import AuditEvent
+from refrncr.persistence.models import AuditEvent
 
 DATA_PATHS = {
     "/api/v1/datasets": Collection[Dataset],

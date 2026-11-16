@@ -320,7 +320,7 @@ def test_search_filters_and_keyset_pages(context, size):
 
 def test_bounded_query_count_and_no_object_graph(database_context, monkeypatch):
     from refrncr.persistence import SqlAlchemyDatasetRecordOperations
-    from refrncr.version_persistence import SqlAlchemyVersionOperations
+    from refrncr.persistence.versions import SqlAlchemyVersionOperations
 
     c = database_context
     prepared(c)
@@ -486,7 +486,7 @@ def test_search_old_and_new_identifier_and_input_bounds(context):
 def test_corrupt_snapshot_fails_closed(context, corruption):
     from sqlalchemy import update
 
-    from refrncr.models import DatasetVersion, DatasetVersionRecord, DatasetVersionValue
+    from refrncr.persistence.models import DatasetVersion, DatasetVersionRecord, DatasetVersionValue
 
     c = context
     version = prepared(c)
@@ -656,7 +656,7 @@ def test_scheduled_activation_blocks_review_publication(database_context):
 def test_corrupt_concept_open_fails_closed(context, kind):
     from sqlalchemy import update
 
-    from refrncr.models import DatasetRecord, DatasetRecordValue
+    from refrncr.persistence.models import DatasetRecord, DatasetRecordValue
 
     c = context
     prepared(c)
@@ -672,7 +672,7 @@ def test_corrupt_concept_open_fails_closed(context, kind):
 
 
 def test_calendar_change_during_open_rolls_back(database_context, monkeypatch):
-    from refrncr.diff_persistence import SqlAlchemyDiffOperations
+    from refrncr.persistence.diff_operations import SqlAlchemyDiffOperations
 
     c = database_context
     prepared(c)

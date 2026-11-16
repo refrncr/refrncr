@@ -3,14 +3,14 @@
 from collections import defaultdict
 from dataclasses import asdict
 
-from sqlalchemy import Numeric, cast, func, select, update
+from sqlalchemy import MetaData, Numeric, Table, cast, func, select, update
 from sqlalchemy.orm import aliased, undefer
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.hierarchies.contracts import HierarchyNode
-from refrncr.hierarchy_persistence import hierarchy_value
-from refrncr.models import (
+from refrncr.persistence.hierarchies import hierarchy_value
+from refrncr.persistence.models import (
     Dataset,
     DatasetVersion,
     DatasetVersionField,
@@ -353,8 +353,6 @@ class SqlAlchemyVersionOperations:
             **asdict(summary),
         )
         if self.legacy_metadata:
-            from sqlalchemy import MetaData, Table
-
             table = Table("dataset_versions", MetaData(), autoload_with=self.session.connection())
             self.session.execute(
                 table.insert().values(
@@ -365,8 +363,6 @@ class SqlAlchemyVersionOperations:
             self.session.add(row)
         self.session.flush()
         if self.legacy_metadata:
-            from sqlalchemy import MetaData, Table
-
             legacy_fields = Table(
                 "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
             )
@@ -453,8 +449,6 @@ class SqlAlchemyVersionOperations:
 
     def fields(self, version):
         if self.legacy_metadata:
-            from sqlalchemy import MetaData, Table
-
             table = Table(
                 "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
             )
@@ -477,8 +471,6 @@ class SqlAlchemyVersionOperations:
         version_ids = tuple(version.id for version in versions)
         dataset_ids = {version.id: version.dataset_id for version in versions}
         if self.legacy_metadata:
-            from sqlalchemy import MetaData, Table
-
             table = Table(
                 "dataset_version_fields", MetaData(), autoload_with=self.session.connection()
             )

@@ -16,8 +16,8 @@ from refrncr.datasets import export as dataset_export
 from refrncr.datasets.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.datasets.export import ExportGenerationError, generate_export
 from refrncr.db.base import Base
-from refrncr.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
 from refrncr.services import RecordConflictError, StaleRecordError, ValidationError
 
 

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.hierarchies.contracts import HierarchyNode, hierarchy_node_paths
-from refrncr.models import (
+from refrncr.persistence.models import (
     DatasetHierarchyNode,
     DatasetHierarchyValue,
     DatasetRecord,

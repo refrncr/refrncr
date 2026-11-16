@@ -5,9 +5,9 @@ from argon2.exceptions import VerifyMismatchError
 from argon2.low_level import Type
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity import argon2_benchmark
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.services import PASSWORD_HASHER, UserService
 
 

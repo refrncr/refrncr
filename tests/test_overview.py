@@ -9,8 +9,8 @@ from test_mapping_source_updates import fixture as mapping_fixture
 from test_mapping_source_updates import next_source, rows, update
 from test_mapping_source_versions import prepare, publish_table
 
-from refrncr.models import Dataset, DatasetConcept, DatasetVisit
 from refrncr.overview import OverviewService
+from refrncr.persistence.models import Dataset, DatasetConcept, DatasetVisit
 from refrncr.services import AuthorizationError
 
 
@@ -286,7 +286,7 @@ def test_parallel_visits_keep_one_row_and_atomic_cap(database_context):
 
 
 def test_visit_write_rolls_back_and_does_not_replace_page(dataset_browser, monkeypatch):
-    from refrncr.overview_persistence import SqlAlchemyOverviewOperations
+    from refrncr.persistence.overview import SqlAlchemyOverviewOperations
     from refrncr.ports import PersistenceConflictError
 
     sessions, services, admin, client = dataset_browser

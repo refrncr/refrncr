@@ -17,9 +17,9 @@ from support import NOW, publish
 from refrncr.api.contracts import PageQuery, Record
 from refrncr.api.routes import create_api
 from refrncr.datasets.record_search import RecordQueryLogFilter
-from refrncr.models import AuditEvent
 from refrncr.operational import LOGGER_NAME, OperationalJSONFormatter
-from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.persistence.models import AuditEvent
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
 from refrncr.versions.published_contracts import decode_identifier, encode_identifier
 
 

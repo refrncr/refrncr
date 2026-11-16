@@ -1,8 +1,21 @@
 """Active concept storage and bounded, identity-preserving snapshot initialization."""
 
-from sqlalchemy import Date, Numeric, case, cast, delete, insert, literal, select, update
+from sqlalchemy import (
+    Date,
+    MetaData,
+    Numeric,
+    Table,
+    case,
+    cast,
+    delete,
+    insert,
+    literal,
+    select,
+    update,
+)
+from sqlalchemy.orm import aliased
 
-from refrncr.models import (
+from refrncr.persistence.models import (
     DatasetBusinessKeyField,
     DatasetConcept,
     DatasetField,
@@ -47,8 +60,6 @@ class SqlAlchemyConceptOperations:
     def create(self, dataset_id, base_version_id, creator_id, now, revision):
         if self._legacy_schema:
             # REF-84 runs before REF-160 adds Concept import metadata.
-            from sqlalchemy import MetaData, Table
-
             table = Table("dataset_concepts", MetaData(), autoload_with=self.session.connection())
             self.session.execute(
                 table.insert().values(
@@ -83,8 +94,6 @@ class SqlAlchemyConceptOperations:
         )
 
     def record_mutation(self, dataset_id, *, import_result=None, source_update_notes=None):
-        from sqlalchemy import case
-
         changes = {
             "records_mutated": case((DatasetConcept.records_mutated.is_(None), None), else_=True)
         }
@@ -156,8 +165,6 @@ class SqlAlchemyConceptOperations:
         field = DatasetVersionField
         mapping_columns, mapping_values = [], []
         if getattr(dataset, "kind", "reference") == "mapping":
-            from sqlalchemy.orm import aliased
-
             source_field = aliased(DatasetVersionField)
             mapping_columns = ["mapping_role", "source_field_key", "source_field_id"]
             mapping_values = [

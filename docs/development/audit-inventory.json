@@ -1674,7 +1674,7 @@
     {
       "symbol": "refrncr dataset-publication-preflight",
       "operations": [
-        "refrncr.versions.version_upgrade.publication_preflight",
+        "refrncr.persistence.version_upgrade.publication_preflight",
         "refrncr.cli.prepare_database"
       ],
       "arguments": [
@@ -1686,7 +1686,7 @@
     {
       "symbol": "refrncr dataset-concept-preflight",
       "operations": [
-        "refrncr.versions.concept_upgrade.concept_preflight",
+        "refrncr.persistence.concept_upgrade.concept_preflight",
         "refrncr.cli.prepare_database"
       ],
       "arguments": [
@@ -1747,10 +1747,10 @@
     "refrncr.web.overview.index",
     "refrncr.web.require_cookie_settings",
     "refrncr.web.require_csrf",
-    "refrncr.versions.version_upgrade.publication_preflight",
-    "refrncr.versions.version_upgrade.create_initial_versions",
-    "refrncr.versions.concept_upgrade.concept_preflight",
-    "refrncr.versions.concept_upgrade.migrate_concepts"
+    "refrncr.persistence.version_upgrade.publication_preflight",
+    "refrncr.persistence.version_upgrade.create_initial_versions",
+    "refrncr.persistence.concept_upgrade.concept_preflight",
+    "refrncr.persistence.concept_upgrade.migrate_concepts"
   ],
   "cli_parser_commands": [
     "start",

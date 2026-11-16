@@ -8,9 +8,9 @@ from refrncr.cli import (
     create_initial_admin,
     prepare_database,
 )
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.operational import database_is_ready, expected_database_revision
+from refrncr.persistence.database import create_database_engine, create_session_factory
 
 from .administrators import recover_administrator_password
 

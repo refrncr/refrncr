@@ -26,7 +26,7 @@ from refrncr.audit_presentation import (
     ObjectPresentation,
     require_complete_presentation,
 )
-from refrncr.models import User
+from refrncr.persistence.models import User
 from refrncr.ports import AuditFilters, AuditReadUnavailable
 from refrncr.services import AuthorizationError, ValidationError
 from refrncr.web import SESSION_COOKIE

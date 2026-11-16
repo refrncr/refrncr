@@ -14,11 +14,11 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from support import NOW, MutableClock, audits, content, publish, revision, setup, snapshot, versions
 
-from refrncr.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.version_persistence import SqlAlchemyVersionOperations
 from refrncr.versions import DatasetVersionService
 from refrncr.versions.version_contracts import version_states
 
@@ -274,7 +274,7 @@ def test_datatypes_and_null_snapshot(context, data_type, raw, canonical):
 def test_invalid_publication_is_atomic(database_context, invalid):
     from sqlalchemy import delete, update
 
-    from refrncr.models import DatasetBusinessKeyField, DatasetRecordValue
+    from refrncr.persistence.models import DatasetBusinessKeyField, DatasetRecordValue
 
     c = database_context
     c.service = DatasetVersionService(
@@ -491,7 +491,7 @@ def test_version_database_constraints(database_context):
     from sqlalchemy import insert
     from sqlalchemy.exc import IntegrityError
 
-    from refrncr.models import DatasetVersionRecord
+    from refrncr.persistence.models import DatasetVersionRecord
 
     c = database_context
     setup(c)

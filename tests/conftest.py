@@ -22,9 +22,9 @@ from werkzeug.datastructures import MultiDict
 from refrncr.app import create_application, create_community_services
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity.api_keys import ApiKeyService
-from refrncr.models import Dataset, DatasetRecord, User
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import Dataset, DatasetRecord, User
 from refrncr.services import ResourceTypeRegistry
 from refrncr.web import create_flask_app
 

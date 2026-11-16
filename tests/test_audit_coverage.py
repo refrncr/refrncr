@@ -14,8 +14,8 @@ from support import audits, snapshot
 
 import refrncr.app as application_module
 from refrncr.audit import OPERATIONS, validate_event
-from refrncr.models import AuditEvent, User
 from refrncr.persistence import SqlAlchemyDatasetRecordOperations, SqlAlchemyUnitOfWork
+from refrncr.persistence.models import AuditEvent, User
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (
     ConflictError,
@@ -796,7 +796,7 @@ def test_composite_events_and_team_cascade_contract(database_context):
         ("team", c.owner.id, "deleted"),
         ("grant", grant.id, "deleted"),
     }
-    from refrncr.models import DatasetExportAccess, Membership
+    from refrncr.persistence.models import DatasetExportAccess, Membership
 
     with c.sessions() as session:
         assert session.get(Membership, membership.id) is None
