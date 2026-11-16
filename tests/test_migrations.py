@@ -28,9 +28,6 @@ from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
     ConflictError,
-    DatasetAuthorizationService,
-    DatasetResourceResolver,
-    DatasetService,
     GrantService,
     MembershipService,
     ResourceTypeRegistry,
@@ -1034,18 +1031,15 @@ def test_empty_postgresql_database_upgrades():
                 connection.scalar(text("SELECT version_num FROM alembic_version")) == "0036_ref_349"
             )
         factory = create_session_factory(application_engine)
-        uow = SqlAlchemyUnitOfWorkFactory(factory)
-        users = UserService(uow)
-        teams = TeamService(uow)
-        memberships = MembershipService(uow)
         resources = ResourceTypeRegistry()
         resources.register("test-resource", lambda resource_id: resource_id == "resource-1")
-        resources.register("dataset", DatasetResourceResolver(uow))
-        grants = GrantService(uow, resources)
-        authorization = AuthorizationService(
-            SqlAlchemyPermissionDataSource(factory), resources, DatasetAuthorizationService(uow)
-        )
-        datasets = DatasetService(uow, authorization)
+        services = create_community_services(factory, resources)
+        users = services.users
+        teams = services.teams
+        memberships = services.memberships
+        grants = services.grants
+        authorization = services.authorization
+        datasets = services.datasets
         users.bootstrap_organisation()
         admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
         dataset = create_owned_dataset(

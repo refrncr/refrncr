@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -76,15 +77,31 @@ class OutcomeAuthentication:
 
 def make_app(authentication, limiter=None, admission=None, sessions=None):
     sessions = sessions or DummySessions()
+    services = SimpleNamespace(
+        users=object(),
+        authentication=authentication,
+        sessions=sessions,
+        teams=object(),
+        memberships=object(),
+        authorization=None,
+        datasets=None,
+        dataset_fields=None,
+        dataset_business_keys=None,
+        dataset_records=None,
+        record_imports=None,
+        hierarchy_imports=None,
+        audit_history=object(),
+        dataset_versions=None,
+        hierarchy=None,
+        overview=None,
+        dataset_diff=None,
+        installation_settings=None,
+        api_keys=None,
+    )
     app = create_flask_app(
-        object(),
-        authentication,
-        sessions,
-        object(),
-        object(),
+        services,
         login_limiter=limiter,
         authentication_admission=admission,
-        audit_history=object(),  # This fixture exercises only login admission.
     )
     app.testing = True
     return app, sessions

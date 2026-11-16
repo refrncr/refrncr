@@ -407,18 +407,7 @@ def browser_setup():
     use_admin_export_policy(services)
     services.users.bootstrap_organisation()
     admin = services.users.create_initial_admin("admin@example.com", "Admin", PASSWORD)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-    )
+    app = create_flask_app(services)
     client = app.test_client()
     token, _session = services.sessions.create(admin)
     client.set_cookie(SESSION_COOKIE, token, domain="localhost", secure=True)

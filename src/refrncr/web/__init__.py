@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hmac
 import secrets
+from typing import TYPE_CHECKING
 
 from flask import (
     Flask,
@@ -29,37 +30,16 @@ from flask import (
 )
 
 from refrncr.audit import record_security_event
-from refrncr.audit_history import AuditHistoryService
-from refrncr.authorization import InstallationSettingsService
 from refrncr.browser_security import (
     HTTPS_ANONYMOUS_CSRF_COOKIE,
     HTTPS_SESSION_COOKIE,
     BrowserCookiePolicy,
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.dataset_versions import DatasetVersionService
-from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.hierarchy import HierarchyService
-from refrncr.hierarchy_import import HierarchyImportService
-from refrncr.identity.api_keys import ApiKeyService
 from refrncr.identity.login_security import (
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,
     SourceIdentityResolver,
-)
-from refrncr.overview import OverviewService
-from refrncr.record_import import DatasetRecordImportService
-from refrncr.services import (
-    AuthenticationService,
-    AuthorizationService,
-    DatasetBusinessKeyService,
-    DatasetFieldService,
-    DatasetRecordService,
-    DatasetService,
-    MembershipService,
-    SessionService,
-    TeamService,
-    UserService,
 )
 from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.auth import register_auth_blueprint
@@ -94,113 +74,16 @@ from refrncr.web.users import register_users_blueprint
 from refrncr.web.versions import register_versions_blueprint
 from refrncr.xml_security import require_xml_protection
 
+if TYPE_CHECKING:
+    from refrncr.app import CommunityServices
+
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
 GENERIC_LOGIN_FAILURE = "Invalid credentials"
 MAX_BROWSER_FORM_CONTENT_LENGTH = 16 * 1024
 
 
-def create_flask_app(
-    users: UserService,
-    authentication: AuthenticationService,
-    sessions: SessionService,
-    teams: TeamService,
-    memberships: MembershipService,
-    *,
-    authorization: AuthorizationService | None = None,
-    datasets: DatasetService | None = None,
-    dataset_fields: DatasetFieldService | None = None,
-    dataset_business_keys: DatasetBusinessKeyService | None = None,
-    dataset_records: DatasetRecordService | None = None,
-    record_imports: DatasetRecordImportService | None = None,
-    hierarchy_imports: HierarchyImportService | None = None,
-    allow_loopback_http: bool = False,
-    login_limiter: LoginAttemptLimiter | None = None,
-    source_resolver: SourceIdentityResolver | None = None,
-    authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
-    audit_history: AuditHistoryService | None = None,
-    dataset_versions: DatasetVersionService | None = None,
-    review_signing_key: bytes | None = None,
-    api_keys: ApiKeyService | None = None,
-    clock: Clock | None = None,
-) -> Flask:
-    require_xml_protection()
-    app = Flask(__name__, static_folder="../static", template_folder="../templates")
-    clock = clock or getattr(
-        api_keys, "clock", getattr(getattr(users, "uow", None), "clock", SYSTEM_CLOCK)
-    )
-    security_uow = getattr(users, "uow", None)
-
-    def audit_security(action, *, actor_user_id=None):
-        # Small interface/unit doubles used by tests may not compose persistence.
-        # Production Community UserService always supplies the shared UoW factory.
-        if security_uow is not None:
-            record_security_event(security_uow, action, actor_user_id=actor_user_id)
-
-    review_secret = (
-        review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
-    )
-    audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
-
-    register_template_filters(app)
-
-    app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
-
-    register_request_limit_hook(app)
-
-    login_limiter = login_limiter or LoginAttemptLimiter(clock=clock)
-    source_resolver = source_resolver or SourceIdentityResolver()
-    authentication_admission = authentication_admission or BrowserAuthenticationAdmissionGuard()
-    existing_dataset_dependencies = (
-        authorization,
-        datasets,
-        dataset_fields,
-        dataset_business_keys,
-    )
-    hierarchy = None
-    if any(dependency is not None for dependency in existing_dataset_dependencies) and not all(
-        dependency is not None for dependency in existing_dataset_dependencies
-    ):
-        raise ValueError("Dataset browser dependencies must be supplied together")
-    if all(dependency is not None for dependency in existing_dataset_dependencies):
-        dataset_records = dataset_records or DatasetRecordService(datasets.uow, authorization)
-        record_imports = record_imports or DatasetRecordImportService(dataset_records)
-        dataset_versions = (
-            dataset_versions
-            or datasets.versions
-            or DatasetVersionService(datasets.uow, authorization.datasets)
-        )
-        hierarchy = HierarchyService(datasets.uow, authorization, versions=dataset_versions)
-    elif dataset_records is not None:
-        raise ValueError("Dataset browser dependencies must be supplied together")
-    dataset_ui_enabled = dataset_records is not None
-    overview_service = (
-        OverviewService(datasets.uow, authorization.datasets) if dataset_ui_enabled else None
-    )
-    dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
-    installation_settings = (
-        InstallationSettingsService(users.uow, authorization.datasets) if authorization else None
-    )
-    cookie_policy = BrowserCookiePolicy(
-        session_max_age=int(sessions.lifetime.total_seconds()),
-        allow_loopback_http=allow_loopback_http,
-    )
-
-    def cookie_settings():
-        return cookie_policy.for_request(
-            scheme=request.scheme,
-            host=request.host,
-            remote_address=request.remote_addr,
-        )
-
-    def require_cookie_settings():
-        settings = cookie_settings()
-        if settings is None:
-            abort(403, description="Authenticated browser access requires HTTPS")
-        return settings
-
-    register_response_hooks(app)
-
+def _authenticated_resolver(sessions, cookie_settings, audit_security):
     authentication_cache_missing = object()
 
     def authenticated():
@@ -222,39 +105,10 @@ def create_flask_app(
         g.authenticated_resolution = resolved
         return resolved
 
-    register_security_hooks(
-        app,
-        authenticated=authenticated,
-        cookie_settings=cookie_settings,
-        require_csrf=lambda token: require_csrf(token),
-        require_capability=lambda capability: require_capability(capability),
-        authorization=authorization,
-        datasets=datasets,
-    )
+    return authenticated
 
-    register_concept_hooks(
-        app,
-        dataset_ui_enabled=dataset_ui_enabled,
-        require_authenticated=lambda: require_authenticated(),
-        require_csrf=lambda token: require_csrf(token),
-        datasets=datasets,
-        dataset_versions=dataset_versions,
-        render_authenticated_template=lambda template, **context: render_authenticated_template(
-            template, **context
-        ),
-        authenticated=authenticated,
-    )
 
-    def render_authenticated_template(template_name: str, **context):
-        resolved = authenticated()
-        actor = resolved[0] if resolved else None
-        csrf = resolved[1].csrf_token if resolved else None
-        context.setdefault("current_actor", actor)
-        context.setdefault("current_csrf", csrf)
-        context.setdefault("active_navigation", active_navigation())
-        context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
-        return render_template(template_name, **context)
-
+def _mapping_renderer(authenticated, datasets, render_authenticated_template):
     def render_mapping_template(template_name, **context):
         resolved = authenticated()
         actor = resolved[0] if resolved else None
@@ -299,6 +153,147 @@ def create_flask_app(
             if history:
                 context["mapping_history_sources"] = context["mapping_source"]["history"]
         return render_authenticated_template(template_name, **context)
+
+    return render_mapping_template
+
+
+def create_flask_app(
+    services: CommunityServices,
+    *,
+    allow_loopback_http: bool = False,
+    login_limiter: LoginAttemptLimiter | None = None,
+    source_resolver: SourceIdentityResolver | None = None,
+    authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
+    review_signing_key: bytes | None = None,
+    clock: Clock | None = None,
+) -> Flask:
+    """Build the Flask adapter from services supplied by the composition root."""
+    return _configure_flask_app(
+        services,
+        allow_loopback_http=allow_loopback_http,
+        login_limiter=login_limiter,
+        source_resolver=source_resolver,
+        authentication_admission=authentication_admission,
+        review_signing_key=review_signing_key,
+        clock=clock,
+    )
+
+
+def _configure_flask_app(
+    services: CommunityServices,
+    *,
+    allow_loopback_http: bool,
+    login_limiter: LoginAttemptLimiter | None,
+    source_resolver: SourceIdentityResolver | None,
+    authentication_admission: BrowserAuthenticationAdmissionGuard | None,
+    review_signing_key: bytes | None,
+    clock: Clock | None,
+) -> Flask:
+    require_xml_protection()
+    app = Flask(__name__, static_folder="../static", template_folder="../templates")
+    users = services.users
+    authentication = services.authentication
+    sessions = services.sessions
+    teams = services.teams
+    memberships = services.memberships
+    authorization = services.authorization
+    datasets = services.datasets
+    dataset_fields = services.dataset_fields
+    dataset_business_keys = services.dataset_business_keys
+    dataset_records = services.dataset_records
+    record_imports = services.record_imports
+    hierarchy_imports = services.hierarchy_imports
+    audit_history = services.audit_history
+    dataset_versions = services.dataset_versions
+    hierarchy = services.hierarchy
+    overview_service = services.overview
+    dataset_diff = services.dataset_diff
+    installation_settings = services.installation_settings
+    api_keys = services.api_keys
+    clock = clock or getattr(
+        services.api_keys,
+        "clock",
+        getattr(getattr(services.users, "uow", None), "clock", SYSTEM_CLOCK),
+    )
+    security_uow = getattr(services.users, "uow", None)
+
+    def audit_security(action, *, actor_user_id=None):
+        # Small interface/unit doubles used by tests may not compose persistence.
+        # Production Community UserService always supplies the shared UoW factory.
+        if security_uow is not None:
+            record_security_event(security_uow, action, actor_user_id=actor_user_id)
+
+    review_secret = (
+        review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
+    )
+    register_template_filters(app)
+
+    app.config["MAX_CONTENT_LENGTH"] = MAX_BROWSER_FORM_CONTENT_LENGTH
+
+    register_request_limit_hook(app)
+
+    login_limiter = login_limiter or LoginAttemptLimiter(clock=clock)
+    source_resolver = source_resolver or SourceIdentityResolver()
+    authentication_admission = authentication_admission or BrowserAuthenticationAdmissionGuard()
+    dataset_ui_enabled = services.dataset_records is not None
+    cookie_policy = BrowserCookiePolicy(
+        session_max_age=int(services.sessions.lifetime.total_seconds()),
+        allow_loopback_http=allow_loopback_http,
+    )
+
+    def cookie_settings():
+        return cookie_policy.for_request(
+            scheme=request.scheme,
+            host=request.host,
+            remote_address=request.remote_addr,
+        )
+
+    def require_cookie_settings():
+        settings = cookie_settings()
+        if settings is None:
+            abort(403, description="Authenticated browser access requires HTTPS")
+        return settings
+
+    register_response_hooks(app)
+
+    authenticated = _authenticated_resolver(sessions, cookie_settings, audit_security)
+
+    register_security_hooks(
+        app,
+        authenticated=authenticated,
+        cookie_settings=cookie_settings,
+        require_csrf=lambda token: require_csrf(token),
+        require_capability=lambda capability: require_capability(capability),
+        authorization=authorization,
+        datasets=datasets,
+    )
+
+    register_concept_hooks(
+        app,
+        dataset_ui_enabled=dataset_ui_enabled,
+        require_authenticated=lambda: require_authenticated(),
+        require_csrf=lambda token: require_csrf(token),
+        datasets=datasets,
+        dataset_versions=dataset_versions,
+        render_authenticated_template=lambda template, **context: render_authenticated_template(
+            template, **context
+        ),
+        authenticated=authenticated,
+    )
+
+    def render_authenticated_template(template_name: str, **context):
+        resolved = authenticated()
+        actor = resolved[0] if resolved else None
+        csrf = resolved[1].csrf_token if resolved else None
+        context.setdefault("current_actor", actor)
+        context.setdefault("current_csrf", csrf)
+        context.setdefault("active_navigation", active_navigation())
+        context.setdefault("dataset_ui_enabled", dataset_ui_enabled)
+        return render_template(template_name, **context)
+
+    render_mapping_template = _mapping_renderer(
+        authenticated, datasets, render_authenticated_template
+    )
 
     register_error_handlers(
         app,

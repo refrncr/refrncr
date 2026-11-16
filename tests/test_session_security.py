@@ -4,6 +4,7 @@ import hashlib
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -52,11 +53,7 @@ def configured_web(*, allow_loopback_http: bool = False):
     services = create_community_services(factory, ResourceTypeRegistry())
     services.users.bootstrap_organisation()
     app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
+        services,
         allow_loopback_http=allow_loopback_http,
     )
     return factory, services, app.test_client()
@@ -171,15 +168,7 @@ def test_trusted_proxy_composition_disables_loopback_http_even_with_rewritten_ho
     _, services, _ = configured_web()
     client = TestClient(
         create_application(
-            services.users,
-            services.authentication,
-            services.sessions,
-            services.teams,
-            services.memberships,
-            authorization=services.authorization,
-            datasets=services.datasets,
-            dataset_fields=services.dataset_fields,
-            dataset_business_keys=services.dataset_business_keys,
+            services,
             allow_loopback_http=True,
             trusted_proxies=("127.0.0.1",),
         ),
@@ -203,15 +192,7 @@ def test_trusted_proxy_composition_accepts_https_with_host_prefixed_cookie():
     _, services, _ = configured_web()
     client = TestClient(
         create_application(
-            services.users,
-            services.authentication,
-            services.sessions,
-            services.teams,
-            services.memberships,
-            authorization=services.authorization,
-            datasets=services.datasets,
-            dataset_fields=services.dataset_fields,
-            dataset_business_keys=services.dataset_business_keys,
+            services,
             allow_loopback_http=True,
             trusted_proxies=("127.0.0.1",),
         ),
@@ -295,13 +276,7 @@ def test_expired_authenticated_cookie_is_rejected_and_cleared_with_injected_cloc
     factory, services, _ = configured_web()
     clock = MutableClock(datetime(2026, 1, 1, tzinfo=UTC))
     sessions = SessionService(factory, clock=clock)
-    client = create_flask_app(
-        services.users,
-        services.authentication,
-        sessions,
-        services.teams,
-        services.memberships,
-    ).test_client()
+    client = create_flask_app(replace(services, sessions=sessions)).test_client()
     base_url = "https://community.example"
     create_admin(client, base_url)
     log_in(client, base_url)

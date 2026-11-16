@@ -4,6 +4,23 @@ from uuid import UUID
 
 from refrncr.errors import ConflictError
 
+# Persistence constraints and Dataset validation share these storage contracts.
+# Keeping them neutral prevents persistence models from loading a domain package
+# while that package is still being initialised.
+DATASET_FIELD_TYPES = (
+    "string",
+    "integer",
+    "number",
+    "float",
+    "boolean",
+    "date",
+    "time",
+    "datetime",
+    "timestamp",
+)
+MAX_RECORD_IDENTIFIER_BYTES = 2000
+FIELD_KEY_PATTERN = r"[a-z0-9][a-z0-9_]{0,99}"
+
 
 def valid_identity(value: str) -> bool:
     """Return whether *value* is the canonical text form of a UUID."""

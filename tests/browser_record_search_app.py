@@ -51,18 +51,7 @@ for suffix in ("320", "768", "1440", "nojs"):
     )
 
 app = create_flask_app(
-    services.users,
-    services.authentication,
-    services.sessions,
-    services.teams,
-    services.memberships,
-    authorization=services.authorization,
-    datasets=services.datasets,
-    dataset_fields=services.dataset_fields,
-    dataset_business_keys=services.dataset_business_keys,
-    dataset_records=services.dataset_records,
-    dataset_versions=services.dataset_versions,
-    record_imports=services.record_imports,
+    services,
     allow_loopback_http=True,
 )
 app.jinja_env.auto_reload = True

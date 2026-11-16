@@ -1,4 +1,6 @@
 from refrncr.datasets.datatypes import get_datatype
+from refrncr.datasets.mapping_updates import mapping_states, source_update_blocker
+from refrncr.version_contracts import version_states
 
 from .deletion import mapping_deletion_error, version_reads
 from .errors import DatasetNotFoundError
@@ -7,8 +9,6 @@ from .errors import DatasetNotFoundError
 class DatasetMappingMixin:
     def mapping_usage(self, actor_id, key, *, details=True):
         """Dataset-wide dependants, with private version details removed before presentation."""
-        from refrncr.version_contracts import version_states
-
         with self.uow() as uow:
             uow.begin_export_snapshot()
             source = uow.datasets.find_by_key(self._validated_lookup_key(key))
@@ -149,8 +149,6 @@ class DatasetMappingMixin:
             visible = self.authorization.has_capability(
                 actor_id, "can_view_dataset", source.id, uow=uow
             )
-            from refrncr.datasets.mapping_updates import source_update_blocker
-
             source_fields = uow.versions.fields(version)
             concept = uow.concepts.get(dataset.id) if maintain else None
             draft_source = (
@@ -171,8 +169,6 @@ class DatasetMappingMixin:
                 )
             draft = None
             if not version_id and concept:
-                from refrncr.datasets.mapping_updates import mapping_states
-
                 fields = uow.dataset_fields.list_for_dataset(dataset.id)
                 states = mapping_states(
                     fields,

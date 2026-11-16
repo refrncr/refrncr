@@ -496,19 +496,7 @@ def test_export_preparation_or_audit_failure_closes_artifact_without_event(
 
 def browser(c):
     s = c.s
-    app = create_flask_app(
-        s.users,
-        s.authentication,
-        s.sessions,
-        s.teams,
-        s.memberships,
-        authorization=s.authorization,
-        datasets=s.datasets,
-        dataset_fields=s.dataset_fields,
-        dataset_business_keys=s.dataset_business_keys,
-        dataset_records=s.dataset_records,
-        record_imports=s.record_imports,
-    )
+    app = create_flask_app(s)
     return app.test_client()
 
 

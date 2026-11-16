@@ -1560,19 +1560,7 @@ def test_browser_import_flow_csrf_visibility_and_escaping(import_context):
     _, services, admin, dataset = import_context
     for key in ("active", "day"):
         services.dataset_fields.delete_field(admin.id, dataset.key, key)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-        dataset_records=services.dataset_records,
-        record_imports=services.record_imports,
-    )
+    app = create_flask_app(services)
     client = app.test_client()
     login = client.get("/login", base_url="https://localhost")
     csrf = login.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]

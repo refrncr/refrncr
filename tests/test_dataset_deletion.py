@@ -432,19 +432,7 @@ def test_snapshot_is_centrally_bounded(value):
 
 def browser(c, actor=None):
     s = c.s
-    app = create_flask_app(
-        s.users,
-        s.authentication,
-        s.sessions,
-        s.teams,
-        s.memberships,
-        authorization=s.authorization,
-        datasets=s.datasets,
-        dataset_fields=s.dataset_fields,
-        dataset_business_keys=s.dataset_business_keys,
-        dataset_records=s.dataset_records,
-        record_imports=s.record_imports,
-    )
+    app = create_flask_app(s)
     client = app.test_client()
     token, login = s.sessions.create(actor or c.a)
     client.set_cookie(SESSION_COOKIE, token, domain="localhost")

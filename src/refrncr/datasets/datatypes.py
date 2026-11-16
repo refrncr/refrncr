@@ -13,6 +13,8 @@ from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from types import MappingProxyType
 
+from refrncr.domain import DATASET_FIELD_TYPES
+
 MAX_INPUT_LENGTH = 4096
 MAX_STRING_BYTES = 1000
 MAX_INTEGER_DIGITS = 1000
@@ -325,7 +327,7 @@ DATATYPES = MappingProxyType(
         )
     }
 )
-DATASET_FIELD_TYPES = tuple(DATATYPES)
+assert tuple(DATATYPES) == DATASET_FIELD_TYPES
 
 
 def get_datatype(type_id: str) -> Datatype:

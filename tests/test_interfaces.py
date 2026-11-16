@@ -2,7 +2,7 @@ import json
 import os
 import re
 import uuid
-from itertools import chain, combinations
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -45,15 +45,46 @@ def configured_services(*, include_dataset_dependencies=False):
             configured.datasets,
             configured.dataset_fields,
             configured.dataset_business_keys,
+            configured,
         )
     return configured_services
 
 
 @pytest.fixture
 def interface():
-    factory, users, authentication, sessions, teams, memberships = configured_services()
-    client = create_flask_app(users, authentication, sessions, teams, memberships).test_client()
+    (
+        factory,
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        _,
+        _,
+        _,
+        _,
+        configured,
+    ) = configured_services(include_dataset_dependencies=True)
+    client = create_flask_app(_without_dataset_ui(configured)).test_client()
     return factory, users, authentication, sessions, teams, memberships, client
+
+
+def _without_dataset_ui(services):
+    return replace(
+        services,
+        authorization=None,
+        datasets=None,
+        dataset_fields=None,
+        dataset_business_keys=None,
+        dataset_records=None,
+        record_imports=None,
+        hierarchy_imports=None,
+        dataset_versions=None,
+        hierarchy=None,
+        overview=None,
+        dataset_diff=None,
+        installation_settings=None,
+    )
 
 
 def request(client, method, path, **kwargs):
@@ -201,26 +232,17 @@ def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        configured,
     ) = configured_services(include_dataset_dependencies=True)
-    app = create_flask_app(
-        users,
-        authentication,
-        sessions,
-        teams,
-        memberships,
-        authorization=authorization,
-        datasets=datasets,
-        dataset_fields=dataset_fields,
-        dataset_business_keys=dataset_business_keys,
-    )
+    app = create_flask_app(configured)
     expected = json.loads((Path(__file__).parent / "fixtures" / "web_routes.json").read_text())
 
     assert _browser_route_contract(app) == expected
 
 
 def test_browser_route_contract_without_dataset_ui_matches_snapshot():
-    factory, users, authentication, sessions, teams, memberships = configured_services()
-    app = create_flask_app(users, authentication, sessions, teams, memberships)
+    *_, configured = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(_without_dataset_ui(configured))
     expected = json.loads(
         (Path(__file__).parent / "fixtures" / "web_routes_without_datasets.json").read_text()
     )
@@ -241,18 +263,9 @@ def test_renamed_views_keep_csrf_and_capability_checks():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        configured,
     ) = configured_services(include_dataset_dependencies=True)
-    app = create_flask_app(
-        users,
-        authentication,
-        sessions,
-        teams,
-        memberships,
-        authorization=authorization,
-        datasets=datasets,
-        dataset_fields=dataset_fields,
-        dataset_business_keys=dataset_business_keys,
-    )
+    app = create_flask_app(configured)
     app.add_url_rule(
         "/renamed-teams/<team_id>",
         endpoint="renamed_team_view",
@@ -460,17 +473,7 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
     owner_team_id = dataset.owner_team_id
     services.memberships.create_membership(admin.id, maintainer.id, owner_team_id)
     services.datasets.grant_export_access(admin.id, dataset.key, "user", exporter.id)
-    app = create_flask_app(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
-    )
+    app = create_flask_app(services)
     expectations = _route_matrix_expectations()
     rules = [
         rule
@@ -579,19 +582,10 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        configured,
     ) = configured_services(include_dataset_dependencies=True)
     client = TestClient(
-        create_application(
-            users,
-            authentication,
-            sessions,
-            teams,
-            memberships,
-            authorization=authorization,
-            datasets=datasets,
-            dataset_fields=dataset_fields,
-            dataset_business_keys=dataset_business_keys,
-        ),
+        create_application(configured),
         base_url="https://testserver",
     )
 
@@ -679,48 +673,6 @@ def test_authenticated_overview_shell_is_permission_aware_and_escapes_actor(inte
     assert 'name="csrf_token"' in page
     assert "<em>Shell member</em>" not in page
     assert "&lt;em&gt;Shell member&lt;/em&gt;" in page
-
-
-@pytest.mark.parametrize(
-    "included",
-    list(
-        chain.from_iterable(
-            combinations(
-                ("authorization", "datasets", "dataset_fields", "dataset_business_keys"), size
-            )
-            for size in range(1, 4)
-        )
-    ),
-)
-def test_low_level_app_rejects_partial_dataset_composition(included):
-    (
-        _,
-        users,
-        authentication,
-        sessions,
-        teams,
-        memberships,
-        authorization,
-        datasets,
-        dataset_fields,
-        dataset_business_keys,
-    ) = configured_services(include_dataset_dependencies=True)
-    available = {
-        "authorization": authorization,
-        "datasets": datasets,
-        "dataset_fields": dataset_fields,
-        "dataset_business_keys": dataset_business_keys,
-    }
-
-    with pytest.raises(ValueError, match="Dataset browser dependencies"):
-        create_flask_app(
-            users,
-            authentication,
-            sessions,
-            teams,
-            memberships,
-            **{name: available[name] for name in included},
-        )
 
 
 def test_setup_requires_matching_csrf_and_can_only_complete_once(interface):

@@ -22,7 +22,11 @@ from sqlalchemy.engine import URL, make_url
 from refrncr.app import create_application, create_community_services
 from refrncr.browser_security import is_loopback_host
 from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
-from refrncr.datasets.dataset_upgrade import DatasetUpgradeError
+from refrncr.datasets.dataset_upgrade import (
+    DatasetUpgradeError,
+    ownership_preflight,
+    read_owner_mapping,
+)
 from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity.login_security import SourceIdentityResolver
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
@@ -388,17 +392,7 @@ def build_application(
         ResourceTypeRegistry(),
     )
     return create_application(
-        services.users,
-        services.authentication,
-        services.sessions,
-        services.teams,
-        services.memberships,
-        authorization=services.authorization,
-        audit_history=services.audit_history,
-        api_keys=services.api_keys,
-        datasets=services.datasets,
-        dataset_fields=services.dataset_fields,
-        dataset_business_keys=services.dataset_business_keys,
+        services,
         allow_loopback_http=allow_loopback_http,
         trusted_proxies=trusted_proxies,
         readiness_engine=engine,
@@ -607,8 +601,6 @@ def main(
             finally:
                 engine.dispose()
         elif args.command == "dataset-ownership-preflight":
-            from refrncr.datasets.dataset_upgrade import ownership_preflight, read_owner_mapping
-
             database_url = resolve_database_url(args)
             mapping = read_owner_mapping(args.mapping)
             engine = create_database_engine(database_url)

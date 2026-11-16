@@ -1,6 +1,7 @@
 """REF-84 browser contracts on SQLite and PostgreSQL; real Chrome is separate."""
 
 import re
+from dataclasses import replace
 from datetime import timedelta
 from html import unescape
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -398,17 +399,7 @@ def test_review_signature_shared_workers_and_key_rotation(context):
 
     def worker(key):
         app = create_flask_app(
-            c.s.users,
-            c.s.authentication,
-            c.s.sessions,
-            c.s.teams,
-            c.s.memberships,
-            authorization=c.s.authorization,
-            datasets=c.s.datasets,
-            dataset_fields=c.s.dataset_fields,
-            dataset_business_keys=c.s.dataset_business_keys,
-            dataset_records=c.s.dataset_records,
-            dataset_versions=c.service,
+            replace(c.s, dataset_versions=c.service),
             review_signing_key=key,
         )
         browser = app.test_client()

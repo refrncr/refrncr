@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from flask import abort, g, redirect, render_template, request, url_for
 
 from refrncr.change_status import ChangeStatus
+from refrncr.datasets.mapping_updates import SourceUpdateBlocked
 from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered_dataset_icon
 from refrncr.services import ConflictError, NotFoundError, ValidationError, parse_expected_revision
 from refrncr.version_contracts import mapping_incomplete_message
@@ -428,8 +429,6 @@ def render_dataset_configuration(
 )
 @version_errors
 def dataset_mapping_source_update(key):
-    from refrncr.datasets.mapping_updates import SourceUpdateBlocked
-
     actor, session = require_authenticated()
     require_csrf(session.csrf_token)
     dataset = datasets.get_dataset_for_edit(actor.id, key)

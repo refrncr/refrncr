@@ -1,6 +1,7 @@
 """User-owned API credentials; framework-independent lifecycle and authentication."""
 
 import hmac
+import os
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -219,8 +220,6 @@ class ApiKeyService:
 
 def configured_api_keys(uow, *, clock: Clock | None = None):
     """Missing configuration disables credentials; never substitute an ephemeral pepper."""
-    import os
-
     value = os.environ.get("REFRNCR_API_KEY_PEPPER")
     if value is None:
         return None

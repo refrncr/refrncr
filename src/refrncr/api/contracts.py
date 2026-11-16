@@ -218,6 +218,7 @@ class Error(Contract):
         "invalid_api_credentials",
         "not_found",
         "invalid_request",
+        "conflict",
         "method_not_allowed",
         "service_unavailable",
     ]

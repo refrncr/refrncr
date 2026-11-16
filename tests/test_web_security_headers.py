@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from support import create_dataset
-from test_interfaces import configured_services, login, setup_admin
+from test_interfaces import _without_dataset_ui, configured_services, login, setup_admin
 from test_session_security import configured_web
 
 from refrncr.api.http import SAFE_HEADERS
@@ -30,8 +30,8 @@ def assert_html_policy(response):
 
 @pytest.fixture
 def web():
-    _, users, authentication, sessions, teams, memberships = configured_services()
-    app = create_flask_app(users, authentication, sessions, teams, memberships)
+    *_, services = configured_services(include_dataset_dependencies=True)
+    app = create_flask_app(_without_dataset_ui(services))
 
     @app.get("/unexpected-error")
     def unexpected_error():

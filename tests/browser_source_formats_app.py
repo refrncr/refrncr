@@ -21,17 +21,7 @@ for key, datatype, required in (
     )
 services.dataset_business_keys.set_business_key(admin.id, dataset.key, ("code",))
 app = create_flask_app(
-    services.users,
-    services.authentication,
-    services.sessions,
-    services.teams,
-    services.memberships,
-    authorization=services.authorization,
-    datasets=services.datasets,
-    dataset_fields=services.dataset_fields,
-    dataset_business_keys=services.dataset_business_keys,
-    dataset_records=services.dataset_records,
-    record_imports=services.record_imports,
+    services,
     allow_loopback_http=True,
 )
 

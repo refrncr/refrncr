@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from refrncr.audit import record_audit
-from refrncr.authorization import AuthorizationService
 from refrncr.datasets.deletion import version_reads as _version_reads
 from refrncr.datasets.errors import DatasetNotFoundError, DatasetValidationError
 from refrncr.datasets.fields import DatasetFieldService
@@ -18,6 +19,9 @@ from refrncr.ports import (
     DatasetRecord,
     UnitOfWorkFactory,
 )
+
+if TYPE_CHECKING:
+    from refrncr.authorization import AuthorizationService
 
 
 class DatasetBusinessKeyService:

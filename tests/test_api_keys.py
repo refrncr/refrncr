@@ -2,6 +2,7 @@
 
 import re
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from threading import Barrier, Event
 from uuid import uuid4
@@ -282,9 +283,7 @@ def test_audit_failure_rolls_back(database_keys, monkeypatch):
 def browser_client(keys):
     _, _, s, _, user, service, now = keys
     now.set(datetime.now(UTC))
-    app = create_flask_app(
-        s.users, s.authentication, s.sessions, s.teams, s.memberships, api_keys=service
-    )
+    app = create_flask_app(replace(s, api_keys=service))
     token, login = s.sessions.create(user)
     client = app.test_client()
     client.set_cookie(SESSION_COOKIE, token, domain="localhost")

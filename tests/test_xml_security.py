@@ -50,21 +50,12 @@ def test_start_rejects_disabled_xml_protection_before_database_changes(
 def test_direct_application_creation_requires_xml_protection(monkeypatch, factory):
     monkeypatch.setattr(openpyxl.xml, "DEFUSEDXML", False)
     users = Mock()
+    services = Mock(users=users)
     with pytest.raises(RuntimeError, match="XML protection"):
         if factory == "flask":
-            create_flask_app(users, None, None, None, None)
+            create_flask_app(services)
         else:
-            create_application(
-                users,
-                None,
-                None,
-                None,
-                None,
-                authorization=None,
-                datasets=None,
-                dataset_fields=None,
-                dataset_business_keys=None,
-            )
+            create_application(services)
     users.bootstrap_organisation.assert_not_called()
 
 

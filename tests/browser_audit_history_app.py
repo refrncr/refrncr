@@ -37,12 +37,7 @@ with factory.begin() as session:
             )
         )
 app = create_flask_app(
-    s.users,
-    s.authentication,
-    s.sessions,
-    s.teams,
-    s.memberships,
-    audit_history=s.audit_history,
+    s,
     allow_loopback_http=True,
 )
 if __name__ == "__main__":
