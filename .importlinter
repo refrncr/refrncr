@@ -32,6 +32,9 @@ forbidden_modules =
     refrncr.persistence
     refrncr.models
     refrncr.app
+    refrncr.services
+    refrncr.db
+    refrncr.cli
 
 [importlinter:contract:web-api]
 name = Web and API packages do not depend on each other
