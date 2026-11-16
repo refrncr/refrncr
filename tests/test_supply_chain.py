@@ -292,7 +292,7 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     gitleaks = (ROOT / ".gitleaks.toml").read_text()
     assert gitleaks.count("redact = 100") == 1
     assert gitleaks.count("[[allowlists]]") == 2
-    assert "^src/refrncr/dataset_versions\\.py$" in gitleaks
+    assert "^src/refrncr/(dataset_versions\\.py|versions/concepts\\.py)$" in gitleaks
     assert "^docs/development/(ref-51-report|supply-chain)\\.md$" in gitleaks
     assert "key,\\s+allow_unpublished=True" in gitleaks
     assert gitleaks.count('condition = "AND"') == 2

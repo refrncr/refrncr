@@ -13,7 +13,6 @@ from refrncr.api.routes import create_api
 from refrncr.audit_history import AuditHistoryService
 from refrncr.authorization import InstallationSettingsService
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
@@ -45,6 +44,7 @@ from refrncr.services import (
     UserService,
     create_deprecated_grant_service,
 )
+from refrncr.versions import DatasetVersionService
 from refrncr.web import create_flask_app
 from refrncr.xml_security import require_xml_protection
 

@@ -21,7 +21,7 @@ from refrncr.models import (
     new_id,
 )
 from refrncr.ports import PersistenceConflictError, RecordValue, StoredRecord
-from refrncr.version_contracts import (
+from refrncr.versions.version_contracts import (
     PublishedVersion,
     SnapshotContent,
     SnapshotField,

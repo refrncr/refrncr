@@ -34,6 +34,13 @@ from refrncr.identity import (
     IdentityNotFoundError,
     IdentityValidationError,
 )
+from refrncr.versions import (
+    VersionAuthorizationError,
+    VersionConflictError,
+    VersionError,
+    VersionNotFoundError,
+    VersionValidationError,
+)
 
 
 def test_compatibility_error_is_an_alias_and_services_reexports_categories():
@@ -109,6 +116,20 @@ def test_dataset_error_exports_are_identical_and_have_one_category():
     for name in names[1:]:
         error_type = getattr(dataset_domain, name)
         assert sum(issubclass(error_type, category) for category in categories) == 1
+
+
+def test_version_errors_have_a_domain_and_exact_category():
+    categories = (NotFoundError, ConflictError, ValidationError, AuthorizationError)
+    assert not any(issubclass(VersionError, category) for category in categories)
+    for error_type, category in (
+        (VersionNotFoundError, NotFoundError),
+        (VersionConflictError, ConflictError),
+        (VersionValidationError, ValidationError),
+        (VersionAuthorizationError, AuthorizationError),
+    ):
+        assert issubclass(error_type, VersionError)
+        assert issubclass(error_type, category)
+        assert sum(issubclass(error_type, candidate) for candidate in categories) == 1
 
 
 @pytest.mark.parametrize(

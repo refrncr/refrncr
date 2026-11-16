@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Protocol
 
-from refrncr.version_contracts import APPLICATION_TIMEZONE
+# The application-wide calendar boundary belongs with the clock, not a domain package.
+APPLICATION_TIMEZONE = UTC
 
 
 class Clock(Protocol):

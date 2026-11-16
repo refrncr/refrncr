@@ -28,7 +28,7 @@ from refrncr.hierarchy_contracts import hierarchy_order as hierarchy_order
 from refrncr.hierarchy_contracts import hierarchy_paths as hierarchy_paths
 from refrncr.hierarchy_contracts import hierarchy_sibling_sort_key as hierarchy_sibling_sort_key
 from refrncr.ports import RecordValue, StoredRecord
-from refrncr.version_contracts import SnapshotContent, SnapshotField
+from refrncr.versions.version_contracts import SnapshotContent, SnapshotField
 
 MAX_HIERARCHY_NODE_NAME = 200
 HIERARCHY_VIEW_ALIASES = {"hierarchy": "tree", "hybrid": "tree", "records": "table"}

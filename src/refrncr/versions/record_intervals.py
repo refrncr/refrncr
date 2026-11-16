@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from refrncr.datasets.datatypes import get_datatype
-from refrncr.published_contracts import record_identifier
+from refrncr.versions.published_contracts import record_identifier
 
 
 @dataclass(frozen=True, slots=True)

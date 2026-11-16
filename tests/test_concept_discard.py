@@ -14,9 +14,9 @@ from support import NOW, active, audits, html_elements, publish, request, setup,
 from support import dataset_version_client as client
 from werkzeug.datastructures import MultiDict
 
-from refrncr.concept_contracts import DISCARD_UNAVAILABLE
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import ConflictError, NotFoundError
+from refrncr.versions.concept_contracts import DISCARD_UNAVAILABLE
 
 
 def prepared(c, *, extra=False):

@@ -11,7 +11,7 @@ from refrncr.services import (
     NotFoundError,
     ValidationError,
 )
-from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.versions.version_contracts import mapping_incomplete_message
 from refrncr.web.records import (
     blueprint,
     dataset_records,

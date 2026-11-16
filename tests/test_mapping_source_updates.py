@@ -222,7 +222,7 @@ def test_failed_source_update_rolls_back_draft_and_audit(database_context, monke
     def fail(*args, **kwargs):
         raise RuntimeError("Injected audit failure")
 
-    monkeypatch.setattr("refrncr.dataset_versions.record_audit", fail)
+    monkeypatch.setattr("refrncr.versions.concepts.record_audit", fail)
     with pytest.raises(RuntimeError):
         update(c, mapping)
     assert snapshot(c) == before
@@ -654,7 +654,7 @@ def test_context_removal_and_notes_roll_back_on_audit_failure(database_context, 
     def fail(*args, **kwargs):
         raise RuntimeError("Injected audit failure")
 
-    monkeypatch.setattr("refrncr.dataset_versions.record_audit", fail)
+    monkeypatch.setattr("refrncr.versions.concepts.record_audit", fail)
     with pytest.raises(RuntimeError, match="Injected"):
         update(c, mapping)
     assert snapshot(c) == before

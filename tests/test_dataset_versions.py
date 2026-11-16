@@ -14,13 +14,13 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from support import NOW, MutableClock, audits, content, publish, revision, setup, snapshot, versions
 
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.version_contracts import version_states
 from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.versions import DatasetVersionService
+from refrncr.versions.version_contracts import version_states
 
 
 def test_snapshot_lifecycle_and_no_change(context):

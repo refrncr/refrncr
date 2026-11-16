@@ -9,7 +9,7 @@ from support import NOW
 from test_api_export_access import policy, special_dataset
 from test_mapping_source_versions import publish_table
 
-from refrncr.published_contracts import encode_identifier
+from refrncr.versions.published_contracts import encode_identifier
 
 
 def get(c, key, suffix="/records", *, headers=None, **selection):

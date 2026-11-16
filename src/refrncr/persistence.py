@@ -816,7 +816,7 @@ class SqlAlchemyDatasetRecordOperations:
         self.add_values(record, values)
 
     def delete_if_revision(self, dataset_id: str, record_id: str, expected_revision: int) -> bool:
-        from refrncr.version_contracts import SnapshotField
+        from refrncr.versions.version_contracts import SnapshotField
 
         record = self.get(dataset_id, record_id)
         if record is None or record.revision != expected_revision:
@@ -868,7 +868,7 @@ class SqlAlchemyDatasetRecordOperations:
         return result.rowcount == 1
 
     def deleted_records(self, dataset_id):
-        from refrncr.version_contracts import SnapshotField
+        from refrncr.versions.version_contracts import SnapshotField
 
         statement = (
             select(DatasetRecord)

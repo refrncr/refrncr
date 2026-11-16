@@ -37,7 +37,7 @@ from refrncr.ports import (
 
 if TYPE_CHECKING:
     from refrncr.authorization import AuthorizationService
-from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.versions.version_contracts import mapping_incomplete_message
 
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
 MAX_RECORD_REVISION = 2_147_483_647

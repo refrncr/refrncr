@@ -50,8 +50,8 @@ from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.hierarchy import hierarchy_order, hierarchy_paths
 from refrncr.identity.api_keys import ApiKeyAuthenticationError
-from refrncr.published_contracts import encode_identifier, record_identifier
 from refrncr.services import AuthenticatedPrincipal, ConflictError, NotFoundError, ValidationError
+from refrncr.versions.published_contracts import encode_identifier, record_identifier
 
 
 def _version(publication):

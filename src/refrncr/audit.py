@@ -879,45 +879,56 @@ _register(
 )
 
 _audited(
-    "DatasetVersionService",
+    "DatasetVersionConceptMixin",
     "update_mapping_source",
     ("dataset", "dataset.mapping_source_updated"),
-    module="dataset_versions",
+    module="versions.concepts",
 )
 _audited(
-    "DatasetVersionService",
+    "DatasetVersionLifecycleMixin",
     "publish",
     ("dataset", "dataset.version_published"),
-    module="dataset_versions",
+    module="versions.lifecycle",
 )
 _audited(
-    "DatasetVersionService",
+    "DatasetVersionLifecycleMixin",
     "cancel",
     ("dataset", "dataset.version_cancelled"),
-    module="dataset_versions",
+    module="versions.lifecycle",
 )
 _register(
-    "DatasetVersionService",
+    "DatasetVersionLifecycleMixin",
     "review",
     "intentionally excluded",
-    module="dataset_versions",
+    module="versions.lifecycle",
     rationale="Authorized publication review; no persisted content or event.",
 )
 
-for _name in ("overview", "context", "history", "read", "concept_context", "review_discard"):
+for _name in ("overview", "context", "history", "concept_context", "review_discard"):
     _register(
-        "DatasetVersionService",
+        "DatasetVersionConceptMixin",
         _name,
         "intentionally excluded",
-        module="dataset_versions",
+        module="versions.concepts",
         rationale=(
             "Authorized coherent concept/published read; current REF-73 permissions, "
             "no mutation or domain event."
         ),
     )
 
+_register(
+    "DatasetVersionLifecycleMixin",
+    "read",
+    "intentionally excluded",
+    module="versions.lifecycle",
+    rationale=(
+        "Authorized coherent concept/published read; current REF-73 permissions, "
+        "no mutation or domain event."
+    ),
+)
+
 for _name in ("publication_preflight", "create_initial_versions"):
-    OPERATIONS[f"refrncr.version_upgrade.{_name}"] = Operation(
+    OPERATIONS[f"refrncr.versions.version_upgrade.{_name}"] = Operation(
         "technical logging only",
         rationale=(
             "Stopped-writer operator migration/preflight; no authenticated actor or domain event."
@@ -939,21 +950,21 @@ _register(
 )
 
 _audited(
-    "DatasetVersionService",
+    "DatasetVersionConceptMixin",
     "create_concept",
     ("dataset", "dataset.concept_created"),
-    module="dataset_versions",
+    module="versions.concepts",
 )
 
 _audited(
-    "DatasetVersionService",
+    "DatasetVersionConceptMixin",
     "discard_concept",
     ("dataset", "dataset.concept_discarded"),
-    module="dataset_versions",
+    module="versions.concepts",
 )
 
 for _name in ("concept_preflight", "migrate_concepts"):
-    OPERATIONS[f"refrncr.concept_upgrade.{_name}"] = Operation(
+    OPERATIONS[f"refrncr.versions.concept_upgrade.{_name}"] = Operation(
         "technical logging only",
         rationale="Stopped-writer concept migration/preflight; no invented actor or domain event.",
     )
@@ -994,28 +1005,28 @@ _register(
     "DatasetVersionService",
     "read_current",
     "intentionally excluded",
-    module="dataset_versions",
+    module="versions.service",
     rationale="Authorized bounded Current read; no per-request durable success audit.",
 )
 _register(
     "DatasetVersionService",
     "read_versions",
     "intentionally excluded",
-    module="dataset_versions",
+    module="versions.service",
     rationale="Authorized bounded published-version reads; no per-request durable success audit.",
 )
 _register(
     "DatasetVersionService",
     "read_history",
     "intentionally excluded",
-    module="dataset_versions",
+    module="versions.service",
     rationale="Authorized derived published-record read; no per-request durable success audit.",
 )
 _audited(
     "DatasetVersionService",
     "export_history",
     ("dataset", "dataset.history_export_requested"),
-    module="dataset_versions",
+    module="versions.service",
 )
 _register(
     "DatasetAuthorizationService",

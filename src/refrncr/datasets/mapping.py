@@ -1,6 +1,6 @@
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.mapping_updates import mapping_states, source_update_blocker
-from refrncr.version_contracts import version_states
+from refrncr.versions.version_contracts import version_states
 
 from .deletion import mapping_deletion_error, version_reads
 from .errors import DatasetNotFoundError

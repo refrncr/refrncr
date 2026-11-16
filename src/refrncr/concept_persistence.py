@@ -2,7 +2,6 @@
 
 from sqlalchemy import Date, Numeric, case, cast, delete, insert, literal, select, update
 
-from refrncr.concept_contracts import ActiveConcept
 from refrncr.models import (
     DatasetBusinessKeyField,
     DatasetConcept,
@@ -19,6 +18,7 @@ from refrncr.models import (
     DatasetVersionValue,
     new_id,
 )
+from refrncr.versions.concept_contracts import ActiveConcept
 
 
 class SqlAlchemyConceptOperations:

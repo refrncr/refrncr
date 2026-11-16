@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 from support import NOW, MutableClock, audits, publish, setup, snapshot
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.diff_classification import classify_fields, relative_moves
-from refrncr.diff_contracts import DiffCriteria
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.version_contracts import SnapshotField
+from refrncr.versions.diff_classification import classify_fields, relative_moves
+from refrncr.versions.diff_contracts import DiffCriteria
+from refrncr.versions.version_contracts import SnapshotField
 
 
 def prepared(c):

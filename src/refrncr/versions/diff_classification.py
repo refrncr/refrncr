@@ -3,12 +3,12 @@
 from bisect import bisect_left
 from dataclasses import fields as dataclass_fields
 
-from refrncr.change_status import ChangeStatus
 from refrncr.datasets.datatypes import get_datatype
-from refrncr.diff_contracts import STATUSES, FieldChange, PropertyChange
 from refrncr.hierarchy_contracts import hierarchy_node_paths
-from refrncr.services import ValidationError
-from refrncr.version_contracts import SnapshotField, SummaryCounts
+from refrncr.versions.change_status import ChangeStatus
+from refrncr.versions.diff_contracts import STATUSES, FieldChange, PropertyChange
+from refrncr.versions.errors import VersionValidationError
+from refrncr.versions.version_contracts import SnapshotField, SummaryCounts
 
 
 def relative_moves(before, after):
@@ -19,7 +19,7 @@ def relative_moves(before, after):
     """
     old = {identity: position for position, identity in enumerate(before)}
     if len(old) != len(before) or len(set(after)) != len(after):
-        raise ValidationError("Invalid Field order")
+        raise VersionValidationError("Invalid Field order")
     surviving = [identity for identity in after if identity in old]
     tails, ends, previous = [], [], []
     for index, identity in enumerate(surviving):
@@ -45,7 +45,7 @@ def classify_fields(current, previous):
             or len({f.key for f in collection}) != len(collection)
             or sorted(f.display_position for f in collection) != list(range(1, len(collection) + 1))
         ):
-            raise ValidationError("Invalid versioned Field configuration")
+            raise VersionValidationError("Invalid versioned Field configuration")
         for field in collection:
             get_datatype(field.data_type)
     new, old = ({f.id: f for f in collection} for collection in (current, previous))
@@ -191,7 +191,7 @@ def classify_hierarchy(current, previous, current_fields, previous_fields):
             left, right = left_values.get(field_id), right_values.get(field_id)
             field = new_fields.get(field_id) or old_fields.get(field_id)
             if field is None:
-                raise ValidationError("Invalid hierarchy Field configuration")
+                raise VersionValidationError("Invalid hierarchy Field configuration")
             left_key = (left.data_type, left.canonical_key) if left else None
             right_key = (right.data_type, right.canonical_key) if right else None
             if left_key != right_key:

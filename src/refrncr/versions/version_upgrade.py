@@ -6,16 +6,16 @@ from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from refrncr.clock import SYSTEM_CLOCK
-from refrncr.dataset_versions import validated_snapshot
+from refrncr.errors import ValidationError
 from refrncr.models import Dataset
 from refrncr.persistence import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
     SqlAlchemyDatasetRecordOperations,
 )
-from refrncr.services import ValidationError
-from refrncr.version_contracts import APPLICATION_TIMEZONE, SummaryCounts
 from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.versions import validated_snapshot
+from refrncr.versions.version_contracts import APPLICATION_TIMEZONE, SummaryCounts
 
 
 class VersionUpgradeError(RuntimeError):

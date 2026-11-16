@@ -20,7 +20,6 @@ from werkzeug.datastructures import MultiDict
 
 from refrncr.app import create_community_services
 from refrncr.clock import SYSTEM_CLOCK
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.datasets.datatypes import DATATYPES, get_datatype
 from refrncr.db.base import Base
@@ -30,7 +29,8 @@ from refrncr.identity import login_security
 from refrncr.models import AuditEvent, Dataset, User
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.services import ResourceTypeRegistry
-from refrncr.version_contracts import APPLICATION_TIMEZONE
+from refrncr.versions import DatasetVersionService
+from refrncr.versions.version_contracts import APPLICATION_TIMEZONE
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"

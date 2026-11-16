@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from refrncr.datasets.mapping_updates import source_update_blocker
 from refrncr.services import AuthorizationError
-from refrncr.version_contracts import version_states
+from refrncr.versions.version_contracts import version_states
 
 REASON_LABELS = {
     1: "Source update available",

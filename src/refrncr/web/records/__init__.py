@@ -9,7 +9,6 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthorizationService,
@@ -18,6 +17,7 @@ from refrncr.services import (
     DatasetRecordService,
     DatasetService,
 )
+from refrncr.versions import DatasetVersionService
 from refrncr.web.routing import DatasetBlueprint
 
 blueprint = DatasetBlueprint("records", __name__)

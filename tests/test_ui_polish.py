@@ -872,7 +872,7 @@ def test_read_only_fields_do_not_disclose_concept_to_reader(dataset_browser):
 
 
 def test_metadata_preserves_current_scheduled_and_expired_snapshots(context):
-    from refrncr.version_contracts import version_states
+    from refrncr.versions.version_contracts import version_states
 
     c = context
     setup(c)

@@ -268,18 +268,18 @@ def test_every_audited_operation_has_behavior_cases():
     behaviors.update(
         {
             "refrncr.record_import.DatasetRecordImportService.confirm",
-            "refrncr.dataset_versions.DatasetVersionService.publish",
-            "refrncr.dataset_versions.DatasetVersionService.cancel",
-            "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
-            "refrncr.dataset_versions.DatasetVersionService.export_history",
+            "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.publish",
+            "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.cancel",
+            "refrncr.versions.concepts.DatasetVersionConceptMixin.update_mapping_source",
+            "refrncr.versions.service.DatasetVersionService.export_history",
             "refrncr.identity.api_keys.ApiKeyService.create_key",
             "refrncr.identity.api_keys.ApiKeyService.revoke_key",
             "refrncr.identity.users.UserService.create_initial_admin",
             "refrncr.identity.users.UserService.recover_administrator_password",
             "refrncr.datasets.records.DatasetRecordService.export_dataset",
             "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
-            "refrncr.dataset_versions.DatasetVersionService.create_concept",
-            "refrncr.dataset_versions.DatasetVersionService.discard_concept",
+            "refrncr.versions.concepts.DatasetVersionConceptMixin.create_concept",
+            "refrncr.versions.concepts.DatasetVersionConceptMixin.discard_concept",
             "refrncr.hierarchy.HierarchyService.create_node",
             "refrncr.hierarchy.HierarchyService.delete_subtree",
             "refrncr.hierarchy.HierarchyService.update_node",
@@ -458,6 +458,24 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     and function.attr != "uow"
                     and not function.attr.startswith("_")
                 ):
+                    version_modules = {
+                        "cancel": "versions.lifecycle",
+                        "publish": "versions.lifecycle",
+                        "read": "versions.lifecycle",
+                        "review": "versions.lifecycle",
+                        "concept_context": "versions.concepts",
+                        "context": "versions.concepts",
+                        "create_concept": "versions.concepts",
+                        "discard_concept": "versions.concepts",
+                        "history": "versions.concepts",
+                        "overview": "versions.concepts",
+                        "review_discard": "versions.concepts",
+                        "update_mapping_source": "versions.concepts",
+                        "export_history": "versions.service",
+                        "read_current": "versions.service",
+                        "read_history": "versions.service",
+                        "read_versions": "versions.service",
+                    }
                     module = {
                         "api_keys": "identity.api_keys",
                         "api_key_service": "identity.api_keys",
@@ -470,7 +488,7 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "users": "identity.users",
                         "record_imports": "record_import",
                         "audit_history": "audit_history",
-                        "dataset_versions": "dataset_versions",
+                        "dataset_versions": version_modules.get(function.attr),
                         "dataset_diff": "datasets.dataset_diff",
                         "dataset_fields": "datasets.fields",
                         "field_service": "datasets.fields",
@@ -482,7 +500,12 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                         "dataset_service": "datasets.service",
                         "service": "datasets.service",
                     }.get(receiver.id, "services")
-                    found.add(f"refrncr.{module}.{receivers[receiver.id]}.{function.attr}")
+                    service_name = receivers[receiver.id]
+                    if module == "versions.concepts":
+                        service_name = "DatasetVersionConceptMixin"
+                    elif module == "versions.lifecycle":
+                        service_name = "DatasetVersionLifecycleMixin"
+                    found.add(f"refrncr.{module}.{service_name}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:
                 found.update(service_calls(function.id, seen))
         return found
