@@ -5,7 +5,7 @@ from sqlalchemy import select, text
 from support import publish, setup, snapshot
 
 from refrncr.imports import ImportValidationError
-from refrncr.models import AuditEvent, DatasetRecord
+from refrncr.persistence.models import AuditEvent, DatasetRecord
 
 
 def stage(c, source, mapping):

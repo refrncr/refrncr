@@ -5,14 +5,15 @@ from threading import Barrier
 
 import pytest
 from argon2 import PasswordHasher
-from sqlalchemy import create_engine, func, inspect, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, LoginSession, Organisation, User
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory, SqlAlchemyUserOperations
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, LoginSession, Organisation, User
+from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import (
     AuthenticationService,
     AuthorizationError,
@@ -31,7 +32,11 @@ def services():
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
-    return factory, UserService(SqlAlchemyUnitOfWorkFactory(factory)), SessionService(factory)
+    return (
+        factory,
+        UserService(SqlAlchemyUnitOfWorkFactory(factory)),
+        SessionService(SqlAlchemyLoginSessionStore(factory)),
+    )
 
 
 def initial_admin(users):
@@ -362,7 +367,7 @@ def test_authentication_and_server_side_session(services):
     assert authentication.authenticate(admin.email, "wrong") is None
     authenticated = authentication.authenticate(admin.email, "correct horse battery staple")
     token, login = sessions.create(authenticated)
-    assert inspect(login).detached
+    assert login.user_id == admin.id
     assert login.id is not None
     assert login.csrf_token
     assert token not in login.token_hash

@@ -29,7 +29,7 @@ def downgrade_historical_fixture(config, revision):
     from alembic.operations import Operations
     from sqlalchemy import inspect, text
 
-    from refrncr.db.session import create_database_engine
+    from refrncr.persistence.database import create_database_engine
 
     supplied = config.attributes.get("connection")
     engine = (

@@ -222,7 +222,7 @@ def test_catalog_and_guard_have_no_framework_or_persistence_dependencies():
             "flask",
             "fastapi",
             "sqlalchemy",
-            "refrncr.models",
+            "refrncr.persistence.models",
             "refrncr.persistence",
             "refrncr.web",
         }

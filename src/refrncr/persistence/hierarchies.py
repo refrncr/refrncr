@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.hierarchies.contracts import HierarchyNode
-from refrncr.models import DatasetField, DatasetHierarchyNode, DatasetHierarchyValue
+from refrncr.persistence.models import DatasetField, DatasetHierarchyNode, DatasetHierarchyValue
 from refrncr.ports import PersistenceConflictError, RecordValue
 
 

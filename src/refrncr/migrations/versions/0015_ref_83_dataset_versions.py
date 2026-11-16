@@ -3,7 +3,7 @@
 import sqlalchemy as sa
 from alembic import op
 
-from refrncr.versions.version_upgrade import (
+from refrncr.persistence.version_upgrade import (
     VersionUpgradeError,
     create_initial_versions,
     publication_preflight,

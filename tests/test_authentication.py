@@ -14,9 +14,9 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import User
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import User
 from refrncr.services import (
     PASSWORD_HASHER,
     AuthenticatedPrincipal,

@@ -51,6 +51,6 @@ def test_module_imports_in_fresh_python(module):
 
 def test_migration_environment_models_first_import():
     """Mirror the first application import made by migrations/env.py."""
-    result = _fresh_python("from refrncr import models")
+    result = _fresh_python("from refrncr.persistence import models")
 
     assert result.returncode == 0, result.stderr

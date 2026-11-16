@@ -12,8 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from refrncr.app import create_community_services
 from refrncr.cli import prepare_database
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import (
+from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import (
     AuditEvent,
     Dataset,
     DatasetBusinessKeyField,
@@ -23,7 +24,7 @@ from refrncr.models import (
     Team,
     User,
 )
-from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
@@ -407,7 +408,7 @@ def test_empty_sqlite_database_upgrades(tmp_path):
     uow = SqlAlchemyUnitOfWorkFactory(factory)
     users = UserService(uow)
     authentication = AuthenticationService(uow)
-    sessions = SessionService(factory)
+    sessions = SessionService(SqlAlchemyLoginSessionStore(factory))
     teams = TeamService(uow)
     memberships = MembershipService(uow)
     resources = ResourceTypeRegistry()
@@ -770,7 +771,7 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     finally:
         upgraded_engine.dispose()
 
-    from refrncr.versions.version_upgrade import VersionUpgradeError
+    from refrncr.persistence.version_upgrade import VersionUpgradeError
 
     with pytest.raises(VersionUpgradeError) as failure:
         command.upgrade(config, "head")
@@ -819,7 +820,7 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     finally:
         upgraded_engine.dispose()
 
-    from refrncr.versions.version_upgrade import VersionUpgradeError
+    from refrncr.persistence.version_upgrade import VersionUpgradeError
 
     with pytest.raises(VersionUpgradeError) as failure:
         command.upgrade(config, "head")

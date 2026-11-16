@@ -32,8 +32,8 @@ from refrncr.audit_presentation import (
     safe_context,
     safe_name,
 )
-from refrncr.models import AuditEvent, Dataset, DatasetField, Team, User
 from refrncr.persistence import SqlAlchemyAuditReadOperations
+from refrncr.persistence.models import AuditEvent, Dataset, DatasetField, Team, User
 from refrncr.ports import AuditFilters
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 

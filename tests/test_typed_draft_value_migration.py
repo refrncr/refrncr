@@ -8,7 +8,7 @@ from alembic import command
 from sqlalchemy import select, text, update
 from support import PASSWORD, config_for, configured_dataset
 
-from refrncr.models import DatasetRecordValue
+from refrncr.persistence.models import DatasetRecordValue
 
 
 def _stored_values(factory, record_id):

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from support import dataset_browser
 
-from refrncr.models import AuditEvent, User
+from refrncr.persistence.models import AuditEvent, User
 from refrncr.web import create_flask_app
 
 factory, s, admin, _ = dataset_browser.__wrapped__()

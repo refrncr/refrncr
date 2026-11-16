@@ -4,16 +4,16 @@ from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from refrncr.clock import SYSTEM_CLOCK
-from refrncr.concept_persistence import SqlAlchemyConceptOperations
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
-from refrncr.diff_persistence import SqlAlchemyDiffOperations
 from refrncr.errors import ValidationError
-from refrncr.models import Dataset
-from refrncr.persistence import (
+from refrncr.persistence.concepts import SqlAlchemyConceptOperations
+from refrncr.persistence.core import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
 )
-from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.persistence.diff_operations import SqlAlchemyDiffOperations
+from refrncr.persistence.models import Dataset
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
 from refrncr.versions.diff_classification import classify_fields
 from refrncr.versions.errors import VersionValidationError
 from refrncr.versions.version_contracts import SnapshotField

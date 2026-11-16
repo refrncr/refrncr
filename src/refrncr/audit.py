@@ -936,7 +936,7 @@ _register(
 )
 
 for _name in ("publication_preflight", "create_initial_versions"):
-    OPERATIONS[f"refrncr.versions.version_upgrade.{_name}"] = Operation(
+    OPERATIONS[f"refrncr.persistence.version_upgrade.{_name}"] = Operation(
         "technical logging only",
         rationale=(
             "Stopped-writer operator migration/preflight; no authenticated actor or domain event."
@@ -972,7 +972,7 @@ _audited(
 )
 
 for _name in ("concept_preflight", "migrate_concepts"):
-    OPERATIONS[f"refrncr.versions.concept_upgrade.{_name}"] = Operation(
+    OPERATIONS[f"refrncr.persistence.concept_upgrade.{_name}"] = Operation(
         "technical logging only",
         rationale="Stopped-writer concept migration/preflight; no invented actor or domain event.",
     )

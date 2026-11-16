@@ -5,9 +5,10 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import LoginSession, User
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import LoginSession, User
+from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import SessionService, UserService
 
 
@@ -42,7 +43,7 @@ def test_sqlite_enforces_session_cascade_and_audit_restriction():
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     users = UserService(SqlAlchemyUnitOfWorkFactory(factory))
-    sessions = SessionService(factory)
+    sessions = SessionService(SqlAlchemyLoginSessionStore(factory))
     users.bootstrap_organisation()
     admin = users.create_initial_admin("admin@example.com", "Admin", "valid password")
     managed = users.create_user(admin.id, "managed@example.com", "Managed", "valid password")

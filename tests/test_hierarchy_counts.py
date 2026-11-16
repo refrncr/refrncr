@@ -3,7 +3,7 @@
 import pytest
 from support import content, node, prepare, publish, snapshot
 
-from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
 
 
 def test_root_only_concept_counts_the_root(context):

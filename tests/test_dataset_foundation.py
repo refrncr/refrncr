@@ -11,19 +11,19 @@ from sqlalchemy.engine import make_url
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import (
-    AuditEvent,
-    Dataset,
-    Grant,
-    ImmutableDatasetKeyError,
-    User,
-)
 from refrncr.persistence import (
     SqlAlchemyDatasetOperations,
     SqlAlchemyGrantOperations,
     SqlAlchemyUnitOfWork,
     SqlAlchemyUnitOfWorkFactory,
+)
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import (
+    AuditEvent,
+    Dataset,
+    Grant,
+    ImmutableDatasetKeyError,
+    User,
 )
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import (

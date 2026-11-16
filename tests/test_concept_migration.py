@@ -5,8 +5,8 @@ from alembic import command
 from sqlalchemy import delete, inspect, select, text, update
 from support import config_for, publish, setup
 
-from refrncr.models import DatasetConcept, DatasetRecordValue
-from refrncr.versions.concept_upgrade import ConceptUpgradeError, concept_preflight
+from refrncr.persistence.concept_upgrade import ConceptUpgradeError, concept_preflight
+from refrncr.persistence.models import DatasetConcept, DatasetRecordValue
 
 
 def predecessor(c):
@@ -78,7 +78,7 @@ def test_corrupt_content_preflight_is_atomic(database_context):
 
 
 def test_copy_failure_rolls_back_new_schema_and_retry(database_context, monkeypatch):
-    from refrncr.concept_persistence import SqlAlchemyConceptOperations
+    from refrncr.persistence.concepts import SqlAlchemyConceptOperations
 
     c = database_context
     setup(c)

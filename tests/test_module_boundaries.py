@@ -171,3 +171,28 @@ def test_split_domain_packages_do_not_raise_general_error_categories():
     assert violations == [], "Domain packages raised general error categories:\n" + "\n".join(
         violations
     )
+
+
+def test_domain_packages_do_not_import_persistence_adapters():
+    violations = []
+    for package in DOMAIN_PACKAGES_WITH_TYPED_ERRORS:
+        for path in (SOURCE_ROOT / package).rglob("*.py"):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                modules = (
+                    [node.module or ""]
+                    if isinstance(node, ast.ImportFrom)
+                    else [name.name for name in node.names]
+                    if isinstance(node, ast.Import)
+                    else []
+                )
+                for module in modules:
+                    if module == "refrncr.persistence" or module.startswith("refrncr.persistence."):
+                        violations.append(
+                            f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} "
+                            f"imports {module}"
+                        )
+
+    assert violations == [], "Domain packages imported persistence adapters:\n" + "\n".join(
+        violations
+    )

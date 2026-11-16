@@ -13,8 +13,8 @@ from support import create_dataset, html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import AuditEvent, LoginSession, Membership, Team, User
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import AuditEvent, LoginSession, Membership, Team, User
 from refrncr.services import AuthorizationError, ResourceTypeRegistry
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 

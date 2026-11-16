@@ -28,6 +28,7 @@ from refrncr.operational import (
 )
 from refrncr.overview import OverviewService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
@@ -117,7 +118,7 @@ def create_community_services(
         audit_history=AuditHistoryService(uow, clock=clock),
         users=users,
         authentication=AuthenticationService(uow),
-        sessions=SessionService(sessions, clock=clock),
+        sessions=SessionService(SqlAlchemyLoginSessionStore(sessions), clock=clock),
         teams=TeamService(uow),
         memberships=MembershipService(uow),
         _deprecated_grants=lambda: create_deprecated_grant_service(uow, resources),

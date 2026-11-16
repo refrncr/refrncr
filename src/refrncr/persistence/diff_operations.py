@@ -1,11 +1,17 @@
 """Canonical Record projections and complete hierarchy comparisons by stable identity."""
 
+from uuid import UUID
+
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
-from refrncr.datasets.datatypes import get_datatype
+from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
+from refrncr.domain import valid_identity
+from refrncr.hierarchies import hierarchy_leaf_records, hierarchy_validation_errors
 from refrncr.hierarchies.contracts import hierarchy_node_paths
-from refrncr.models import (
+from refrncr.persistence.dataset_operations import SqlAlchemyDatasetFieldOperations
+from refrncr.persistence.hierarchies import SqlAlchemyHierarchyOperations
+from refrncr.persistence.models import (
     Dataset,
     DatasetField,
     DatasetRecord,
@@ -14,7 +20,10 @@ from refrncr.models import (
     DatasetVersionRecord,
     DatasetVersionValue,
 )
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
+from refrncr.ports import DatasetBusinessKey
 from refrncr.versions.change_status import STATUSES, ChangeStatus
+from refrncr.versions.diff_classification import classify_hierarchy
 from refrncr.versions.diff_contracts import PAGE_SIZE, RecordProjection, ValueChange
 
 
@@ -34,10 +43,6 @@ class SqlAlchemyDiffOperations:
         return self._hierarchy_kinds[dataset_id]
 
     def _hierarchy_content(self, dataset_id, version_id):
-        from refrncr.hierarchy_persistence import SqlAlchemyHierarchyOperations
-        from refrncr.persistence import SqlAlchemyDatasetFieldOperations
-        from refrncr.version_persistence import SqlAlchemyVersionOperations
-
         versions = SqlAlchemyVersionOperations(self.session)
         version = versions.get(dataset_id, version_id) if version_id else None
         return (
@@ -48,15 +53,11 @@ class SqlAlchemyDiffOperations:
         )
 
     def hierarchy_changes(self, dataset_id, version_id):
-        from refrncr.versions.diff_classification import classify_hierarchy
-
         if not self._is_hierarchy(dataset_id):
             return ()
         return classify_hierarchy(*self._hierarchy_content(dataset_id, version_id))
 
     def _hierarchy_records(self, dataset_id, version_id):
-        from refrncr.hierarchies import hierarchy_leaf_records
-
         nodes, old_nodes, fields, old_fields = self._hierarchy_content(dataset_id, version_id)
         new, old = (
             {record.id: record for record in hierarchy_leaf_records(tree, schema)}
@@ -259,8 +260,6 @@ class SqlAlchemyDiffOperations:
 
     def removed_records(self, dataset_id, version):
         # Selection is the same REF-83/84 projection used for summary and review.
-        from refrncr.version_persistence import SqlAlchemyVersionOperations
-
         if self._is_hierarchy(dataset_id):
             # A former leaf becoming a branch is not a deleted hierarchy node.
             return
@@ -300,11 +299,6 @@ class SqlAlchemyDiffOperations:
     def validate_snapshot(self, version):
         """Validate stored content and identifiers, including the hierarchy leaf projection."""
         if self._is_hierarchy(version.dataset_id):
-            from refrncr.domain import valid_identity
-            from refrncr.hierarchies import hierarchy_leaf_records, hierarchy_validation_errors
-            from refrncr.ports import DatasetBusinessKey
-            from refrncr.version_persistence import SqlAlchemyVersionOperations
-
             versions = SqlAlchemyVersionOperations(self.session)
             fields = versions.fields(version)
             nodes = versions.hierarchy_nodes(version)
@@ -440,10 +434,6 @@ class SqlAlchemyDiffOperations:
         return self._validate_rows(statement, identifier_fields)
 
     def _validate_rows(self, statement, identifier_fields, expected_count=None):
-        from uuid import UUID
-
-        from refrncr.datasets.datatypes import DatatypeError
-
         record_id, encoded, components, count = None, None, [], 0
 
         def valid_identifier():

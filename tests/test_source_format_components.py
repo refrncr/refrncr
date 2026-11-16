@@ -310,7 +310,7 @@ def test_float_column_mixed_notation_confirms_canonical_values(wizard, import_co
     assert wizard.count() == 4
     from sqlalchemy import select
 
-    from refrncr.models import DatasetField, DatasetRecordValue
+    from refrncr.persistence.models import DatasetField, DatasetRecordValue
 
     with import_context[0]() as session:
         stored = session.scalars(

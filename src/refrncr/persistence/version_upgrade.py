@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.errors import ValidationError
-from refrncr.models import Dataset
-from refrncr.persistence import (
+from refrncr.persistence.core import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
     SqlAlchemyDatasetRecordOperations,
 )
-from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.persistence.models import Dataset
+from refrncr.persistence.versions import SqlAlchemyVersionOperations
 from refrncr.versions import validated_snapshot
 from refrncr.versions.version_contracts import APPLICATION_TIMEZONE, SummaryCounts
 

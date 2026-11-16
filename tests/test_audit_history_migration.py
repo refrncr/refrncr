@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from support import migrate
 
 from refrncr.db.base import Base
-from refrncr.models import AuditEvent
+from refrncr.persistence.models import AuditEvent
 
 
 def test_chronology_index_preserves_events(database_audit_db):

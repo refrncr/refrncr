@@ -19,7 +19,8 @@ from werkzeug.datastructures import MultiDict
 from refrncr.audit import AuditContractError, validate_event
 from refrncr.audit_history import AuditHistoryService
 from refrncr.db.base import Base
-from refrncr.models import (
+from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
+from refrncr.persistence.models import (
     AuditEvent,
     Dataset,
     DatasetBusinessKeyField,
@@ -29,7 +30,6 @@ from refrncr.models import (
     DatasetRecordValue,
     Grant,
 )
-from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.ports import PersistenceConflictError
 from refrncr.services import ConflictError, NotFoundError, ValidationError
 from refrncr.web import SESSION_COOKIE, create_flask_app

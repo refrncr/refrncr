@@ -22,8 +22,9 @@ from refrncr.browser_security import (
     is_loopback_host,
 )
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.models import LoginSession
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import LoginSession
+from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import AuthenticatedPrincipal, ResourceTypeRegistry, SessionService
 from refrncr.web import create_flask_app
 
@@ -275,7 +276,7 @@ def test_stale_authenticated_cookie_is_cleared_when_presented():
 def test_expired_authenticated_cookie_is_rejected_and_cleared_with_injected_clock():
     factory, services, _ = configured_web()
     clock = MutableClock(datetime(2026, 1, 1, tzinfo=UTC))
-    sessions = SessionService(factory, clock=clock)
+    sessions = SessionService(SqlAlchemyLoginSessionStore(factory), clock=clock)
     client = create_flask_app(replace(services, sessions=sessions)).test_client()
     base_url = "https://community.example"
     create_admin(client, base_url)
@@ -289,10 +290,12 @@ def test_expired_authenticated_cookie_is_rejected_and_cleared_with_injected_cloc
 
 def assert_session_lifecycle_and_cleanup(factory):
     clock = MutableClock(datetime(2026, 1, 1, tzinfo=UTC))
-    service = SessionService(factory, clock=clock, cleanup_batch_size=2)
+    service = SessionService(
+        SqlAlchemyLoginSessionStore(factory), clock=clock, cleanup_batch_size=2
+    )
     principal = AuthenticatedPrincipal(str(uuid.uuid4()))
     with factory.begin() as session:
-        from refrncr.models import User
+        from refrncr.persistence.models import User
 
         session.add(
             User(
@@ -344,7 +347,7 @@ def retention_service(*, batch_size=2):
     clock = MutableClock(datetime(2026, 2, 1, tzinfo=UTC))
     principal = AuthenticatedPrincipal(str(uuid.uuid4()))
     with factory.begin() as session:
-        from refrncr.models import User
+        from refrncr.persistence.models import User
 
         session.add(
             User(
@@ -359,7 +362,9 @@ def retention_service(*, batch_size=2):
         factory,
         clock,
         principal,
-        SessionService(factory, clock=clock, cleanup_batch_size=batch_size),
+        SessionService(
+            SqlAlchemyLoginSessionStore(factory), clock=clock, cleanup_batch_size=batch_size
+        ),
     )
 
 
@@ -459,7 +464,7 @@ def test_postgresql_session_create_resolve_expire_revoke_rotation_and_cleanup():
         assert_session_lifecycle_and_cleanup(factory)
 
         clock = MutableClock(datetime(2026, 2, 1, tzinfo=UTC))
-        service = SessionService(factory, clock=clock)
+        service = SessionService(SqlAlchemyLoginSessionStore(factory), clock=clock)
         with factory() as session:
             user_id = session.scalar(select(LoginSession.user_id).limit(1))
         principal = AuthenticatedPrincipal(user_id)

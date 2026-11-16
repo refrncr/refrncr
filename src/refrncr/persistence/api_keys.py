@@ -2,7 +2,7 @@
 
 from sqlalchemy import or_, select, update
 
-from refrncr.models import ApiKey
+from refrncr.persistence.models import ApiKey
 
 
 class SqlAlchemyApiKeyOperations:

@@ -8,7 +8,7 @@ from html import unescape
 import pytest
 from support import NOW, configured, dataset_version_client, publish, request
 
-from refrncr.models import DatasetConcept
+from refrncr.persistence.models import DatasetConcept
 from refrncr.services import NotFoundError
 
 

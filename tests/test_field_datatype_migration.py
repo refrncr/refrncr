@@ -8,8 +8,8 @@ from support import PASSWORD, configured_dataset, migrate
 
 from refrncr.app import create_community_services
 from refrncr.db.base import Base
-from refrncr.db.session import create_session_factory
-from refrncr.models import (
+from refrncr.persistence.database import create_session_factory
+from refrncr.persistence.models import (
     AuditEvent,
     Dataset,
     DatasetBusinessKeyField,

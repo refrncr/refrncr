@@ -9,7 +9,7 @@ from support import NOW, publish
 from test_mapping_source_versions import create_mapping, publish_table
 
 from refrncr.authorization import EXPORT_POLICIES
-from refrncr.models import AuditEvent
+from refrncr.persistence.models import AuditEvent
 from refrncr.services import AuthorizationError, NotFoundError
 from refrncr.web import SESSION_COOKIE
 

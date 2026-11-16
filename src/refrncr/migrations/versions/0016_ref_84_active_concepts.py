@@ -3,7 +3,7 @@
 import sqlalchemy as sa
 from alembic import op
 
-from refrncr.versions.concept_upgrade import (
+from refrncr.persistence.concept_upgrade import (
     ConceptUpgradeError,
     concept_preflight,
     migrate_concepts,

@@ -9,8 +9,8 @@ from sqlalchemy import inspect, select, text
 from support import setup
 
 from refrncr.db.base import Base
-from refrncr.models import DatasetVersion
-from refrncr.versions.version_upgrade import VersionUpgradeError, publication_preflight
+from refrncr.persistence.models import DatasetVersion
+from refrncr.persistence.version_upgrade import VersionUpgradeError, publication_preflight
 
 
 def config_for(connection):
@@ -141,7 +141,7 @@ def test_empty_upgrade_from_every_supported_revision(database_audit_db, revision
 
 @pytest.mark.slow
 def test_migration_copy_failure_rolls_back_schema_and_all_versions(database_context, monkeypatch):
-    from refrncr.version_persistence import SqlAlchemyVersionOperations
+    from refrncr.persistence.versions import SqlAlchemyVersionOperations
 
     c = database_context
     setup(c)

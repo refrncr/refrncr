@@ -20,8 +20,8 @@ from refrncr.audit_presentation import (
     present_object,
     require_complete_presentation,
 )
-from refrncr.models import AuditEvent, DatasetExportAccess, DatasetRecord, User
 from refrncr.persistence import SqlAlchemyAuditReadOperations
+from refrncr.persistence.models import AuditEvent, DatasetExportAccess, DatasetRecord, User
 from refrncr.ports import AUDIT_NAMED_OBJECT_TYPES, AuditObjectRecord, AuditReadUnavailable
 
 

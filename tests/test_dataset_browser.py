@@ -20,8 +20,8 @@ from support import (
     session_csrf,
 )
 
-from refrncr.models import AuditEvent, Dataset, DatasetField, Grant, LoginSession
 from refrncr.persistence import SqlAlchemyUnitOfWork
+from refrncr.persistence.models import AuditEvent, Dataset, DatasetField, Grant, LoginSession
 from refrncr.presentation_metadata import DATASET_ICONS
 from refrncr.services import NotFoundError, ValidationError
 

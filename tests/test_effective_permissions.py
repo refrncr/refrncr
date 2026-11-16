@@ -6,8 +6,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 from refrncr.db.base import Base
-from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.services import (
     AuthorizationError,
     AuthorizationService,
