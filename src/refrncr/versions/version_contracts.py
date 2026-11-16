@@ -13,7 +13,7 @@ from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOvervie
 from refrncr.versions.concept_contracts import ActiveConcept
 
 if TYPE_CHECKING:
-    from refrncr.services import RecordPage
+    from refrncr.datasets import RecordPage
 
 MAX_RELEASE_NOTE = 2000
 
