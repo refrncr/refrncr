@@ -5,10 +5,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import TYPE_CHECKING, Protocol
-
-if TYPE_CHECKING:
-    from refrncr.hierarchy_contracts import HierarchyNode
+from typing import Protocol
 
 
 class PersistenceConflictError(Exception):
@@ -218,6 +215,17 @@ class RecordValue:
     value: str | int | Decimal | float | bool | date | time | datetime
     canonical_key: bytes
     is_unique: bool
+
+
+class HierarchyNode(Protocol):
+    """Structural node shape used by persistence ports without a domain import."""
+
+    id: str
+    dataset_id: str
+    name: str
+    parent_id: str | None
+    values: tuple[RecordValue, ...]
+    revision: int
 
 
 @dataclass(frozen=True, slots=True)

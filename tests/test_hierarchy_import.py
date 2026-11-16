@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 from support import revision
 
 from refrncr.datasets.export import generate_export
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.imports import ImportValidationError, TransientImportStore
 from refrncr.services import NotFoundError, StaleRecordError
 

@@ -281,12 +281,12 @@ def test_every_audited_operation_has_behavior_cases():
             "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
             "refrncr.versions.concepts.DatasetVersionConceptMixin.create_concept",
             "refrncr.versions.concepts.DatasetVersionConceptMixin.discard_concept",
-            "refrncr.hierarchy.HierarchyService.create_node",
-            "refrncr.hierarchy.HierarchyService.delete_subtree",
-            "refrncr.hierarchy.HierarchyService.update_node",
-            "refrncr.hierarchy.HierarchyService.update_node_and_values",
-            "refrncr.hierarchy.HierarchyService.update_values",
-            "refrncr.hierarchy_import.HierarchyImportService.confirm",
+            "refrncr.hierarchies.service.HierarchyService.create_node",
+            "refrncr.hierarchies.service.HierarchyService.delete_subtree",
+            "refrncr.hierarchies.service.HierarchyService.update_node",
+            "refrncr.hierarchies.service.HierarchyService.update_node_and_values",
+            "refrncr.hierarchies.service.HierarchyService.update_values",
+            "refrncr.hierarchies.imports.HierarchyImportService.confirm",
             "refrncr.authorization.installation_settings.InstallationSettingsService.change_policy",
         }
     )

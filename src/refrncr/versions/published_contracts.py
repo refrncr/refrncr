@@ -12,7 +12,7 @@ from refrncr.datasets.record_identity import (
     decode_record_identifier,
     encode_record_identifier,
 )
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.ports import StoredRecord
 from refrncr.versions.version_contracts import PublishedVersion, SnapshotField, SourceVersion
 

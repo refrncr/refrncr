@@ -2201,7 +2201,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "active",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.active",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.active",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.import_hierarchy_file GET,POST /datasets/<key>/concept/hierarchy-import"
       ],
@@ -2232,7 +2232,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "begin",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.begin",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.begin",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.import_hierarchy_file GET,POST /datasets/<key>/concept/hierarchy-import"
       ],
@@ -2263,7 +2263,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "preview",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.preview",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.preview",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.hierarchy_import_preview GET /datasets/<key>/concept/hierarchy-import/<token>",
         "refrncr.web.hierarchies.imports.confirm_hierarchy_import POST /datasets/<key>/concept/hierarchy-import/<token>/confirm"
@@ -2295,7 +2295,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "cancel",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.cancel",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.cancel",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.cancel_hierarchy_import POST /datasets/<key>/concept/hierarchy-import/<token>/cancel"
       ],
@@ -2326,7 +2326,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "state",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.state",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.state",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.hierarchy_import_preview GET /datasets/<key>/concept/hierarchy-import/<token>",
         "refrncr.web.hierarchies.imports.confirm_hierarchy_import POST /datasets/<key>/concept/hierarchy-import/<token>/confirm"
@@ -2358,7 +2358,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "revoke_session",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.revoke_session",
       "interface_entrypoints": [
         "refrncr.web.auth.logout POST /logout"
       ],
@@ -2389,7 +2389,7 @@
     {
       "capability": "HierarchyImportService",
       "operation": "confirm",
-      "service": "refrncr.hierarchy_import.HierarchyImportService.confirm",
+      "service": "refrncr.hierarchies.imports.HierarchyImportService.confirm",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.imports.confirm_hierarchy_import POST /datasets/<key>/concept/hierarchy-import/<token>/confirm"
       ],
@@ -6375,7 +6375,7 @@
     {
       "capability": "Hierarchy maintenance",
       "operation": "create_node",
-      "service": "refrncr.hierarchy.HierarchyService.create_node",
+      "service": "refrncr.hierarchies.service.HierarchyService.create_node",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_create GET,POST /datasets/<key>/concept/nodes/new"
       ],
@@ -6415,7 +6415,7 @@
     {
       "capability": "Hierarchy maintenance",
       "operation": "delete_subtree",
-      "service": "refrncr.hierarchy.HierarchyService.delete_subtree",
+      "service": "refrncr.hierarchies.service.HierarchyService.delete_subtree",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_delete GET,POST /datasets/<key>/concept/nodes/<node_id>/delete"
       ],
@@ -6456,9 +6456,9 @@
     {
       "capability": "Hierarchy maintenance",
       "operation": "update_node",
-      "service": "refrncr.hierarchy.HierarchyService.update_node",
+      "service": "refrncr.hierarchies.service.HierarchyService.update_node",
       "interface_entrypoints": [
-        "refrncr.hierarchy.HierarchyService.update_node direct service interface"
+        "refrncr.hierarchies.service.HierarchyService.update_node direct service interface"
       ],
       "kind": "mutation",
       "classification": "domain-audited",
@@ -6496,7 +6496,7 @@
     {
       "capability": "Hierarchy maintenance",
       "operation": "update_node_and_values",
-      "service": "refrncr.hierarchy.HierarchyService.update_node_and_values",
+      "service": "refrncr.hierarchies.service.HierarchyService.update_node_and_values",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_edit GET,POST /datasets/<key>/concept/nodes/<node_id>/edit"
       ],
@@ -6536,7 +6536,7 @@
     {
       "capability": "Hierarchy maintenance",
       "operation": "update_values",
-      "service": "refrncr.hierarchy.HierarchyService.update_values",
+      "service": "refrncr.hierarchies.service.HierarchyService.update_values",
       "interface_entrypoints": [
         "refrncr.web.hierarchies.maintenance.dataset_hierarchy_node_values GET,POST /datasets/<key>/concept/nodes/<node_id>/values"
       ],

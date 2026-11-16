@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from refrncr.hierarchy_contracts import HierarchyNode, hierarchy_node_paths
+from refrncr.hierarchies.contracts import HierarchyNode, hierarchy_node_paths
 from refrncr.models import (
     DatasetHierarchyNode,
     DatasetHierarchyValue,

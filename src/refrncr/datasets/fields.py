@@ -25,7 +25,7 @@ from refrncr.datasets.shared import (
 )
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
-from refrncr.hierarchy_contracts import validate_hierarchy_scope
+from refrncr.hierarchies.contracts import validate_hierarchy_scope
 from refrncr.ports import (
     DatasetFieldRecord,
     DatasetRecord,

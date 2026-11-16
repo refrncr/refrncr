@@ -8,7 +8,7 @@ from sqlalchemy.orm import aliased, undefer
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.datasets.record_identity import encode_record_identifier
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.hierarchy_persistence import hierarchy_value
 from refrncr.models import (
     Dataset,

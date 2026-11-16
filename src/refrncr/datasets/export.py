@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
-from refrncr.hierarchy_contracts import (
+from refrncr.hierarchies.contracts import (
     applicable,
     hierarchy_order,
     hierarchy_path_label,

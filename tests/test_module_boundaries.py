@@ -10,6 +10,7 @@ DOMAIN_PACKAGES_WITH_TYPED_ERRORS = (
     "datasets",
     "versions",
     "imports",
+    "hierarchies",
 )
 GENERAL_ERROR_TYPES = {
     "AuthorizationError",

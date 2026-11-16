@@ -24,7 +24,7 @@ from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.datasets.datatypes import DATATYPES, get_datatype
 from refrncr.db.base import Base
 from refrncr.db.session import create_database_engine, create_session_factory
-from refrncr.hierarchy import HierarchyService
+from refrncr.hierarchies import HierarchyService
 from refrncr.identity import login_security
 from refrncr.models import AuditEvent, Dataset, User
 from refrncr.ports import RecordValue, StoredRecord

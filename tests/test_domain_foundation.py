@@ -27,6 +27,12 @@ from refrncr.errors import (
     UserManagementError,
     ValidationError,
 )
+from refrncr.hierarchies import (
+    HierarchyConflictError,
+    HierarchyError,
+    HierarchyNotFoundError,
+    HierarchyValidationError,
+)
 from refrncr.identity import (
     IdentityAuthorizationError,
     IdentityConflictError,
@@ -147,6 +153,19 @@ def test_import_errors_have_a_domain_and_exact_category():
         (ImportValidationError, ValidationError),
     ):
         assert issubclass(error_type, ImportDomainError)
+        assert issubclass(error_type, category)
+        assert sum(issubclass(error_type, candidate) for candidate in categories) == 1
+
+
+def test_hierarchy_errors_have_a_domain_and_exact_category():
+    categories = (NotFoundError, ConflictError, ValidationError, AuthorizationError)
+    assert not any(issubclass(HierarchyError, category) for category in categories)
+    for error_type, category in (
+        (HierarchyNotFoundError, NotFoundError),
+        (HierarchyConflictError, ConflictError),
+        (HierarchyValidationError, ValidationError),
+    ):
+        assert issubclass(error_type, HierarchyError)
         assert issubclass(error_type, category)
         assert sum(issubclass(error_type, candidate) for candidate in categories) == 1
 

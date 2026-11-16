@@ -14,8 +14,8 @@ from refrncr.audit_history import AuditHistoryService
 from refrncr.authorization import InstallationSettingsService
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.hierarchy import HierarchyService
-from refrncr.hierarchy_import import HierarchyImportService
+from refrncr.hierarchies import HierarchyService
+from refrncr.hierarchies.imports import HierarchyImportService
 from refrncr.identity.api_keys import ApiKeyService, configured_api_keys
 from refrncr.identity.login_security import SourceIdentityResolver
 from refrncr.imports import DatasetRecordImportService
