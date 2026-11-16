@@ -450,20 +450,20 @@ for _method, _action in (
     ("update_node_and_values", "hierarchy.node_updated"),
     ("update_values", "hierarchy.values_updated"),
 ):
-    _audited("HierarchyService", _method, ("dataset", _action), module="hierarchy")
+    _audited("HierarchyService", _method, ("dataset", _action), module="hierarchies.service")
 
 _register(
     "HierarchyImportService",
     "confirm",
     "domain-audited",
     events=(("dataset", "hierarchy.import_applied"),),
-    module="hierarchy_import",
+    module="hierarchies.imports",
 )
 _register(
     "HierarchyImportService",
     "begin active state preview cancel revoke_session",
     "intentionally excluded",
-    module="hierarchy_import",
+    module="hierarchies.imports",
     rationale="Transient preview state only; no committed hierarchy change.",
 )
 

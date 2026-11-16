@@ -13,7 +13,7 @@ from support import (
     session_csrf,
 )
 
-from refrncr.hierarchy import HierarchyService
+from refrncr.hierarchies import HierarchyService
 from refrncr.services import DatasetRecordService, ValidationError
 
 

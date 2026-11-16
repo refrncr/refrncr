@@ -2,17 +2,17 @@
 
 from dataclasses import dataclass
 
-from refrncr.errors import ValidationError
+from refrncr.hierarchies.errors import HierarchyValidationError
 from refrncr.ports import RecordValue
 
 
 def validate_hierarchy_scope(scope, kind):
     if kind != "hierarchy":
         if scope is not None:
-            raise ValidationError("Field scope is only available for hierarchy datasets")
+            raise HierarchyValidationError("Field scope is only available for hierarchy datasets")
         return None
     if scope not in {"leaves", "all_nodes"}:
-        raise ValidationError("Choose Leaves only or All nodes for the field scope")
+        raise HierarchyValidationError("Choose Leaves only or All nodes for the field scope")
     return scope
 
 

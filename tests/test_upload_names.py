@@ -1,6 +1,6 @@
 import pytest
 
-from refrncr import hierarchy_import
+from refrncr.hierarchies import imports as hierarchy_import
 from refrncr.imports import service as record_import
 
 

@@ -9,8 +9,8 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.hierarchy import HierarchyService
-from refrncr.hierarchy_import import HierarchyImportService
+from refrncr.hierarchies import HierarchyService
+from refrncr.hierarchies.imports import HierarchyImportService
 from refrncr.services import AuthorizationService, DatasetRecordService
 from refrncr.versions import DatasetVersionService
 from refrncr.web.routing import DatasetBlueprint

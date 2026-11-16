@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy.orm import Session
 from support import audits, snapshot
 
-from refrncr.hierarchy import hierarchy_snapshot, hierarchy_validation_errors
+from refrncr.hierarchies import hierarchy_snapshot, hierarchy_validation_errors
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.services import (
     NotFoundError,

@@ -18,15 +18,16 @@ from refrncr.datasets.shared import (
     validate_field_metadata,
 )
 from refrncr.domain import advance_concept, require_concept, valid_identity
-from refrncr.errors import NotFoundError, ValidationError
-from refrncr.hierarchy_contracts import (
+from refrncr.errors import ValidationError
+from refrncr.hierarchies.contracts import (
     applicable,
     hierarchy_node_paths,
     validate_hierarchy_scope,
 )
-from refrncr.hierarchy_contracts import hierarchy_order as hierarchy_order
-from refrncr.hierarchy_contracts import hierarchy_paths as hierarchy_paths
-from refrncr.hierarchy_contracts import hierarchy_sibling_sort_key as hierarchy_sibling_sort_key
+from refrncr.hierarchies.contracts import hierarchy_order as hierarchy_order
+from refrncr.hierarchies.contracts import hierarchy_paths as hierarchy_paths
+from refrncr.hierarchies.contracts import hierarchy_sibling_sort_key as hierarchy_sibling_sort_key
+from refrncr.hierarchies.errors import HierarchyNotFoundError, HierarchyValidationError
 from refrncr.ports import RecordValue, StoredRecord
 from refrncr.versions.version_contracts import SnapshotContent, SnapshotField
 
@@ -42,7 +43,7 @@ def canonical_hierarchy_view(view):
 def _node_name(name):
     name = name.strip() if isinstance(name, str) else ""
     if not name or len(name) > MAX_HIERARCHY_NODE_NAME:
-        raise ValidationError("Node name must contain between 1 and 200 characters")
+        raise HierarchyValidationError("Node name must contain between 1 and 200 characters")
     return name
 
 
@@ -191,10 +192,10 @@ def hierarchy_snapshot(uow, dataset, *, validate=True):
         or len({field.key for field in fields}) != len(fields)
         or sorted(field.display_position for field in fields) != list(range(1, len(fields) + 1))
     ):
-        raise ValidationError("Invalid Field configuration")
+        raise HierarchyValidationError("Invalid Field configuration")
     for field in fields:
         if field.dataset_id != dataset.id or not valid_identity(field.id):
-            raise ValidationError("Invalid Field identity")
+            raise HierarchyValidationError("Invalid Field identity")
         validate_dataset_field_key(field.key)
         normalize_dataset_field_name(field.name)
         validate_dataset_field_type(field.data_type)
@@ -208,7 +209,7 @@ def hierarchy_snapshot(uow, dataset, *, validate=True):
         or (node.parent_id is not None and not valid_identity(node.parent_id))
         for node in nodes
     ):
-        raise ValidationError("Invalid hierarchy node identity")
+        raise HierarchyValidationError("Invalid hierarchy node identity")
     snapshot_fields = tuple(
         SnapshotField(
             field.id,
@@ -229,7 +230,7 @@ def hierarchy_snapshot(uow, dataset, *, validate=True):
         for field in fields
     )
     if validate and (errors := hierarchy_validation_errors(snapshot_fields, identifier, nodes)):
-        raise ValidationError("; ".join(errors))
+        raise HierarchyValidationError("; ".join(errors))
     return SnapshotContent(
         dataset.name,
         dataset.description,
@@ -251,17 +252,17 @@ class HierarchyService:
         try:
             key = validate_dataset_key(dataset_key)
         except ValidationError as exc:
-            raise NotFoundError("Dataset not found") from exc
+            raise HierarchyNotFoundError("Dataset not found") from exc
         dataset = work.datasets.find_by_key(key, for_update=True)
         if (
             dataset is None
             or dataset.kind != "hierarchy"
             or not self.authorization.datasets.can_maintain_dataset(actor_id, dataset.id, uow=work)
         ):
-            raise NotFoundError("Dataset not found")
+            raise HierarchyNotFoundError("Dataset not found")
         require_concept(work, dataset.id)
         if type(expected_revision) is not int or expected_revision < 1:
-            raise ValidationError("Expected revision must be a positive integer")
+            raise HierarchyValidationError("Expected revision must be a positive integer")
         if expected_revision != dataset.revision:
             raise StaleRecordError("Hierarchy changed since this form was opened")
         return dataset
@@ -287,11 +288,13 @@ class HierarchyService:
             nodes = work.hierarchy.list_for_dataset(dataset.id)
             if parent_id is None:
                 if nodes:
-                    raise ValidationError("The hierarchy already has a root; choose a parent")
+                    raise HierarchyValidationError(
+                        "The hierarchy already has a root; choose a parent"
+                    )
             elif not any(node.id == parent_id for node in nodes):
-                raise ValidationError("Choose a parent in this hierarchy")
+                raise HierarchyValidationError("Choose a parent in this hierarchy")
             if any(node.name == name for node in nodes):
-                raise ValidationError("A node in this hierarchy already has this name")
+                raise HierarchyValidationError("A node in this hierarchy already has this name")
             node = work.hierarchy.create(dataset.id, name, parent_id)
             self._changed(work, dataset, actor_id, "hierarchy.node_created")
             return node
@@ -302,14 +305,16 @@ class HierarchyService:
             nodes = work.hierarchy.list_for_dataset(dataset.id)
             node = next((item for item in nodes if item.id == node_id), None)
             if node is None:
-                raise NotFoundError("Node not found")
+                raise HierarchyNotFoundError("Node not found")
             if (node.parent_id is None) != (parent_id is None):
-                raise ValidationError("Keep the existing root and choose a parent for other nodes")
+                raise HierarchyValidationError(
+                    "Keep the existing root and choose a parent for other nodes"
+                )
             name = _node_name(name)
             if name != node.name and any(
                 item.id != node_id and item.name == name for item in nodes
             ):
-                raise ValidationError("A node in this hierarchy already has this name")
+                raise HierarchyValidationError("A node in this hierarchy already has this name")
             proposed = tuple(
                 replace(item, name=name, parent_id=parent_id) if item.id == node_id else item
                 for item in nodes
@@ -318,7 +323,7 @@ class HierarchyService:
             # different parents. Permit independent repairs and unchanged-name
             # moves while still rejecting new conflicts and invalid structure.
             if errors := _structure_errors(proposed, publication=False, allow_legacy_names=True):
-                raise ValidationError("; ".join(errors))
+                raise HierarchyValidationError("; ".join(errors))
             if node.name == name and node.parent_id == parent_id:
                 return node
             updated = work.hierarchy.update(dataset.id, node_id, name, parent_id)
@@ -332,7 +337,7 @@ class HierarchyService:
     ):
         active = [field for field in fields if applicable(field, target_node, parent_ids)]
         if not isinstance(submitted, dict) or set(submitted) - {field.key for field in active}:
-            raise ValidationError("Only applicable fields may be edited for this node")
+            raise HierarchyValidationError("Only applicable fields may be edited for this node")
         active_ids = {field.id for field in active}
         values = [value for value in target_node.values if value.field_id not in active_ids]
         errors = {}
@@ -392,20 +397,22 @@ class HierarchyService:
             nodes = work.hierarchy.list_for_dataset(dataset.id)
             node = next((item for item in nodes if item.id == node_id), None)
             if node is None:
-                raise NotFoundError("Node not found")
+                raise HierarchyNotFoundError("Node not found")
             if (node.parent_id is None) != (parent_id is None):
-                raise ValidationError("Keep the existing root and choose a parent for other nodes")
+                raise HierarchyValidationError(
+                    "Keep the existing root and choose a parent for other nodes"
+                )
             name = _node_name(name)
             if name != node.name and any(
                 item.id != node_id and item.name == name for item in nodes
             ):
-                raise ValidationError("A node in this hierarchy already has this name")
+                raise HierarchyValidationError("A node in this hierarchy already has this name")
             proposed = tuple(
                 replace(item, name=name, parent_id=parent_id) if item.id == node_id else item
                 for item in nodes
             )
             if errors := _structure_errors(proposed, publication=False, allow_legacy_names=True):
-                raise ValidationError("; ".join(errors))
+                raise HierarchyValidationError("; ".join(errors))
 
             proposed_node = next(item for item in proposed if item.id == node_id)
             parent_ids = {item.parent_id for item in proposed}
@@ -433,9 +440,9 @@ class HierarchyService:
             nodes = work.hierarchy.list_for_dataset(dataset.id)
             node = next((item for item in nodes if item.id == node_id), None)
             if node is None:
-                raise NotFoundError("Node not found")
+                raise HierarchyNotFoundError("Node not found")
             if node.parent_id is None:
-                raise ValidationError("The root node cannot be deleted")
+                raise HierarchyValidationError("The root node cannot be deleted")
 
             children = {}
             for item in nodes:
@@ -458,7 +465,7 @@ class HierarchyService:
             nodes = work.hierarchy.list_for_dataset(dataset.id)
             node = next((item for item in nodes if item.id == node_id), None)
             if node is None:
-                raise NotFoundError("Node not found")
+                raise HierarchyNotFoundError("Node not found")
             fields = work.dataset_fields.list_for_dataset(dataset.id)
             parents = {item.parent_id for item in nodes}
             values = self._validated_values(work, dataset, node, nodes, fields, submitted, parents)

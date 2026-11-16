@@ -10,9 +10,13 @@ from dataclasses import dataclass
 
 from refrncr.audit import record_audit
 from refrncr.datasets import StaleRecordError
+from refrncr.datasets.fields import DatasetFieldService
+from refrncr.datasets.shared import canonicalize_record_value
 from refrncr.domain import advance_concept, require_concept
-from refrncr.hierarchy import hierarchy_validation_errors
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.errors import ValidationError
+from refrncr.hierarchies import hierarchy_validation_errors
+from refrncr.hierarchies.contracts import HierarchyNode
+from refrncr.hierarchies.errors import HierarchyNotFoundError
 from refrncr.imports import (
     ImportValidationError,
     TransientImportStore,
@@ -20,12 +24,6 @@ from refrncr.imports import (
 )
 from refrncr.imports.upload_names import safe_upload_filename
 from refrncr.ports import RecordValue
-from refrncr.services import (
-    DatasetFieldService,
-    NotFoundError,
-    ValidationError,
-    canonicalize_record_value,
-)
 
 STRUCTURAL_COLUMNS = ("Node ID", "Parent ID", "Name", "Parent")
 
@@ -95,7 +93,7 @@ class HierarchyImportService:
                     actor_id, dataset.id, uow=uow
                 )
             ):
-                raise NotFoundError("Dataset not found")
+                raise HierarchyNotFoundError("Dataset not found")
             require_concept(uow, dataset.id)
             return dataset.id, dataset.revision
 
@@ -108,6 +106,66 @@ class HierarchyImportService:
         if parsed != value.casefold():
             raise ImportValidationError(f"{label} must be a canonical Node ID")
         return parsed
+
+    @staticmethod
+    def _header_errors(headers, expected):
+        if headers == expected:
+            return []
+        missing = [column for column in expected if column not in headers]
+        unknown = [column for column in headers if column not in expected]
+        errors = []
+        if missing:
+            errors.append("The Data worksheet is missing: " + ", ".join(missing))
+        if unknown:
+            errors.append("The Data worksheet contains unsupported columns: " + ", ".join(unknown))
+        if not missing and not unknown:
+            errors.append("The Data worksheet columns are in the wrong order")
+        return errors
+
+    def _preview_row(self, source_row, fields, by_id, seen_ids):
+        errors = []
+        values = source_row.values
+        if source_row.formulas:
+            return None, [f"Row {source_row.number} contains a formula; use literal values"]
+        raw_id = values[0].strip()
+        node_id = None
+        if raw_id:
+            node_id = self._parse_uuid(raw_id, f"Node ID in row {source_row.number}")
+            if node_id in seen_ids:
+                errors.append(f"Node ID is duplicated in row {source_row.number}")
+            seen_ids.add(node_id)
+            if node_id not in by_id:
+                errors.append(f"Node ID in row {source_row.number} is not in this hierarchy")
+        raw_parent = values[1].strip()
+        parent_id = None
+        if raw_parent:
+            parent_id = self._parse_uuid(raw_parent, f"Parent ID in row {source_row.number}")
+            if parent_id not in by_id:
+                errors.append(f"Parent ID in row {source_row.number} is not in this hierarchy")
+        name = values[2].strip()
+        if not name:
+            errors.append(f"Name is required in row {source_row.number}")
+        if parent_id is None and values[3].strip():
+            errors.append(f"Root row {source_row.number} must have an empty Parent")
+        parsed_values = []
+        for index, field in enumerate(fields, 4):
+            raw = values[index]
+            if raw == "":
+                continue
+            try:
+                canonical = canonicalize_record_value(field.data_type, raw)
+            except ValidationError as error:
+                errors.append(f"Row {source_row.number}, {field.name}: {error}")
+                continue
+            if canonical is not None:
+                value, key = canonical
+                parsed_values.append(
+                    RecordValue(field.id, field.key, field.data_type, value, key, field.is_unique)
+                )
+        return (
+            HierarchyImportRow(source_row.number, node_id, parent_id, name, tuple(parsed_values)),
+            errors,
+        )
 
     def _preview_for(self, dataset_id, content, filename, expected_revision):
         if os.path.splitext(filename)[1].casefold() != ".xlsx":
@@ -123,71 +181,17 @@ class HierarchyImportService:
         by_id = {node.id: node for node in current}
         headers = tuple(source.headers)
         expected = (*STRUCTURAL_COLUMNS, *_field_columns(fields))
-        errors = []
-        if headers != expected:
-            missing = [column for column in expected if column not in headers]
-            unknown = [column for column in headers if column not in expected]
-            if missing:
-                errors.append("The Data worksheet is missing: " + ", ".join(missing))
-            if unknown:
-                errors.append(
-                    "The Data worksheet contains unsupported columns: " + ", ".join(unknown)
-                )
-            if not missing and not unknown:
-                errors.append("The Data worksheet columns are in the wrong order")
+        errors = self._header_errors(headers, expected)
+        if errors:
             return HierarchyImportPreview(expected_revision, (), 0, 0, 0, 0, 0, tuple(errors))
 
         rows = []
         seen_ids = set()
         for source_row in source.rows:
-            values = source_row.values
-            if source_row.formulas:
-                errors.append(f"Row {source_row.number} contains a formula; use literal values")
-                continue
-            raw_id = values[0].strip()
-            node_id = None
-            if raw_id:
-                node_id = self._parse_uuid(raw_id, f"Node ID in row {source_row.number}")
-                if node_id in seen_ids:
-                    errors.append(f"Node ID is duplicated in row {source_row.number}")
-                seen_ids.add(node_id)
-                if node_id not in by_id:
-                    errors.append(f"Node ID in row {source_row.number} is not in this hierarchy")
-            raw_parent = values[1].strip()
-            parent_id = None
-            if raw_parent:
-                parent_id = self._parse_uuid(raw_parent, f"Parent ID in row {source_row.number}")
-                if parent_id not in by_id:
-                    errors.append(f"Parent ID in row {source_row.number} is not in this hierarchy")
-            name = values[2].strip()
-            if not name:
-                errors.append(f"Name is required in row {source_row.number}")
-            if parent_id is None and values[3].strip():
-                errors.append(f"Root row {source_row.number} must have an empty Parent")
-            # Parent ID is authoritative. The display-only Parent column can
-            # legitimately reflect a renamed parent in the same workbook.
-            parsed_values = []
-            for index, field in enumerate(fields, 4):
-                raw = values[index]
-                if raw == "":
-                    continue
-                try:
-                    canonical = canonicalize_record_value(field.data_type, raw)
-                except ValidationError as error:
-                    errors.append(f"Row {source_row.number}, {field.name}: {error}")
-                    continue
-                if canonical is not None:
-                    value, key = canonical
-                    parsed_values.append(
-                        RecordValue(
-                            field.id, field.key, field.data_type, value, key, field.is_unique
-                        )
-                    )
-            rows.append(
-                HierarchyImportRow(
-                    source_row.number, node_id, parent_id, name, tuple(parsed_values)
-                )
-            )
+            row, row_errors = self._preview_row(source_row, fields, by_id, seen_ids)
+            errors.extend(row_errors)
+            if row is not None:
+                rows.append(row)
 
         existing_rows = {row.node_id for row in rows if row.node_id is not None}
         removals = tuple(node for node in current if node.id not in existing_rows)
@@ -301,7 +305,7 @@ class HierarchyImportService:
         dataset_id, _revision = self._target(actor_id, dataset_key)
         state = self.store.get(token, actor_id, session_id, dataset_id)
         if state.mode != "hierarchy" or state.busy:
-            raise NotFoundError("Import not found")
+            raise HierarchyNotFoundError("Import not found")
         return state
 
     def active(self, actor_id, session_id, dataset_key):
@@ -319,7 +323,7 @@ class HierarchyImportService:
         dataset_id, revision = self._target(actor_id, dataset_key)
         with self.store._operation(token, actor_id, session_id, dataset_id) as state:
             if state.mode != "hierarchy" or state.busy:
-                raise NotFoundError("Import not found")
+                raise HierarchyNotFoundError("Import not found")
             preview = self._preview_for(state.dataset_id, state.content, state.filename, revision)
             self.store.update(
                 state,
@@ -360,7 +364,7 @@ class HierarchyImportService:
         with self.uow(write=True, serialized=True, translate_errors=True) as work:
             dataset = work.datasets.get(dataset_id, for_update=True)
             if dataset is None or dataset.kind != "hierarchy":
-                raise NotFoundError("Dataset not found")
+                raise HierarchyNotFoundError("Dataset not found")
             if dataset.revision != preview.expected_revision:
                 raise StaleRecordError("The hierarchy changed since validation")
             require_concept(work, dataset.id)

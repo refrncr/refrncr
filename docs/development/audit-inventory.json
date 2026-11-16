@@ -33,18 +33,18 @@
     "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.review",
     "refrncr.versions.concepts.DatasetVersionConceptMixin.review_discard",
     "refrncr.versions.concepts.DatasetVersionConceptMixin.update_mapping_source",
-    "refrncr.hierarchy.HierarchyService.create_node",
-    "refrncr.hierarchy.HierarchyService.delete_subtree",
-    "refrncr.hierarchy.HierarchyService.update_node",
-    "refrncr.hierarchy.HierarchyService.update_node_and_values",
-    "refrncr.hierarchy.HierarchyService.update_values",
-    "refrncr.hierarchy_import.HierarchyImportService.active",
-    "refrncr.hierarchy_import.HierarchyImportService.begin",
-    "refrncr.hierarchy_import.HierarchyImportService.cancel",
-    "refrncr.hierarchy_import.HierarchyImportService.confirm",
-    "refrncr.hierarchy_import.HierarchyImportService.preview",
-    "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
-    "refrncr.hierarchy_import.HierarchyImportService.state",
+    "refrncr.hierarchies.service.HierarchyService.create_node",
+    "refrncr.hierarchies.service.HierarchyService.delete_subtree",
+    "refrncr.hierarchies.service.HierarchyService.update_node",
+    "refrncr.hierarchies.service.HierarchyService.update_node_and_values",
+    "refrncr.hierarchies.service.HierarchyService.update_values",
+    "refrncr.hierarchies.imports.HierarchyImportService.active",
+    "refrncr.hierarchies.imports.HierarchyImportService.begin",
+    "refrncr.hierarchies.imports.HierarchyImportService.cancel",
+    "refrncr.hierarchies.imports.HierarchyImportService.confirm",
+    "refrncr.hierarchies.imports.HierarchyImportService.preview",
+    "refrncr.hierarchies.imports.HierarchyImportService.revoke_session",
+    "refrncr.hierarchies.imports.HierarchyImportService.state",
     "refrncr.authorization.installation_settings.InstallationSettingsService.change_policy",
     "refrncr.authorization.installation_settings.InstallationSettingsService.get_policy",
     "refrncr.authorization.installation_settings.InstallationSettingsService.requires_export_access",
@@ -785,8 +785,8 @@
         "POST"
       ],
       "operations": [
-        "refrncr.hierarchy_import.HierarchyImportService.active",
-        "refrncr.hierarchy_import.HierarchyImportService.begin",
+        "refrncr.hierarchies.imports.HierarchyImportService.active",
+        "refrncr.hierarchies.imports.HierarchyImportService.begin",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -799,8 +799,8 @@
         "GET"
       ],
       "operations": [
-        "refrncr.hierarchy_import.HierarchyImportService.preview",
-        "refrncr.hierarchy_import.HierarchyImportService.state",
+        "refrncr.hierarchies.imports.HierarchyImportService.preview",
+        "refrncr.hierarchies.imports.HierarchyImportService.state",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -812,9 +812,9 @@
         "POST"
       ],
       "operations": [
-        "refrncr.hierarchy_import.HierarchyImportService.confirm",
-        "refrncr.hierarchy_import.HierarchyImportService.preview",
-        "refrncr.hierarchy_import.HierarchyImportService.state",
+        "refrncr.hierarchies.imports.HierarchyImportService.confirm",
+        "refrncr.hierarchies.imports.HierarchyImportService.preview",
+        "refrncr.hierarchies.imports.HierarchyImportService.state",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -827,7 +827,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.hierarchy_import.HierarchyImportService.cancel",
+        "refrncr.hierarchies.imports.HierarchyImportService.cancel",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -1117,7 +1117,7 @@
       ],
       "operations": [
         "refrncr.browser_security.BrowserCookiePolicy.for_request",
-        "refrncr.hierarchy_import.HierarchyImportService.revoke_session",
+        "refrncr.hierarchies.imports.HierarchyImportService.revoke_session",
         "refrncr.imports.workflows.ImportWorkflowMixin.revoke_session",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.identity.sessions.SessionService.revoke",
@@ -1536,7 +1536,7 @@
       ],
       "operations": [
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
-        "refrncr.hierarchy.HierarchyService.create_node",
+        "refrncr.hierarchies.service.HierarchyService.create_node",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -1549,7 +1549,7 @@
       ],
       "operations": [
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
-        "refrncr.hierarchy.HierarchyService.update_node_and_values",
+        "refrncr.hierarchies.service.HierarchyService.update_node_and_values",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -1562,7 +1562,7 @@
       ],
       "operations": [
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
-        "refrncr.hierarchy.HierarchyService.delete_subtree",
+        "refrncr.hierarchies.service.HierarchyService.delete_subtree",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -1575,7 +1575,7 @@
       ],
       "operations": [
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
-        "refrncr.hierarchy.HierarchyService.update_values",
+        "refrncr.hierarchies.service.HierarchyService.update_values",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },

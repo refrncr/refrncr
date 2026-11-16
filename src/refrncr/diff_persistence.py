@@ -4,7 +4,7 @@ from sqlalchemy import and_, case, func, literal, or_, select, union_all
 
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
-from refrncr.hierarchy_contracts import hierarchy_node_paths
+from refrncr.hierarchies.contracts import hierarchy_node_paths
 from refrncr.models import (
     Dataset,
     DatasetField,
@@ -55,7 +55,7 @@ class SqlAlchemyDiffOperations:
         return classify_hierarchy(*self._hierarchy_content(dataset_id, version_id))
 
     def _hierarchy_records(self, dataset_id, version_id):
-        from refrncr.hierarchy import hierarchy_leaf_records
+        from refrncr.hierarchies import hierarchy_leaf_records
 
         nodes, old_nodes, fields, old_fields = self._hierarchy_content(dataset_id, version_id)
         new, old = (
@@ -301,7 +301,7 @@ class SqlAlchemyDiffOperations:
         """Validate stored content and identifiers, including the hierarchy leaf projection."""
         if self._is_hierarchy(version.dataset_id):
             from refrncr.domain import valid_identity
-            from refrncr.hierarchy import hierarchy_leaf_records, hierarchy_validation_errors
+            from refrncr.hierarchies import hierarchy_leaf_records, hierarchy_validation_errors
             from refrncr.ports import DatasetBusinessKey
             from refrncr.version_persistence import SqlAlchemyVersionOperations
 

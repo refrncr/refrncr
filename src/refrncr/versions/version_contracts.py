@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from refrncr.clock import APPLICATION_TIMEZONE as APPLICATION_TIMEZONE
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOverview, StoredRecord
 from refrncr.versions.concept_contracts import ActiveConcept
 

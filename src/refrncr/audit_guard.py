@@ -117,7 +117,7 @@ def verify_inventory(root):
                 "refrncr.versions",
                 "refrncr.datasets.dataset_diff",
                 "refrncr.identity.api_keys",
-                "refrncr.hierarchy",
+                "refrncr.hierarchies.service",
             }
             or module == "refrncr.web"
             or module.startswith("refrncr.web.")

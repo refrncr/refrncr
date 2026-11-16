@@ -20,10 +20,6 @@ class VersionError(DomainError):
     """Dataset-version-domain failure."""
 
 
-class HierarchyError(DomainError):
-    """Hierarchy-domain failure."""
-
-
 class PersistenceError(DomainError):
     """Persistence-boundary failure safe to expose as a domain error."""
 
@@ -53,6 +49,7 @@ class AuthorizationError(DomainError):
 
 
 _MOVED_ERROR_MODULES = {
+    "HierarchyError": "refrncr.hierarchies.errors",
     "ImportDomainError": "refrncr.imports.errors",
 }
 

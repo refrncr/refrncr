@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.export import generate_export
-from refrncr.hierarchy_contracts import HierarchyNode
+from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.ports import RecordValue
 
 

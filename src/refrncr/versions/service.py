@@ -20,7 +20,7 @@ from refrncr.datasets.shared import (
     validate_field_metadata,
 )
 from refrncr.errors import ValidationError
-from refrncr.hierarchy import (
+from refrncr.hierarchies import (
     hierarchy_snapshot,
 )
 from refrncr.ports import (
