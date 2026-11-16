@@ -16,7 +16,7 @@ from refrncr.models import (
     DatasetVersionHierarchyValue,
 )
 from refrncr.ports import PersistenceConflictError, RecordValue, StoredRecord
-from refrncr.version_contracts import SnapshotContent, SnapshotField, SummaryCounts
+from refrncr.versions.version_contracts import SnapshotContent, SnapshotField, SummaryCounts
 
 NOW = datetime(2026, 9, 28, 12, tzinfo=UTC)
 

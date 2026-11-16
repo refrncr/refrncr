@@ -3,7 +3,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from refrncr.change_status import (
+from refrncr.versions.change_status import (
     LEGACY_STATUS_ALIASES,
     UI_STATUS_ALIASES,
     ChangeStatus,

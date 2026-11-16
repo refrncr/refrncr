@@ -25,7 +25,6 @@ from refrncr.audit import record_audit
 from refrncr.datasets import RecordConflictError, RecordValidationError
 from refrncr.datasets.datatypes import DATASET_FIELD_TYPES, get_datatype
 from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
-from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ImportDomainError
 from refrncr.ports import PersistenceConflictError
@@ -49,6 +48,7 @@ from refrncr.source_formats import (
     temporal_controls,
 )
 from refrncr.upload_names import safe_upload_filename
+from refrncr.versions.diff_contracts import MAX_SEARCH
 from refrncr.xml_security import require_xml_protection
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024

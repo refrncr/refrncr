@@ -7,12 +7,12 @@ from datetime import date
 
 from flask import abort, redirect, request, send_file, url_for
 
-from refrncr.change_status import RECORD_STATUS_FILTERS
 from refrncr.datasets.export import ExportGenerationError, logged_export_stream
 from refrncr.datasets.record_search import MAX_QUERY_BYTES, RecordSearchError, parse_parameters
 from refrncr.presentation import DISPLAY_STATUSES, pluralize
 from refrncr.services import NotFoundError, ValidationError
-from refrncr.version_contracts import mapping_incomplete_message
+from refrncr.versions.change_status import RECORD_STATUS_FILTERS
+from refrncr.versions.version_contracts import mapping_incomplete_message
 from refrncr.web.records import (
     active_navigation,
     authorization,

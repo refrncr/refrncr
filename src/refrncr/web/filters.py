@@ -6,9 +6,7 @@ from flask import Flask
 from markupsafe import Markup
 
 from refrncr.audit_history import MAX_AUDIT_DATETIME_LENGTH
-from refrncr.change_status import ChangeStatus
 from refrncr.datasets.datatypes import get_datatype
-from refrncr.diff_contracts import MAX_SEARCH
 from refrncr.hierarchy import MAX_HIERARCHY_NODE_NAME
 from refrncr.presentation import (
     DISPLAY_STATUSES,
@@ -26,6 +24,8 @@ from refrncr.presentation_metadata import (
     rendered_dataset_icon,
 )
 from refrncr.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
+from refrncr.versions.change_status import ChangeStatus
+from refrncr.versions.diff_contracts import MAX_SEARCH
 
 MONTHS = (
     "Jan",

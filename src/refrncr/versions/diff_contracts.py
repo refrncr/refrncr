@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from refrncr.change_status import STATUSES, ChangeStatus
-from refrncr.version_contracts import SummaryCounts
+from refrncr.versions.change_status import STATUSES, ChangeStatus
+from refrncr.versions.version_contracts import SummaryCounts
 
 PAGE_SIZE = 50
 MAX_SEARCH = 200

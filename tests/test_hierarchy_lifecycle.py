@@ -10,12 +10,12 @@ import pytest
 from sqlalchemy import select, update
 from support import NOW, MutableClock, audits, content, publish, revision, snapshot
 
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.hierarchy import hierarchy_snapshot
 from refrncr.models import DatasetRecord, DatasetVersionRecord
 from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.version_contracts import SummaryCounts
+from refrncr.versions import DatasetVersionService
+from refrncr.versions.version_contracts import SummaryCounts
 
 
 def prepare(c):

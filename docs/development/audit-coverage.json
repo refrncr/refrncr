@@ -4959,7 +4959,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "publish",
-      "service": "refrncr.dataset_versions.DatasetVersionService.publish",
+      "service": "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.publish",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
@@ -5006,7 +5006,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "cancel",
-      "service": "refrncr.dataset_versions.DatasetVersionService.cancel",
+      "service": "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.cancel",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_cancel GET,POST /datasets/<key>/versions/<version_id>/cancel"
       ],
@@ -5053,7 +5053,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "review",
-      "service": "refrncr.dataset_versions.DatasetVersionService.review",
+      "service": "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.review",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_version_publish GET,POST /datasets/<key>/versions/publish"
       ],
@@ -5087,7 +5087,7 @@
     {
       "capability": "Version upgrade",
       "operation": "publication_preflight",
-      "service": "refrncr.version_upgrade.publication_preflight",
+      "service": "refrncr.versions.version_upgrade.publication_preflight",
       "interface_entrypoints": [
         "refrncr dataset-publication-preflight"
       ],
@@ -5119,7 +5119,7 @@
     {
       "capability": "Version upgrade",
       "operation": "create_initial_versions",
-      "service": "refrncr.version_upgrade.create_initial_versions",
+      "service": "refrncr.versions.version_upgrade.create_initial_versions",
       "interface_entrypoints": [
         "Alembic 0015_ref_83 within prepare_database"
       ],
@@ -5151,7 +5151,7 @@
     {
       "capability": "Dataset version reads",
       "operation": "overview",
-      "service": "refrncr.dataset_versions.DatasetVersionService.overview",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.overview",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_list GET /datasets"
       ],
@@ -5183,7 +5183,7 @@
     {
       "capability": "Dataset version reads",
       "operation": "context",
-      "service": "refrncr.dataset_versions.DatasetVersionService.context",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.context",
       "interface_entrypoints": [
         "Trusted programmatic service invocation; browser interface follows in part 2."
       ],
@@ -5215,7 +5215,7 @@
     {
       "capability": "Dataset version reads",
       "operation": "history",
-      "service": "refrncr.dataset_versions.DatasetVersionService.history",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -5260,7 +5260,7 @@
     {
       "capability": "Dataset version reads",
       "operation": "read",
-      "service": "refrncr.dataset_versions.DatasetVersionService.read",
+      "service": "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>",
@@ -5466,7 +5466,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "concept_context",
-      "service": "refrncr.dataset_versions.DatasetVersionService.concept_context",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_detail GET /datasets/<key>/concept",
         "refrncr.web.datasets.maintenance.update_dataset POST /datasets/<key>",
@@ -5524,7 +5524,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "create_concept",
-      "service": "refrncr.dataset_versions.DatasetVersionService.create_concept",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.create_concept",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_concept_create POST /datasets/<key>/concept/new"
       ],
@@ -5566,7 +5566,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "concept_preflight",
-      "service": "refrncr.concept_upgrade.concept_preflight",
+      "service": "refrncr.versions.concept_upgrade.concept_preflight",
       "interface_entrypoints": [
         "refrncr dataset-concept-preflight"
       ],
@@ -5597,7 +5597,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "migrate_concepts",
-      "service": "refrncr.concept_upgrade.migrate_concepts",
+      "service": "refrncr.versions.concept_upgrade.migrate_concepts",
       "interface_entrypoints": [
         "Trusted programmatic caller"
       ],
@@ -5663,7 +5663,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "review_discard",
-      "service": "refrncr.dataset_versions.DatasetVersionService.review_discard",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.review_discard",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
@@ -5695,7 +5695,7 @@
     {
       "capability": "Explicit Dataset concept lifecycle",
       "operation": "discard_concept",
-      "service": "refrncr.dataset_versions.DatasetVersionService.discard_concept",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.discard_concept",
       "interface_entrypoints": [
         "refrncr.web.versions.dataset_concept_discard GET,POST /datasets/<key>/concept/discard"
       ],
@@ -6132,7 +6132,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "read_current",
-      "service": "refrncr.dataset_versions.DatasetVersionService.read_current",
+      "service": "refrncr.versions.service.DatasetVersionService.read_current",
       "interface_entrypoints": [
         "refrncr.api.routes.datasets GET /datasets",
         "refrncr.api.routes.dataset GET /datasets/{dataset_key}",
@@ -6173,7 +6173,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "read_versions",
-      "service": "refrncr.dataset_versions.DatasetVersionService.read_versions",
+      "service": "refrncr.versions.service.DatasetVersionService.read_versions",
       "interface_entrypoints": [
         "refrncr.api.routes.dataset_versions GET /datasets/{dataset_key}/versions"
       ],
@@ -6205,7 +6205,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "read_history",
-      "service": "refrncr.dataset_versions.DatasetVersionService.read_history",
+      "service": "refrncr.versions.service.DatasetVersionService.read_history",
       "interface_entrypoints": [
         "refrncr.api.routes.record_history GET /datasets/{dataset_key}/records/history"
       ],
@@ -6237,7 +6237,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "export_history",
-      "service": "refrncr.dataset_versions.DatasetVersionService.export_history",
+      "service": "refrncr.versions.service.DatasetVersionService.export_history",
       "interface_entrypoints": [
         "refrncr.web.records.browse.export_dataset_history GET,POST /datasets/<key>/records/export/period"
       ],
@@ -6894,7 +6894,7 @@
     {
       "capability": "DatasetVersionService",
       "operation": "update_mapping_source",
-      "service": "refrncr.dataset_versions.DatasetVersionService.update_mapping_source",
+      "service": "refrncr.versions.concepts.DatasetVersionConceptMixin.update_mapping_source",
       "interface_entrypoints": [
         "refrncr.web.datasets.core.dataset_mapping_source_update POST /datasets/<key>/source/update"
       ],

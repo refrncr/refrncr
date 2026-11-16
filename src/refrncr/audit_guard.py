@@ -15,6 +15,8 @@ SUPPORT_CLASSES = frozenset(
         "LoginAttemptLimiter",
         "BrowserAuthenticationAdmissionGuard",
         "BrowserCookiePolicy",
+        "DatasetVersionConceptMixin",
+        "DatasetVersionLifecycleMixin",
     }
 )
 ROUTE_DECORATORS = {
@@ -110,7 +112,7 @@ def verify_inventory(root):
                 "refrncr.datasets.records",
                 "refrncr.datasets.service",
                 "refrncr.record_import",
-                "refrncr.dataset_versions",
+                "refrncr.versions",
                 "refrncr.datasets.dataset_diff",
                 "refrncr.identity.api_keys",
                 "refrncr.hierarchy",

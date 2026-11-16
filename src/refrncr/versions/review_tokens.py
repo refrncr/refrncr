@@ -10,8 +10,8 @@ import json
 import secrets
 from dataclasses import asdict
 
-from refrncr.concept_contracts import DiscardIdentity
-from refrncr.diff_contracts import ReviewIdentity
+from refrncr.versions.concept_contracts import DiscardIdentity
+from refrncr.versions.diff_contracts import ReviewIdentity
 
 
 def encode_review(identity, session_id, secret):

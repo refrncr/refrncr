@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from refrncr.concept_contracts import ActiveConcept
+from refrncr.clock import APPLICATION_TIMEZONE as APPLICATION_TIMEZONE
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOverview, StoredRecord
+from refrncr.versions.concept_contracts import ActiveConcept
 
 if TYPE_CHECKING:
     from refrncr.services import RecordPage
 
-APPLICATION_TIMEZONE = UTC
 MAX_RELEASE_NOTE = 2000
 
 

@@ -9,10 +9,10 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.dataset_versions import DatasetVersionService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.services import AuthorizationService, DatasetRecordService
+from refrncr.versions import DatasetVersionService
 from refrncr.web.routing import DatasetBlueprint
 
 blueprint = DatasetBlueprint("hierarchies", __name__)

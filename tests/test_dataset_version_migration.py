@@ -10,7 +10,7 @@ from support import setup
 
 from refrncr.db.base import Base
 from refrncr.models import DatasetVersion
-from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
+from refrncr.versions.version_upgrade import VersionUpgradeError, publication_preflight
 
 
 def config_for(connection):

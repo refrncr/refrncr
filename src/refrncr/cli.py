@@ -21,7 +21,6 @@ from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
 from refrncr.browser_security import is_loopback_host
-from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.datasets.dataset_upgrade import (
     DatasetUpgradeError,
     ownership_preflight,
@@ -31,7 +30,8 @@ from refrncr.db.session import create_database_engine, create_session_factory
 from refrncr.identity.login_security import SourceIdentityResolver
 from refrncr.operational import LOGGER_NAME, configure_operational_logging
 from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
-from refrncr.version_upgrade import VersionUpgradeError, publication_preflight
+from refrncr.versions.concept_upgrade import ConceptUpgradeError, concept_preflight
+from refrncr.versions.version_upgrade import VersionUpgradeError, publication_preflight
 from refrncr.xml_security import require_xml_protection
 
 DEFAULT_HOST = "127.0.0.1"

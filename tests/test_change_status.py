@@ -1,7 +1,6 @@
 import subprocess
 import sys
 
-from refrncr.change_status import ChangeStatus, change_status
 from refrncr.presentation import (
     DISPLAY_STATUSES,
     STATUS_PRESENTATION,
@@ -11,6 +10,7 @@ from refrncr.presentation import (
     status_badge_variant,
     status_label,
 )
+from refrncr.versions.change_status import ChangeStatus, change_status
 
 
 def test_presentation_module_imports_directly_in_a_fresh_python_process():

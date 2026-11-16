@@ -7,9 +7,9 @@ import pytest
 from sqlalchemy import event, text
 from support import NOW, csrf_token, get, publish
 
-from refrncr.published_contracts import decode_identifier
 from refrncr.services import AuthorizedResourceSet
 from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.versions.published_contracts import decode_identifier
 
 
 def test_flask_browser_assets_session_csrf_and_errors_alongside_api(api):

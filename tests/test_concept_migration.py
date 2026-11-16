@@ -5,8 +5,8 @@ from alembic import command
 from sqlalchemy import delete, inspect, select, text, update
 from support import config_for, publish, setup
 
-from refrncr.concept_upgrade import ConceptUpgradeError, concept_preflight
 from refrncr.models import DatasetConcept, DatasetRecordValue
+from refrncr.versions.concept_upgrade import ConceptUpgradeError, concept_preflight
 
 
 def predecessor(c):

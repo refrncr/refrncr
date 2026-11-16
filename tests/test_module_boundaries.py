@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "refrncr"
-DOMAIN_PACKAGES_WITH_TYPED_ERRORS = ("identity", "authorization", "datasets")
+DOMAIN_PACKAGES_WITH_TYPED_ERRORS = ("identity", "authorization", "datasets", "versions")
 GENERAL_ERROR_TYPES = {
     "AuthorizationError",
     "ConflictError",

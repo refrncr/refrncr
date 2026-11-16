@@ -6,16 +6,17 @@ from sqlalchemy.orm import Session
 from refrncr.clock import SYSTEM_CLOCK
 from refrncr.concept_persistence import SqlAlchemyConceptOperations
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
-from refrncr.diff_classification import classify_fields
 from refrncr.diff_persistence import SqlAlchemyDiffOperations
+from refrncr.errors import ValidationError
 from refrncr.models import Dataset
 from refrncr.persistence import (
     SqlAlchemyDatasetBusinessKeyOperations,
     SqlAlchemyDatasetFieldOperations,
 )
-from refrncr.services import ValidationError
-from refrncr.version_contracts import SnapshotField
 from refrncr.version_persistence import SqlAlchemyVersionOperations
+from refrncr.versions.diff_classification import classify_fields
+from refrncr.versions.errors import VersionValidationError
+from refrncr.versions.version_contracts import SnapshotField
 
 
 class ConceptUpgradeError(RuntimeError):
@@ -70,14 +71,14 @@ def _decisions(connection):
                     and (not f.is_required or not get_datatype(f.data_type).identifier_eligible)
                     for f in current
                 ):
-                    raise ValidationError("Invalid stored identifier configuration")
+                    raise VersionValidationError("Invalid stored identifier configuration")
                 previous = versions.fields(latest) if latest else ()
                 changes = classify_fields(current, previous)
                 if not diff.validate_concept(dataset.id, current) or (
                     latest
                     and (len(previous) != latest.field_count or not diff.validate_snapshot(latest))
                 ):
-                    raise ValidationError("Invalid stored content")
+                    raise VersionValidationError("Invalid stored content")
                 if (
                     latest is None
                     or changes

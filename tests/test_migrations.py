@@ -770,7 +770,7 @@ def test_populated_ref_72_sqlite_database_upgrades_to_ref_74(tmp_path):
     finally:
         upgraded_engine.dispose()
 
-    from refrncr.version_upgrade import VersionUpgradeError
+    from refrncr.versions.version_upgrade import VersionUpgradeError
 
     with pytest.raises(VersionUpgradeError) as failure:
         command.upgrade(config, "head")
@@ -819,7 +819,7 @@ def test_populated_ref_74_sqlite_database_upgrades_to_ref_75(tmp_path):
     finally:
         upgraded_engine.dispose()
 
-    from refrncr.version_upgrade import VersionUpgradeError
+    from refrncr.versions.version_upgrade import VersionUpgradeError
 
     with pytest.raises(VersionUpgradeError) as failure:
         command.upgrade(config, "head")

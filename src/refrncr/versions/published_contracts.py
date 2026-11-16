@@ -14,7 +14,7 @@ from refrncr.datasets.record_identity import (
 )
 from refrncr.hierarchy_contracts import HierarchyNode
 from refrncr.ports import StoredRecord
-from refrncr.version_contracts import PublishedVersion, SnapshotField, SourceVersion
+from refrncr.versions.version_contracts import PublishedVersion, SnapshotField, SourceVersion
 
 
 def encode_identifier(key: bytes) -> str:
