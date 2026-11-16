@@ -11,7 +11,7 @@ from typing import Any
 from flask import Blueprint, Flask, abort, current_app, g, url_for
 from werkzeug.exceptions import HTTPException
 
-from refrncr.record_import import (
+from refrncr.imports import (
     DatasetRecordImportService,
     ImportExpiredError,
     ImportValidationError,

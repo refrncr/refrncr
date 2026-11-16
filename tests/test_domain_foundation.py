@@ -34,6 +34,12 @@ from refrncr.identity import (
     IdentityNotFoundError,
     IdentityValidationError,
 )
+from refrncr.imports import (
+    ImportConflictError,
+    ImportNotFoundError,
+    ImportValidationError,
+)
+from refrncr.imports.errors import ImportDomainError
 from refrncr.versions import (
     VersionAuthorizationError,
     VersionConflictError,
@@ -128,6 +134,19 @@ def test_version_errors_have_a_domain_and_exact_category():
         (VersionAuthorizationError, AuthorizationError),
     ):
         assert issubclass(error_type, VersionError)
+        assert issubclass(error_type, category)
+        assert sum(issubclass(error_type, candidate) for candidate in categories) == 1
+
+
+def test_import_errors_have_a_domain_and_exact_category():
+    categories = (NotFoundError, ConflictError, ValidationError, AuthorizationError)
+    assert not any(issubclass(ImportDomainError, category) for category in categories)
+    for error_type, category in (
+        (ImportNotFoundError, NotFoundError),
+        (ImportConflictError, ConflictError),
+        (ImportValidationError, ValidationError),
+    ):
+        assert issubclass(error_type, ImportDomainError)
         assert issubclass(error_type, category)
         assert sum(issubclass(error_type, candidate) for candidate in categories) == 1
 

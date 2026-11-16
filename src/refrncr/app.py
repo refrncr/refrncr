@@ -18,6 +18,8 @@ from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.identity.api_keys import ApiKeyService, configured_api_keys
 from refrncr.identity.login_security import SourceIdentityResolver
+from refrncr.imports import DatasetRecordImportService
+from refrncr.imports.xml_security import require_xml_protection
 from refrncr.operational import (
     LOGGER_NAME,
     OperationalMiddleware,
@@ -26,7 +28,6 @@ from refrncr.operational import (
 )
 from refrncr.overview import OverviewService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
-from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,
@@ -46,7 +47,6 @@ from refrncr.services import (
 )
 from refrncr.versions import DatasetVersionService
 from refrncr.web import create_flask_app
-from refrncr.xml_security import require_xml_protection
 
 
 @dataclass(frozen=True, slots=True)

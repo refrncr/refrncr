@@ -6,7 +6,7 @@ import pytest
 from support import html_elements
 from werkzeug.datastructures import MultiDict
 
-from refrncr.source_formats import (
+from refrncr.imports.source_formats import (
     SourceFormatError,
     canonical_source,
     compose_format,
@@ -235,7 +235,7 @@ def test_remembered_datetime_initializes_all_components(profile):
     from datetime import datetime
     from types import SimpleNamespace
 
-    from refrncr.record_import import DatasetRecordImportService, ParsedSource, SourceRow
+    from refrncr.imports import DatasetRecordImportService, ParsedSource, SourceRow
 
     if profile.kind == "native":
         value = datetime(2024, 2, 29, 21, 5)  # noqa: DTZ001 - native Excel local value
@@ -361,7 +361,7 @@ def test_ref154_catalogue_is_preserved_exactly():
 @pytest.mark.parametrize("ambiguous", [False, True])
 @pytest.mark.slow
 def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambiguous):
-    from refrncr.record_import import MAX_COLUMNS
+    from refrncr.imports import MAX_COLUMNS
 
     for index in range(MAX_COLUMNS - 2):
         wizard.services.dataset_fields.create_field(
@@ -407,7 +407,7 @@ def test_maximum_width_component_form_preserves_upload_column_limit(wizard, ambi
 
 @pytest.mark.parametrize("endpoint", ["/formats", "/preview"])
 def test_component_form_envelopes_remain_bounded(wizard, endpoint):
-    from refrncr.record_import import MAX_COLUMNS
+    from refrncr.imports import MAX_COLUMNS
 
     temporal_upload(wizard)
     response = wizard.client.post(

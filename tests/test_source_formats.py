@@ -5,7 +5,7 @@ from decimal import localcontext
 
 import pytest
 
-from refrncr.source_formats import (
+from refrncr.imports.source_formats import (
     BOOLEAN_TOKENS,
     SOURCE_FORMATS,
     SourceFormatError,
@@ -313,7 +313,7 @@ def test_native_excel_numeric_cells_have_no_text_grouping_ambiguity(datatype, va
 
 
 def test_whitespace_is_not_an_empty_numeric_csv_row():
-    from refrncr.record_import import parse_source
+    from refrncr.imports import parse_source
 
     source = parse_source("spaces.csv", b"code;amount\n; \n")
     assert len(source.rows) == 1

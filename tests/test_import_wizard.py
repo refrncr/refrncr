@@ -10,7 +10,7 @@ from dataset_helpers import create_mapping_dataset, create_owned_dataset
 from openpyxl import Workbook
 from support import PASSWORD, html_elements, html_tag_texts, html_text
 
-from refrncr.record_import import TransientImportStore
+from refrncr.imports import TransientImportStore
 from refrncr.services import NotFoundError
 
 

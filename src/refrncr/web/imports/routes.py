@@ -7,7 +7,7 @@ import logging
 from flask import abort, redirect, render_template, request, url_for
 
 from refrncr.datasets import RecordConflictError
-from refrncr.record_import import (
+from refrncr.imports import (
     MAX_UPLOAD_BYTES,
     ImportValidationError,
     SourceFormatComponentsError,

@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy import select
 from support import content, dataset_version_client, publish, request, setup, snapshot
 
+from refrncr.imports import ImportValidationError
 from refrncr.models import AuditEvent, DatasetConcept, DatasetRecord
-from refrncr.record_import import ImportValidationError
 from refrncr.services import ConflictError, NotFoundError
 
 
@@ -934,7 +934,7 @@ def test_empty_xlsx_and_no_active_concept_are_blocked(database_context):
 
 
 def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(context):
-    from refrncr.record_import import TransientImportStore
+    from refrncr.imports import TransientImportStore
 
     c = context
     clean(c)

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from support import audits, snapshot
 
+import refrncr.app as application_module
 from refrncr.audit import OPERATIONS, validate_event
 from refrncr.models import AuditEvent, User
 from refrncr.persistence import SqlAlchemyDatasetRecordOperations, SqlAlchemyUnitOfWork
@@ -231,23 +232,10 @@ def test_declared_event_actor_target_and_safe_context(database_context, operatio
     actual = {(e.object_type, e.action, e.object_id) for e in events}
     expected = {(kind, action, target or result.id) for kind, action, target in expected}
     assert actual == expected and len(events) == len(expected)
-    service = operation.split(".", 1)[0]
-    if service == "DatasetVersionService":
-        method = operation.split(".", 1)[1]
-        symbol = f"refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.{method}"
-    else:
-        module = {
-            "DatasetRecordImportService": "record_import",
-            "DatasetService": "datasets.service",
-            "DatasetFieldService": "datasets.fields",
-            "DatasetBusinessKeyService": "datasets.business_key",
-            "DatasetRecordService": "datasets.records",
-            "GrantService": "authorization.grants",
-            "MembershipService": "identity.memberships",
-            "TeamService": "identity.teams",
-            "UserService": "identity.users",
-        }.get(service, "services")
-        symbol = f"refrncr.{module}.{operation}"
+    service, method = operation.split(".", 1)
+    service_type = getattr(application_module, service)
+    owner = next(base for base in service_type.__mro__ if method in base.__dict__)
+    symbol = f"{owner.__module__}.{owner.__name__}.{method}"
     declared = OPERATIONS[symbol].events
     for e in events:
         assert e.actor_user_id == c.a.id and e.timestamp is not None

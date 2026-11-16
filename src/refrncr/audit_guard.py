@@ -17,6 +17,7 @@ SUPPORT_CLASSES = frozenset(
         "BrowserCookiePolicy",
         "DatasetVersionConceptMixin",
         "DatasetVersionLifecycleMixin",
+        "ImportWorkflowMixin",
     }
 )
 ROUTE_DECORATORS = {
@@ -111,7 +112,8 @@ def verify_inventory(root):
                 "refrncr.datasets.deletion",
                 "refrncr.datasets.records",
                 "refrncr.datasets.service",
-                "refrncr.record_import",
+                "refrncr.imports.service",
+                "refrncr.imports.workflows",
                 "refrncr.versions",
                 "refrncr.datasets.dataset_diff",
                 "refrncr.identity.api_keys",

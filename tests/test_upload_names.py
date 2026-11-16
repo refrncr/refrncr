@@ -1,6 +1,7 @@
 import pytest
 
-from refrncr import hierarchy_import, record_import
+from refrncr import hierarchy_import
+from refrncr.imports import service as record_import
 
 
 @pytest.mark.parametrize(

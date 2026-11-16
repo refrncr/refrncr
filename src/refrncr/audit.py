@@ -657,20 +657,28 @@ _read(
     module="datasets.records",
 )
 _audited(
-    "DatasetRecordImportService",
+    "ImportWorkflowMixin",
     "confirm",
     ("dataset", "dataset.records_imported"),
     ("dataset", "dataset.new_version_imported"),
     ("dataset", "dataset.mapping_targets_updated"),
-    module="record_import",
+    module="imports.workflows",
 )
 _register(
     "DatasetRecordImportService",
     "eligibility active state source_format_review begin navigate select_worksheet "
     "mapping_assistance format_assistance submitted_source_formats "
-    "submitted_source_format_assistance preview saved_preview cancel revoke_session",
+    "submitted_source_format_assistance",
     "intentionally excluded",
-    module="record_import",
+    module="imports.service",
+    rationale="Transient preview/receipt state only; no committed "
+    "Records. Rejected or suspicious import attempts belong to REF-31.",
+)
+_register(
+    "ImportWorkflowMixin",
+    "preview saved_preview cancel revoke_session",
+    "intentionally excluded",
+    module="imports.workflows",
     rationale="Transient preview/receipt state only; no committed "
     "Records. Rejected or suspicious import attempts belong to REF-31.",
 )
@@ -715,7 +723,7 @@ _read(
 # business services. None invents a successful domain event for a denied request.
 for _module, _service, _methods, _classification, _reason in (
     (
-        "record_import",
+        "imports.store",
         "TransientImportStore",
         "create get update active claim finish consume cancel revoke_session revoke_concept",
         "intentionally excluded",

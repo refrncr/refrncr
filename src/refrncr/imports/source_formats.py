@@ -292,6 +292,70 @@ def _local_timestamp(value, timezone, fold):
     return instants[-1] if fold == "later" else instants[0]
 
 
+def _profile_value(data_type, value, profile):
+    if type(value) in (int, float) and profile.id in ("v1-plain", "v1-float"):
+        if data_type == "number":
+            return get_datatype("number").text(Decimal(str(value)))
+        if data_type == "integer" and type(value) is float:
+            if not value.is_integer():
+                raise ValueError
+            return str(int(value))
+        return str(value)
+    if type(value) is bool and profile.kind == "boolean":
+        return "true" if value else "false"
+    if data_type == "string" and not isinstance(value, str):
+        return str(value)
+    return value
+
+
+def _native_value(data_type, value):
+    if data_type == "date":
+        if type(value) is datetime and value.time() == time():
+            value = value.date()
+        if type(value) is not date:
+            raise ValueError
+    elif data_type == "time":
+        if type(value) is not time or value.tzinfo is not None:
+            raise ValueError
+    elif type(value) is not datetime or value.tzinfo is not None:
+        raise ValueError
+    return value
+
+
+def _text_value(data_type, value, profile):
+    if not isinstance(value, str):
+        raise ValueError
+    if profile.kind == "number":
+        integer = r"[0-9]+"
+        if profile.group:
+            integer = r"(?:[0-9]+|[1-9][0-9]{0,2}(?:" + re.escape(profile.group) + r"[0-9]{3})+)"
+        fraction = (
+            r"(?:" + re.escape(profile.decimal) + r"[0-9]+)?" if data_type == "number" else ""
+        )
+        if not re.fullmatch("-?" + integer + fraction, value):
+            raise ValueError
+        if profile.group:
+            value = value.replace(profile.group, "")
+        return value.replace(profile.decimal, ".")
+    if profile.kind == "boolean":
+        return BOOLEAN_TOKENS[value.lower()]
+    if profile.kind == "date":
+        return _date(value, profile)
+    if profile.kind == "time":
+        return _time(value, profile.time_style)
+    if profile.kind == "datetime":
+        width = 8 if not profile.date_separator else 10
+        separator = value[width : width + 1]
+        if separator != " " and not (
+            profile.date_order == "ymd" and profile.date_separator == "-" and separator == "T"
+        ):
+            raise ValueError
+        return datetime.combine(
+            _date(value[:width], profile), _time(value[width + 1 :], profile.time_style)
+        )
+    return value
+
+
 def canonical_source(data_type, value, profile_id, *, timezone="", fold=""):
     """Parse one value with exactly the selected bounded profile."""
     profile = SOURCE_FORMATS.get(profile_id) if isinstance(profile_id, str) else None
@@ -304,67 +368,11 @@ def canonical_source(data_type, value, profile_id, *, timezone="", fold=""):
     if isinstance(value, str) and len(value) > 4096:
         raise SourceFormatError("Source value exceeds the supported length.")
     try:
-        if type(value) in (int, float) and profile.id in ("v1-plain", "v1-float"):
-            if data_type == "number":
-                value = get_datatype("number").text(Decimal(str(value)))
-            elif data_type == "integer" and type(value) is float:
-                if not value.is_integer():
-                    raise ValueError
-                value = str(int(value))
-            else:
-                value = str(value)
-        elif type(value) is bool and profile.kind == "boolean":
-            value = "true" if value else "false"
-        elif data_type == "string" and not isinstance(value, str):
-            value = str(value)
+        value = _profile_value(data_type, value, profile)
         if profile.kind == "native":
-            if data_type == "date":
-                if type(value) is datetime and value.time() == time():
-                    value = value.date()
-                if type(value) is not date:
-                    raise ValueError
-            elif data_type == "time":
-                if type(value) is not time or value.tzinfo is not None:
-                    raise ValueError
-            elif type(value) is not datetime or value.tzinfo is not None:
-                raise ValueError
+            value = _native_value(data_type, value)
         else:
-            if not isinstance(value, str):
-                raise ValueError
-            if profile.kind == "number":
-                integer = r"[0-9]+"
-                if profile.group:
-                    integer = (
-                        r"(?:[0-9]+|[1-9][0-9]{0,2}(?:" + re.escape(profile.group) + r"[0-9]{3})+)"
-                    )
-                fraction = (
-                    r"(?:" + re.escape(profile.decimal) + r"[0-9]+)?"
-                    if data_type == "number"
-                    else ""
-                )
-                if not re.fullmatch("-?" + integer + fraction, value):
-                    raise ValueError
-                if profile.group:
-                    value = value.replace(profile.group, "")
-                value = value.replace(profile.decimal, ".")
-            elif profile.kind == "boolean":
-                value = BOOLEAN_TOKENS[value.lower()]
-            elif profile.kind == "date":
-                value = _date(value, profile)
-            elif profile.kind == "time":
-                value = _time(value, profile.time_style)
-            elif profile.kind == "datetime":
-                # Date width is fixed by the profile; AM/PM may contain a later space.
-                width = 8 if not profile.date_separator else 10
-                if value[width : width + 1] != " " and not (
-                    profile.date_order == "ymd"
-                    and profile.date_separator == "-"
-                    and value[width : width + 1] == "T"
-                ):
-                    raise ValueError
-                value = datetime.combine(
-                    _date(value[:width], profile), _time(value[width + 1 :], profile.time_style)
-                )
+            value = _text_value(data_type, value, profile)
         if data_type == "timestamp" and profile.kind != "canonical":
             value = _local_timestamp(value, timezone, fold)
         datatype = get_datatype(data_type)
