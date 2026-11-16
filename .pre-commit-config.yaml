@@ -19,3 +19,12 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: import-linter
+        name: import-linter
+        entry: python tools/lint_imports.py
+        language: python
+        additional_dependencies: [import-linter==2.16]
+        pass_filenames: false

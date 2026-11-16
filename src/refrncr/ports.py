@@ -5,7 +5,41 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
+
+
+class AuthorizationServicePort(Protocol):
+    """Dataset-facing authorization contract without a domain-package dependency."""
+
+    datasets: Any
+
+    def has_capability(
+        self, user_id: str, capability: str, resource_id=None, *, uow=None
+    ) -> bool: ...
+
+
+class CommunityServicesPort(Protocol):
+    """Browser-facing view of the service bundle supplied by composition."""
+
+    installation_settings: Any
+    api_keys: Any
+    dataset_versions: Any
+    audit_history: Any
+    users: Any
+    authentication: Any
+    sessions: Any
+    teams: Any
+    memberships: Any
+    authorization: Any
+    datasets: Any
+    dataset_fields: Any
+    dataset_business_keys: Any
+    dataset_records: Any
+    record_imports: Any
+    hierarchy_imports: Any
+    hierarchy: Any
+    overview: Any
+    dataset_diff: Any
 
 
 class PersistenceConflictError(Exception):
@@ -267,6 +301,14 @@ class StoredRecord:
     dataset_id: str
     values: tuple[RecordValue, ...]
     revision: int
+
+
+@dataclass(frozen=True, slots=True)
+class RecordPage:
+    records: tuple[StoredRecord, ...]
+    page: int
+    page_size: int
+    total: int
 
 
 @dataclass(frozen=True, slots=True)

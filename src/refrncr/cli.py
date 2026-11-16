@@ -20,7 +20,6 @@ from sqlalchemy import inspect, text
 from sqlalchemy.engine import URL, make_url
 
 from refrncr.app import create_application, create_community_services
-from refrncr.browser_security import is_loopback_host
 from refrncr.datasets.dataset_upgrade import (
     DatasetUpgradeError,
     ownership_preflight,
@@ -33,6 +32,7 @@ from refrncr.persistence.concept_upgrade import ConceptUpgradeError, concept_pre
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.version_upgrade import VersionUpgradeError, publication_preflight
 from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry, ValidationError
+from refrncr.web.security import is_loopback_host
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000

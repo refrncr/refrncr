@@ -16,7 +16,7 @@ from refrncr.imports import (
 from refrncr.presentation import record_label
 from refrncr.services import NotFoundError
 from refrncr.web.helpers import merge_error_messages, parse_page_parameter
-from refrncr.web.imports import (
+from refrncr.web.imports.context import (
     record_imports,
     render_authenticated_template,
     require_authenticated,

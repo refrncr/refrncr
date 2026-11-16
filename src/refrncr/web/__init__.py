@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import hmac
 import secrets
-from typing import TYPE_CHECKING
 
 from flask import (
     Flask,
@@ -30,11 +29,6 @@ from flask import (
 )
 
 from refrncr.audit import record_security_event
-from refrncr.browser_security import (
-    HTTPS_ANONYMOUS_CSRF_COOKIE,
-    HTTPS_SESSION_COOKIE,
-    BrowserCookiePolicy,
-)
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.identity.login_security import (
     BrowserAuthenticationAdmissionGuard,
@@ -42,6 +36,7 @@ from refrncr.identity.login_security import (
     SourceIdentityResolver,
 )
 from refrncr.imports.xml_security import require_xml_protection
+from refrncr.ports import CommunityServicesPort
 from refrncr.web.audit import register_audit_blueprint
 from refrncr.web.auth import register_auth_blueprint
 from refrncr.web.datasets import register_datasets_blueprint
@@ -69,13 +64,15 @@ from refrncr.web.records import register_records_blueprint
 from refrncr.web.routing import authenticated_route as authenticated_route
 from refrncr.web.routing import public_route as public_route
 from refrncr.web.routing import register_web_routing_context
+from refrncr.web.security import (
+    HTTPS_ANONYMOUS_CSRF_COOKIE,
+    HTTPS_SESSION_COOKIE,
+    BrowserCookiePolicy,
+)
 from refrncr.web.settings import register_settings_blueprint
 from refrncr.web.teams import register_teams_blueprint
 from refrncr.web.users import register_users_blueprint
 from refrncr.web.versions import register_versions_blueprint
-
-if TYPE_CHECKING:
-    from refrncr.app import CommunityServices
 
 ANONYMOUS_CSRF_COOKIE = HTTPS_ANONYMOUS_CSRF_COOKIE
 SESSION_COOKIE = HTTPS_SESSION_COOKIE
@@ -158,7 +155,7 @@ def _mapping_renderer(authenticated, datasets, render_authenticated_template):
 
 
 def create_flask_app(
-    services: CommunityServices,
+    services: CommunityServicesPort,
     *,
     allow_loopback_http: bool = False,
     login_limiter: LoginAttemptLimiter | None = None,
@@ -180,7 +177,7 @@ def create_flask_app(
 
 
 def _configure_flask_app(
-    services: CommunityServices,
+    services: CommunityServicesPort,
     *,
     allow_loopback_http: bool,
     login_limiter: LoginAttemptLimiter | None,

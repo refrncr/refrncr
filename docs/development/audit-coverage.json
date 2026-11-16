@@ -4191,7 +4191,7 @@
     {
       "capability": "BrowserCookiePolicy",
       "operation": "for_request",
-      "service": "refrncr.browser_security.BrowserCookiePolicy.for_request",
+      "service": "refrncr.web.security.BrowserCookiePolicy.for_request",
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log",
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>",

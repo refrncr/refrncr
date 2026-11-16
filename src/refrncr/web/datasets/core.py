@@ -9,7 +9,7 @@ from refrncr.presentation_metadata import DATASET_ICONS, key_from_name, rendered
 from refrncr.services import ConflictError, NotFoundError, ValidationError, parse_expected_revision
 from refrncr.versions.change_status import ChangeStatus
 from refrncr.versions.version_contracts import mapping_incomplete_message
-from refrncr.web.datasets import (
+from refrncr.web.datasets.context import (
     active_navigation,
     authorization,
     blueprint,

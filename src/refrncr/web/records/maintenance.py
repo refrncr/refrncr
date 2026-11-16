@@ -12,7 +12,7 @@ from refrncr.services import (
     ValidationError,
 )
 from refrncr.versions.version_contracts import mapping_incomplete_message
-from refrncr.web.records import (
+from refrncr.web.records.context import (
     blueprint,
     dataset_records,
     exact_expected_revision,

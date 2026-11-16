@@ -48,11 +48,6 @@ class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
 
 
-_MOVED_ERROR_MODULES = {
-    "HierarchyError": "refrncr.hierarchies.errors",
-    "ImportDomainError": "refrncr.imports.errors",
-}
-
 _DATASET_ERROR_NAMES = frozenset(
     {
         "DatasetError",
@@ -71,8 +66,12 @@ _DATASET_ERROR_NAMES = frozenset(
 
 def __getattr__(name: str):
     """Temporarily preserve moved domain-error imports until REF-370."""
-    if module := _MOVED_ERROR_MODULES.get(name):
-        value = getattr(import_module(module), name)
+    if name == "HierarchyError":
+        value = getattr(import_module("refrncr.hierarchies.errors"), name)
+        globals()[name] = value
+        return value
+    if name == "ImportDomainError":
+        value = getattr(import_module("refrncr.imports.errors"), name)
         globals()[name] = value
         return value
     if name in _DATASET_ERROR_NAMES:

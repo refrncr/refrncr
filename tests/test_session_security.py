@@ -14,19 +14,19 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.pool import StaticPool
 
 from refrncr.app import create_application, create_community_services
-from refrncr.browser_security import (
-    HTTPS_ANONYMOUS_CSRF_COOKIE,
-    HTTPS_SESSION_COOKIE,
-    LOOPBACK_ANONYMOUS_CSRF_COOKIE,
-    LOOPBACK_SESSION_COOKIE,
-    is_loopback_host,
-)
 from refrncr.db.base import Base
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import LoginSession
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.services import AuthenticatedPrincipal, ResourceTypeRegistry, SessionService
 from refrncr.web import create_flask_app
+from refrncr.web.security import (
+    HTTPS_ANONYMOUS_CSRF_COOKIE,
+    HTTPS_SESSION_COOKIE,
+    LOOPBACK_ANONYMOUS_CSRF_COOKIE,
+    LOOPBACK_SESSION_COOKIE,
+    is_loopback_host,
+)
 
 PASSWORD = "correct horse battery staple"
 

@@ -8,7 +8,6 @@ from typing import Any, Protocol
 
 from flask import Blueprint, Flask, current_app, redirect, request, url_for
 
-from refrncr.browser_security import BrowserCookieSettings
 from refrncr.hierarchies.imports import HierarchyImportService
 from refrncr.identity.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
@@ -21,6 +20,7 @@ from refrncr.imports import DatasetRecordImportService
 from refrncr.services import AuthenticationService, SessionService, UserManagementError, UserService
 from refrncr.web.helpers import is_safe_login_target
 from refrncr.web.routing import anonymous_csrf_route, public_route
+from refrncr.web.security import BrowserCookieSettings
 
 blueprint = Blueprint("auth", __name__)
 

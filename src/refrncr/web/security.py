@@ -1,3 +1,5 @@
+"""Browser transport, cookie, and response-header security policy."""
+
 from __future__ import annotations
 
 import ipaddress

@@ -1,0 +1,60 @@
+[importlinter]
+root_package = refrncr
+include_external_packages = True
+exclude_type_checking_imports = False
+
+[importlinter:contract:acyclic]
+name = Package internals are acyclic
+type = acyclic_siblings
+ancestors =
+    refrncr.web
+    refrncr.identity
+    refrncr.authorization
+    refrncr.datasets
+    refrncr.versions
+    refrncr.imports
+    refrncr.hierarchies
+depth = 10
+
+[importlinter:contract:domain-infrastructure]
+name = Domain packages do not depend on infrastructure
+type = forbidden
+source_modules =
+    refrncr.identity
+    refrncr.authorization
+    refrncr.datasets
+    refrncr.versions
+    refrncr.imports
+    refrncr.hierarchies
+forbidden_modules =
+    refrncr.web
+    refrncr.api
+    refrncr.persistence
+    refrncr.models
+    refrncr.app
+    refrncr.services
+    refrncr.db
+    refrncr.cli
+
+[importlinter:contract:web-api]
+name = Web and API packages do not depend on each other
+type = independence
+modules =
+    refrncr.web
+    refrncr.api
+
+[importlinter:contract:integration]
+name = Internal production code does not import the integration facade
+type = forbidden
+source_modules = refrncr.*
+forbidden_modules = refrncr.integration
+
+[importlinter:contract:viewmodels]
+name = View models stay framework and web independent
+type = forbidden
+source_modules = refrncr.web.viewmodels
+forbidden_modules =
+    refrncr.web.*
+    flask
+    werkzeug
+    sqlalchemy

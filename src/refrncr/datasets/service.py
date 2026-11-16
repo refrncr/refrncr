@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from refrncr.audit import record_audit
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.domain import valid_identity
 from refrncr.ports import (
     AuditEntry,
+    AuthorizationServicePort,
     DatasetConfiguration,
     DatasetOverview,
     DatasetRecord,
@@ -33,9 +32,6 @@ from .shared import (
     validate_dataset_key,
 )
 
-if TYPE_CHECKING:
-    from refrncr.authorization import AuthorizationService
-
 SUBJECT_TYPES = {"user", "team"}
 
 
@@ -43,7 +39,7 @@ class DatasetService(DatasetDeletionMixin, DatasetMappingMixin):
     """Authorized Dataset operations within the one Community installation context."""
 
     def __init__(
-        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationServicePort, *, versions=None
     ) -> None:
         self.uow = uow
         self.authorization = authorization

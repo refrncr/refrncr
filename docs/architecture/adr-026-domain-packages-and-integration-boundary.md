@@ -64,6 +64,13 @@ The allowed direction, later enforced by import-linter, is:
 6. `web/` and `api/` do not import each other. Both use the same application services.
 7. Imports inside functions are not used to evade these rules or break cycles.
 
+Import Linter enforces these rules with type-checking imports included. A separate static guard
+makes dynamic `import_module` calls visible. During this migration, that guard permits only the
+compatibility facades in `errors.py`, `hierarchies/__init__.py`, `imports/__init__.py` and
+`versions/__init__.py`. Their lazy imports prevent package initializers from recreating cycles
+while preserving existing import paths; REF-370 removes these temporary facades or replaces them
+with direct owning-module imports. No other dynamic-import exception is allowed.
+
 Within a domain package, service modules may depend on that package's contracts and errors. A
 module-private function stays inside its defining module. Cross-module behavior is given a public
 name even when it remains internal to the installed distribution. A static guard checks this rule
