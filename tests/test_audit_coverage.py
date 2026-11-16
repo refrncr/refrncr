@@ -64,26 +64,118 @@ MUTATIONS = (
 )
 
 
+def _prepare_field_operation(c, method):
+    s, a, d = c.s, c.a, c.d
+    if method == "create_field":
+        return lambda actor: s.dataset_fields.create_field(
+            actor, d.key, "code", "Code", "string"
+        ), [("dataset_field", "created", None)]
+    field = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
+    if method in ("replace_order", "move_field"):
+        other = s.dataset_fields.create_field(a.id, d.key, "label", "Label", "string")
+        if method == "move_field":
+
+            def call(actor):
+                return s.dataset_fields.move_field(
+                    actor, d.key, field.id, "down", (field.id, other.id)
+                )
+        else:
+
+            def call(actor):
+                return s.dataset_fields.replace_order(
+                    actor, d.key, (field.id, other.id), (other.id, field.id)
+                )
+
+        return call, [("dataset", "field_order_updated", d.id)]
+    if method == "delete_field":
+        return lambda actor: s.dataset_fields.delete_field(actor, d.key, field.key), [
+            ("dataset_field", "deleted", field.id)
+        ]
+    if method == "update_field_and_business_key_membership":
+        return lambda actor: s.dataset_fields.update_field_and_business_key_membership(
+            actor, d.key, field.key, "Changed", "string", True, False, True
+        ), [
+            ("dataset", "business_key_defined", d.id),
+            ("dataset_field", "definition_updated", field.id),
+        ]
+    return lambda actor: s.dataset_fields.update_field(
+        actor, d.key, field.key, "Changed", "string", True, False
+    ), [("dataset_field", "definition_updated", field.id)]
+
+
+def _prepare_record_operation(c, cls, method):
+    s, a, d = c.s, c.a, c.d
+    s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
+    if cls == "DatasetBusinessKeyService":
+        return lambda actor: s.dataset_business_keys.set_business_key(actor, d.key, ("code",)), [
+            ("dataset", "business_key_defined", d.id)
+        ]
+    s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
+    if cls == "DatasetRecordImportService":
+        state, _, _ = s.record_imports.begin(
+            a.id, "trusted-session", d.key, "records.csv", b"code,label\nsecret-a,x\nsecret-b,y\n"
+        )
+        s.record_imports.preview(a.id, "trusted-session", d.key, state.token, ("code", None))
+        return lambda actor: s.record_imports.confirm(
+            actor, "trusted-session", d.key, state.token
+        ), [("dataset", "dataset.records_imported", d.id)]
+    if method == "create_record":
+        return lambda actor: s.dataset_records.create_record(
+            actor, d.key, {"code": "secret-value"}
+        ), [("dataset_record", "created", None)]
+    record = s.dataset_records.create_record(a.id, d.key, {"code": "secret-old"})
+    if method == "restore_record":
+        s.dataset_records.delete_record(a.id, d.key, record.id, 1)
+        with s.datasets.uow() as work:
+            concept = work.concepts.get(d.id)
+        return lambda actor: s.dataset_records.restore_record(
+            actor, d.key, record.id, 2, concept_id=concept.id
+        ), [("dataset_record", "restored", record.id)]
+    if method == "update_record":
+        return lambda actor: s.dataset_records.update_record(
+            actor, d.key, record.id, 1, {"code": "secret-new"}
+        ), [("dataset_record", "updated", record.id)]
+    return lambda actor: s.dataset_records.delete_record(actor, d.key, record.id, 1), [
+        ("dataset_record", "deleted", record.id)
+    ]
+
+
+def _prepare_version_operation(c, method):
+    from datetime import timedelta
+
+    from refrncr.clock import SYSTEM_CLOCK
+
+    s, a, d = c.s, c.a, c.d
+    s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
+    revision = s.datasets.get_dataset(a.id, d.key).revision
+    day = SYSTEM_CLOCK.today() + timedelta(days=1)
+    if method == "publish":
+        return lambda actor: s.dataset_versions.publish(actor, d.id, day, "", revision), [
+            ("dataset", "dataset.version_published", d.id)
+        ]
+    version = s.dataset_versions.publish(a.id, d.id, day, "", revision)
+    return lambda actor: s.dataset_versions.cancel(actor, d.id, version.id), [
+        ("dataset", "dataset.version_cancelled", d.id)
+    ]
+
+
+def _prepare_team_operation(c, method):
+    s, other = c.s, c.other
+    if method == "create_team":
+        return lambda actor: s.teams.create_team(actor, "New"), [("team", "created", None)]
+    if method == "rename_team":
+        return lambda actor: s.teams.rename_team(actor, other.id, "New"), [
+            ("team", "renamed", other.id)
+        ]
+    return lambda actor: s.teams.delete_team(actor, other.id), [("team", "deleted", other.id)]
+
+
 def prepare(c, operation):
     """Return a concrete operation and its independently expected event/target."""
     s, a, u, d = c.s, c.a, c.u, c.d
     cls, method = operation.split(".")
     if cls == "DatasetVersionService":
-        from datetime import timedelta
-
-        from refrncr.clock import SYSTEM_CLOCK
-
-        s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True, True, True)
-        revision = s.datasets.get_dataset(a.id, d.key).revision
-        day = SYSTEM_CLOCK.today() + timedelta(days=1)
-        if method == "publish":
-            return lambda actor: s.dataset_versions.publish(actor, d.id, day, "", revision), [
-                ("dataset", "dataset.version_published", d.id)
-            ]
-        v = s.dataset_versions.publish(a.id, d.id, day, "", revision)
-        return lambda actor: s.dataset_versions.cancel(actor, d.id, v.id), [
-            ("dataset", "dataset.version_cancelled", d.id)
-        ]
+        return _prepare_version_operation(c, method)
     if cls == "UserService":
         if method == "create_user":
             return lambda actor: s.users.create_user(
@@ -100,15 +192,7 @@ def prepare(c, operation):
         ]
         return lambda actor: getattr(s.users, method)(actor, u.id), [("user", action, u.id)]
     if cls == "TeamService":
-        if method == "create_team":
-            return lambda actor: s.teams.create_team(actor, "New"), [("team", "created", None)]
-        if method == "rename_team":
-            return lambda actor: s.teams.rename_team(actor, c.other.id, "New"), [
-                ("team", "renamed", c.other.id)
-            ]
-        return lambda actor: s.teams.delete_team(actor, c.other.id), [
-            ("team", "deleted", c.other.id)
-        ]
+        return _prepare_team_operation(c, method)
     if cls == "MembershipService":
         if method == "create_membership":
             return lambda actor: s.memberships.create_membership(actor, u.id, c.owner.id), [
@@ -156,70 +240,8 @@ def prepare(c, operation):
             ("dataset_export_access", "revoked", access.id)
         ]
     if cls == "DatasetFieldService":
-        if method == "create_field":
-            return lambda actor: s.dataset_fields.create_field(
-                actor, d.key, "code", "Code", "string"
-            ), [("dataset_field", "created", None)]
-        f = s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
-        if method in ("replace_order", "move_field"):
-            g = s.dataset_fields.create_field(a.id, d.key, "label", "Label", "string")
-            if method == "move_field":
-
-                def call(actor):
-                    return s.dataset_fields.move_field(actor, d.key, f.id, "down", (f.id, g.id))
-            else:
-
-                def call(actor):
-                    return s.dataset_fields.replace_order(actor, d.key, (f.id, g.id), (g.id, f.id))
-
-            return call, [("dataset", "field_order_updated", d.id)]
-        if method == "delete_field":
-            return lambda actor: s.dataset_fields.delete_field(actor, d.key, f.key), [
-                ("dataset_field", "deleted", f.id)
-            ]
-        if method == "update_field_and_business_key_membership":
-            return lambda actor: s.dataset_fields.update_field_and_business_key_membership(
-                actor, d.key, f.key, "Changed", "string", True, False, True
-            ), [
-                ("dataset", "business_key_defined", d.id),
-                ("dataset_field", "definition_updated", f.id),
-            ]
-        return lambda actor: s.dataset_fields.update_field(
-            actor, d.key, f.key, "Changed", "string", True, False
-        ), [("dataset_field", "definition_updated", f.id)]
-    s.dataset_fields.create_field(a.id, d.key, "code", "Code", "string", True)
-    if cls == "DatasetBusinessKeyService":
-        return lambda actor: s.dataset_business_keys.set_business_key(actor, d.key, ("code",)), [
-            ("dataset", "business_key_defined", d.id)
-        ]
-    s.dataset_business_keys.set_business_key(a.id, d.key, ("code",))
-    if cls == "DatasetRecordImportService":
-        state, _, _ = s.record_imports.begin(
-            a.id, "trusted-session", d.key, "records.csv", b"code,label\nsecret-a,x\nsecret-b,y\n"
-        )
-        s.record_imports.preview(a.id, "trusted-session", d.key, state.token, ("code", None))
-        return lambda actor: s.record_imports.confirm(
-            actor, "trusted-session", d.key, state.token
-        ), [("dataset", "dataset.records_imported", d.id)]
-    if method == "create_record":
-        return lambda actor: s.dataset_records.create_record(
-            actor, d.key, {"code": "secret-value"}
-        ), [("dataset_record", "created", None)]
-    r = s.dataset_records.create_record(a.id, d.key, {"code": "secret-old"})
-    if method == "restore_record":
-        s.dataset_records.delete_record(a.id, d.key, r.id, 1)
-        with s.datasets.uow() as work:
-            concept = work.concepts.get(d.id)
-        return lambda actor: s.dataset_records.restore_record(
-            actor, d.key, r.id, 2, concept_id=concept.id
-        ), [("dataset_record", "restored", r.id)]
-    if method == "update_record":
-        return lambda actor: s.dataset_records.update_record(
-            actor, d.key, r.id, 1, {"code": "secret-new"}
-        ), [("dataset_record", "updated", r.id)]
-    return lambda actor: s.dataset_records.delete_record(actor, d.key, r.id, 1), [
-        ("dataset_record", "deleted", r.id)
-    ]
+        return _prepare_field_operation(c, method)
+    return _prepare_record_operation(c, cls, method)
 
 
 @pytest.mark.parametrize("operation", MUTATIONS)

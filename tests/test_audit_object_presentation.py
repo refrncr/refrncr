@@ -12,7 +12,7 @@ from support import audit_history_state as state
 from support import seed
 
 from refrncr.audit import EVENTS, AuditContractError
-from refrncr.audit_presentation import (
+from refrncr.audit.presentation import (
     ACTION_LABELS,
     ACTION_PRESENTATIONS,
     OBJECTS,

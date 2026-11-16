@@ -17,7 +17,7 @@ from support import audits, context_from_audit_db, snapshot
 from werkzeug.datastructures import MultiDict
 
 from refrncr.audit import AuditContractError, validate_event
-from refrncr.audit_history import AuditHistoryService
+from refrncr.audit.history import AuditHistoryService
 from refrncr.db.base import Base
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.persistence.models import (

@@ -16,8 +16,8 @@ from support import audit_history_client as client
 from support import audit_history_state as state
 
 from refrncr.audit import EVENTS, AuditContractError
-from refrncr.audit_history import parse_audit_filters, parse_audit_time
-from refrncr.audit_presentation import (
+from refrncr.audit.history import parse_audit_filters, parse_audit_time
+from refrncr.audit.presentation import (
     ACTION_LABELS,
     ACTION_PRESENTATIONS,
     CONTEXT_LABELS,

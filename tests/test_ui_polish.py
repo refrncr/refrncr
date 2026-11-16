@@ -26,7 +26,7 @@ from support import (
 )
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.presentation_metadata import DATASET_ICONS, key_from_name
+from refrncr.presentation.metadata import DATASET_ICONS, key_from_name
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 
 ROOT = Path(__file__).parents[1]
@@ -99,7 +99,7 @@ def test_icon_catalog_and_clear(context, icon):
     ],
 )
 def test_untrusted_icon_input_safely_defaults(context, icon):
-    from refrncr.presentation_metadata import rendered_dataset_icon
+    from refrncr.presentation.metadata import rendered_dataset_icon
 
     c = context
     d = c.s.datasets.create_dataset(c.a.id, "fallback", "Fallback", "", c.owner.id, icon=icon)
@@ -517,7 +517,7 @@ def test_manual_icon_normalization_and_fallback(context, submitted, expected):
 
 
 def test_manual_icon_rendering_and_legacy_fallback(dataset_browser):
-    from refrncr.presentation_metadata import rendered_dataset_icon
+    from refrncr.presentation.metadata import rendered_dataset_icon
 
     _, s, a, client = dataset_browser
     d = create_dataset(s, a, "manual-icon", "Manual icon")

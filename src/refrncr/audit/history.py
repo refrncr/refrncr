@@ -10,7 +10,7 @@ import secrets
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 
-from refrncr.audit_presentation import (
+from refrncr.audit.presentation import (
     ACTION_LABELS,
     DELETED_ACTOR,
     OBJECTS,

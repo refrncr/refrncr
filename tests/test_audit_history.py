@@ -18,13 +18,13 @@ from support import audit_history_client as client
 from support import audit_history_state as state
 
 from refrncr.audit import EVENTS, AuditContractError
-from refrncr.audit_history import (
+from refrncr.audit.history import (
     CURSOR_LIFETIME,
     AuditHistoryService,
     parse_audit_filters,
     parse_audit_time,
 )
-from refrncr.audit_presentation import (
+from refrncr.audit.presentation import (
     ACTION_LABELS,
     OBJECTS,
     SYSTEM_ACTORS,
@@ -513,8 +513,8 @@ def test_database_failure_is_neutral(database_history, monkeypatch):
 def test_read_boundary_has_no_framework_or_database_imports():
     root = Path(__file__).parents[1] / "src/refrncr"
     for name in (
-        "audit_history.py",
-        "audit_presentation.py",
+        "audit/history.py",
+        "audit/presentation.py",
         "ports.py",
         "web/audit.py",
     ):

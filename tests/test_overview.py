@@ -9,8 +9,8 @@ from test_mapping_source_updates import fixture as mapping_fixture
 from test_mapping_source_updates import next_source, rows, update
 from test_mapping_source_versions import prepare, publish_table
 
-from refrncr.overview import OverviewService
 from refrncr.persistence.models import Dataset, DatasetConcept, DatasetVisit
+from refrncr.presentation.overview import OverviewService
 from refrncr.services import AuthorizationError
 
 
@@ -386,7 +386,7 @@ def test_filtered_incomplete_draft_uses_its_reason_and_record_filter(database_co
 
 @pytest.mark.parametrize("days,expected", [(0, "today"), (1, "tomorrow"), (2, "in 2 days")])
 def test_effect_timing_copy(days, expected):
-    from refrncr.overview import effect_timing
+    from refrncr.presentation.overview import effect_timing
 
     assert effect_timing(days) == expected
 

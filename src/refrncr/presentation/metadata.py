@@ -18,7 +18,7 @@ LEGACY_ICON_SPRITE = "images/lucide-legacy-0.468.0.svg"
 ICON_SPRITES = {
     symbol.attrib["id"]: sprite
     for sprite in (LEGACY_ICON_SPRITE, DEFAULT_ICON_SPRITE)
-    for symbol in ET.parse(Path(__file__).parent / "static" / sprite)
+    for symbol in ET.parse(Path(__file__).parent.parent / "static" / sprite)
     .getroot()
     .findall(".//{http://www.w3.org/2000/svg}symbol")
 }

@@ -6,8 +6,8 @@ from browser_mapping_updates_app import admin, app, mapping, services
 from dataset_helpers import create_mapping_dataset, publish_dataset
 from support import MutableClock
 
-from refrncr.overview import OverviewService
 from refrncr.persistence.models import DatasetConcept
+from refrncr.presentation.overview import OverviewService
 
 # Include both a coming source + stale Draft and a source update already prepared.
 services.dataset_versions.create_concept(admin.id, mapping.id)

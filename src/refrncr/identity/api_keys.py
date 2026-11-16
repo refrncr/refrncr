@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from refrncr.audit import record_audit
-from refrncr.audit_presentation import valid_id
+from refrncr.audit.presentation import valid_id
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.identity.errors import (
     IdentityAuthorizationError,

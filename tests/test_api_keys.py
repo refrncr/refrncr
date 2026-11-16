@@ -12,7 +12,7 @@ from sqlalchemy import select
 from support import MutableClock
 
 from refrncr.audit import AuditContractError, validate_event
-from refrncr.audit_presentation import present_event
+from refrncr.audit.presentation import present_event
 from refrncr.identity.api_keys import (
     LAST_USED_INTERVAL,
     LIFETIME,

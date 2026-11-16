@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from flask import Flask, abort, current_app, render_template, request, url_for
 
-from refrncr.overview import REASON_LABELS, OverviewService
+from refrncr.presentation.overview import REASON_LABELS, OverviewService
 from refrncr.web.routing import (
     DatasetBlueprint,
     authenticated_route,
@@ -45,7 +45,7 @@ class OverviewContext:
 
 
 def _context() -> OverviewContext:
-    return current_app.extensions["refrncr.overview"]
+    return current_app.extensions["refrncr.presentation.overview"]
 
 
 def _render_overview(actor, *, full=False):
@@ -134,7 +134,7 @@ def register_overview_blueprint(
     audit_security: SecurityAuditor,
     dataset_ui_enabled: bool,
 ) -> None:
-    app.extensions["refrncr.overview"] = OverviewContext(
+    app.extensions["refrncr.presentation.overview"] = OverviewContext(
         authenticated=authenticated,
         require_authenticated=require_authenticated,
         overview_service=overview_service,
