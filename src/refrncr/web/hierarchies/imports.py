@@ -5,7 +5,7 @@ from flask import abort, redirect, request, url_for
 from refrncr.datasets import StaleRecordError
 from refrncr.imports import MAX_UPLOAD_BYTES, ImportValidationError
 from refrncr.services import ConflictError
-from refrncr.web.hierarchies import (
+from refrncr.web.hierarchies.context import (
     blueprint,
     dataset_records,
     hierarchy_import_service,

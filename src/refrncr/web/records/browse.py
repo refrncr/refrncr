@@ -13,7 +13,7 @@ from refrncr.presentation import DISPLAY_STATUSES, pluralize
 from refrncr.services import NotFoundError, ValidationError
 from refrncr.versions.change_status import RECORD_STATUS_FILTERS
 from refrncr.versions.version_contracts import mapping_incomplete_message
-from refrncr.web.records import (
+from refrncr.web.records.context import (
     active_navigation,
     authorization,
     blueprint,

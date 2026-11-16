@@ -5,15 +5,17 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import TYPE_CHECKING
 
 from refrncr.clock import APPLICATION_TIMEZONE as APPLICATION_TIMEZONE
 from refrncr.hierarchies.contracts import HierarchyNode
-from refrncr.ports import DatasetBusinessKey, DatasetFieldRecord, DatasetOverview, StoredRecord
+from refrncr.ports import (
+    DatasetBusinessKey,
+    DatasetFieldRecord,
+    DatasetOverview,
+    RecordPage,
+    StoredRecord,
+)
 from refrncr.versions.concept_contracts import ActiveConcept
-
-if TYPE_CHECKING:
-    from refrncr.datasets import RecordPage
 
 MAX_RELEASE_NOTE = 2000
 

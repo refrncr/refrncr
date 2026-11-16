@@ -19,7 +19,9 @@ from .errors import (
 from .business_key import DatasetBusinessKeyService
 from .deletion import DatasetDeletion, version_reads
 from .fields import DatasetFieldService
-from .records import MAX_RECORD_REVISION, DatasetRecordService, RecordPage, parse_expected_revision
+from refrncr.ports import RecordPage
+
+from .records import MAX_RECORD_REVISION, DatasetRecordService, parse_expected_revision
 from .service import DatasetService
 from .shared import (
     DatasetDetails,

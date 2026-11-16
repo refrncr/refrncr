@@ -18,6 +18,15 @@ GENERAL_ERROR_TYPES = {
     "NotFoundError",
     "ValidationError",
 }
+ALLOWED_DYNAMIC_IMPORTS = {
+    ("errors.py", "'refrncr.hierarchies.errors'"),
+    ("errors.py", "'refrncr.imports.errors'"),
+    ("errors.py", "'refrncr.datasets.errors'"),
+    ("hierarchies/__init__.py", "'refrncr.hierarchies.imports'"),
+    ("hierarchies/__init__.py", "'refrncr.hierarchies.service'"),
+    ("imports/__init__.py", "'refrncr.imports.service'"),
+    ("versions/__init__.py", "'refrncr.versions.service'"),
+}
 
 
 def _module_name(path: Path) -> str:
@@ -124,6 +133,30 @@ def test_layers_above_persistence_do_not_hide_dependencies_in_functions():
                     )
 
     assert violations == [], "Function-local imports hide dependencies:\n" + "\n".join(violations)
+
+
+def test_dynamic_imports_are_limited_to_documented_compatibility_facades():
+    discovered = set()
+    for path in SOURCE_ROOT.rglob("*.py"):
+        if "migrations" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            function = node.func
+            is_import_module = (
+                isinstance(function, ast.Name) and function.id == "import_module"
+            ) or (
+                isinstance(function, ast.Attribute)
+                and isinstance(function.value, ast.Name)
+                and function.value.id == "importlib"
+                and function.attr == "import_module"
+            )
+            if is_import_module:
+                discovered.add((str(path.relative_to(SOURCE_ROOT)), ast.unparse(node.args[0])))
+
+    assert discovered == ALLOWED_DYNAMIC_IMPORTS
 
 
 def test_services_do_not_hold_a_private_composition_backdoor():

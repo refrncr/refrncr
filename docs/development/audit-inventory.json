@@ -160,7 +160,7 @@
       ],
       "operations": [
         "refrncr.audit_history.AuditHistoryService.list_history",
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -173,7 +173,7 @@
       ],
       "operations": [
         "refrncr.audit_history.AuditHistoryService.get_event",
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
@@ -185,7 +185,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.overview.index",
         "refrncr.overview.OverviewService.read"
@@ -198,7 +198,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.overview",
         "refrncr.authorization.datasets.DatasetAuthorizationService.can_create_dataset",
         "refrncr.datasets.service.DatasetService.list_dataset_overview",
@@ -214,7 +214,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.datasets.DatasetAuthorizationService.creation_teams",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
         "refrncr.datasets.service.DatasetService.list_dataset_overview",
@@ -229,7 +229,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.datasets.DatasetAuthorizationService.creation_teams",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
         "refrncr.datasets.service.DatasetService.create_dataset",
@@ -268,7 +268,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.authorization.datasets.DatasetAuthorizationService.can_change_dataset_owner",
@@ -289,7 +289,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.authorization.datasets.DatasetAuthorizationService.can_change_dataset_owner",
@@ -348,7 +348,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.datasets.service.DatasetService.mapping_source",
         "refrncr.datasets.service.DatasetService.mapping_usage",
@@ -407,7 +407,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.datasets.dataset_diff.DatasetDiffService.review",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
@@ -427,7 +427,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.cancel",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
@@ -441,7 +441,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
@@ -465,7 +465,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.datasets.service.DatasetService.revoke_export_access",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -478,7 +478,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.move_field",
         "refrncr.datasets.fields.DatasetFieldService.replace_order",
@@ -513,7 +513,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.imports.service.DatasetRecordImportService.eligibility",
@@ -531,7 +531,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.imports.service.DatasetRecordImportService.eligibility",
@@ -563,7 +563,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.service.DatasetVersionService.export_history",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.require_csrf"
@@ -576,7 +576,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.datasets.export.logged_export_stream",
         "refrncr.datasets.records.DatasetRecordService.export_dataset",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
@@ -589,7 +589,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.datasets.export.logged_export_stream",
         "refrncr.datasets.records.DatasetRecordService.export_dataset",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
@@ -603,7 +603,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.active",
         "refrncr.imports.service.DatasetRecordImportService.begin",
@@ -628,7 +628,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.active",
         "refrncr.imports.service.DatasetRecordImportService.begin",
@@ -652,7 +652,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.format_assistance",
         "refrncr.imports.service.DatasetRecordImportService.mapping_assistance",
@@ -672,7 +672,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.format_assistance",
         "refrncr.imports.service.DatasetRecordImportService.mapping_assistance",
@@ -694,7 +694,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.imports.service.DatasetRecordImportService.source_format_review",
         "refrncr.imports.service.DatasetRecordImportService.submitted_source_format_assistance",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -708,7 +708,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.mapping_assistance",
         "refrncr.imports.service.DatasetRecordImportService.navigate",
@@ -727,7 +727,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.service.DatasetRecordImportService.mapping_assistance",
         "refrncr.imports.service.DatasetRecordImportService.navigate",
@@ -747,7 +747,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.workflows.ImportWorkflowMixin.confirm",
         "refrncr.imports.service.DatasetRecordImportService.format_assistance",
@@ -769,7 +769,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.imports.workflows.ImportWorkflowMixin.cancel",
         "refrncr.datasets.service.DatasetService.get_dataset_for_edit",
@@ -840,7 +840,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
@@ -855,7 +855,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
         "refrncr.datasets.records.DatasetRecordService.create_record",
@@ -873,7 +873,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
         "refrncr.datasets.records.DatasetRecordService.get_dataset_for_add",
@@ -904,7 +904,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.datasets.business_key.DatasetBusinessKeyService.get_business_key",
         "refrncr.datasets.records.DatasetRecordService.delete_record",
@@ -922,7 +922,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.authorization.datasets.DatasetAuthorizationService.can_change_dataset_owner",
@@ -942,7 +942,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
@@ -968,7 +968,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.datasets.service.DatasetService.delete_dataset",
         "refrncr.datasets.service.DatasetService.get_dataset_for_deletion",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -982,7 +982,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.datasets.fields.DatasetFieldService.list_fields",
@@ -1001,7 +1001,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.datasets.fields.DatasetFieldService.create_field",
@@ -1022,7 +1022,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.datasets.business_key.DatasetBusinessKeyService.get_business_key",
@@ -1040,7 +1040,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.datasets.fields.DatasetFieldService.get_field",
@@ -1059,7 +1059,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.concept_context",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.datasets.business_key.DatasetBusinessKeyService.get_business_key",
@@ -1080,7 +1080,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.users.UserService.create_initial_admin",
         "refrncr.identity.users.UserService.has_users",
         "refrncr.web.require_cookie_settings",
@@ -1095,7 +1095,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
         "refrncr.identity.login_security.LoginAttemptLimiter.reserve",
         "refrncr.identity.login_security.LoginAttemptReservation.cancel",
@@ -1116,7 +1116,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.hierarchies.imports.HierarchyImportService.revoke_session",
         "refrncr.imports.workflows.ImportWorkflowMixin.revoke_session",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -1131,7 +1131,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.identity.users.UserService.update_theme_preference",
         "refrncr.web.require_csrf"
@@ -1144,7 +1144,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
       ]
     },
@@ -1155,7 +1155,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_relationships",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -1169,7 +1169,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_relationships",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -1185,7 +1185,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.identity.users.UserService.delete_user",
@@ -1201,7 +1201,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_relationships",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
@@ -1217,7 +1217,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
         "refrncr.identity.memberships.MembershipService.list_relationships",
         "refrncr.identity.memberships.MembershipService.list_team_members",
@@ -1232,7 +1232,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
         "refrncr.identity.memberships.MembershipService.list_relationships",
@@ -1250,7 +1250,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
         "refrncr.identity.memberships.MembershipService.list_relationships",
@@ -1268,7 +1268,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.identity.teams.TeamService.delete_team",
@@ -1282,7 +1282,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
         "refrncr.identity.memberships.MembershipService.list_team_members",
@@ -1296,7 +1296,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.create_membership",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
@@ -1314,7 +1314,7 @@
         "POST"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.memberships.MembershipService.delete_membership",
         "refrncr.identity.memberships.MembershipService.list_eligible_users",
@@ -1362,7 +1362,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.versions.concepts.DatasetVersionConceptMixin.history",
         "refrncr.versions.lifecycle.DatasetVersionLifecycleMixin.read",
         "refrncr.authorization.datasets.DatasetAuthorizationService.can_change_dataset_owner",
@@ -1598,7 +1598,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.browser_security.BrowserCookiePolicy.for_request",
+        "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.overview.OverviewService.read"
       ]
@@ -1705,7 +1705,7 @@
   ],
   "support_operations": [
     "refrncr.audit.record_security_event",
-    "refrncr.browser_security.BrowserCookiePolicy.for_request",
+    "refrncr.web.security.BrowserCookiePolicy.for_request",
     "refrncr.identity.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
     "refrncr.identity.login_security.LoginAttemptLimiter.allow",
     "refrncr.identity.login_security.LoginAttemptLimiter.entry_count",

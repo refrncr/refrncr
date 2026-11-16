@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from refrncr.audit import record_audit
 from refrncr.datasets.deletion import version_reads as _version_reads
 from refrncr.datasets.errors import DatasetNotFoundError, DatasetValidationError
@@ -15,20 +13,18 @@ from refrncr.datasets.shared import (
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
 from refrncr.ports import (
+    AuthorizationServicePort,
     DatasetBusinessKey,
     DatasetRecord,
     UnitOfWorkFactory,
 )
-
-if TYPE_CHECKING:
-    from refrncr.authorization import AuthorizationService
 
 
 class DatasetBusinessKeyService:
     """Authorized business-key metadata operations scoped through a parent Dataset."""
 
     def __init__(
-        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationServicePort, *, versions=None
     ) -> None:
         self.uow = uow
         self.authorization = authorization

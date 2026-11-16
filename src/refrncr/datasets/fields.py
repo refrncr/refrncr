@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from refrncr.audit import record_audit
 from refrncr.datasets.deletion import version_reads as _version_reads
 from refrncr.datasets.errors import (
@@ -27,6 +25,7 @@ from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
 from refrncr.hierarchies.contracts import validate_hierarchy_scope
 from refrncr.ports import (
+    AuthorizationServicePort,
     DatasetFieldRecord,
     DatasetRecord,
     PersistenceConflictError,
@@ -35,15 +34,12 @@ from refrncr.ports import (
     UnitOfWorkFactory,
 )
 
-if TYPE_CHECKING:
-    from refrncr.authorization import AuthorizationService
-
 
 class DatasetFieldService:
     """Authorized schema operations scoped through a parent Dataset."""
 
     def __init__(
-        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationServicePort, *, versions=None
     ) -> None:
         self.uow = uow
         self.authorization = authorization

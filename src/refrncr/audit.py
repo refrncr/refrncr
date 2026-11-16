@@ -770,7 +770,7 @@ for _module, _service, _methods, _classification, _reason in (
         "counters only.",
     ),
     (
-        "browser_security",
+        "web.security",
         "BrowserCookiePolicy",
         "for_request",
         "security logging required",

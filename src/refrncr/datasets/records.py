@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from refrncr.audit import record_audit
 from refrncr.datasets import export as dataset_export
@@ -26,17 +24,16 @@ from refrncr.datasets.shared import (
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
 from refrncr.ports import (
+    AuthorizationServicePort,
     DatasetBusinessKey,
     DatasetRecord,
     PersistenceConflictError,
+    RecordPage,
     RecordValue,
     StoredRecord,
     UnitOfWork,
     UnitOfWorkFactory,
 )
-
-if TYPE_CHECKING:
-    from refrncr.authorization import AuthorizationService
 from refrncr.versions.version_contracts import mapping_incomplete_message
 
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
@@ -52,21 +49,13 @@ def parse_expected_revision(raw: str) -> int:
     return revision
 
 
-@dataclass(frozen=True, slots=True)
-class RecordPage:
-    records: tuple[StoredRecord, ...]
-    page: int
-    page_size: int
-    total: int
-
-
 class DatasetRecordService:
     """Authorized current-record operations scoped through a parent Dataset."""
 
     PAGE_SIZE = 50
 
     def __init__(
-        self, uow: UnitOfWorkFactory, authorization: AuthorizationService, *, versions=None
+        self, uow: UnitOfWorkFactory, authorization: AuthorizationServicePort, *, versions=None
     ) -> None:
         self.uow = uow
         self.authorization = authorization

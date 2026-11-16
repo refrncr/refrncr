@@ -7,7 +7,7 @@ from flask import abort, redirect, request, url_for
 from refrncr.datasets import RecordValidationError
 from refrncr.hierarchies import canonical_hierarchy_view
 from refrncr.services import ConflictError, ValidationError
-from refrncr.web.hierarchies import (
+from refrncr.web.hierarchies.context import (
     blueprint,
     dataset_versions,
     exact_expected_revision,
