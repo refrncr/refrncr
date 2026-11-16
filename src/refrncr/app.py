@@ -14,6 +14,7 @@ from refrncr.audit_history import AuditHistoryService
 from refrncr.authorization import InstallationSettingsService
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.dataset_versions import DatasetVersionService
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.hierarchy import HierarchyService
 from refrncr.hierarchy_import import HierarchyImportService
 from refrncr.identity.api_keys import ApiKeyService, configured_api_keys
@@ -24,6 +25,7 @@ from refrncr.operational import (
     operational_response,
     readiness_status,
 )
+from refrncr.overview import OverviewService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.record_import import DatasetRecordImportService
 from refrncr.services import (
@@ -47,6 +49,14 @@ from refrncr.web import create_flask_app
 from refrncr.xml_security import require_xml_protection
 
 
+@dataclass(frozen=True, slots=True)
+class ServiceWrappers:
+    """Optional integrator wrappers applied once during Community composition."""
+
+    users: Callable[[UserService], UserService] | None = None
+    datasets: Callable[[DatasetService], DatasetService] | None = None
+
+
 @dataclass(frozen=True)
 class CommunityServices:
     installation_settings: InstallationSettingsService
@@ -67,6 +77,8 @@ class CommunityServices:
     record_imports: DatasetRecordImportService
     hierarchy_imports: HierarchyImportService
     hierarchy: HierarchyService
+    overview: OverviewService
+    dataset_diff: DatasetDiffService
 
     @property
     def grants(self) -> GrantService:
@@ -75,7 +87,11 @@ class CommunityServices:
 
 
 def create_community_services(
-    sessions: sessionmaker[Session], resources: ResourceTypeRegistry, *, clock: Clock = SYSTEM_CLOCK
+    sessions: sessionmaker[Session],
+    resources: ResourceTypeRegistry,
+    *,
+    clock: Clock = SYSTEM_CLOCK,
+    wrappers: ServiceWrappers | None = None,
 ) -> CommunityServices:
     """Compose shared services with the Community SQLAlchemy adapters."""
     uow = SqlAlchemyUnitOfWorkFactory(sessions, clock)
@@ -86,26 +102,48 @@ def create_community_services(
     )
     versions = DatasetVersionService(uow, authorization.datasets, clock=clock)
     dataset_records = DatasetRecordService(uow, authorization, versions=versions)
-    return CommunityServices(
+    wrappers = wrappers or ServiceWrappers()
+    users = UserService(uow)
+    datasets = DatasetService(uow, authorization, versions=versions)
+    if wrappers.users is not None:
+        users = wrappers.users(users)
+    if wrappers.datasets is not None:
+        datasets = wrappers.datasets(datasets)
+    final_versions = datasets.versions
+    services = CommunityServices(
         installation_settings=InstallationSettingsService(uow, authorization.datasets),
         api_keys=configured_api_keys(uow, clock=clock),
-        dataset_versions=versions,
+        dataset_versions=final_versions,
         audit_history=AuditHistoryService(uow, clock=clock),
-        users=UserService(uow),
+        users=users,
         authentication=AuthenticationService(uow),
         sessions=SessionService(sessions, clock=clock),
         teams=TeamService(uow),
         memberships=MembershipService(uow),
         _deprecated_grants=lambda: create_deprecated_grant_service(uow, resources),
         authorization=authorization,
-        datasets=DatasetService(uow, authorization, versions=versions),
+        datasets=datasets,
         dataset_fields=DatasetFieldService(uow, authorization, versions=versions),
         dataset_business_keys=DatasetBusinessKeyService(uow, authorization, versions=versions),
         dataset_records=dataset_records,
         record_imports=DatasetRecordImportService(dataset_records),
         hierarchy_imports=HierarchyImportService(uow, authorization),
         hierarchy=HierarchyService(uow, authorization, versions=versions),
+        overview=OverviewService(uow, authorization.datasets),
+        dataset_diff=DatasetDiffService(final_versions),
     )
+    # Low-level adapter tests and embedders may still pass the individual
+    # services to ``create_flask_app``.  Keep a reference to the already
+    # composed bundle so the Flask adapter can recover siblings without
+    # constructing domain services itself.
+    for service in (users, datasets):
+        try:
+            service._community_services = services
+        except AttributeError:
+            # Wrappers may use slots or otherwise reject implementation-only
+            # attributes; the public application path supplies siblings directly.
+            pass
+    return services
 
 
 def create_application(
@@ -151,11 +189,19 @@ def create_application(
     )
     app.add_middleware(OperationalMiddleware)
     clock = getattr(api_keys, "clock", getattr(users.uow, "clock", SYSTEM_CLOCK))
-    versions = (
-        dataset_versions
-        or datasets.versions
-        or DatasetVersionService(datasets.uow, authorization.datasets)
+    versions = dataset_versions or datasets.versions
+    if versions is None:
+        raise ValueError("DatasetVersionService must be supplied by the composition root")
+    dataset_records = dataset_records or DatasetRecordService(
+        datasets.uow, authorization, versions=versions
     )
+    record_imports = record_imports or DatasetRecordImportService(dataset_records)
+    hierarchy_imports = hierarchy_imports or HierarchyImportService(datasets.uow, authorization)
+    audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
+    hierarchy = HierarchyService(datasets.uow, authorization, versions=versions)
+    overview = OverviewService(datasets.uow, authorization.datasets)
+    dataset_diff = DatasetDiffService(versions)
+    installation_settings = InstallationSettingsService(users.uow, authorization.datasets)
     api = create_api(versions, api_keys, clock=clock)
     app.mount("/api/v1", api)
     publish_documentation(app, api)
@@ -208,7 +254,11 @@ def create_application(
         source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
         audit_history=audit_history,
         api_keys=api_keys,
-        dataset_versions=dataset_versions,
+        dataset_versions=versions,
+        hierarchy=hierarchy,
+        overview_service=overview,
+        dataset_diff=dataset_diff,
+        installation_settings=installation_settings,
         clock=clock,
     )
     app.mount("/", WSGIMiddleware(flask_app))

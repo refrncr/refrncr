@@ -45,6 +45,7 @@ def configured_services(*, include_dataset_dependencies=False):
             configured.datasets,
             configured.dataset_fields,
             configured.dataset_business_keys,
+            configured,
         )
     return configured_services
 
@@ -201,6 +202,7 @@ def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        configured,
     ) = configured_services(include_dataset_dependencies=True)
     app = create_flask_app(
         users,
@@ -212,6 +214,15 @@ def test_browser_route_contract_matches_the_pre_blueprint_snapshot():
         datasets=datasets,
         dataset_fields=dataset_fields,
         dataset_business_keys=dataset_business_keys,
+        dataset_records=configured.dataset_records,
+        record_imports=configured.record_imports,
+        hierarchy_imports=configured.hierarchy_imports,
+        audit_history=configured.audit_history,
+        dataset_versions=configured.dataset_versions,
+        hierarchy=configured.hierarchy,
+        overview_service=configured.overview,
+        dataset_diff=configured.dataset_diff,
+        installation_settings=configured.installation_settings,
     )
     expected = json.loads((Path(__file__).parent / "fixtures" / "web_routes.json").read_text())
 
@@ -241,6 +252,7 @@ def test_renamed_views_keep_csrf_and_capability_checks():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        configured,
     ) = configured_services(include_dataset_dependencies=True)
     app = create_flask_app(
         users,
@@ -252,6 +264,15 @@ def test_renamed_views_keep_csrf_and_capability_checks():
         datasets=datasets,
         dataset_fields=dataset_fields,
         dataset_business_keys=dataset_business_keys,
+        dataset_records=configured.dataset_records,
+        record_imports=configured.record_imports,
+        hierarchy_imports=configured.hierarchy_imports,
+        audit_history=configured.audit_history,
+        dataset_versions=configured.dataset_versions,
+        hierarchy=configured.hierarchy,
+        overview_service=configured.overview,
+        dataset_diff=configured.dataset_diff,
+        installation_settings=configured.installation_settings,
     )
     app.add_url_rule(
         "/renamed-teams/<team_id>",
@@ -470,6 +491,15 @@ def test_route_authorization_matrix(database_backend, request, monkeypatch):
         datasets=services.datasets,
         dataset_fields=services.dataset_fields,
         dataset_business_keys=services.dataset_business_keys,
+        dataset_records=services.dataset_records,
+        record_imports=services.record_imports,
+        hierarchy_imports=services.hierarchy_imports,
+        audit_history=services.audit_history,
+        dataset_versions=services.dataset_versions,
+        hierarchy=services.hierarchy,
+        overview_service=services.overview,
+        dataset_diff=services.dataset_diff,
+        installation_settings=services.installation_settings,
     )
     expectations = _route_matrix_expectations()
     rules = [
@@ -579,6 +609,7 @@ def test_fastapi_hosts_api_and_flask_boundaries_with_shared_authorization():
         datasets,
         dataset_fields,
         dataset_business_keys,
+        _configured,
     ) = configured_services(include_dataset_dependencies=True)
     client = TestClient(
         create_application(
@@ -704,6 +735,7 @@ def test_low_level_app_rejects_partial_dataset_composition(included):
         datasets,
         dataset_fields,
         dataset_business_keys,
+        _configured,
     ) = configured_services(include_dataset_dependencies=True)
     available = {
         "authorization": authorization,

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from refrncr.audit import record_audit
-from refrncr.authorization import AuthorizationService
+from refrncr.datasets import export as dataset_export
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.deletion import version_reads as _version_reads
 from refrncr.datasets.errors import (
@@ -33,6 +34,9 @@ from refrncr.ports import (
     UnitOfWork,
     UnitOfWorkFactory,
 )
+
+if TYPE_CHECKING:
+    from refrncr.authorization import AuthorizationService
 from refrncr.version_contracts import mapping_incomplete_message
 
 _EXPECTED_REVISION_PATTERN = re.compile(r"[1-9][0-9]*")
@@ -348,22 +352,15 @@ class DatasetRecordService:
         prefer_concept=False,
         variant=None,
     ):
-        from refrncr.datasets.export import (
-            ExportGenerationError,
-            externally_ordered_records,
-            generate_export,
-            verify_artifact_readable,
-        )
-
         if not isinstance(format_name, str) or format_name not in {
             "csv",
             "csv_zip",
             "xlsx",
             "json",
         }:
-            raise ExportGenerationError("Choose exactly one supported export format")
+            raise dataset_export.ExportGenerationError("Choose exactly one supported export format")
         if variant is not None and variant not in {"data", "flattened", "reporting"}:
-            raise ExportGenerationError(
+            raise dataset_export.ExportGenerationError(
                 "Choose Data, Flattened or Reporting for a hierarchy export"
             )
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
@@ -418,7 +415,7 @@ class DatasetRecordService:
                         "version": selected.version.number,
                         "version_id": selected.version.id,
                     }
-                records = externally_ordered_records(
+                records = dataset_export.externally_ordered_records(
                     source,
                     lambda record: self._record_sort_key(record, identifier.field_keys),
                 )
@@ -427,25 +424,31 @@ class DatasetRecordService:
                     and variant in {"data", "flattened"}
                     and format_name != "csv"
                 ):
-                    raise ExportGenerationError("A hierarchy variant can only be selected for CSV")
+                    raise dataset_export.ExportGenerationError(
+                        "A hierarchy variant can only be selected for CSV"
+                    )
                 if (
                     dataset.kind == "hierarchy"
                     and variant == "reporting"
                     and format_name not in {"csv", "xlsx"}
                 ):
-                    raise ExportGenerationError("Reporting tables are available as CSV or Excel")
+                    raise dataset_export.ExportGenerationError(
+                        "Reporting tables are available as CSV or Excel"
+                    )
                 if dataset.kind != "hierarchy" and variant is not None:
-                    raise ExportGenerationError(
+                    raise dataset_export.ExportGenerationError(
                         "CSV variants are only available for hierarchy exports"
                     )
                 if format_name == "csv_zip" and dataset.kind != "hierarchy":
-                    raise ExportGenerationError(
+                    raise dataset_export.ExportGenerationError(
                         "CSV bundles are only available for hierarchy exports"
                     )
                 if hierarchy_nodes is None and variant is None and format_name != "csv_zip":
-                    artifact = generate_export(format_name, fields, records, export_key)
+                    artifact = dataset_export.generate_export(
+                        format_name, fields, records, export_key
+                    )
                 else:
-                    artifact = generate_export(
+                    artifact = dataset_export.generate_export(
                         format_name,
                         fields,
                         records,
@@ -454,7 +457,7 @@ class DatasetRecordService:
                         hierarchy_variant=variant or "data",
                         provenance=provenance,
                     )
-                verify_artifact_readable(artifact)
+                dataset_export.verify_artifact_readable(artifact)
             # Authorization and content were pinned to the completed snapshot.
             # Close it before acquiring the audit writer (including SQLite).
             with self.uow(

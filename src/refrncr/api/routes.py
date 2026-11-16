@@ -50,7 +50,7 @@ from refrncr.datasets.datatypes import get_datatype
 from refrncr.hierarchy import hierarchy_order, hierarchy_paths
 from refrncr.identity.api_keys import ApiKeyAuthenticationError
 from refrncr.published_contracts import encode_identifier, record_identifier
-from refrncr.services import AuthenticatedPrincipal, NotFoundError, ValidationError
+from refrncr.services import AuthenticatedPrincipal, ConflictError, NotFoundError, ValidationError
 
 
 def _version(publication):
@@ -240,6 +240,11 @@ def _pagination(page, total, path, effective_date=None, version_number=None):
 
 
 def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
+    """Build the published API through its focused registration helper."""
+    return _configure_api(versions, api_keys, clock)
+
+
+def _configure_api(versions, api_keys, clock: Clock):
     app = FastAPI(
         title="refrncr Published data API",
         version="1",
@@ -292,6 +297,10 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
     @app.exception_handler(NotFoundError)
     async def not_found(request, error):
         return CanonicalJSONResponse(Error(error="not_found"), status_code=404)
+
+    @app.exception_handler(ConflictError)
+    async def conflict(request, error):
+        return CanonicalJSONResponse(Error(error="conflict"), status_code=409)
 
     @app.exception_handler(ValidationError)
     @app.exception_handler(ModelValidationError)
@@ -463,6 +472,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
             401: "Missing, invalid, expired or revoked API key.",
             404: "Resource absent, inaccessible, invalid, or without a selected publication.",
             405: "Method not allowed; the API is read-only.",
+            409: "Request conflicts with current state.",
             503: "Temporarily unavailable. No internal error details are returned.",
         }.items()
     }
@@ -471,6 +481,7 @@ def create_api(versions, api_keys, clock: Clock = SYSTEM_CLOCK):
         401: "invalid_api_credentials",
         404: "not_found",
         405: "method_not_allowed",
+        409: "conflict",
         503: "service_unavailable",
     }.items():
         errors[status]["content"] = {

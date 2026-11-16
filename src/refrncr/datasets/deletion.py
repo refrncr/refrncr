@@ -19,9 +19,9 @@ class DatasetDeletion:
 
 
 def version_reads(service):
-    from refrncr.dataset_versions import DatasetVersionService
-
-    return service.versions or DatasetVersionService(service.uow, service.authorization.datasets)
+    if service.versions is None:
+        raise RuntimeError("DatasetVersionService must be supplied by the composition root")
+    return service.versions
 
 
 def mapping_deletion_error(count):

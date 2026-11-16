@@ -1,6 +1,7 @@
 """Public integration contract exercised without importing refrncr internals."""
 
 import os
+import re
 import uuid
 
 import pytest
@@ -15,6 +16,7 @@ from refrncr.integration import (
     CreateAdminConfiguration,
     NotFoundError,
     ResourceTypeRegistry,
+    ServiceWrappers,
     ValidationError,
     create_application,
     create_community_services,
@@ -39,6 +41,7 @@ def test_integration_exposes_application_and_error_contract():
         "CreateAdminConfiguration",
         "NotFoundError",
         "ResourceTypeRegistry",
+        "ServiceWrappers",
         "ValidationError",
         "create_application",
         "create_community_services",
@@ -64,6 +67,111 @@ def test_integration_exposes_application_and_error_contract():
     assert issubclass(ValidationError, Exception)
     assert issubclass(AuthorizationError, Exception)
     assert issubclass(CliError, Exception)
+
+
+def test_integration_applies_service_wrappers_once(tmp_path):
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'wrappers.db'}")
+    sessions = create_session_factory(engine)
+    calls = []
+
+    def wrap_users(service):
+        calls.append(("users", service))
+        return service
+
+    def wrap_datasets(service):
+        calls.append(("datasets", service))
+        return service
+
+    services = create_community_services(
+        sessions,
+        ResourceTypeRegistry(),
+        wrappers=ServiceWrappers(users=wrap_users, datasets=wrap_datasets),
+    )
+
+    assert calls == [("users", services.users), ("datasets", services.datasets)]
+    engine.dispose()
+
+
+class _ConflictingVersions:
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    def read_current(self, *_args, **_kwargs):
+        raise ConflictError("Dataset limit reached")
+
+
+class _ConflictingDatasets:
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+        self.versions = _ConflictingVersions(wrapped.versions)
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    def list_dataset_overview(self, *_args, **_kwargs):
+        raise ConflictError("Dataset limit reached")
+
+
+def test_wrapper_conflicts_reach_web_and_api_boundaries(tmp_path, monkeypatch):
+    database_url = f"sqlite:///{tmp_path / 'wrapper-boundaries.db'}"
+    monkeypatch.setenv("REFRNCR_API_KEY_PEPPER", "11" * 32)
+    prepare_database(database_url)
+    engine = create_database_engine(database_url)
+    services = create_community_services(
+        create_session_factory(engine),
+        ResourceTypeRegistry(),
+        wrappers=ServiceWrappers(datasets=_ConflictingDatasets),
+    )
+    password = "correct horse battery staple"
+    administrator = services.users.create_initial_admin(
+        "administrator@example.com", "Administrator", password
+    )
+    key = services.api_keys.create_key(administrator.id, "Integration contract")
+    application = create_application(
+        services.users,
+        services.authentication,
+        services.sessions,
+        services.teams,
+        services.memberships,
+        authorization=services.authorization,
+        datasets=services.datasets,
+        dataset_fields=services.dataset_fields,
+        dataset_business_keys=services.dataset_business_keys,
+        dataset_records=services.dataset_records,
+        record_imports=services.record_imports,
+        hierarchy_imports=services.hierarchy_imports,
+        audit_history=services.audit_history,
+        dataset_versions=services.dataset_versions,
+        api_keys=services.api_keys,
+        readiness_engine=engine,
+    )
+
+    with TestClient(application, base_url="https://testserver") as client:
+        login = client.get("/login")
+        csrf = re.search(r"name='csrf_token' value='([^']+)'", login.text).group(1)
+        response = client.post(
+            "/login",
+            data={
+                "email": "administrator@example.com",
+                "password": password,
+                "csrf_token": csrf,
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        web_response = client.get("/datasets")
+        api_response = client.get(
+            "/api/v1/datasets", headers={"Authorization": f"Bearer {key.secret}"}
+        )
+
+    assert web_response.status_code == 409
+    assert web_response.text == "Dataset limit reached"
+    assert api_response.status_code == 409
+    assert api_response.json() == {"error": "conflict"}
+    engine.dispose()
 
 
 @pytest.fixture(params=["sqlite", pytest.param("postgresql", marks=pytest.mark.postgres)])

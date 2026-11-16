@@ -1,6 +1,6 @@
 """Supported integration surface for applications embedding refrncr Community."""
 
-from refrncr.app import create_application, create_community_services
+from refrncr.app import ServiceWrappers, create_application, create_community_services
 from refrncr.authorization import ResourceTypeRegistry
 from refrncr.cli import (
     CliError,
@@ -21,6 +21,7 @@ __all__ = (
     "CreateAdminConfiguration",
     "NotFoundError",
     "ResourceTypeRegistry",
+    "ServiceWrappers",
     "ValidationError",
     "create_application",
     "create_community_services",

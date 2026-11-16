@@ -120,9 +120,71 @@ def create_flask_app(
     authentication_admission: BrowserAuthenticationAdmissionGuard | None = None,
     audit_history: AuditHistoryService | None = None,
     dataset_versions: DatasetVersionService | None = None,
+    hierarchy: HierarchyService | None = None,
+    overview_service: OverviewService | None = None,
+    dataset_diff: DatasetDiffService | None = None,
+    installation_settings: InstallationSettingsService | None = None,
     review_signing_key: bytes | None = None,
     api_keys: ApiKeyService | None = None,
     clock: Clock | None = None,
+) -> Flask:
+    """Build the Flask adapter from services supplied by the composition root."""
+    return _configure_flask_app(
+        users,
+        authentication,
+        sessions,
+        teams,
+        memberships,
+        authorization=authorization,
+        datasets=datasets,
+        dataset_fields=dataset_fields,
+        dataset_business_keys=dataset_business_keys,
+        dataset_records=dataset_records,
+        record_imports=record_imports,
+        hierarchy_imports=hierarchy_imports,
+        allow_loopback_http=allow_loopback_http,
+        login_limiter=login_limiter,
+        source_resolver=source_resolver,
+        authentication_admission=authentication_admission,
+        audit_history=audit_history,
+        dataset_versions=dataset_versions,
+        hierarchy=hierarchy,
+        overview_service=overview_service,
+        dataset_diff=dataset_diff,
+        installation_settings=installation_settings,
+        review_signing_key=review_signing_key,
+        api_keys=api_keys,
+        clock=clock,
+    )
+
+
+def _configure_flask_app(
+    users: UserService,
+    authentication: AuthenticationService,
+    sessions: SessionService,
+    teams: TeamService,
+    memberships: MembershipService,
+    *,
+    authorization: AuthorizationService | None,
+    datasets: DatasetService | None,
+    dataset_fields: DatasetFieldService | None,
+    dataset_business_keys: DatasetBusinessKeyService | None,
+    dataset_records: DatasetRecordService | None,
+    record_imports: DatasetRecordImportService | None,
+    hierarchy_imports: HierarchyImportService | None,
+    allow_loopback_http: bool,
+    login_limiter: LoginAttemptLimiter | None,
+    source_resolver: SourceIdentityResolver | None,
+    authentication_admission: BrowserAuthenticationAdmissionGuard | None,
+    audit_history: AuditHistoryService | None,
+    dataset_versions: DatasetVersionService | None,
+    hierarchy: HierarchyService | None,
+    overview_service: OverviewService | None,
+    dataset_diff: DatasetDiffService | None,
+    installation_settings: InstallationSettingsService | None,
+    review_signing_key: bytes | None,
+    api_keys: ApiKeyService | None,
+    clock: Clock | None,
 ) -> Flask:
     require_xml_protection()
     app = Flask(__name__, static_folder="../static", template_folder="../templates")
@@ -140,7 +202,10 @@ def create_flask_app(
     review_secret = (
         review_signing_key if review_signing_key is not None else secrets.token_bytes(32)
     )
-    audit_history = audit_history or AuditHistoryService(users.uow, clock=clock)
+    composed = getattr(users, "_community_services", None)
+    audit_history = audit_history or getattr(composed, "audit_history", None)
+    if audit_history is None:
+        raise ValueError("AuditHistoryService must be supplied by the composition root")
 
     register_template_filters(app)
 
@@ -157,30 +222,36 @@ def create_flask_app(
         dataset_fields,
         dataset_business_keys,
     )
-    hierarchy = None
     if any(dependency is not None for dependency in existing_dataset_dependencies) and not all(
         dependency is not None for dependency in existing_dataset_dependencies
     ):
         raise ValueError("Dataset browser dependencies must be supplied together")
     if all(dependency is not None for dependency in existing_dataset_dependencies):
-        dataset_records = dataset_records or DatasetRecordService(datasets.uow, authorization)
-        record_imports = record_imports or DatasetRecordImportService(dataset_records)
-        dataset_versions = (
-            dataset_versions
-            or datasets.versions
-            or DatasetVersionService(datasets.uow, authorization.datasets)
+        composed = getattr(datasets, "_community_services", None)
+        dataset_records = dataset_records or getattr(composed, "dataset_records", None)
+        record_imports = record_imports or getattr(composed, "record_imports", None)
+        hierarchy_imports = hierarchy_imports or getattr(composed, "hierarchy_imports", None)
+        dataset_versions = dataset_versions or getattr(composed, "dataset_versions", None)
+        hierarchy = hierarchy or getattr(composed, "hierarchy", None)
+        overview_service = overview_service or getattr(composed, "overview", None)
+        dataset_diff = dataset_diff or getattr(composed, "dataset_diff", None)
+        installation_settings = installation_settings or getattr(
+            composed, "installation_settings", None
         )
-        hierarchy = HierarchyService(datasets.uow, authorization, versions=dataset_versions)
+        required_services = (
+            dataset_records,
+            record_imports,
+            dataset_versions,
+            hierarchy,
+            overview_service,
+            dataset_diff,
+            installation_settings,
+        )
+        if not all(service is not None for service in required_services):
+            raise ValueError("Dataset browser services must be supplied by the composition root")
     elif dataset_records is not None:
         raise ValueError("Dataset browser dependencies must be supplied together")
     dataset_ui_enabled = dataset_records is not None
-    overview_service = (
-        OverviewService(datasets.uow, authorization.datasets) if dataset_ui_enabled else None
-    )
-    dataset_diff = DatasetDiffService(dataset_versions) if dataset_ui_enabled else None
-    installation_settings = (
-        InstallationSettingsService(users.uow, authorization.datasets) if authorization else None
-    )
     cookie_policy = BrowserCookiePolicy(
         session_max_age=int(sessions.lifetime.total_seconds()),
         allow_loopback_http=allow_loopback_http,

@@ -22,6 +22,7 @@ from refrncr.diff_contracts import (
     ReviewIdentity,
 )
 from refrncr.domain import require_concept, valid_identity
+from refrncr.hierarchy import hierarchy_validation_errors
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
 from refrncr.version_contracts import SnapshotField, version_states
@@ -118,8 +119,6 @@ class DatasetDiffService:
         counts = summary_counts(changes, uow.version_diff.counts(dataset.id, identity.baseline_id))
         hierarchy_changes, hierarchy_errors = (), ()
         if dataset.kind == "hierarchy":
-            from refrncr.hierarchy import hierarchy_validation_errors
-
             hierarchy_changes = uow.version_diff.hierarchy_changes(dataset.id, identity.baseline_id)
             hierarchy_errors = hierarchy_validation_errors(
                 uow.dataset_fields.list_for_dataset(dataset.id),

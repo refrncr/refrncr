@@ -2,10 +2,10 @@
 
 from collections.abc import Iterable, Mapping
 
-from refrncr.datasets import DatasetError
+from refrncr.datasets.errors import DatasetError
+from refrncr.domain import MAX_RECORD_IDENTIFIER_BYTES
 from refrncr.errors import ValidationError
 
-MAX_RECORD_IDENTIFIER_BYTES = 2000
 RECORD_IDENTIFIER_MESSAGES = {
     "too_long": (
         "Record identifier is too long: the identifier fields together may be at most "

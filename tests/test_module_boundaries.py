@@ -92,6 +92,33 @@ def test_production_modules_do_not_use_private_functions_from_other_modules():
     )
 
 
+def test_layers_above_persistence_do_not_hide_dependencies_in_functions():
+    violations = []
+    for path in SOURCE_ROOT.rglob("*.py"):
+        relative = path.relative_to(SOURCE_ROOT)
+        if (
+            "migrations" in relative.parts
+            or relative.parts[0] == "db"
+            or path.name == "models.py"
+            or "persistence" in path.stem
+        ):
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for function in (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        ):
+            for node in ast.walk(function):
+                if isinstance(node, ast.Import | ast.ImportFrom):
+                    violations.append(
+                        f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} imports "
+                        f"inside {function.name}"
+                    )
+
+    assert violations == [], "Function-local imports hide dependencies:\n" + "\n".join(violations)
+
+
 def test_split_domain_packages_do_not_raise_general_error_categories():
     violations = []
     for package in DOMAIN_PACKAGES_WITH_TYPED_ERRORS:

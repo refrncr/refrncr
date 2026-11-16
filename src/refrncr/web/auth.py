@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from flask import Blueprint, Flask, redirect, request, url_for
+from flask import Blueprint, Flask, current_app, redirect, request, url_for
 
 from refrncr.browser_security import BrowserCookieSettings
 from refrncr.hierarchy_import import HierarchyImportService
@@ -69,8 +69,6 @@ class AuthContext:
 
 
 def _context() -> AuthContext:
-    from flask import current_app
-
     return current_app.extensions["refrncr.auth"]
 
 

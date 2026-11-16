@@ -12,13 +12,25 @@ from refrncr.change_status import (
     RECORD_STATUS_FILTERS,
 )
 from refrncr.clock import SYSTEM_CLOCK, Clock
-from refrncr.concept_contracts import DISCARD_UNAVAILABLE, DiscardIdentity, DiscardReview
+from refrncr.concept_contracts import (
+    DISCARD_UNAVAILABLE,
+    ConceptContext,
+    DiscardIdentity,
+    DiscardReview,
+)
 from refrncr.datasets import export as dataset_export
 from refrncr.datasets import history_export
+from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.mapping_updates import mapping_states, reconcile_source
 from refrncr.datasets.record_search import RecordSearchError, matches, search_term
 from refrncr.diff_classification import classify_fields, summary_counts
 from refrncr.domain import advance_concept, require_concept, valid_identity
+from refrncr.hierarchy import (
+    hierarchy_leaf_records,
+    hierarchy_snapshot,
+    hierarchy_validation_errors,
+)
 from refrncr.hierarchy_contracts import hierarchy_node_paths
 from refrncr.ports import (
     DatasetBusinessKey,
@@ -75,8 +87,6 @@ def _validated_snapshot(uow, dataset):
     name = normalize_dataset_name(dataset.name)
     description = validate_dataset_description(dataset.description)
     if getattr(dataset, "kind", "reference") == "hierarchy":
-        from refrncr.hierarchy import hierarchy_snapshot
-
         return hierarchy_snapshot(uow, dataset)
     fields = uow.dataset_fields.list_for_dataset(dataset.id)
     identifier = uow.dataset_business_keys.get(dataset.id)
@@ -704,8 +714,6 @@ class DatasetVersionService:
 
     def update_mapping_source(self, actor_id, dataset_id, expected_revision):
         """Explicitly upgrade to the latest non-cancelled publication, atomically."""
-        from refrncr.datasets.mapping_updates import reconcile_source
-
         try:
             with self.uow(write=True, serialized=True, translate_errors=True) as uow:
                 dataset = self._target(uow, actor_id, dataset_id, write=True)
@@ -934,9 +942,6 @@ class DatasetVersionService:
             )
 
     def _concept_context(self, uow, actor_id, dataset):
-        from refrncr.concept_contracts import ConceptContext
-        from refrncr.datasets.dataset_diff import DatasetDiffService
-
         diff = DatasetDiffService(self)
         target, identity, state, _current, _previous, changes = diff._load(
             uow, actor_id, dataset.id, allow_stale=True
@@ -1013,8 +1018,6 @@ class DatasetVersionService:
                 records = uow.versions.iterate_records(state.version) if page is not None else ()
             hierarchy_nodes, hierarchy_errors = (), ()
             if dataset.kind == "hierarchy":
-                from refrncr.hierarchy import hierarchy_leaf_records, hierarchy_validation_errors
-
                 hierarchy_nodes = (
                     uow.hierarchy.list_for_dataset(dataset.id)
                     if state is None
@@ -1114,8 +1117,6 @@ class DatasetVersionService:
             )
             mapping_record_states = {}
             if state is None and dataset.kind == "mapping":
-                from refrncr.datasets.mapping_updates import mapping_states
-
                 mapping_record_states = mapping_states(fields, ordered, removed)
             ordered = matching
             if mapping_status != "all":
@@ -1239,8 +1240,6 @@ class DatasetVersionService:
                 if expected_review is not None:
                     # Optional REF-84 context, checked under this same publication lock.
                     # Ordinary REF-83 publication remains independent of detailed review.
-                    from refrncr.datasets.dataset_diff import DatasetDiffService
-
                     diff = DatasetDiffService(self)
                     review_state = diff._load(uow, actor_id, dataset_id, expected_review)[2]
                 now = self.clock.now()

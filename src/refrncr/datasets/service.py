@@ -1,9 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from refrncr.audit import record_audit
-from refrncr.authorization import AuthorizationService
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.datasets.record_identity import encode_record_identifier
 from refrncr.domain import valid_identity
-from refrncr.identity import UserService
 from refrncr.ports import (
     AuditEntry,
     DatasetConfiguration,
@@ -30,6 +32,9 @@ from .shared import (
     validate_dataset_icon,
     validate_dataset_key,
 )
+
+if TYPE_CHECKING:
+    from refrncr.authorization import AuthorizationService
 
 SUBJECT_TYPES = {"user", "team"}
 
@@ -561,4 +566,12 @@ class DatasetService(DatasetDeletionMixin, DatasetMappingMixin):
             action=action,
         )
 
-    _add_audit = staticmethod(UserService._add_audit)
+    @staticmethod
+    def _add_audit(uow, audit: AuditEntry) -> None:
+        record_audit(
+            uow,
+            actor_user_id=audit.actor_user_id,
+            object_type=audit.object_type,
+            object_id=audit.object_id,
+            action=audit.action,
+        )

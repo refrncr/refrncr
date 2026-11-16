@@ -2,6 +2,7 @@
 
 from logging import Filter
 from unicodedata import normalize
+from urllib.parse import unquote
 
 from refrncr.change_status import LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
 from refrncr.datasets.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
@@ -26,8 +27,6 @@ class RecordQueryLogFilter(Filter):
         if not isinstance(target, str):
             return False
         path = target.partition("?")[0]
-        from urllib.parse import unquote
-
         if unquote(path).startswith("/api/"):
             record.args = (client, method, "/api/[redacted]", version, status)
             return True

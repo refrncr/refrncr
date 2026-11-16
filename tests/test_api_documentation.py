@@ -81,7 +81,16 @@ def test_schema_matches_registered_routes_and_contracts(api):
         assert set(schema["paths"][path]) == {"get"}
         op = schema["paths"][path]["get"]
         assert op["security"] == [{"HTTPBearer": []}]
-        assert set(op["responses"]) == {"200", "304", "400", "401", "404", "405", "503"}
+        assert set(op["responses"]) == {
+            "200",
+            "304",
+            "400",
+            "401",
+            "404",
+            "405",
+            "409",
+            "503",
+        }
         response_schema = op["responses"]["200"]["content"]["application/json"]["schema"]
         expected = TypeAdapter(model).json_schema(
             mode="serialization", ref_template="#/components/schemas/{model}"

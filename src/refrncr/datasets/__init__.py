@@ -1,51 +1,71 @@
-from importlib import import_module
+"""Dataset-domain services, errors, and supporting behavior."""
 
-from .errors import DatasetAuthorizationError as DatasetAuthorizationError
-from .errors import DatasetConflictError as DatasetConflictError
-from .errors import DatasetError as DatasetError
-from .errors import DatasetNotFoundError as DatasetNotFoundError
-from .errors import DatasetValidationError as DatasetValidationError
-from .errors import RecordConflictError as RecordConflictError
-from .errors import RecordValidationError as RecordValidationError
-from .errors import StaleDatasetOwnerError as StaleDatasetOwnerError
-from .errors import StaleFieldOrderError as StaleFieldOrderError
-from .errors import StaleRecordError as StaleRecordError
+# The error exports intentionally precede services: authorization imports the
+# Dataset categories while the package is being initialized.
+# ruff: noqa: I001
 
-_LAZY_EXPORTS = {
-    "DatasetBusinessKeyService": ("business_key", "DatasetBusinessKeyService"),
-    "DatasetDeletion": ("deletion", "DatasetDeletion"),
-    "DatasetFieldService": ("fields", "DatasetFieldService"),
-    "DatasetRecordService": ("records", "DatasetRecordService"),
-    "MAX_RECORD_REVISION": ("records", "MAX_RECORD_REVISION"),
-    "RecordPage": ("records", "RecordPage"),
-    "parse_expected_revision": ("records", "parse_expected_revision"),
-    "version_reads": ("deletion", "version_reads"),
-    "DatasetService": ("service", "DatasetService"),
-    "DatasetDetails": ("shared", "DatasetDetails"),
-    "canonicalize_record_value": ("shared", "canonicalize_record_value"),
-    "normalize_dataset_field_name": ("shared", "normalize_dataset_field_name"),
-    "normalize_dataset_name": ("shared", "normalize_dataset_name"),
-    "require_identifier_type": ("shared", "require_identifier_type"),
-    "validate_dataset_description": ("shared", "validate_dataset_description"),
-    "validate_dataset_field_flag": ("shared", "validate_dataset_field_flag"),
-    "validate_dataset_field_key": ("shared", "validate_dataset_field_key"),
-    "validate_dataset_field_type": ("shared", "validate_dataset_field_type"),
-    "validate_dataset_icon": ("shared", "validate_dataset_icon"),
-    "validate_dataset_key": ("shared", "validate_dataset_key"),
-    "validate_field_metadata": ("shared", "validate_field_metadata"),
-}
+from .errors import (
+    DatasetAuthorizationError,
+    DatasetConflictError,
+    DatasetError,
+    DatasetNotFoundError,
+    DatasetValidationError,
+    RecordConflictError,
+    RecordValidationError,
+    StaleDatasetOwnerError,
+    StaleFieldOrderError,
+    StaleRecordError,
+)
+from .business_key import DatasetBusinessKeyService
+from .deletion import DatasetDeletion, version_reads
+from .fields import DatasetFieldService
+from .records import MAX_RECORD_REVISION, DatasetRecordService, RecordPage, parse_expected_revision
+from .service import DatasetService
+from .shared import (
+    DatasetDetails,
+    canonicalize_record_value,
+    normalize_dataset_field_name,
+    normalize_dataset_name,
+    require_identifier_type,
+    validate_dataset_description,
+    validate_dataset_field_flag,
+    validate_dataset_field_key,
+    validate_dataset_field_type,
+    validate_dataset_icon,
+    validate_dataset_key,
+    validate_field_metadata,
+)
 
-
-def __getattr__(name: str):
-    """Load service exports only when callers request the compatibility surface."""
-    try:
-        module_name, attribute = _LAZY_EXPORTS[name]
-    except KeyError:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
-    value = getattr(import_module(f"{__name__}.{module_name}"), attribute)
-    globals()[name] = value
-    return value
-
-
-def __dir__():
-    return sorted({*globals(), *_LAZY_EXPORTS})
+__all__ = (
+    "MAX_RECORD_REVISION",
+    "DatasetAuthorizationError",
+    "DatasetBusinessKeyService",
+    "DatasetConflictError",
+    "DatasetDeletion",
+    "DatasetDetails",
+    "DatasetError",
+    "DatasetFieldService",
+    "DatasetNotFoundError",
+    "DatasetRecordService",
+    "DatasetService",
+    "DatasetValidationError",
+    "RecordConflictError",
+    "RecordPage",
+    "RecordValidationError",
+    "StaleDatasetOwnerError",
+    "StaleFieldOrderError",
+    "StaleRecordError",
+    "canonicalize_record_value",
+    "normalize_dataset_field_name",
+    "normalize_dataset_name",
+    "parse_expected_revision",
+    "require_identifier_type",
+    "validate_dataset_description",
+    "validate_dataset_field_flag",
+    "validate_dataset_field_key",
+    "validate_dataset_field_type",
+    "validate_dataset_icon",
+    "validate_dataset_key",
+    "validate_field_metadata",
+    "version_reads",
+)

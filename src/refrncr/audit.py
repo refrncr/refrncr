@@ -11,7 +11,7 @@ from types import MappingProxyType
 from unicodedata import category, normalize
 from uuid import UUID, uuid4
 
-from refrncr.datasets.field_contracts import FIELD_KEY_PATTERN
+from refrncr.domain import FIELD_KEY_PATTERN
 
 
 class AuditContractError(ValueError):

@@ -6,8 +6,12 @@ migration proceeds.
 
 ## Application composition
 
-- `create_community_services(session_factory, resource_types, *, clock=...)` constructs the
-  Community service bundle with the built-in SQLAlchemy adapters.
+- `create_community_services(session_factory, resource_types, *, clock=..., wrappers=...)`
+  constructs the Community service bundle with the built-in SQLAlchemy adapters.
+- `ServiceWrappers(users=..., datasets=...)` supplies immutable, optional wrapper callables. Each
+  receives one fully composed Community service and returns the service contract exposed to the
+  application. Wrappers are applied exactly once; close over integrator policy state instead of
+  expecting Community sessions or repositories.
 - `create_application(...)` constructs the combined FastAPI and Flask application from composed
   services.
 - `ResourceTypeRegistry` registers existence checks for authorization resource types.
@@ -46,8 +50,23 @@ application = create_application(
 )
 ```
 
-The documented user- and dataset-service wrapper hook is added by REF-362. Until then, this
-contract preserves the existing composition behavior.
+For example, an integrator can apply product policy without subclassing Community services:
+
+```python
+from refrncr.integration import ServiceWrappers, create_community_services
+
+services = create_community_services(
+    session_factory,
+    resource_types,
+    wrappers=ServiceWrappers(
+        users=lambda community: LimitedUsers(community, limits),
+        datasets=lambda community: LimitedDatasets(community, limits),
+    ),
+)
+```
+
+The wrapper must preserve the corresponding public service contract. Category errors such as
+`ConflictError` pass unchanged to the existing web and API boundary translation.
 
 ## Database setup and readiness
 

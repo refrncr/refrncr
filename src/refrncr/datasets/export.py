@@ -21,8 +21,12 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
-from refrncr.hierarchy import applicable, hierarchy_order, hierarchy_paths
-from refrncr.hierarchy_contracts import hierarchy_path_label
+from refrncr.hierarchy_contracts import (
+    applicable,
+    hierarchy_order,
+    hierarchy_path_label,
+    hierarchy_paths,
+)
 from refrncr.ports import DatasetFieldRecord, StoredRecord
 
 SPOOL_MEMORY_LIMIT = 1024 * 1024

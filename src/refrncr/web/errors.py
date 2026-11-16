@@ -22,8 +22,6 @@ def register_error_handlers(
 
     @app.errorhandler(RequestEntityTooLarge)
     def handle_oversized_request(_error: RequestEntityTooLarge):
-        from flask import request
-
         if request.path == "/login":
             return generic_login_failure, 401
         return "Request is too large", 413

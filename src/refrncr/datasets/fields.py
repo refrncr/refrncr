@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from refrncr.audit import record_audit
-from refrncr.authorization import AuthorizationService
 from refrncr.datasets.deletion import version_reads as _version_reads
 from refrncr.datasets.errors import (
     DatasetAuthorizationError,
@@ -24,6 +25,7 @@ from refrncr.datasets.shared import (
 )
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
+from refrncr.hierarchy_contracts import validate_hierarchy_scope
 from refrncr.ports import (
     DatasetFieldRecord,
     DatasetRecord,
@@ -32,6 +34,9 @@ from refrncr.ports import (
     UnitOfWork,
     UnitOfWorkFactory,
 )
+
+if TYPE_CHECKING:
+    from refrncr.authorization import AuthorizationService
 
 
 class DatasetFieldService:
@@ -65,8 +70,6 @@ class DatasetFieldService:
         with self.uow(write=True, serialized=True) as uow:
             dataset = uow.datasets.find_by_key(validated_dataset_key, for_update=True)
             self._require_dataset_access(actor_id, dataset, "can_maintain_dataset", uow=uow)
-            from refrncr.hierarchy import validate_hierarchy_scope
-
             hierarchy_scope = validate_hierarchy_scope(hierarchy_scope, dataset.kind)
             source_field = None
             source_dataset = None
@@ -264,8 +267,6 @@ class DatasetFieldService:
             if field.source_field_key:
                 raise DatasetValidationError("Source mapping fields are read-only")
 
-            from refrncr.hierarchy import validate_hierarchy_scope
-
             hierarchy_scope = validate_hierarchy_scope(
                 field.hierarchy_scope if hierarchy_scope is None else hierarchy_scope, dataset.kind
             )
@@ -356,8 +357,6 @@ class DatasetFieldService:
                 field.key if new_key is None else validate_dataset_field_key(new_key)
             )
             key_changed = self._validate_field_key_change(uow, dataset, field, validated_new_key)
-
-            from refrncr.hierarchy import validate_hierarchy_scope
 
             hierarchy_scope = validate_hierarchy_scope(
                 field.hierarchy_scope if hierarchy_scope is None else hierarchy_scope, dataset.kind

@@ -3,16 +3,10 @@
 from dataclasses import replace
 
 from refrncr.audit import record_audit
-from refrncr.datasets import RecordConflictError, RecordValidationError, StaleRecordError
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.errors import RecordConflictError, RecordValidationError, StaleRecordError
 from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
-from refrncr.domain import advance_concept, require_concept, valid_identity
-from refrncr.hierarchy_contracts import hierarchy_node_paths
-from refrncr.ports import RecordValue, StoredRecord
-from refrncr.services import (
-    DatasetFieldService,
-    NotFoundError,
-    ValidationError,
+from refrncr.datasets.shared import (
     canonicalize_record_value,
     normalize_dataset_field_name,
     normalize_dataset_name,
@@ -23,6 +17,17 @@ from refrncr.services import (
     validate_dataset_key,
     validate_field_metadata,
 )
+from refrncr.domain import advance_concept, require_concept, valid_identity
+from refrncr.errors import NotFoundError, ValidationError
+from refrncr.hierarchy_contracts import (
+    applicable,
+    hierarchy_node_paths,
+    validate_hierarchy_scope,
+)
+from refrncr.hierarchy_contracts import hierarchy_order as hierarchy_order
+from refrncr.hierarchy_contracts import hierarchy_paths as hierarchy_paths
+from refrncr.hierarchy_contracts import hierarchy_sibling_sort_key as hierarchy_sibling_sort_key
+from refrncr.ports import RecordValue, StoredRecord
 from refrncr.version_contracts import SnapshotContent, SnapshotField
 
 MAX_HIERARCHY_NODE_NAME = 200
@@ -34,62 +39,11 @@ def canonical_hierarchy_view(view):
     return HIERARCHY_VIEW_ALIASES.get(view, view)
 
 
-def hierarchy_sibling_sort_key(node):
-    """Stable display order shared by hierarchy UI, API, and exports."""
-    return node.name.casefold(), node.name, node.id
-
-
-def hierarchy_order(nodes):
-    """Return a deterministic depth-first order with siblings sorted consistently."""
-    by_parent = {}
-    for node in nodes:
-        by_parent.setdefault(node.parent_id, []).append(node)
-    for siblings in by_parent.values():
-        siblings.sort(key=hierarchy_sibling_sort_key)
-    ordered = []
-    pending = list(reversed(by_parent.get(None, ())))
-    while pending:
-        node = pending.pop()
-        ordered.append(node)
-        pending.extend(reversed(by_parent.get(node.id, ())))
-    ordered.extend(node for node in nodes if node not in ordered)
-    return tuple(ordered)
-
-
-def hierarchy_paths(nodes):
-    """Return node paths without recursion, including finite paths for invalid graphs."""
-    nodes = tuple(nodes)
-    by_id = {node.id: node for node in nodes}
-    paths = {}
-    for node in nodes:
-        path, current, visited = [], node, set()
-        while current is not None and current.id not in visited:
-            visited.add(current.id)
-            path.append(current)
-            current = by_id.get(current.parent_id)
-        paths[node.id] = tuple(reversed(path))
-    return paths
-
-
-def validate_hierarchy_scope(scope, kind):
-    if kind != "hierarchy":
-        if scope is not None:
-            raise ValidationError("Field scope is only available for hierarchy datasets")
-        return None
-    if scope not in {"leaves", "all_nodes"}:
-        raise ValidationError("Choose Leaves only or All nodes for the field scope")
-    return scope
-
-
 def _node_name(name):
     name = name.strip() if isinstance(name, str) else ""
     if not name or len(name) > MAX_HIERARCHY_NODE_NAME:
         raise ValidationError("Node name must contain between 1 and 200 characters")
     return name
-
-
-def applicable(field, node, parent_ids):
-    return field.hierarchy_scope == "all_nodes" or node.id not in parent_ids
 
 
 def hierarchy_leaf_records(nodes, fields):
@@ -294,7 +248,10 @@ class HierarchyService:
         self.versions = versions
 
     def _target(self, work, actor_id, dataset_key, expected_revision):
-        key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
+        try:
+            key = validate_dataset_key(dataset_key)
+        except ValidationError as exc:
+            raise NotFoundError("Dataset not found") from exc
         dataset = work.datasets.find_by_key(key, for_update=True)
         if (
             dataset is None
