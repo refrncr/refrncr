@@ -7,12 +7,12 @@ from contextlib import contextmanager
 from dataclasses import replace
 from types import MappingProxyType
 
-from refrncr.imports.contracts import (
+from refrncr.imports.contracts import StagedImport
+from refrncr.imports.errors import (
     ImportConflictError,
     ImportExpiredError,
     ImportNotFoundError,
     ImportValidationError,
-    StagedImport,
 )
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024

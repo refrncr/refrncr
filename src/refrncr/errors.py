@@ -20,10 +20,6 @@ class VersionError(DomainError):
     """Dataset-version-domain failure."""
 
 
-class ImportDomainError(DomainError):
-    """Import-domain failure; named distinctly from Python's built-in ImportError."""
-
-
 class HierarchyError(DomainError):
     """Hierarchy-domain failure."""
 
@@ -56,6 +52,10 @@ class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
 
 
+_MOVED_ERROR_MODULES = {
+    "ImportDomainError": "refrncr.imports.errors",
+}
+
 _DATASET_ERROR_NAMES = frozenset(
     {
         "DatasetError",
@@ -73,7 +73,11 @@ _DATASET_ERROR_NAMES = frozenset(
 
 
 def __getattr__(name: str):
-    """Temporarily preserve dataset-error imports until REF-370."""
+    """Temporarily preserve moved domain-error imports until REF-370."""
+    if module := _MOVED_ERROR_MODULES.get(name):
+        value = getattr(import_module(module), name)
+        globals()[name] = value
+        return value
     if name in _DATASET_ERROR_NAMES:
         value = getattr(import_module("refrncr.datasets.errors"), name)
         globals()[name] = value

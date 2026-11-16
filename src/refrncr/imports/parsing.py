@@ -11,7 +11,8 @@ from pathlib import PurePath
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from refrncr.imports.contracts import ImportValidationError, ParsedSource, SourceRow
+from refrncr.imports.contracts import ParsedSource, SourceRow
+from refrncr.imports.errors import ImportValidationError
 from refrncr.imports.profiling import normalize_mapping_name
 from refrncr.imports.xml_security import require_xml_protection
 

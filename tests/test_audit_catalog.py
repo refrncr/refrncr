@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+import refrncr.app as application_module
 from refrncr.audit import (
     EVENTS,
     OPERATIONS,
@@ -458,59 +459,12 @@ def test_http_inventory_traces_current_service_calls_and_shared_helpers():
                     and function.attr != "uow"
                     and not function.attr.startswith("_")
                 ):
-                    version_modules = {
-                        "cancel": "versions.lifecycle",
-                        "publish": "versions.lifecycle",
-                        "read": "versions.lifecycle",
-                        "review": "versions.lifecycle",
-                        "concept_context": "versions.concepts",
-                        "context": "versions.concepts",
-                        "create_concept": "versions.concepts",
-                        "discard_concept": "versions.concepts",
-                        "history": "versions.concepts",
-                        "overview": "versions.concepts",
-                        "review_discard": "versions.concepts",
-                        "update_mapping_source": "versions.concepts",
-                        "export_history": "versions.service",
-                        "read_current": "versions.service",
-                        "read_history": "versions.service",
-                        "read_versions": "versions.service",
-                    }
-                    module = {
-                        "api_keys": "identity.api_keys",
-                        "api_key_service": "identity.api_keys",
-                        "authentication": "identity.authentication",
-                        "authorization": "authorization.service",
-                        "authorization_service": "authorization.service",
-                        "memberships": "identity.memberships",
-                        "sessions": "identity.sessions",
-                        "teams": "identity.teams",
-                        "users": "identity.users",
-                        "record_imports": "imports.workflows"
-                        if function.attr
-                        in {"preview", "saved_preview", "confirm", "cancel", "revoke_session"}
-                        else "imports.service",
-                        "audit_history": "audit_history",
-                        "dataset_versions": version_modules.get(function.attr),
-                        "dataset_diff": "datasets.dataset_diff",
-                        "dataset_fields": "datasets.fields",
-                        "field_service": "datasets.fields",
-                        "dataset_business_keys": "datasets.business_key",
-                        "business_key_service": "datasets.business_key",
-                        "dataset_records": "datasets.records",
-                        "record_service": "datasets.records",
-                        "datasets": "datasets.service",
-                        "dataset_service": "datasets.service",
-                        "service": "datasets.service",
-                    }.get(receiver.id, "services")
                     service_name = receivers[receiver.id]
-                    if module == "versions.concepts":
-                        service_name = "DatasetVersionConceptMixin"
-                    elif module == "versions.lifecycle":
-                        service_name = "DatasetVersionLifecycleMixin"
-                    elif module == "imports.workflows":
-                        service_name = "ImportWorkflowMixin"
-                    found.add(f"refrncr.{module}.{service_name}.{function.attr}")
+                    service_type = getattr(application_module, service_name)
+                    owner = next(
+                        base for base in service_type.__mro__ if function.attr in base.__dict__
+                    )
+                    found.add(f"{owner.__module__}.{owner.__name__}.{function.attr}")
             elif isinstance(function, ast.Name) and function.id in functions:
                 found.update(service_calls(function.id, seen))
         return found

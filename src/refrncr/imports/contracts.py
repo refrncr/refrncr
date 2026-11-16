@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from refrncr.errors import ConflictError, ImportDomainError, NotFoundError, ValidationError
 from refrncr.imports.source_formats import (
     MAX_SOURCE_TIMEZONE_LENGTH,
     SourceFormatError,
@@ -33,28 +32,6 @@ UNREADABLE_XLSX_MESSAGE = (
     ".xlsx copy, and upload that copy. Password-protected, damaged, or unsupported workbooks "
     "cannot be imported."
 )
-
-
-class ImportValidationError(ImportDomainError, ValidationError):
-    """A safe, user-facing import validation failure."""
-
-
-class ImportConflictError(ImportDomainError, ConflictError):
-    """Import work conflicts with its staged or persisted state."""
-
-
-class ImportNotFoundError(ImportDomainError, NotFoundError):
-    """An import or deliberately concealed Dataset does not exist."""
-
-
-class SourceFormatComponentsError(ImportValidationError):
-    def __init__(self, issues):
-        self.issues = tuple(issues)
-        super().__init__("Choose a valid source type and its required format components.")
-
-
-class ImportExpiredError(ImportDomainError, NotFoundError):
-    """A previously valid staged import expired for its bound session and dataset."""
 
 
 @dataclass(frozen=True, slots=True)

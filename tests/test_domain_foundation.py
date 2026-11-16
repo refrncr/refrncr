@@ -39,7 +39,7 @@ from refrncr.imports import (
     ImportNotFoundError,
     ImportValidationError,
 )
-from refrncr.imports.contracts import ImportDomainError
+from refrncr.imports.errors import ImportDomainError
 from refrncr.versions import (
     VersionAuthorizationError,
     VersionConflictError,
