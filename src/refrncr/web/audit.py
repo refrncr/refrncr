@@ -7,8 +7,8 @@ from typing import Any, Protocol
 
 from flask import Blueprint, Flask, abort, current_app, request, url_for
 
-from refrncr.audit_history import AuditHistoryService, filter_values, parse_audit_filters
-from refrncr.audit_presentation import ACTION_LABELS, OBJECTS
+from refrncr.audit.history import AuditHistoryService, filter_values, parse_audit_filters
+from refrncr.audit.presentation import ACTION_LABELS, OBJECTS
 from refrncr.ports import AuditReadUnavailable
 from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 from refrncr.web.routing import capability_route, no_store_route

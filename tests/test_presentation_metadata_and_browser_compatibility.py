@@ -15,7 +15,7 @@ from support import (
 )
 
 from refrncr.persistence.models import Dataset
-from refrncr.presentation_metadata import (
+from refrncr.presentation.metadata import (
     ICON_SPRITES,
     LEGACY_ICON_SPRITE,
     dataset_icon,

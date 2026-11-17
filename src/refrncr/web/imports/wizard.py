@@ -41,6 +41,56 @@ def show_source_format_issues(columns, issues):
     return columns
 
 
+def _mapping_samples(source, assistance):
+    if not assistance:
+        return []
+    result = []
+    for index in range(len(source.headers)):
+        samples = (
+            row.values[index]
+            for row in source.rows[:PROFILE_SCAN_ROWS]
+            if index not in row.formulas and row.values[index].strip()
+        )
+        result.append(distinct_samples(samples))
+    return result
+
+
+def _merge_source_format_issues(error, issues, mapping_errors, step_mapping_errors):
+    for issue in issues:
+        message = mapping_issue_message(issue)
+        if not message:
+            continue
+        step_mapping_errors.append(message)
+        if issue.column_index is not None:
+            mapping_errors[issue.column_index] = message
+    return merge_error_messages(error, *step_mapping_errors) if step_mapping_errors else error
+
+
+def _preview_report(preview, required_keys, identifier_keys):
+    if not preview or not preview.errors:
+        return []
+    rows = {row.number: row for row in preview.source.rows}
+    report = []
+    for number, errors in preview.row_error_groups:
+        row = rows[number]
+        identifier_values = [
+            row.values[preview.mapping.index(key)] if key in preview.mapping else None
+            for key in required_keys
+            if key in identifier_keys
+        ]
+        details = []
+        for item in errors:
+            value = None
+            if item.header in preview.source.headers:
+                index = preview.source.headers.index(item.header)
+                value = "[Formula]" if index in row.formulas else row.values[index]
+            details.append(dict(field=item.field, value=value, message=item.message))
+        report.append(
+            dict(number=number, identifier=record_label(identifier_values), errors=details)
+        )
+    return report
+
+
 def render_import_wizard(
     dataset,
     login_session,
@@ -117,50 +167,17 @@ def render_import_wizard(
                 state = record_imports.navigate(
                     actor.id, login_session.id, dataset.key, state.token, step
                 )
-    if assistance:
-        # Full versions of the same bounded display examples, for accessible disclosure.
-        for index in range(len(source.headers)):
-            samples = (
-                row.values[index]
-                for row in source.rows[:PROFILE_SCAN_ROWS]
-                if index not in row.formulas and row.values[index].strip()
-            )
-            mapping_samples.append(distinct_samples(samples))
+    mapping_samples = _mapping_samples(source, assistance)
     if assistance:
         format_columns = list(assistance.format_columns)
     format_columns = show_source_format_issues(format_columns, source_format_issues)
-    for issue in source_format_issues:
-        message = mapping_issue_message(issue)
-        if not message:
-            continue
-        step_mapping_errors.append(message)
-        if issue.column_index is not None:
-            mapping_errors[issue.column_index] = message
-    if step_mapping_errors:
-        error = merge_error_messages(error, *step_mapping_errors)
+    error = _merge_source_format_issues(
+        error, source_format_issues, mapping_errors, step_mapping_errors
+    )
     wizard_status = import_wizard_status(state, source, step)
     preview_fields = [field for field in fields if preview and field.key in preview.mapping]
     preview_rows = preview.sample if preview and preview.valid else []
-    report_rows = []
-    if preview and preview.errors:
-        rows = {row.number: row for row in preview.source.rows}
-        for number, errors in preview.row_error_groups:
-            row = rows[number]
-            identifier_values = [
-                row.values[preview.mapping.index(key)] if key in preview.mapping else None
-                for key in required_keys
-                if key in identifier_keys
-            ]
-            details = []
-            for item in errors:
-                value = None
-                if item.header in preview.source.headers:
-                    index = preview.source.headers.index(item.header)
-                    value = "[Formula]" if index in row.formulas else row.values[index]
-                details.append(dict(field=item.field, value=value, message=item.message))
-            report_rows.append(
-                dict(number=number, identifier=record_label(identifier_values), errors=details)
-            )
+    report_rows = _preview_report(preview, required_keys, identifier_keys)
     return render_authenticated_template(
         "pages/datasets/import/wizard.html",
         mode=mode,

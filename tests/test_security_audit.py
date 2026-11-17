@@ -5,7 +5,7 @@ from support import SECURITY_HTTPS as HTTPS
 from support import LoginAttemptLimiter, configured_web, post_login
 
 from refrncr.audit import record_security_event, validate_event
-from refrncr.audit_presentation import present_event
+from refrncr.audit.presentation import present_event
 from refrncr.persistence.models import AuditEvent
 from refrncr.web import SESSION_COOKIE
 

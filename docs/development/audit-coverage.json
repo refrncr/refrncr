@@ -36,7 +36,7 @@
     {
       "capability": "Security audit",
       "operation": "record_security_event",
-      "service": "refrncr.audit.record_security_event",
+      "service": "refrncr.audit.catalog.record_security_event",
       "interface_entrypoints": [
         "Internal browser security boundary"
       ],
@@ -4801,7 +4801,7 @@
     {
       "capability": "AuditHistoryService",
       "operation": "list_history",
-      "service": "refrncr.audit_history.AuditHistoryService.list_history",
+      "service": "refrncr.audit.history.AuditHistoryService.list_history",
       "interface_entrypoints": [
         "refrncr.web.audit.audit_list GET /settings/audit-log"
       ],
@@ -4835,7 +4835,7 @@
     {
       "capability": "AuditHistoryService",
       "operation": "get_event",
-      "service": "refrncr.audit_history.AuditHistoryService.get_event",
+      "service": "refrncr.audit.history.AuditHistoryService.get_event",
       "interface_entrypoints": [
         "refrncr.web.audit.audit_detail GET /settings/audit-log/<event_id>"
       ],
@@ -6983,7 +6983,7 @@
     {
       "capability": "Private Overview",
       "operation": "read",
-      "service": "refrncr.overview.OverviewService.read",
+      "service": "refrncr.presentation.overview.OverviewService.read",
       "interface_entrypoints": [
         "refrncr.web.overview.index GET /",
         "refrncr.web.overview.attention_overview GET /attention"
@@ -7016,7 +7016,7 @@
     {
       "capability": "Private Overview",
       "operation": "record_visit",
-      "service": "refrncr.overview.OverviewService.record_visit",
+      "service": "refrncr.presentation.overview.OverviewService.record_visit",
       "interface_entrypoints": [
         "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit"
       ],

@@ -11,8 +11,8 @@
     "refrncr.identity.api_keys.ApiKeyService.get_key",
     "refrncr.identity.api_keys.ApiKeyService.list_keys",
     "refrncr.identity.api_keys.ApiKeyService.revoke_key",
-    "refrncr.audit_history.AuditHistoryService.get_event",
-    "refrncr.audit_history.AuditHistoryService.list_history",
+    "refrncr.audit.history.AuditHistoryService.get_event",
+    "refrncr.audit.history.AuditHistoryService.list_history",
     "refrncr.datasets.dataset_diff.DatasetDiffService.field_detail",
     "refrncr.datasets.dataset_diff.DatasetDiffService.open_review",
     "refrncr.datasets.dataset_diff.DatasetDiffService.record_detail",
@@ -48,8 +48,8 @@
     "refrncr.authorization.installation_settings.InstallationSettingsService.change_policy",
     "refrncr.authorization.installation_settings.InstallationSettingsService.get_policy",
     "refrncr.authorization.installation_settings.InstallationSettingsService.requires_export_access",
-    "refrncr.overview.OverviewService.read",
-    "refrncr.overview.OverviewService.record_visit",
+    "refrncr.presentation.overview.OverviewService.read",
+    "refrncr.presentation.overview.OverviewService.record_visit",
     "refrncr.imports.service.DatasetRecordImportService.active",
     "refrncr.imports.service.DatasetRecordImportService.begin",
     "refrncr.imports.workflows.ImportWorkflowMixin.cancel",
@@ -159,7 +159,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.audit_history.AuditHistoryService.list_history",
+        "refrncr.audit.history.AuditHistoryService.list_history",
         "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
@@ -172,7 +172,7 @@
         "GET"
       ],
       "operations": [
-        "refrncr.audit_history.AuditHistoryService.get_event",
+        "refrncr.audit.history.AuditHistoryService.get_event",
         "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.authorization.service.AuthorizationService.has_capability",
         "refrncr.identity.sessions.SessionService.resolve_with_session"
@@ -188,7 +188,7 @@
         "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
         "refrncr.web.overview.index",
-        "refrncr.overview.OverviewService.read"
+        "refrncr.presentation.overview.OverviewService.read"
       ]
     },
     {
@@ -1600,7 +1600,7 @@
       "operations": [
         "refrncr.web.security.BrowserCookiePolicy.for_request",
         "refrncr.identity.sessions.SessionService.resolve_with_session",
-        "refrncr.overview.OverviewService.read"
+        "refrncr.presentation.overview.OverviewService.read"
       ]
     },
     {
@@ -1704,7 +1704,7 @@
     "No background business worker exists. API credentials, publication/versioning, Dataset deletion and authenticated Current reads are inventoried. Alembic upgrade/downgrade is the operator migration capability, not user history."
   ],
   "support_operations": [
-    "refrncr.audit.record_security_event",
+    "refrncr.audit.catalog.record_security_event",
     "refrncr.web.security.BrowserCookiePolicy.for_request",
     "refrncr.identity.login_security.BrowserAuthenticationAdmissionGuard.try_acquire",
     "refrncr.identity.login_security.LoginAttemptLimiter.allow",
@@ -1795,7 +1795,7 @@
     {
       "symbol": "Successful dataset HTML GET: refrncr.web.hooks.record_dataset_visit",
       "operations": [
-        "refrncr.overview.OverviewService.record_visit"
+        "refrncr.presentation.overview.OverviewService.record_visit"
       ]
     }
   ],

@@ -5,7 +5,7 @@ from datetime import UTC
 from flask import Flask
 from markupsafe import Markup
 
-from refrncr.audit_history import MAX_AUDIT_DATETIME_LENGTH
+from refrncr.audit.history import MAX_AUDIT_DATETIME_LENGTH
 from refrncr.datasets.datatypes import get_datatype
 from refrncr.hierarchies import MAX_HIERARCHY_NODE_NAME
 from refrncr.imports.source_formats import MAX_SOURCE_TIMEZONE_LENGTH
@@ -16,7 +16,7 @@ from refrncr.presentation import (
     status_badge_variant,
     status_label,
 )
-from refrncr.presentation_metadata import (
+from refrncr.presentation.metadata import (
     MAX_DATASET_ICON_LENGTH,
     MAX_FIELD_DEFINITION,
     MAX_FIELD_UNIT,

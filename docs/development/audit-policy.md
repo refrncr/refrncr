@@ -9,10 +9,10 @@ operation regardless of the number of interfaces; its event references distingui
 and composite writes. Read these JSON artifacts as maintained documentation, not generated claims
 that runtime behavior must necessarily be correct.
 
-The framework-independent [catalog](../../src/refrncr/audit.py) validates event contracts and
+The framework-independent [catalog](../../src/refrncr/audit/catalog.py) validates event contracts and
 explicit operation classifications. It uses the existing `AuditEvent`, `AuditEntry` and Unit of
 Work; there is no second event model, logging framework, repository, event bus or external service.
-The static [guard](../../src/refrncr/audit_guard.py) verifies the inventory/matrix/catalog agreement.
+The static [guard](../../src/refrncr/audit/guard.py) verifies the inventory/matrix/catalog agreement.
 
 ## Decisions and scope
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.api.documentation import publish_documentation
 from refrncr.api.routes import create_api
-from refrncr.audit_history import AuditHistoryService
+from refrncr.audit.history import AuditHistoryService
 from refrncr.authorization import InstallationSettingsService
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datasets.dataset_diff import DatasetDiffService
@@ -26,9 +26,9 @@ from refrncr.operational import (
     operational_response,
     readiness_status,
 )
-from refrncr.overview import OverviewService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
+from refrncr.presentation.overview import OverviewService
 from refrncr.services import (
     AuthenticationService,
     AuthorizationService,

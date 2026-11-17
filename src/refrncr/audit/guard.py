@@ -84,14 +84,23 @@ def discover_routes(source, module):
     return routes
 
 
-def verify_inventory(root):
-    root = Path(root)
-    inventory = json.loads((root / "docs/development/audit-inventory.json").read_text())
-    matrix = json.loads((root / "docs/development/audit-coverage.json").read_text())
+def _discover_application_inventory(root):
     discovered, routes, module_commands = set(), [], []
+    guarded_modules = {
+        "refrncr.services",
+        "refrncr.datasets.deletion",
+        "refrncr.datasets.records",
+        "refrncr.datasets.service",
+        "refrncr.imports.service",
+        "refrncr.imports.workflows",
+        "refrncr.versions",
+        "refrncr.datasets.dataset_diff",
+        "refrncr.identity.api_keys",
+        "refrncr.hierarchies.service",
+    }
     for path in (root / "src/refrncr").rglob("*.py"):
         if "migrations" in path.parts:
-            continue  # Operator prepare_database owns the complete Alembic revision chain.
+            continue
         module_parts = path.relative_to(root / "src").with_suffix("").parts
         if module_parts[-1] == "__init__":
             module_parts = module_parts[:-1]
@@ -106,27 +115,34 @@ def verify_inventory(root):
         discovered.update(discover_service_operations(source, module))
         routes.extend(discover_routes(source, module))
         if (
-            module
-            in {
-                "refrncr.services",
-                "refrncr.datasets.deletion",
-                "refrncr.datasets.records",
-                "refrncr.datasets.service",
-                "refrncr.imports.service",
-                "refrncr.imports.workflows",
-                "refrncr.versions",
-                "refrncr.datasets.dataset_diff",
-                "refrncr.identity.api_keys",
-                "refrncr.hierarchies.service",
-            }
+            module in guarded_modules
             or module == "refrncr.web"
             or module.startswith("refrncr.web.")
         ):
-            for node in ast.walk(ast.parse(source)):
-                if isinstance(node, ast.Call) and (
-                    ast.unparse(node.func) in {"AuditEvent", "uow.add_audit"}
-                ):
-                    raise AuditContractError("Audit catalog bypass in " + module)
+            if any(
+                isinstance(node, ast.Call)
+                and ast.unparse(node.func) in {"AuditEvent", "uow.add_audit"}
+                for node in ast.walk(tree)
+            ):
+                raise AuditContractError("Audit catalog bypass in " + module)
+    return discovered, routes, module_commands
+
+
+def _verify_interfaces(inventory, rows):
+    interfaces = inventory["routes"] + inventory["cli_commands"] + inventory["implicit_interfaces"]
+    for interface in interfaces:
+        if not interface["operations"]:
+            raise AuditContractError("Interface has no audit disposition: " + interface["symbol"])
+        require_classified(interface["operations"], OPERATIONS)
+        label = interface["symbol"]
+        if "path" in interface:
+            label += " " + ",".join(interface["methods"]) + " " + interface["path"]
+        for symbol, row in rows.items():
+            if (symbol in interface["operations"]) != (label in row["interface_entrypoints"]):
+                raise AuditContractError("Interface coverage mismatch: " + symbol + " via " + label)
+
+
+def _verify_discovery(inventory, discovered, routes, module_commands):
     require_classified(discovered, OPERATIONS)
     if sorted(module_commands) != sorted(inventory["module_commands"]):
         raise AuditContractError("Module CLI inventory mismatch: " + ", ".join(module_commands))
@@ -144,11 +160,19 @@ def verify_inventory(root):
     documented_routes = [
         {key: row[key] for key in ("symbol", "path", "methods")} for row in inventory["routes"]
     ]
-    if sorted(routes, key=lambda r: r["symbol"]) != sorted(
-        documented_routes, key=lambda r: r["symbol"]
+    if sorted(routes, key=lambda row: row["symbol"]) != sorted(
+        documented_routes, key=lambda row: row["symbol"]
     ):
-        missing = {r["symbol"] for r in routes} - {r["symbol"] for r in documented_routes}
+        missing = {row["symbol"] for row in routes} - {row["symbol"] for row in documented_routes}
         raise AuditContractError("Route inventory mismatch: " + ", ".join(sorted(missing)))
+
+
+def verify_inventory(root):
+    root = Path(root)
+    inventory = json.loads((root / "docs/development/audit-inventory.json").read_text())
+    matrix = json.loads((root / "docs/development/audit-coverage.json").read_text())
+    discovered, routes, module_commands = _discover_application_inventory(root)
+    _verify_discovery(inventory, discovered, routes, module_commands)
     # Discover argparse subcommands independently; flags are included in the inventory
     # and checked against the actual parser in tests.
     cli = ast.parse((root / "src/refrncr/cli.py").read_text())
@@ -243,16 +267,5 @@ def verify_inventory(root):
             tree = ast.parse((root / filename).read_text())
             if not any(isinstance(n, ast.FunctionDef) and n.name == name for n in ast.walk(tree)):
                 raise AuditContractError("Missing coverage test: " + reference)
-    for interface in (
-        inventory["routes"] + inventory["cli_commands"] + inventory["implicit_interfaces"]
-    ):
-        if not interface["operations"]:
-            raise AuditContractError("Interface has no audit disposition: " + interface["symbol"])
-        require_classified(interface["operations"], OPERATIONS)
-        label = interface["symbol"]
-        if "path" in interface:
-            label += " " + ",".join(interface["methods"]) + " " + interface["path"]
-        for symbol, row in rows.items():
-            if (symbol in interface["operations"]) != (label in row["interface_entrypoints"]):
-                raise AuditContractError("Interface coverage mismatch: " + symbol + " via " + label)
+    _verify_interfaces(inventory, rows)
     return len(OPERATIONS), len(routes)

@@ -19,7 +19,7 @@ from refrncr.audit import (
     require_classified,
     validate_event,
 )
-from refrncr.audit_guard import discover_service_operations, verify_inventory
+from refrncr.audit.guard import discover_service_operations, verify_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -215,7 +215,11 @@ def test_context_normalization_allowlist_missing_fields_and_count_limits():
 
 
 def test_catalog_and_guard_have_no_framework_or_persistence_dependencies():
-    for filename in ("audit.py", "audit_guard.py"):
+    for filename in (
+        "audit/catalog.py",
+        "audit/operations.py",
+        "audit/guard.py",
+    ):
         tree = ast.parse((ROOT / "src/refrncr" / filename).read_text())
         imports = {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
         assert not imports & {

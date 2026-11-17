@@ -16,6 +16,47 @@ def create_owned_dataset(service, actor_id, key, name, description, **kwargs):
     )
 
 
+def _downgrade_linear_revisions(config, current):
+    previous = {
+        "0031_ref_239": "0030_ref_205",
+        "0032_ref_239": "0030_ref_205",
+        "0033_ref_301": "0030_ref_205",
+        "0034_ref_238": "0030_ref_205",
+        "0035_ref_294": "0030_ref_205",
+        "0036_ref_349": "0030_ref_205",
+        "0030_ref_205": "0029_ref_195",
+        "0029_ref_195": "0028_ref_179",
+        "0028_ref_179": "0027_ref_177",
+        "0027_ref_177": "0026_ref_177",
+    }
+    from alembic import command
+
+    while current in previous:
+        current = previous[current]
+        command.downgrade(config, current)
+    return current
+
+
+def _downgrade_pre_concept_revisions(config, current):
+    previous = {
+        "0025_ref_177": "0024_ref_177",
+        "0024_ref_177": "0023_ref_176",
+        "0023_ref_176": "0022_ref_31",
+        "0022_ref_31": "0021_ref_40",
+        "0021_ref_40": "0020_ref_162",
+        "0020_ref_162": "0019_ref_162",
+        "0019_ref_162": "0018_ref_160",
+        "0018_ref_160": "0017_ref_154",
+        "0017_ref_154": "0016_ref_84",
+    }
+    from alembic import command
+
+    while current in previous:
+        current = previous[current]
+        command.downgrade(config, current)
+    return current
+
+
 def downgrade_historical_fixture(config, revision):
     """Construct a pre-REF-73 fixture, then exercise the requested older downgrade.
 
@@ -41,28 +82,7 @@ def downgrade_historical_fixture(config, revision):
     try:
         current = connection.scalar(text("SELECT version_num FROM alembic_version"))
         connection.commit()
-        if current in {
-            "0031_ref_239",
-            "0032_ref_239",
-            "0033_ref_301",
-            "0034_ref_238",
-            "0035_ref_294",
-            "0036_ref_349",
-        }:
-            command.downgrade(config, "0030_ref_205")
-            current = "0030_ref_205"
-        if current == "0030_ref_205":
-            command.downgrade(config, "0029_ref_195")
-            current = "0029_ref_195"
-        if current == "0029_ref_195":
-            command.downgrade(config, "0028_ref_179")
-            current = "0028_ref_179"
-        if current == "0028_ref_179":
-            command.downgrade(config, "0027_ref_177")
-            current = "0027_ref_177"
-        if current == "0027_ref_177":
-            command.downgrade(config, "0026_ref_177")
-            current = "0026_ref_177"
+        current = _downgrade_linear_revisions(config, current)
         if current == "0026_ref_177":
             connection.execute(
                 text(
@@ -73,33 +93,7 @@ def downgrade_historical_fixture(config, revision):
             connection.commit()
             command.downgrade(config, "0025_ref_177")
             current = "0025_ref_177"
-        if current == "0025_ref_177":
-            command.downgrade(config, "0024_ref_177")
-            current = "0024_ref_177"
-        if current == "0024_ref_177":
-            command.downgrade(config, "0023_ref_176")
-            current = "0023_ref_176"
-        if current == "0023_ref_176":
-            command.downgrade(config, "0022_ref_31")
-            current = "0022_ref_31"
-        if current == "0022_ref_31":
-            command.downgrade(config, "0021_ref_40")
-            current = "0021_ref_40"
-        if current == "0021_ref_40":
-            command.downgrade(config, "0020_ref_162")
-            current = "0020_ref_162"
-        if current == "0020_ref_162":
-            command.downgrade(config, "0019_ref_162")
-            current = "0019_ref_162"
-        if current == "0019_ref_162":
-            command.downgrade(config, "0018_ref_160")
-            current = "0018_ref_160"
-        if current == "0018_ref_160":
-            command.downgrade(config, "0017_ref_154")
-            current = "0017_ref_154"
-        if current == "0017_ref_154":
-            command.downgrade(config, "0016_ref_84")
-            current = "0016_ref_84"
+        current = _downgrade_pre_concept_revisions(config, current)
         if current == "0016_ref_84":
             # Historical fixture construction only; lifecycle downgrade safety has
             # dedicated tests. Preserve every working-content and audit row.
