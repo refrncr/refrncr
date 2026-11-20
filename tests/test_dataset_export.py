@@ -19,6 +19,8 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.pool import StaticPool
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
+from refrncr.datasets import DatasetRecordService
 from refrncr.datasets.export import (
     ExportArtifact,
     ExportGenerationError,
@@ -27,11 +29,11 @@ from refrncr.datasets.export import (
     verify_artifact_readable,
 )
 from refrncr.db.base import Base
+from refrncr.errors import NotFoundError
 from refrncr.persistence import SqlAlchemyDatasetRecordOperations
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, Dataset
 from refrncr.ports import RecordValue, StoredRecord
-from refrncr.services import DatasetRecordService, NotFoundError, ResourceTypeRegistry
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"

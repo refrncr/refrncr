@@ -6,23 +6,13 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from refrncr.authorization import AuthorizationService, GrantService, ResourceTypeRegistry
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from refrncr.identity import InvalidLifecycleError, MembershipService, TeamService, UserService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, Grant, Membership
-from refrncr.services import (
-    AuthorizationError,
-    AuthorizationService,
-    ConflictError,
-    GrantService,
-    InvalidLifecycleError,
-    MembershipService,
-    NotFoundError,
-    ResourceTypeRegistry,
-    TeamService,
-    UserService,
-    ValidationError,
-)
 
 
 @pytest.fixture

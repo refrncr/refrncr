@@ -21,6 +21,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableColumn, TableStyleInfo
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
+from refrncr.datasets.errors import ExportGenerationError
 from refrncr.hierarchies.contracts import (
     applicable,
     hierarchy_order,
@@ -46,10 +47,6 @@ def logged_export_stream(iterable):
     except Exception:
         logging.getLogger(__name__).error("Dataset export stream failed")
         raise
-
-
-class ExportGenerationError(Exception):
-    """A known data or serialization failure that is safe to show to a user."""
 
 
 @dataclass(frozen=True, slots=True)

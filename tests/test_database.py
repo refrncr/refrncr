@@ -5,11 +5,11 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
+from refrncr.identity import SessionService, UserService
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import LoginSession, User
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
-from refrncr.services import SessionService, UserService
 
 
 def test_sqlite_database_connection():

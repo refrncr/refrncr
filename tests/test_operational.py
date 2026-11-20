@@ -14,6 +14,7 @@ from sqlalchemy.engine import make_url
 
 from refrncr import cli
 from refrncr.app import create_application
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.operational import (
     LOGGER_NAME,
     InteractiveTerminalHandler,
@@ -24,7 +25,6 @@ from refrncr.operational import (
 )
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent
-from refrncr.services import ResourceTypeRegistry
 
 
 def terminal_record(level, event, **fields):

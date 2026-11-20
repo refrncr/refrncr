@@ -11,14 +11,7 @@ from types import MappingProxyType
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
-
-
-class SourceFormatError(ValueError):
-    """Bounded public error, never containing source content."""
-
-    def __init__(self, message, *, requires_choice=False):
-        super().__init__(message)
-        self.requires_choice = requires_choice
+from refrncr.imports.errors import SourceFormatError
 
 
 @dataclass(frozen=True, slots=True)

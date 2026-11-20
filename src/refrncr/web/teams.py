@@ -7,13 +7,8 @@ from typing import Any, Protocol
 
 from flask import Blueprint, Flask, abort, current_app, redirect, render_template, request, url_for
 
-from refrncr.services import (
-    ConflictError,
-    MembershipService,
-    NotFoundError,
-    TeamService,
-    ValidationError,
-)
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
+from refrncr.identity import MembershipService, TeamService
 from refrncr.web.routing import authenticated_route, capability_route
 
 blueprint = Blueprint("teams", __name__)

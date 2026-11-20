@@ -8,8 +8,8 @@ from support import NOW, snapshot
 from test_mapping_source_versions import create_mapping, prepare, publish_table
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
 from refrncr.persistence.models import AuditEvent
-from refrncr.services import ConflictError, NotFoundError, ValidationError
 
 
 def rows(c, mapping):

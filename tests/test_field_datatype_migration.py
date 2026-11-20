@@ -7,6 +7,7 @@ from sqlalchemy import event, inspect, select, text
 from support import PASSWORD, configured_dataset, migrate
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.db.base import Base
 from refrncr.persistence.database import create_session_factory
 from refrncr.persistence.models import (
@@ -17,7 +18,6 @@ from refrncr.persistence.models import (
     DatasetRecord,
     DatasetRecordValue,
 )
-from refrncr.services import ResourceTypeRegistry
 
 
 def old_database(engine):

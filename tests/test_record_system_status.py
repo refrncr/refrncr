@@ -7,7 +7,7 @@ from sqlalchemy import event
 from support import dataset_version_client as client
 from support import exported_rows, publish, request, setup, snapshot
 
-from refrncr.services import NotFoundError
+from refrncr.errors import NotFoundError
 
 
 def test_system_status_is_distinct_from_content_and_tombstones_are_read_only(context):

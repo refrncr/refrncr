@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 from support import governance_state as state
 
 from refrncr import cli
+from refrncr.errors import AuthorizationError, NotFoundError
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.persistence.models import Dataset, DatasetExportAccess
-from refrncr.services import AuthorizationError, NotFoundError
 
 
 @pytest.mark.parametrize(
@@ -206,7 +206,7 @@ def test_membership_removal_commits_before_waiting_mutation(governance, operatio
             work.flush()
             task = pool.submit(mutate)
             assert started.wait(10)
-        from refrncr.services import ValidationError
+        from refrncr.errors import ValidationError
 
         with pytest.raises(ValidationError if operation == "create" else NotFoundError):
             task.result(timeout=10)
@@ -248,7 +248,7 @@ def test_preflight_does_not_print_database_error_details(monkeypatch, capsys):
 
 def test_admin_creation_zero_one_and_multiple_teams(governance):
     _, factory, s, a, _, owner, other, d = governance
-    from refrncr.services import ValidationError
+    from refrncr.errors import ValidationError
 
     with factory.begin() as session:
         session.delete(session.get(Dataset, d.id))

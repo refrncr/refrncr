@@ -8,7 +8,7 @@ from support import NOW, body, html_elements, html_text, login, request, snapsho
 from test_mapping_source_updates import browser, fixture, next_source, update
 from test_mapping_source_versions import create_mapping, prepare, publish_table
 
-from refrncr.services import ConflictError, NotFoundError
+from refrncr.errors import ConflictError, NotFoundError
 
 
 def usage(c, actor=None, **kwargs):

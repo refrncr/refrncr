@@ -9,15 +9,15 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.imports import DatasetRecordImportService
-from refrncr.services import (
-    AuthorizationService,
+from refrncr.authorization import AuthorizationService
+from refrncr.datasets import (
     DatasetBusinessKeyService,
     DatasetFieldService,
     DatasetRecordService,
     DatasetService,
 )
-from refrncr.versions import DatasetVersionService
+from refrncr.imports.service import DatasetRecordImportService
+from refrncr.versions.service import DatasetVersionService
 from refrncr.web.routing import DatasetBlueprint
 
 blueprint = DatasetBlueprint("records", __name__)

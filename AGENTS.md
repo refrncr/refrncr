@@ -381,6 +381,19 @@ For significant architectural decisions:
   - status.
 - Do not create an ADR for trivial implementation details.
 
+### Architecture guardrails
+
+- Keep production Python files at or below 800 lines; Alembic migrations are the only
+  exception.
+- Define at most one concrete class whose name ends in `Service` per module.
+- Put new production responsibilities in the owning package. Do not add a flat module under
+  `src/refrncr/` without an approved architecture change.
+- Private functions, classes and constants stay inside their defining module.
+- Do not use dynamic imports or function-local imports to hide dependencies or cycles.
+- Keep Ruff's complexity limit and all architecture-test limits monotonic: they may move down,
+  never up. Adding an exception or increasing a limit requires product-owner approval and the
+  corresponding architecture documentation.
+
 ### Impact review
 
 Before considering a Jira story complete, explicitly consider whether it affects:

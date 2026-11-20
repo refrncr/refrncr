@@ -4,26 +4,29 @@ import pytest
 
 from refrncr import datasets as dataset_domain
 from refrncr import errors as shared_errors
-from refrncr import services
 from refrncr.authorization import (
     AccessManagementAuthorizationError,
     AccessManagementConflictError,
+    AccessManagementError,
     AccessManagementNotFoundError,
     AccessManagementValidationError,
 )
-from refrncr.domain import advance_concept, require_concept, valid_identity
-from refrncr.errors import (
-    AccessManagementError,
-    AuthorizationError,
-    ConflictError,
+from refrncr.datasets import (
     DatasetConflictError,
     DatasetError,
     DatasetNotFoundError,
     DatasetValidationError,
+    ExportGenerationError,
+    RecordConflictError,
+    RecordSearchError,
+    RecordValidationError,
+)
+from refrncr.domain import advance_concept, require_concept, valid_identity
+from refrncr.errors import (
+    AuthorizationError,
+    ConflictError,
     DomainError,
     NotFoundError,
-    RecordConflictError,
-    RecordValidationError,
     UserManagementError,
     ValidationError,
 )
@@ -44,6 +47,7 @@ from refrncr.imports import (
     ImportConflictError,
     ImportNotFoundError,
     ImportValidationError,
+    SourceFormatError,
 )
 from refrncr.imports.errors import ImportDomainError
 from refrncr.versions import (
@@ -56,6 +60,13 @@ from refrncr.versions import (
 
 
 def test_compatibility_error_is_an_alias_and_services_reexports_categories():
+    import importlib
+    import sys
+
+    sys.modules.pop("refrncr.services", None)
+    with pytest.warns(DeprecationWarning, match=r"refrncr\.integration"):
+        services = importlib.import_module("refrncr.services")
+
     assert UserManagementError is DomainError
     assert services.UserManagementError is DomainError
     assert services.NotFoundError is NotFoundError
@@ -89,6 +100,20 @@ def test_record_errors_have_a_domain_and_exact_category():
 
 
 @pytest.mark.parametrize(
+    ("error_type", "domain_type"),
+    [
+        (ExportGenerationError, DatasetError),
+        (RecordSearchError, DatasetError),
+        (SourceFormatError, ImportDomainError),
+    ],
+)
+def test_remaining_domain_failures_use_the_validation_category(error_type, domain_type):
+    assert issubclass(error_type, domain_type)
+    assert issubclass(error_type, ValidationError)
+    assert not issubclass(error_type, NotFoundError | ConflictError | AuthorizationError)
+
+
+@pytest.mark.parametrize(
     ("error_type", "category", "other_categories"),
     [
         (DatasetNotFoundError, NotFoundError, ConflictError | ValidationError),
@@ -107,7 +132,7 @@ def test_dataset_errors_have_a_domain_and_exact_category(error_type, category, o
     assert not issubclass(error_type, other_categories)
 
 
-def test_dataset_error_exports_are_identical_and_have_one_category():
+def test_dataset_errors_have_one_category_and_are_not_forwarded_by_shared_errors():
     names = (
         "DatasetError",
         "DatasetAuthorizationError",
@@ -121,7 +146,7 @@ def test_dataset_error_exports_are_identical_and_have_one_category():
         "StaleDatasetOwnerError",
     )
     for name in names:
-        assert getattr(dataset_domain, name) is getattr(shared_errors, name)
+        assert not hasattr(shared_errors, name)
 
     categories = (NotFoundError, ConflictError, ValidationError, AuthorizationError)
     assert not any(issubclass(dataset_domain.DatasetError, category) for category in categories)
@@ -283,12 +308,12 @@ def test_dataset_service_compatibility_exports_are_the_domain_classes():
         DatasetFieldService,
         DatasetRecordService,
     )
+    from refrncr.datasets import DatasetBusinessKeyService as CompatibilityBusinessKeys
+    from refrncr.datasets import DatasetFieldService as CompatibilityFields
+    from refrncr.datasets import DatasetRecordService as CompatibilityRecords
     from refrncr.datasets.business_key import DatasetBusinessKeyService as DomainBusinessKeys
     from refrncr.datasets.fields import DatasetFieldService as DomainFields
     from refrncr.datasets.records import DatasetRecordService as DomainRecords
-    from refrncr.services import DatasetBusinessKeyService as CompatibilityBusinessKeys
-    from refrncr.services import DatasetFieldService as CompatibilityFields
-    from refrncr.services import DatasetRecordService as CompatibilityRecords
 
     assert DatasetFieldService is DomainFields is CompatibilityFields
     assert DatasetBusinessKeyService is DomainBusinessKeys is CompatibilityBusinessKeys

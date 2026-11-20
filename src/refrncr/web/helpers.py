@@ -7,7 +7,8 @@ from urllib.parse import unquote, urlsplit
 
 from flask import abort, request
 
-from refrncr.services import ValidationError, parse_expected_revision
+from refrncr.datasets import parse_expected_revision
+from refrncr.errors import ValidationError
 
 
 def merge_error_messages(*messages: str | None) -> str:

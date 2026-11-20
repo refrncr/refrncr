@@ -1,7 +1,5 @@
 """Dataset import domain services, contracts, parsing, and source formats."""
 
-from importlib import import_module
-
 from refrncr.imports.contracts import (
     ImportIssue,
     ImportPreview,
@@ -17,6 +15,7 @@ from refrncr.imports.errors import (
     ImportNotFoundError,
     ImportValidationError,
     SourceFormatComponentsError,
+    SourceFormatError,
 )
 from refrncr.imports.parsing import (
     MAX_COLUMNS,
@@ -40,7 +39,6 @@ __all__ = [
     "MAX_COMPRESSION_RATIO",
     "MAX_UPLOAD_BYTES",
     "PROFILE_SCAN_ROWS",
-    "DatasetRecordImportService",
     "ImportConflictError",
     "ImportDomainError",
     "ImportExpiredError",
@@ -50,6 +48,7 @@ __all__ = [
     "ImportValidationError",
     "ParsedSource",
     "SourceFormatComponentsError",
+    "SourceFormatError",
     "SourceRow",
     "TransientImportStore",
     "UNREADABLE_XLSX_MESSAGE",
@@ -62,9 +61,3 @@ __all__ = [
     "rank_mapping_candidates",
     "validate_source_format_components",
 ]
-
-
-def __getattr__(name: str):
-    if name == "DatasetRecordImportService":
-        return getattr(import_module("refrncr.imports.service"), name)
-    raise AttributeError(name)

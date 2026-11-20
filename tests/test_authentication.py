@@ -14,17 +14,17 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from refrncr.db.base import Base
-from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
-from refrncr.persistence.database import create_database_engine, create_session_factory
-from refrncr.persistence.models import User
-from refrncr.services import (
-    PASSWORD_HASHER,
+from refrncr.errors import ValidationError
+from refrncr.identity import (
     AuthenticatedPrincipal,
     AuthenticationService,
     UserService,
-    ValidationError,
     validate_password,
 )
+from refrncr.identity.shared import PASSWORD_HASHER
+from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
+from refrncr.persistence.database import create_database_engine, create_session_factory
+from refrncr.persistence.models import User
 
 VALID_PASSWORD = "correct horse battery staple"
 

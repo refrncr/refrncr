@@ -5,7 +5,7 @@ from datetime import timedelta
 import pytest
 from support import NOW, setup
 
-from refrncr.services import ValidationError
+from refrncr.errors import ValidationError
 
 
 def create_mapping(c, key="mapping"):
@@ -173,7 +173,7 @@ def test_source_values_cannot_be_forged_or_deleted(database_context):
 
 
 def test_mapping_source_details_follow_mapping_version_authority(database_context):
-    from refrncr.services import NotFoundError
+    from refrncr.errors import NotFoundError
 
     c = prepare(database_context)
     publish_table(c, c.d)

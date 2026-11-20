@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session, sessionmaker
 
 from refrncr.app import create_community_services
-from refrncr.services import ResourceTypeRegistry
+from refrncr.authorization import ResourceTypeRegistry
 
 
 def recover_administrator_password(

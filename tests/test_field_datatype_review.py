@@ -12,13 +12,14 @@ from sqlalchemy import delete, event, select, text
 from sqlalchemy.orm import Session
 from support import FIELDS, PASSWORD, setup_dataset, stored
 
+from refrncr.datasets import RecordConflictError, StaleRecordError
 from refrncr.datasets import export as dataset_export
 from refrncr.datasets.datatypes import DATATYPES, canonicalize, get_datatype
 from refrncr.datasets.export import ExportGenerationError, generate_export
 from refrncr.db.base import Base
+from refrncr.errors import ValidationError
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.persistence.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
-from refrncr.services import RecordConflictError, StaleRecordError, ValidationError
 
 
 def _build_reviewed(audit_db):

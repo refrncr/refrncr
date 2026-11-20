@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import warnings
+
 from refrncr import errors as _errors
+from refrncr.authorization import (
+    AccessManagementError as AccessManagementError,
+)
 from refrncr.authorization import (
     AuthorizationService as AuthorizationService,
 )
@@ -55,6 +60,7 @@ from refrncr.errors import (
 )
 from refrncr.errors import NotFoundError as NotFoundError
 from refrncr.errors import ValidationError as ValidationError
+from refrncr.hierarchies import HierarchyError as HierarchyError
 from refrncr.identity import (
     AuthenticatedPrincipal as AuthenticatedPrincipal,
 )
@@ -104,15 +110,20 @@ from refrncr.identity import (
     validate_password as validate_password,
 )
 from refrncr.identity.shared import PASSWORD_HASHER as PASSWORD_HASHER
+from refrncr.imports import ImportDomainError as ImportDomainError
+from refrncr.persistence import PersistenceError as PersistenceError
+from refrncr.versions import VersionError as VersionError
+
+warnings.warn(
+    "refrncr.services is deprecated; import the public integration contract from "
+    "refrncr.integration instead",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 SUBJECT_TYPES = {"user", "team"}
 
 # Compatibility facade while services move to domain packages. These assignments keep
 # existing imports working without making ``errors.py`` depend on the facade.
 DomainError = _errors.DomainError
-HierarchyError = _errors.HierarchyError
-ImportDomainError = _errors.ImportDomainError
-PersistenceError = _errors.PersistenceError
-AccessManagementError = _errors.AccessManagementError
 UserManagementError = _errors.UserManagementError
-VersionError = _errors.VersionError

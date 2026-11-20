@@ -6,7 +6,8 @@ from types import SimpleNamespace
 import pytest
 from support import Controls, html_text, optional_field
 
-from refrncr.imports import DatasetRecordImportService, ParsedSource, SourceRow, source_formats
+from refrncr.imports import ParsedSource, SourceRow, source_formats
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.imports.source_formats import (
     canonical_source,
     formats_for,

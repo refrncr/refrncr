@@ -7,8 +7,8 @@ import pytest
 from sqlalchemy import event, text
 from support import NOW, csrf_token, get, publish
 
+from refrncr.authorization import AuthorizedResourceSet
 from refrncr.persistence.versions import SqlAlchemyVersionOperations
-from refrncr.services import AuthorizedResourceSet
 from refrncr.versions.published_contracts import decode_identifier
 
 

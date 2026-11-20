@@ -13,8 +13,9 @@ from support import (
     session_csrf,
 )
 
-from refrncr.hierarchies import HierarchyService
-from refrncr.services import DatasetRecordService, ValidationError
+from refrncr.datasets import DatasetRecordService
+from refrncr.errors import ValidationError
+from refrncr.hierarchies.service import HierarchyService
 
 
 def hierarchy_fixture(services, admin):

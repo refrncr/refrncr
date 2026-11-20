@@ -1,12 +1,16 @@
 """Access-management domain errors."""
 
 from refrncr.errors import (
-    AccessManagementError,
     AuthorizationError,
     ConflictError,
+    DomainError,
     NotFoundError,
     ValidationError,
 )
+
+
+class AccessManagementError(DomainError):
+    """Access-management-domain failure."""
 
 
 class AccessManagementNotFoundError(AccessManagementError, NotFoundError):

@@ -9,8 +9,8 @@ from typing import Any
 from flask import Flask, current_app
 from werkzeug.local import LocalProxy
 
-from refrncr.imports import DatasetRecordImportService
-from refrncr.services import DatasetRecordService
+from refrncr.datasets import DatasetRecordService
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.web.routing import DatasetBlueprint
 
 blueprint = DatasetBlueprint("imports", __name__)

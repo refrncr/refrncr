@@ -20,12 +20,12 @@ from support import NOW, MutableClock, _dataset_browser, publish, setup
 from werkzeug.datastructures import MultiDict
 
 from refrncr.app import create_application, create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.datasets.dataset_diff import DatasetDiffService
 from refrncr.db.base import Base
 from refrncr.identity.api_keys import ApiKeyService
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import Dataset, DatasetRecord, User
-from refrncr.services import ResourceTypeRegistry
 from refrncr.web import create_flask_app
 
 POSTGRES_SKIP_REASON = "PostgreSQL tests require REFRNCR_TEST_POSTGRES_URL"
@@ -52,7 +52,8 @@ def pytest_addoption(parser):
 @pytest.fixture(autouse=True)
 def fast_password_hasher(monkeypatch):
     """Keep ordinary tests cheap while production parameters remain tested explicitly."""
-    monkeypatch.setattr("refrncr.services.PASSWORD_HASHER", TEST_PASSWORD_HASHER)
+    monkeypatch.setattr("refrncr.identity.authentication.PASSWORD_HASHER", TEST_PASSWORD_HASHER)
+    monkeypatch.setattr("refrncr.identity.users.PASSWORD_HASHER", TEST_PASSWORD_HASHER)
 
 
 def pytest_runtest_makereport(item, call):

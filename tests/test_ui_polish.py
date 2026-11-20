@@ -26,8 +26,8 @@ from support import (
 )
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
+from refrncr.errors import AuthorizationError, NotFoundError, ValidationError
 from refrncr.presentation.metadata import DATASET_ICONS, key_from_name
-from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 
 ROOT = Path(__file__).parents[1]
 
@@ -613,7 +613,7 @@ def test_configure_section_links_respect_existing_permissions(dataset_browser):
 
 @pytest.mark.parametrize("with_concept", [False, True])
 def test_dataset_metadata_is_independent_of_versions(context, with_concept):
-    from refrncr.services import ConflictError
+    from refrncr.errors import ConflictError
 
     c = context
     setup(c)

@@ -18,15 +18,11 @@ from refrncr.authorization import (
     PolicyConfirmationRequired,
 )
 from refrncr.clock import Clock
+from refrncr.datasets import parse_expected_revision
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
+from refrncr.identity import UserService
 from refrncr.identity.api_keys import LIFETIME, ApiKeyService
 from refrncr.ports import PersistenceConflictError
-from refrncr.services import (
-    ConflictError,
-    NotFoundError,
-    UserService,
-    ValidationError,
-    parse_expected_revision,
-)
 from refrncr.web.routing import authenticated_route, capability_route, no_store_route
 
 blueprint = Blueprint("settings", __name__)

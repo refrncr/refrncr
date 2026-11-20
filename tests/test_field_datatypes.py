@@ -8,8 +8,9 @@ from decimal import Decimal, localcontext
 
 import pytest
 
+from refrncr.datasets import canonicalize_record_value
 from refrncr.datasets.datatypes import DATATYPES, DatatypeError, canonicalize, get_datatype
-from refrncr.services import ValidationError, canonicalize_record_value
+from refrncr.errors import ValidationError
 
 CASES = [
     ("string", " Cafe\u0301 ", "Café", "Café"),

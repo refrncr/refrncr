@@ -13,11 +13,11 @@ from refrncr.datasets.mapping_updates import mapping_states
 from refrncr.datasets.record_search import RecordSearchError, matches, search_term
 from refrncr.datasets.records import DatasetRecordService
 from refrncr.domain import require_concept
-from refrncr.hierarchies import (
+from refrncr.hierarchies.contracts import hierarchy_node_paths
+from refrncr.hierarchies.service import (
     hierarchy_leaf_records,
     hierarchy_validation_errors,
 )
-from refrncr.hierarchies.contracts import hierarchy_node_paths
 from refrncr.ports import (
     DatasetBusinessKey,
     PersistenceConflictError,

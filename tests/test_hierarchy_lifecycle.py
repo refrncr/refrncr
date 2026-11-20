@@ -11,10 +11,10 @@ from sqlalchemy import select, update
 from support import NOW, MutableClock, audits, content, publish, revision, snapshot
 
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.hierarchies import hierarchy_snapshot
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
+from refrncr.hierarchies.service import hierarchy_snapshot
 from refrncr.persistence.models import DatasetRecord, DatasetVersionRecord
-from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.versions import DatasetVersionService
+from refrncr.versions.service import DatasetVersionService
 from refrncr.versions.version_contracts import SummaryCounts
 
 

@@ -18,17 +18,11 @@ def test_cloud_production_import_paths_remain_available():
     with pytest.warns(DeprecationWarning, match=r"refrncr\.integration"):
         from refrncr.db.session import create_database_engine, create_session_factory
 
-    from refrncr.errors import ValidationError
+    from refrncr.authorization import ResourceTypeRegistry
+    from refrncr.errors import ConflictError, NotFoundError, ValidationError
+    from refrncr.identity import AuthenticationService, SessionService, UserService
     from refrncr.operational import database_is_ready, expected_database_revision
     from refrncr.persistence import SqlAlchemyUnitOfWorkFactory, SqlAlchemyUserOperations
-    from refrncr.services import (
-        AuthenticationService,
-        ConflictError,
-        NotFoundError,
-        ResourceTypeRegistry,
-        SessionService,
-        UserService,
-    )
 
     assert all(
         callable(value)

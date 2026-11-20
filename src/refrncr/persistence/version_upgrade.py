@@ -14,7 +14,7 @@ from refrncr.persistence.core import (
 )
 from refrncr.persistence.models import Dataset
 from refrncr.persistence.versions import SqlAlchemyVersionOperations
-from refrncr.versions import validated_snapshot
+from refrncr.versions.service import validated_snapshot
 from refrncr.versions.version_contracts import APPLICATION_TIMEZONE, SummaryCounts
 
 

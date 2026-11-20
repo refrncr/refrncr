@@ -10,7 +10,9 @@ from sqlalchemy import event, func, select, text, update
 from sqlalchemy.engine import make_url
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.persistence import (
     SqlAlchemyDatasetOperations,
     SqlAlchemyGrantOperations,
@@ -26,13 +28,6 @@ from refrncr.persistence.models import (
     User,
 )
 from refrncr.ports import PersistenceConflictError
-from refrncr.services import (
-    AuthorizationError,
-    ConflictError,
-    NotFoundError,
-    ResourceTypeRegistry,
-    ValidationError,
-)
 
 
 @pytest.fixture

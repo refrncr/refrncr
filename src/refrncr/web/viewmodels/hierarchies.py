@@ -5,8 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from refrncr.hierarchies import hierarchy_sibling_sort_key
-from refrncr.hierarchies.contracts import hierarchy_path_label
+from refrncr.hierarchies.contracts import hierarchy_path_label, hierarchy_sibling_sort_key
 
 
 def hierarchy_presentation(view: Any) -> tuple[list[dict[str, Any]], dict[Any, list[Any]]]:
