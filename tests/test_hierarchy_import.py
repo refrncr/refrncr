@@ -9,10 +9,11 @@ import pytest
 from openpyxl import load_workbook
 from support import revision
 
+from refrncr.datasets import StaleRecordError
 from refrncr.datasets.export import generate_export
+from refrncr.errors import NotFoundError
 from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.imports import ImportValidationError, TransientImportStore
-from refrncr.services import NotFoundError, StaleRecordError
 
 
 def prepare(c):

@@ -14,9 +14,9 @@ from refrncr.datasets.fields import DatasetFieldService
 from refrncr.datasets.shared import canonicalize_record_value
 from refrncr.domain import advance_concept, require_concept
 from refrncr.errors import ValidationError
-from refrncr.hierarchies import hierarchy_validation_errors
 from refrncr.hierarchies.contracts import HierarchyNode
 from refrncr.hierarchies.errors import HierarchyNotFoundError
+from refrncr.hierarchies.service import hierarchy_validation_errors
 from refrncr.imports import (
     ImportValidationError,
     TransientImportStore,

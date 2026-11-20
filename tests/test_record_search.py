@@ -12,7 +12,7 @@ from support import dataset_version_client as client
 
 from refrncr.datasets.datatypes import DATATYPES
 from refrncr.datasets.record_search import RecordQueryLogFilter
-from refrncr.services import NotFoundError
+from refrncr.errors import NotFoundError
 
 SAMPLES = {
     "string": ("Amsterdam", "Rotterdam", "ams"),

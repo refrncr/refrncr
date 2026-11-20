@@ -12,10 +12,12 @@ from sqlalchemy.pool import StaticPool
 from support import create_dataset, html_elements, html_tag_texts
 
 from refrncr.app import create_application, create_community_services
+from refrncr.authorization import ResourceTypeRegistry
+from refrncr.clock import SYSTEM_CLOCK
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, LoginSession, Membership, Team, User
-from refrncr.services import AuthorizationError, ResourceTypeRegistry
 from refrncr.web import ANONYMOUS_CSRF_COOKIE, SESSION_COOKIE, create_flask_app
 
 HTTPS = "https://localhost"
@@ -31,6 +33,7 @@ def configured_services(*, include_dataset_dependencies=False):
     Base.metadata.create_all(engine)
     factory = create_session_factory(engine)
     configured = create_community_services(factory, ResourceTypeRegistry())
+    assert configured.clock is SYSTEM_CLOCK
     users = configured.users
     authentication = configured.authentication
     sessions = configured.sessions

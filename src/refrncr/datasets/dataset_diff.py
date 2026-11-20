@@ -8,7 +8,7 @@ from refrncr.audit import record_audit
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.datasets.record_identity import RecordIdentifierError, decode_record_identifier
 from refrncr.domain import require_concept, valid_identity
-from refrncr.hierarchies import hierarchy_validation_errors
+from refrncr.hierarchies.service import hierarchy_validation_errors
 from refrncr.ports import PersistenceConflictError
 from refrncr.presentation import record_label
 from refrncr.versions.change_status import ChangeStatus

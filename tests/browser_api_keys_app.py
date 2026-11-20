@@ -6,10 +6,10 @@ from dataclasses import replace
 from sqlalchemy.pool import StaticPool
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.db.base import Base
 from refrncr.identity.api_keys import ApiKeyService
 from refrncr.persistence.database import create_database_engine, create_session_factory
-from refrncr.services import ResourceTypeRegistry
 from refrncr.web import create_flask_app
 
 engine = create_database_engine(

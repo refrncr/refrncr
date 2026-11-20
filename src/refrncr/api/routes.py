@@ -48,9 +48,10 @@ from refrncr.api.documentation import (
 from refrncr.api.http import SAFE_HEADERS, CanonicalJSONResponse, ConditionalRead
 from refrncr.clock import SYSTEM_CLOCK, Clock
 from refrncr.datasets.datatypes import get_datatype
-from refrncr.hierarchies import hierarchy_order, hierarchy_paths
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
+from refrncr.hierarchies.contracts import hierarchy_order, hierarchy_paths
+from refrncr.identity import AuthenticatedPrincipal
 from refrncr.identity.api_keys import ApiKeyAuthenticationError
-from refrncr.services import AuthenticatedPrincipal, ConflictError, NotFoundError, ValidationError
 from refrncr.versions.published_contracts import encode_identifier, record_identifier
 
 

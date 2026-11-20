@@ -18,14 +18,23 @@ GENERAL_ERROR_TYPES = {
     "NotFoundError",
     "ValidationError",
 }
-ALLOWED_DYNAMIC_IMPORTS = {
-    ("errors.py", "'refrncr.hierarchies.errors'"),
-    ("errors.py", "'refrncr.imports.errors'"),
-    ("errors.py", "'refrncr.datasets.errors'"),
-    ("hierarchies/__init__.py", "'refrncr.hierarchies.imports'"),
-    ("hierarchies/__init__.py", "'refrncr.hierarchies.service'"),
-    ("imports/__init__.py", "'refrncr.imports.service'"),
-    ("versions/__init__.py", "'refrncr.versions.service'"),
+ALLOWED_DYNAMIC_IMPORTS = set()
+ALLOWED_TOP_LEVEL_MODULES = {
+    "__init__.py",
+    "app.py",
+    "cli.py",
+    "clock.py",
+    "domain.py",
+    "errors.py",
+    "models.py",
+    "operational.py",
+    "services.py",
+}
+STABLE_MIGRATION_IMPORTS = {
+    "refrncr.datasets.dataset_upgrade",
+    "refrncr.datasets.datatypes",
+    "refrncr.persistence.concept_upgrade",
+    "refrncr.persistence.version_upgrade",
 }
 
 
@@ -37,14 +46,16 @@ def _module_name(path: Path) -> str:
     return ".".join(parts)
 
 
-def _private_functions(tree: ast.Module) -> set[str]:
-    return {
-        node.name
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-        and node.name.startswith("_")
-        and not node.name.startswith("__")
-    }
+def _private_names(tree: ast.Module) -> set[str]:
+    names = set()
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+    return {name for name in names if name.startswith("_") and not name.startswith("__")}
 
 
 def _from_module(path: Path, consumer: str, imported: ast.ImportFrom) -> str:
@@ -55,7 +66,7 @@ def _from_module(path: Path, consumer: str, imported: ast.ImportFrom) -> str:
     return ".".join([*parent, *(imported.module or "").split(".")]).rstrip(".")
 
 
-def test_production_modules_do_not_use_private_functions_from_other_modules():
+def test_production_modules_do_not_use_private_names_from_other_modules():
     modules = {}
     trees = {}
     for path in SOURCE_ROOT.rglob("*.py"):
@@ -63,7 +74,7 @@ def test_production_modules_do_not_use_private_functions_from_other_modules():
             continue
         tree = ast.parse(path.read_text(), filename=str(path))
         module = _module_name(path)
-        modules[module] = _private_functions(tree)
+        modules[module] = _private_names(tree)
         trees[path] = tree
 
     violations = []
@@ -81,7 +92,7 @@ def test_production_modules_do_not_use_private_functions_from_other_modules():
                     ):
                         violations.append(
                             f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} imports "
-                            f"private function {imported_module}.{imported.name}"
+                            f"private name {imported_module}.{imported.name}"
                         )
                     child_module = f"{imported_module}.{imported.name}"
                     if child_module in modules:
@@ -100,12 +111,75 @@ def test_production_modules_do_not_use_private_functions_from_other_modules():
             if module != consumer and module is not None and node.attr in modules[module]:
                 violations.append(
                     f"{path.relative_to(SOURCE_ROOT.parent.parent)}:{node.lineno} uses private "
-                    f"function {module}.{node.attr}"
+                    f"name {module}.{node.attr}"
                 )
 
-    assert violations == [], "Private functions crossed module boundaries:\n" + "\n".join(
-        violations
-    )
+    assert violations == [], "Private names crossed module boundaries:\n" + "\n".join(violations)
+
+
+def test_source_files_stay_within_architecture_size_limit():
+    oversized = [
+        f"{path.relative_to(SOURCE_ROOT.parent.parent)}: {len(path.read_text().splitlines())} lines"
+        for path in SOURCE_ROOT.rglob("*.py")
+        if "migrations" not in path.parts and len(path.read_text().splitlines()) > 800
+    ]
+    assert oversized == [], "Python files exceed 800 lines:\n" + "\n".join(oversized)
+
+
+def test_modules_define_at_most_one_service_class():
+    violations = []
+    for path in SOURCE_ROOT.rglob("*.py"):
+        if "migrations" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        services = [
+            node.name
+            for node in tree.body
+            if isinstance(node, ast.ClassDef) and node.name.endswith("Service")
+        ]
+        if len(services) > 1:
+            violations.append(
+                f"{path.relative_to(SOURCE_ROOT.parent.parent)}: {', '.join(services)}"
+            )
+    assert violations == [], "Modules define multiple service classes:\n" + "\n".join(violations)
+
+
+def test_no_new_flat_production_modules_are_added():
+    discovered = {path.name for path in SOURCE_ROOT.glob("*.py")}
+    assert discovered == ALLOWED_TOP_LEVEL_MODULES
+
+
+def test_internal_code_does_not_import_deprecated_services_facade():
+    violations = []
+    roots = (SOURCE_ROOT, SOURCE_ROOT.parent.parent / "tests")
+    for root in roots:
+        for path in root.rglob("*.py"):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in ast.walk(tree):
+                modules = (
+                    [node.module or ""]
+                    if isinstance(node, ast.ImportFrom)
+                    else [name.name for name in node.names]
+                    if isinstance(node, ast.Import)
+                    else []
+                )
+                if "refrncr.services" in modules:
+                    violations.append(f"{path.relative_to(root.parent)}:{node.lineno}")
+    assert violations == [], "Internal imports use refrncr.services:\n" + "\n".join(violations)
+
+
+def test_immutable_migrations_only_import_documented_stable_application_helpers():
+    discovered = set()
+    for path in (SOURCE_ROOT / "migrations" / "versions").glob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("refrncr."):
+                discovered.add(node.module)
+            elif isinstance(node, ast.Import):
+                discovered.update(
+                    name.name for name in node.names if name.name.startswith("refrncr.")
+                )
+    assert discovered == STABLE_MIGRATION_IMPORTS
 
 
 def test_layers_above_persistence_do_not_hide_dependencies_in_functions():

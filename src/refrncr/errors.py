@@ -1,7 +1,5 @@
 """Shared, persistence-neutral domain error hierarchy."""
 
-from importlib import import_module
-
 
 class DomainError(Exception):
     """Base class for safe domain errors exposed at an application boundary."""
@@ -10,18 +8,6 @@ class DomainError(Exception):
 # Temporary compatibility name. REF-353 removes it after integrators have moved to
 # the category-based public contract in ``refrncr.integration``.
 UserManagementError = DomainError
-
-
-class AccessManagementError(DomainError):
-    """Access-management-domain failure."""
-
-
-class VersionError(DomainError):
-    """Dataset-version-domain failure."""
-
-
-class PersistenceError(DomainError):
-    """Persistence-boundary failure safe to expose as a domain error."""
 
 
 class NotFoundError(DomainError):
@@ -46,36 +32,3 @@ class ValidationError(DomainError, ValueError):
 
 class AuthorizationError(DomainError):
     """An authenticated actor is not authorized to perform the requested operation."""
-
-
-_DATASET_ERROR_NAMES = frozenset(
-    {
-        "DatasetError",
-        "DatasetAuthorizationError",
-        "DatasetNotFoundError",
-        "DatasetConflictError",
-        "DatasetValidationError",
-        "RecordValidationError",
-        "RecordConflictError",
-        "StaleRecordError",
-        "StaleFieldOrderError",
-        "StaleDatasetOwnerError",
-    }
-)
-
-
-def __getattr__(name: str):
-    """Temporarily preserve moved domain-error imports until REF-370."""
-    if name == "HierarchyError":
-        value = getattr(import_module("refrncr.hierarchies.errors"), name)
-        globals()[name] = value
-        return value
-    if name == "ImportDomainError":
-        value = getattr(import_module("refrncr.imports.errors"), name)
-        globals()[name] = value
-        return value
-    if name in _DATASET_ERROR_NAMES:
-        value = getattr(import_module("refrncr.datasets.errors"), name)
-        globals()[name] = value
-        return value
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

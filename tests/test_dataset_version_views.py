@@ -19,7 +19,7 @@ from support import (
     dataset_version_client as client,
 )
 
-from refrncr.services import NotFoundError
+from refrncr.errors import NotFoundError
 
 HTTPS = "https://localhost"
 

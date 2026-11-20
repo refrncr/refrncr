@@ -5,10 +5,10 @@ from argon2.exceptions import VerifyMismatchError
 from argon2.low_level import Type
 
 from refrncr.db.base import Base
-from refrncr.identity import argon2_benchmark
+from refrncr.identity import UserService, argon2_benchmark
+from refrncr.identity.shared import PASSWORD_HASHER
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
-from refrncr.services import PASSWORD_HASHER, UserService
 
 
 class FakeHasher:
@@ -45,7 +45,7 @@ def test_application_service_hashes_use_the_production_profile(monkeypatch):
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     sessions = create_session_factory(engine)
-    monkeypatch.setattr("refrncr.services.PASSWORD_HASHER", PASSWORD_HASHER)
+    monkeypatch.setattr("refrncr.identity.users.PASSWORD_HASHER", PASSWORD_HASHER)
     users = UserService(SqlAlchemyUnitOfWorkFactory(sessions))
     users.bootstrap_organisation()
     admin = users.create_initial_admin(

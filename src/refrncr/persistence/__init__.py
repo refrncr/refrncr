@@ -11,6 +11,7 @@ from refrncr.persistence.core import (
 )
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.dataset_operations import SqlAlchemyDatasetOperations
+from refrncr.persistence.errors import PersistenceError
 from refrncr.persistence.identity_operations import (
     SqlAlchemyGrantOperations,
     SqlAlchemyUserOperations,
@@ -19,6 +20,7 @@ from refrncr.persistence.record_operations import SqlAlchemyDatasetRecordOperati
 
 __all__ = (
     "SqlAlchemyPermissionDataSource",
+    "PersistenceError",
     "SqlAlchemyAuditReadOperations",
     "SqlAlchemyDatasetOperations",
     "SqlAlchemyDatasetRecordOperations",

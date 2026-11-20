@@ -5,6 +5,7 @@ from .datasets import DatasetAuthorizationService
 from .errors import (
     AccessManagementAuthorizationError,
     AccessManagementConflictError,
+    AccessManagementError,
     AccessManagementNotFoundError,
     AccessManagementValidationError,
 )
@@ -21,6 +22,7 @@ from .resource_types import ResourceTypeRegistry
 from .service import AuthorizationService
 
 __all__ = (
+    "AccessManagementError",
     "AccessManagementAuthorizationError",
     "AccessManagementConflictError",
     "AccessManagementNotFoundError",

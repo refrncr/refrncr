@@ -11,7 +11,16 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.app import create_community_services
+from refrncr.authorization import AuthorizationService, GrantService, ResourceTypeRegistry
 from refrncr.cli import prepare_database
+from refrncr.errors import ConflictError
+from refrncr.identity import (
+    AuthenticationService,
+    MembershipService,
+    SessionService,
+    TeamService,
+    UserService,
+)
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import (
@@ -25,17 +34,6 @@ from refrncr.persistence.models import (
     User,
 )
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
-from refrncr.services import (
-    AuthenticationService,
-    AuthorizationService,
-    ConflictError,
-    GrantService,
-    MembershipService,
-    ResourceTypeRegistry,
-    SessionService,
-    TeamService,
-    UserService,
-)
 
 
 def assert_community_schema(engine, *, dataset_revision=True, mapping_tables=True):

@@ -7,8 +7,8 @@ from sqlalchemy import and_, case, func, literal, or_, select, union_all
 from refrncr.datasets.datatypes import DatatypeError, get_datatype
 from refrncr.datasets.record_identity import RecordIdentifierError, encode_record_identifier
 from refrncr.domain import valid_identity
-from refrncr.hierarchies import hierarchy_leaf_records, hierarchy_validation_errors
 from refrncr.hierarchies.contracts import hierarchy_node_paths
+from refrncr.hierarchies.service import hierarchy_leaf_records, hierarchy_validation_errors
 from refrncr.persistence.dataset_operations import SqlAlchemyDatasetFieldOperations
 from refrncr.persistence.hierarchies import SqlAlchemyHierarchyOperations
 from refrncr.persistence.models import (

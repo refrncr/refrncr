@@ -27,6 +27,14 @@ class DatasetAuthorizationError(DatasetError, AuthorizationError):
     """An authenticated actor cannot perform the requested Dataset operation."""
 
 
+class ExportGenerationError(DatasetError, ValidationError):
+    """Known export data or serialization failure safe to show to a user."""
+
+
+class RecordSearchError(DatasetError, ValidationError):
+    """Record search criteria violate the bounded query contract."""
+
+
 class RecordValidationError(DatasetError, ValidationError):
     """Record values violate one or more Dataset field constraints."""
 

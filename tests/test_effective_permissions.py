@@ -5,20 +5,12 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
+from refrncr.authorization import AuthorizationService, GrantService, ResourceTypeRegistry
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError, NotFoundError, ValidationError
+from refrncr.identity import MembershipService, TeamService, UserService
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
-from refrncr.services import (
-    AuthorizationError,
-    AuthorizationService,
-    GrantService,
-    MembershipService,
-    NotFoundError,
-    ResourceTypeRegistry,
-    TeamService,
-    UserService,
-    ValidationError,
-)
 
 
 class PermissionScenario:

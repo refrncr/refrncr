@@ -8,8 +8,8 @@ from html import unescape
 import pytest
 from support import NOW, configured, dataset_version_client, publish, request
 
+from refrncr.errors import NotFoundError
 from refrncr.persistence.models import DatasetConcept
-from refrncr.services import NotFoundError
 
 
 def records_link(page):

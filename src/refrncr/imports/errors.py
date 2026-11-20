@@ -27,3 +27,11 @@ class SourceFormatComponentsError(ImportValidationError):
     def __init__(self, issues):
         self.issues = tuple(issues)
         super().__init__("Choose a valid source type and its required format components.")
+
+
+class SourceFormatError(ImportDomainError, ValidationError):
+    """Bounded source-format failure that never contains imported content."""
+
+    def __init__(self, message, *, requires_choice=False):
+        super().__init__(message)
+        self.requires_choice = requires_choice

@@ -14,12 +14,12 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from support import NOW, MutableClock, audits, content, publish, revision, setup, snapshot, versions
 
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.persistence.models import DatasetVersion, DatasetVersionField, DatasetVersionValue
 from refrncr.persistence.versions import SqlAlchemyVersionOperations
 from refrncr.ports import PersistenceConflictError
-from refrncr.services import ConflictError, NotFoundError, ValidationError
-from refrncr.versions import DatasetVersionService
+from refrncr.versions.service import DatasetVersionService
 from refrncr.versions.version_contracts import version_states
 
 

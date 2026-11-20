@@ -235,7 +235,8 @@ def test_remembered_datetime_initializes_all_components(profile):
     from datetime import datetime
     from types import SimpleNamespace
 
-    from refrncr.imports import DatasetRecordImportService, ParsedSource, SourceRow
+    from refrncr.imports import ParsedSource, SourceRow
+    from refrncr.imports.service import DatasetRecordImportService
 
     if profile.kind == "native":
         value = datetime(2024, 2, 29, 21, 5)  # noqa: DTZ001 - native Excel local value

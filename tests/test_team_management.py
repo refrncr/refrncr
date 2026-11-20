@@ -9,17 +9,11 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from refrncr.identity import TeamService, UserService
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, Team
-from refrncr.services import (
-    AuthorizationError,
-    ConflictError,
-    NotFoundError,
-    TeamService,
-    UserService,
-    ValidationError,
-)
 
 
 @pytest.fixture

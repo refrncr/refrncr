@@ -11,14 +11,35 @@ from sqlalchemy.orm import Session, sessionmaker
 from refrncr.api.documentation import publish_documentation
 from refrncr.api.routes import create_api
 from refrncr.audit.history import AuditHistoryService
-from refrncr.authorization import InstallationSettingsService
+from refrncr.authorization import (
+    AuthorizationService,
+    DatasetAuthorizationService,
+    DatasetResourceResolver,
+    GrantService,
+    InstallationSettingsService,
+    ResourceTypeRegistry,
+    create_deprecated_grant_service,
+)
 from refrncr.clock import SYSTEM_CLOCK, Clock
+from refrncr.datasets import (
+    DatasetBusinessKeyService,
+    DatasetFieldService,
+    DatasetRecordService,
+    DatasetService,
+)
 from refrncr.datasets.dataset_diff import DatasetDiffService
-from refrncr.hierarchies import HierarchyService
 from refrncr.hierarchies.imports import HierarchyImportService
+from refrncr.hierarchies.service import HierarchyService
+from refrncr.identity import (
+    AuthenticationService,
+    MembershipService,
+    SessionService,
+    TeamService,
+    UserService,
+)
 from refrncr.identity.api_keys import ApiKeyService, configured_api_keys
 from refrncr.identity.login_security import SourceIdentityResolver
-from refrncr.imports import DatasetRecordImportService
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.imports.xml_security import require_xml_protection
 from refrncr.operational import (
     LOGGER_NAME,
@@ -29,24 +50,7 @@ from refrncr.operational import (
 from refrncr.persistence import SqlAlchemyPermissionDataSource, SqlAlchemyUnitOfWorkFactory
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.presentation.overview import OverviewService
-from refrncr.services import (
-    AuthenticationService,
-    AuthorizationService,
-    DatasetAuthorizationService,
-    DatasetBusinessKeyService,
-    DatasetFieldService,
-    DatasetRecordService,
-    DatasetResourceResolver,
-    DatasetService,
-    GrantService,
-    MembershipService,
-    ResourceTypeRegistry,
-    SessionService,
-    TeamService,
-    UserService,
-    create_deprecated_grant_service,
-)
-from refrncr.versions import DatasetVersionService
+from refrncr.versions.service import DatasetVersionService
 from refrncr.web import create_flask_app
 
 
@@ -60,6 +64,7 @@ class ServiceWrappers:
 
 @dataclass(frozen=True)
 class CommunityServices:
+    clock: Clock
     installation_settings: InstallationSettingsService
     api_keys: ApiKeyService | None
     dataset_versions: DatasetVersionService
@@ -112,6 +117,7 @@ def create_community_services(
         datasets = wrappers.datasets(datasets)
     final_versions = datasets.versions
     services = CommunityServices(
+        clock=clock,
         installation_settings=InstallationSettingsService(uow, authorization.datasets),
         api_keys=configured_api_keys(uow, clock=clock),
         dataset_versions=final_versions,
@@ -164,7 +170,7 @@ def create_application(
         lifespan=lifespan,
     )
     app.add_middleware(OperationalMiddleware)
-    clock = getattr(services.api_keys, "clock", getattr(services.users.uow, "clock", SYSTEM_CLOCK))
+    clock = services.clock
     api = create_api(services.dataset_versions, services.api_keys, clock=clock)
     app.mount("/api/v1", api)
     publish_documentation(app, api)

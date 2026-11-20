@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import abort, redirect, request, url_for
 
 from refrncr.datasets.record_search import matches, search_term
-from refrncr.hierarchies import canonical_hierarchy_view
+from refrncr.hierarchies.service import canonical_hierarchy_view
 from refrncr.web.hierarchies.context import authorization, render_authenticated_template
 from refrncr.web.viewmodels.hierarchies import hierarchy_presentation, sort_hierarchy_rows
 

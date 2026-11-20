@@ -11,16 +11,10 @@ from typing import Any
 from flask import Flask, abort, current_app, redirect, request, url_for
 from werkzeug.local import LocalProxy
 
+from refrncr.datasets import DatasetService, parse_expected_revision
 from refrncr.datasets.dataset_diff import STALE_MESSAGE, DatasetDiffService
-from refrncr.imports import DatasetRecordImportService
-from refrncr.services import (
-    ConflictError,
-    DatasetService,
-    NotFoundError,
-    ValidationError,
-    parse_expected_revision,
-)
-from refrncr.versions import DatasetVersionService
+from refrncr.errors import ConflictError, NotFoundError, ValidationError
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.versions.change_status import ChangeStatus, change_status
 from refrncr.versions.diff_contracts import STATUSES, DiffCriteria
 from refrncr.versions.review_tokens import (
@@ -29,6 +23,7 @@ from refrncr.versions.review_tokens import (
     encode_discard,
     encode_review,
 )
+from refrncr.versions.service import DatasetVersionService
 from refrncr.web.routing import DatasetBlueprint, concept_route, version_errors
 
 blueprint = DatasetBlueprint("versions", __name__)

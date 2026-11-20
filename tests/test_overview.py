@@ -9,9 +9,9 @@ from test_mapping_source_updates import fixture as mapping_fixture
 from test_mapping_source_updates import next_source, rows, update
 from test_mapping_source_versions import prepare, publish_table
 
+from refrncr.errors import AuthorizationError
 from refrncr.persistence.models import Dataset, DatasetConcept, DatasetVisit
 from refrncr.presentation.overview import OverviewService
-from refrncr.services import AuthorizationError
 
 
 def service(c):

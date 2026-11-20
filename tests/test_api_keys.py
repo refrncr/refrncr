@@ -13,6 +13,7 @@ from support import MutableClock
 
 from refrncr.audit import AuditContractError, validate_event
 from refrncr.audit.presentation import present_event
+from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.identity.api_keys import (
     LAST_USED_INTERVAL,
     LIFETIME,
@@ -22,7 +23,6 @@ from refrncr.identity.api_keys import (
 from refrncr.persistence import SqlAlchemyUnitOfWork
 from refrncr.persistence.api_keys import SqlAlchemyApiKeyOperations
 from refrncr.persistence.models import ApiKey, AuditEvent
-from refrncr.services import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from refrncr.web import SESSION_COOKIE, create_flask_app
 
 

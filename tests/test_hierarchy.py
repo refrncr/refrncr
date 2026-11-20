@@ -7,15 +7,10 @@ import pytest
 from sqlalchemy.orm import Session
 from support import audits, snapshot
 
-from refrncr.hierarchies import hierarchy_snapshot, hierarchy_validation_errors
+from refrncr.datasets import RecordConflictError, RecordValidationError, StaleRecordError
+from refrncr.errors import NotFoundError, ValidationError
+from refrncr.hierarchies.service import hierarchy_snapshot, hierarchy_validation_errors
 from refrncr.persistence import SqlAlchemyUnitOfWork
-from refrncr.services import (
-    NotFoundError,
-    RecordConflictError,
-    RecordValidationError,
-    StaleRecordError,
-    ValidationError,
-)
 
 
 @pytest.fixture

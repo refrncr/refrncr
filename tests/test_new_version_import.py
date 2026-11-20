@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy import select
 from support import content, dataset_version_client, publish, request, setup, snapshot
 
+from refrncr.errors import ConflictError, NotFoundError
 from refrncr.imports import ImportValidationError
 from refrncr.persistence.models import AuditEvent, DatasetConcept, DatasetRecord
-from refrncr.services import ConflictError, NotFoundError
 
 
 def clean(c):
@@ -580,7 +580,7 @@ def test_unique_values_can_swap_and_be_reused_from_deleted_records(database_cont
     assert len(view.page.records) == 4 and view.deleted_count == 1
     deleted = next(r for r in view.page.records if view.record_states[r.id] == "Deleted")
     before = snapshot(c)
-    from refrncr.services import RecordConflictError
+    from refrncr.datasets import RecordConflictError
 
     with pytest.raises(RecordConflictError, match="unique"):
         c.s.dataset_records.restore_record(
@@ -912,7 +912,7 @@ def test_empty_xlsx_and_no_active_concept_are_blocked(database_context):
 
     from openpyxl import Workbook
 
-    from refrncr.services import ConflictError
+    from refrncr.errors import ConflictError
 
     c = database_context
     clean(c)
@@ -961,7 +961,8 @@ def test_new_mode_cancel_expiry_and_replaced_concept_revoke_staged_content(conte
 
 @pytest.mark.parametrize("source", [b"code,label\na,Changed\n", b"code,label\nb,Added\n"])
 def test_mutating_an_exhausted_record_revision_fails_before_writes(context, source):
-    from refrncr.services import MAX_RECORD_REVISION, ValidationError
+    from refrncr.datasets import MAX_RECORD_REVISION
+    from refrncr.errors import ValidationError
 
     c = context
     clean(c)

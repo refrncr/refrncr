@@ -2,9 +2,14 @@ from dataclasses import dataclass
 
 import pytest
 
-from refrncr.authorization import highest_permission, permits
+from refrncr.authorization import (
+    AuthorizationService,
+    ResourceTypeRegistry,
+    highest_permission,
+    permits,
+)
+from refrncr.errors import ValidationError
 from refrncr.ports import AuthorizationSubject, PermissionContext
-from refrncr.services import AuthorizationService, ResourceTypeRegistry, ValidationError
 
 
 @pytest.mark.parametrize(

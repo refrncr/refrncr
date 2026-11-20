@@ -7,12 +7,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from refrncr.identity import AuthenticatedPrincipal
 from refrncr.identity.login_security import (
     BrowserAuthenticationAdmissionGuard,
     LoginAttemptLimiter,
     canonical_account_key,
 )
-from refrncr.services import AuthenticatedPrincipal
 from refrncr.web import GENERIC_LOGIN_FAILURE, create_flask_app
 
 HTTPS = "https://community.example"

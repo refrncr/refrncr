@@ -8,10 +8,10 @@ from openpyxl import Workbook
 from sqlalchemy import func, select
 from support import html_elements
 
+from refrncr.errors import NotFoundError
 from refrncr.imports import ImportValidationError, TransientImportStore, parse_source
 from refrncr.imports import service as record_import_module
 from refrncr.persistence.models import AuditEvent, DatasetFieldSourceFormat, DatasetRecord
-from refrncr.services import NotFoundError
 
 
 @pytest.fixture

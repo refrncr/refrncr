@@ -10,21 +10,18 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.db.base import Base
+from refrncr.errors import AuthorizationError, ConflictError, NotFoundError, UserManagementError
+from refrncr.identity import (
+    AuthenticationService,
+    InvalidLifecycleError,
+    SessionService,
+    UserService,
+    normalize_email,
+)
 from refrncr.persistence import SqlAlchemyUnitOfWorkFactory, SqlAlchemyUserOperations
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, LoginSession, Organisation, User
 from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
-from refrncr.services import (
-    AuthenticationService,
-    AuthorizationError,
-    ConflictError,
-    InvalidLifecycleError,
-    NotFoundError,
-    SessionService,
-    UserManagementError,
-    UserService,
-    normalize_email,
-)
 
 
 @pytest.fixture

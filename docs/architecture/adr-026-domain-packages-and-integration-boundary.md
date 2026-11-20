@@ -36,7 +36,7 @@ a different layer without a follow-up ADR.
 | `persistence/` | `persistence.py`; `models.py`; `api_key_persistence.py`; `concept_persistence.py`; `diff_persistence.py`; `hierarchy_persistence.py`; `overview_persistence.py`; `version_persistence.py`; the Community database adapter responsibility in `db/session.py` |
 | `audit/` | `audit.py`; `audit_guard.py`; `audit_history.py`; `audit_presentation.py` |
 | `presentation/` | `presentation.py`; `presentation_metadata.py`; `overview.py` |
-| shared domain/application modules | the category bases in `errors.py`; `domain.py`; `clock.py`; `ports.py` |
+| shared domain/application modules | the category bases in `errors.py`; `domain.py`; `clock.py`; the focused contracts in `ports/` |
 | composition and operations | `app.py`; `cli.py`; `operational.py`; `browser_security.py` moves to `web/security.py` |
 | one-off upgrade support | `concept_upgrade.py`, `dataset_upgrade.py` and `version_upgrade.py` move beside their owning domain; Alembic code remains under `migrations/` |
 
@@ -65,11 +65,9 @@ The allowed direction, later enforced by import-linter, is:
 7. Imports inside functions are not used to evade these rules or break cycles.
 
 Import Linter enforces these rules with type-checking imports included. A separate static guard
-makes dynamic `import_module` calls visible. During this migration, that guard permits only the
-compatibility facades in `errors.py`, `hierarchies/__init__.py`, `imports/__init__.py` and
-`versions/__init__.py`. Their lazy imports prevent package initializers from recreating cycles
-while preserving existing import paths; REF-370 removes these temporary facades or replaces them
-with direct owning-module imports. No other dynamic-import exception is allowed.
+forbids dynamic `import_module` calls in production code. Package initializers expose only names
+that can be loaded without a cycle; internal code imports service implementations from their
+owning modules.
 
 Within a domain package, service modules may depend on that package's contracts and errors. A
 module-private function stays inside its defining module. Cross-module behavior is given a public
@@ -135,18 +133,33 @@ For example, a Dataset-specific missing-resource error inherits from both `Datas
 `NotFoundError`. Boundary code maps categories and does not need to know every domain-specific
 type. `UserManagementError` is an alias of `DomainError` during the compatibility period; it is not
 a separate superclass. Existing imports from `refrncr.services` continue to resolve through that
-module's re-exports.
+module's re-exports and emit a `DeprecationWarning` pointing to `refrncr.integration`.
+
+`ExportGenerationError` and `RecordSearchError` are Dataset validation-category errors;
+`SourceFormatError` is an Import validation-category error. This preserves their prior boundary
+mapping while making their domain ownership explicit.
+
+### Stable migration support
+
+Alembic revisions are immutable and may not depend on ordinary application implementation paths.
+The existing revisions that need historical data conversion use four frozen support modules:
+`datasets.dataset_upgrade`, `datasets.datatypes`, `persistence.concept_upgrade` and
+`persistence.version_upgrade`. These paths and the behavior used by their revisions are stable for
+the lifetime of those migrations. A guard records the complete allowlist; new migrations inline
+one-off conversion logic unless an architecture review deliberately adds another frozen path.
 
 ### Size and private-function guards
 
-The final limit is approximately 800 lines for every Python file below `src/refrncr`. Alembic files
+The final limit is 800 lines for every Python file below `src/refrncr`. Alembic files
 under `src/refrncr/migrations/` are the only size exception because they are immutable,
 independently ordered migration artifacts. There are no other size exceptions in this decision.
 
-There are no exceptions to the private-function rule at acceptance of this ADR. Framework
-callbacks may keep a leading underscore while they remain inside their defining module; if another
-module needs them, they receive a public name. Any future exception requires an ADR update with a
-narrow reason before the guard is weakened.
+There are no exceptions to the private-name rule at acceptance of this ADR. Functions, classes
+and constants may keep a leading underscore while they remain inside their defining module; if
+another module needs them, they receive a public name. Each module defines at most one concrete
+class whose name ends in `Service`, and new production responsibilities go into a package rather
+than a new flat top-level module. Any future exception requires an ADR update with a narrow reason
+before a guard is weakened.
 
 ## Consequences
 

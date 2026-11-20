@@ -32,10 +32,10 @@ from refrncr.audit.presentation import (
     safe_context,
     safe_name,
 )
+from refrncr.errors import AuthorizationError, NotFoundError, ValidationError
 from refrncr.persistence import SqlAlchemyAuditReadOperations
 from refrncr.persistence.models import AuditEvent, Dataset, DatasetField, Team, User
 from refrncr.ports import AuditFilters
-from refrncr.services import AuthorizationError, NotFoundError, ValidationError
 
 
 @pytest.mark.parametrize("count", [0, 1, 49, 50, 51, 100, 101, 127, 10000])
@@ -512,17 +512,18 @@ def test_database_failure_is_neutral(database_history, monkeypatch):
 
 def test_read_boundary_has_no_framework_or_database_imports():
     root = Path(__file__).parents[1] / "src/refrncr"
-    for name in (
-        "audit/history.py",
-        "audit/presentation.py",
-        "ports.py",
-        "web/audit.py",
-    ):
-        tree = ast.parse((root / name).read_text())
+    paths = [
+        root / "audit/history.py",
+        root / "audit/presentation.py",
+        root / "web/audit.py",
+        *(root / "ports").glob("*.py"),
+    ]
+    for path in paths:
+        tree = ast.parse(path.read_text())
         imports = [n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)]
         imports += [a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names]
         assert not any(n and n.startswith("sqlalchemy") for n in imports)
-        if not name.startswith("web/"):
+        if path.parent.name != "web":
             assert not any(n and n.startswith("flask") for n in imports)
 
 

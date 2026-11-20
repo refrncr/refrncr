@@ -8,7 +8,9 @@ from typing import Any, Protocol
 
 from flask import Blueprint, Flask, current_app, redirect, request, url_for
 
+from refrncr.errors import DomainError
 from refrncr.hierarchies.imports import HierarchyImportService
+from refrncr.identity import AuthenticationService, SessionService, UserService
 from refrncr.identity.login_security import (
     MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS,
     BrowserAuthenticationAdmissionGuard,
@@ -16,8 +18,7 @@ from refrncr.identity.login_security import (
     SourceIdentityResolver,
     canonical_account_key,
 )
-from refrncr.imports import DatasetRecordImportService
-from refrncr.services import AuthenticationService, SessionService, UserManagementError, UserService
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.web.helpers import is_safe_login_target
 from refrncr.web.routing import anonymous_csrf_route, public_route
 from refrncr.web.security import BrowserCookieSettings
@@ -88,7 +89,7 @@ def setup():
                 request.form["display_name"],
                 request.form["password"],
             )
-        except UserManagementError as error:
+        except DomainError as error:
             message = str(error)
             error_field = getattr(error, "field", None)
             return (

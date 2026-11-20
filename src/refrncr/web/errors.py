@@ -9,7 +9,7 @@ from typing import Any
 from flask import Flask, abort, g, request
 from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
-from refrncr.services import AuthorizationError, ConflictError, NotFoundError, UserManagementError
+from refrncr.errors import AuthorizationError, ConflictError, DomainError, NotFoundError
 
 
 def register_error_handlers(
@@ -63,8 +63,8 @@ def register_error_handlers(
 def register_user_error_handler(app: Flask, audit_security: Callable[..., None]) -> None:
     """Register the shared service error policy after all browser blueprints."""
 
-    @app.errorhandler(UserManagementError)
-    def handle_user_error(error: UserManagementError):
+    @app.errorhandler(DomainError)
+    def handle_user_error(error: DomainError):
         view = app.view_functions.get(request.endpoint)
         if isinstance(error, NotFoundError) and getattr(view, "dataset_not_found_route", False):
             return "Dataset not found", 404

@@ -5,16 +5,13 @@ from unicodedata import normalize
 from urllib.parse import unquote
 
 from refrncr.datasets.datatypes import MAX_INPUT_LENGTH, DatatypeError, get_datatype
+from refrncr.datasets.errors import RecordSearchError
 from refrncr.presentation import DISPLAY_STATUSES
 from refrncr.versions.change_status import LEGACY_STATUS_ALIASES, RECORD_STATUS_FILTERS
 from refrncr.versions.diff_contracts import MAX_SEARCH
 
 MAX_QUERY_BYTES = 32 * 1024
 RECORD_CHANGE_FILTERS = tuple(RECORD_STATUS_FILTERS)
-
-
-class RecordSearchError(ValueError):
-    """Safe fixed messages; never attach submitted values or Field names."""
 
 
 class RecordQueryLogFilter(Filter):

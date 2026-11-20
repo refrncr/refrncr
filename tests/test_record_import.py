@@ -16,10 +16,11 @@ from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.db.base import Base
+from refrncr.errors import ConflictError, NotFoundError
 from refrncr.imports import (
     MAX_COMPRESSION_RATIO,
-    DatasetRecordImportService,
     ImportValidationError,
     ParsedSource,
     SourceRow,
@@ -32,9 +33,9 @@ from refrncr.imports import (
     validate_source_format_components,
 )
 from refrncr.imports import parsing as record_import_module
+from refrncr.imports.service import DatasetRecordImportService
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import AuditEvent, DatasetField, DatasetRecord, DatasetRecordValue
-from refrncr.services import ConflictError, NotFoundError, ResourceTypeRegistry
 from refrncr.web import create_flask_app
 
 PASSWORD = "correct horse battery staple"

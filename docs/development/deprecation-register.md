@@ -1,5 +1,15 @@
 # Deprecation register
 
+## `refrncr.services`
+
+- **Status:** deprecated compatibility facade
+- **Scope:** historical imports of services, contracts and errors that now live in their
+  owning domain packages.
+- **Current behaviour:** importing the module emits a `DeprecationWarning` that points
+  integrators to the supported `refrncr.integration` contract.
+- **Removal:** REF-353, after Cloud confirms that production and integration tests no
+  longer import this facade.
+
 ## Cloud compatibility import paths
 
 - **Status:** deprecated compatibility facades

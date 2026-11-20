@@ -207,11 +207,7 @@ def _configure_flask_app(
     dataset_diff = services.dataset_diff
     installation_settings = services.installation_settings
     api_keys = services.api_keys
-    clock = clock or getattr(
-        services.api_keys,
-        "clock",
-        getattr(getattr(services.users, "uow", None), "clock", SYSTEM_CLOCK),
-    )
+    clock = clock or getattr(services, "clock", SYSTEM_CLOCK)
     security_uow = getattr(services.users, "uow", None)
 
     def audit_security(action, *, actor_user_id=None):

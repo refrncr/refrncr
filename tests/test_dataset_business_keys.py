@@ -11,7 +11,9 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 from refrncr.app import create_community_services
+from refrncr.authorization import ResourceTypeRegistry
 from refrncr.db.base import Base
+from refrncr.errors import NotFoundError, ValidationError
 from refrncr.persistence import SqlAlchemyDatasetOperations, SqlAlchemyUnitOfWork
 from refrncr.persistence.database import create_database_engine, create_session_factory
 from refrncr.persistence.models import (
@@ -21,7 +23,6 @@ from refrncr.persistence.models import (
     DatasetField,
     Grant,
 )
-from refrncr.services import NotFoundError, ResourceTypeRegistry, ValidationError
 
 PASSWORD = "correct horse battery staple"
 
