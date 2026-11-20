@@ -139,6 +139,21 @@ module's re-exports and emit a `DeprecationWarning` pointing to `refrncr.integra
 `SourceFormatError` is an Import validation-category error. This preserves their prior boundary
 mapping while making their domain ownership explicit.
 
+Three technical errors deliberately inherit directly from built-in exceptions rather than the
+domain hierarchy:
+
+- `ApiKeyAuthenticationError(Exception)` is a private authentication-control signal. The API-key
+  boundary consumes it and returns the established HTTP 401 response; it is not exposed as a safe
+  domain error or integration contract.
+- `DatatypeError(ValueError)` is the low-level datatype parser and canonicalizer signal. Services
+  translate it where a domain failure is needed, while migration preflight code relies on its
+  `ValueError` compatibility when validating historical data.
+- `DatasetUpgradeError(RuntimeError)` is an operator-facing migration preflight failure. It aborts
+  an immutable upgrade and never crosses an application boundary as a domain failure.
+
+A guard records this exact allowlist and rejects every other domain-package class that directly
+inherits from a built-in exception.
+
 ### Stable migration support
 
 Alembic revisions are immutable and may not depend on ordinary application implementation paths.

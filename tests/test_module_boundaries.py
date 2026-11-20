@@ -1,6 +1,7 @@
 """Static architecture guards for production module boundaries."""
 
 import ast
+import builtins
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "refrncr"
@@ -35,6 +36,11 @@ STABLE_MIGRATION_IMPORTS = {
     "refrncr.datasets.datatypes",
     "refrncr.persistence.concept_upgrade",
     "refrncr.persistence.version_upgrade",
+}
+ALLOWED_DIRECT_BUILTIN_ERRORS = {
+    ("datasets/datatypes.py", "DatatypeError", "ValueError"),
+    ("datasets/dataset_upgrade.py", "DatasetUpgradeError", "RuntimeError"),
+    ("identity/api_keys.py", "ApiKeyAuthenticationError", "Exception"),
 }
 
 
@@ -278,6 +284,26 @@ def test_split_domain_packages_do_not_raise_general_error_categories():
     assert violations == [], "Domain packages raised general error categories:\n" + "\n".join(
         violations
     )
+
+
+def test_domain_packages_only_define_documented_direct_builtin_errors():
+    builtin_errors = {
+        name
+        for name, value in vars(builtins).items()
+        if isinstance(value, type) and issubclass(value, BaseException)
+    }
+    discovered = set()
+    for package in DOMAIN_PACKAGES_WITH_TYPED_ERRORS:
+        for path in (SOURCE_ROOT / package).rglob("*.py"):
+            tree = ast.parse(path.read_text(), filename=str(path))
+            for node in tree.body:
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                for base in node.bases:
+                    if isinstance(base, ast.Name) and base.id in builtin_errors:
+                        discovered.add((str(path.relative_to(SOURCE_ROOT)), node.name, base.id))
+
+    assert discovered == ALLOWED_DIRECT_BUILTIN_ERRORS
 
 
 def test_domain_packages_do_not_import_persistence_adapters():
