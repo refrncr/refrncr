@@ -147,41 +147,4 @@ ignore_missing_imports = true
 follow_imports = "skip"
 show_error_codes = true
 warn_unused_configs = true
-
-[[tool.mypy.overrides]]
-module = ["refrncr.authorization.datasets"]
-disable_error_code = ["union-attr"]
-
-[[tool.mypy.overrides]]
-module = ["refrncr.datasets.*"]
-disable_error_code = [
-    "arg-type",
-    "attr-defined",
-    "call-arg",
-    "index",
-    "misc",
-    "operator",
-    "return-value",
-    "union-attr",
-    "var-annotated",
-]
-
-[[tool.mypy.overrides]]
-module = ["refrncr.imports.*"]
-disable_error_code = ["arg-type", "assignment", "attr-defined", "return-value"]
-
-[[tool.mypy.overrides]]
-module = ["refrncr.persistence.*"]
-disable_error_code = [
-    "arg-type",
-    "assignment",
-    "attr-defined",
-    "misc",
-    "return-value",
-    "union-attr",
-    "var-annotated",
-]
-
-[[tool.mypy.overrides]]
-module = ["refrncr.audit.operations"]
-disable_error_code = ["assignment"]
+warn_unused_ignores = true

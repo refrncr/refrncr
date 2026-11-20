@@ -70,7 +70,7 @@ def parse_csv(content: bytes) -> ParsedSource:
             candidates = [delimiter for delimiter in ",;\t" if delimiter in first_line]
             if len(candidates) != 1:
                 raise
-            dialect = csv.excel()
+            dialect = csv.excel()  # type: ignore[assignment]
             dialect.delimiter = candidates[0]
         reader = csv.reader(io.StringIO(text, newline=""), dialect, strict=True)
         raw_header = next(reader)

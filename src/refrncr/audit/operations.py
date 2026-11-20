@@ -357,7 +357,7 @@ _read(
 )
 # Supporting security/administrative entrypoints are inventoried separately from
 # business services. None invents a successful domain event for a denied request.
-for _module, _service, _methods, _classification, _reason in (
+for _module, _service, _methods, _classification, _reason in (  # type: ignore[assignment]
     (
         "imports.store",
         "TransientImportStore",
@@ -723,4 +723,4 @@ _audited(
     module="authorization.installation_settings",
 )
 
-OPERATIONS = MappingProxyType(OPERATIONS)
+OPERATIONS = MappingProxyType(OPERATIONS)  # type: ignore[assignment]

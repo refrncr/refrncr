@@ -83,7 +83,7 @@ def _excel_decimal(value: object) -> Decimal | str:
     rendered = _plain_decimal(value)
     significant_digits = len(rendered.lstrip("-").replace(".", "").lstrip("0"))
     # Excel numeric cells reliably retain at most 15 significant decimal digits.
-    return value if significant_digits <= 15 else rendered
+    return value if significant_digits <= 15 else rendered  # type: ignore[return-value]
 
 
 def _record_values(record: StoredRecord) -> dict[str, object]:
@@ -129,7 +129,7 @@ def write_csv(target: BinaryIO, fields, records) -> None:
                 continue
             value = _validate_value(field, value)
             if field.data_type == "string":
-                row.append(_csv_string(value))
+                row.append(_csv_string(value))  # type: ignore[arg-type]
             elif field.data_type == "number":
                 row.append(_plain_decimal(value))
             elif field.data_type == "boolean":
@@ -621,7 +621,7 @@ def externally_ordered_records(
                     runs = [_consolidated_run(runs, key)]
                 chunk = []
         if not runs:
-            chunk.sort(key=key)
+            chunk.sort(key=key)  # type: ignore[arg-type]
             yield from chunk
             return
         if chunk:
@@ -642,7 +642,7 @@ def _sorted_run(records: list[StoredRecord], key) -> BinaryIO:
 
 
 def _merge_runs(runs: list[BinaryIO], key) -> Iterator[StoredRecord]:
-    heap = []
+    heap = []  # type: ignore[var-annotated]
     for index, run in enumerate(runs):
         record = _next_pickled(run)
         if record is not None:
@@ -709,7 +709,7 @@ def generate_export(
     try:
         media_type, writer = formats[format_name]
         if is_hierarchy and format_name == "csv_zip":
-            writer(target, fields, hierarchy_nodes, dataset_key)
+            writer(target, fields, hierarchy_nodes, dataset_key)  # type: ignore[operator]
         elif is_hierarchy and format_name == "csv":
             _write_hierarchy_csv(target, fields, hierarchy_nodes, hierarchy_variant)
         elif is_hierarchy and format_name == "json":
@@ -725,9 +725,9 @@ def generate_export(
         elif is_hierarchy and format_name == "xlsx":
             write_hierarchy_xlsx(target, fields, hierarchy_nodes, dataset_key)
         elif format_name == "xlsx":
-            writer(target, fields, records, dataset_key)
+            writer(target, fields, records, dataset_key)  # type: ignore[operator]
         else:
-            writer(target, fields, records)
+            writer(target, fields, records)  # type: ignore[operator]
         target.seek(0)
         suffix = (
             f"-{hierarchy_variant}"
@@ -735,7 +735,12 @@ def generate_export(
             else ""
         )
         extension = "zip" if format_name == "csv_zip" else format_name
-        return ExportArtifact(target, media_type, extension, f"{dataset_key}{suffix}.{extension}")
+        return ExportArtifact(
+            target,  # type: ignore[arg-type]
+            media_type,
+            extension,
+            f"{dataset_key}{suffix}.{extension}",
+        )
     except ExportGenerationError:
         target.close()
         raise

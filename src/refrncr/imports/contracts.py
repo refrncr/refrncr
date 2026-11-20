@@ -233,7 +233,7 @@ def mapping_issue_message(issue: MappingIssue | ImportIssue) -> str:
             "Choose a valid source type and its required format components."
         ),
         "source_format_ambiguous": "Choose an unambiguous source format for this field.",
-    }.get(issue.code)
+    }.get(issue.code)  # type: ignore[arg-type, return-value]
 
 
 @dataclass(frozen=True, slots=True)

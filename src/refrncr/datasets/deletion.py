@@ -33,7 +33,7 @@ def mapping_deletion_error(count):
 
 class DatasetDeletionMixin:
     def get_dataset_for_deletion(self, actor_id: str, dataset_id: str) -> DatasetDeletion:
-        with self.uow(translate_errors=True) as uow:
+        with self.uow(translate_errors=True) as uow:  # type: ignore[attr-defined]
             uow.begin_export_snapshot()
             dataset = self._deletion_target(uow, actor_id, dataset_id)
             return self._deletion_context(uow, dataset)
@@ -41,7 +41,9 @@ class DatasetDeletionMixin:
     def delete_dataset(
         self, actor_id: str, dataset_id: str, confirmation_name: str, expected_updated_at: str
     ) -> DatasetDeletion:
-        with self.uow(write=True, serialized=True, translate_errors=True) as uow:
+        with self.uow(  # type: ignore[attr-defined]
+            write=True, serialized=True, translate_errors=True
+        ) as uow:
             dataset = self._deletion_target(uow, actor_id, dataset_id, for_update=True)
             if expected_updated_at != self._deletion_timestamp(dataset):
                 raise DatasetConflictError(

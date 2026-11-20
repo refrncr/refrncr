@@ -200,24 +200,27 @@ class Datatype:
         """
         if type(value) is not self.python_type:
             raise DatatypeError("Invalid typed value")
-        if self.id == "integer" and abs(value) >= 10**MAX_INTEGER_DIGITS:
+        if self.id == "integer" and abs(value) >= 10**MAX_INTEGER_DIGITS:  # type: ignore[arg-type]
             raise DatatypeError("Integer must not exceed 1000 digits", "limit_exceeded")
         if self.id == "number":
-            if not value.is_finite():
+            if not value.is_finite():  # type: ignore[attr-defined]
                 raise DatatypeError("Invalid typed value")
-            _, digits, exponent = value.as_tuple()
+            _, digits, exponent = value.as_tuple()  # type: ignore[attr-defined]
             if (
                 len(digits) > MAX_DECIMAL_INTEGER_DIGITS + MAX_DECIMAL_SCALE
                 or exponent < -MAX_DECIMAL_SCALE
                 or exponent > MAX_DECIMAL_INTEGER_DIGITS
-                or value.adjusted() >= MAX_DECIMAL_INTEGER_DIGITS
+                or value.adjusted() >= MAX_DECIMAL_INTEGER_DIGITS  # type: ignore[attr-defined]
             ):
                 raise DatatypeError("Invalid typed Decimal bounds", "limit_exceeded")
-        if self.id == "float" and not math.isfinite(value):
+        if self.id == "float" and not math.isfinite(value):  # type: ignore[arg-type]
             raise DatatypeError("Invalid typed value")
-        if self.id in {"time", "datetime"} and value.tzinfo is not None:
+        if self.id in {"time", "datetime"} and value.tzinfo is not None:  # type: ignore[attr-defined]
             raise DatatypeError("Local time must not contain a timezone")
-        if self.id == "timestamp" and (value.tzinfo is None or value.utcoffset() is None):
+        if self.id == "timestamp" and (
+            value.tzinfo is None  # type: ignore[attr-defined]
+            or value.utcoffset() is None  # type: ignore[attr-defined]
+        ):
             raise DatatypeError("Timestamp requires an exact instant")
 
     def from_key(self, key: bytes) -> object:
@@ -239,8 +242,13 @@ class Datatype:
         """Typed ascending order, null last; equality uses the same normalized value."""
         if value is None:
             return (1, None)
-        normalized = self.canonicalize(self.text(value))[0]
-        return (0, normalized.encode("utf-8") if self.id == "string" else normalized)
+        normalized = self.canonicalize(self.text(value))[0]  # type: ignore[index]
+        return (
+            0,
+            normalized.encode("utf-8")  # type: ignore[union-attr]
+            if self.id == "string"
+            else normalized,
+        )
 
 
 DATATYPES = MappingProxyType(

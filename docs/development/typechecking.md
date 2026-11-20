@@ -14,8 +14,9 @@ enabling strict mode are follow-up work. Imports outside the selected paths are 
 environment cannot silently broaden this story to `web/`, `api/`, `app.py` or `cli.py`; modules
 inside the selected paths remain explicit mypy inputs and are all checked.
 
-The package-specific disabled error codes are the initial non-strict baseline for existing
-annotations around Dataset services, import workflows and SQLAlchemy adapters. Clean packages
-use mypy's default checks without overrides. New suppressions must remain narrowly scoped and
-documented in `pyproject.toml`; prefer correcting an annotation when that stays within the
-current story and does not change runtime behavior.
+Existing errors in Dataset services, import workflows and SQLAlchemy adapters are suppressed only
+on the affected line with the specific mypy error code. `warn_unused_ignores` rejects suppressions
+that are no longer needed. `tests/test_typechecking.py` rejects unqualified `type: ignore`
+comments and prevents the number of scoped suppressions from growing. Prefer correcting an
+annotation when that stays within the current story and does not change runtime behavior; lower
+the guard's maximum when an existing suppression is removed.
