@@ -43,6 +43,7 @@ dev = [
     "cyclonedx-bom==8.0.1",
     "httpx==0.28.1",
     "import-linter==2.16",
+    "mypy==2.4.1",
     "pytest-cov==7.1.0",
     "pytest-timeout==2.4.0",
     "pytest-xdist==3.8.0",
@@ -127,3 +128,23 @@ max-complexity = 20
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+files = [
+    "src/refrncr/identity",
+    "src/refrncr/authorization",
+    "src/refrncr/datasets",
+    "src/refrncr/versions",
+    "src/refrncr/imports",
+    "src/refrncr/hierarchies",
+    "src/refrncr/persistence",
+    "src/refrncr/audit",
+    "src/refrncr/presentation",
+    "src/refrncr/integration",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+show_error_codes = true
+warn_unused_configs = true
+warn_unused_ignores = true

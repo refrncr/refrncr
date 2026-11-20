@@ -28,3 +28,9 @@ repos:
         language: python
         additional_dependencies: [import-linter==2.16]
         pass_filenames: false
+      - id: mypy
+        name: mypy
+        entry: python tools/typecheck.py
+        language: python
+        additional_dependencies: [mypy==2.4.1, "."]
+        pass_filenames: false

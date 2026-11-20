@@ -254,9 +254,9 @@ class SqlAlchemyDatasetRecordOperations:
             if type(value.value) is not datatype.python_type or decoded != value.value:
                 raise DatatypeError("Invalid stored canonical value", "invalid_storage")
             if value.data_type in {"string", "number", "boolean", "date"}:
-                typed[f"{value.data_type}_value"] = value.value
+                typed[f"{value.data_type}_value"] = value.value  # type: ignore[assignment]
             else:
-                typed["string_value"] = datatype.text(decoded)
+                typed["string_value"] = datatype.text(decoded)  # type: ignore[assignment]
             rows.append(
                 DatasetRecordValue(
                     record_id=record.id,

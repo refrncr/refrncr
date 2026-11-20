@@ -125,6 +125,7 @@ jobs:
         run: |
           python -m ruff check .
           python tools/lint_imports.py
+          python tools/typecheck.py
 
       - name: Collect SQLite cases
         run: python -m pytest --collect-only -q -m 'not postgres'

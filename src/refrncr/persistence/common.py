@@ -31,7 +31,7 @@ def safe_constraint_name(error: IntegrityError) -> str | None:
         "uq_dataset_records_dataset_identifier",
         "uq_dataset_record_values_unique_value",
     }:
-        return diagnostic.constraint_name
+        return diagnostic.constraint_name  # type: ignore[union-attr]
     if str(error.orig) == "UNIQUE constraint failed: datasets.key":
         return "uq_datasets_key"
     if str(error.orig) == (

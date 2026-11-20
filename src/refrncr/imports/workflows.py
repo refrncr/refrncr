@@ -370,12 +370,16 @@ class ImportWorkflowMixin:
         acknowledge_deletions=False,
     ) -> int:
         validated_key = DatasetFieldService._validated_dataset_lookup_key(dataset_key)
-        with self.uow() as read_uow:
+        with self.uow() as read_uow:  # type: ignore[attr-defined]
             target = read_uow.datasets.find_by_key(validated_key)
         if target is None:
             raise ImportNotFoundError("Dataset not found")
-        self.records._require_access(actor_id, target, "can_maintain_dataset")
-        state = self._bound_state(token, actor_id, session_id, target.id)
+        self.records._require_access(  # type: ignore[attr-defined]
+            actor_id, target, "can_maintain_dataset"
+        )
+        state = self._bound_state(  # type: ignore[attr-defined]
+            token, actor_id, session_id, target.id
+        )
         if (
             state.busy
             or state.imported_count is not None
@@ -384,23 +388,27 @@ class ImportWorkflowMixin:
             raise ImportNotFoundError("Import not found")
         if not state.mapping_ready:
             raise ImportNotFoundError("Import not found")
-        claimed = self.store.claim(state)
+        claimed = self.store.claim(state)  # type: ignore[attr-defined]
         try:
-            with self.uow(write=True, serialized=True) as uow:
+            with self.uow(  # type: ignore[attr-defined]
+                write=True, serialized=True
+            ) as uow:
                 preview, validated = self._confirmed_import(
                     uow, actor_id, validated_key, state, confirmation, acknowledge_deletions
                 )
 
         except (ValidationError, RecordConflictError):
-            self.store.finish(claimed, validation_valid=False, step=4)
+            self.store.finish(  # type: ignore[attr-defined]
+                claimed, validation_valid=False, step=4
+            )
             raise
         except Exception:
-            self.store.finish(claimed)
+            self.store.finish(claimed)  # type: ignore[attr-defined]
             raise
         updated_count = (
             preview.counts["Changed"] if state.mode == "mapping_update" else len(validated)
         )
-        self.store.finish(
+        self.store.finish(  # type: ignore[attr-defined]
             claimed,
             content=b"",
             mapping=None,
@@ -416,4 +424,4 @@ class ImportWorkflowMixin:
         self.store.cancel(token, actor_id, session_id, dataset.id)
 
     def revoke_session(self, session_id: str) -> None:
-        self.store.revoke_session(session_id)
+        self.store.revoke_session(session_id)  # type: ignore[attr-defined]

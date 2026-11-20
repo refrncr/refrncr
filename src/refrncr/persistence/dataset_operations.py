@@ -251,7 +251,7 @@ class SqlAlchemyDatasetFieldOperations:
                 return None
             values = dict(row._mapping)
             values["key"] = values.pop("_key")
-            return SimpleNamespace(**values)
+            return SimpleNamespace(**values)  # type: ignore[return-value]
         statement = locked(
             select(DatasetField).where(
                 DatasetField.dataset_id == dataset_id,
@@ -266,7 +266,9 @@ class SqlAlchemyDatasetFieldOperations:
         if self.legacy_metadata:
             table = Table("dataset_fields", MetaData(), autoload_with=self.session.connection())
             return [
-                SimpleNamespace(definition=None, unit=None, **row)
+                SimpleNamespace(  # type: ignore[misc]
+                    definition=None, unit=None, **row
+                )
                 for row in self.session.execute(
                     select(table)
                     .where(table.c.dataset_id == dataset_id)
@@ -296,7 +298,7 @@ class SqlAlchemyDatasetFieldOperations:
                 values = dict(row._mapping)
                 values["key"] = values.pop("_key")
                 result.append(SimpleNamespace(**values))
-            return result
+            return result  # type: ignore[return-value]
         return list(
             self.session.scalars(
                 select(DatasetField)
@@ -320,7 +322,10 @@ class SqlAlchemyDatasetFieldOperations:
             )
             return {
                 dataset_id: [
-                    SimpleNamespace(definition=None, unit=None, **row) for row in rows_for_dataset
+                    SimpleNamespace(  # type: ignore[misc]
+                        definition=None, unit=None, **row
+                    )
+                    for row in rows_for_dataset
                 ]
                 for dataset_id in dataset_ids
                 for rows_for_dataset in ([row for row in rows if row["dataset_id"] == dataset_id],)
@@ -330,7 +335,9 @@ class SqlAlchemyDatasetFieldOperations:
             .where(DatasetField.dataset_id.in_(dataset_ids))
             .order_by(DatasetField.dataset_id, DatasetField.display_position, DatasetField._key)
         )
-        result = {dataset_id: [] for dataset_id in dataset_ids}
+        result = {  # type: ignore[var-annotated]
+            dataset_id: [] for dataset_id in dataset_ids
+        }
         for field in rows:
             result[field.dataset_id].append(field)
         return result
@@ -349,7 +356,9 @@ class SqlAlchemyDatasetFieldOperations:
                 ),
                 {**values, "key": key},
             )
-            return SimpleNamespace(_key=key, key=key, **values)
+            return SimpleNamespace(  # type: ignore[return-value]
+                _key=key, key=key, **values
+            )
         field = DatasetField(_key=values.pop("key"), **values)
         self.session.add(field)
         return field
