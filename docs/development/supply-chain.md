@@ -35,7 +35,7 @@ commit SHA and readable version comment.
 
 `requirements/dev.in` is the source of truth for direct development-tool versions. The
 `pyproject.toml` development extra, the hash-pinned `requirements/dev.txt`, the Ruff
-pre-commit revision and shared release-tool pins must agree with it.
+pre-commit revision, the mypy pre-commit pin and shared release-tool pins must agree with it.
 
 `requirements/dev.in` and the generated, hash-pinned `requirements/dev.txt` keep the local and CI
 development tools identical. CI installs the editable project and then installs this lock with

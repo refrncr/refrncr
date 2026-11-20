@@ -87,6 +87,7 @@ The current development quality baseline consists of:
 - pre-commit hooks;
 - Ruff linting;
 - Ruff formatting;
+- scoped, non-strict mypy type checking;
 - pytest;
 - SQLite database tests;
 - PostgreSQL integration tests;
@@ -97,9 +98,9 @@ The current development quality baseline consists of:
 
 The repository also runs migration and authorization-boundary tests, CodeQL, Gitleaks,
 and release-time CycloneDX SBOM generation in GitHub Actions. These are CI controls, not
-local replacements for the required commands above. Type checking, container scanning,
-tenant-isolation testing, and automated release publication remain out of scope unless a
-future story configures them.
+local replacements for the required commands above. Repository-wide strict type checking,
+container scanning, tenant-isolation testing, and automated release publication remain out
+of scope unless a future story configures them.
 
 
 ## Required checks before completing a change
@@ -110,6 +111,7 @@ Run the checks currently configured for the repository:
 python -m pre_commit run --all-files
 python -m pytest
 python -m ruff check .
+python tools/typecheck.py
 ```
 
 All configured checks must pass before the work is considered complete.

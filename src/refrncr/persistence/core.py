@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import TracebackType
+from typing import Literal
 
 from sqlalchemy import (
     or_,
@@ -109,7 +110,7 @@ class SqlAlchemyUnitOfWork:
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         traceback: TracebackType | None,
-    ) -> bool:
+    ) -> Literal[False]:
         try:
             if exc_type is None and self.write:
                 try:
