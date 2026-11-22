@@ -276,9 +276,17 @@ def test_pr_workflows_are_read_only_and_release_permissions_are_job_scoped():
 
 def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     text = (ROOT / ".github/workflows/security.yml").read_text()
+    workflow = load_workflow("security.yml")
+    setup_go_pins = [
+        step["uses"]
+        for job in workflow["jobs"].values()
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-go@")
+    ]
     assert "pull_request:" in text and "push:" in text and "schedule:" in text
     assert "fetch-depth: 0" in text
-    assert text.count("actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e") == 2
+    assert len(setup_go_pins) == 2
+    assert len(set(setup_go_pins)) == 1
     assert text.count('go-version: "1.24.11"') == 2
     assert text.count("go install github.com/zricethezav/gitleaks/v8@v8.30.1") == 2
     assert "go install github.com/gitleaks/gitleaks/v8" not in text
