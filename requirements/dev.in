@@ -1,10 +1,10 @@
 # Exact development-tool input. Runtime dependencies remain in release.txt.
 build==1.6.1
-cyclonedx-bom==8.0.1
+cyclonedx-bom==9.0.0
 httpx==0.28.1
-import-linter==2.16
+import-linter==2.17
 mypy==2.4.1
-pip-tools==7.6.2
+pip-tools==7.7.0
 pre-commit==4.7.0
 pytest==9.2.0
 pytest-cov==7.1.0
