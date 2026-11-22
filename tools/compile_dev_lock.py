@@ -11,7 +11,7 @@ from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-PIP_TOOLS_VERSION = "7.6.2"
+PIP_TOOLS_VERSION = "7.7.0"
 CANONICAL_PLATFORM = "linux"
 CANONICAL_PYTHON = (3, 12)
 ROOT = Path(__file__).resolve().parents[1]
