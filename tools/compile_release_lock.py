@@ -9,12 +9,18 @@ import tempfile
 from importlib.metadata import version
 from pathlib import Path
 
-PIP_TOOLS_VERSION = "7.7.0"
+if __package__:
+    from .dependency_pins import read_dependency_pins
+else:
+    from dependency_pins import read_dependency_pins
+
 CANONICAL_PLATFORM = "linux"
 CANONICAL_PYTHON = (3, 12)
 ROOT = Path(__file__).resolve().parents[1]
 INPUT = ROOT / "requirements" / "release.in"
 OUTPUT = ROOT / "requirements" / "release.txt"
+DEV_INPUT = ROOT / "requirements" / "dev.in"
+PIP_TOOLS_VERSION = read_dependency_pins(DEV_INPUT, ("pip-tools",))["pip-tools"]
 COMPILE_FLAGS = (
     "--no-config",
     "--generate-hashes",

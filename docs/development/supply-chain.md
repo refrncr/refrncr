@@ -20,8 +20,9 @@ python -m pip install --require-hashes -r requirements/release.txt
 git diff -- requirements/release.in requirements/release.txt pyproject.toml
 ```
 
-The Linux generator requires exactly pip-tools 7.6.1. It ignores ambient pip-tools configuration
-and explicitly fixes hash generation, resolver,
+The Linux generators require exactly the pip-tools version pinned in `requirements/dev.in`; they
+read that source directly rather than duplicating the version in generator code. They ignore
+ambient pip-tools configuration and explicitly fix hash generation, resolver,
 `--strip-extras`, build isolation, unsafe-package policy, no-upgrade behavior, hash reuse, LF
 newlines, header/colour behavior, annotations and index/find-links emission. `--no-upgrade` keeps
 the committed graph stable during verification; reviewed dependency updates deliberately change
@@ -36,6 +37,19 @@ commit SHA and readable version comment.
 `requirements/dev.in` is the source of truth for direct development-tool versions. The
 `pyproject.toml` development extra, the hash-pinned `requirements/dev.txt`, the Ruff
 pre-commit revision, the mypy pre-commit pin and shared release-tool pins must agree with it.
+
+Run `python tools/sync_dependency_pins.py` after changing a managed input pin. The script updates
+only the Ruff revision in `.pre-commit-config.yaml`, the pip-tools installation in
+`.github/workflows/security.yml`, and the build, cyclonedx-bom and twine installations in
+`.github/workflows/release.yml`. It uses targeted text replacement rather than rewriting YAML,
+requires every expected source and target exactly once, validates every file before writing any
+file, and is idempotent. Neighboring release-tool pins such as pip-audit and pipx are not managed by
+this script.
+
+Use `python tools/sync_dependency_pins.py --check` to verify the derived pins without changing
+files. The supply-chain workflow runs this check before regenerating either lock and reports the
+same repair command when a pin is stale. It is deliberately not a pre-commit hook: CI remains the
+repository-wide policy gate, while developers can run the explicit command when updating tools.
 
 `requirements/dev.in` and the generated, hash-pinned `requirements/dev.txt` keep the local and CI
 development tools identical. CI installs the editable project and then installs this lock with
