@@ -99,7 +99,8 @@ jobs:
         run: |
           cd "$TRUSTED_DIR"
           python -E -s validate_dependency_refresh.py preflight --patch "$PATCH_PATH"
-          git -C "$GITHUB_WORKSPACE" apply "$PATCH_PATH"
+          python -E -s validate_dependency_refresh.py apply \
+            --root "$GITHUB_WORKSPACE" --patch "$PATCH_PATH"
           python -E -s validate_dependency_refresh.py worktree \
             --root "$GITHUB_WORKSPACE" --head-sha "$HEAD_SHA"
       - name: Require configured Dependabot secrets
@@ -112,7 +113,7 @@ jobs:
           python -E -s validate_dependency_refresh.py secrets
       - name: Create scoped GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.0.0
         with:
           client-id: ${{ secrets.LOCK_REFRESH_CLIENT_ID }}
           private-key: ${{ secrets.LOCK_REFRESH_PRIVATE_KEY }}
@@ -142,6 +143,6 @@ jobs:
             -m "chore(deps): refresh locks and derived pins"
           gh auth setup-git
           if ! git push origin "HEAD:refs/heads/$HEAD_REF"; then
-            echo "::error::Dependabot branch changed during refresh; wait for the newer workflow run"
+            echo "::error::Refresh push failed; the branch may have changed or GitHub may be unavailable"
             exit 1
           fi

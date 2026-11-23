@@ -290,8 +290,9 @@ def test_dependabot_lock_refresh_has_two_job_security_boundary():
 
     push_text = "\n".join(step.get("run", "") for step in push.get("steps", []))
     assert "python -E -s validate_dependency_refresh.py preflight" in push_text
-    assert push_text.index("preflight") < push_text.index('git -C "$GITHUB_WORKSPACE" apply')
-    assert push_text.index('git -C "$GITHUB_WORKSPACE" apply') < push_text.index("worktree")
+    assert "python -E -s validate_dependency_refresh.py apply" in push_text
+    assert push_text.index("preflight") < push_text.index("validate_dependency_refresh.py apply")
+    assert push_text.index("validate_dependency_refresh.py apply") < push_text.index("worktree")
     assert 'cd "$TRUSTED_DIR"' in push_text
     assert "--binary" not in text
     assert "--force" not in text and "--force-with-lease" not in text
@@ -300,6 +301,8 @@ def test_dependabot_lock_refresh_has_two_job_security_boundary():
     assert "tools/validate_dependency_refresh.py" in push_text
     assert "tools/sync_dependency_pins.py" in push_text
     assert "tools/dependency_pins.py" in push_text
+    validator = (ROOT / "tools/validate_dependency_refresh.py").read_text(encoding="utf-8")
+    assert 'f"--include={path}" for path in sorted(ALLOWED_PATHS)' in validator
 
 
 def test_dependabot_lock_refresh_limits_secret_exposure_to_trusted_job():

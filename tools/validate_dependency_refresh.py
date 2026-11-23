@@ -31,10 +31,50 @@ DERIVED_PATHS = (
 )
 DIFF_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)$")
 INDEX_HEADER = re.compile(r"^index [0-9a-f]+\.\.[0-9a-f]+(?: 100644)?$")
+HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
 
 
 class RefreshValidationError(ValueError):
     """Raised when refresh input is unsafe or inconsistent."""
+
+
+def _patch_path(line: str, paths: set[str]) -> str:
+    match = DIFF_HEADER.fullmatch(line)
+    if not match or match.group(1) != match.group(2):
+        raise RefreshValidationError("patch contains a renamed or unsafe path")
+    path = match.group(1)
+    if path not in ALLOWED_PATHS:
+        raise RefreshValidationError(f"path is not allowlisted: {path}")
+    if path in paths:
+        raise RefreshValidationError(f"duplicate patch section: {path}")
+    return path
+
+
+def _hunk_counts(line: str, path: str) -> tuple[int, int]:
+    match = HUNK_HEADER.fullmatch(line)
+    if match is None:
+        raise RefreshValidationError(f"invalid hunk header for {path}")
+    counts = (int(match.group(2) or 1), int(match.group(4) or 1))
+    if counts == (0, 0):
+        raise RefreshValidationError(f"empty hunk for {path}")
+    return counts
+
+
+def _consume_hunk_line(line: str, path: str, old: int, new: int) -> tuple[int, int]:
+    prefix = line[:1]
+    if prefix == " ":
+        if old == 0 or new == 0:
+            raise RefreshValidationError(f"hunk exceeds declared size for {path}")
+        return old - 1, new - 1
+    if prefix == "-":
+        if old == 0:
+            raise RefreshValidationError(f"hunk exceeds declared old size for {path}")
+        return old - 1, new
+    if prefix == "+":
+        if new == 0:
+            raise RefreshValidationError(f"hunk exceeds declared new size for {path}")
+        return old, new - 1
+    raise RefreshValidationError(f"unsupported hunk content for {path}")
 
 
 def _git(root: Path, *arguments: str, text: bool = True) -> str | bytes:
@@ -74,33 +114,44 @@ def validate_patch(patch_path: Path) -> set[str]:
     paths: set[str] = set()
     current_path: str | None = None
     saw_old = saw_new = saw_hunk = False
+    old_remaining = new_remaining = 0
+    last_was_hunk_line = False
 
     def finish_section() -> None:
         if current_path is not None and not (saw_old and saw_new and saw_hunk):
             raise RefreshValidationError(f"incomplete text patch for {current_path}")
+        if old_remaining or new_remaining:
+            raise RefreshValidationError(f"incomplete hunk for {current_path}")
 
     for line in lines:
+        if old_remaining or new_remaining:
+            old_remaining, new_remaining = _consume_hunk_line(
+                line, str(current_path), old_remaining, new_remaining
+            )
+            last_was_hunk_line = True
+            continue
+        if line == "\\ No newline at end of file":
+            if not last_was_hunk_line:
+                raise RefreshValidationError(f"misplaced no-newline marker for {current_path}")
+            last_was_hunk_line = False
+            continue
+        last_was_hunk_line = False
         if line.startswith("diff --git "):
             finish_section()
-            match = DIFF_HEADER.fullmatch(line)
-            if not match or match.group(1) != match.group(2):
-                raise RefreshValidationError("patch contains a renamed or unsafe path")
-            current_path = match.group(1)
-            if current_path not in ALLOWED_PATHS:
-                raise RefreshValidationError(f"path is not allowlisted: {current_path}")
-            if current_path in paths:
-                raise RefreshValidationError(f"duplicate patch section: {current_path}")
+            current_path = _patch_path(line, paths)
             paths.add(current_path)
             saw_old = saw_new = saw_hunk = False
             continue
         if current_path is None:
             raise RefreshValidationError("patch data appears before a file header")
+        if line.startswith("@@ "):
+            if not (saw_old and saw_new):
+                raise RefreshValidationError(f"hunk precedes file headers for {current_path}")
+            old_remaining, new_remaining = _hunk_counts(line, current_path)
+            saw_hunk = True
+            continue
         if saw_hunk:
-            if line.startswith("@@ "):
-                continue
-            if line.startswith((" ", "+", "-", "\\ No newline at end of file")):
-                continue
-            raise RefreshValidationError(f"unsupported patch content for {current_path}")
+            raise RefreshValidationError(f"content outside a hunk for {current_path}")
         if INDEX_HEADER.fullmatch(line):
             continue
         if line == f"--- a/{current_path}":
@@ -109,13 +160,16 @@ def validate_patch(patch_path: Path) -> set[str]:
         if line == f"+++ b/{current_path}":
             saw_new = True
             continue
-        if line.startswith("@@ "):
-            saw_hunk = True
-            continue
         raise RefreshValidationError(f"unsupported patch metadata for {current_path}: {line}")
 
     finish_section()
     return paths
+
+
+def apply_patch(root: Path, patch_path: Path) -> None:
+    """Apply only allowlisted paths, independently of patch-provided filenames."""
+    includes = tuple(f"--include={path}" for path in sorted(ALLOWED_PATHS))
+    _git(root, "apply", *includes, str(patch_path))
 
 
 def validate_worktree(root: Path, expected_head: str) -> set[str]:
@@ -126,12 +180,20 @@ def validate_worktree(root: Path, expected_head: str) -> set[str]:
             f"checked-out HEAD changed: expected {expected_head}, found {actual_head}"
         )
 
-    status = str(_git(root, "diff", "--name-status", "--no-renames", "HEAD"))
+    status = str(
+        _git(
+            root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignored=matching",
+        )
+    )
     changed: set[str] = set()
     for line in status.splitlines():
-        state, separator, path = line.partition("\t")
-        if not separator or state != "M":
-            raise RefreshValidationError(f"only modifications are allowed: {line}")
+        state, path = line[:2], line[3:]
+        if state != " M":
+            raise RefreshValidationError(f"unexpected worktree entry: {line}")
         if path not in ALLOWED_PATHS:
             raise RefreshValidationError(f"path is not allowlisted: {path}")
         changed.add(path)
@@ -196,6 +258,9 @@ def main(argv: list[str] | None = None) -> int:
     prepare.add_argument("--github-output", type=Path, required=True)
     preflight = subparsers.add_parser("preflight")
     preflight.add_argument("--patch", type=Path, required=True)
+    apply = subparsers.add_parser("apply")
+    apply.add_argument("--root", type=Path, required=True)
+    apply.add_argument("--patch", type=Path, required=True)
     worktree = subparsers.add_parser("worktree")
     worktree.add_argument("--root", type=Path, required=True)
     worktree.add_argument("--head-sha", required=True)
@@ -206,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
             prepare_patch(arguments.root, arguments.patch, arguments.github_output)
         elif arguments.command == "preflight":
             validate_patch(arguments.patch)
+        elif arguments.command == "apply":
+            apply_patch(arguments.root, arguments.patch)
         elif arguments.command == "worktree":
             validate_worktree(arguments.root, arguments.head_sha)
         else:
