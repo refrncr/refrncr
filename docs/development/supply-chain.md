@@ -65,6 +65,13 @@ Python 3.12; never bypass the validator or manually grant a pull-request job a w
 workflow intentionally does not require `pip --only-binary`: dependency installation is confined
 to the secretless untrusted job, while the trusted job installs no package from the pull request.
 
+Fresh development-lock generation lets exact direct pins from `requirements/dev.in` move while it
+keeps existing transitive versions as hard constraints. This minimizes unrelated lock churn, but a
+direct update that requires a newer transitive dependency can therefore be unresolvable. In that
+case the secretless generation job fails visibly and no patch, token or commit is produced. Update
+the lock manually on the Dependabot branch after reviewing the required transitive change, or
+update that transitive dependency first in a separate pull request, then rerun the refresh.
+
 When an open Dependabot pull request predates this workflow or its base is too stale to refresh,
 comment `@dependabot recreate` so Dependabot replaces its branch from current `main`. Use
 `recreate`, not `rebase`, as the documented recovery command. During rollout, issue `recreate` on

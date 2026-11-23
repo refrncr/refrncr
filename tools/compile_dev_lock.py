@@ -44,6 +44,7 @@ COMPILE_FLAGS = (
 )
 FRESH_COMPILE_FLAGS = tuple(flag for flag in COMPILE_FLAGS if flag != "--reuse-hashes")
 PINNED_REQUIREMENT = re.compile(r"^([A-Za-z0-9_.-]+)==([^\s\\;]+)")
+NAME_SEPARATOR = re.compile(r"[-_.]+")
 
 
 def is_canonical_environment(
@@ -60,13 +61,31 @@ def is_canonical_environment(
     )
 
 
-def write_version_constraints(lock: Path, destination: Path) -> None:
+def canonical_package_name(name: str) -> str:
+    """Return the comparison form used for Python distribution names."""
+    return NAME_SEPARATOR.sub("-", name).lower()
+
+
+def direct_requirement_names(path: Path) -> frozenset[str]:
+    """Return canonical names of every exact direct input pin."""
+    return frozenset(
+        canonical_package_name(match.group(1))
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if (match := PINNED_REQUIREMENT.match(line))
+    )
+
+
+def write_version_constraints(
+    lock: Path, destination: Path, *, excluded_names: frozenset[str] = frozenset()
+) -> None:
+    """Preserve locked versions except direct inputs that may have changed."""
     constraints = [
         f"{match.group(1)}=={match.group(2)}"
-        for line in lock.read_text().splitlines()
+        for line in lock.read_text(encoding="utf-8").splitlines()
         if (match := PINNED_REQUIREMENT.match(line))
+        and canonical_package_name(match.group(1)) not in excluded_names
     ]
-    destination.write_text("\n".join(constraints) + "\n")
+    destination.write_text("\n".join(constraints) + "\n", encoding="utf-8", newline="\n")
 
 
 def main() -> int:
@@ -113,7 +132,11 @@ def main() -> int:
         return 2
     with TemporaryDirectory() as temporary_directory:
         constraints = Path(temporary_directory) / "dev-versions.txt"
-        write_version_constraints(OUTPUT, constraints)
+        write_version_constraints(
+            OUTPUT,
+            constraints,
+            excluded_names=direct_requirement_names(INPUT),
+        )
         OUTPUT.unlink()
         flags = (*FRESH_COMPILE_FLAGS, "--constraint", str(constraints))
         result = subprocess.run(
@@ -123,9 +146,9 @@ def main() -> int:
             check=False,
         )
         if result.returncode == 0:
-            generated = OUTPUT.read_text()
+            generated = OUTPUT.read_text(encoding="utf-8")
             generated = generated.replace(f"-c {constraints}, ", "")
-            OUTPUT.write_text(generated)
+            OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
         return result.returncode
 
 

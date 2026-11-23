@@ -17,7 +17,7 @@ from tools.compile_dev_lock import (
 from tools.compile_dev_lock import (
     PIP_TOOLS_VERSION as DEV_PIP_TOOLS_VERSION,
 )
-from tools.compile_dev_lock import write_version_constraints
+from tools.compile_dev_lock import direct_requirement_names, write_version_constraints
 from tools.compile_release_lock import (
     CANONICAL_PLATFORM,
     CANONICAL_PYTHON,
@@ -184,6 +184,22 @@ def test_fresh_development_lock_constraints_preserve_versions_without_hashes(tmp
     write_version_constraints(lock, constraints)
 
     assert constraints.read_text() == "alpha==1.2.3\nbeta==4.5.6\n"
+
+
+def test_fresh_development_lock_constraints_exclude_changed_direct_pins(tmp_path):
+    lock = tmp_path / "dev.txt"
+    lock.write_text("ruff==0.17.5\nPyYAML==6.0.2\ntransitive==3.2.1\n", encoding="utf-8")
+    direct = tmp_path / "dev.in"
+    direct.write_text("ruff==0.17.6\npyyaml==6.0.3\n", encoding="utf-8")
+    constraints = tmp_path / "constraints.txt"
+
+    write_version_constraints(
+        lock,
+        constraints,
+        excluded_names=direct_requirement_names(direct),
+    )
+
+    assert constraints.read_text(encoding="utf-8") == "transitive==3.2.1\n"
 
 
 def parse_pins(path):
