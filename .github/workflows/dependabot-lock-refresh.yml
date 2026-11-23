@@ -1,0 +1,147 @@
+name: Refresh Dependabot Python locks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-lock-refresh-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: >-
+      startsWith(github.head_ref, 'dependabot/pip/') &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      changed: ${{ steps.patch.outputs.changed }}
+    steps:
+      - name: Checkout fixed Dependabot commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install the pinned lock compiler
+        run: |
+          requirement="$(python -c 'from pathlib import Path; from tools.dependency_pins import read_dependency_pins; version = read_dependency_pins(Path("requirements/dev.in"), ("pip-tools",))["pip-tools"]; print(f"pip-tools=={version}")')"
+          python -m pip install "$requirement"
+      - name: Refresh derived pins and locks
+        run: |
+          python tools/sync_dependency_pins.py
+          python tools/compile_release_lock.py
+          python tools/compile_dev_lock.py --fresh
+      - name: Prepare refresh patch
+        id: patch
+        env:
+          PATCH_PATH: ${{ runner.temp }}/dependency-refresh.patch
+        run: >-
+          python tools/validate_dependency_refresh.py prepare
+          --root "$GITHUB_WORKSPACE"
+          --patch "$PATCH_PATH"
+          --github-output "$GITHUB_OUTPUT"
+      - name: Upload refresh patch
+        if: steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-refresh-patch
+          path: ${{ runner.temp }}/dependency-refresh.patch
+          retention-days: 1
+          if-no-files-found: error
+
+  push:
+    needs: generate
+    if: needs.generate.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the same fixed Dependabot commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Set up trusted Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Export validator from the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TRUSTED_DIR: ${{ runner.temp }}/trusted-refresh
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          mkdir -p "$TRUSTED_DIR"
+          git archive "$BASE_SHA" \
+            tools/validate_dependency_refresh.py \
+            tools/sync_dependency_pins.py \
+            tools/dependency_pins.py \
+            | tar -x --strip-components=1 -C "$TRUSTED_DIR"
+      - name: Download refresh patch
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dependency-refresh-patch
+          path: ${{ runner.temp }}/refresh-artifact
+      - name: Preflight, apply, and validate refresh patch
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATCH_PATH: ${{ runner.temp }}/refresh-artifact/dependency-refresh.patch
+          TRUSTED_DIR: ${{ runner.temp }}/trusted-refresh
+        run: |
+          cd "$TRUSTED_DIR"
+          python -E -s validate_dependency_refresh.py preflight --patch "$PATCH_PATH"
+          git -C "$GITHUB_WORKSPACE" apply "$PATCH_PATH"
+          python -E -s validate_dependency_refresh.py worktree \
+            --root "$GITHUB_WORKSPACE" --head-sha "$HEAD_SHA"
+      - name: Require configured Dependabot secrets
+        env:
+          HAS_CLIENT_ID: ${{ secrets.LOCK_REFRESH_CLIENT_ID != '' }}
+          HAS_PRIVATE_KEY: ${{ secrets.LOCK_REFRESH_PRIVATE_KEY != '' }}
+          TRUSTED_DIR: ${{ runner.temp }}/trusted-refresh
+        run: |
+          cd "$TRUSTED_DIR"
+          python -E -s validate_dependency_refresh.py secrets
+      - name: Create scoped GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3
+        with:
+          client-id: ${{ secrets.LOCK_REFRESH_CLIENT_ID }}
+          private-key: ${{ secrets.LOCK_REFRESH_PRIVATE_KEY }}
+          permission-contents: write
+          permission-workflows: write
+      - name: Commit and push refresh
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          bot_name="${APP_SLUG}[bot]"
+          bot_id="$(gh api "/users/$bot_name" --jq .id)"
+          git config user.name "$bot_name"
+          git config user.email "${bot_id}+${bot_name}@users.noreply.github.com"
+          git add -- \
+            requirements/dev.txt \
+            requirements/release.txt \
+            .pre-commit-config.yaml \
+            .github/workflows/security.yml \
+            .github/workflows/release.yml
+          git diff --cached --quiet && {
+            echo "::error::Validated refresh patch produced no staged changes"
+            exit 1
+          }
+          git -c core.hooksPath=/dev/null commit \
+            -m "chore(deps): refresh locks and derived pins"
+          gh auth setup-git
+          if ! git push origin "HEAD:refs/heads/$HEAD_REF"; then
+            echo "::error::Dependabot branch changed during refresh; wait for the newer workflow run"
+            exit 1
+          fi

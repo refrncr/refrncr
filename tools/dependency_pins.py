@@ -15,7 +15,7 @@ class DependencyPinError(ValueError):
 def read_dependency_pins(path: Path, packages: tuple[str, ...]) -> dict[str, str]:
     """Return exactly pinned versions for the requested package names."""
     matches: dict[str, list[str]] = {package: [] for package in packages}
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         match = EXACT_PIN.fullmatch(line.strip())
         if match and match.group(1) in matches:
             matches[match.group(1)].append(match.group(2))

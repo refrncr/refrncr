@@ -82,7 +82,7 @@ def _replace_block(content: str, bounds: tuple[int, int], updated_block: str) ->
 
 
 def _sync_pre_commit(path: Path, version: str) -> PendingWrite:
-    original = path.read_text()
+    original = path.read_text(encoding="utf-8")
     bounds = _repo_block(original, path, "https://github.com/astral-sh/ruff-pre-commit")
     block = original[bounds[0] : bounds[1]]
     updated_block, count = re.subn(
@@ -98,7 +98,7 @@ def _sync_pre_commit(path: Path, version: str) -> PendingWrite:
 
 
 def _sync_security(path: Path, version: str) -> PendingWrite:
-    original = path.read_text()
+    original = path.read_text(encoding="utf-8")
     job_bounds = _job_block(original, path, "dependency-and-policy")
     job = original[job_bounds[0] : job_bounds[1]]
     step_bounds = _step_block(job, path, "Install security tooling")
@@ -109,7 +109,7 @@ def _sync_security(path: Path, version: str) -> PendingWrite:
 
 
 def _sync_release(path: Path, pins: dict[str, str]) -> PendingWrite:
-    original = path.read_text()
+    original = path.read_text(encoding="utf-8")
     job_bounds = _job_block(original, path, "build")
     job = original[job_bounds[0] : job_bounds[1]]
     step_bounds = _step_block(job, path, "Install locked runtime graph and release tools")
@@ -137,7 +137,7 @@ def synchronize_dependency_pins(root: Path, *, check: bool = False) -> list[Path
     if not check:
         for write in writes:
             if write.updated != write.original:
-                write.path.write_text(write.updated)
+                write.path.write_text(write.updated, encoding="utf-8", newline="\n")
     return changed
 
 

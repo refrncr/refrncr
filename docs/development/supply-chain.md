@@ -32,6 +32,51 @@ Review direct and transitive version changes, their hashes, upstream release not
 Dependabot proposes weekly pip and GitHub Actions updates; action updates must retain a full 40-byte
 commit SHA and readable version comment.
 
+### Dependabot lock refresh
+
+Python Dependabot pull requests are refreshed by `dependabot-lock-refresh.yml`. The workflow has
+two deliberately separate jobs. The first job checks out the fixed pull-request head commit,
+installs the pip-tools version declared by that commit, regenerates the locks and derived pins, and
+uploads only a text patch. It has no token and cannot read the GitHub App secrets, so all of its
+output is treated as untrusted.
+
+The second job starts on a fresh runner at the same fixed head commit. Before downloading the
+patch, it exports the validator and its two imports from the pull request's base commit into a
+directory outside the pull-request worktree. It runs that trusted code from that directory with
+`python -E -s`. The validator inspects the patch before `git apply`: only modifications to the two
+lockfiles and the three managed derived-pin files are allowed; additions, deletions, renames, mode
+changes, symlinks and binary hunks are rejected. After application it checks the allowlist again
+and byte-compares every derived pin against output computed by the base-commit synchronizer. No
+Python from the pull request is executed after the patch is applied.
+
+Only after validation does the job check secret availability and mint a short-lived GitHub App
+token. Configure the repository secrets `LOCK_REFRESH_CLIENT_ID` and
+`LOCK_REFRESH_PRIVATE_KEY` for an App installed only on this repository with Contents and Workflows
+read/write permission. The availability check receives booleans, not secret values; the private key
+is passed only to the token action. Commits use the App bot identity, disable Git hooks, stage the
+five allowlisted paths explicitly, and push without force. Per-PR concurrency cancels stale runs;
+if the Dependabot branch changes before the push, the non-fast-forward push fails and the newer run
+takes over.
+
+Rotate the App private key by adding a new key in GitHub, replacing
+`LOCK_REFRESH_PRIVATE_KEY`, verifying one refresh, and then deleting the old key. If generation or
+validation fails, inspect the workflow annotation and reproduce the generators in canonical Linux
+Python 3.12; never bypass the validator or manually grant a pull-request job a write token. The
+workflow intentionally does not require `pip --only-binary`: dependency installation is confined
+to the secretless untrusted job, while the trusted job installs no package from the pull request.
+
+When an open Dependabot pull request predates this workflow or its base is too stale to refresh,
+comment `@dependabot recreate` so Dependabot replaces its branch from current `main`. Use
+`recreate`, not `rebase`, as the documented recovery command. During rollout, issue `recreate` on
+every older open Dependabot pull request before relying on automatic lock refresh.
+
+For the practical acceptance test, open or recreate a Python Dependabot pull request with stale
+locks, record the head SHA, and verify that the two jobs run separately, the App-authored refresh
+commit lands without force, all ordinary CI checks run on that commit, and a concurrent head change
+causes the old push to fail or be cancelled. Also record Dependabot's actual response to an
+`@dependabot rebase` comment, without relying on that command for recovery, then run
+`@dependabot recreate` and verify that refresh succeeds on the replacement branch.
+
 ## Development-tool lock
 
 `requirements/dev.in` is the source of truth for direct development-tool versions. The
