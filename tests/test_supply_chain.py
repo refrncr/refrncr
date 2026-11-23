@@ -264,6 +264,71 @@ def test_dependabot_covers_python_and_actions():
     assert {item["package-ecosystem"] for item in config["updates"]} >= {"pip", "github-actions"}
 
 
+def test_dependabot_lock_refresh_has_two_job_security_boundary():
+    workflow = load_workflow("dependabot-lock-refresh.yml")
+    text = (ROOT / ".github/workflows/dependabot-lock-refresh.yml").read_text()
+    generate = workflow["jobs"]["generate"]
+    push = workflow["jobs"]["push"]
+
+    assert set(workflow["jobs"]) == {"generate", "push"}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["concurrency"]["cancel-in-progress"] == "true"
+    assert generate["timeout-minutes"] == "20"
+    assert push["timeout-minutes"] == "10"
+    assert push["needs"] == "generate"
+    assert "pull_request_target" not in text
+
+    for job in (generate, push):
+        checkout = next(
+            step for step in job.get("steps", []) if "actions/checkout@" in step.get("uses", "")
+        )
+        assert checkout["with"]["ref"] == "${{ github.event.pull_request.head.sha }}"
+        assert checkout["with"]["persist-credentials"] == "false"
+        assert any("actions/setup-python@" in step.get("uses", "") for step in job.get("steps", []))
+        for step in job.get("steps", []):
+            assert "${{ github." not in step.get("run", "")
+
+    push_text = "\n".join(step.get("run", "") for step in push.get("steps", []))
+    assert "python -E -s validate_dependency_refresh.py preflight" in push_text
+    assert "python -E -s validate_dependency_refresh.py apply" in push_text
+    assert push_text.index("preflight") < push_text.index("validate_dependency_refresh.py apply")
+    assert push_text.index("validate_dependency_refresh.py apply") < push_text.index("worktree")
+    assert 'cd "$TRUSTED_DIR"' in push_text
+    assert "--binary" not in text
+    assert "--force" not in text and "--force-with-lease" not in text
+    assert "core.hooksPath=/dev/null" in push_text
+    assert "git add ." not in push_text
+    assert "tools/validate_dependency_refresh.py" in push_text
+    assert "tools/sync_dependency_pins.py" in push_text
+    assert "tools/dependency_pins.py" in push_text
+    validator = (ROOT / "tools/validate_dependency_refresh.py").read_text(encoding="utf-8")
+    assert 'f"--include={path}" for path in sorted(ALLOWED_PATHS)' in validator
+
+
+def test_dependabot_lock_refresh_limits_secret_exposure_to_trusted_job():
+    workflow = load_workflow("dependabot-lock-refresh.yml")
+    generate = workflow["jobs"]["generate"]
+    push = workflow["jobs"]["push"]
+    generate_text = repr(generate)
+    push_steps = push.get("steps", [])
+
+    assert "secrets." not in generate_text
+    secret_check = next(
+        step for step in push_steps if step.get("name") == "Require configured Dependabot secrets"
+    )
+    assert secret_check["env"] == {
+        "HAS_CLIENT_ID": "${{ secrets.LOCK_REFRESH_CLIENT_ID != '' }}",
+        "HAS_PRIVATE_KEY": "${{ secrets.LOCK_REFRESH_PRIVATE_KEY != '' }}",
+        "TRUSTED_DIR": "${{ runner.temp }}/trusted-refresh",
+    }
+    token = next(step for step in push_steps if "create-github-app-token@" in step.get("uses", ""))
+    assert token["with"]["client-id"] == "${{ secrets.LOCK_REFRESH_CLIENT_ID }}"
+    assert token["with"]["private-key"] == "${{ secrets.LOCK_REFRESH_PRIVATE_KEY }}"
+    assert token["with"]["permission-contents"] == "write"
+    assert token["with"]["permission-workflows"] == "write"
+    assert "owner" not in token["with"] and "repositories" not in token["with"]
+
+
 def test_pr_workflows_are_read_only_and_release_permissions_are_job_scoped():
     for name in ("ci.yml", "security.yml"):
         workflow = load_workflow(name)
