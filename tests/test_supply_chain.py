@@ -132,6 +132,9 @@ def test_development_tool_pins_match_project_hooks_and_workflows():
     pre_commit = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
     release = load_workflow("release.yml")
 
+    assert DEV_PIP_TOOLS_VERSION == dev_input["pip-tools"]
+    assert PIP_TOOLS_VERSION == dev_input["pip-tools"]
+
     for package, pinned in dev_input.items():
         assert f"{package}=={pinned}" in dev
         assert dev_lock[package] == pinned
