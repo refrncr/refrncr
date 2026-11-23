@@ -146,9 +146,9 @@ def main() -> int:
             check=False,
         )
         if result.returncode == 0:
-            generated = OUTPUT.read_text()
+            generated = OUTPUT.read_text(encoding="utf-8")
             generated = generated.replace(f"-c {constraints}, ", "")
-            OUTPUT.write_text(generated)
+            OUTPUT.write_text(generated, encoding="utf-8", newline="\n")
         return result.returncode
 
 
