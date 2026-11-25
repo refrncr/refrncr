@@ -3911,6 +3911,37 @@
     },
     {
       "capability": "SourceIdentityResolver",
+      "operation": "is_trusted_peer",
+      "service": "refrncr.identity.login_security.SourceIdentityResolver.is_trusted_peer",
+      "interface_entrypoints": [
+        "Programmatic service/adapter caller; no direct HTTP or CLI entrypoint"
+      ],
+      "kind": "read",
+      "classification": "security logging required",
+      "domain_audit": false,
+      "security_logging": true,
+      "security_handoff": "REF-31: authentication/session outcome; invalid/expired/revoked session, wrong/unknown/inactive/deleted account, throttling/capacity denial, malformed forwarding or insecure transport as applicable. Record safe outcome/reason/source only; no passwords, token hashes, tokens or cookies. Normal session resolution needs no per-read event.",
+      "technical_logging": "Fixed safe diagnostic on unexpected failure; no request payload, paths, credentials or exception details in audit. Existing diagnostic mechanisms only.",
+      "events": [],
+      "object_identifier": "No domain event; use only required stable IDs in future security diagnostics.",
+      "actor_source": "Trusted interface/operator context where present; no domain actor/event invented.",
+      "allowed_context": {},
+      "success": "No domain event. Trusted source/proxy resolution for REF-31; never trust unvalidated forwarded request data.",
+      "validation_failure": "No domain event; retain the existing safe validation outcome.",
+      "authorization_failure": "No successful domain event; reject without committed business state changes. Non-disclosing errors retained; REF-31 owns denied-attempt logs.",
+      "stale_input": "No mutation CAS. Existing snapshot or transient-state checks apply; rejected requests create no event.",
+      "no_op": "No domain event.",
+      "rollback": "No successful domain event; existing technical/transient transaction behavior retained.",
+      "duplicate_retry": "No domain event; transient/session lifecycle retains existing replay policy.",
+      "tests": [
+        "tests/test_audit_catalog.py::test_inventory_and_coverage_match_current_code"
+      ],
+      "implementation_status": "Implemented for REF-345; local validation passed; GitHub CI pending.",
+      "exclusion_reason": "Trusted source/proxy resolution for REF-31; never trust unvalidated forwarded request data.",
+      "persistence_scope": "Existing internal/read/technical boundary; no new domain persistence."
+    },
+    {
+      "capability": "SourceIdentityResolver",
       "operation": "resolve",
       "service": "refrncr.identity.login_security.SourceIdentityResolver.resolve",
       "interface_entrypoints": [

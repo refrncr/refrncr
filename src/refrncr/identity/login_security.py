@@ -17,7 +17,6 @@ DEFAULT_WINDOW = timedelta(minutes=5)
 DEFAULT_MAX_ENTRIES = 10_000
 DEFAULT_AUTHENTICATION_CAPACITY = 4
 MAX_FORWARDED_FOR_LENGTH = 4096
-MAX_FORWARDED_ADDRESSES = 32
 MAX_BROWSER_LOGIN_IDENTIFIER_CODEPOINTS = 320
 OVERSIZED_ACCOUNT_KEY = hashlib.sha256(b"oversized-browser-login-identifier").hexdigest()
 
@@ -37,7 +36,7 @@ class SourceIdentityResolver:
 
     @classmethod
     def from_config(cls, values: Iterable[str] = ()) -> SourceIdentityResolver:
-        networks = tuple(ipaddress.ip_network(value.strip(), strict=False) for value in values)
+        networks = tuple(cls._network(value.strip()) for value in values)
         return cls(networks)
 
     def resolve(self, direct_peer: str | None, forwarded_for: str | None = None) -> str:
@@ -46,13 +45,14 @@ class SourceIdentityResolver:
             return "unknown"
         if not self._trusted(direct) or not forwarded_for:
             return direct.compressed
-        forwarded = self._forwarded_addresses(forwarded_for)
+        forwarded = self._forwarded_address(forwarded_for)
         if forwarded is None:
             return direct.compressed
-        for address in reversed(forwarded):
-            if not self._trusted(address):
-                return address.compressed
-        return direct.compressed
+        return forwarded.compressed
+
+    def is_trusted_peer(self, value: str | None) -> bool:
+        address = self._address(value)
+        return address is not None and self._trusted(address)
 
     def _trusted(self, address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         return any(
@@ -63,21 +63,32 @@ class SourceIdentityResolver:
     @staticmethod
     def _address(value: str | None):
         try:
-            return ipaddress.ip_address(value) if value else None
+            address = ipaddress.ip_address(value) if value else None
         except ValueError:
             return None
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+            return address.ipv4_mapped
+        return address
+
+    @staticmethod
+    def _network(value: str):
+        network = ipaddress.ip_network(value, strict=False)
+        if (
+            isinstance(network, ipaddress.IPv6Network)
+            and network.prefixlen >= 96
+            and network.network_address.ipv4_mapped is not None
+        ):
+            return ipaddress.ip_network(
+                f"{network.network_address.ipv4_mapped}/{network.prefixlen - 96}",
+                strict=False,
+            )
+        return network
 
     @classmethod
-    def _forwarded_addresses(cls, value: str):
+    def _forwarded_address(cls, value: str):
         if len(value) > MAX_FORWARDED_FOR_LENGTH:
             return None
-        parts = [part.strip() for part in value.split(",")]
-        if not parts or len(parts) > MAX_FORWARDED_ADDRESSES or any(not part for part in parts):
-            return None
-        addresses = [cls._address(part) for part in parts]
-        if any(address is None for address in addresses):
-            return None
-        return addresses
+        return cls._address(value.strip())
 
 
 @dataclass(slots=True)

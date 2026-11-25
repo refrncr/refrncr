@@ -52,6 +52,7 @@ from refrncr.persistence.sessions import SqlAlchemyLoginSessionStore
 from refrncr.presentation.overview import OverviewService
 from refrncr.versions.service import DatasetVersionService
 from refrncr.web import create_flask_app
+from refrncr.web.proxy import TrustedProxyMiddleware
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,11 +207,13 @@ def create_application(
             "unavailable", request.scope["refrncr.request_id"], status_code=503
         )
 
+    source_resolver = SourceIdentityResolver.from_config(trusted_proxies)
     flask_app = create_flask_app(
         services,
         allow_loopback_http=allow_loopback_http and not trusted_proxies,
-        source_resolver=SourceIdentityResolver.from_config(trusted_proxies),
+        source_resolver=source_resolver,
         clock=clock,
     )
     app.mount("/", WSGIMiddleware(flask_app))
+    app.add_middleware(TrustedProxyMiddleware, source_resolver=source_resolver)
     return app

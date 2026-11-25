@@ -4,6 +4,15 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+- Support secure browser sessions behind explicitly trusted TLS-terminating reverse proxies. A
+  trusted direct peer may supply exactly one `X-Forwarded-Proto: https` value and exactly one
+  valid client address in `X-Forwarded-For`; all other forwarding headers remain ignored
+  (REF-345).
+- **Breaking proxy configuration change:** trusted proxies must now replace `X-Forwarded-For`
+  with one validated client IP. Comma-separated forwarding chains, including configurations that
+  append with `$proxy_add_x_forwarded_for`, are rejected and fall back to the direct proxy address
+  (REF-345).
+
 ## [0.1.0rc4] - 2026-11-24
 
 - Add `refrncr.integration` as the supported integration contract for Community composition,

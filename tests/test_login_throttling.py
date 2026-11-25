@@ -54,7 +54,7 @@ def generic_login_failure_body(response) -> str:
     return re.sub(r"name='csrf_token' value='[^']+'", "name='csrf_token' value='TOKEN'", body)
 
 
-def configured_web(limiter: LoginAttemptLimiter, admission=None):
+def configured_web(limiter: LoginAttemptLimiter, admission=None, source_resolver=None):
     engine = create_database_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -64,6 +64,7 @@ def configured_web(limiter: LoginAttemptLimiter, admission=None):
     client = create_flask_app(
         services,
         login_limiter=limiter,
+        source_resolver=source_resolver,
         authentication_admission=admission,
     ).test_client()
     token = csrf(client.get("/setup", base_url=HTTPS))
@@ -202,10 +203,11 @@ def test_direct_peer_is_default_and_forwarding_headers_are_not_implicitly_truste
     assert resolver.resolve(None, "198.51.100.10") == "unknown"
 
 
-def test_configured_proxy_selects_first_untrusted_address_from_the_right():
+def test_configured_proxy_accepts_exactly_one_forwarded_address():
     resolver = SourceIdentityResolver.from_config(("10.0.0.0/8", "2001:db8:1::/48"))
-    assert resolver.resolve("10.0.0.2", "198.51.100.4, 10.0.0.1") == "198.51.100.4"
-    assert resolver.resolve("2001:db8:1::2", "2001:db8:2::4, 2001:db8:1::1") == "2001:db8:2::4"
+    assert resolver.resolve("10.0.0.2", "198.51.100.4") == "198.51.100.4"
+    assert resolver.resolve("2001:db8:1::2", "2001:db8:2::4") == "2001:db8:2::4"
+    assert resolver.resolve("10.0.0.2", "198.51.100.4, 10.0.0.1") == "10.0.0.2"
 
 
 def test_forwarding_from_untrusted_peer_and_malformed_trusted_chain_fall_back_to_peer():
@@ -213,6 +215,71 @@ def test_forwarding_from_untrusted_peer_and_malformed_trusted_chain_fall_back_to
     assert resolver.resolve("192.0.2.1", "198.51.100.4") == "192.0.2.1"
     for malformed in ("", "unknown", "198.51.100.4,", "198.51.100.4:1234", "x" * 4097):
         assert resolver.resolve("10.0.0.2", malformed) == "10.0.0.2"
+
+
+def test_ipv4_mapped_ipv6_addresses_are_normalized_for_trust_and_identity():
+    resolver = SourceIdentityResolver.from_config(("::ffff:10.0.0.0/104",))
+    assert resolver.is_trusted_peer("::ffff:10.0.0.2")
+    assert resolver.resolve("::ffff:10.0.0.2", "::ffff:198.51.100.4") == "198.51.100.4"
+
+
+def test_trusted_proxy_visitors_have_separate_login_limiter_counters():
+    limiter = LoginAttemptLimiter(source_account_limit=1)
+    resolver = SourceIdentityResolver.from_config(("10.0.0.0/8",))
+    services, client = configured_web(limiter, source_resolver=resolver)
+    services.authentication.authenticate = Mock(return_value=None)
+    request_environment = {"environ_base": {"REMOTE_ADDR": "10.0.0.2"}}
+
+    first = post_login(
+        client,
+        "admin@example.com",
+        "wrong password",
+        headers={"X-Forwarded-For": "198.51.100.1"},
+        **request_environment,
+    )
+    throttled = post_login(
+        client,
+        "admin@example.com",
+        "wrong password",
+        headers={"X-Forwarded-For": "198.51.100.1"},
+        **request_environment,
+    )
+    other_visitor = post_login(
+        client,
+        "admin@example.com",
+        "wrong password",
+        headers={"X-Forwarded-For": "198.51.100.2"},
+        **request_environment,
+    )
+
+    assert first.status_code == throttled.status_code == other_visitor.status_code == 401
+    assert services.authentication.authenticate.call_count == 2
+
+
+def test_untrusted_peer_cannot_split_login_limiter_with_forged_forwarded_for():
+    limiter = LoginAttemptLimiter(source_account_limit=1)
+    resolver = SourceIdentityResolver.from_config(("10.0.0.0/8",))
+    services, client = configured_web(limiter, source_resolver=resolver)
+    services.authentication.authenticate = Mock(return_value=None)
+    request_environment = {"environ_base": {"REMOTE_ADDR": "192.0.2.1"}}
+
+    first = post_login(
+        client,
+        "admin@example.com",
+        "wrong password",
+        headers={"X-Forwarded-For": "198.51.100.1"},
+        **request_environment,
+    )
+    forged_other_visitor = post_login(
+        client,
+        "admin@example.com",
+        "wrong password",
+        headers={"X-Forwarded-For": "203.0.113.1"},
+        **request_environment,
+    )
+
+    assert first.status_code == forged_other_visitor.status_code == 401
+    assert services.authentication.authenticate.call_count == 1
 
 
 @pytest.mark.parametrize("header", ["X-Forwarded-For", "Forwarded", "X-Real-IP"])
