@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -432,12 +433,70 @@ def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
     )
 
 
-def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
+def test_release_integrity_covers_public_assets_and_internal_bundle_before_use():
     text = (ROOT / ".github/workflows/release.yml").read_text()
+    workflow = load_workflow("release.yml")
+    build = workflow["jobs"]["build"]
+    publish = workflow["jobs"]["publish"]
+    build_steps = {step["name"]: step for step in build["steps"] if "name" in step}
+    publish_steps = {step["name"]: step for step in publish["steps"] if "name" in step}
+
     assert "cyclonedx-py requirements requirements/release.txt" in text
-    assert "subject-path: |" in text
-    assert "release-artifacts/distributions/*.whl" in text
-    assert "release-artifacts/distributions/*.tar.gz" in text
+    assert list(build_steps).index("Generate CycloneDX JSON SBOM from locked graph") < list(
+        build_steps
+    ).index("Validate the exact artifacts")
+    public_hashes = build_steps["Validate the exact artifacts"]["run"]
+    assert "distributions/*.whl distributions/*.tar.gz refrncr.cdx.json" in public_hashes
+    assert '$(basename "$asset")' in public_hashes
+    assert public_hashes.index("release_bundle.py distributions") < public_hashes.index(
+        "done > SHA256SUMS"
+    )
+
+    assert (
+        build["outputs"]["bundle-manifest-sha256"] == "${{ steps.bundle-manifest.outputs.sha256 }}"
+    )
+    bundle_manifest = build_steps["Create and anchor the internal bundle manifest"]["run"]
+    for bundled in (
+        "SHA256SUMS",
+        "refrncr.cdx.json",
+        "release_bundle.py",
+        "release_publication.py",
+        "distributions/*.whl",
+        "distributions/*.tar.gz",
+    ):
+        assert bundled in bundle_manifest
+    assert 'echo "sha256=$manifest_sha256" >> "$GITHUB_OUTPUT"' in bundle_manifest
+
+    publish_order = list(publish_steps)
+    anchor = "Verify the externally anchored bundle manifest"
+    bundle = "Verify every transferred bundle file"
+    inventory = "Reject extra missing or linked bundle files"
+    public = "Verify public release asset hashes"
+    verifier = "Check for an identical existing PyPI publication"
+    assert publish_order.index(anchor) < publish_order.index(bundle)
+    assert publish_order.index(bundle) < publish_order.index(inventory)
+    assert publish_order.index(inventory) < publish_order.index(public)
+    for later_step in (
+        "Attest exact wheel source distribution and SBOM",
+        "Attach the validated artifact set to the existing GitHub Release",
+        verifier,
+    ):
+        assert publish_order.index(inventory) < publish_order.index(later_step)
+    assert (
+        publish_steps[anchor]["env"]["EXPECTED_BUNDLE_MANIFEST_SHA256"]
+        == "${{ needs.build.outputs.bundle-manifest-sha256 }}"
+    )
+    assert "test -n" in publish_steps[anchor]["run"]
+    assert "sha256sum --check --strict -" in publish_steps[anchor]["run"]
+    assert publish_steps[bundle]["run"] == "sha256sum --check --strict BUNDLE_SHA256SUMS"
+    assert "release_bundle.py inventory" in publish_steps[inventory]["run"]
+
+    attest = publish_steps["Attest exact wheel source distribution and SBOM"]
+    assert attest["with"]["subject-path"].splitlines() == [
+        "release-artifacts/distributions/*.whl",
+        "release-artifacts/distributions/*.tar.gz",
+        "release-artifacts/refrncr.cdx.json",
+    ]
     assert "dist/**" not in text
     assert re.search(r"python -m build --outdir release-artifacts/distributions", text)
     assert 'gh release upload "$tag" --repo "$repository"' in text
@@ -446,11 +505,73 @@ def test_release_attests_exact_built_wheel_and_sdist_and_generates_sbom():
     assert "python tools/release_smoke.py http://127.0.0.1:8765" in text
     assert "python tools/release_upgrade.py" in text
     assert "python tools/normalize_sdist.py" in text
-    assert "sha256sum --check SHA256SUMS" in text
+    assert "sha256sum --check --strict SHA256SUMS" in publish_steps[public]["run"]
     assert "Existing release asset differs" in text
+    assert "python -I tools/release_bundle.py distributions release-artifacts/distributions" in text
+    assert "cp tools/release_bundle.py release-artifacts/release_bundle.py" in text
     assert "cp tools/release_publication.py release-artifacts/release_publication.py" in text
-    assert "python release-artifacts/release_publication.py" in text
+    assert "python -I release-artifacts/release_publication.py" in text
     assert "if: steps.pypi.outputs.publish == 'true'" in text
+    release_assets = publish_steps[
+        "Attach the validated artifact set to the existing GitHub Release"
+    ]["run"]
+    assert "BUNDLE_SHA256SUMS" not in release_assets
+    pypi = publish_steps["Publish exact distributions through PyPI Trusted Publishing"]
+    assert pypi["with"] == {"packages-dir": "release-artifacts/distributions/"}
+
+
+def test_release_artifact_scripts_always_run_in_isolated_mode():
+    text = (ROOT / ".github/workflows/release.yml").read_text()
+    invocations = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("python ") and "release-artifacts/" in line and ".py" in line
+    ]
+
+    assert invocations
+    assert all(invocation.startswith("python -I ") for invocation in invocations)
+
+
+def test_public_release_checksums_work_for_flat_download_and_reject_tampering(tmp_path):
+    assets = [
+        tmp_path / "refrncr-0.1.0rc5-py3-none-any.whl",
+        tmp_path / "refrncr-0.1.0rc5.tar.gz",
+        tmp_path / "refrncr.cdx.json",
+    ]
+    for index, asset in enumerate(assets):
+        asset.write_bytes(f"release asset {index}\n".encode())
+    checksums = [
+        subprocess.run(
+            ["sha256sum", asset.name],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        for asset in assets
+    ]
+    (tmp_path / "SHA256SUMS").write_text("".join(checksums), encoding="utf-8")
+
+    valid = subprocess.run(
+        ["sha256sum", "--check", "--strict", "SHA256SUMS"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert valid.returncode == 0
+    assert all(f"{asset.name}: OK" in valid.stdout for asset in assets)
+
+    assets[-1].write_text("tampered\n", encoding="utf-8")
+    tampered = subprocess.run(
+        ["sha256sum", "--check", "--strict", "SHA256SUMS"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert tampered.returncode != 0
+    assert f"{assets[-1].name}: FAILED" in tampered.stdout
 
 
 def write_test_wheel(path, *, version="0.1.0rc2"):

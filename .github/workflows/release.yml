@@ -10,6 +10,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      bundle-manifest-sha256: ${{ steps.bundle-manifest.outputs.sha256 }}
     permissions:
       contents: read
       checks: read
@@ -64,14 +66,23 @@ jobs:
           python -m build --outdir release-artifacts/distributions
           python tools/normalize_sdist.py \
             release-artifacts/distributions/*.tar.gz "$SOURCE_DATE_EPOCH"
+      - name: Generate CycloneDX JSON SBOM from locked graph
+        run: >-
+          cyclonedx-py requirements requirements/release.txt
+          --output-format JSON --output-file release-artifacts/refrncr.cdx.json
       - name: Validate the exact artifacts
         run: |
           python -m twine check release-artifacts/distributions/*
           python -m pip install --no-deps release-artifacts/distributions/*.whl
           python -m pip check
           refrncr --help
+          python -I tools/release_bundle.py distributions release-artifacts/distributions
           cd release-artifacts
-          sha256sum distributions/*.whl distributions/*.tar.gz > SHA256SUMS
+          for asset in distributions/*.whl distributions/*.tar.gz refrncr.cdx.json
+          do
+            printf '%s  %s\n' \
+              "$(sha256sum "$asset" | cut -d ' ' -f1)" "$(basename "$asset")"
+          done > SHA256SUMS
       - name: Prove a clean pipx install and packaged startup
         env:
           PIPX_HOME: ${{ runner.temp }}/release-pipx-home
@@ -93,12 +104,25 @@ jobs:
         run: >-
           python tools/release_upgrade.py
           release-artifacts/distributions/*.whl "$RUNNER_TEMP/release-upgrade"
-      - name: Generate CycloneDX JSON SBOM from locked graph
-        run: >-
-          cyclonedx-py requirements requirements/release.txt
-          --output-format JSON --output-file release-artifacts/refrncr.cdx.json
       - name: Add the publication verifier to the validated job bundle
-        run: cp tools/release_publication.py release-artifacts/release_publication.py
+        run: |
+          cp tools/release_bundle.py release-artifacts/release_bundle.py
+          cp tools/release_publication.py release-artifacts/release_publication.py
+      - id: bundle-manifest
+        name: Create and anchor the internal bundle manifest
+        run: |
+          cd release-artifacts
+          sha256sum \
+            SHA256SUMS \
+            refrncr.cdx.json \
+            release_bundle.py \
+            release_publication.py \
+            distributions/*.whl \
+            distributions/*.tar.gz \
+            > BUNDLE_SHA256SUMS
+          manifest_sha256="$(sha256sum BUNDLE_SHA256SUMS | cut -d ' ' -f1)"
+          test -n "$manifest_sha256"
+          echo "sha256=$manifest_sha256" >> "$GITHUB_OUTPUT"
       - name: Upload the single validated artifact set
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -120,15 +144,39 @@ jobs:
         with:
           name: validated-release-artifacts
           path: release-artifacts
-      - name: Verify transferred artifact hashes
+      - name: Verify the externally anchored bundle manifest
         working-directory: release-artifacts
-        run: sha256sum --check SHA256SUMS
-      - name: Attest exact wheel and source distribution
+        env:
+          EXPECTED_BUNDLE_MANIFEST_SHA256: ${{ needs.build.outputs.bundle-manifest-sha256 }}
+        run: |
+          test -n "$EXPECTED_BUNDLE_MANIFEST_SHA256"
+          printf '%s  %s\n' "$EXPECTED_BUNDLE_MANIFEST_SHA256" BUNDLE_SHA256SUMS \
+            | sha256sum --check --strict -
+      - name: Verify every transferred bundle file
+        working-directory: release-artifacts
+        run: sha256sum --check --strict BUNDLE_SHA256SUMS
+      - name: Reject extra missing or linked bundle files
+        run: >-
+          python -I release-artifacts/release_bundle.py inventory
+          release-artifacts release-artifacts/BUNDLE_SHA256SUMS
+      - name: Verify public release asset hashes
+        run: |
+          verification_directory="$RUNNER_TEMP/public-release-assets"
+          mkdir -p "$verification_directory"
+          cp \
+            release-artifacts/SHA256SUMS \
+            release-artifacts/refrncr.cdx.json \
+            release-artifacts/distributions/* \
+            "$verification_directory/"
+          cd "$verification_directory"
+          sha256sum --check --strict SHA256SUMS
+      - name: Attest exact wheel source distribution and SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             release-artifacts/distributions/*.whl
             release-artifacts/distributions/*.tar.gz
+            release-artifacts/refrncr.cdx.json
       - name: Attach the validated artifact set to the existing GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -161,7 +209,7 @@ jobs:
       - id: pypi
         name: Check for an identical existing PyPI publication
         run: >-
-          python release-artifacts/release_publication.py
+          python -I release-artifacts/release_publication.py
           release-artifacts/distributions "$GITHUB_OUTPUT"
       - name: Publish exact distributions through PyPI Trusted Publishing
         if: steps.pypi.outputs.publish == 'true'

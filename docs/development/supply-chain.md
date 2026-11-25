@@ -153,11 +153,37 @@ mismatched or expired entries fail the gate; deleting an entry restores the ordi
 
 The repository workflow listens only to a published GitHub Release, validates its tag/version and
 that it targets current `main` with successful CI, then builds wheel and sdist once. It validates
-those files, performs a clean `pipx` install and HTTP startup smoke test, writes SHA-256 sums,
-generates `refrncr.cdx.json` from the locked graph, and transfers one named artifact bundle. The
-publish job verifies those hashes after download. Only the protected `publish` job receives
-`contents: write`, `id-token: write`, and `attestations: write`; it attests and publishes the exact
-downloaded wheel and sdist and attaches the SBOM and checksums.
+those files, performs a clean `pipx` install and HTTP startup smoke test, generates
+`refrncr.cdx.json` from the locked graph, and writes public SHA-256 sums for the wheel, sdist and
+SBOM. The public manifest uses their bare GitHub release-asset names. An internal
+`BUNDLE_SHA256SUMS` also covers the public manifest and `release_publication.py`; the build job
+passes the internal manifest's digest separately as a job output. After download, the publish job
+first checks that external anchor, then every internal bundle entry, and finally the public asset
+manifest before using any bundle file. Between the internal and public checksum checks it also
+requires the recursive bundle file set to equal the internal entries plus the manifest itself;
+hidden, extra, missing or symlinked entries fail closed. The build applies the same exactness rule
+to distributions before public checksums exist: one regular wheel, one regular sdist and nothing
+else. Every bundled Python script, and the build-side distribution validator, runs with Python's
+isolated mode (`-I`) so a planted sibling module cannot execute before validation. Only the
+protected `publish` job receives `contents: write`,
+`id-token: write`, and `attestations: write`; it publishes only the exact wheel and sdist to PyPI,
+attests wheel, sdist and SBOM as artifact subjects, and attaches those three assets plus the public
+checksums to the GitHub Release. The locked-graph SBOM is not presented as an artifact-specific
+CycloneDX predicate for either distribution.
+
+To verify a current release, download `SHA256SUMS`, the wheel, the sdist and
+`refrncr.cdx.json` into one directory and run:
+
+```shell
+sha256sum --check SHA256SUMS
+gh attestation verify refrncr.cdx.json --repo refrncr/refrncr
+gh attestation verify refrncr-<version>-py3-none-any.whl --repo refrncr/refrncr
+gh attestation verify refrncr-<version>.tar.gz --repo refrncr/refrncr
+```
+
+For `0.1.0rc4` and earlier, the published manifest contains a `distributions/` prefix for wheel and
+sdist. Create that directory and move those two downloaded files into it before running
+`sha256sum --check SHA256SUMS`; earlier release assets and manifests are intentionally unchanged.
 
 The build uses the tagged commit time as `SOURCE_DATE_EPOCH`. On a retry, existing GitHub assets
 and PyPI distributions are accepted only when every filename and SHA-256 digest matches the newly
