@@ -76,7 +76,7 @@ jobs:
           python -m pip install --no-deps release-artifacts/distributions/*.whl
           python -m pip check
           refrncr --help
-          python tools/release_bundle.py distributions release-artifacts/distributions
+          python -I tools/release_bundle.py distributions release-artifacts/distributions
           cd release-artifacts
           for asset in distributions/*.whl distributions/*.tar.gz refrncr.cdx.json
           do
@@ -157,7 +157,7 @@ jobs:
         run: sha256sum --check --strict BUNDLE_SHA256SUMS
       - name: Reject extra missing or linked bundle files
         run: >-
-          python release-artifacts/release_bundle.py inventory
+          python -I release-artifacts/release_bundle.py inventory
           release-artifacts release-artifacts/BUNDLE_SHA256SUMS
       - name: Verify public release asset hashes
         run: |
@@ -209,7 +209,7 @@ jobs:
       - id: pypi
         name: Check for an identical existing PyPI publication
         run: >-
-          python release-artifacts/release_publication.py
+          python -I release-artifacts/release_publication.py
           release-artifacts/distributions "$GITHUB_OUTPUT"
       - name: Publish exact distributions through PyPI Trusted Publishing
         if: steps.pypi.outputs.publish == 'true'

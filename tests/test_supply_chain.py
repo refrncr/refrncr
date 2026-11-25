@@ -507,10 +507,10 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     assert "python tools/normalize_sdist.py" in text
     assert "sha256sum --check --strict SHA256SUMS" in publish_steps[public]["run"]
     assert "Existing release asset differs" in text
-    assert "python tools/release_bundle.py distributions release-artifacts/distributions" in text
+    assert "python -I tools/release_bundle.py distributions release-artifacts/distributions" in text
     assert "cp tools/release_bundle.py release-artifacts/release_bundle.py" in text
     assert "cp tools/release_publication.py release-artifacts/release_publication.py" in text
-    assert "python release-artifacts/release_publication.py" in text
+    assert "python -I release-artifacts/release_publication.py" in text
     assert "if: steps.pypi.outputs.publish == 'true'" in text
     release_assets = publish_steps[
         "Attach the validated artifact set to the existing GitHub Release"
@@ -518,6 +518,18 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     assert "BUNDLE_SHA256SUMS" not in release_assets
     pypi = publish_steps["Publish exact distributions through PyPI Trusted Publishing"]
     assert pypi["with"] == {"packages-dir": "release-artifacts/distributions/"}
+
+
+def test_release_artifact_scripts_always_run_in_isolated_mode():
+    text = (ROOT / ".github/workflows/release.yml").read_text()
+    invocations = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("python ") and "release-artifacts/" in line and ".py" in line
+    ]
+
+    assert invocations
+    assert all(invocation.startswith("python -I ") for invocation in invocations)
 
 
 def test_public_release_checksums_work_for_flat_download_and_reject_tampering(tmp_path):

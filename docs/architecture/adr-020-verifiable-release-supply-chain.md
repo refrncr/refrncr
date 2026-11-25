@@ -28,7 +28,9 @@ artifact set.
 Before public checksums are created, the build requires the distribution directory to contain
 exactly one regular wheel and one regular sdist. After transfer and checksum verification, a
 hash-verified standard-library validator compares the complete recursive bundle inventory with the
-internal manifest plus the manifest itself. Hidden files, missing files, extra files and symlinks
+internal manifest plus the manifest itself. Bundled scripts and the build-side validator run in
+Python isolated mode (`-I`) to prevent sibling-module shadowing before validation. Hidden files,
+missing files, extra files and symlinks
 fail before public checksum verification, attestation, release-asset upload or verifier execution.
 
 CodeQL pull-request analysis produces SARIF locally and blocks actionable results without write
