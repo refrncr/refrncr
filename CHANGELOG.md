@@ -4,6 +4,8 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
+## [0.1.0rc5] - 2026-11-25
+
 - Support secure browser sessions behind explicitly trusted TLS-terminating reverse proxies. A
   trusted direct peer may supply exactly one `X-Forwarded-Proto: https` value and exactly one
   valid client address in `X-Forwarded-For`; all other forwarding headers remain ignored
@@ -12,6 +14,12 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
   with one validated client IP. Comma-separated forwarding chains, including configurations that
   append with `$proxy_add_x_forwarded_for`, are rejected and fall back to the direct proxy address
   (REF-345).
+- Protect the release SBOM alongside the wheel and source distribution: `refrncr.cdx.json` is
+  included in `SHA256SUMS` and in the artifact attestation, while the transferred release bundle
+  is externally anchored and checked for an exact file inventory (REF-377).
+- Manage the pinned `pip-audit` and `pipx` release and CI tools from the development dependency
+  source and verify workflow synchronization during dependency refreshes (REF-376).
+- Update the Ruff development tool from 0.17.5 to 0.17.6 (#214).
 
 ## [0.1.0rc4] - 2026-11-24
 
