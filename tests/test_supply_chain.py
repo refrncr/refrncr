@@ -384,7 +384,7 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     setup_go_pins = [
         step["uses"]
         for job in workflow["jobs"].values()
-        for step in job["steps"]
+        for step in job.get("steps", [])
         if step.get("uses", "").startswith("actions/setup-go@")
     ]
     assert "pull_request:" in text and "push:" in text and "schedule:" in text
@@ -422,13 +422,13 @@ def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
     assert text.count("upload: never") == 2
     assert "upload: false" not in text
     assert all(
-        any("gate-sarif" in step.get("run", "") for step in job["steps"])
+        any("gate-sarif" in step.get("run", "") for step in job.get("steps", []))
         for job in (pull_request, trusted)
     )
     assert all(
         "upload-sarif@" not in step.get("uses", "")
         for job in (pull_request, trusted)
-        for step in job["steps"]
+        for step in job.get("steps", [])
     )
 
 
