@@ -31,7 +31,7 @@ def write_repository(root: Path) -> None:
         "  dependency-and-policy:\n"
         "    steps:\n"
         "      - name: Install security tooling\n"
-        "        run: python -m pip install pip-audit==2.10.1 pip-tools==7.6.2\n"
+        "        run: python -m pip install pip-audit==2.9.0 pip-tools==7.6.2\n"
         "      - name: Verify lock\n"
         "        run: python tools/compile_release_lock.py\n"
     )
@@ -41,7 +41,7 @@ def write_repository(root: Path) -> None:
         "    steps:\n"
         "      - name: Install locked runtime graph and release tools\n"
         "        run: python -m pip install build==1.6.0 cyclonedx-bom==8.0.1 "
-        "pip-audit==2.10.1 pipx==1.7.1 twine==6.2.0\n"
+        "pip-audit==2.9.0 pipx==1.6.0 twine==6.2.0\n"
         "      - name: Build\n"
         "        run: python -m build\n"
     )
@@ -124,8 +124,8 @@ def test_check_cli_points_to_repair_command(tmp_path, monkeypatch, capsys):
         (".pre-commit-config.yaml", "    rev: v0.17.4\n", "    tag: v0.17.4\n"),
         (
             ".github/workflows/security.yml",
-            "pip-audit==2.10.1 pip-tools==7.6.2",
-            "pip-audit==2.10.1 piptools==7.6.2",
+            "pip-audit==2.9.0 pip-tools==7.6.2",
+            "pip-audit==2.9.0 piptools==7.6.2",
         ),
         (
             ".github/workflows/release.yml",
