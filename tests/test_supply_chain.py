@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 import yaml
+from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from tools.compile_dev_lock import (
@@ -130,6 +132,7 @@ def test_development_tool_pins_match_project_hooks_and_workflows():
     dev_input = parse_pins(ROOT / "requirements/dev.in")
     dev_lock = parse_pins(ROOT / "requirements/dev.txt")
     pre_commit = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text())
+    security = load_workflow("security.yml")
     release = load_workflow("release.yml")
 
     assert DEV_PIP_TOOLS_VERSION == dev_input["pip-tools"]
@@ -141,14 +144,31 @@ def test_development_tool_pins_match_project_hooks_and_workflows():
 
     ruff_hook = next(repo for repo in pre_commit["repos"] if "ruff-pre-commit" in repo["repo"])
     assert ruff_hook["rev"] == f"v{dev_input['ruff']}"
+    security_install = "\n".join(
+        step["run"]
+        for step in security["jobs"]["dependency-and-policy"]["steps"]
+        if "pip install" in step.get("run", "")
+    )
+    security_pins = dict(re.findall(r"([A-Za-z0-9_.-]+)==([0-9][^\s]+)", security_install))
+    for package in ("pip-audit", "pip-tools"):
+        assert security_pins[package] == dev_input[package]
     release_install = "\n".join(
         step["run"]
         for step in release["jobs"]["build"]["steps"]
         if "pip install" in step.get("run", "")
     )
     release_pins = dict(re.findall(r"([A-Za-z0-9_.-]+)==([0-9][^\s]+)", release_install))
-    for package in ("build", "cyclonedx-bom", "twine"):
+    for package in ("build", "cyclonedx-bom", "pip-audit", "pipx", "twine"):
         assert release_pins[package] == dev_input[package]
+
+    quality = [
+        Requirement(item) for item in metadata["project"]["optional-dependencies"]["quality"]
+    ]
+    pip_audit_quality = next(
+        requirement for requirement in quality if requirement.name == "pip-audit"
+    )
+    assert pip_audit_quality.specifier == SpecifierSet(">=2.9,<3")
+    assert Version(dev_input["pip-audit"]) in pip_audit_quality.specifier
 
 
 def test_development_lock_generator_is_linux_pinned_and_checked_in_ci():
@@ -364,7 +384,7 @@ def test_security_workflow_has_required_events_and_safe_gitleaks_redaction():
     setup_go_pins = [
         step["uses"]
         for job in workflow["jobs"].values()
-        for step in job["steps"]
+        for step in job.get("steps", [])
         if step.get("uses", "").startswith("actions/setup-go@")
     ]
     assert "pull_request:" in text and "push:" in text and "schedule:" in text
@@ -402,13 +422,13 @@ def test_codeql_analyzes_python_uploads_and_has_a_real_sarif_gate():
     assert text.count("upload: never") == 2
     assert "upload: false" not in text
     assert all(
-        any("gate-sarif" in step.get("run", "") for step in job["steps"])
+        any("gate-sarif" in step.get("run", "") for step in job.get("steps", []))
         for job in (pull_request, trusted)
     )
     assert all(
         "upload-sarif@" not in step.get("uses", "")
         for job in (pull_request, trusted)
-        for step in job["steps"]
+        for step in job.get("steps", [])
     )
 
 
