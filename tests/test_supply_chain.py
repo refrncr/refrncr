@@ -448,6 +448,9 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     public_hashes = build_steps["Validate the exact artifacts"]["run"]
     assert "distributions/*.whl distributions/*.tar.gz refrncr.cdx.json" in public_hashes
     assert '$(basename "$asset")' in public_hashes
+    assert public_hashes.index("release_bundle.py distributions") < public_hashes.index(
+        "done > SHA256SUMS"
+    )
 
     assert (
         build["outputs"]["bundle-manifest-sha256"] == "${{ steps.bundle-manifest.outputs.sha256 }}"
@@ -456,6 +459,7 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     for bundled in (
         "SHA256SUMS",
         "refrncr.cdx.json",
+        "release_bundle.py",
         "release_publication.py",
         "distributions/*.whl",
         "distributions/*.tar.gz",
@@ -466,10 +470,18 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     publish_order = list(publish_steps)
     anchor = "Verify the externally anchored bundle manifest"
     bundle = "Verify every transferred bundle file"
+    inventory = "Reject extra missing or linked bundle files"
     public = "Verify public release asset hashes"
     verifier = "Check for an identical existing PyPI publication"
-    assert publish_order.index(anchor) < publish_order.index(bundle) < publish_order.index(public)
-    assert publish_order.index(bundle) < publish_order.index(verifier)
+    assert publish_order.index(anchor) < publish_order.index(bundle)
+    assert publish_order.index(bundle) < publish_order.index(inventory)
+    assert publish_order.index(inventory) < publish_order.index(public)
+    for later_step in (
+        "Attest exact wheel source distribution and SBOM",
+        "Attach the validated artifact set to the existing GitHub Release",
+        verifier,
+    ):
+        assert publish_order.index(inventory) < publish_order.index(later_step)
     assert (
         publish_steps[anchor]["env"]["EXPECTED_BUNDLE_MANIFEST_SHA256"]
         == "${{ needs.build.outputs.bundle-manifest-sha256 }}"
@@ -477,6 +489,7 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     assert "test -n" in publish_steps[anchor]["run"]
     assert "sha256sum --check --strict -" in publish_steps[anchor]["run"]
     assert publish_steps[bundle]["run"] == "sha256sum --check --strict BUNDLE_SHA256SUMS"
+    assert "release_bundle.py inventory" in publish_steps[inventory]["run"]
 
     attest = publish_steps["Attest exact wheel source distribution and SBOM"]
     assert attest["with"]["subject-path"].splitlines() == [
@@ -494,6 +507,8 @@ def test_release_integrity_covers_public_assets_and_internal_bundle_before_use()
     assert "python tools/normalize_sdist.py" in text
     assert "sha256sum --check --strict SHA256SUMS" in publish_steps[public]["run"]
     assert "Existing release asset differs" in text
+    assert "python tools/release_bundle.py distributions release-artifacts/distributions" in text
+    assert "cp tools/release_bundle.py release-artifacts/release_bundle.py" in text
     assert "cp tools/release_publication.py release-artifacts/release_publication.py" in text
     assert "python release-artifacts/release_publication.py" in text
     assert "if: steps.pypi.outputs.publish == 'true'" in text

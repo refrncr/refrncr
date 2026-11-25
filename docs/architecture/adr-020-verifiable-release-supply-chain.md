@@ -25,6 +25,12 @@ for stable versions, upgrade from the immediately preceding public version are b
 Retries accept existing GitHub/PyPI files only when their names and hashes match the validated
 artifact set.
 
+Before public checksums are created, the build requires the distribution directory to contain
+exactly one regular wheel and one regular sdist. After transfer and checksum verification, a
+hash-verified standard-library validator compares the complete recursive bundle inventory with the
+internal manifest plus the manifest itself. Hidden files, missing files, extra files and symlinks
+fail before public checksum verification, attestation, release-asset upload or verifier execution.
+
 CodeQL pull-request analysis produces SARIF locally and blocks actionable results without write
 authority. Main/scheduled analysis additionally uploads the same gated SARIF with the narrowly
 scoped `security-events: write` permission.

@@ -159,7 +159,11 @@ SBOM. The public manifest uses their bare GitHub release-asset names. An interna
 `BUNDLE_SHA256SUMS` also covers the public manifest and `release_publication.py`; the build job
 passes the internal manifest's digest separately as a job output. After download, the publish job
 first checks that external anchor, then every internal bundle entry, and finally the public asset
-manifest before using any bundle file. Only the protected `publish` job receives `contents: write`,
+manifest before using any bundle file. Between the internal and public checksum checks it also
+requires the recursive bundle file set to equal the internal entries plus the manifest itself;
+hidden, extra, missing or symlinked entries fail closed. The build applies the same exactness rule
+to distributions before public checksums exist: one regular wheel, one regular sdist and nothing
+else. Only the protected `publish` job receives `contents: write`,
 `id-token: write`, and `attestations: write`; it publishes only the exact wheel and sdist to PyPI,
 attests wheel, sdist and SBOM as artifact subjects, and attaches those three assets plus the public
 checksums to the GitHub Release. The locked-graph SBOM is not presented as an artifact-specific
