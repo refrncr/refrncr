@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from tools.sync_dependency_pins import synchronize_dependency_pins
 from tools.validate_dependency_refresh import (
     ALLOWED_PATHS,
     RefreshValidationError,
@@ -197,6 +198,47 @@ def test_worktree_validation_accepts_only_reproducible_allowlisted_changes(tmp_p
     dev_lock.write_text(dev_lock.read_text(encoding="utf-8") + "# refreshed\n", encoding="utf-8")
 
     assert validate_worktree(tmp_path, head) == {"requirements/dev.txt"}
+
+
+def prepare_tool_pin_refresh(root: Path) -> str:
+    initialize_repository(root)
+    dev_input = root / "requirements/dev.in"
+    bumped = dev_input.read_text(encoding="utf-8").replace("pip-audit==2.10.1", "pip-audit==2.11.0")
+    bumped = bumped.replace("pipx==1.7.1", "pipx==1.8.0")
+    dev_input.write_text(bumped, encoding="utf-8")
+    git(root, "add", "requirements/dev.in")
+    git(root, "commit", "-m", "bump managed tools")
+    head = git(root, "rev-parse", "HEAD")
+    synchronize_dependency_pins(root)
+    return head
+
+
+def test_worktree_validation_accepts_exact_workflow_changes_for_tool_pin_refresh(tmp_path):
+    head = prepare_tool_pin_refresh(tmp_path)
+
+    assert validate_worktree(tmp_path, head) == {
+        ".github/workflows/security.yml",
+        ".github/workflows/release.yml",
+    }
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "old", "new"),
+    [
+        (".github/workflows/security.yml", "pip-audit==2.11.0", "pip-audit==2.10.1"),
+        (".github/workflows/release.yml", "pipx==1.8.0", "pipx==1.7.1"),
+        (".github/workflows/release.yml", "pip-audit==2.11.0", "pip-audit==2.12.0"),
+    ],
+)
+def test_worktree_validation_rejects_missing_or_mismatched_tool_workflow_pin(
+    tmp_path, relative_path, old, new
+):
+    head = prepare_tool_pin_refresh(tmp_path)
+    target = tmp_path / relative_path
+    target.write_text(target.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
+
+    with pytest.raises(RefreshValidationError, match="derived file has non-allowlisted changes"):
+        validate_worktree(tmp_path, head)
 
 
 def test_worktree_validation_rejects_unmanaged_derived_change(tmp_path):

@@ -14,7 +14,15 @@ else:
     from dependency_pins import DependencyPinError, read_dependency_pins
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_PACKAGES = ("ruff", "pip-tools", "build", "cyclonedx-bom", "twine")
+SOURCE_PACKAGES = (
+    "ruff",
+    "pip-tools",
+    "pip-audit",
+    "pipx",
+    "build",
+    "cyclonedx-bom",
+    "twine",
+)
 REPAIR_COMMAND = "python tools/sync_dependency_pins.py"
 
 
@@ -97,13 +105,15 @@ def _sync_pre_commit(path: Path, version: str) -> PendingWrite:
     return PendingWrite(path, original, _replace_block(original, bounds, updated_block))
 
 
-def _sync_security(path: Path, version: str) -> PendingWrite:
+def _sync_security(path: Path, pins: dict[str, str]) -> PendingWrite:
     original = path.read_text(encoding="utf-8")
     job_bounds = _job_block(original, path, "dependency-and-policy")
     job = original[job_bounds[0] : job_bounds[1]]
     step_bounds = _step_block(job, path, "Install security tooling")
     step = job[step_bounds[0] : step_bounds[1]]
-    updated_step = _replace_package_pin(step, path, "pip-tools", version)
+    updated_step = step
+    for package in ("pip-audit", "pip-tools"):
+        updated_step = _replace_package_pin(updated_step, path, package, pins[package])
     updated_job = _replace_block(job, step_bounds, updated_step)
     return PendingWrite(path, original, _replace_block(original, job_bounds, updated_job))
 
@@ -114,7 +124,7 @@ def _sync_release(path: Path, pins: dict[str, str]) -> PendingWrite:
     job = original[job_bounds[0] : job_bounds[1]]
     step_bounds = _step_block(job, path, "Install locked runtime graph and release tools")
     block = job[step_bounds[0] : step_bounds[1]]
-    for package in ("build", "cyclonedx-bom", "twine"):
+    for package in ("build", "cyclonedx-bom", "pip-audit", "pipx", "twine"):
         block = _replace_package_pin(block, path, package, pins[package])
     updated_job = _replace_block(job, step_bounds, block)
     return PendingWrite(path, original, _replace_block(original, job_bounds, updated_job))
@@ -125,7 +135,7 @@ def planned_writes(root: Path) -> list[PendingWrite]:
     pins = read_dependency_pins(root / "requirements/dev.in", SOURCE_PACKAGES)
     return [
         _sync_pre_commit(root / ".pre-commit-config.yaml", pins["ruff"]),
-        _sync_security(root / ".github/workflows/security.yml", pins["pip-tools"]),
+        _sync_security(root / ".github/workflows/security.yml", pins),
         _sync_release(root / ".github/workflows/release.yml", pins),
     ]
 

@@ -14,7 +14,8 @@ def write_repository(root: Path) -> None:
     (root / "requirements").mkdir()
     (root / ".github/workflows").mkdir(parents=True)
     (root / "requirements/dev.in").write_text(
-        "build==1.6.1\ncyclonedx-bom==9.0.0\npip-tools==7.7.0\nruff==0.17.5\ntwine==7.0.0\n"
+        "build==1.6.1\ncyclonedx-bom==9.0.0\npip-audit==2.10.1\n"
+        "pip-tools==7.7.0\npipx==1.7.1\nruff==0.17.5\ntwine==7.0.0\n"
     )
     (root / ".pre-commit-config.yaml").write_text(
         "repos:\n"
@@ -50,7 +51,7 @@ def repository_contents(root: Path) -> dict[Path, str]:
     return {path.relative_to(root): path.read_text() for path in root.rglob("*") if path.is_file()}
 
 
-def test_sync_updates_only_managed_pins_and_preserves_release_neighbors(tmp_path):
+def test_sync_updates_all_managed_pins(tmp_path):
     write_repository(tmp_path)
 
     changed = synchronize_dependency_pins(tmp_path)
@@ -71,6 +72,23 @@ def test_sync_updates_only_managed_pins_and_preserves_release_neighbors(tmp_path
     assert "twine==7.0.0" in release
     assert "pip-audit==2.10.1" in release
     assert "pipx==1.7.1" in release
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "old", "new"),
+    [
+        (".github/workflows/security.yml", "pip-audit==2.10.1", "pip-audit==2.9.0"),
+        (".github/workflows/release.yml", "pip-audit==2.10.1", "pip-audit==2.9.0"),
+        (".github/workflows/release.yml", "pipx==1.7.1", "pipx==1.6.0"),
+    ],
+)
+def test_check_reports_stale_managed_workflow_pin(tmp_path, relative_path, old, new):
+    write_repository(tmp_path)
+    synchronize_dependency_pins(tmp_path)
+    target = tmp_path / relative_path
+    target.write_text(target.read_text().replace(old, new))
+
+    assert target in synchronize_dependency_pins(tmp_path, check=True)
 
 
 def test_sync_is_idempotent(tmp_path):
