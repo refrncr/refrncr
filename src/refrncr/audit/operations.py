@@ -376,7 +376,7 @@ for _module, _service, _methods, _classification, _reason in (  # type: ignore[a
     (
         "identity.login_security",
         "SourceIdentityResolver",
-        "from_config resolve",
+        "from_config is_trusted_peer resolve",
         "security logging required",
         "Trusted source/proxy resolution for REF-31; never trust unvalidated forwarded "
         "request data.",

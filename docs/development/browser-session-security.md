@@ -55,10 +55,96 @@ limited to 16 KiB so the framework does not buffer arbitrarily large login or se
 
 An operator may explicitly configure trusted proxy IPs or CIDR networks with repeatable
 `--trusted-proxy IP_OR_CIDR` options or comma-separated `REFRNCR_TRUSTED_PROXIES`. Only
-`X-Forwarded-For` from a configured direct proxy is considered. Every address must be a plain valid
-IP address; the chain is examined from right to left and the first address outside the trusted
-networks becomes the source. An untrusted direct peer, malformed/oversized chain, or chain containing
-only trusted addresses falls back to the direct peer. `Forwarded` and `X-Real-IP` remain ignored.
+`X-Forwarded-For` from a configured direct proxy is considered. It must contain exactly one plain,
+valid IPv4 or IPv6 address. An untrusted direct peer or a missing, duplicate, comma-separated,
+malformed or oversized value falls back to the direct peer. IPv4-mapped IPv6 values are normalized
+to IPv4 before matching and use. `Forwarded`, `X-Real-IP` and all other client-address headers remain
+ignored.
+
+## Trusted reverse-proxy deployment
+
+The bundled Uvicorn server keeps `proxy_headers=False`. Community itself recognizes external HTTPS
+only when the direct peer matches an explicit trusted-proxy IP/CIDR and supplies exactly one
+`X-Forwarded-Proto` header whose trimmed, case-insensitive value is `https`. Missing, duplicate,
+comma-separated or different values leave the request as HTTP and authenticated browser endpoints
+fail closed. The same direct-peer trust boundary controls the single `X-Forwarded-For` client IP.
+
+Prefer the exact proxy address (`/32` for IPv4 or `/128` for IPv6), or an exclusive internal network
+containing only the proxy and Community. Trusting a broad shared container network also trusts every
+other container on it. Never configure public Cloudflare ranges or general private ranges merely
+because they are private. The public proxy must redirect plain HTTP to HTTPS before traffic reaches
+Community.
+
+### Caddy
+
+This direct Caddy example replaces both headers. It does not use Caddy's default append behavior:
+
+```caddyfile
+http://community.example {
+    redir https://community.example{uri} permanent
+}
+
+community.example {
+    reverse_proxy refrncr:8000 {
+        header_up -X-Forwarded-Proto
+        header_up X-Forwarded-Proto https
+        header_up -X-Forwarded-For
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+```
+
+Configure Community with the address of Caddy, for example
+`REFRNCR_TRUSTED_PROXIES=172.18.0.2/32`. A changing container address requires an exclusive,
+inspected proxy network; do not silently widen trust to unrelated containers.
+
+Behind Cloudflare Tunnel, `{remote_host}` is normally the tunnel peer rather than the browser.
+Caddy must accept `CF-Connecting-IP` only from a trusted `cloudflared` peer, validate it as one IP,
+and then replace `X-Forwarded-For` with that value. Requests outside that tunnel trust boundary must
+not be allowed to supply `CF-Connecting-IP`. Community does not read that header itself.
+
+### Nginx
+
+Use `proxy_set_header`, which replaces the upstream value. Do not use
+`$proxy_add_x_forwarded_for`, because it creates a comma-separated chain that Community rejects:
+
+```nginx
+location / {
+    proxy_pass http://refrncr:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+Terminate TLS on this server, redirect its port 80 listener to HTTPS, and configure only the direct
+Nginx address/network as trusted in Community. When another ingress sits in front of Nginx, first
+validate that ingress at Nginx and map its authoritative single-IP header to `$remote_addr` (or an
+equivalent validated variable) before forwarding.
+
+### Traefik
+
+Traefik deployments must apply the same contract at the final hop: the entrypoint trusts only the
+known preceding proxy, removes client-supplied forwarding values, and sends one normalized client IP
+plus one `X-Forwarded-Proto: https` value to Community. Do not enable insecure forwarding-header
+trust, and do not pass Traefik's usual comma-separated `X-Forwarded-For` chain. If the chosen Traefik
+configuration cannot replace that chain with a single address, place a small sanitizing proxy at the
+final hop or leave `REFRNCR_TRUSTED_PROXIES` unset; do not weaken Community's parser.
+
+### Troubleshooting HTTPS 403
+
+`Authenticated browser access requires HTTPS` means Community still observes an untrusted HTTP
+request. Check, in order:
+
+1. the actual direct peer address seen by the Community container;
+2. that the narrow matching address/CIDR is in `REFRNCR_TRUSTED_PROXIES`;
+3. that the final proxy replaces XFP with exactly one `https` value (not two header fields or a
+   comma-separated value);
+4. that XFF is replaced with exactly one validated IP rather than appended; and
+5. that no direct route can bypass the TLS-terminating proxy.
+
+`Forwarded`, `X-Forwarded-Host`, `X-Real-IP`, `CF-Connecting-IP` and other forwarding headers do not
+change Community's scheme or client identity.
 
 Browser calls to `AuthenticationService` also pass through a process-local admission guard with a
 capacity of four. Acquisition is non-blocking: a fifth concurrent verification immediately returns

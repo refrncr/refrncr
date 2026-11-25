@@ -1715,6 +1715,7 @@
     "refrncr.identity.login_security.LoginAttemptReservation.failed",
     "refrncr.identity.login_security.LoginAttemptReservation.succeeded",
     "refrncr.identity.login_security.SourceIdentityResolver.from_config",
+    "refrncr.identity.login_security.SourceIdentityResolver.is_trusted_peer",
     "refrncr.identity.login_security.SourceIdentityResolver.resolve",
     "refrncr.imports.store.TransientImportStore.active",
     "refrncr.imports.store.TransientImportStore.cancel",

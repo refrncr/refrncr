@@ -116,6 +116,12 @@ proxies can be configured with repeatable `--trusted-proxy IP_OR_CIDR` options o
 Configuring a trusted proxy disables plain-HTTP loopback cookies, so proxy deployments require
 HTTPS.
 
+For TLS termination, the proxy must replace (not append to) `X-Forwarded-Proto` with `https` and
+replace `X-Forwarded-For` with exactly one validated browser IP. Community accepts those two
+values only from a configured direct peer; see the
+[reverse-proxy deployment guide](docs/development/browser-session-security.md#trusted-reverse-proxy-deployment)
+for Caddy, Nginx, Traefik and Cloudflare examples and fail-closed troubleshooting.
+
 ## Development
 
 Development uses Python 3.12 or newer. From the repository root:
