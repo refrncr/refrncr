@@ -4,7 +4,7 @@ This file follows the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) f
 
 ## [Unreleased]
 
-## [0.1.0rc5] - 2026-11-25
+## [0.1.0rc5] - 2026-11-26
 
 - Support secure browser sessions behind explicitly trusted TLS-terminating reverse proxies. A
   trusted direct peer may supply exactly one `X-Forwarded-Proto: https` value and exactly one
